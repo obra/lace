@@ -528,24 +528,16 @@ export const InteractiveDemo: Story = {
           <Sidebar
             isOpen={isOpen}
             onToggle={handleToggle}
-            currentProject={currentProject}
-            projects={mockProjects}
-            currentTimeline={currentTimeline}
-            timelines={mockTimelines}
-            activeTasks={mockTasks}
-            recentFiles={mockRecentFiles}
             currentTheme={currentTheme}
-            onProjectChange={handleProjectChange}
-            onTimelineChange={handleTimelineChange}
-            onNewTimeline={handleNewTimeline}
-            onOpenTask={handleOpenTask}
-            onOpenFile={handleOpenFile}
-            onTriggerTool={handleTriggerTool}
-            onOpenTaskBoard={handleOpenTaskBoard}
-            onOpenFileManager={handleOpenFileManager}
-            onOpenRulesFile={handleOpenRulesFile}
             onThemeChange={handleThemeChange}
-          />
+          >
+            {/* Interactive demo sidebar content */}
+            <div className="p-4">
+              <p className="text-sm text-base-content/60">
+                Interactive demo - content rendered as children
+              </p>
+            </div>
+          </Sidebar>
           
           <div className="flex-1 p-8 overflow-y-auto">
             <div className="max-w-2xl">

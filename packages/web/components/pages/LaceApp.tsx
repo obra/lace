@@ -31,8 +31,8 @@ import type {
 } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
-import { getAllEventTypes } from '@/types/events';
 import { useHashRouter } from '@/hooks/useHashRouter';
+import { useSessionEvents } from '@/hooks/useSessionEvents';
 
 export function LaceApp() {
   // Theme state
@@ -63,11 +63,18 @@ export function LaceApp() {
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState<SessionEvent[]>([]);
   const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [creatingSession, setCreatingSession] = useState(false);
+
+  // Use session events hook for event management
+  const {
+    filteredEvents: events,
+    approvalRequest,
+    loadingHistory,
+    connected,
+    clearApprovalRequest,
+  } = useSessionEvents(selectedSession, selectedAgent);
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
@@ -180,123 +187,8 @@ export function LaceApp() {
   const handleProjectSelect = (project: { id: string }) => {
     // Hash router automatically clears session/agent when project changes
     setSelectedProject(project.id);
-    setEvents([]);
   };
 
-  // Connect to SSE when agent selected
-  useEffect(() => {
-    if (!selectedAgent) {
-      setEvents([]);
-      return;
-    }
-
-    // Clear events when switching agents
-    setEvents([]);
-
-    // Load conversation history for the session (contains all agent events)
-    void loadConversationHistory(selectedSession);
-
-    const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
-
-    // Store event listeners for cleanup
-    const eventListeners = new Map<string, (event: MessageEvent) => void>();
-
-    // Listen to all event types
-    const eventTypes = getAllEventTypes();
-
-    eventTypes.forEach((eventType) => {
-      const listener = (event: MessageEvent) => {
-        try {
-          const data: unknown = JSON.parse(String(event.data));
-
-          // Type guard for event structure
-          if (typeof data === 'object' && data !== null && 'type' in data) {
-            const eventData = data as { type: string; data: unknown; timestamp?: string | Date };
-
-            // Handle approval requests separately
-            if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
-              setApprovalRequest(eventData.data as ToolApprovalRequestData);
-            } else {
-              // Convert timestamp from string to Date if needed
-              const timestamp = eventData.timestamp 
-                ? (typeof eventData.timestamp === 'string' ? new Date(eventData.timestamp) : eventData.timestamp)
-                : new Date();
-
-              // Create the session event with proper type narrowing
-              const sessionEvent = {
-                ...eventData,
-                threadId: selectedAgent as ThreadId,
-                timestamp
-              } as SessionEvent;
-
-              setEvents((prev) => [...prev, sessionEvent]);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to parse event:', error);
-        }
-      };
-
-      eventListeners.set(eventType, listener);
-      eventSource.addEventListener(eventType, listener);
-    });
-
-    const connectionListener = (_event: Event) => {
-      const connectionEvent: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedAgent as ThreadId,
-        timestamp: new Date(),
-        data: { content: 'Connected to agent stream' },
-      };
-      setEvents((prev) => [...prev, connectionEvent]);
-    };
-
-    eventSource.addEventListener('connection', connectionListener);
-
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
-      const errorEvent: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedAgent as ThreadId,
-        timestamp: new Date(),
-        data: { content: 'Connection lost' },
-      };
-      setEvents((prev) => [...prev, errorEvent]);
-    };
-
-    return () => {
-      // Remove all event listeners before closing
-      eventListeners.forEach((listener, eventType) => {
-        eventSource.removeEventListener(eventType, listener);
-      });
-      eventSource.removeEventListener('connection', connectionListener);
-      eventSource.close();
-    };
-  }, [selectedAgent, selectedSession]);
-
-  async function loadConversationHistory(sessionId: ThreadId) {
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/history`);
-      const data: unknown = await res.json();
-
-      if (isApiError(data)) {
-        console.error('Failed to load conversation history:', data.error);
-        return;
-      }
-
-      const historyData = data as { events: Array<SessionEvent & { timestamp: string }> };
-      
-      // Convert string timestamps to Date objects
-      const eventsWithDateTimestamps: SessionEvent[] = (historyData.events || []).map(event => ({
-        ...event,
-        timestamp: new Date(event.timestamp)
-      }));
-      
-      setEvents(eventsWithDateTimestamps);
-    } catch (error) {
-      console.error('Failed to load conversation history:', error);
-    }
-  }
 
   async function sendMessage() {
     if (!selectedAgent || !message.trim()) return;
@@ -330,7 +222,7 @@ export function LaceApp() {
       });
 
       if (res.ok) {
-        setApprovalRequest(null);
+        clearApprovalRequest();
       } else {
         console.error('Failed to submit approval decision');
       }
@@ -412,13 +304,11 @@ export function LaceApp() {
   const handleSessionSelect = (sessionId: string) => {
     // Hash router automatically clears agent when session changes
     setSelectedSession(sessionId as ThreadId);
-    setEvents([]);
   };
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
     setSelectedAgent(agentThreadId as ThreadId);
-    setEvents([]);
   };
 
   // Handle agent updates - refresh session details to show updated agent info
@@ -534,7 +424,6 @@ export function LaceApp() {
                   <SidebarButton
                     onClick={() => {
                       setSelectedProject(null);
-                      setEvents([]);
                       setShowMobileNav(false);
                     }}
                     variant="ghost"
@@ -567,7 +456,6 @@ export function LaceApp() {
                   <SidebarButton
                     onClick={() => {
                       setSelectedAgent(undefined);
-                      setEvents([]);
                       setShowMobileNav(false);
                     }}
                     variant="ghost"
@@ -653,7 +541,6 @@ export function LaceApp() {
               <SidebarButton
                 onClick={() => {
                   setSelectedProject(null);
-                  setEvents([]);
                 }}
                 variant="ghost"
               >
@@ -685,7 +572,6 @@ export function LaceApp() {
               <SidebarButton
                 onClick={() => {
                   setSelectedAgent(undefined);
-                  setEvents([]);
                 }}
                 variant="ghost"
               >

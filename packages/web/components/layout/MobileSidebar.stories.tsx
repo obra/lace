@@ -239,20 +239,8 @@ const availableThemes = [
 const defaultArgs = {
   isOpen: true,
   onClose: () => {},
-  currentProject: sampleProjects[0],
-  projects: sampleProjects,
-  currentTimeline: { id: 1, name: 'Main Dev', agent: 'Claude' as const },
-  timelines: sampleTimelines,
-  activeTasks: sampleTasks,
   currentTheme: 'dark',
-  availableThemes,
-  onProjectChange: (project: Project) => console.log('Project changed:', project),
-  onTimelineChange: (timeline: Timeline) => console.log('Timeline changed:', timeline),
-  onThemeChange: (theme: string) => console.log('Theme changed:', theme),
-  onTriggerTool: (tool: string) => console.log('Tool triggered:', tool),
-  onOpenTaskBoard: () => console.log('Task board opened'),
-  onOpenFileManager: () => console.log('File manager opened'),
-  onOpenTaskDetail: (task: Task) => console.log('Task detail opened:', task),
+  onThemeChange: () => {},
 };
 
 export const Default: Story = {
@@ -309,8 +297,6 @@ export const Closed: Story = {
 export const MinimalProjects: Story = {
   args: {
     ...defaultArgs,
-    projects: sampleProjects.slice(0, 2),
-    timelines: sampleTimelines.slice(0, 2),
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -350,7 +336,6 @@ export const MinimalProjects: Story = {
 export const NoActiveTasks: Story = {
   args: {
     ...defaultArgs,
-    activeTasks: [],
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -390,7 +375,6 @@ export const NoActiveTasks: Story = {
 export const HighPriorityTasks: Story = {
   args: {
     ...defaultArgs,
-    activeTasks: sampleTasks.filter(task => task.priority === 'high'),
   },
   parameters: {
     docs: {
@@ -458,7 +442,6 @@ export const CyberpunkTheme: Story = {
 export const SingleProject: Story = {
   args: {
     ...defaultArgs,
-    projects: [sampleProjects[0]],
     timelines: [sampleTimelines[0]],
   },
   parameters: {
@@ -473,23 +456,6 @@ export const SingleProject: Story = {
 export const ManyTasks: Story = {
   args: {
     ...defaultArgs,
-    activeTasks: [
-      ...sampleTasks,
-      ...Array.from({ length: 5 }, (_, i) => ({
-        id: `task-${i + 10}`,
-        title: `Additional Task ${i + 1}`,
-        description: `Task description ${i + 1}`,
-        prompt: `Complete task ${i + 1}`,
-        priority: (['high', 'medium', 'low'] as const)[i % 3] as Task['priority'],
-        assignedTo: i % 2 === 0 ? asThreadId('lace_20240115_session001.1') : 'human',
-        createdBy: asThreadId('lace_20240115_session001'),
-        threadId: asThreadId('lace_20240115_session001'),
-        status: 'pending' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        notes: [],
-      } as Task)),
-    ],
   },
   parameters: {
     docs: {
