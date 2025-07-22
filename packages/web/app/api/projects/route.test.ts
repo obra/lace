@@ -246,7 +246,7 @@ describe('Projects API', () => {
       // Override the persistence mock for this test
       const { getPersistence } = await import('~/persistence/database');
       vi.mocked(getPersistence).mockReturnValue(
-        mockPersistence as ReturnType<typeof getPersistence>
+        mockPersistence as unknown as ReturnType<typeof getPersistence>
       );
 
       const requestBody = {

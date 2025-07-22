@@ -59,7 +59,7 @@ export function useConversationStream({
         case 'connection':
           setState((prev) => ({
             ...prev,
-            currentThreadId: event.threadId,
+            currentThreadId: event.threadId || null,
             isConnected: true,
           }));
           connectionKeyRef.current = event.connectionKey || null;
@@ -69,18 +69,16 @@ export function useConversationStream({
           setState((prev) => ({ ...prev, isThinking: true }));
           break;
 
-        case 'streaming_start':
-          setState((prev) => ({ ...prev, isStreaming: true, isThinking: false }));
-          break;
-
-        case 'streaming_token':
-          if (event.token) {
-            currentContentRef.current += event.token;
+        case 'token':
+          if (event.content) {
+            // Start streaming on first token
+            setState((prev) => ({ ...prev, isStreaming: true, isThinking: false }));
+            currentContentRef.current += event.content;
             setState((prev) => ({ ...prev, currentContent: currentContentRef.current }));
           }
           break;
 
-        case 'streaming_complete':
+        case 'response_complete':
           setState((prev) => ({ ...prev, isStreaming: false }));
 
           // Call completion callback if provided

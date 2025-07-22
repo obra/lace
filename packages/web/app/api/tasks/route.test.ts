@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/tasks/route';
 import type { Task } from '@/types/api';
+import type { ThreadId } from '@/lib/server/core-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Mock environment variables - avoid requiring real API keys in tests
@@ -86,7 +87,7 @@ describe('Task API Routes', () => {
       // Arrange: Create tasks using the real session
       const { getSessionService } = await import('@/lib/server/session-service');
       const sessionService = getSessionService();
-      const session = await sessionService.getSession(testSession.id);
+      const session = await sessionService.getSession(testSession.id as ThreadId);
 
       if (!session) {
         throw new Error('Test session not found');
@@ -153,7 +154,7 @@ describe('Task API Routes', () => {
       // Arrange: Create a session and task
       const { getSessionService } = await import('@/lib/server/session-service');
       const sessionService = getSessionService();
-      const session = await sessionService.getSession(testSession.id);
+      const session = await sessionService.getSession(testSession.id as ThreadId);
 
       if (!session) {
         throw new Error('Test session not found');
@@ -253,7 +254,7 @@ describe('Task API Routes', () => {
       // Verify task was actually created in the session
       const { getSessionService } = await import('@/lib/server/session-service');
       const sessionService = getSessionService();
-      const session = await sessionService.getSession(testSession.id);
+      const session = await sessionService.getSession(testSession.id as ThreadId);
       const taskManager = session?.getTaskManager();
       const tasks = taskManager?.getTasks();
 
