@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTasks, faUser } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
@@ -183,7 +183,7 @@ export function TaskBoardModal({
         )}
 
         {/* Kanban board */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-0">
           {taskColumns.map((column) => {
             const columnTasks = getTasksByStatus(column.status);
 
@@ -203,7 +203,7 @@ export function TaskBoardModal({
                 </div>
 
                 {/* Column content */}
-                <div className="flex-1 bg-base-100 border-2 border-t-0 border-base-300 rounded-b-lg p-3 overflow-y-auto min-h-[200px]">
+                <div className="flex-1 bg-base-100 border-2 border-t-0 border-base-300 rounded-b-lg p-3 overflow-y-auto min-h-0">
                   <div className="space-y-3">
                     {columnTasks.map((task) => (
                       <div

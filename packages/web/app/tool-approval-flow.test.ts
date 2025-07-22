@@ -7,14 +7,13 @@ import { getApprovalManager } from '@/lib/server/approval-manager';
 import { Agent, AgentEvents, ApprovalDecision, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/lib/server/core-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
-import { mkdtemp, rm } from 'fs/promises';
+import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-// Mock the file-read tool for testing
-import { Tool } from '~/tools/tool';
+// Use real file-read tool for testing
+import { FileReadTool } from '~/tools/implementations/file-read';
 import { ToolAnnotations } from '~/tools/types';
-import { z } from 'zod';
 
 // Type definitions for test
 interface ToolExecutorWithApproval {
@@ -34,25 +33,7 @@ interface ApprovalManagerWithPending {
   resolveApproval: (requestId: string, decision: ApprovalDecision) => boolean;
 }
 
-class MockFileReadTool extends Tool {
-  name = 'file-read';
-  description = 'Test tool that requires approval';
-  schema = z.object({
-    path: z.string().min(1, 'File path cannot be empty'),
-  });
-
-  annotations = {
-    readOnlyHint: true,
-    destructiveHint: false,
-  };
-
-  protected async executeValidated(_args: z.infer<typeof this.schema>) {
-    return {
-      content: [{ type: 'text' as const, text: 'File content here' }],
-      isError: false,
-    };
-  }
-}
+// Using real FileReadTool - no mock needed
 
 describe('Tool Approval Flow Integration', () => {
   let sessionService: ReturnType<typeof getSessionService>;
@@ -76,6 +57,12 @@ describe('Tool Approval Flow Integration', () => {
 
     // Create temp directory
     tempDir = await mkdtemp(join(tmpdir(), 'lace-approval-test-'));
+
+    // Create a test file for reading
+    await writeFile(
+      join(tempDir, 'test-file.txt'),
+      'This is test content for approval flow testing'
+    );
 
     // Clear event log
     eventLog.length = 0;
@@ -119,7 +106,7 @@ describe('Tool Approval Flow Integration', () => {
     agent = agentResult;
 
     // Register mock tool with correct name
-    const mockTool = new MockFileReadTool();
+    const mockTool = new FileReadTool();
     agent.toolExecutor.registerTool('file-read', mockTool);
 
     // Add event logging to agent
@@ -222,9 +209,10 @@ describe('Tool Approval Flow Integration', () => {
     expect(listenerCount).toBeGreaterThan(0);
 
     // Step 4: Execute a tool that requires approval
+    const testFilePath = join(tempDir, 'test-file.txt');
     logEvent('tool.execution.start', {
       toolName: 'file-read',
-      args: { path: '/test/file.txt' },
+      args: { path: testFilePath },
     });
 
     // Create a promise to track approval request
@@ -249,7 +237,7 @@ describe('Tool Approval Flow Integration', () => {
     const toolCall = {
       id: 'test-call-id',
       name: 'file-read',
-      arguments: { path: '/test/file.txt' },
+      arguments: { path: testFilePath },
     };
     const toolResult = await agent.toolExecutor.executeTool(toolCall, undefined);
 
@@ -305,8 +293,9 @@ describe('Tool Approval Flow Integration', () => {
 
     logEvent('direct.callback.calling', { toolName: 'file-read' });
 
+    const testFilePath = join(tempDir, 'test-file.txt');
     const decision = await approvalCallback.requestApproval('file-read', {
-      path: '/test/file.txt',
+      path: testFilePath,
     });
 
     logEvent('direct.callback.complete', {
@@ -372,14 +361,15 @@ describe('Tool Approval Flow Integration', () => {
       );
 
     const testPromise = new Promise<ApprovalDecision>((resolve) => {
+      const testFilePath = join(tempDir, 'test-file.txt');
       logEvent('manual.approval_request.emitting', {
         toolName: 'file-read',
-        input: { path: '/test/file.txt' },
+        input: { path: testFilePath },
       });
 
       agent.emit('approval_request', {
         toolName: 'file-read',
-        input: { path: '/test/file.txt' },
+        input: { path: testFilePath },
         isReadOnly: true,
         requestId: 'test-request-123',
         resolve,
@@ -404,13 +394,14 @@ describe('Tool Approval Flow Integration', () => {
     logEvent('test.start', { testName: 'ApprovalManager SSE integration' });
 
     // Test ApprovalManager directly
+    const testFilePath = join(tempDir, 'test-file.txt');
     const approvalPromise = approvalManager.requestApproval(
       asThreadId(agent.threadId),
       sessionId,
       'file-read',
       'Test approval request',
       undefined,
-      { path: '/test/file.txt' },
+      { path: testFilePath },
       true
     );
 

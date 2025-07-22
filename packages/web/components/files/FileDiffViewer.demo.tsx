@@ -162,8 +162,8 @@ export default function FileDiffViewerDemo() {
           viewMode="side-by-side"
           showLineNumbers={true}
           maxLines={100}
-          onCopy={(content) => {
-            void ('Copied:', content);
+          onCopy={() => {
+            // Copy handler for demo
           }}
         />
       </div>

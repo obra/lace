@@ -348,13 +348,13 @@ export const NonActionable: Story = {
 export const AllCategories: Story = {
   render: () => (
     <div className="space-y-4">
-      {[
+      {([
         { category: 'pattern', title: 'Pattern Analysis', description: 'Development pattern detected' },
         { category: 'performance', title: 'Performance Insight', description: 'Performance optimization opportunity' },
         { category: 'error', title: 'Error Analysis', description: 'Error pattern identified' },
         { category: 'optimization', title: 'Optimization Insight', description: 'Code optimization suggestion' },
         { category: 'prediction', title: 'Predictive Insight', description: 'Future outcome prediction' },
-      ].map((data, index) => (
+      ] as const).map((data, index) => (
         <FeedbackInsightCard
           key={index}
           insight={{

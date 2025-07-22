@@ -222,7 +222,7 @@ select {
 .hljs-selector-id,
 .hljs-selector-class,
 .hljs-selector-pseudo {
-  @apply text-secondary-focus;
+  @apply text-secondary;
 }
 
 .hljs-meta,

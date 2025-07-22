@@ -68,6 +68,15 @@ export default [
           }
         ]
       }],
+      'no-restricted-globals': ['error', {
+        name: 'location',
+        message: 'Use Next.js router.push() instead of window.location for navigation in React components'
+      }],
+      'no-restricted-properties': ['error', {
+        object: 'window',
+        property: 'location',
+        message: 'Use Next.js router.push() instead of window.location for navigation in React components'
+      }],
       'no-var': 'error'
     },
   },
