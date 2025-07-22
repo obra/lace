@@ -66,13 +66,13 @@ export async function POST(
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
     setupAgentApprovals(agent, sessionId);
 
-    // Convert to API format
+    // Convert to API format - use actual agent properties with proper typing
     const agentResponse = {
-      threadId: agent.threadId,
-      name: body.name,
-      provider: body.provider || 'anthropic',
-      model: body.model || 'claude-3-haiku-20240307',
-      status: 'idle' as const,
+      threadId: agent.threadId as string,
+      name: agent.name as string,
+      provider: agent.provider as string,
+      model: agent.model as string,
+      status: agent.status as string,
       createdAt: new Date().toISOString(),
     };
 
