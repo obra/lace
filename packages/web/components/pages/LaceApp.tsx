@@ -401,12 +401,12 @@ export function LaceApp() {
     setSessionName('');
   };
 
-  // Handle session selection - auto-select coordinator agent
+  // Handle session selection - load session details but don't auto-select agent
   const handleSessionSelect = (sessionId: string) => {
     const threadId = sessionId as ThreadId;
     setSelectedSession(threadId);
-    // Coordinator agent shares the session's threadId
-    setSelectedAgent(threadId);
+    // Don't automatically select an agent - let user choose
+    setSelectedAgent(undefined);
     setEvents([]);
   };
 

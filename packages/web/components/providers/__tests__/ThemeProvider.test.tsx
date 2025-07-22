@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ThemeProvider, useTheme } from '../ThemeProvider';
+import { ThemeProvider, useTheme } from '@/components/providers/ThemeProvider';
 
 // Test component that uses the theme hook
 function TestComponent() {

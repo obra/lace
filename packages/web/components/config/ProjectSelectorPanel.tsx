@@ -33,7 +33,7 @@ interface ProjectConfiguration {
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
   provider: 'anthropic',
-  model: 'claude-3-sonnet-20241022',
+  model: 'claude-3-5-sonnet-20241022',
   maxTokens: 4096,
   tools: [],
   toolPolicies: {},
@@ -66,15 +66,30 @@ export function ProjectSelectorPanel({
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
 
+  // Project creation state
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createWorkingDirectory, setCreateWorkingDirectory] = useState('');
+  const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
+  const [createNewEnvKey, setCreateNewEnvKey] = useState('');
+  const [createNewEnvValue, setCreateNewEnvValue] = useState('');
+
   // Get available models for project configuration
   const availableModels = useMemo(() => {
-    const provider = providers.find(p => p.type === editConfig.provider);
+    const provider = providers.find(p => p.name === editConfig.provider);
     return provider?.models || [];
   }, [providers, editConfig.provider]);
 
-  // Get available providers (only those that are available)
+  // Get available models for project creation
+  const availableCreateModels = useMemo(() => {
+    const provider = providers.find(p => p.name === createConfig.provider);
+    return provider?.models || [];
+  }, [providers, createConfig.provider]);
+
+  // Get available providers (only those that are configured)
   const availableProviders = useMemo(() => {
-    return providers.filter(p => p.available);
+    return providers.filter(p => p.configured);
   }, [providers]);
 
   // Helper function to check if project was active in given timeframe
@@ -158,8 +173,8 @@ export function ProjectSelectorPanel({
         setEditName(project.name);
         setEditDescription(project.description || '');
         setEditWorkingDirectory(project.workingDirectory);
-        // TODO: Load actual project configuration from API
-        setEditConfig(DEFAULT_PROJECT_CONFIG);
+        // Load actual project configuration from API
+        void loadProjectConfiguration(project.id);
         break;
     }
     
@@ -167,18 +182,42 @@ export function ProjectSelectorPanel({
   };
 
   // Handle edit project form submission
-  const handleEditProject = (e: React.FormEvent) => {
+  const handleEditProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProject || !onProjectUpdate || !editName.trim()) return;
+    if (!editingProject || !editName.trim()) return;
 
-    onProjectUpdate(editingProject.id, {
-      name: editName.trim(),
-      description: editDescription.trim() || undefined,
-      workingDirectory: editWorkingDirectory.trim(),
-      configuration: editConfig,
-    });
+    try {
+      // Update project via API
+      const res = await fetch(`/api/projects/${editingProject.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          description: editDescription.trim() || undefined,
+          workingDirectory: editWorkingDirectory.trim(),
+          configuration: editConfig,
+        }),
+      });
 
-    handleCancelEdit();
+      if (res.ok) {
+        // Update local state via callback if available
+        if (onProjectUpdate) {
+          onProjectUpdate(editingProject.id, {
+            name: editName.trim(),
+            description: editDescription.trim() || undefined,
+            workingDirectory: editWorkingDirectory.trim(),
+            configuration: editConfig,
+          });
+        }
+        
+        handleCancelEdit();
+      } else {
+        const errorData = await res.json() as { error: string };
+        console.error('Failed to update project:', errorData.error);
+      }
+    } catch (error) {
+      console.error('Error updating project:', error);
+    }
   };
 
   // Cancel edit project
@@ -212,16 +251,120 @@ export function ProjectSelectorPanel({
   const handleRemoveEnvironmentVariable = (key: string) => {
     setEditConfig(prev => ({
       ...prev,
-      environmentVariables: {
-        ...prev.environmentVariables,
-        [key]: undefined,
-      },
+      environmentVariables: Object.fromEntries(
+        Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
+      ),
     }));
   };
 
   // Handle tool policy changes
   const handleToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
     setEditConfig(prev => ({
+      ...prev,
+      toolPolicies: {
+        ...prev.toolPolicies,
+        [tool]: policy,
+      },
+    }));
+  };
+
+  // Load project configuration from API
+  const loadProjectConfiguration = async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/configuration`);
+      
+      if (res.ok) {
+        const data = await res.json() as { configuration: ProjectConfiguration };
+        setEditConfig(data.configuration);
+      } else {
+        console.error('Failed to load project configuration');
+        // Fallback to default configuration
+        setEditConfig(DEFAULT_PROJECT_CONFIG);
+      }
+    } catch (error) {
+      console.error('Error loading project configuration:', error);
+      // Fallback to default configuration
+      setEditConfig(DEFAULT_PROJECT_CONFIG);
+    }
+  };
+
+  // Handle project creation
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createName.trim() || !createWorkingDirectory.trim()) return;
+
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: createName.trim(),
+          description: createDescription.trim() || undefined,
+          workingDirectory: createWorkingDirectory.trim(),
+          configuration: createConfig,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as { project: ProjectInfo };
+        
+        // Call the callback to refresh projects list if available
+        if (onProjectCreate) {
+          onProjectCreate();
+        }
+        
+        // Optionally select the newly created project
+        onProjectSelect(data.project);
+        
+        handleCancelCreateProject();
+      } else {
+        const errorData = await res.json() as { error: string };
+        console.error('Failed to create project:', errorData.error);
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
+  };
+
+  // Cancel project creation
+  const handleCancelCreateProject = () => {
+    setShowCreateProject(false);
+    setCreateName('');
+    setCreateDescription('');
+    setCreateWorkingDirectory('');
+    setCreateConfig(DEFAULT_PROJECT_CONFIG);
+    setCreateNewEnvKey('');
+    setCreateNewEnvValue('');
+  };
+
+  // Handle create project environment variables
+  const handleAddCreateEnvironmentVariable = () => {
+    if (!createNewEnvKey.trim() || !createNewEnvValue.trim()) return;
+
+    setCreateConfig(prev => ({
+      ...prev,
+      environmentVariables: {
+        ...prev.environmentVariables,
+        [createNewEnvKey.trim()]: createNewEnvValue.trim(),
+      },
+    }));
+
+    setCreateNewEnvKey('');
+    setCreateNewEnvValue('');
+  };
+
+  const handleRemoveCreateEnvironmentVariable = (key: string) => {
+    setCreateConfig(prev => ({
+      ...prev,
+      environmentVariables: Object.fromEntries(
+        Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
+      ),
+    }));
+  };
+
+  // Handle create project tool policy changes
+  const handleCreateToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
+    setCreateConfig(prev => ({
       ...prev,
       toolPolicies: {
         ...prev.toolPolicies,
@@ -284,16 +427,14 @@ export function ProjectSelectorPanel({
           </div>
         </div>
         
-        {onProjectCreate && (
-          <button
-            onClick={onProjectCreate}
-            className="btn btn-primary"
-            disabled={loading}
-          >
-            <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-            New Project
-          </button>
-        )}
+        <button
+          onClick={() => setShowCreateProject(true)}
+          className="btn btn-primary"
+          disabled={loading}
+        >
+          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+          New Project
+        </button>
       </div>
 
       {/* Search */}
@@ -327,15 +468,13 @@ export function ProjectSelectorPanel({
                 <p className="text-base-content/60 mb-6">
                   Create your first project to start working with AI agents
                 </p>
-                {onProjectCreate && (
-                  <button
-                    onClick={onProjectCreate}
-                    className="btn btn-primary"
-                  >
-                    <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                    Create First Project
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowCreateProject(true)}
+                  className="btn btn-primary"
+                >
+                  <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+                  Create First Project
+                </button>
               </>
             ) : (
               <>
@@ -349,18 +488,16 @@ export function ProjectSelectorPanel({
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pb-4">
             {/* New Project Card */}
-            {onProjectCreate && (
-              <div
-                onClick={onProjectCreate}
-                className="border-2 border-dashed border-primary/50 rounded-lg p-6 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center text-center min-h-48"
-              >
-                <FontAwesomeIcon icon={faPlus} className="w-8 h-8 text-primary mb-3" />
-                <h3 className="font-semibold text-base-content mb-2">Create New Project</h3>
-                <p className="text-sm text-base-content/60">
-                  Start a new project to organize your AI conversations
-                </p>
-              </div>
-            )}
+            <div
+              onClick={() => setShowCreateProject(true)}
+              className="border-2 border-dashed border-primary/50 rounded-lg p-6 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center text-center min-h-48"
+            >
+              <FontAwesomeIcon icon={faPlus} className="w-8 h-8 text-primary mb-3" />
+              <h3 className="font-semibold text-base-content mb-2">Create New Project</h3>
+              <p className="text-sm text-base-content/60">
+                Start a new project to organize your AI conversations
+              </p>
+            </div>
             
             {filteredProjects.map((project) => (
             <div
@@ -550,18 +687,18 @@ export function ProjectSelectorPanel({
                       value={editConfig.provider}
                       onChange={(e) => {
                         const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
                         setEditConfig(prev => ({
                           ...prev,
                           provider: newProvider,
-                          model: providerModels[0]?.name || prev.model,
+                          model: providerModels[0]?.id || prev.model,
                         }));
                       }}
                       className="select select-bordered w-full"
                     >
                       {availableProviders.map((provider) => (
-                        <option key={provider.type} value={provider.type}>
-                          {provider.name}
+                        <option key={provider.name} value={provider.name}>
+                          {provider.displayName}
                         </option>
                       ))}
                     </select>
@@ -702,6 +839,238 @@ export function ProjectSelectorPanel({
                     </>
                   ) : (
                     'Update Project'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Project Modal */}
+      {showCreateProject && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Create New Project</h3>
+              <button
+                onClick={handleCancelCreateProject}
+                className="btn btn-ghost btn-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                {/* Basic Information */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Project Name *</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      className="input input-bordered w-full"
+                      placeholder="Enter project name"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Description</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={createDescription}
+                      onChange={(e) => setCreateDescription(e.target.value)}
+                      className="input input-bordered w-full"
+                      placeholder="Optional description"
+                    />
+                  </div>
+                </div>
+
+                {/* Working Directory */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Working Directory *</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={createWorkingDirectory}
+                    onChange={(e) => setCreateWorkingDirectory(e.target.value)}
+                    className="input input-bordered w-full"
+                    placeholder="/path/to/project"
+                    required
+                  />
+                </div>
+
+                {/* Default Provider and Model Configuration */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Default Provider</span>
+                    </label>
+                    <select
+                      value={createConfig.provider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value;
+                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
+                        setCreateConfig(prev => ({
+                          ...prev,
+                          provider: newProvider,
+                          model: providerModels[0]?.id || prev.model,
+                        }));
+                      }}
+                      className="select select-bordered w-full"
+                    >
+                      {availableProviders.map((provider) => (
+                        <option key={provider.name} value={provider.name}>
+                          {provider.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Default Model</span>
+                    </label>
+                    <select
+                      value={createConfig.model}
+                      onChange={(e) => setCreateConfig(prev => ({ ...prev, model: e.target.value }))}
+                      className="select select-bordered w-full"
+                    >
+                      {availableCreateModels.map((model) => (
+                        <option key={model.name} value={model.name}>
+                          {model.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Max Tokens</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200000"
+                      value={createConfig.maxTokens}
+                      onChange={(e) => setCreateConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
+                      className="input input-bordered w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Environment Variables */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Environment Variables</span>
+                  </label>
+                  <div className="space-y-2">
+                    {Object.entries(createConfig.environmentVariables || {}).map(([key, value]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={key}
+                          className="input input-bordered input-sm flex-1"
+                          readOnly
+                        />
+                        <span className="text-base-content/60">=</span>
+                        <input
+                          type="text"
+                          value={value}
+                          className="input input-bordered input-sm flex-1"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCreateEnvironmentVariable(key)}
+                          className="btn btn-error btn-sm btn-square"
+                        >
+                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={createNewEnvKey}
+                        onChange={(e) => setCreateNewEnvKey(e.target.value)}
+                        className="input input-bordered input-sm flex-1"
+                        placeholder="Key"
+                      />
+                      <span className="text-base-content/60">=</span>
+                      <input
+                        type="text"
+                        value={createNewEnvValue}
+                        onChange={(e) => setCreateNewEnvValue(e.target.value)}
+                        className="input input-bordered input-sm flex-1"
+                        placeholder="Value"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCreateEnvironmentVariable}
+                        className="btn btn-primary btn-sm"
+                        disabled={!createNewEnvKey.trim() || !createNewEnvValue.trim()}
+                      >
+                        <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tool Access Policies */}
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Tool Access Policies</span>
+                  </label>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {AVAILABLE_TOOLS.map((tool) => (
+                      <div key={tool} className="flex items-center justify-between p-3 border border-base-300 rounded-lg">
+                        <span className="font-medium text-sm">{tool}</span>
+                        <select
+                          value={createConfig.toolPolicies?.[tool] || 'require-approval'}
+                          onChange={(e) => handleCreateToolPolicyChange(tool, e.target.value as 'allow' | 'require-approval' | 'deny')}
+                          className="select select-bordered select-sm w-40"
+                        >
+                          <option value="allow">Allow</option>
+                          <option value="require-approval">Require Approval</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
+                <button
+                  type="button"
+                  onClick={handleCancelCreateProject}
+                  className="btn btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!createName.trim() || !createWorkingDirectory.trim() || loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="loading loading-spinner loading-sm"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Project'
                   )}
                 </button>
               </div>

@@ -69,7 +69,8 @@ vi.mock('@/types/events', () => ({
 }));
 
 // Mock fetch for API calls
-global.fetch = vi.fn();
+const mockFetch = vi.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
 
 // Mock EventSource
 global.EventSource = vi.fn().mockImplementation(() => ({
@@ -82,13 +83,13 @@ global.EventSource = vi.fn().mockImplementation(() => ({
 describe('LaceApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (fetch as vi.MockedFunction<typeof fetch>).mockClear();
+    mockFetch.mockClear();
     
     // Set up default fetch mock to return empty projects
-    (fetch as vi.MockedFunction<typeof fetch>).mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ projects: [] }),
-    } as Response);
+    });
   });
 
   afterEach(() => {
@@ -153,7 +154,7 @@ describe('LaceApp', () => {
       },
     ];
 
-    (fetch as vi.MockedFunction<typeof fetch>).mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ projects: mockProjects }),
     } as Response);
@@ -196,7 +197,7 @@ describe('LaceApp', () => {
     ];
 
     // Mock API responses
-    (fetch as vi.MockedFunction<typeof fetch>).mockImplementation((url) => {
+    mockFetch.mockImplementation((url) => {
       if (typeof url === 'string') {
         if (url === '/api/projects') {
           return Promise.resolve({

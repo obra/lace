@@ -237,18 +237,22 @@ export interface ProvidersResponse {
 }
 
 export interface ProviderInfo {
-  type: string;
   name: string;
+  displayName: string;
+  requiresApiKey: boolean;
+  configurationHint: string;
   models: ModelInfo[];
-  available: boolean;
+  configured: boolean;
 }
 
 export interface ModelInfo {
-  name: string;
+  id: string;
   displayName: string;
+  description: string;
   contextWindow: number;
-  supportsFunctionCalling: boolean;
-  supportsStreaming: boolean;
+  maxOutputTokens: number;
+  capabilities: string[];
+  isDefault?: boolean;
 }
 
 // Project management types

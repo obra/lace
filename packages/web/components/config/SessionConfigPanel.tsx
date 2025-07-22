@@ -5,7 +5,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faCog, faRobot, faFolder, faExclamationTriangle, faTrash, faEdit } from '@/lib/fontawesome';
+import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
+import { ModelDropdown } from './ModelDropdown';
+import { ProviderDropdown } from './ProviderDropdown';
 import type { 
   Session, 
   ProjectInfo, 
@@ -38,7 +40,7 @@ interface SessionConfigPanelProps {
 
 const DEFAULT_CONFIG: SessionConfiguration = {
   provider: 'anthropic',
-  model: 'claude-3-sonnet-20241022',
+  model: 'claude-3-5-sonnet-20241022',
   maxTokens: 4096,
   tools: [],
   toolPolicies: {},
@@ -88,27 +90,10 @@ export function SessionConfigPanel({
   const [editNewEnvKey, setEditNewEnvKey] = useState('');
   const [editNewEnvValue, setEditNewEnvValue] = useState('');
 
-  // Get available models for session configuration
-  const sessionAvailableModels = useMemo(() => {
-    const provider = providers.find(p => p.type === sessionConfig.provider);
-    return provider?.models || [];
-  }, [providers, sessionConfig.provider]);
 
-  // Get available models for agent configuration  
-  const agentAvailableModels = useMemo(() => {
-    const provider = providers.find(p => p.type === agentProvider);
-    return provider?.models || [];
-  }, [providers, agentProvider]);
-
-  // Get available models for session edit configuration
-  const editSessionAvailableModels = useMemo(() => {
-    const provider = providers.find(p => p.type === editSessionConfig.provider);
-    return provider?.models || [];
-  }, [providers, editSessionConfig.provider]);
-
-  // Get available providers (only those that are available)
+  // Get available providers (only those that are configured)
   const availableProviders = useMemo(() => {
-    return providers.filter(p => p.available);
+    return providers.filter(p => p.configured);
   }, [providers]);
 
   // Reset form when project changes
@@ -191,10 +176,9 @@ export function SessionConfigPanel({
   const handleRemoveEnvironmentVariable = (key: string) => {
     setSessionConfig(prev => ({
       ...prev,
-      environmentVariables: {
-        ...prev.environmentVariables,
-        [key]: undefined,
-      },
+      environmentVariables: Object.fromEntries(
+        Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
+      ),
     }));
   };
 
@@ -209,28 +193,87 @@ export function SessionConfigPanel({
   };
 
   // Handle session edit
-  const handleEditSessionClick = () => {
+  const handleEditSessionClick = async () => {
     if (!selectedSession) return;
     
-    setEditSessionName(selectedSession.name);
-    setEditSessionDescription(''); // TODO: Load from API if available
-    // TODO: Load actual session configuration from API
-    setEditSessionConfig(DEFAULT_CONFIG);
-    setShowEditConfig(true);
+    try {
+      // Load session configuration from API
+      const res = await fetch(`/api/sessions/${selectedSession.id}/configuration`);
+      
+      if (res.ok) {
+        const data = await res.json() as { configuration: SessionConfiguration };
+        setEditSessionName(selectedSession.name);
+        setEditSessionDescription(''); // Session descriptions not currently stored
+        setEditSessionConfig(data.configuration);
+        setShowEditConfig(true);
+      } else {
+        console.error('Failed to load session configuration');
+        // Fallback to default configuration
+        setEditSessionName(selectedSession.name);
+        setEditSessionDescription('');
+        setEditSessionConfig(DEFAULT_CONFIG);
+        setShowEditConfig(true);
+      }
+    } catch (error) {
+      console.error('Error loading session configuration:', error);
+      // Fallback to default configuration
+      setEditSessionName(selectedSession.name);
+      setEditSessionDescription('');
+      setEditSessionConfig(DEFAULT_CONFIG);
+      setShowEditConfig(true);
+    }
   };
 
-  const handleEditSessionSubmit = (e: React.FormEvent) => {
+  const handleEditSessionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSession || !onSessionUpdate || !editSessionName.trim()) return;
+    if (!selectedSession || !editSessionName.trim()) return;
 
-    onSessionUpdate(selectedSession.id, {
-      name: editSessionName.trim(),
-      description: editSessionDescription.trim() || undefined,
-      configuration: editSessionConfig,
-    });
+    try {
+      // Update session configuration via API
+      const configRes = await fetch(`/api/sessions/${selectedSession.id}/configuration`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editSessionConfig),
+      });
 
-    setShowEditConfig(false);
-    resetEditSessionForm();
+      // Update session name/description if changed via PATCH endpoint
+      const nameChanged = editSessionName.trim() !== selectedSession.name;
+      const descChanged = (editSessionDescription.trim() || undefined) !== undefined;
+      
+      if (nameChanged || descChanged) {
+        const sessionRes = await fetch(`/api/sessions/${selectedSession.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: editSessionName.trim(),
+            description: editSessionDescription.trim() || undefined,
+          }),
+        });
+
+        if (!sessionRes.ok) {
+          const errorData = await sessionRes.json() as { error: string };
+          console.error('Failed to update session name/description:', errorData.error);
+        }
+      }
+
+      if (configRes.ok) {
+        // Trigger local state update if callback is available
+        if (onSessionUpdate) {
+          onSessionUpdate(selectedSession.id, {
+            name: editSessionName.trim(),
+            configuration: editSessionConfig,
+          });
+        }
+        
+        setShowEditConfig(false);
+        resetEditSessionForm();
+      } else {
+        const errorData = await configRes.json() as { error: string };
+        console.error('Failed to update session configuration:', errorData.error);
+      }
+    } catch (error) {
+      console.error('Error updating session:', error);
+    }
   };
 
   // Handle edit session environment variables
@@ -252,10 +295,9 @@ export function SessionConfigPanel({
   const handleRemoveEditEnvironmentVariable = (key: string) => {
     setEditSessionConfig(prev => ({
       ...prev,
-      environmentVariables: {
-        ...prev.environmentVariables,
-        [key]: undefined,
-      },
+      environmentVariables: Object.fromEntries(
+        Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
+      ),
     }));
   };
 
@@ -275,15 +317,36 @@ export function SessionConfigPanel({
     setShowEditAgent(true);
   };
 
-  const handleEditAgentSubmit = (e: React.FormEvent) => {
+  const handleEditAgentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingAgent) return;
+    if (!editingAgent || !editingAgent.name.trim()) return;
 
-    // TODO: Implement agent update API call
-    console.warn('Agent update not yet implemented:', editingAgent);
-    
-    setShowEditAgent(false);
-    setEditingAgent(null);
+    try {
+      const res = await fetch(`/api/agents/${editingAgent.threadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingAgent.name.trim(),
+          provider: editingAgent.provider,
+          model: editingAgent.model,
+        }),
+      });
+
+      if (res.ok) {
+        // Reload session details to reflect the agent changes
+        if (selectedSession) {
+          // Trigger a refresh by calling parent's session select handler
+          window.location.reload(); // Simple approach for now
+        }
+        setShowEditAgent(false);
+        setEditingAgent(null);
+      } else {
+        const errorData = await res.json() as { error: string };
+        console.error('Failed to update agent:', errorData.error);
+      }
+    } catch (error) {
+      console.error('Failed to update agent:', error);
+    }
   };
 
   return (
@@ -399,7 +462,7 @@ export function SessionConfigPanel({
                             </button>
                             <span className={`badge badge-xs ${
                               agent.status === 'idle' ? 'badge-success' :
-                              agent.status === 'busy' ? 'badge-warning' :
+                              (agent.status === 'streaming' || agent.status === 'thinking' || agent.status === 'tool_execution') ? 'badge-warning' :
                               'badge-neutral'
                             }`}>
                               {agent.status}
@@ -473,38 +536,31 @@ export function SessionConfigPanel({
                       value={sessionConfig.provider}
                       onChange={(e) => {
                         const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
                         setSessionConfig(prev => ({
                           ...prev,
                           provider: newProvider,
-                          model: providerModels[0]?.name || prev.model,
+                          model: providerModels[0]?.id || prev.model,
                         }));
                       }}
                       className="select select-bordered w-full"
                     >
                       {availableProviders.map((provider) => (
-                        <option key={provider.type} value={provider.type}>
-                          {provider.name}
+                        <option key={provider.name} value={provider.name}>
+                          {provider.displayName}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Model</span>
-                    </label>
-                    <select
-                      value={sessionConfig.model}
-                      onChange={(e) => setSessionConfig(prev => ({ ...prev, model: e.target.value }))}
-                      className="select select-bordered w-full"
-                    >
-                      {sessionAvailableModels.map((model) => (
-                        <option key={model.name} value={model.name}>
-                          {model.displayName}
-                        </option>
-                      ))}
-                    </select>
+                    <ModelDropdown
+                      providers={providers}
+                      selectedProvider={sessionConfig.provider || ''}
+                      selectedModel={sessionConfig.model || ''}
+                      onChange={(model) => setSessionConfig(prev => ({ ...prev, model }))}
+                      label="Default Model"
+                    />
                   </div>
 
                   <div>
@@ -685,9 +741,9 @@ export function SessionConfigPanel({
                   value={agentProvider}
                   onChange={(e) => {
                     const newProvider = e.target.value;
-                    const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                    const providerModels = providers.find(p => p.name === newProvider)?.models || [];
                     setAgentProvider(newProvider);
-                    setAgentModel(providerModels[0]?.name || agentModel);
+                    setAgentModel(providerModels[0]?.id || agentModel);
                   }}
                   className="select select-bordered w-full"
                 >
@@ -700,20 +756,13 @@ export function SessionConfigPanel({
               </div>
 
               <div>
-                <label className="label">
-                  <span className="label-text font-medium">Model</span>
-                </label>
-                <select
-                  value={agentModel}
-                  onChange={(e) => setAgentModel(e.target.value)}
-                  className="select select-bordered w-full"
-                >
-                  {agentAvailableModels.map((model) => (
-                    <option key={model.name} value={model.name}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
+                <ModelDropdown
+                  providers={providers}
+                  selectedProvider={agentProvider}
+                  selectedModel={agentModel}
+                  onChange={setAgentModel}
+                  label="Model"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
@@ -801,38 +850,31 @@ export function SessionConfigPanel({
                       value={editSessionConfig.provider}
                       onChange={(e) => {
                         const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
                         setEditSessionConfig(prev => ({
                           ...prev,
                           provider: newProvider,
-                          model: providerModels[0]?.name || prev.model,
+                          model: providerModels[0]?.id || prev.model,
                         }));
                       }}
                       className="select select-bordered w-full"
                     >
                       {availableProviders.map((provider) => (
-                        <option key={provider.type} value={provider.type}>
-                          {provider.name}
+                        <option key={provider.name} value={provider.name}>
+                          {provider.displayName}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Model</span>
-                    </label>
-                    <select
-                      value={editSessionConfig.model}
-                      onChange={(e) => setEditSessionConfig(prev => ({ ...prev, model: e.target.value }))}
-                      className="select select-bordered w-full"
-                    >
-                      {editSessionAvailableModels.map((model) => (
-                        <option key={model.name} value={model.name}>
-                          {model.displayName}
-                        </option>
-                      ))}
-                    </select>
+                    <ModelDropdown
+                      providers={providers}
+                      selectedProvider={editSessionConfig.provider || ''}
+                      selectedModel={editSessionConfig.model || ''}
+                      onChange={(model) => setEditSessionConfig(prev => ({ ...prev, model }))}
+                      label="Default Model"
+                    />
                   </div>
 
                   <div>
@@ -1013,11 +1055,11 @@ export function SessionConfigPanel({
                   value={editingAgent.provider}
                   onChange={(e) => {
                     const newProvider = e.target.value;
-                    const providerModels = providers.find(p => p.type === newProvider)?.models || [];
+                    const providerModels = providers.find(p => p.name === newProvider)?.models || [];
                     setEditingAgent(prev => prev ? {
                       ...prev,
                       provider: newProvider,
-                      model: providerModels[0]?.name || prev.model,
+                      model: providerModels[0]?.id || prev.model,
                     } : null);
                   }}
                   className="select select-bordered w-full"
@@ -1031,20 +1073,13 @@ export function SessionConfigPanel({
               </div>
 
               <div>
-                <label className="label">
-                  <span className="label-text font-medium">Model</span>
-                </label>
-                <select
-                  value={editingAgent.model}
-                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, model: e.target.value } : null)}
-                  className="select select-bordered w-full"
-                >
-                  {providers.find(p => p.type === editingAgent.provider)?.models.map((model) => (
-                    <option key={model.name} value={model.name}>
-                      {model.displayName}
-                    </option>
-                  )) || []}
-                </select>
+                <ModelDropdown
+                  providers={providers}
+                  selectedProvider={editingAgent.provider}
+                  selectedModel={editingAgent.model}
+                  onChange={(model) => setEditingAgent(prev => prev ? { ...prev, model } : null)}
+                  label="Model"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
