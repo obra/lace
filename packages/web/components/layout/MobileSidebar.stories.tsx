@@ -442,7 +442,6 @@ export const CyberpunkTheme: Story = {
 export const SingleProject: Story = {
   args: {
     ...defaultArgs,
-    timelines: [sampleTimelines[0]],
   },
   parameters: {
     docs: {
