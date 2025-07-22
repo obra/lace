@@ -186,7 +186,7 @@ export class Session {
     const session = new Session(sessionAgent, sessionData.projectId);
 
     // Load delegate threads (child agents) for this session
-    const delegateThreadIds = threadManager.getThreadsForSession(sessionId);
+    const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
     logger.debug(
       `Found ${delegateThreadIds.length} delegate threads: ${delegateThreadIds.join(', ')}`
     );
