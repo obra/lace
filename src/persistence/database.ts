@@ -544,14 +544,19 @@ export class DatabasePersistence {
   }
 
   getAllThreadsWithMetadata(): Thread[] {
+    return this.executeThreadQuery('', '');
+  }
+
+  private executeThreadQuery(whereClause: string, param: string): Thread[] {
     if (this._disabled || !this.db) return [];
 
     const stmt = this.db.prepare(`
       SELECT id, session_id, project_id, created_at, updated_at, metadata FROM threads
+      ${whereClause}
       ORDER BY updated_at DESC
     `);
 
-    const rows = stmt.all() as Array<{
+    const rows = (whereClause ? stmt.all(param) : stmt.all()) as Array<{
       id: string;
       session_id: string | null;
       project_id: string | null;
@@ -580,6 +585,25 @@ export class DatabasePersistence {
         metadata,
       };
     });
+  }
+
+  getThreadsByProject(projectId: string): Thread[] {
+    return this.executeThreadQuery('WHERE project_id = ?', projectId);
+  }
+
+  getThreadsBySession(sessionId: string): Thread[] {
+    return this.executeThreadQuery('WHERE session_id = ?', sessionId);
+  }
+
+  getThreadCountBySession(sessionId: string): number {
+    if (this._disabled || !this.db) return 0;
+
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count FROM threads WHERE session_id = ?
+    `);
+
+    const result = stmt.get(sessionId) as { count: number };
+    return result.count;
   }
 
   getCurrentVersion(canonicalId: string): string | null {

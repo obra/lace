@@ -362,14 +362,6 @@ export function SessionConfigPanel({
           </div>
         </div>
         
-        <button
-          onClick={() => setShowCreateSession(true)}
-          className="btn btn-primary btn-sm"
-          disabled={loading}
-        >
-          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-          New Session
-        </button>
       </div>
 
       {/* Sessions List */}
@@ -387,7 +379,9 @@ export function SessionConfigPanel({
           </div>
         ) : (
           <div className="grid gap-3">
-            {sessions.map((session) => (
+            {sessions
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              .map((session) => (
               <div
                 key={session.id}
                 className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
@@ -402,7 +396,7 @@ export function SessionConfigPanel({
                     <h4 className="font-medium text-base-content">{session.name}</h4>
                     <div className="flex items-center gap-4 mt-2 text-sm text-base-content/60">
                       <span>Created {new Date(session.createdAt).toLocaleDateString()}</span>
-                      <span>{selectedSession?.id === session.id ? (selectedSession.agents?.length || 0) : (session.agents?.length || 0)} agents</span>
+                      <span>{session.agentCount || 0} agents</span>
                     </div>
                   </div>
                   
@@ -415,9 +409,9 @@ export function SessionConfigPanel({
                             handleEditSessionClick();
                           }}
                           className="btn btn-ghost btn-xs"
-                          title="Edit Configuration"
+                          title="Edit Session"
                         >
-                          <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
+                          <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
                         </button>
                         <button
                           onClick={(e) => {
@@ -478,6 +472,16 @@ export function SessionConfigPanel({
             ))}
           </div>
         )}
+        
+        {/* New Session Button - moved to bottom */}
+        <button
+          onClick={() => setShowCreateSession(true)}
+          className="btn btn-primary btn-sm w-full"
+          disabled={loading}
+        >
+          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+          New Session
+        </button>
       </div>
 
       {/* Create Session Modal */}

@@ -24,6 +24,7 @@ export interface Session {
   id: ThreadId; // sessionId (parent threadId)
   name: string;
   createdAt: string;
+  agentCount?: number; // Count of agents for list view
   agents?: Agent[]; // Optional for list view, populated when session is selected
 }
 
