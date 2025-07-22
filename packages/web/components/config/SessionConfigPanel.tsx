@@ -34,6 +34,7 @@ interface SessionConfigPanelProps {
   onSessionCreate: (sessionData: { name: string; description?: string; configuration?: SessionConfiguration }) => void;
   onSessionSelect: (session: Session) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
+  onAgentSelect?: (agentId: string) => void;
   onAgentUpdate?: () => void | Promise<void>;
   onSessionUpdate?: (sessionId: string, updates: Partial<Session & { configuration?: SessionConfiguration }>) => void;
   loading?: boolean;
@@ -61,6 +62,7 @@ export function SessionConfigPanel({
   onSessionCreate,
   onSessionSelect,
   onAgentCreate,
+  onAgentSelect,
   onAgentUpdate,
   onSessionUpdate,
   loading = false,
@@ -435,7 +437,11 @@ export function SessionConfigPanel({
                       {selectedSession.agents.map((agent) => (
                         <div
                           key={agent.threadId}
-                          className="flex items-center justify-between p-2 bg-base-50 rounded border border-base-200"
+                          className="flex items-center justify-between p-2 bg-base-50 rounded border border-base-200 cursor-pointer hover:bg-base-100 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAgentSelect?.(agent.threadId);
+                          }}
                         >
                           <div className="flex items-center gap-2">
                             <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-primary" />

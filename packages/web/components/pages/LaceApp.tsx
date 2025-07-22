@@ -801,6 +801,7 @@ export function LaceApp() {
                   onSessionCreate={handleSessionCreate}
                   onSessionSelect={(session) => handleSessionSelect(session.id)}
                   onAgentCreate={handleAgentCreate}
+                  onAgentSelect={handleAgentSelect}
                   onAgentUpdate={handleAgentUpdate}
                   loading={loading}
                 />

@@ -67,20 +67,7 @@ vi.mock('@/types/events', () => ({
 const mockFetch = vi.fn(() => new Promise(() => {})); // Promise that never resolves
 global.fetch = mockFetch as unknown as typeof fetch;
 
-// Mock EventSource - external API, acceptable to mock per testing guidelines
-const MockEventSource = vi.fn().mockImplementation(() => ({
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  close: vi.fn(),
-  onerror: vi.fn(),
-}));
-
-// Add static properties required by EventSource interface
-MockEventSource.CONNECTING = 0;
-MockEventSource.OPEN = 1;
-MockEventSource.CLOSED = 2;
-
-global.EventSource = MockEventSource as unknown as typeof EventSource;
+// Try without mocking EventSource - let's see if the component actually needs it
 
 // Helper to render with real theme provider
 const renderWithProviders = (component: React.ReactElement) => {
