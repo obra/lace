@@ -223,7 +223,8 @@ describe('DelegateTool', () => {
     quickTimeoutTool.setDependencies(realAgent, toolExecutor);
 
     // Override the default timeout for testing
-    (quickTimeoutTool as DelegateTool & { defaultTimeout: number }).defaultTimeout = 100;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (quickTimeoutTool as any).defaultTimeout = 100;
 
     // Mock provider to delay longer than timeout
     mockProvider.createResponse.mockImplementationOnce(

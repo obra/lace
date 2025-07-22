@@ -12,7 +12,8 @@
       "mcp__secret-journal__process_thoughts",
       "mcp__secret-journal__read_journal_entry",
       "Bash(npm run test:run:*)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": []
   }
