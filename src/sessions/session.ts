@@ -415,7 +415,7 @@ export class Session {
       isAgent: true,
       parentSessionId: this._sessionId,
       provider: provider || this._sessionAgent.providerName,
-      model: model || this._sessionAgent.provider.modelName,
+      model: model || this._sessionAgent.providerInstance.modelName,
     });
 
     // Store agent
@@ -450,7 +450,7 @@ export class Session {
         threadId: asThreadId(agent.threadId),
         name: (metadata?.name as string) || 'Agent ' + agent.threadId,
         provider: (metadata?.provider as string) || agent.providerName,
-        model: (metadata?.model as string) || agent.provider.modelName,
+        model: (metadata?.model as string) || agent.providerInstance.modelName,
         status: agent.getCurrentState(),
       });
     });

@@ -1,4 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+// ABOUTME: Hook for managing conversation stream with SSE connection and message processing
+// ABOUTME: Provides real-time streaming conversation interface with event handling
+
+import { useState, useCallback, useRef } from 'react';
 import type { StreamEvent } from '@/types';
 
 interface UseConversationStreamOptions {
@@ -8,11 +11,11 @@ interface UseConversationStreamOptions {
 }
 
 interface ConversationStreamState {
+  isConnected: boolean;
   isStreaming: boolean;
   isThinking: boolean;
-  currentThreadId?: string;
+  currentThreadId: string | null;
   error?: string;
-  isConnected: boolean;
 }
 
 export function useConversationStream({
@@ -21,9 +24,10 @@ export function useConversationStream({
   onError,
 }: UseConversationStreamOptions = {}) {
   const [state, setState] = useState<ConversationStreamState>({
+    isConnected: false,
     isStreaming: false,
     isThinking: false,
-    isConnected: false,
+    currentThreadId: null,
   });
 
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
@@ -31,14 +35,6 @@ export function useConversationStream({
   const currentContentRef = useRef<string>('');
   const isProcessingRef = useRef<boolean>(false);
   const connectionKeyRef = useRef<string | null>(null);
-
-  // Initialize connection on mount
-  useEffect(() => {
-    // Don't auto-initialize connection - wait for first message
-    return () => {
-      cleanup();
-    };
-  }, []);
 
   const cleanup = useCallback(() => {
     if (readerRef.current) {
@@ -54,6 +50,71 @@ export function useConversationStream({
     connectionKeyRef.current = null;
     setState((prev) => ({ ...prev, isConnected: false, isStreaming: false, isThinking: false }));
   }, []);
+
+  const handleStreamEvent = useCallback(
+    (event: StreamEvent) => {
+      onStreamEvent?.(event);
+
+      switch (event.type) {
+        case 'connection':
+          setState((prev) => ({
+            ...prev,
+            currentThreadId: event.threadId,
+            isConnected: true,
+          }));
+          connectionKeyRef.current = event.connectionKey || null;
+          break;
+
+        case 'thinking_start':
+          setState((prev) => ({ ...prev, isThinking: true }));
+          break;
+
+        case 'streaming_start':
+          setState((prev) => ({ ...prev, isStreaming: true, isThinking: false }));
+          break;
+
+        case 'streaming_token':
+          if (event.token) {
+            currentContentRef.current += event.token;
+            setState((prev) => ({ ...prev, currentContent: currentContentRef.current }));
+          }
+          break;
+
+        case 'streaming_complete':
+          setState((prev) => ({ ...prev, isStreaming: false }));
+
+          // Call completion callback if provided
+          if (currentContentRef.current) {
+            onMessageComplete?.(currentContentRef.current);
+          }
+
+          // Reset content for next message
+          currentContentRef.current = '';
+          break;
+
+        case 'ready_for_input':
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            isThinking: false,
+          }));
+          break;
+
+        case 'error':
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            isThinking: false,
+            error: event.error,
+          }));
+          if (event.error) {
+            onError?.(event.error);
+          }
+          break;
+      }
+    },
+    [onStreamEvent, onMessageComplete, onError]
+  );
 
   const processStream = useCallback(async () => {
     if (!readerRef.current || isProcessingRef.current) return;
@@ -96,75 +157,7 @@ export function useConversationStream({
     } finally {
       isProcessingRef.current = false;
     }
-  }, [onError]);
-
-  const handleStreamEvent = useCallback(
-    (event: StreamEvent) => {
-      onStreamEvent?.(event);
-
-      switch (event.type) {
-        case 'connection':
-          setState((prev) => ({
-            ...prev,
-            currentThreadId: event.threadId,
-            isConnected: true,
-          }));
-          connectionKeyRef.current = event.connectionKey || null;
-          break;
-
-        case 'thinking_start':
-          setState((prev) => ({ ...prev, isThinking: true }));
-          break;
-
-        case 'thinking_complete':
-          setState((prev) => ({ ...prev, isThinking: false }));
-          break;
-
-        case 'token':
-          if (event.content) {
-            currentContentRef.current += event.content;
-          }
-          break;
-
-        case 'response_complete':
-          // Response complete, content length: ${currentContentRef.current.length}
-          setState((prev) => ({
-            ...prev,
-            isStreaming: false,
-            isThinking: false,
-          }));
-
-          if (currentContentRef.current) {
-            onMessageComplete?.(currentContentRef.current);
-          }
-
-          // Reset content for next message
-          currentContentRef.current = '';
-          break;
-
-        case 'ready_for_input':
-          setState((prev) => ({
-            ...prev,
-            isStreaming: false,
-            isThinking: false,
-          }));
-          break;
-
-        case 'error':
-          setState((prev) => ({
-            ...prev,
-            isStreaming: false,
-            isThinking: false,
-            error: event.error,
-          }));
-          if (event.error) {
-            onError?.(event.error);
-          }
-          break;
-      }
-    },
-    [onStreamEvent, onMessageComplete, onError]
-  );
+  }, [handleStreamEvent, onError]);
 
   const sendMessage = useCallback(
     async (message: string, threadId?: string) => {
@@ -235,43 +228,26 @@ export function useConversationStream({
 
   const interruptStream = useCallback(() => {
     // Interrupting stream
-
-    setState((prev) => ({
-      ...prev,
-      isStreaming: false,
-      isThinking: false,
-    }));
-
-    // If there's partial content, treat it as a completed message
-    if (currentContentRef.current.trim()) {
-      onMessageComplete?.(currentContentRef.current);
-    }
-
-    // Reset content
-    currentContentRef.current = '';
-
-    // Stop the current stream
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      abortControllerRef.current = null;
     }
-
-    if (readerRef.current) {
-      readerRef.current.cancel().catch(() => {
-        // Ignore cancel errors
-      });
-      readerRef.current = null;
-    }
-  }, [onMessageComplete]);
-
-  const stopStream = useCallback(() => {
     cleanup();
   }, [cleanup]);
+
+  // Initialize connection on mount
+  /*
+  useEffect(() => {
+    // Don't auto-initialize connection - wait for first message
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
+  */
 
   return {
     ...state,
     sendMessage,
-    stopStream,
     interruptStream,
+    cleanup,
   };
 }

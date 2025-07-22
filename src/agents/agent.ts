@@ -365,8 +365,27 @@ export class Agent extends EventEmitter {
     return [...this._tools]; // Return copy to prevent mutation
   }
 
-  get provider(): AIProvider {
+  get providerInstance(): AIProvider {
     return this._provider;
+  }
+
+  get provider(): string {
+    const metadata = this.getThreadMetadata();
+    return (metadata?.provider as string) || this._provider.providerName;
+  }
+
+  get name(): string {
+    const metadata = this.getThreadMetadata();
+    return (metadata?.name as string) || 'unnamed-agent';
+  }
+
+  get model(): string {
+    const metadata = this.getThreadMetadata();
+    return (metadata?.model as string) || this._provider.modelName || 'unknown-model';
+  }
+
+  get status(): string {
+    return this._state;
   }
 
   // Token budget management

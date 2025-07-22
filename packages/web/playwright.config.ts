@@ -4,7 +4,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './__tests__/e2e',
+  testDir: './e2e',
   testMatch: '**/*.e2e.ts',
 
   fullyParallel: false, // Disable parallel execution to avoid state conflicts

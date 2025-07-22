@@ -17,20 +17,50 @@ vi.mock('server-only', () => {
 
 // Mock the Anthropic SDK globally to prevent real API calls in all tests
 vi.mock('@anthropic-ai/sdk', () => {
+  // Create a proper mock stream type
+  interface MockEventEmitter {
+    on: (event: string, listener: (...args: unknown[]) => void) => void;
+    emit: (event: string, ...args: unknown[]) => void;
+    finalMessage: () => Promise<{
+      id: string;
+      role: string;
+      content: Array<{ type: string; text: string }>;
+      model: string;
+      stop_reason: string;
+      usage: { input_tokens: number; output_tokens: number };
+    }>;
+  }
+
+  const createMockStream = (): MockEventEmitter => {
+    const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
+
+    return {
+      on: (event: string, listener: (...args: unknown[]) => void) => {
+        if (!listeners[event]) {
+          listeners[event] = [];
+        }
+        listeners[event].push(listener);
+      },
+      emit: (event: string, ...args: unknown[]) => {
+        if (listeners[event]) {
+          listeners[event].forEach((listener) => listener(...args));
+        }
+      },
+      finalMessage: vi.fn().mockResolvedValue({
+        id: 'msg_test',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Hello! This is a test response.' }],
+        model: 'claude-3-haiku-20240307',
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 8 },
+      }),
+    };
+  };
+
   const mockClient = {
     messages: {
       stream: vi.fn().mockImplementation(() => {
-        const EventEmitter = require('events');
-        const mockStream = new EventEmitter();
-
-        mockStream.finalMessage = vi.fn().mockResolvedValue({
-          id: 'msg_test',
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Hello! This is a test response.' }],
-          model: 'claude-3-haiku-20240307',
-          stop_reason: 'end_turn',
-          usage: { input_tokens: 10, output_tokens: 8 },
-        });
+        const mockStream = createMockStream();
 
         setTimeout(() => {
           mockStream.emit('text', 'Hello! ');

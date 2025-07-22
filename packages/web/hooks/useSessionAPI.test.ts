@@ -295,7 +295,8 @@ describe('useSessionAPI', () => {
 
       expect(agents).toEqual(mockAgents);
       // Verify agents list request was made correctly
-      const requestUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+      const requestUrl = fetchMock.mock.calls[0][0] as string;
       expect(requestUrl).toBe(`/api/sessions/${sessionId}/agents`);
     });
   });

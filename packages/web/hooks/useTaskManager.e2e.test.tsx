@@ -82,7 +82,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
             const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
             const request = new NextRequest('http://localhost' + urlString, init);
             const response = await getTask(request, { params: Promise.resolve({ taskId: taskId! }) });
-            const responseData = await response.json();
+            const responseData = (await response.json()) as unknown;
             return new Response(JSON.stringify(responseData), {
               status: response.status,
               headers: { 'Content-Type': 'application/json' }

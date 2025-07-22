@@ -17,7 +17,7 @@ const compat = new FlatCompat({
 
 const config = [
   {
-    ignores: ['.next/**/*', 'node_modules/**/*'],
+    ignores: ['.next/**/*', 'node_modules/**/*', '.storybook/**/*'],
   },
   // Add Next.js specific configuration
   ...compat.config({

@@ -18,7 +18,7 @@ export interface FeedbackEvent {
       elapsedMs: number;
     };
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface FeedbackInsight {
