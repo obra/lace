@@ -68,11 +68,11 @@ export async function POST(
 
     // Convert to API format - use agent's improved API
     const agentResponse = {
-      threadId: agent.threadId as string,
-      name: agent.name as string,
-      provider: agent.provider as string,
-      model: agent.model as string,
-      status: agent.status as string,
+      threadId: agent.threadId,
+      name: agent.name,
+      provider: agent.provider,
+      model: agent.model,
+      status: agent.status,
       createdAt: new Date().toISOString(),
     };
 
