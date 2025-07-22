@@ -11,10 +11,9 @@ import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-// Mock the file-read tool for testing
-import { Tool } from '~/tools/tool';
+// Use real file-read tool for testing
+import { FileReadTool } from '~/tools/implementations/file-read';
 import { ToolAnnotations } from '~/tools/types';
-import { z } from 'zod';
 
 // Type definitions for test
 interface ToolExecutorWithApproval {
@@ -34,25 +33,7 @@ interface ApprovalManagerWithPending {
   resolveApproval: (requestId: string, decision: ApprovalDecision) => boolean;
 }
 
-class MockFileReadTool extends Tool {
-  name = 'file-read';
-  description = 'Test tool that requires approval';
-  schema = z.object({
-    path: z.string().min(1, 'File path cannot be empty'),
-  });
-
-  annotations = {
-    readOnlyHint: true,
-    destructiveHint: false,
-  };
-
-  protected async executeValidated(_args: z.infer<typeof this.schema>) {
-    return {
-      content: [{ type: 'text' as const, text: 'File content here' }],
-      isError: false,
-    };
-  }
-}
+// Using real FileReadTool - no mock needed
 
 describe('Tool Approval Flow Integration', () => {
   let sessionService: ReturnType<typeof getSessionService>;
@@ -119,7 +100,7 @@ describe('Tool Approval Flow Integration', () => {
     agent = agentResult;
 
     // Register mock tool with correct name
-    const mockTool = new MockFileReadTool();
+    const mockTool = new FileReadTool();
     agent.toolExecutor.registerTool('file-read', mockTool);
 
     // Add event logging to agent

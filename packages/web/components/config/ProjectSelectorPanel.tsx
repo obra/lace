@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
 import type { ProjectInfo, ProviderInfo } from '@/types/api';
@@ -714,7 +714,7 @@ export function ProjectSelectorPanel({
                       className="select select-bordered w-full"
                     >
                       {availableModels.map((model) => (
-                        <option key={model.name} value={model.name}>
+                        <option key={model.id} value={model.id}>
                           {model.displayName}
                         </option>
                       ))}
@@ -946,7 +946,7 @@ export function ProjectSelectorPanel({
                       className="select select-bordered w-full"
                     >
                       {availableCreateModels.map((model) => (
-                        <option key={model.name} value={model.name}>
+                        <option key={model.id} value={model.id}>
                           {model.displayName}
                         </option>
                       ))}

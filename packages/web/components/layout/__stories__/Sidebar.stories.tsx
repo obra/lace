@@ -4,7 +4,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faComments, faRobot, faPlus, faTasks } from '@/lib/fontawesome';
-import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '../Sidebar';
+import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Layout/Sidebar',

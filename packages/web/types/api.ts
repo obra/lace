@@ -3,6 +3,10 @@
 
 // Import core types from Lace
 import type { AgentState, ThreadId, AssigneeId } from '@/lib/server/lace-imports';
+import type {
+  ProviderInfo as BackendProviderInfo,
+  ModelInfo as BackendModelInfo,
+} from '@/lib/server/core-types';
 
 // Re-export imported types
 export type { ThreadId, AssigneeId, AgentState };
@@ -65,7 +69,9 @@ type _SessionEventType =
   | 'TOOL_CALL'
   | 'TOOL_RESULT'
   | 'THINKING'
-  | 'LOCAL_SYSTEM_MESSAGE';
+  | 'LOCAL_SYSTEM_MESSAGE'
+  | 'SYSTEM_PROMPT'
+  | 'USER_SYSTEM_PROMPT';
 
 // Specific event data types
 export interface UserMessageEventData {
@@ -91,6 +97,14 @@ export interface ThinkingEventData {
 }
 
 export interface LocalSystemMessageEventData {
+  content: string;
+}
+
+export interface SystemPromptEventData {
+  content: string;
+}
+
+export interface UserSystemPromptEventData {
   content: string;
 }
 
@@ -149,6 +163,18 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: Date;
       data: ToolApprovalRequestData;
+    }
+  | {
+      type: 'SYSTEM_PROMPT';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: SystemPromptEventData;
+    }
+  | {
+      type: 'USER_SYSTEM_PROMPT';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: UserSystemPromptEventData;
     };
 
 // Tool approval event data - extends what the agent emits
@@ -236,24 +262,14 @@ export interface ProvidersResponse {
   providers: ProviderInfo[];
 }
 
-export interface ProviderInfo {
-  name: string;
-  displayName: string;
-  requiresApiKey: boolean;
-  configurationHint: string;
+// Extend backend types with web-specific additions
+export interface ProviderInfo extends BackendProviderInfo {
   models: ModelInfo[];
   configured: boolean;
 }
 
-export interface ModelInfo {
-  id: string;
-  displayName: string;
-  description: string;
-  contextWindow: number;
-  maxOutputTokens: number;
-  capabilities: string[];
-  isDefault?: boolean;
-}
+// Re-export backend ModelInfo directly - it matches what we need
+export type ModelInfo = BackendModelInfo;
 
 // Project management types
 export interface ProjectInfo {

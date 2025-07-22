@@ -333,10 +333,9 @@ export function SessionConfigPanel({
       });
 
       if (res.ok) {
-        // Reload session details to reflect the agent changes
+        // Trigger a refresh by calling parent's session select handler to reload session data
         if (selectedSession) {
-          // Trigger a refresh by calling parent's session select handler
-          window.location.reload(); // Simple approach for now
+          onSessionSelect(selectedSession);
         }
         setShowEditAgent(false);
         setEditingAgent(null);
@@ -401,7 +400,7 @@ export function SessionConfigPanel({
                     <h4 className="font-medium text-base-content">{session.name}</h4>
                     <div className="flex items-center gap-4 mt-2 text-sm text-base-content/60">
                       <span>Created {new Date(session.createdAt).toLocaleDateString()}</span>
-                      <span>{session.agents?.length || 0} agents</span>
+                      <span>{selectedSession?.id === session.id ? (selectedSession.agents?.length || 0) : (session.agents?.length || 0)} agents</span>
                     </div>
                   </div>
                   
@@ -434,10 +433,10 @@ export function SessionConfigPanel({
                 </div>
 
                 {/* Agents List */}
-                {selectedSession?.id === session.id && session.agents && session.agents.length > 0 && (
+                {selectedSession?.id === session.id && selectedSession.agents && selectedSession.agents.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-base-300">
                     <div className="grid gap-2">
-                      {session.agents.map((agent) => (
+                      {selectedSession.agents.map((agent) => (
                         <div
                           key={agent.threadId}
                           className="flex items-center justify-between p-2 bg-base-50 rounded border border-base-200"
@@ -748,8 +747,8 @@ export function SessionConfigPanel({
                   className="select select-bordered w-full"
                 >
                   {availableProviders.map((provider) => (
-                    <option key={provider.type} value={provider.type}>
-                      {provider.name}
+                    <option key={provider.name} value={provider.name}>
+                      {provider.displayName}
                     </option>
                   ))}
                 </select>
@@ -1065,8 +1064,8 @@ export function SessionConfigPanel({
                   className="select select-bordered w-full"
                 >
                   {availableProviders.map((provider) => (
-                    <option key={provider.type} value={provider.type}>
-                      {provider.name}
+                    <option key={provider.name} value={provider.name}>
+                      {provider.displayName}
                     </option>
                   ))}
                 </select>

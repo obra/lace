@@ -9,7 +9,7 @@ import type { ProviderInfo } from '@/types/api';
 interface ProviderDropdownProps {
   providers: ProviderInfo[];
   selectedProvider: string;
-  onChange: (providerType: string, availableModels: { name: string; displayName: string }[]) => void;
+  onChange: (providerType: string, availableModels: { id: string; displayName: string }[]) => void;
   className?: string;
   disabled?: boolean;
   label?: string;

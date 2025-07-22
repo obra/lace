@@ -423,9 +423,11 @@ describe('FileFindTool with schema validation', () => {
       // This test would create a file in the current working directory
       // but it's complex to do safely in tests, so we'll just verify
       // the tool works with relative paths when no context is provided
+      // Use maxDepth: 1 to limit the search to the current directory only (minimum allowed depth)
       const result = await tool.execute({
         pattern: 'non-existent-file.txt',
         path: '.',
+        maxDepth: 1,
       });
 
       expect(result.isError).toBe(false);
