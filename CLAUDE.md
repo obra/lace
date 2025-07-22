@@ -17,6 +17,18 @@ npm run lint:fix    # Auto-fix linting issues
 npm run format      # Format code with Prettier
 ```
 
+### Debug Logging
+```bash
+npm run dev:debug    # Start with debug logging enabled
+# Or manually:
+LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true npm run dev
+```
+
+**Environment Variables:**
+- `LACE_LOG_LEVEL`: Set to `error`, `warn`, `info`, or `debug`
+- `LACE_LOG_STDERR`: Set to `true` to output logs to stderr
+- `LACE_LOG_FILE`: Optional file path for log output
+
 ### Testing
 ```bash
 npm test            # Run tests in watch mode
