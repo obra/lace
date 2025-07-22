@@ -8,6 +8,7 @@ import { ThreadId } from '@/lib/server/core-types';
 export function useHashRouter() {
   const [state, setState] = useState<AppState>({});
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isUpdatingHash, setIsUpdatingHash] = useState(false);
 
   // Initialize state from URL on mount
   useEffect(() => {
@@ -19,11 +20,14 @@ export function useHashRouter() {
   // Listen for hash changes (browser back/forward)
   useEffect(() => {
     const cleanup = onHashChange((newState) => {
-      setState(newState);
+      // Only update state if we're not the ones updating the hash
+      if (!isUpdatingHash) {
+        setState(newState);
+      }
     });
 
     return cleanup;
-  }, []);
+  }, [isUpdatingHash]);
 
   // Update URL when state changes
   const updateState = (newState: Partial<AppState>, replace = true) => {
@@ -31,7 +35,10 @@ export function useHashRouter() {
     setState(fullState);
 
     if (isHydrated) {
+      setIsUpdatingHash(true);
       updateHash(fullState, replace);
+      // Reset flag after a microtask to allow hash change to complete
+      setTimeout(() => setIsUpdatingHash(false), 0);
     }
   };
 

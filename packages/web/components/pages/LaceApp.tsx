@@ -421,6 +421,13 @@ export function LaceApp() {
     setEvents([]);
   };
 
+  // Handle agent updates - refresh session details to show updated agent info
+  const handleAgentUpdate = async () => {
+    if (selectedSession) {
+      await loadSessionDetails(selectedSession);
+    }
+  };
+
   // Handle project updates (archive/unarchive/edit)
   const handleProjectUpdate = async (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: Record<string, unknown> }) => {
     try {
@@ -527,8 +534,6 @@ export function LaceApp() {
                   <SidebarButton
                     onClick={() => {
                       setSelectedProject(null);
-                      setSelectedSession(null);
-                      setSelectedAgent(undefined);
                       setEvents([]);
                       setShowMobileNav(false);
                     }}
@@ -648,8 +653,6 @@ export function LaceApp() {
               <SidebarButton
                 onClick={() => {
                   setSelectedProject(null);
-                  setSelectedSession(null);
-                  setSelectedAgent(undefined);
                   setEvents([]);
                 }}
                 variant="ghost"
@@ -798,6 +801,7 @@ export function LaceApp() {
                   onSessionCreate={handleSessionCreate}
                   onSessionSelect={(session) => handleSessionSelect(session.id)}
                   onAgentCreate={handleAgentCreate}
+                  onAgentUpdate={handleAgentUpdate}
                   loading={loading}
                 />
               </div>

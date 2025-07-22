@@ -34,6 +34,7 @@ interface SessionConfigPanelProps {
   onSessionCreate: (sessionData: { name: string; description?: string; configuration?: SessionConfiguration }) => void;
   onSessionSelect: (session: Session) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
+  onAgentUpdate?: () => void | Promise<void>;
   onSessionUpdate?: (sessionId: string, updates: Partial<Session & { configuration?: SessionConfiguration }>) => void;
   loading?: boolean;
 }
@@ -60,6 +61,7 @@ export function SessionConfigPanel({
   onSessionCreate,
   onSessionSelect,
   onAgentCreate,
+  onAgentUpdate,
   onSessionUpdate,
   loading = false,
 }: SessionConfigPanelProps) {
@@ -333,9 +335,9 @@ export function SessionConfigPanel({
       });
 
       if (res.ok) {
-        // Trigger a refresh by calling parent's session select handler to reload session data
-        if (selectedSession) {
-          onSessionSelect(selectedSession);
+        // Trigger a refresh by calling parent's agent update handler to reload session data
+        if (onAgentUpdate) {
+          await onAgentUpdate();
         }
         setShowEditAgent(false);
         setEditingAgent(null);
