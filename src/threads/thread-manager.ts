@@ -283,7 +283,7 @@ export class ThreadManager {
     allEvents.push(...this.getEvents(mainThreadId));
 
     // Get delegate thread events
-    const delegateThreads = this.getThreadsForSession(mainThreadId);
+    const delegateThreads = this.listThreadIdsForSession(mainThreadId);
     for (const delegateThreadId of delegateThreads) {
       const delegateEvents = this._persistence.loadEvents(delegateThreadId);
       allEvents.push(...delegateEvents);
@@ -293,7 +293,12 @@ export class ThreadManager {
     return allEvents.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
-  getThreadsForSession(sessionId: string): string[] {
+  /**
+   * Get thread IDs for all delegate threads belonging to a session.
+   * Returns only the IDs, not full thread objects. Use getThreadsBySession()
+   * if you need full Thread objects with events.
+   */
+  listThreadIdsForSession(sessionId: string): string[] {
     // Use the persistence layer's SQL-based filtering instead
     return this._persistence.getDelegateThreadsFor(sessionId);
   }
@@ -303,46 +308,19 @@ export class ThreadManager {
     return this._persistence.getAllThreadsWithMetadata();
   }
 
+  /**
+   * Get full Thread objects (with events loaded) for all threads belonging to a session.
+   * This is more expensive than listThreadIdsForSession() as it loads all events.
+   */
   getThreadsBySession(sessionId: string): Thread[] {
-    if (!this._persistence.database) return [];
+    // Get threads without events first
+    const threadsWithoutEvents = this._persistence.getThreadsBySession(sessionId);
 
-    const stmt = this._persistence.database.prepare(`
-      SELECT * FROM threads 
-      WHERE session_id = ?
-      ORDER BY updated_at DESC
-    `);
-
-    const rows = stmt.all(sessionId) as Array<{
-      id: string;
-      session_id: string;
-      project_id: string;
-      created_at: string;
-      updated_at: string;
-      metadata: string | null;
-    }>;
-
-    return rows.map((row) => {
-      const events = this._persistence.loadEvents(row.id);
-      let metadata: Thread['metadata'] = undefined;
-
-      if (row.metadata) {
-        try {
-          metadata = JSON.parse(row.metadata) as Record<string, unknown>;
-        } catch (error) {
-          logger.warn('Failed to parse thread metadata', { threadId: row.id, error });
-        }
-      }
-
-      return {
-        id: row.id,
-        sessionId: row.session_id,
-        projectId: row.project_id,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
-        events,
-        metadata,
-      };
-    });
+    // Load events for each thread
+    return threadsWithoutEvents.map((thread) => ({
+      ...thread,
+      events: this._persistence.loadEvents(thread.id),
+    }));
   }
 
   // Update existing methods to not treat threads as sessions
