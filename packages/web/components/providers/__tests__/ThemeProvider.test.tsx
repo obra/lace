@@ -125,7 +125,7 @@ describe('ThemeProvider', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('should log theme initialization', () => {
+  it('should initialize with theme from localStorage', () => {
     mockLocalStorage.getItem.mockReturnValue('cupcake');
 
     render(
@@ -134,6 +134,8 @@ describe('ThemeProvider', () => {
       </ThemeProvider>
     );
 
-    expect(consoleSpy).toHaveBeenCalledWith('Theme initialized:', 'cupcake');
+    expect(mockLocalStorage.getItem).toHaveBeenCalledWith('lace-theme');
+    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'cupcake');
+    expect(screen.getByTestId('current-theme')).toHaveTextContent('cupcake');
   });
 });

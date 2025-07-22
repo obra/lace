@@ -16,8 +16,8 @@ const mockProjects: ProjectInfo[] = [
     description: 'First test project',
     workingDirectory: '/path/to/project1',
     isArchived: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    lastUsedAt: '2024-01-15T00:00:00Z',
+    createdAt: '2025-07-01T00:00:00Z',
+    lastUsedAt: '2025-07-20T00:00:00Z',
     sessionCount: 5,
   },
   {
@@ -26,8 +26,8 @@ const mockProjects: ProjectInfo[] = [
     description: 'Second test project',
     workingDirectory: '/path/to/project2',
     isArchived: false,
-    createdAt: '2024-01-02T00:00:00Z',
-    lastUsedAt: '2024-01-14T00:00:00Z',
+    createdAt: '2025-07-02T00:00:00Z',
+    lastUsedAt: '2025-07-19T00:00:00Z',
     sessionCount: 3,
   }
 ];
@@ -101,7 +101,7 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    expect(screen.getByText(/new project/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /new project/i })).toBeInTheDocument();
   });
 
   it('should open create project modal when create button is clicked', async () => {
@@ -114,9 +114,11 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    await user.click(screen.getByText(/new project/i));
-    expect(screen.getByText('Create New Project')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /new project/i }));
+    // Modal should open with form
     expect(screen.getByPlaceholderText('Enter project name')).toBeInTheDocument();
+    // Should have both the card heading and modal heading - just check for the input instead
+    expect(screen.getAllByText('Create New Project')).toHaveLength(2);
   });
 
   it('should handle empty project list', () => {
@@ -129,7 +131,7 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    expect(screen.getByText(/no projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/no projects yet/i)).toBeInTheDocument();
   });
 
   it('should show loading state', () => {
@@ -143,6 +145,6 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    expect(screen.getByText('Loading projects...')).toBeInTheDocument();
   });
 });

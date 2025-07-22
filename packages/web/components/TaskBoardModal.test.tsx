@@ -7,8 +7,8 @@ import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import type { Task, ThreadId, AssigneeId } from '@/types/api';
-import { asThreadId } from '@/lib/server/core-types';
+import type { Task } from '@/types';
+import { asThreadId, type ThreadId, type AssigneeId } from '@/lib/server/core-types';
 
 const mockTasks: Task[] = [
   {
@@ -21,8 +21,8 @@ const mockTasks: Task[] = [
     assignedTo: 'agent-1' as AssigneeId,
     createdBy: asThreadId('thread-1'),
     threadId: asThreadId('thread-1'),
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    updatedAt: new Date('2024-01-01T00:00:00Z'),
     notes: [],
   },
   {
@@ -35,8 +35,8 @@ const mockTasks: Task[] = [
     assignedTo: 'agent-2' as AssigneeId,
     createdBy: asThreadId('thread-2'),
     threadId: asThreadId('thread-2'),
-    createdAt: '2024-01-02T00:00:00Z',
-    updatedAt: '2024-01-02T00:00:00Z',
+    createdAt: new Date('2024-01-02T00:00:00Z'),
+    updatedAt: new Date('2024-01-02T00:00:00Z'),
     notes: [],
   }
 ];
@@ -96,7 +96,7 @@ describe('TaskBoardModal', () => {
       />
     );
 
-    const closeButton = screen.getByText('✕');
+    const closeButton = screen.getByLabelText('Close modal');
     await user.click(closeButton);
     expect(mockOnClose).toHaveBeenCalled();
   });
@@ -113,9 +113,10 @@ describe('TaskBoardModal', () => {
     );
 
     // Check that columns exist
-    expect(screen.getByText(/pending/i)).toBeInTheDocument();
-    expect(screen.getByText(/in progress/i)).toBeInTheDocument();
-    expect(screen.getByText(/completed/i)).toBeInTheDocument();
+    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText('Blocked')).toBeInTheDocument();
   });
 
   it('should handle empty task list', () => {
@@ -131,7 +132,8 @@ describe('TaskBoardModal', () => {
 
     expect(screen.getByText(/task board/i)).toBeInTheDocument();
     // Should still show columns even with no tasks
-    expect(screen.getByText(/pending/i)).toBeInTheDocument();
+    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
   });
 
   it('should show task priorities', () => {
