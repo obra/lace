@@ -247,9 +247,10 @@ describe('Agent Queue Processing', () => {
 
       // Directly setting state to non-idle shouldn't trigger queue processing
       // We can verify this by checking the queue remains unchanged
-      const agentAny: Record<string, unknown> = agent;
-      const setState = agentAny._setState as (state: string) => void;
-      setState('thinking');
+      const agentAny = agent as unknown as {
+        _setState: (state: 'thinking' | 'idle' | 'streaming' | 'tool_execution') => void;
+      };
+      agentAny._setState('thinking');
 
       // Wait a bit to ensure no async processing occurs
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -258,8 +259,8 @@ describe('Agent Queue Processing', () => {
       expect(statsAfterThinking.queueLength).toBe(1); // Queue unchanged
 
       // Similarly for other non-idle states
-      setState('streaming');
-      setState('tool_execution');
+      agentAny._setState('streaming');
+      agentAny._setState('tool_execution');
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 

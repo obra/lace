@@ -17,7 +17,8 @@
       "Bash(npm run lint:fix:*)",
       "Bash(sed:*)",
       "Bash(npm run lint)",
-      "mcp__secret-journal__search_journal"
+      "mcp__secret-journal__search_journal",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }

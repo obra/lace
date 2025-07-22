@@ -127,10 +127,10 @@ export class TaskListTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  protected executeValidated(
+  protected async executeValidated(
     args: z.infer<typeof listTasksSchema>,
     context?: ToolContext
-  ): ToolResult {
+  ): Promise<ToolResult> {
     if (!context?.threadId) {
       return this.createError('No thread context available');
     }
@@ -146,7 +146,9 @@ export class TaskListTool extends Tool {
           isHuman: false,
         };
 
-        tasks = taskManager.listTasks(args.filter, args.includeCompleted, taskContext);
+        tasks = await Promise.resolve(
+          taskManager.listTasks(args.filter, args.includeCompleted, taskContext)
+        );
       } else {
         // Fallback to original implementation for backward compatibility
         const parentThreadId = context.parentThreadId || context.threadId;
@@ -468,10 +470,10 @@ export class TaskViewTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  protected executeValidated(
+  protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
     context?: ToolContext
-  ): ToolResult {
+  ): Promise<ToolResult> {
     try {
       let task: Task | null = null;
 
@@ -482,7 +484,7 @@ export class TaskViewTool extends Tool {
           actor: context.threadId,
           isHuman: false,
         };
-        task = taskManager.getTask(args.taskId, taskContext);
+        task = await Promise.resolve(taskManager.getTask(args.taskId, taskContext));
       } else {
         // Fallback to original implementation for backward compatibility
         const persistence = getPersistence();

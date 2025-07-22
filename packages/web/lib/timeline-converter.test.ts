@@ -84,7 +84,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123-\d+-0$/),
+        id: expect.stringMatching(/^session-123-\d+-0$/) as string,
         type: 'human',
         content: 'Hello, can you help me with TypeScript?',
         timestamp: new Date('2025-07-21T10:30:00Z'),
@@ -99,7 +99,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/),
+        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'ai',
         content: "Of course! I'd be happy to help you with TypeScript.",
         timestamp: new Date('2025-07-21T10:30:30Z'),
@@ -115,7 +115,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/),
+        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'tool',
         content: 'Tool: file_read',
         tool: 'file_read',
@@ -132,10 +132,10 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/),
+        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'tool',
-        content: expect.stringContaining('interface User'),
-        result: expect.stringContaining('interface User'),
+        content: expect.stringContaining('interface User') as string,
+        result: expect.stringContaining('interface User') as string,
         timestamp: new Date('2025-07-21T10:31:15Z'),
         agent: 'Claude',
       })
@@ -149,7 +149,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/),
+        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'ai',
         content: 'Claude is thinking...',
         timestamp: new Date('2025-07-21T10:31:30Z'),
@@ -165,7 +165,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123-\d+-0$/),
+        id: expect.stringMatching(/^session-123-\d+-0$/) as string,
         type: 'admin',
         content: 'Connected to session stream',
         timestamp: new Date('2025-07-21T10:32:00Z'),
@@ -221,7 +221,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/),
+        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'ai',
         content: 'Hello there!',
         timestamp: new Date('2025-07-21T10:35:02Z'),
@@ -252,7 +252,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/),
+        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'ai',
         content: 'Hello incomplete...',
         timestamp: new Date('2025-07-21T10:36:01Z'),
@@ -333,7 +333,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123-\d+-0$/),
+        id: expect.stringMatching(/^session-123-\d+-0$/) as string,
         type: 'admin',
         content: 'Unknown event: UNKNOWN_EVENT_TYPE',
         timestamp: new Date('2025-07-21T10:38:00Z'),

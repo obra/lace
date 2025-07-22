@@ -223,7 +223,7 @@ describe('DelegateTool', () => {
     quickTimeoutTool.setDependencies(realAgent, toolExecutor);
 
     // Override the default timeout for testing
-    (quickTimeoutTool as { defaultTimeout: number }).defaultTimeout = 100;
+    (quickTimeoutTool as unknown as { defaultTimeout: number }).defaultTimeout = 100;
 
     // Mock provider to delay longer than timeout
     mockProvider.createResponse.mockImplementationOnce(

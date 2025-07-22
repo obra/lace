@@ -7,7 +7,8 @@ import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager, type ThreadEvent } from '~/threads/thread-manager';
+import { ThreadManager } from '~/threads/thread-manager';
+import type { ThreadEvent } from '~/threads/types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Type helper for accessing private methods in tests
