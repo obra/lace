@@ -386,22 +386,14 @@ export const WithManyTimelines: Story = {
       timelines={[
         ...mockTimelines,
         {
-          id: '4',
+          id: 4,
           name: 'Performance Optimization',
           agent: 'Claude',
-          created: new Date('2024-01-15T11:00:00Z'),
-          lastMessage: new Date('2024-01-15T11:30:00Z'),
-          messageCount: 5,
-          isActive: false,
         },
         {
-          id: '5',
+          id: 5,
           name: 'UI/UX Improvements',
           agent: 'GPT-4',
-          created: new Date('2024-01-15T12:00:00Z'),
-          lastMessage: new Date('2024-01-15T12:15:00Z'),
-          messageCount: 3,
-          isActive: false,
         },
       ]}
     />
