@@ -2,12 +2,7 @@
 // ABOUTME: Provides high-level interface for project CRUD operations and session management
 
 import { randomUUID } from 'crypto';
-import {
-  getPersistence,
-  ProjectData,
-  DatabasePersistence,
-  SessionData,
-} from '~/persistence/database';
+import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
@@ -64,12 +59,9 @@ export class Project {
     return new Project(projectData.id);
   }
 
-  static getAll(dbPath?: string): ProjectInfo[] {
-    const persistence = dbPath ? new DatabasePersistence(dbPath) : getPersistence();
+  static getAll(): ProjectInfo[] {
+    const persistence = getPersistence();
     const projects = persistence.loadAllProjects();
-    if (dbPath) {
-      persistence.close();
-    }
 
     return projects.map((project) => {
       // Create a temporary Project instance to get session count
@@ -87,12 +79,9 @@ export class Project {
     });
   }
 
-  static getById(projectId: string, dbPath?: string): Project | null {
-    const persistence = dbPath ? new DatabasePersistence(dbPath) : getPersistence();
+  static getById(projectId: string): Project | null {
+    const persistence = getPersistence();
     const projectData = persistence.loadProject(projectId);
-    if (dbPath) {
-      persistence.close();
-    }
 
     if (!projectData) {
       return null;
@@ -108,7 +97,6 @@ export class Project {
   getInfo(): ProjectInfo | null {
     const persistence = getPersistence();
     const projectData = persistence.loadProject(this._id);
-    // Don't close the global persistence - it's managed by the persistence system
 
     if (!projectData) {
       return null;
@@ -210,14 +198,14 @@ export class Project {
 
   getSessions(): (SessionData & { agentCount: number })[] {
     const persistence = getPersistence();
-    const sessions = persistence.loadSessionsByProject(this._id);
+    const sessionDataList = persistence.loadSessionsByProject(this._id);
 
-    // Get agent counts for each session using efficient count query
-    return sessions.map((session) => {
-      const agentCount = persistence.getThreadCountBySession(session.id);
+    // Use persistence layer directly for agent counts to avoid async complexity
+    return sessionDataList.map((sessionData) => {
+      const agentCount = persistence.getThreadsBySession(sessionData.id).length;
 
       return {
-        ...session,
+        ...sessionData,
         agentCount,
       };
     });
