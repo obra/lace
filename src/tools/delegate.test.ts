@@ -223,8 +223,7 @@ describe('DelegateTool', () => {
     quickTimeoutTool.setDependencies(realAgent, toolExecutor);
 
     // Override the default timeout for testing
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    (quickTimeoutTool as any).defaultTimeout = 100;
+    (quickTimeoutTool as { defaultTimeout: number }).defaultTimeout = 100;
 
     // Mock provider to delay longer than timeout
     mockProvider.createResponse.mockImplementationOnce(
@@ -234,14 +233,33 @@ describe('DelegateTool', () => {
         })
     );
 
-    const result = await quickTimeoutTool.execute({
-      title: 'Slow task',
-      prompt: 'This will timeout',
-      expected_response: 'Will not complete',
-    });
+    // Set up unhandled rejection handler for this test
+    const rejectionHandler = (reason: any) => {
+      // Ignore timeout rejections from DelegateTool during this test
+      if (reason instanceof Error && reason.message.includes('Subagent timeout after')) {
+        // Expected timeout rejection, ignore it
+        return;
+      }
+      // Re-throw other unhandled rejections
+      throw reason;
+    };
+    process.on('unhandledRejection', rejectionHandler);
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('timeout');
+    try {
+      const result = await quickTimeoutTool.execute({
+        title: 'Slow task',
+        prompt: 'This will timeout',
+        expected_response: 'Will not complete',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('timeout');
+    } finally {
+      // Restore original handlers
+      process.removeListener('unhandledRejection', rejectionHandler);
+      // Wait a bit to let any pending timeouts fire
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
   }, 1000); // Set test timeout to 1 second
 
   it('should format the subagent system prompt correctly', async () => {

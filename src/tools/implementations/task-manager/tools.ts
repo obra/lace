@@ -127,11 +127,10 @@ export class TaskListTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  protected async executeValidated(
+  protected executeValidated(
     args: z.infer<typeof listTasksSchema>,
     context?: ToolContext
-  ): Promise<ToolResult> {
+  ): ToolResult {
     if (!context?.threadId) {
       return this.createError('No thread context available');
     }
@@ -469,11 +468,10 @@ export class TaskViewTool extends Tool {
   // This will be injected by the factory
   protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  protected async executeValidated(
+  protected executeValidated(
     args: z.infer<typeof viewTaskSchema>,
     context?: ToolContext
-  ): Promise<ToolResult> {
+  ): ToolResult {
     try {
       let task: Task | null = null;
 

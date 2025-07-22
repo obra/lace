@@ -7,7 +7,7 @@ import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
+import { ThreadManager, type ThreadEvent } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
 
 // Type helper for accessing private methods in tests
@@ -55,9 +55,34 @@ describe('Agent sendMessage Queue Option', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ToolExecutor;
 
+    let eventCount = 0;
+
     mockThreadManager = {
-      addEvent: vi.fn(),
-      getEvents: vi.fn().mockReturnValue([]),
+      addEvent: vi.fn((): ThreadEvent => {
+        eventCount++;
+        const event: ThreadEvent = {
+          id: `event_${eventCount}`,
+          threadId: 'test-thread',
+          type: 'USER_MESSAGE' as const,
+          data: 'test',
+          timestamp: new Date(),
+        };
+        return event;
+      }),
+      getEvents: vi.fn((): ThreadEvent[] => {
+        const events: ThreadEvent[] = [];
+        for (let i = 0; i < eventCount; i++) {
+          const event: ThreadEvent = {
+            id: `event_${i + 1}`,
+            threadId: 'test-thread',
+            type: 'USER_MESSAGE' as const,
+            data: 'test',
+            timestamp: new Date(),
+          };
+          events.push(event);
+        }
+        return events;
+      }),
       getSessionInfo: vi.fn().mockReturnValue({
         threadId: 'test-thread',
         model: 'test-model',

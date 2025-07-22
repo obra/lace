@@ -13,7 +13,7 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/
 // Type helper for accessing private methods in tests
 type _AgentWithPrivateMethods = Agent & {
   _setState: (state: 'thinking' | 'idle' | 'streaming' | 'tool_execution') => void;
-  _processMessage: (...args: any[]) => Promise<void>;
+  _processMessage: (...args: unknown[]) => Promise<void>;
 };
 
 // Mock provider for testing
@@ -247,8 +247,9 @@ describe('Agent Queue Processing', () => {
 
       // Directly setting state to non-idle shouldn't trigger queue processing
       // We can verify this by checking the queue remains unchanged
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      (agent as any)._setState('thinking');
+      const agentAny: Record<string, unknown> = agent;
+      const setState = agentAny._setState as (state: string) => void;
+      setState('thinking');
 
       // Wait a bit to ensure no async processing occurs
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -257,10 +258,8 @@ describe('Agent Queue Processing', () => {
       expect(statsAfterThinking.queueLength).toBe(1); // Queue unchanged
 
       // Similarly for other non-idle states
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      (agent as any)._setState('streaming');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      (agent as any)._setState('tool_execution');
+      setState('streaming');
+      setState('tool_execution');
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 

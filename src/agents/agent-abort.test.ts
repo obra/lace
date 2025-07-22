@@ -271,10 +271,13 @@ describe('Agent Abort Functionality', () => {
   describe('streaming abort support', () => {
     it('should pass abort signal to streaming provider methods', async () => {
       // Arrange
-      const streamingProvider = new MockAbortableProvider({
-        content: 'Streaming response',
-        toolCalls: [],
-      });
+      const streamingProvider = new MockAbortableProvider(
+        {
+          content: 'Streaming response',
+          toolCalls: [],
+        },
+        100
+      ); // 100ms delay to allow abort
 
       // Make it support streaming
       Object.defineProperty(streamingProvider, 'supportsStreaming', {
