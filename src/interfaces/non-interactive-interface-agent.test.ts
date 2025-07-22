@@ -46,43 +46,56 @@ describe('NonInteractiveInterface Agent API Usage', () => {
   });
 
   describe('clearSession', () => {
-    it('should use Agent.generateThreadId() instead of direct ThreadManager access', () => {
-      // Arrange
+    it('should create a new thread in the ThreadManager', () => {
       const agentGenerateThreadIdSpy = vi.spyOn(agent, 'generateThreadId');
-
-      // Act
-      nonInteractiveInterface.clearSession();
-
-      // Assert - Should use Agent API
-      expect(agentGenerateThreadIdSpy).toHaveBeenCalled();
-    });
-
-    it('should use Agent.createThread() instead of direct ThreadManager access', () => {
-      // Arrange
       const agentCreateThreadSpy = vi.spyOn(agent, 'createThread');
 
-      // Act
+      // Execute clearSession
       nonInteractiveInterface.clearSession();
 
-      // Assert - Should use Agent API
+      // Test actual behavior - Agent API methods are called to create new thread
+      expect(agentGenerateThreadIdSpy).toHaveBeenCalled();
       expect(agentCreateThreadSpy).toHaveBeenCalled();
     });
 
-    it('should create new thread through Agent API', () => {
-      // Arrange
-      const agentGenerateThreadIdSpy = vi
-        .spyOn(agent, 'generateThreadId')
-        .mockReturnValue('test-thread-123');
+    it('should use Agent API rather than direct ThreadManager access', () => {
+      const agentGenerateThreadIdSpy = vi.spyOn(agent, 'generateThreadId');
       const agentCreateThreadSpy = vi.spyOn(agent, 'createThread');
 
-      // Act
+      // Execute clearSession multiple times
+      nonInteractiveInterface.clearSession();
       nonInteractiveInterface.clearSession();
 
-      // Assert
-      expect(agentGenerateThreadIdSpy).toHaveBeenCalled();
-      expect(agentCreateThreadSpy).toHaveBeenCalledWith('test-thread-123');
+      // Test actual behavior - each call uses Agent API
+      expect(agentGenerateThreadIdSpy).toHaveBeenCalledTimes(2);
+      expect(agentCreateThreadSpy).toHaveBeenCalledTimes(2);
     });
 
-    // All thread operations go through Agent API
+    it('should generate thread IDs through Agent API', () => {
+      const testThreadId = 'test-thread-123';
+      const agentGenerateThreadIdSpy = vi
+        .spyOn(agent, 'generateThreadId')
+        .mockReturnValue(testThreadId);
+      const agentCreateThreadSpy = vi.spyOn(agent, 'createThread');
+
+      // Execute clearSession
+      nonInteractiveInterface.clearSession();
+
+      // Test actual behavior - generated thread ID is used for creation
+      expect(agentGenerateThreadIdSpy).toHaveBeenCalled();
+      expect(agentCreateThreadSpy).toHaveBeenCalledWith(testThreadId);
+    });
+
+    it('should maintain agent thread consistency', () => {
+      const initialThreadId = agent.getThreadId();
+
+      // Execute clearSession
+      nonInteractiveInterface.clearSession();
+
+      // Test actual behavior - agent maintains its original thread ID
+      // (clearSession creates new threads but doesn't switch the agent to them)
+      expect(agent.getThreadId()).toBe(initialThreadId);
+      expect(agent.getThreadId()).toBeDefined();
+    });
   });
 });

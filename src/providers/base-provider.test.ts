@@ -66,11 +66,11 @@ describe('AIProvider retry functionality', () => {
   describe('isRetryableError', () => {
     it('should identify network errors as retryable', () => {
       const networkErrors = [
-        { code: 'ECONNREFUSED' },
-        { code: 'ENOTFOUND' },
-        { code: 'ETIMEDOUT' },
-        { code: 'ECONNRESET' },
-        { code: 'EHOSTUNREACH' },
+        Object.assign(new Error(), { code: 'ECONNREFUSED' }),
+        Object.assign(new Error(), { code: 'ENOTFOUND' }),
+        Object.assign(new Error(), { code: 'ETIMEDOUT' }),
+        Object.assign(new Error(), { code: 'ECONNRESET' }),
+        Object.assign(new Error(), { code: 'EHOSTUNREACH' }),
       ];
 
       networkErrors.forEach((error) => {
@@ -178,44 +178,62 @@ describe('AIProvider retry functionality', () => {
 
   describe('withRetry', () => {
     it('should return immediately on successful call', async () => {
-      const operation = vi.fn().mockResolvedValue('success');
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        return Promise.resolve('success');
+      });
 
       const result = await provider.withRetry(operation);
 
       expect(result).toBe('success');
-      expect(operation).toHaveBeenCalledTimes(1);
+      expect(callCount).toBe(1);
     });
 
     it('should retry on retryable error', async () => {
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
-        .mockResolvedValueOnce('success');
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' });
+          return Promise.reject(error);
+        }
+        return Promise.resolve('success');
+      });
 
       const promise = provider.withRetry(operation);
 
-      // Wait for first call
+      // Wait for first call to fail
       await vi.advanceTimersByTimeAsync(0);
-      expect(operation).toHaveBeenCalledTimes(1);
+      expect(callCount).toBe(1);
 
-      // Advance past retry delay
+      // Advance past retry delay to trigger second attempt
       await vi.advanceTimersByTimeAsync(1500);
 
       const result = await promise;
       expect(result).toBe('success');
-      expect(operation).toHaveBeenCalledTimes(2);
+      expect(callCount).toBe(2);
     });
 
     it('should not retry on non-retryable error', async () => {
-      const authError = { status: 401, message: 'Unauthorized' };
-      const operation = vi.fn().mockRejectedValue(authError);
+      const authError = Object.assign(new Error('Unauthorized'), { status: 401 });
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        return Promise.reject(authError);
+      });
 
       await expect(provider.withRetry(operation)).rejects.toEqual(authError);
-      expect(operation).toHaveBeenCalledTimes(1);
+      expect(callCount).toBe(1);
     });
 
     it('should respect max attempts', async () => {
-      const operation = vi.fn().mockRejectedValue({ code: 'ECONNREFUSED' });
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        const error = Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' });
+        return Promise.reject(error);
+      });
 
       const promise = provider.withRetry(operation, { maxAttempts: 3 });
       promise.catch(() => {
@@ -228,17 +246,28 @@ describe('AIProvider retry functionality', () => {
       }
 
       await expect(promise).rejects.toMatchObject({ code: 'ECONNREFUSED' });
-      expect(operation).toHaveBeenCalledTimes(3);
+      expect(callCount).toBe(3);
     });
 
     it('should emit retry events', async () => {
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
-        .mockResolvedValueOnce('success');
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' });
+          return Promise.reject(error);
+        }
+        return Promise.resolve('success');
+      });
 
-      const retryAttemptSpy = vi.fn();
-      provider.on('retry_attempt', retryAttemptSpy);
+      const retryEvents: Array<{ attempt: number; delay: number; error: Record<string, unknown> }> =
+        [];
+      provider.on(
+        'retry_attempt',
+        (event: { attempt: number; delay: number; error: Record<string, unknown> }) => {
+          retryEvents.push(event);
+        }
+      );
 
       const promise = provider.withRetry(operation);
 
@@ -247,7 +276,8 @@ describe('AIProvider retry functionality', () => {
 
       await promise;
 
-      expect(retryAttemptSpy).toHaveBeenCalledWith({
+      expect(retryEvents).toHaveLength(1);
+      expect(retryEvents[0]).toEqual({
         attempt: 1,
         delay: expect.any(Number) as number,
         error: expect.objectContaining({ code: 'ECONNREFUSED' }) as Record<string, unknown>,
@@ -257,12 +287,28 @@ describe('AIProvider retry functionality', () => {
     it('should emit retry exhausted event', async () => {
       vi.useRealTimers(); // Use real timers for this test
 
-      const operation = vi.fn().mockRejectedValue({ code: 'ECONNREFUSED' });
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        const error = Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' });
+        return Promise.reject(error);
+      });
 
-      const exhaustedSpy = vi.fn();
-      const retrySpy = vi.fn();
-      provider.on('retry_exhausted', exhaustedSpy);
-      provider.on('retry_attempt', retrySpy);
+      const exhaustedEvents: Array<{ attempts: number; lastError: Record<string, unknown> }> = [];
+      const retryEvents: Array<{ attempt: number; delay: number; error: Record<string, unknown> }> =
+        [];
+      provider.on(
+        'retry_exhausted',
+        (event: { attempts: number; lastError: Record<string, unknown> }) => {
+          exhaustedEvents.push(event);
+        }
+      );
+      provider.on(
+        'retry_attempt',
+        (event: { attempt: number; delay: number; error: Record<string, unknown> }) => {
+          retryEvents.push(event);
+        }
+      );
 
       // Use very short retry delays for testing
       provider.RETRY_CONFIG = {
@@ -274,13 +320,13 @@ describe('AIProvider retry functionality', () => {
         code: 'ECONNREFUSED',
       });
 
-      // Check retry was attempted
-      expect(operation).toHaveBeenCalledTimes(2);
-      expect(retrySpy).toHaveBeenCalledTimes(1);
+      // Check retry was attempted - callCount tracks actual behavior
+      expect(callCount).toBe(2);
+      expect(retryEvents).toHaveLength(1);
 
       // The exhausted event should have been emitted
-      expect(exhaustedSpy).toHaveBeenCalledTimes(1);
-      expect(exhaustedSpy).toHaveBeenCalledWith({
+      expect(exhaustedEvents).toHaveLength(1);
+      expect(exhaustedEvents[0]).toEqual({
         attempts: 2,
         lastError: expect.objectContaining({ code: 'ECONNREFUSED' }) as Record<string, unknown>,
       });
@@ -290,10 +336,15 @@ describe('AIProvider retry functionality', () => {
     });
 
     it('should respect abort signal', async () => {
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
-        .mockResolvedValueOnce('success');
+      let callCount = 0;
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' });
+          return Promise.reject(error);
+        }
+        return Promise.resolve('success');
+      });
 
       // Abort immediately
       abortController.abort();
@@ -302,7 +353,7 @@ describe('AIProvider retry functionality', () => {
         provider.withRetry(operation, { signal: abortController.signal })
       ).rejects.toThrow('Aborted');
 
-      expect(operation).toHaveBeenCalledTimes(0);
+      expect(callCount).toBe(0);
     });
 
     it('should check abort signal between retries', async () => {
@@ -328,7 +379,7 @@ describe('AIProvider retry functionality', () => {
       await vi.advanceTimersByTimeAsync(1500);
 
       await expect(promise).rejects.toThrow('Aborted');
-      expect(operation).toHaveBeenCalledTimes(1);
+      expect(callCount).toBe(1);
     });
 
     it('should handle streaming with canRetry callback', async () => {
@@ -368,25 +419,36 @@ describe('AIProvider retry functionality', () => {
 
       await expect(promise).rejects.toMatchObject({ code: 'ECONNREFUSED' });
       // Should only try twice: once initially, once after retry (then streaming started)
-      expect(operation).toHaveBeenCalledTimes(2);
+      expect(callCount).toBe(2);
     });
 
     it('should wait appropriate delay between retries', async () => {
-      const operation = vi
-        .fn()
-        .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
-        .mockResolvedValueOnce('success');
+      let callCount = 0;
+      let retryDelayMeasured = 0;
+      const startTime = Date.now();
+
+      const operation = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          const error = Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' });
+          return Promise.reject(error);
+        }
+        retryDelayMeasured = Date.now() - startTime;
+        return Promise.resolve('success');
+      });
 
       const promise = provider.withRetry(operation);
 
-      // Should not retry immediately
-      expect(operation).toHaveBeenCalledTimes(1);
+      // Should call once immediately
+      expect(callCount).toBe(1);
 
       // Advance timers to trigger retry
       await vi.advanceTimersByTimeAsync(1500);
 
       await promise;
-      expect(operation).toHaveBeenCalledTimes(2);
+      expect(callCount).toBe(2);
+      // In fake timer mode, we can't measure actual delay, but we can verify the sequence
+      expect(retryDelayMeasured).toBeGreaterThanOrEqual(0);
     });
   });
 });

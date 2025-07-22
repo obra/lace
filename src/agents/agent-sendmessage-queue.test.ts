@@ -86,37 +86,40 @@ describe('Agent sendMessage Queue Option', () => {
 
   describe('when agent is idle', () => {
     it('should process message immediately without queue option', async () => {
-      // Mock the actual message processing
-      const originalSendMessage = agent.sendMessage.bind(agent);
-      let processedImmediately = false;
-
-      vi.spyOn(agent, 'sendMessage').mockImplementation(async (content, options) => {
-        if (options?.queue) {
-          return originalSendMessage(content, options);
-        }
-        processedImmediately = true;
-      });
+      const initialThreadEvents = mockThreadManager.getEvents('test-thread').length;
 
       await agent.sendMessage('test message');
 
-      expect(processedImmediately).toBe(true);
+      // Verify message was processed immediately (added to thread)
+      const finalThreadEvents = mockThreadManager.getEvents('test-thread').length;
+      expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
+
+      // Verify the message appears in thread manager calls
+      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
+        .calls;
+      expect(
+        addEventCalls.some((call) => call[1] === 'USER_MESSAGE' && call[2] === 'test message')
+      ).toBe(true);
 
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(0);
     });
 
     it('should process message immediately even with queue option', async () => {
-      let processedImmediately = false;
-
-      // Mock to track immediate processing
-      vi.spyOn(agent, 'sendMessage').mockImplementation(() => {
-        processedImmediately = true;
-        return Promise.resolve();
-      });
+      const initialThreadEvents = mockThreadManager.getEvents('test-thread').length;
 
       await agent.sendMessage('test message', { queue: true });
 
-      expect(processedImmediately).toBe(true);
+      // Verify message was processed immediately (added to thread) even with queue option
+      const finalThreadEvents = mockThreadManager.getEvents('test-thread').length;
+      expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
+
+      // Verify the message appears in thread manager calls
+      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
+        .calls;
+      expect(
+        addEventCalls.some((call) => call[1] === 'USER_MESSAGE' && call[2] === 'test message')
+      ).toBe(true);
     });
   });
 
@@ -183,23 +186,20 @@ describe('Agent sendMessage Queue Option', () => {
       await agent.sendMessage('message 1', { queue: true });
       await agent.sendMessage('message 2', { queue: true });
 
-      const processedMessages: string[] = [];
-
-      // Mock _processMessage instead since that's what gets called during queue processing
-      vi.spyOn(agent as unknown as AgentWithPrivateMethods, '_processMessage').mockImplementation(
-        (...args: any[]) => {
-          processedMessages.push(args[0] as string);
-          return Promise.resolve();
-        }
-      );
-
-      // Return to idle
+      // Return to idle - this should trigger queue processing
       (agent as unknown as AgentWithPrivateMethods)._setState('idle');
 
       // Allow async processing
-      await new Promise((resolve) => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(processedMessages).toEqual(['message 1', 'message 2']);
+      // Verify messages were processed by checking thread manager calls
+      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
+        .calls;
+      const userMessageCalls = addEventCalls.filter((call) => call[1] === 'USER_MESSAGE');
+      const messageContents = userMessageCalls.map((call: unknown[]) => call[2] as string);
+
+      expect(messageContents).toContain('message 1');
+      expect(messageContents).toContain('message 2');
 
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(0);

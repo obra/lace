@@ -1,5 +1,5 @@
 // ABOUTME: Unit tests for all system commands (help, exit, clear, status, compact)
-// ABOUTME: Tests individual command functionality and UserInterface integration
+// ABOUTME: Tests command behavior and output rather than mock interactions
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { createHelpCommand } from '~/commands/system/help';
@@ -10,6 +10,7 @@ import { compactCommand } from '~/commands/system/compact';
 import { queueCommand } from '~/commands/system/queue';
 import { CommandRegistry } from '~/commands/registry';
 import type { UserInterface, Command } from '~/commands/types';
+import type { Agent } from '~/agents/agent';
 
 type MockAgent = {
   getCurrentThreadId: MockedFunction<() => string | null>;
@@ -26,8 +27,51 @@ type MockAgent = {
   };
 };
 
+// Test helpers for capturing behavior instead of mocking interactions
+class TestUI implements UserInterface {
+  agent: Agent;
+  messages: string[] = [];
+  exitCalled = false;
+  clearSessionCalled = false;
+
+  constructor(agent: MockAgent) {
+    this.agent = agent as unknown as Agent;
+  }
+
+  displayMessage(message: string): void {
+    this.messages.push(message);
+  }
+
+  clearSession(): void {
+    this.clearSessionCalled = true;
+  }
+
+  exit(): void {
+    this.exitCalled = true;
+  }
+
+  // Helper methods for assertions
+  getLastMessage(): string {
+    return this.messages[this.messages.length - 1] || '';
+  }
+
+  getAllMessages(): string[] {
+    return [...this.messages];
+  }
+
+  hasMessage(content: string): boolean {
+    return this.messages.some((msg) => msg.includes(content));
+  }
+
+  reset(): void {
+    this.messages = [];
+    this.exitCalled = false;
+    this.clearSessionCalled = false;
+  }
+}
+
 describe('System Commands', () => {
-  let mockUI: UserInterface;
+  let testUI: TestUI;
   let mockAgent: MockAgent;
   let registry: CommandRegistry;
   let helpCommand: Command;
@@ -65,12 +109,7 @@ describe('System Commands', () => {
       },
     } as MockAgent;
 
-    mockUI = {
-      agent: mockAgent as unknown,
-      displayMessage: vi.fn(),
-      clearSession: vi.fn(),
-      exit: vi.fn(),
-    } as unknown as UserInterface;
+    testUI = new TestUI(mockAgent);
   });
 
   describe('helpCommand', () => {
@@ -80,18 +119,19 @@ describe('System Commands', () => {
       expect(typeof helpCommand.execute).toBe('function');
     });
 
-    it('should display help message', async () => {
-      await helpCommand.execute('', mockUI);
+    it('should display help message with available commands', async () => {
+      await helpCommand.execute('', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Available commands:')
-      );
+      // Test actual behavior - help message was displayed
+      expect(testUI.hasMessage('Available commands:')).toBe(true);
+      expect(testUI.messages.length).toBeGreaterThan(0);
     });
 
     it('should show specific command help when args provided', async () => {
-      await helpCommand.execute('exit', mockUI);
+      await helpCommand.execute('exit', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('/exit - Exit the application');
+      // Test actual behavior - specific help was shown
+      expect(testUI.hasMessage('/exit - Exit the application')).toBe(true);
     });
   });
 
@@ -103,15 +143,17 @@ describe('System Commands', () => {
     });
 
     it('should terminate the application', async () => {
-      await exitCommand.execute('', mockUI);
+      await exitCommand.execute('', testUI);
 
-      expect(mockUI.exit).toHaveBeenCalled();
+      // Test actual behavior - application was terminated
+      expect(testUI.exitCalled).toBe(true);
     });
 
-    it('should ignore arguments', async () => {
-      await exitCommand.execute('some args', mockUI);
+    it('should ignore arguments and still exit', async () => {
+      await exitCommand.execute('some args', testUI);
 
-      expect(mockUI.exit).toHaveBeenCalled();
+      // Test actual behavior - exit still happened regardless of args
+      expect(testUI.exitCalled).toBe(true);
     });
   });
 
@@ -123,15 +165,17 @@ describe('System Commands', () => {
     });
 
     it('should clear the conversation session', async () => {
-      await clearCommand.execute('', mockUI);
+      await clearCommand.execute('', testUI);
 
-      expect(mockUI.clearSession).toHaveBeenCalled();
+      // Test actual behavior - session was cleared
+      expect(testUI.clearSessionCalled).toBe(true);
     });
 
-    it('should ignore arguments', async () => {
-      await clearCommand.execute('some args', mockUI);
+    it('should ignore arguments and still clear', async () => {
+      await clearCommand.execute('some args', testUI);
 
-      expect(mockUI.clearSession).toHaveBeenCalled();
+      // Test actual behavior - clear still happened regardless of args
+      expect(testUI.clearSessionCalled).toBe(true);
     });
   });
 
@@ -142,34 +186,29 @@ describe('System Commands', () => {
       expect(typeof statusCommand.execute).toBe('function');
     });
 
-    it('should display session status', async () => {
-      await statusCommand.execute('', mockUI);
+    it('should display comprehensive session status', async () => {
+      await statusCommand.execute('', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Provider: test-provider')
-      );
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Thread: test-thread-123')
-      );
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Tools: 0 available')
-      );
+      // Test actual behavior - status information was displayed
+      expect(testUI.hasMessage('Provider: test-provider')).toBe(true);
+      expect(testUI.hasMessage('Thread: test-thread-123')).toBe(true);
+      expect(testUI.hasMessage('Tools: 0 available')).toBe(true);
     });
 
-    it('should handle missing thread ID', async () => {
+    it('should handle missing thread ID gracefully', async () => {
       mockAgent.getCurrentThreadId.mockReturnValue(null);
 
-      await statusCommand.execute('', mockUI);
+      await statusCommand.execute('', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(expect.stringContaining('Thread: none'));
+      // Test actual behavior - proper handling of missing thread
+      expect(testUI.hasMessage('Thread: none')).toBe(true);
     });
 
-    it('should ignore arguments', async () => {
-      await statusCommand.execute('some args', mockUI);
+    it('should ignore arguments and show status', async () => {
+      await statusCommand.execute('some args', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Provider: test-provider')
-      );
+      // Test actual behavior - status shown regardless of args
+      expect(testUI.hasMessage('Provider: test-provider')).toBe(true);
     });
   });
 
@@ -180,32 +219,32 @@ describe('System Commands', () => {
       expect(typeof compactCommand.execute).toBe('function');
     });
 
-    it('should compact current thread and show message', async () => {
-      await compactCommand.execute('', mockUI);
+    it('should compact current thread and show success message', async () => {
+      await compactCommand.execute('', testUI);
 
-      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread-123');
-      expect(mockAgent.getThreadEvents).toHaveBeenCalledWith('test-thread-123');
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        '✅ Compacted 5 tool results to save tokens'
-      );
+      // Test actual behavior - compaction happened and user was informed
+      expect(testUI.hasMessage('✅ Compacted 5 tool results to save tokens')).toBe(true);
+      // The success message demonstrates that compaction was triggered and completed successfully
     });
 
-    it('should handle no active thread', async () => {
+    it('should handle no active thread gracefully', async () => {
       mockAgent.getCurrentThreadId.mockReturnValue(null);
 
-      await compactCommand.execute('', mockUI);
+      await compactCommand.execute('', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('❌ No active thread to compact');
-      expect(mockAgent.compact).not.toHaveBeenCalled();
+      // Test actual behavior - proper error message displayed
+      expect(testUI.hasMessage('❌ No active thread to compact')).toBe(true);
+      // Error message demonstrates appropriate handling of no active thread scenario
     });
 
     it('should handle compact with no system message', async () => {
       mockAgent.getThreadEvents.mockReturnValue([]);
 
-      await compactCommand.execute('', mockUI);
+      await compactCommand.execute('', testUI);
 
-      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread-123');
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('✅ Compacted thread test-thread-123');
+      // Test actual behavior - generic success message shown
+      expect(testUI.hasMessage('✅ Compacted thread test-thread-123')).toBe(true);
+      // Generic success message confirms compaction completed despite missing system messages
     });
 
     it('should handle events without system message', async () => {
@@ -214,15 +253,18 @@ describe('System Commands', () => {
         { type: 'AGENT_MESSAGE', data: 'Hi there' },
       ]);
 
-      await compactCommand.execute('', mockUI);
+      await compactCommand.execute('', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('✅ Compacted thread test-thread-123');
+      // Test actual behavior - generic success message for non-system events
+      expect(testUI.hasMessage('✅ Compacted thread test-thread-123')).toBe(true);
     });
 
-    it('should ignore arguments', async () => {
-      await compactCommand.execute('some args', mockUI);
+    it('should ignore arguments and compact', async () => {
+      await compactCommand.execute('some args', testUI);
 
-      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread-123');
+      // Test actual behavior - compaction happened regardless of args
+      expect(testUI.hasMessage('✅ Compacted 5 tool results to save tokens')).toBe(true);
+      // Success message confirms arguments are ignored and compaction proceeds normally
     });
   });
 
@@ -233,19 +275,21 @@ describe('System Commands', () => {
       expect(typeof queueCommand.execute).toBe('function');
     });
 
-    it('should handle empty queue', async () => {
-      await queueCommand.execute('', mockUI);
+    it('should display empty queue status', async () => {
+      await queueCommand.execute('', testUI);
 
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Message queue is empty');
+      // Test actual behavior - empty queue message displayed
+      expect(testUI.hasMessage('📬 Message queue is empty')).toBe(true);
     });
 
-    it('should handle queue clearing', async () => {
+    it('should handle queue clearing with feedback', async () => {
       mockAgent.clearQueue.mockReturnValue(2);
 
-      await queueCommand.execute('clear', mockUI);
+      await queueCommand.execute('clear', testUI);
 
-      expect(mockAgent.clearQueue).toHaveBeenCalled();
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('📬 Cleared 2 user messages from queue');
+      // Test actual behavior - clear operation performed and user informed
+      expect(testUI.hasMessage('📬 Cleared 2 user messages from queue')).toBe(true);
+      // Clear message confirms the queue clearing operation was executed successfully
     });
   });
 

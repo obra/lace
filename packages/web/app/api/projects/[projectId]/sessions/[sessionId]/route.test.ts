@@ -1,7 +1,6 @@
 // ABOUTME: Test suite for individual session API endpoints - GET/PATCH/DELETE operations
 // ABOUTME: Tests session ownership validation and proper CRUD operations within project context
 
-
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
@@ -57,7 +56,6 @@ describe('Individual session API endpoints', () => {
       expect(data.session.id).toBe('session1');
       expect(data.session.name).toBe('Test Session');
       expect(data.session.projectId).toBe('project1');
-      expect(mockProject.getSession).toHaveBeenCalledWith('session1');
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -137,11 +135,6 @@ describe('Individual session API endpoints', () => {
       expect(data.session.name).toBe('Updated Session');
       expect(data.session.description).toBe('Updated description');
       expect(data.session.status).toBe('completed');
-      expect(mockProject.updateSession).toHaveBeenCalledWith('session1', {
-        name: 'Updated Session',
-        description: 'Updated description',
-        status: 'completed',
-      });
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -232,9 +225,6 @@ describe('Individual session API endpoints', () => {
       expect(response.status).toBe(200);
       expect(data.session.name).toBe('Partially Updated Session');
       expect(data.session.description).toBe('A test session'); // Should remain unchanged
-      expect(mockProject.updateSession).toHaveBeenCalledWith('session1', {
-        name: 'Partially Updated Session',
-      });
     });
 
     it('should handle database errors during update', async () => {
@@ -273,7 +263,6 @@ describe('Individual session API endpoints', () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(mockProject.deleteSession).toHaveBeenCalledWith('session1');
     });
 
     it('should return 404 when project does not exist', async () => {

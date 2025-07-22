@@ -412,10 +412,6 @@ describe('Enhanced Agent', () => {
 
       toolExecutor.registerTool(failingTool.name, failingTool);
 
-      // Mock tool executor to throw error
-      const executeSpy = vi.spyOn(toolExecutor, 'executeTool');
-      executeSpy.mockRejectedValueOnce(new Error('Execution error'));
-
       const errorEvents: Array<{ toolName: string; result: ToolResult; callId: string }> = [];
       agent.on('tool_call_complete', (data) => {
         if (data.result.isError) {
@@ -427,7 +423,7 @@ describe('Enhanced Agent', () => {
 
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0].result.isError).toBe(true);
-      expect(errorEvents[0].result.content[0].text).toBe('Execution error');
+      expect(errorEvents[0].result.content[0].text).toBe('Tool failed');
     });
 
     it('should recurse for next response after tool execution', async () => {
@@ -944,29 +940,39 @@ describe('Enhanced Agent', () => {
       });
 
       it('should fall back to createResponse method', async () => {
-        const createResponseSpy = vi.spyOn(nonStreamingProvider, 'createResponse');
-        const createStreamingSpy = vi.spyOn(nonStreamingProvider, 'createStreamingResponse');
-
+        // Test actual behavior: should receive response from non-streaming provider
         await agent.sendMessage('Test fallback');
 
-        expect(createResponseSpy).toHaveBeenCalled();
-        expect(createStreamingSpy).not.toHaveBeenCalled();
+        // Verify the agent processed a response (state returns to idle)
+        expect(agent.getCurrentState()).toBe('idle');
+
+        // Verify response was added to thread
+        const events = threadManager.getEvents(threadId);
+        const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
+        expect(agentMessages).toHaveLength(1);
+        expect(agentMessages[0].data).toBe('Non-streaming response');
       });
     });
 
     describe('streaming configuration', () => {
       it('should prefer streaming when both supported and configured', async () => {
         const streamingProvider = new MockStreamingProvider({ streaming: true });
-        const createStreamingSpy = vi.spyOn(streamingProvider, 'createStreamingResponse');
-        const createResponseSpy = vi.spyOn(streamingProvider, 'createResponse');
-
         agent = createAgent({ provider: streamingProvider });
         await agent.start();
 
+        const tokenEvents: string[] = [];
+        agent.on('agent_token', ({ token }) => {
+          tokenEvents.push(token);
+        });
+
         await agent.sendMessage('Test streaming preference');
 
-        expect(createStreamingSpy).toHaveBeenCalled();
-        expect(createResponseSpy).not.toHaveBeenCalled();
+        // Verify streaming behavior occurred (tokens were emitted)
+        expect(tokenEvents.length).toBeGreaterThan(0);
+        expect(tokenEvents.join('')).toContain('Streaming');
+
+        // Verify final response was processed
+        expect(agent.getCurrentState()).toBe('idle');
 
         agent.removeAllListeners();
         streamingProvider.removeAllListeners();
@@ -974,16 +980,24 @@ describe('Enhanced Agent', () => {
 
       it('should use non-streaming when supported but not configured', async () => {
         const streamingProvider = new MockStreamingProvider({ streaming: false });
-        const createStreamingSpy = vi.spyOn(streamingProvider, 'createStreamingResponse');
-        const createResponseSpy = vi.spyOn(streamingProvider, 'createResponse');
-
         agent = createAgent({ provider: streamingProvider });
         await agent.start();
 
+        const tokenEvents: string[] = [];
+        agent.on('agent_token', ({ token }) => {
+          tokenEvents.push(token);
+        });
+
         await agent.sendMessage('Test non-streaming when disabled');
 
-        expect(createStreamingSpy).not.toHaveBeenCalled();
-        expect(createResponseSpy).toHaveBeenCalled();
+        // Verify non-streaming behavior (no tokens emitted)
+        expect(tokenEvents).toHaveLength(0);
+
+        // Verify final response was processed
+        expect(agent.getCurrentState()).toBe('idle');
+        const events = threadManager.getEvents(threadId);
+        const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
+        expect(agentMessages).toHaveLength(1);
 
         agent.removeAllListeners();
         streamingProvider.removeAllListeners();

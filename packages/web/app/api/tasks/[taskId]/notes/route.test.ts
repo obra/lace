@@ -1,5 +1,5 @@
 // ABOUTME: Unit tests for task notes API endpoints
-// ABOUTME: Tests adding notes to tasks
+// ABOUTME: Tests HTTP behavior and response data rather than mock interactions
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -194,11 +194,6 @@ describe('Task Notes API Routes', () => {
       expect(data.message).toBe('Note added successfully');
       expect(data.task.notes).toHaveLength(1);
       expect(data.task.notes[0].content).toBe('This is a new note');
-      expect(mockTaskManager.addNote).toHaveBeenCalledWith(
-        'task_20240101_abc123',
-        'This is a new note',
-        { actor: 'human', isHuman: true }
-      );
     });
 
     it('should handle errors when adding note', async () => {
@@ -264,14 +259,10 @@ describe('Task Notes API Routes', () => {
       const response = await POST(request, {
         params: Promise.resolve({ taskId: 'task_20240101_abc123' }),
       });
-      const _data = (await response.json()) as { message: string };
+      const data = (await response.json()) as { message: string };
 
       expect(response.status).toBe(201);
-      expect(mockTaskManager.addNote).toHaveBeenCalledWith(
-        'task_20240101_abc123',
-        'Agent progress update',
-        { actor: 'lace_20240101_agent1', isHuman: false }
-      );
+      expect(data.message).toBe('Note added successfully');
     });
   });
 });

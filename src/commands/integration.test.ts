@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CommandRegistry } from '~/commands/registry';
 import { CommandExecutor } from '~/commands/executor';
 import type { UserInterface } from '~/commands/types';
+import type { Agent } from '~/agents/agent';
 
 type MockAgent = {
   getCurrentThreadId: () => string;
@@ -25,8 +26,68 @@ type MockAgent = {
   };
 };
 
+// Test helper for capturing command system integration behavior
+class TestUI implements UserInterface {
+  agent: Agent;
+  messages: string[] = [];
+  exitCalled = false;
+  clearSessionCalled = false;
+  commandExecutionResults: {
+    lastCommandName?: string;
+    executionSuccess: boolean;
+    compactionPerformed: boolean;
+  } = { executionSuccess: false, compactionPerformed: false };
+
+  constructor(agent: MockAgent) {
+    this.agent = agent as unknown as Agent;
+  }
+
+  displayMessage(message: string): void {
+    this.messages.push(message);
+  }
+
+  clearSession(): void {
+    this.clearSessionCalled = true;
+  }
+
+  exit(): void {
+    this.exitCalled = true;
+  }
+
+  // Helper methods for integration testing
+  getLastMessage(): string {
+    return this.messages[this.messages.length - 1] || '';
+  }
+
+  getAllMessages(): string[] {
+    return [...this.messages];
+  }
+
+  hasMessage(content: string): boolean {
+    return this.messages.some((msg) => msg.includes(content));
+  }
+
+  getCommandResults() {
+    return {
+      helpDisplayed: this.hasMessage('Available commands:'),
+      statusDisplayed: this.hasMessage('Provider:'),
+      unknownCommandError: this.hasMessage('Unknown command:'),
+      exitTriggered: this.exitCalled,
+      sessionCleared: this.clearSessionCalled,
+      compactionTriggered: this.hasMessage('✅ Compacted thread'), // Check for actual compaction success message
+    };
+  }
+
+  reset(): void {
+    this.messages = [];
+    this.exitCalled = false;
+    this.clearSessionCalled = false;
+    this.commandExecutionResults = { executionSuccess: false, compactionPerformed: false };
+  }
+}
+
 describe('Command System Integration', () => {
-  let mockUI: UserInterface;
+  let testUI: TestUI;
   let mockAgent: MockAgent;
 
   beforeEach(() => {
@@ -51,12 +112,7 @@ describe('Command System Integration', () => {
       },
     } as MockAgent;
 
-    mockUI = {
-      agent: mockAgent as unknown,
-      displayMessage: vi.fn(),
-      clearSession: vi.fn(),
-      exit: vi.fn(),
-    } as unknown as UserInterface;
+    testUI = new TestUI(mockAgent);
   });
 
   describe('auto-discovery and execution', () => {
@@ -83,12 +139,12 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute help command
-      await executor.execute('/help', mockUI);
+      await executor.execute('/help', testUI);
 
-      // Should display help message
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Available commands:')
-      );
+      // Test actual behavior - help was displayed with command list
+      const results = testUI.getCommandResults();
+      expect(results.helpDisplayed).toBe(true);
+      expect(testUI.hasMessage('Available commands:')).toBe(true);
     });
 
     it('should execute status command successfully', async () => {
@@ -96,12 +152,12 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute status command
-      await executor.execute('/status', mockUI);
+      await executor.execute('/status', testUI);
 
-      // Should display status information
-      expect(mockUI.displayMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Provider: test-provider')
-      );
+      // Test actual behavior - status information was displayed
+      const results = testUI.getCommandResults();
+      expect(results.statusDisplayed).toBe(true);
+      expect(testUI.hasMessage('Provider: test-provider')).toBe(true);
     });
 
     it('should execute exit command successfully', async () => {
@@ -109,10 +165,11 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute exit command
-      await executor.execute('/exit', mockUI);
+      await executor.execute('/exit', testUI);
 
-      // Should call UI exit method
-      expect(mockUI.exit).toHaveBeenCalled();
+      // Test actual behavior - application exit was triggered
+      const results = testUI.getCommandResults();
+      expect(results.exitTriggered).toBe(true);
     });
 
     it('should execute clear command successfully', async () => {
@@ -120,10 +177,11 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute clear command
-      await executor.execute('/clear', mockUI);
+      await executor.execute('/clear', testUI);
 
-      // Should call UI clearSession method
-      expect(mockUI.clearSession).toHaveBeenCalled();
+      // Test actual behavior - session was cleared
+      const results = testUI.getCommandResults();
+      expect(results.sessionCleared).toBe(true);
     });
 
     it('should execute compact command successfully', async () => {
@@ -131,10 +189,12 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute compact command
-      await executor.execute('/compact', mockUI);
+      await executor.execute('/compact', testUI);
 
-      // Should call agent compact (new API)
-      expect(mockAgent.compact).toHaveBeenCalledWith('test-thread');
+      // Test actual behavior - compaction command executed and displayed success message
+      const results = testUI.getCommandResults();
+      expect(results.compactionTriggered).toBe(true);
+      expect(testUI.hasMessage('✅ Compacted thread test-thread')).toBe(true);
     });
 
     it('should handle unknown commands gracefully', async () => {
@@ -142,10 +202,12 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute unknown command
-      await executor.execute('/unknown', mockUI);
+      await executor.execute('/unknown', testUI);
 
-      // Should display error message
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('Unknown command: unknown');
+      // Test actual behavior - unknown command error displayed
+      const results = testUI.getCommandResults();
+      expect(results.unknownCommandError).toBe(true);
+      expect(testUI.hasMessage('Unknown command: unknown')).toBe(true);
     });
 
     it('should handle non-slash input gracefully', async () => {
@@ -153,10 +215,12 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute non-slash input
-      await executor.execute('not a command', mockUI);
+      await executor.execute('not a command', testUI);
 
-      // Should not call displayMessage
-      expect(mockUI.displayMessage).not.toHaveBeenCalled();
+      // Test actual behavior - no command processing occurred
+      expect(testUI.messages).toHaveLength(0);
+      expect(testUI.exitCalled).toBe(false);
+      expect(testUI.clearSessionCalled).toBe(false);
     });
   });
 
@@ -166,10 +230,11 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute help with specific command
-      await executor.execute('/help exit', mockUI);
+      await executor.execute('/help exit', testUI);
 
-      // Should show specific command help
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('/exit - Exit the application');
+      // Test actual behavior - specific command help was displayed
+      expect(testUI.hasMessage('/exit - Exit the application')).toBe(true);
+      expect(testUI.messages).toHaveLength(1);
     });
 
     it('should show unknown command error for invalid help argument', async () => {
@@ -177,10 +242,12 @@ describe('Command System Integration', () => {
       const executor = new CommandExecutor(registry);
 
       // Execute help with unknown command
-      await executor.execute('/help unknown', mockUI);
+      await executor.execute('/help unknown', testUI);
 
-      // Should show error
-      expect(mockUI.displayMessage).toHaveBeenCalledWith('Unknown command: unknown');
+      // Test actual behavior - error message displayed for invalid help argument
+      expect(testUI.hasMessage('Unknown command: unknown')).toBe(true);
+      const results = testUI.getCommandResults();
+      expect(results.unknownCommandError).toBe(true);
     });
   });
 });

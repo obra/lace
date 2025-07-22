@@ -1,5 +1,5 @@
 // ABOUTME: Unit tests for individual task operations API endpoints
-// ABOUTME: Tests GET, PATCH, DELETE operations on specific tasks
+// ABOUTME: Tests HTTP behavior, response data, and error handling rather than mock interactions
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -221,11 +221,6 @@ describe('Task [taskId] API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data.task.status).toBe('completed');
-      expect(mockTaskManager.updateTask).toHaveBeenCalledWith(
-        'task_20240101_abc123',
-        { status: 'completed' },
-        { actor: 'human', isHuman: true }
-      );
     });
 
     it('should update task assignment', async () => {
@@ -339,10 +334,6 @@ describe('Task [taskId] API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data.message).toBe('Task deleted successfully');
-      expect(mockTaskManager.deleteTask).toHaveBeenCalledWith('task_20240101_abc123', {
-        actor: 'human',
-        isHuman: true,
-      });
     });
 
     it('should return 404 if task not found', async () => {

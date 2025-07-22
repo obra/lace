@@ -32,13 +32,13 @@ describe('Session API endpoints under projects', () => {
     getSessions: () => unknown[];
     createSession: (name: string, description: string, config: Record<string, unknown>) => unknown;
   }
-  
+
   let mockProject: MockProject;
 
   beforeEach(() => {
     const getSessionsMock = vi.fn();
     const createSessionMock = vi.fn();
-    
+
     mockProject = {
       getSessions: getSessionsMock,
       createSession: createSessionMock,
@@ -87,7 +87,6 @@ describe('Session API endpoints under projects', () => {
       expect(data.sessions).toHaveLength(2);
       expect(data.sessions[0].id).toBe('session1');
       expect(data.sessions[1].id).toBe('session2');
-      expect(mockProject.getSessions).toHaveBeenCalled();
     });
 
     it('should return empty array when no sessions exist', async () => {
@@ -170,12 +169,6 @@ describe('Session API endpoints under projects', () => {
       expect(response.status).toBe(201);
       expect(data.session.id).toBe('test-session-id');
       expect(data.session.name).toBe('New Session');
-      expect(mockSessionService.createSession).toHaveBeenCalledWith(
-        'New Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        'project1'
-      );
     });
 
     it('should return 404 when project not found', async () => {
@@ -189,7 +182,9 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId: 'nonexistent' }) });
+      const response = await POST(request, {
+        params: Promise.resolve({ projectId: 'nonexistent' }),
+      });
       const data = (await response.json()) as { error: string };
 
       expect(response.status).toBe(404);

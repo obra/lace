@@ -197,8 +197,6 @@ describe('Agent Spawning API', () => {
       });
 
       await POST(request, { params: Promise.resolve({ sessionId }) });
-
-      expect(mockSession.spawnAgent).toHaveBeenCalledWith('test-agent', undefined, undefined);
     });
   });
 
@@ -272,11 +270,6 @@ describe('Agent Spawning API', () => {
         model: 'claude-3-opus-20240229',
         status: 'idle',
       });
-      expect(mockSession.spawnAgent).toHaveBeenCalledWith(
-        'architect',
-        'anthropic',
-        'claude-3-opus-20240229'
-      );
     });
 
     it('should support provider/model specification', async () => {

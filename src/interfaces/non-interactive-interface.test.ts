@@ -53,51 +53,74 @@ describe('NonInteractiveInterface', () => {
   });
 
   describe('executePrompt', () => {
-    it('should execute single prompt and exit gracefully', async () => {
-      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {
+    it('should execute single prompt and display provider information', async () => {
+      vi.spyOn(agent, 'start').mockImplementation(async () => {
         // Mock implementation for testing - prevents actual agent start
       });
       const { log } = withConsoleCapture();
 
       await nonInteractive.executePrompt('Test prompt');
 
-      expect(log).toHaveBeenCalledWith(expect.stringContaining('using mock-provider provider'));
-      expect(agentStartSpy).toHaveBeenCalled();
-      // agent.sendMessage is already a spy from beforeEach setup
+      // Test actual behavior - provider information is displayed
+      expect(log).toHaveBeenCalledWith('🤖 Lace Agent using mock-provider provider.\n');
 
+      // Test that the prompt was sent to agent (essential business logic)
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
 
-    it('should handle errors during prompt execution', async () => {
-      vi.spyOn(agent, 'sendMessage').mockRejectedValue(new Error('Test error'));
+    it('should handle and propagate agent errors', async () => {
+      const testError = new Error('Test error');
+      vi.spyOn(agent, 'sendMessage').mockRejectedValue(testError);
       vi.spyOn(agent, 'start').mockImplementation(async () => {
         // Mock implementation for testing - prevents actual agent start
       });
 
+      // Test actual behavior - errors are propagated to caller
       await expect(nonInteractive.executePrompt('Test prompt')).rejects.toThrow('Test error');
     });
 
-    it('should display provider information', async () => {
+    it('should handle agent output streaming', async () => {
       vi.spyOn(agent, 'start').mockImplementation(async () => {
         // Mock implementation for testing - prevents actual agent start
       });
-      const { log } = withConsoleCapture();
+
+      // Capture stdout to verify streaming output
+      const stdoutSpy = vi.spyOn(process.stdout, 'write');
 
       await nonInteractive.executePrompt('Test prompt');
 
-      expect(log).toHaveBeenCalledWith('🤖 Lace Agent using mock-provider provider.\n');
+      // Wait for agent events to be processed
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Test actual behavior - agent responses are written to stdout
+      expect(stdoutSpy).toHaveBeenCalledWith('Test response');
+    });
+
+    it('should handle conversation completion', async () => {
+      vi.spyOn(agent, 'start').mockImplementation(async () => {
+        // Mock implementation for testing - prevents actual agent start
+      });
+
+      // Test that executePrompt completes when conversation_complete event is emitted
+      const executePromise = nonInteractive.executePrompt('Test prompt');
+
+      // Wait for the execution to complete
+      await executePromise;
+
+      // Test that the conversation completed successfully
+      expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
 
     it('should work without tool executor', async () => {
       const nonInteractiveWithoutTools = new NonInteractiveInterface(agent);
-      const agentStartSpy = vi.spyOn(agent, 'start').mockImplementation(async () => {
+      vi.spyOn(agent, 'start').mockImplementation(async () => {
         // Mock implementation for testing - prevents actual agent start
       });
 
+      // Test actual behavior - interface works even without tools
       await nonInteractiveWithoutTools.executePrompt('Test prompt');
 
-      expect(agentStartSpy).toHaveBeenCalled();
-
+      // Verify prompt was processed
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
     });
   });
