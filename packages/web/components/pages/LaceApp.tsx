@@ -484,18 +484,13 @@ export function LaceApp() {
                           />
                           <span className="font-medium">{agent.name}</span>
                         </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-xs text-base-content/60">
-                            {agent.provider}
-                          </span>
-                          <span className={`text-xs badge badge-xs ${
-                            agent.status === 'idle' ? 'badge-success' :
-                            agent.status === 'busy' ? 'badge-warning' :
-                            'badge-neutral'
-                          }`}>
-                            {agent.status}
-                          </span>
-                        </div>
+                        <span className={`text-xs badge badge-xs ${
+                          agent.status === 'idle' ? 'badge-success' :
+                          agent.status === 'busy' ? 'badge-warning' :
+                          'badge-neutral'
+                        }`}>
+                          {agent.status}
+                        </span>
                       </div>
                     </SidebarItem>
                   )) || []}
@@ -596,18 +591,13 @@ export function LaceApp() {
                       />
                       <span className="font-medium">{agent.name}</span>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-xs text-base-content/60">
-                        {agent.provider}
-                      </span>
-                      <span className={`text-xs badge badge-xs ${
-                        agent.status === 'idle' ? 'badge-success' :
-                        agent.status === 'busy' ? 'badge-warning' :
-                        'badge-neutral'
-                      }`}>
-                        {agent.status}
-                      </span>
-                    </div>
+                    <span className={`text-xs badge badge-xs ${
+                      agent.status === 'idle' ? 'badge-success' :
+                      agent.status === 'busy' ? 'badge-warning' :
+                      'badge-neutral'
+                    }`}>
+                      {agent.status}
+                    </span>
                   </div>
                 </SidebarItem>
               )) || []}
@@ -630,7 +620,13 @@ export function LaceApp() {
               </motion.button>
               <div className="flex items-center gap-2">
                 <h1 className="font-semibold text-base-content truncate">
-                  {selectedProject ? currentProject.name : 'Select a Project'}
+                  {selectedAgent && selectedSessionDetails?.agents ? 
+                    (() => {
+                      const currentAgent = selectedSessionDetails.agents.find(a => a.threadId === selectedAgent);
+                      return currentAgent ? `${currentAgent.name} - ${currentAgent.model}` : (selectedProject ? currentProject.name : 'Select a Project');
+                    })() :
+                    (selectedProject ? currentProject.name : 'Select a Project')
+                  }
                 </h1>
               </div>
             </motion.div>

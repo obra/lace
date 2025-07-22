@@ -264,13 +264,16 @@ export class Agent extends EventEmitter {
     // Configure provider with loaded system prompt
     this._provider.setSystemPrompt(promptConfig.systemPrompt);
 
-    // Record events for new conversations only
+    // Record events for new conversations only - check for existing prompts too
     const events = this._threadManager.getEvents(this._threadId);
     const hasConversationStarted = events.some(
       (e) => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE'
     );
+    const hasSystemPrompts = events.some(
+      (e) => e.type === 'SYSTEM_PROMPT' || e.type === 'USER_SYSTEM_PROMPT'
+    );
 
-    if (!hasConversationStarted) {
+    if (!hasConversationStarted && !hasSystemPrompts) {
       this._addEventAndEmit(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
       this._addEventAndEmit(this._threadId, 'USER_SYSTEM_PROMPT', promptConfig.userInstructions);
     }
