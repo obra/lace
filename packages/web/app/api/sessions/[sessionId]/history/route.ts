@@ -147,6 +147,22 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       };
     }
 
+    case 'SYSTEM_PROMPT': {
+      return {
+        ...baseEvent,
+        type: 'SYSTEM_PROMPT',
+        data: { content: 'System prompt loaded' },
+      };
+    }
+
+    case 'USER_SYSTEM_PROMPT': {
+      return {
+        ...baseEvent,
+        type: 'USER_SYSTEM_PROMPT',
+        data: { content: 'User instructions loaded' },
+      };
+    }
+
     default: {
       // For unknown event types, return a generic system message
       const eventType = threadEvent.type as string;

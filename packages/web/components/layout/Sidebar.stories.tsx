@@ -132,31 +132,19 @@ const mockProjects: Project[] = [
 
 const mockTimelines: Timeline[] = [
   {
-    id: '1',
+    id: 1,
     name: 'Feature Development',
     agent: 'Claude',
-    created: new Date('2024-01-15T10:00:00Z'),
-    lastMessage: new Date('2024-01-15T10:30:00Z'),
-    messageCount: 15,
-    isActive: true,
   },
   {
-    id: '2',
+    id: 2,
     name: 'Bug Fixes',
     agent: 'GPT-4',
-    created: new Date('2024-01-14T14:00:00Z'),
-    lastMessage: new Date('2024-01-14T16:45:00Z'),
-    messageCount: 8,
-    isActive: false,
   },
   {
-    id: '3',
+    id: 3,
     name: 'Code Review',
     agent: 'Gemini',
-    created: new Date('2024-01-13T09:00:00Z'),
-    lastMessage: new Date('2024-01-13T11:20:00Z'),
-    messageCount: 12,
-    isActive: false,
   },
 ];
 
