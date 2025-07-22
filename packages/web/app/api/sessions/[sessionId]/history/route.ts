@@ -147,29 +147,12 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       };
     }
 
-    case 'SYSTEM_PROMPT': {
-      return {
-        ...baseEvent,
-        type: 'SYSTEM_PROMPT',
-        data: { content: 'System prompt loaded' },
-      };
-    }
-
-    case 'USER_SYSTEM_PROMPT': {
-      return {
-        ...baseEvent,
-        type: 'USER_SYSTEM_PROMPT',
-        data: { content: 'User instructions loaded' },
-      };
-    }
-
     default: {
-      // For unknown event types, return a generic system message
-      const eventType = threadEvent.type as string;
+      // For unknown event types, preserve the original event so frontend can handle it properly
       return {
         ...baseEvent,
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event: ${eventType}` },
+        type: threadEvent.type,
+        data: threadEvent.data,
       };
     }
   }

@@ -168,22 +168,6 @@ function convertEvent(
         timestamp,
       };
 
-    case 'SYSTEM_PROMPT':
-      return {
-        id,
-        type: 'admin',
-        content: `System prompt loaded`,
-        timestamp,
-      };
-
-    case 'USER_SYSTEM_PROMPT':
-      return {
-        id,
-        type: 'admin',
-        content: `User instructions loaded`,
-        timestamp,
-      };
-
     default:
       // Fallback for unknown events - provide rich metadata for proper rendering
       const unknownEvent = event as {
