@@ -34,14 +34,22 @@ export class TaskAPIClient {
     this.baseUrl = baseUrl;
   }
 
-  async listTasks(sessionId: string, filters?: TaskFilters): Promise<Task[]> {
-    const params = new URLSearchParams({ sessionId });
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.priority) params.append('priority', filters.priority);
-    if (filters?.assignedTo) params.append('assignedTo', filters.assignedTo);
-    if (filters?.createdBy) params.append('createdBy', filters.createdBy);
+  async listTasks(projectId: string, sessionId: string, filters?: TaskFilters): Promise<Task[]> {
+    let url = `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks`;
+    
+    if (filters) {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.assignedTo) params.append('assignedTo', filters.assignedTo);
+      if (filters.createdBy) params.append('createdBy', filters.createdBy);
+      
+      if (params.toString()) {
+        url += `?${params}`;
+      }
+    }
 
-    const response = await fetch(`${this.baseUrl}/api/tasks?${params}`);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Failed to fetch tasks');
     }
@@ -50,11 +58,11 @@ export class TaskAPIClient {
     return data.tasks;
   }
 
-  async createTask(sessionId: string, task: CreateTaskRequest): Promise<Task> {
-    const response = await fetch(`${this.baseUrl}/api/tasks`, {
+  async createTask(projectId: string, sessionId: string, task: CreateTaskRequest): Promise<Task> {
+    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, ...task }),
+      body: JSON.stringify(task),
     });
 
     if (!response.ok) {
@@ -65,9 +73,8 @@ export class TaskAPIClient {
     return data.task;
   }
 
-  async getTask(sessionId: string, taskId: string): Promise<Task> {
-    const params = new URLSearchParams({ sessionId });
-    const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}?${params}`);
+  async getTask(projectId: string, sessionId: string, taskId: string): Promise<Task> {
+    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch task');
@@ -77,11 +84,11 @@ export class TaskAPIClient {
     return data.task;
   }
 
-  async updateTask(sessionId: string, taskId: string, updates: UpdateTaskRequest): Promise<Task> {
-    const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}`, {
+  async updateTask(projectId: string, sessionId: string, taskId: string, updates: UpdateTaskRequest): Promise<Task> {
+    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, ...updates }),
+      body: JSON.stringify(updates),
     });
 
     if (!response.ok) {
@@ -92,9 +99,8 @@ export class TaskAPIClient {
     return data.task;
   }
 
-  async deleteTask(sessionId: string, taskId: string): Promise<void> {
-    const params = new URLSearchParams({ sessionId });
-    const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}?${params}`, {
+  async deleteTask(projectId: string, sessionId: string, taskId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`, {
       method: 'DELETE',
     });
 
@@ -104,15 +110,21 @@ export class TaskAPIClient {
   }
 
   async addNote(
+    projectId: string,
     sessionId: string,
     taskId: string,
     content: string,
     author?: string
   ): Promise<Task> {
-    const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}/notes`, {
+    const requestBody: { content: string; author?: string } = { content };
+    if (author) {
+      requestBody.author = author;
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, content, author }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
