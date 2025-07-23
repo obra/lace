@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { logger } from '~/utils/logger';
 import type { TaskEvent } from '@/hooks/useTaskStream';
 
 interface RouteContext {
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           });
         } else {
           // Fallback: just keep connection open for now
-          console.warn('TaskManager does not support event emitters yet');
+          logger.warn('TaskManager does not support event emitters yet');
           request.signal.addEventListener('abort', () => {
             controller.close();
           });
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (error: unknown) {
-    console.error('Error in task SSE stream:', error);
+    logger.error('Error in task SSE stream:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to establish SSE connection' },
       { status: 500 }

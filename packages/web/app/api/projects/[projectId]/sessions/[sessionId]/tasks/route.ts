@@ -2,9 +2,26 @@
 // ABOUTME: Provides proper nested route structure for task CRUD operations
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { Project } from '@/lib/server/lace-imports';
+import { logger } from '~/utils/logger';
+import {
+  ProjectIdSchema,
+  SessionIdSchema,
+  CreateTaskSchema,
+  validateRouteParams,
+  validateRequestBody,
+  serializeTask,
+  createErrorResponse,
+  createSuccessResponse,
+} from '@/lib/server/api-utils';
 import type { TaskFilters } from '@/lib/server/core-types';
 import type { Task, TaskStatus, TaskPriority } from '@/types/api';
+
+const RouteParamsSchema = z.object({
+  projectId: ProjectIdSchema,
+  sessionId: SessionIdSchema,
+});
 
 interface RouteContext {
   params: Promise<{
@@ -15,7 +32,7 @@ interface RouteContext {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId } = await context.params;
+    const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
 
     // Get project first
     const project = Project.getById(projectId);
@@ -47,43 +64,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get tasks with filters
     const tasks = taskManager.getTasks(Object.keys(filters).length > 0 ? filters : undefined);
 
-    // Convert dates to strings for JSON serialization
-    const serializedTasks = tasks.map((task) => ({
-      ...task,
-      createdAt: task.createdAt instanceof Date ? task.createdAt.toISOString() : task.createdAt,
-      updatedAt: task.updatedAt instanceof Date ? task.updatedAt.toISOString() : task.updatedAt,
-      notes: task.notes.map((note) => ({
-        ...note,
-        timestamp: note.timestamp instanceof Date ? note.timestamp.toISOString() : note.timestamp,
-      })),
-    }));
+    // Serialize tasks for JSON response
+    const serializedTasks = tasks.map(serializeTask);
 
-    return NextResponse.json({ tasks: serializedTasks });
+    return createSuccessResponse({ tasks: serializedTasks });
   } catch (error: unknown) {
-    console.error('Error fetching tasks:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch tasks' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch tasks',
+      500,
+      error
     );
   }
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId } = await context.params;
+    const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
     
-    const body = (await request.json()) as {
-      title?: string;
-      description?: string;
-      prompt?: string;
-      priority?: TaskPriority;
-      assignedTo?: string;
-    };
-    const { title, description, prompt, priority, assignedTo } = body;
-
-    if (!title || !prompt) {
-      return NextResponse.json({ error: 'Title and prompt are required' }, { status: 400 });
-    }
+    const body = await request.json();
+    const { title, description, prompt, priority, assignedTo } = validateRequestBody(body, CreateTaskSchema);
 
     // Get project first
     const project = Project.getById(projectId);
@@ -116,23 +115,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     );
 
-    // Convert dates to strings for JSON serialization
-    const serializedTask: Task = {
-      ...task,
-      createdAt: task.createdAt instanceof Date ? task.createdAt.toISOString() : task.createdAt,
-      updatedAt: task.updatedAt instanceof Date ? task.updatedAt.toISOString() : task.updatedAt,
-      notes: task.notes.map((note) => ({
-        ...note,
-        timestamp: note.timestamp instanceof Date ? note.timestamp.toISOString() : note.timestamp,
-      })),
-    };
+    // Serialize task for JSON response
+    const serializedTask = serializeTask(task);
 
-    return NextResponse.json({ task: serializedTask }, { status: 201 });
+    return createSuccessResponse({ task: serializedTask }, 201);
   } catch (error: unknown) {
-    console.error('Error creating task:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create task' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to create task',
+      500,
+      error
     );
   }
 }

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { logger } from '~/utils/logger';
 import type { Task } from '@/types/api';
 
 interface RouteContext {
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       throw error;
     }
   } catch (error: unknown) {
-    console.error('Error adding note:', error);
+    logger.error('Error adding note:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to add note' },
       { status: 500 }

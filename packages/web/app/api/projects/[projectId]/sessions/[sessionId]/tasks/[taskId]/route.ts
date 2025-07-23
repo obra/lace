@@ -36,20 +36,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Convert dates to strings for JSON serialization
-    const serializedTask: Task = {
-      ...task,
-      createdAt: task.createdAt instanceof Date ? task.createdAt.toISOString() : task.createdAt,
-      updatedAt: task.updatedAt instanceof Date ? task.updatedAt.toISOString() : task.updatedAt,
-      notes: task.notes.map((note) => ({
-        ...note,
-        timestamp: note.timestamp instanceof Date ? note.timestamp.toISOString() : note.timestamp,
-      })),
-    };
+    // Serialize task for JSON response
+    const serializedTask = serializeTask(task);
 
-    return NextResponse.json({ task: serializedTask });
+    return createSuccessResponse({ task: serializedTask });
   } catch (error: unknown) {
-    console.error('Error fetching task:', error);
+    logger.error('Error fetching task:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch task' },
       { status: 500 }
@@ -89,23 +81,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       isHuman: true,
     });
 
-    // Convert dates to strings for JSON serialization
-    const serializedTask: Task = {
-      ...task,
-      createdAt: task.createdAt instanceof Date ? task.createdAt.toISOString() : task.createdAt,
-      updatedAt: task.updatedAt instanceof Date ? task.updatedAt.toISOString() : task.updatedAt,
-      notes: task.notes.map((note) => ({
-        ...note,
-        timestamp: note.timestamp instanceof Date ? note.timestamp.toISOString() : note.timestamp,
-      })),
-    };
+    // Serialize task for JSON response
+    const serializedTask = serializeTask(task);
 
-    return NextResponse.json({ task: serializedTask });
+    return createSuccessResponse({ task: serializedTask });
   } catch (error: unknown) {
-    console.error('Error updating task:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update task' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to update task',
+      500,
+      error
     );
   }
 }
@@ -142,7 +126,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       throw error;
     }
   } catch (error: unknown) {
-    console.error('Error deleting task:', error);
+    logger.error('Error deleting task:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to delete task' },
       { status: 500 }
