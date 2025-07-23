@@ -9,6 +9,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Tool } from '~/tools/tool';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Mock provider that can emit retry events
 class MockRetryProvider extends BaseMockProvider {
@@ -105,11 +106,9 @@ describe('Agent retry event forwarding', () => {
   let mockProvider: MockRetryProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
-  let threadId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
-    threadId = 'test-thread-id';
     mockProvider = new MockRetryProvider({});
 
     // Mock ToolExecutor
@@ -120,21 +119,15 @@ describe('Agent retry event forwarding', () => {
     } as unknown as ToolExecutor;
 
     // Mock ThreadManager
+    mockThreadManager = createMockThreadManager();
 
-    mockThreadManager = {
-      addEvent: vi.fn(),
-      getEvents: vi.fn().mockReturnValue([]),
-      getCanonicalId: vi.fn().mockReturnValue(threadId),
-      getCurrentThreadId: vi.fn().mockReturnValue(threadId),
-      needsCompaction: vi.fn().mockResolvedValue(false),
-      close: vi.fn(),
-    } as unknown as ThreadManager;
+    const testThreadId = mockThreadManager.getCurrentThreadId();
 
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
       threadManager: mockThreadManager,
-      threadId,
+      threadId: testThreadId,
       tools: [],
     });
 
