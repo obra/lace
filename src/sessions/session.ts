@@ -56,12 +56,19 @@ export class Session {
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
   }
 
-  static create(
-    name: string,
-    provider = 'anthropic',
-    model = 'claude-3-haiku-20240307',
-    projectId: string // REQUIRED: All sessions must be project-based
-  ): Session {
+  static create(options: {
+    name?: string;
+    description?: string;
+    provider?: string;
+    model?: string;
+    projectId: string; // REQUIRED: All sessions must be project-based
+    approvalCallback?: ApprovalCallback;
+    configuration?: Record<string, unknown>;
+  }): Session {
+    // Use existing logic for provider/model detection with intelligent defaults
+    const provider = options.provider || Session.detectDefaultProvider();
+    const model = options.model || Session.getDefaultModel(provider);
+    const name = options.name || Session.generateSessionName();
     // Create provider
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
@@ -72,18 +79,18 @@ export class Session {
     // Create session record in sessions table
     const sessionData = {
       id: threadManager.generateThreadId(),
-      projectId,
+      projectId: options.projectId,
       name,
-      description: '',
-      configuration: { provider, model },
+      description: options.description || '',
+      configuration: { provider, model, ...options.configuration },
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    Session.createSession(sessionData);
+    Session._saveSessionData(sessionData);
 
     // Create thread for this session
-    const threadId = threadManager.createThread(sessionData.id, sessionData.id, projectId);
+    const threadId = threadManager.createThread(sessionData.id, sessionData.id, options.projectId);
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
@@ -109,9 +116,15 @@ export class Session {
       model,
     });
 
-    const session = new Session(sessionAgent, projectId);
+    const session = new Session(sessionAgent, options.projectId);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
+
+    // Set up coordinator agent with approval callback if provided
+    const coordinatorAgent = session.getAgent(session.getId());
+    if (coordinatorAgent && options.approvalCallback) {
+      coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
+    }
 
     return session;
   }
@@ -257,7 +270,7 @@ export class Session {
   // Session management static methods
   // ===============================
 
-  static createSession(session: SessionData): void {
+  private static _saveSessionData(session: SessionData): void {
     getPersistence().saveSession(session);
     logger.info('Session created', { sessionId: session.id, projectId: session.projectId });
   }
@@ -586,35 +599,6 @@ export class Session {
       agent.removeAllListeners();
     }
     this._agents.clear();
-  }
-
-  static async createWithDefaults(options: {
-    name?: string;
-    provider?: string;
-    model?: string;
-    projectId: string; // REQUIRED: All sessions must be project-based
-    approvalCallback?: ApprovalCallback;
-  }): Promise<Session> {
-    // Use existing logic for provider/model detection
-    const provider = options.provider || Session.detectDefaultProvider();
-    const model = options.model || Session.getDefaultModel(provider);
-    const name = options.name || Session.generateSessionName();
-
-    // Create session using existing create method
-    const session = Session.create(name, provider, model, options.projectId);
-
-    // Set up coordinator agent with approval callback if provided
-    const coordinatorAgent = session.getAgent(session.getId());
-    if (coordinatorAgent && options.approvalCallback) {
-      coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
-    }
-
-    // Start coordinator agent
-    if (coordinatorAgent) {
-      await coordinatorAgent.start();
-    }
-
-    return session;
   }
 
   private static detectDefaultProvider(): string {

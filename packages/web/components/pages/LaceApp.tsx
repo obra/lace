@@ -711,6 +711,7 @@ export function LaceApp() {
                 selectedProject={currentProject.id ? currentProject : null}
                 providers={providers}
                 onProjectSelect={handleProjectSelect}
+                onProjectCreate={loadProjects}
                 onProjectUpdate={handleProjectUpdate}
                 loading={loadingProjects}
               />

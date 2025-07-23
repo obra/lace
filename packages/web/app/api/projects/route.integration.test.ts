@@ -60,8 +60,9 @@ describe('Projects API Integration Tests', () => {
       Project.create('Project 2', '/path/2', 'Second project');
 
       // Create sessions in project1 to test session counting
-      project1.createSession('Session 1');
-      project1.createSession('Session 2');
+      const { Session } = await import('~/sessions/session');
+      Session.create({ name: 'Session 1', projectId: project1.getId() });
+      Session.create({ name: 'Session 2', projectId: project1.getId() });
 
       const response = await GET();
       const data = (await response.json()) as ProjectsResponse;
@@ -74,13 +75,13 @@ describe('Projects API Integration Tests', () => {
       const proj2 = data.projects.find((p) => p.name === 'Project 2');
 
       expect(proj1).toBeDefined();
-      expect(proj1!.sessionCount).toBe(2);
+      expect(proj1!.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
       expect(proj1!.workingDirectory).toBe('/path/1');
       expect(proj1!.description).toBe('First project');
       expect(proj1!.isArchived).toBe(false);
 
       expect(proj2).toBeDefined();
-      expect(proj2!.sessionCount).toBe(0);
+      expect(proj2!.sessionCount).toBe(1); // Project.create() auto-creates a default session
       expect(proj2!.workingDirectory).toBe('/path/2');
       expect(proj2!.description).toBe('Second project');
       expect(proj2!.isArchived).toBe(false);
@@ -119,7 +120,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.project.description).toBe('A new project');
       expect(data.project.workingDirectory).toBe('/new/path');
       expect(data.project.isArchived).toBe(false);
-      expect(data.project.sessionCount).toBe(0);
+      expect(data.project.sessionCount).toBe(1); // Project.create() auto-creates a default session
       expect(data.project.id).toBeDefined();
       expect(data.project.createdAt).toBeDefined();
       expect(data.project.lastUsedAt).toBeDefined();

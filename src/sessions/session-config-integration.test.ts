@@ -118,12 +118,12 @@ describe('Session Configuration Integration', () => {
   describe('Session configuration inheritance', () => {
     it('should inherit configuration from project', () => {
       // Create session with minimal configuration to allow inheritance
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       const effectiveConfig = session.getEffectiveConfiguration();
 
@@ -137,12 +137,12 @@ describe('Session Configuration Integration', () => {
     });
 
     it('should override project configuration with session configuration', () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       // Update session configuration
       session.updateConfiguration({
@@ -171,12 +171,12 @@ describe('Session Configuration Integration', () => {
         },
       });
 
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       // Update session tool policies
       session.updateConfiguration({
@@ -224,12 +224,12 @@ describe('Session Configuration Integration', () => {
       expect(preset).toBeDefined();
 
       // Apply preset to session
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
       session.updateConfiguration(preset!.configuration);
 
       const effectiveConfig = session.getEffectiveConfiguration();
@@ -252,12 +252,12 @@ describe('Session Configuration Integration', () => {
 
   describe('Tool policy enforcement', () => {
     it('should return correct tool policies from configuration', () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       // Set tool policies
       session.updateConfiguration({
@@ -279,12 +279,12 @@ describe('Session Configuration Integration', () => {
 
   describe('Session working directory', () => {
     it('should use session working directory override', () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       // Set working directory override
       session.updateConfiguration({
@@ -297,12 +297,12 @@ describe('Session Configuration Integration', () => {
     });
 
     it('should fall back to project working directory', () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       // Should use project working directory
       expect(session.getWorkingDirectory()).toBe('/test/path');
@@ -313,12 +313,12 @@ describe('Session Configuration Integration', () => {
 
   describe('Session metadata', () => {
     it('should include configuration in session info', () => {
-      const session = Session.create(
-        'Test Session',
-        'anthropic',
-        'claude-3-haiku-20240307',
-        projectId
-      );
+      const session = Session.create({
+        name: 'Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId,
+      });
 
       const info = session.getInfo();
       expect(info).toBeDefined();

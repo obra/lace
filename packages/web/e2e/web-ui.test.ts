@@ -100,7 +100,7 @@ describe('Web UI E2E Tests', () => {
       );
 
       const sessions = await sessionService.listSessions();
-      expect(sessions).toHaveLength(2);
+      expect(sessions).toHaveLength(3); // 1 auto-created + 2 explicitly created
       expect(sessions.map((s) => s.name)).toContain('Session 1');
       expect(sessions.map((s) => s.name)).toContain('Session 2');
     });
@@ -258,7 +258,7 @@ describe('Web UI E2E Tests', () => {
 
       // Should list all sessions
       const sessions = await newSessionService.listSessions();
-      expect(sessions).toHaveLength(2);
+      expect(sessions).toHaveLength(3); // 1 auto-created + 2 explicitly created
       expect(sessions.map((s) => s.name)).toContain('Session A');
       expect(sessions.map((s) => s.name)).toContain('Session B');
     });

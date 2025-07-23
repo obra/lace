@@ -209,9 +209,14 @@ describe('Thread Messaging API', () => {
 
     expect(response.status).toBe(202);
 
-    // Verify agent is running after message
+    // Get the agent
     const session = await sessionService.getSession(asThreadId(realSessionId));
     const agent = session!.getAgent(asThreadId(realThreadId));
+
+    // Wait a short time for the async sendMessage call to complete and start the agent
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Verify agent is running after message processing starts
     expect(agent!.isRunning).toBe(true);
   });
 });

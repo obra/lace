@@ -90,7 +90,12 @@ describe('Agent Configuration', () => {
     projectId = testProject.getId();
 
     // Create test session
-    testSession = Session.create('Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+    testSession = Session.create({
+      name: 'Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId,
+    });
   });
 
   afterEach(() => {
