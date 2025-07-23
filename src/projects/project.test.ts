@@ -61,22 +61,19 @@ describe('Project', () => {
 
       const projects = Project.getAll();
 
-      // Should have our 2 projects plus the historical project from database initialization
-      expect(projects).toHaveLength(3);
+      // Should have our 2 created projects
+      expect(projects).toHaveLength(2);
       expect(projects.find((p) => p.name === 'Project 1')).toBeDefined();
       expect(projects.find((p) => p.name === 'Project 2')).toBeDefined();
-      expect(projects.find((p) => p.name === 'Historical')).toBeDefined(); // Default historical project
       expect(projects.find((p) => p.name === 'Project 1')?.workingDirectory).toBe('/path1');
       expect(projects.find((p) => p.name === 'Project 2')?.workingDirectory).toBe('/path2');
     });
 
-    it('should include historical project by default', () => {
+    it('should return empty list when no projects exist', () => {
       const projects = Project.getAll();
 
-      // Database always creates a "Historical" project for legacy sessions
-      expect(projects).toHaveLength(1);
-      expect(projects[0]?.name).toBe('Historical');
-      expect(projects[0]?.id).toBe('historical');
+      // Clean database should have no projects by default
+      expect(projects).toHaveLength(0);
     });
   });
 
