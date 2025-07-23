@@ -12,13 +12,13 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 
 // Import API routes to test against
-import { GET as listTasks, POST as createTask } from '@/app/api/tasks/route';
+import { GET as listTasks, POST as createTask } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
 import {
   GET as getTask,
   PATCH as updateTask,
   DELETE as deleteTask,
-} from '@/app/api/tasks/[taskId]/route';
-import { POST as addNote } from '@/app/api/tasks/[taskId]/notes/route';
+} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/route';
+import { POST as addNote } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes/route';
 import { NextRequest } from 'next/server';
 
 // Mock external dependencies only
