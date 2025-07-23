@@ -220,8 +220,21 @@ export class Agent extends EventEmitter {
   // Control methods
   async start(): Promise<void> {
     // Load prompts when starting
+    const session = this._getSession();
+    const project = this._getProject();
+
+    logger.debug('Agent.start() - loading prompt config with session/project context', {
+      threadId: this._threadId,
+      hasSession: !!session,
+      hasProject: !!project,
+      sessionWorkingDir: session?.getWorkingDirectory(),
+      projectWorkingDir: project?.getWorkingDirectory(),
+    });
+
     const promptConfig = await loadPromptConfig({
       tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
+      session: session,
+      project: project,
     });
 
     // Configure provider with loaded system prompt
@@ -897,12 +910,26 @@ export class Agent extends EventEmitter {
       });
 
       try {
-        // Execute tool
-        const result = await this._toolExecutor.executeTool(toolCall, {
+        // Get working directory for context
+        const workingDirectory = this._getWorkingDirectory();
+        const toolContext = {
           threadId: asThreadId(this._threadId),
           parentThreadId: asThreadId(this._getParentThreadId()),
-          workingDirectory: this._getWorkingDirectory(),
+          workingDirectory,
+        };
+
+        logger.debug('Agent - executing tool with context', {
+          threadId: this._threadId,
+          toolName: toolCall.name,
+          toolId: toolCall.id,
+          toolArguments: toolCall.arguments,
+          context: toolContext,
+          workingDirectoryFromMethod: workingDirectory,
+          processCwd: process.cwd(),
         });
+
+        // Execute tool
+        const result = await this._toolExecutor.executeTool(toolCall, toolContext);
 
         const outputText = result.content[0]?.text || '';
 
@@ -1584,34 +1611,178 @@ export class Agent extends EventEmitter {
   }
 
   private _getWorkingDirectory(): string | undefined {
+    logger.debug('Agent._getWorkingDirectory() called', {
+      threadId: this._threadId,
+      agentState: this.getCurrentState(),
+    });
+
     try {
       // Get the current thread to find its session and project
       const thread = this._threadManager.getThread(this._threadId);
-      if (!thread) return undefined;
+      logger.debug('Agent._getWorkingDirectory() - got thread', {
+        threadId: this._threadId,
+        hasThread: !!thread,
+        threadSessionId: thread?.sessionId,
+        threadProjectId: thread?.projectId,
+        threadMetadata: thread?.metadata,
+      });
+
+      if (!thread) {
+        logger.warn('Agent._getWorkingDirectory() - no thread found, returning undefined', {
+          threadId: this._threadId,
+        });
+        return undefined;
+      }
 
       // If thread has a sessionId, get the session to find the project
       if (thread.sessionId) {
+        logger.debug('Agent._getWorkingDirectory() - thread has sessionId, looking up session', {
+          threadId: this._threadId,
+          sessionId: thread.sessionId,
+        });
+
         const session = Session.getSession(thread.sessionId);
+        logger.debug('Agent._getWorkingDirectory() - got session from sessionId', {
+          threadId: this._threadId,
+          sessionId: thread.sessionId,
+          hasSession: !!session,
+          sessionProjectId: session?.projectId,
+        });
+
         if (session?.projectId) {
+          logger.debug('Agent._getWorkingDirectory() - session has projectId, looking up project', {
+            threadId: this._threadId,
+            sessionId: thread.sessionId,
+            projectId: session.projectId,
+          });
+
           const project = Project.getById(session.projectId);
-          return project?.getWorkingDirectory();
+          const workingDir = project?.getWorkingDirectory();
+          logger.debug(
+            'Agent._getWorkingDirectory() - got project and working directory from session path',
+            {
+              threadId: this._threadId,
+              sessionId: thread.sessionId,
+              projectId: session.projectId,
+              hasProject: !!project,
+              workingDirectory: workingDir,
+              processCwd: process.cwd(),
+            }
+          );
+
+          return workingDir;
         }
       }
 
       // If thread has a direct projectId, use that
       if (thread.projectId) {
+        logger.debug(
+          'Agent._getWorkingDirectory() - thread has direct projectId, looking up project',
+          {
+            threadId: this._threadId,
+            projectId: thread.projectId,
+          }
+        );
+
         const project = Project.getById(thread.projectId);
-        return project?.getWorkingDirectory();
+        const workingDir = project?.getWorkingDirectory();
+        logger.debug(
+          'Agent._getWorkingDirectory() - got project and working directory from direct thread path',
+          {
+            threadId: this._threadId,
+            projectId: thread.projectId,
+            hasProject: !!project,
+            workingDirectory: workingDir,
+            processCwd: process.cwd(),
+          }
+        );
+
+        return workingDir;
       }
 
       // Fallback to current working directory
+      logger.debug(
+        'Agent._getWorkingDirectory() - no session or project found, falling back to process.cwd()',
+        {
+          threadId: this._threadId,
+          processCwd: process.cwd(),
+        }
+      );
       return process.cwd();
     } catch (error) {
       logger.warn('Failed to get working directory from session/project', {
         threadId: this._threadId,
         error: error instanceof Error ? error.message : String(error),
+        processCwd: process.cwd(),
       });
       return process.cwd();
+    }
+  }
+
+  private _getSession(): { getWorkingDirectory(): string } | undefined {
+    try {
+      const thread = this._threadManager.getThread(this._threadId);
+      if (!thread?.sessionId) {
+        return undefined;
+      }
+
+      const sessionData = Session.getSession(thread.sessionId);
+      if (!sessionData) {
+        return undefined;
+      }
+
+      // Create a session-like object with getWorkingDirectory method
+      return {
+        getWorkingDirectory: () => {
+          if (sessionData.configuration?.workingDirectory) {
+            return sessionData.configuration.workingDirectory as string;
+          }
+
+          if (sessionData.projectId) {
+            const project = Project.getById(sessionData.projectId);
+            if (project) {
+              return project.getWorkingDirectory();
+            }
+          }
+
+          return process.cwd();
+        },
+      };
+    } catch (error) {
+      logger.debug('Failed to get session for prompt generation', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  private _getProject(): { getWorkingDirectory(): string } | undefined {
+    try {
+      const thread = this._threadManager.getThread(this._threadId);
+
+      // First try to get project through session
+      if (thread?.sessionId) {
+        const sessionData = Session.getSession(thread.sessionId);
+        if (sessionData?.projectId) {
+          const project = Project.getById(sessionData.projectId);
+          return project || undefined;
+        }
+      }
+
+      // Then try direct project association
+      if (thread?.projectId) {
+        const project = Project.getById(thread.projectId);
+        return project || undefined;
+      }
+
+      return undefined;
+    } catch (error) {
+      logger.debug('Failed to get project for prompt generation', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
     }
   }
 

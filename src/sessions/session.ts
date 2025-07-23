@@ -83,7 +83,7 @@ export class Session {
     Session.createSession(sessionData);
 
     // Create thread for this session
-    const threadId = threadManager.createThread(sessionData.id, projectId);
+    const threadId = threadManager.createThread(sessionData.id, sessionData.id, projectId);
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
@@ -263,7 +263,32 @@ export class Session {
   }
 
   static getSession(sessionId: string): SessionData | null {
-    return getPersistence().loadSession(sessionId);
+    logger.debug('Session.getSession() called', {
+      sessionId: sessionId,
+    });
+
+    const sessionData = getPersistence().loadSession(sessionId);
+
+    logger.debug('Session.getSession() - database lookup result', {
+      sessionId: sessionId,
+      hasSessionData: !!sessionData,
+      sessionData: sessionData,
+    });
+
+    // If session not found, let's see what sessions DO exist
+    if (!sessionData) {
+      const allSessions =
+        (getPersistence()
+          .database?.prepare('SELECT id, name, project_id FROM sessions')
+          .all() as Array<{ id: string; name: string; project_id: string }>) || [];
+      logger.debug('Session.getSession() - session not found, showing all sessions', {
+        requestedSessionId: sessionId,
+        allSessionIds: allSessions.map((s) => s.id),
+        allSessions: allSessions,
+      });
+    }
+
+    return sessionData;
   }
 
   static getSessionsByProject(projectId: string): SessionData[] {

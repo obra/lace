@@ -9,6 +9,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Type helper for accessing private methods in tests
 type _AgentWithPrivateMethods = Agent & {
@@ -56,25 +57,15 @@ describe('Agent Queue Processing', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ToolExecutor;
 
-    mockThreadManager = {
-      addEvent: vi.fn(),
-      getEvents: vi.fn().mockReturnValue([]),
-      getSessionInfo: vi.fn().mockReturnValue({
-        threadId: 'test-thread',
-        model: 'test-model',
-        provider: 'test-provider',
-      }),
-      getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
-      needsCompaction: vi.fn().mockResolvedValue(false),
-      createCompactedVersion: vi.fn(),
-      close: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ThreadManager;
+    mockThreadManager = createMockThreadManager();
+
+    const testThreadId = mockThreadManager.getCurrentThreadId()!;
 
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
       threadManager: mockThreadManager,
-      threadId: 'test-thread',
+      threadId: testThreadId,
       tools: [],
     });
   });

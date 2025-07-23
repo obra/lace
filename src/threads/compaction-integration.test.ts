@@ -13,6 +13,7 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { Tool } from '~/tools/tool';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { logger } from '~/utils/logger';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -192,6 +193,15 @@ describe('Compaction Integration', () => {
     // Get the active thread ID (compacted thread or original)
     const activeThreadId = threadManager.getCurrentThreadId() || originalThreadId;
     const finalEvents = threadManager.getEvents(activeThreadId);
+
+    // Debug: log final events to understand the sequence
+    logger.debug('Final events:', {
+      count: finalEvents.length,
+      events: finalEvents.map((e) => ({
+        type: e.type,
+        data: typeof e.data === 'string' ? e.data : JSON.stringify(e.data),
+      })),
+    });
 
     // Should have events and the last should be the new response
     expect(finalEvents.length).toBeGreaterThan(0);

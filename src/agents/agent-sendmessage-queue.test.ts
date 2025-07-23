@@ -10,6 +10,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { ThreadEvent } from '~/threads/types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Type helper for accessing private methods in tests
 type AgentWithPrivateMethods = {
@@ -45,6 +46,7 @@ describe('Agent sendMessage Queue Option', () => {
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
+  let testThreadId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -58,48 +60,43 @@ describe('Agent sendMessage Queue Option', () => {
 
     let eventCount = 0;
 
-    mockThreadManager = {
-      addEvent: vi.fn((): ThreadEvent => {
-        eventCount++;
+    mockThreadManager = createMockThreadManager();
+    testThreadId = mockThreadManager.getCurrentThreadId()!;
+
+    // Override addEvent to track event count for this specific test
+    mockThreadManager.addEvent = vi.fn((): ThreadEvent => {
+      eventCount++;
+      const event: ThreadEvent = {
+        id: `event_${eventCount}`,
+        threadId: testThreadId,
+        type: 'USER_MESSAGE' as const,
+        data: 'test',
+        timestamp: new Date(),
+      };
+      return event;
+    });
+
+    // Override getEvents to return events based on count for this specific test
+    mockThreadManager.getEvents = vi.fn((): ThreadEvent[] => {
+      const events: ThreadEvent[] = [];
+      for (let i = 0; i < eventCount; i++) {
         const event: ThreadEvent = {
-          id: `event_${eventCount}`,
-          threadId: 'test-thread',
+          id: `event_${i + 1}`,
+          threadId: testThreadId,
           type: 'USER_MESSAGE' as const,
           data: 'test',
           timestamp: new Date(),
         };
-        return event;
-      }),
-      getEvents: vi.fn((): ThreadEvent[] => {
-        const events: ThreadEvent[] = [];
-        for (let i = 0; i < eventCount; i++) {
-          const event: ThreadEvent = {
-            id: `event_${i + 1}`,
-            threadId: 'test-thread',
-            type: 'USER_MESSAGE' as const,
-            data: 'test',
-            timestamp: new Date(),
-          };
-          events.push(event);
-        }
-        return events;
-      }),
-      getSessionInfo: vi.fn().mockReturnValue({
-        threadId: 'test-thread',
-        model: 'test-model',
-        provider: 'test-provider',
-      }),
-      getCurrentThreadId: vi.fn().mockReturnValue('test-thread'),
-      needsCompaction: vi.fn().mockResolvedValue(false),
-      createCompactedVersion: vi.fn(),
-      close: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ThreadManager;
+        events.push(event);
+      }
+      return events;
+    });
 
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
       threadManager: mockThreadManager,
-      threadId: 'test-thread',
+      threadId: testThreadId,
       tools: [],
     });
 
@@ -112,12 +109,12 @@ describe('Agent sendMessage Queue Option', () => {
 
   describe('when agent is idle', () => {
     it('should process message immediately without queue option', async () => {
-      const initialThreadEvents = mockThreadManager.getEvents('test-thread').length;
+      const initialThreadEvents = mockThreadManager.getEvents(testThreadId).length;
 
       await agent.sendMessage('test message');
 
       // Verify message was processed immediately (added to thread)
-      const finalThreadEvents = mockThreadManager.getEvents('test-thread').length;
+      const finalThreadEvents = mockThreadManager.getEvents(testThreadId).length;
       expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
 
       // Verify the message appears in thread manager calls
@@ -132,12 +129,12 @@ describe('Agent sendMessage Queue Option', () => {
     });
 
     it('should process message immediately even with queue option', async () => {
-      const initialThreadEvents = mockThreadManager.getEvents('test-thread').length;
+      const initialThreadEvents = mockThreadManager.getEvents(testThreadId).length;
 
       await agent.sendMessage('test message', { queue: true });
 
       // Verify message was processed immediately (added to thread) even with queue option
-      const finalThreadEvents = mockThreadManager.getEvents('test-thread').length;
+      const finalThreadEvents = mockThreadManager.getEvents(testThreadId).length;
       expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
 
       // Verify the message appears in thread manager calls
