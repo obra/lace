@@ -1,7 +1,7 @@
 // ABOUTME: RESTful task notes API - add notes to tasks under project/session
 // ABOUTME: Provides note creation with proper nested route validation
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
@@ -14,6 +14,7 @@ import {
   validateRequestBody,
   serializeTask,
   createErrorResponse,
+  createSuccessResponse,
 } from '@/lib/server/api-utils';
 
 const NotesRouteParamsSchema = z.object({
@@ -71,19 +72,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // Get updated task to return
       const task = taskManager.getTaskById(taskId);
       if (!task) {
-        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+        return createErrorResponse('Task not found', 404);
       }
 
       // Get updated task to return (use serializeTask utility)
       const serializedTask = serializeTask(task);
 
-      return NextResponse.json(
+      return createSuccessResponse(
         { message: 'Note added successfully', task: serializedTask },
-        { status: 201 }
+        201
       );
     } catch (error: unknown) {
       if (error instanceof Error && error.message === 'Task not found') {
-        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+        return createErrorResponse('Task not found', 404);
       }
       throw error;
     }

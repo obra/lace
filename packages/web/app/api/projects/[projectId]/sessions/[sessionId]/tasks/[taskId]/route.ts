@@ -1,11 +1,25 @@
 // ABOUTME: RESTful task detail API - GET/PATCH/DELETE specific task under project/session
 // ABOUTME: Individual task operations with proper nested route validation
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { serializeTask, createErrorResponse, createSuccessResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
+import {
+  ProjectIdSchema,
+  SessionIdSchema,
+  TaskIdSchema,
+  validateRouteParams,
+  serializeTask,
+  createErrorResponse,
+  createSuccessResponse,
+} from '@/lib/server/api-utils';
+
+const TaskRouteParamsSchema = z.object({
+  projectId: ProjectIdSchema,
+  sessionId: SessionIdSchema,
+  taskId: TaskIdSchema,
+});
 
 interface RouteContext {
   params: Promise<{
@@ -17,7 +31,10 @@ interface RouteContext {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId, taskId } = await context.params;
+    const { projectId, sessionId, taskId } = await validateRouteParams(
+      context.params,
+      TaskRouteParamsSchema
+    );
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -42,7 +59,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const task = taskManager.getTaskById(taskId);
 
     if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      return createErrorResponse('Task not found', 404);
     }
 
     // Serialize task for JSON response
@@ -50,17 +67,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return createSuccessResponse({ task: serializedTask });
   } catch (error: unknown) {
-    logger.error('Error fetching task', { error });
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch task' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch task',
+      500,
+      error
     );
   }
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId, taskId } = await context.params;
+    const { projectId, sessionId, taskId } = await validateRouteParams(
+      context.params,
+      TaskRouteParamsSchema
+    );
 
     // Parse request body
     const body = (await request.json()) as Record<string, unknown>;
@@ -112,7 +132,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId, taskId } = await context.params;
+    const { projectId, sessionId, taskId } = await validateRouteParams(
+      context.params,
+      TaskRouteParamsSchema
+    );
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -141,10 +164,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         isHuman: true,
       });
 
-      return NextResponse.json({ message: 'Task deleted successfully' });
+      return createSuccessResponse({ message: 'Task deleted successfully' });
     } catch (error: unknown) {
       if (error instanceof Error && error.message === 'Task not found') {
-        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+        return createErrorResponse('Task not found', 404);
       }
       throw error;
     }

@@ -136,7 +136,7 @@ describe('TaskAPIClient E2E Tests', () => {
 
           throw new Error(`Unhandled API route: ${method} ${urlString}`);
         } catch (error) {
-          console.error('API route error:', error);
+          // API route error - rethrow for test handling
           throw error;
         }
       });
