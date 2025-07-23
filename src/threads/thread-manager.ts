@@ -1,5 +1,5 @@
-// ABOUTME: Tthread management with SQLite persistence support - PRIVATE AND INTERNAL. ONLY ACCESS THROUGH AGENT
-// ABOUTME: Maintains backward compatibility with immediate event persistence
+// ABOUTME: Stateless thread management with SQLite persistence support
+// ABOUTME: Provides shared caching and immediate event persistence
 
 import {
   DatabasePersistence,
