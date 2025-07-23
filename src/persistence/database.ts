@@ -3,14 +3,7 @@
 
 import Database from 'better-sqlite3';
 import { getLaceDbPath } from '~/config/lace-dir';
-import {
-  Thread,
-  ThreadEvent,
-  EventType,
-  VersionHistoryEntry,
-  ThreadId,
-  AssigneeId,
-} from '~/threads/types';
+import { Thread, ThreadEvent, EventType, ThreadId, AssigneeId } from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
 import {
   Task,
@@ -229,11 +222,7 @@ export class DatabasePersistence {
   loadThread(threadId: string): Thread | null {
     if (this._disabled || !this.db) return null;
 
-    // Check if this is a canonical ID with a current version
-    const currentVersionId = this.getCurrentVersion(threadId);
-    const actualThreadId = currentVersionId || threadId;
-
-    // Load thread from database with version mapping support
+    const actualThreadId = threadId;
 
     const threadStmt = this.db.prepare(`
       SELECT * FROM threads WHERE id = ?
@@ -405,187 +394,6 @@ export class DatabasePersistence {
 
   getThreadsBySession(sessionId: string): Thread[] {
     return this.executeThreadQuery('WHERE session_id = ?', sessionId);
-  }
-
-  getCurrentVersion(canonicalId: string): string | null {
-    if (this._disabled || !this.db) return null;
-
-    const stmt = this.db.prepare(`
-      SELECT current_version_id FROM thread_versions WHERE canonical_id = ?
-    `);
-
-    const row = stmt.get(canonicalId) as { current_version_id: string } | undefined;
-    return row ? row.current_version_id : null;
-  }
-
-  createVersion(canonicalId: string, newVersionId: string, reason: string): void {
-    if (this._closed || this._disabled || !this.db) return;
-
-    const transaction = this.db.transaction(() => {
-      // Insert or update the current version
-      const upsertStmt = this.db!.prepare(`
-        INSERT OR REPLACE INTO thread_versions (canonical_id, current_version_id, created_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-      `);
-      upsertStmt.run(canonicalId, newVersionId);
-
-      // Add to version history
-      const historyStmt = this.db!.prepare(`
-        INSERT INTO version_history (canonical_id, version_id, created_at, reason)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-      `);
-      historyStmt.run(canonicalId, newVersionId, reason);
-    });
-
-    transaction();
-  }
-
-  getVersionHistory(canonicalId: string): VersionHistoryEntry[] {
-    if (this._disabled || !this.db) return [];
-
-    const stmt = this.db.prepare(`
-      SELECT * FROM version_history 
-      WHERE canonical_id = ? 
-      ORDER BY id DESC
-    `);
-
-    const rows = stmt.all(canonicalId) as Array<{
-      id: number;
-      canonical_id: string;
-      version_id: string;
-      created_at: string;
-      reason: string;
-    }>;
-
-    return rows.map((row) => ({
-      id: row.id,
-      canonicalId: row.canonical_id,
-      versionId: row.version_id,
-      createdAt: new Date(row.created_at),
-      reason: row.reason,
-    }));
-  }
-
-  findCanonicalIdForVersion(versionId: string): string | null {
-    if (this._disabled || !this.db) return null;
-
-    const stmt = this.db.prepare(`
-      SELECT canonical_id FROM version_history 
-      WHERE version_id = ? 
-      LIMIT 1
-    `);
-
-    const row = stmt.get(versionId) as { canonical_id: string } | undefined;
-    return row ? row.canonical_id : null;
-  }
-
-  // Execute multiple operations in a single transaction for atomic compacted thread creation
-  createShadowThreadTransaction(
-    shadowThread: Thread,
-    events: ThreadEvent[],
-    canonicalId: string,
-    reason: string
-  ): void {
-    if (this._closed || this._disabled || !this.db) return;
-
-    const transaction = this.db.transaction(() => {
-      // 1. Save the compacted thread
-      const threadStmt = this.db!.prepare(`
-        INSERT OR REPLACE INTO threads (id, created_at, updated_at)
-        VALUES (?, ?, ?)
-      `);
-      threadStmt.run(
-        shadowThread.id,
-        shadowThread.createdAt.toISOString(),
-        shadowThread.updatedAt.toISOString()
-      );
-
-      // 2. Save all events
-      const eventStmt = this.db!.prepare(`
-        INSERT OR REPLACE INTO events (id, thread_id, type, timestamp, data)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-
-      for (const event of events) {
-        eventStmt.run(
-          event.id,
-          event.threadId,
-          event.type,
-          event.timestamp.toISOString(),
-          JSON.stringify(event.data)
-        );
-      }
-
-      // 3. Update version mapping
-      const versionStmt = this.db!.prepare(`
-        INSERT OR REPLACE INTO thread_versions (canonical_id, current_version_id, created_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-      `);
-      versionStmt.run(canonicalId, shadowThread.id);
-
-      // 4. Add to version history
-      const historyStmt = this.db!.prepare(`
-        INSERT INTO version_history (canonical_id, version_id, created_at, reason)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-      `);
-      historyStmt.run(canonicalId, shadowThread.id, reason);
-    });
-
-    // Execute all operations atomically
-    transaction();
-  }
-
-  // Clean up old compacted threads to prevent unbounded growth
-  cleanupOldShadows(canonicalId: string, keepLast: number = 3): void {
-    if (this._closed || this._disabled || !this.db) return;
-
-    const transaction = this.db.transaction(() => {
-      // Get all version IDs for this canonical thread, ordered by creation date (newest first)
-      const versionsStmt = this.db!.prepare(`
-        SELECT version_id FROM version_history 
-        WHERE canonical_id = ? 
-        ORDER BY id DESC
-      `);
-
-      const versions = versionsStmt.all(canonicalId) as Array<{ version_id: string }>;
-
-      if (versions.length <= keepLast) {
-        return; // Nothing to clean up
-      }
-
-      // Keep the most recent N versions, delete the rest
-      const versionsToDelete = versions.slice(keepLast).map((v) => v.version_id);
-
-      if (versionsToDelete.length === 0) return;
-
-      // Delete events for old compacted threads
-      const deleteEventsStmt = this.db!.prepare(`
-        DELETE FROM events WHERE thread_id = ?
-      `);
-
-      // Delete old compacted threads
-      const deleteThreadStmt = this.db!.prepare(`
-        DELETE FROM threads WHERE id = ?
-      `);
-
-      // Delete old version history entries (but keep the current version mapping)
-      const deleteHistoryStmt = this.db!.prepare(`
-        DELETE FROM version_history WHERE version_id = ?
-      `);
-
-      for (const versionId of versionsToDelete) {
-        deleteEventsStmt.run(versionId);
-        deleteThreadStmt.run(versionId);
-        deleteHistoryStmt.run(versionId);
-      }
-
-      logger.info('Cleaned up old compacted threads', {
-        versionsDeleted: versionsToDelete.length,
-        canonicalId,
-      });
-    });
-
-    transaction();
   }
 
   // ===============================
