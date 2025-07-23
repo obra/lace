@@ -20,12 +20,14 @@ export interface ThreadSessionInfo {
   resumeError?: string;
 }
 
+// Shared cache across all ThreadManager instances to ensure consistency
+const sharedThreadCache = new Map<string, Thread>();
+
 export class ThreadManager {
   private _currentThread: Thread | null = null;
   private _persistence: DatabasePersistence;
   private _compactionStrategy: SummarizeStrategy;
   private _providerStrategyCache = new Map<string, SummarizeStrategy>();
-  private _threadCache = new Map<string, Thread>();
 
   constructor() {
     this._persistence = getPersistence();
@@ -235,8 +237,8 @@ export class ThreadManager {
       return this._currentThread;
     }
 
-    // Check cache
-    const cachedThread = this._threadCache.get(threadId);
+    // Check shared cache
+    const cachedThread = sharedThreadCache.get(threadId);
     if (cachedThread) {
       return cachedThread;
     }
@@ -245,7 +247,7 @@ export class ThreadManager {
     try {
       const thread = this._persistence.loadThread(threadId);
       if (thread) {
-        this._threadCache.set(threadId, thread);
+        sharedThreadCache.set(threadId, thread);
         return thread;
       }
       return undefined;
@@ -278,8 +280,8 @@ export class ThreadManager {
     // Save event to persistence immediately
     try {
       this._persistence.saveEvent(event);
-      // Update cache with modified thread
-      this._threadCache.set(threadId, thread);
+      // Update shared cache with modified thread
+      sharedThreadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to save event', { error });
     }
@@ -360,8 +362,8 @@ export class ThreadManager {
 
     try {
       this._persistence.saveThread(thread);
-      // Update cache with modified thread
-      this._threadCache.set(threadId, thread);
+      // Update shared cache with modified thread
+      sharedThreadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to update thread metadata', { threadId, error });
     }
@@ -379,8 +381,8 @@ export class ThreadManager {
       this._currentThread = null;
     }
 
-    // Remove from cache
-    this._threadCache.delete(threadId);
+    // Remove from shared cache
+    sharedThreadCache.delete(threadId);
 
     logger.info('Thread deleted', { threadId });
   }
@@ -479,8 +481,8 @@ export class ThreadManager {
   saveThread(thread: Thread): void {
     try {
       this._persistence.saveThread(thread);
-      // Update cache with saved thread
-      this._threadCache.set(thread.id, thread);
+      // Update shared cache with saved thread
+      sharedThreadCache.set(thread.id, thread);
     } catch (error) {
       logger.error('Failed to save thread', { threadId: thread.id, error });
     }
@@ -665,7 +667,7 @@ export class ThreadManager {
     }
     // Clear caches
     this._providerStrategyCache.clear();
-    this._threadCache.clear();
+    sharedThreadCache.clear();
     this._persistence.close();
   }
 
