@@ -39,7 +39,7 @@ test.describe('Agent Count Investigation', () => {
             if (contentType?.includes('application/json')) {
               request.response = await response.json();
             }
-          } catch (error) {
+          } catch (_error) {
             // Failed to parse JSON response for API call
           }
         }
@@ -61,21 +61,21 @@ test.describe('Agent Count Investigation', () => {
     await page.waitForTimeout(3000);
 
     // Check if the page loaded successfully
-    const pageTitle = await page.title();
+    const _pageTitle = await page.title();
     // Page title captured for debugging
 
     // Look for elements that should display agent count
     const agentCountElements = page.locator(
       '[data-testid*="agent"], [class*="agent"], text=/agent/i'
     );
-    const agentElementCount = await agentCountElements.count();
+    const _agentElementCount = await agentCountElements.count();
     // Agent-related elements count captured for analysis
 
     // Try to find specific session/agent information
     const sessionInfo = page.locator(
       '[data-testid="session-info"], [class*="session"], [class*="count"]'
     );
-    const sessionInfoCount = await sessionInfo.count();
+    const _sessionInfoCount = await sessionInfo.count();
     // Session info elements count captured for analysis
 
     // Analyze network requests that might be related to agents or sessions
@@ -115,14 +115,14 @@ test.describe('Agent Count Investigation', () => {
         const response = sessionsListRequest.response as { sessions?: unknown[] };
         if (response.sessions && Array.isArray(response.sessions)) {
           // Sessions count and individual session data captured for analysis
-          response.sessions.forEach((session, index) => {
+          response.sessions.forEach((_session, _index) => {
             // Session data captured for debugging
           });
         }
       }
     } else {
       // No sessions list API found - available requests captured for analysis
-      relevantRequests.forEach((req) => {
+      relevantRequests.forEach((_req) => {
         // Available request captured: method and URL
       });
     }
@@ -130,7 +130,7 @@ test.describe('Agent Count Investigation', () => {
     // Console errors analysis
     if (consoleErrors.length > 0) {
       // Console errors captured for analysis
-      consoleErrors.forEach((error) => {
+      consoleErrors.forEach((_error) => {
         // Individual console error captured
       });
     } else {
@@ -149,7 +149,7 @@ test.describe('Agent Count Investigation', () => {
       if (sessionIndex !== -1) {
         const contextStart = Math.max(0, sessionIndex - 200);
         const contextEnd = Math.min(nearbyText?.length ?? 0, sessionIndex + 200);
-        const context = nearbyText?.slice(contextStart, contextEnd);
+        const _context = nearbyText?.slice(contextStart, contextEnd);
         // Context around session captured for analysis
       }
     }
@@ -166,7 +166,7 @@ test.describe('Agent Count Investigation', () => {
     await page.waitForTimeout(2000);
 
     // Final network analysis
-    const finalRelevantRequests = networkRequests.filter(
+    const _finalRelevantRequests = networkRequests.filter(
       (req) =>
         req.url.includes('/api/projects/') ||
         req.url.includes('/api/sessions/') ||

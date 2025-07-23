@@ -243,7 +243,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
         } else if ((await launchButton.count()) > 0) {
           await launchButton.click();
         }
-      } catch (error) {
+      } catch (_error) {
         // Agent functionality may not work due to server configuration issues
         // Agent functionality not available - error captured
       }
