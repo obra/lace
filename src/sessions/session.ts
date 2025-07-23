@@ -214,9 +214,6 @@ export class Session {
     await sessionAgent.start();
     logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
 
-    // Set this as the current thread for delegate creation
-    threadManager.setCurrentThread(sessionId);
-
     const session = new Session(sessionAgent, sessionData.projectId);
 
     // Load delegate threads (child agents) for this session
