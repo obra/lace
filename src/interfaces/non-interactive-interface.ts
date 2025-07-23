@@ -2,7 +2,14 @@
 // ABOUTME: Handles --prompt flag execution without user interaction
 
 import type { Agent } from '~/agents/agent';
-import type { UserInterface } from '~/commands/types';
+
+// Simple interface for non-interactive execution
+interface UserInterface {
+  agent: Agent;
+  displayMessage(message: string): void;
+  clearSession(): void;
+  exit(): void;
+}
 
 /**
  * Non-interactive interface for single prompt execution
