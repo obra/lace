@@ -6,11 +6,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withConsoleCapture } from '~/test-setup-dir/console-capture';
+import { withConsoleCapture } from '~/test-utils/console-capture';
 import { run } from '~/app';
 import { CLIOptions } from '~/cli/args';
 // Real Agent class is used in tests but not directly imported
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies only - use real business logic instances

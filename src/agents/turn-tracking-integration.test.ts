@@ -5,12 +5,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, CurrentTurnMetrics } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends BaseMockProvider {

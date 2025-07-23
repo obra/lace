@@ -7,8 +7,8 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock provider with configurable delay for testing long operations
 class LongOperationProvider extends BaseMockProvider {

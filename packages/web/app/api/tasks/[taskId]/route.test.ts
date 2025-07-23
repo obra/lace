@@ -7,7 +7,7 @@ import { GET, PATCH, DELETE } from '@/app/api/tasks/[taskId]/route';
 import type { SessionService } from '@/lib/server/session-service';
 import type { Session as ApiSession } from '@/types/api';
 import { asThreadId } from '@/lib/server/core-types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Helper function for tests using proper thread ID creation
 function createThreadId(id: string): import('@/types/api').ThreadId {

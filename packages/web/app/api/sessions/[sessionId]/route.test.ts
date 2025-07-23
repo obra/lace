@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { Session } from '@/types/api';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
 import { asThreadId } from '@/lib/server/core-types';

@@ -6,7 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { AIProvider } from '~/providers/base-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;

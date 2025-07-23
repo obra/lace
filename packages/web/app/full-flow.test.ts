@@ -19,7 +19,7 @@ import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessi
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
 import type { ThreadId, Session } from '@/types/api';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 

@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/tasks/[taskId]/notes/route';
 import type { SessionService } from '@/lib/server/session-service';
 // Note: We can't import the actual Session class due to server-only restrictions in tests
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Helper function for tests to avoid server-only imports
 function createThreadId(id: string): import('@/types/api').ThreadId {
