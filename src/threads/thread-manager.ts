@@ -10,7 +10,6 @@ import {
 import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
-import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { estimateTokens } from '~/utils/token-estimation';
 
 export interface ThreadSessionInfo {
@@ -23,13 +22,10 @@ export interface ThreadSessionInfo {
 const sharedThreadCache = new Map<string, Thread>();
 
 export class ThreadManager {
-  private _currentThread: Thread | null = null;
   private _persistence: DatabasePersistence;
-  private _compactionStrategy: SummarizeStrategy;
 
   constructor() {
     this._persistence = getPersistence();
-    this._compactionStrategy = new SummarizeStrategy();
   }
 
   generateThreadId(): string {
@@ -59,7 +55,11 @@ export class ThreadManager {
   resumeOrCreate(threadId?: string): ThreadSessionInfo {
     if (threadId) {
       try {
-        this.setCurrentThread(threadId);
+        // Just verify thread exists
+        const thread = this.loadThread(threadId);
+        if (!thread) {
+          throw new Error(`Thread ${threadId} not found`);
+        }
         return { threadId, isResumed: true };
       } catch (error) {
         // Fall through to create new
@@ -172,8 +172,6 @@ export class ThreadManager {
       events: [],
     };
 
-    this._currentThread = thread;
-
     // Save thread to database immediately (synchronous for createThread)
     try {
       // Use synchronous version to maintain createThread signature
@@ -195,8 +193,6 @@ export class ThreadManager {
       events: [],
       metadata,
     };
-
-    this._currentThread = thread;
 
     // Save thread to database immediately
     try {
@@ -230,11 +226,6 @@ export class ThreadManager {
   }
 
   getThread(threadId: string): Thread | undefined {
-    // Check current thread first
-    if (this._currentThread?.id === threadId) {
-      return this._currentThread;
-    }
-
     // Check shared cache
     const cachedThread = sharedThreadCache.get(threadId);
     if (cachedThread) {
@@ -374,11 +365,6 @@ export class ThreadManager {
       this._persistence.database.prepare('DELETE FROM threads WHERE id = ?').run(threadId);
     }
 
-    // Clear from current thread if it's the one being deleted
-    if (this._currentThread?.id === threadId) {
-      this._currentThread = null;
-    }
-
     // Remove from shared cache
     sharedThreadCache.delete(threadId);
 
@@ -470,12 +456,6 @@ export class ThreadManager {
     return thread;
   }
 
-  saveCurrentThread(): void {
-    if (!this._currentThread) return;
-
-    this._persistence.saveThread(this._currentThread);
-  }
-
   saveThread(thread: Thread): void {
     try {
       this._persistence.saveThread(thread);
@@ -486,30 +466,12 @@ export class ThreadManager {
     }
   }
 
-  setCurrentThread(threadId: string): void {
-    // Save current thread before switching
-    this.saveCurrentThread();
-
-    // Load new thread
-    this._currentThread = this.loadThread(threadId);
-  }
-
   getLatestThreadId(): string | null {
     return this._persistence.getLatestThreadId();
   }
 
-  getCurrentThreadId(): string | null {
-    const threadId = this._currentThread?.id || null;
-    return threadId;
-  }
-
   // Cleanup
   close(): void {
-    try {
-      this.saveCurrentThread();
-    } catch {
-      // Ignore save errors on close
-    }
     // Clear caches
     sharedThreadCache.clear();
     this._persistence.close();
