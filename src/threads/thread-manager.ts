@@ -25,6 +25,7 @@ export class ThreadManager {
   private _persistence: DatabasePersistence;
   private _compactionStrategy: SummarizeStrategy;
   private _providerStrategyCache = new Map<string, SummarizeStrategy>();
+  private _threadCache = new Map<string, Thread>();
 
   constructor() {
     this._persistence = getPersistence();
@@ -233,8 +234,10 @@ export class ThreadManager {
       requestedThreadId: threadId,
       currentThreadId: this._currentThread?.id,
       matchesCurrent: this._currentThread?.id === threadId,
+      inCache: this._threadCache.has(threadId),
     });
 
+    // Check current thread first
     if (this._currentThread?.id === threadId) {
       logger.debug('Returning current thread', {
         threadId: this._currentThread.id,
@@ -243,16 +246,30 @@ export class ThreadManager {
       return this._currentThread;
     }
 
-    // For delegation support, try to load thread from persistence
+    // Check cache
+    const cachedThread = this._threadCache.get(threadId);
+    if (cachedThread) {
+      logger.debug('Returning cached thread', {
+        threadId: cachedThread.id,
+        eventCount: cachedThread.events.length,
+      });
+      return cachedThread;
+    }
+
+    // Load from persistence and cache
     try {
       const thread = this._persistence.loadThread(threadId);
-      logger.debug('Loaded thread from persistence', {
-        requestedThreadId: threadId,
-        foundThread: !!thread,
-        actualThreadId: thread?.id,
-        eventCount: thread?.events?.length || 0,
-      });
-      return thread || undefined;
+      if (thread) {
+        logger.debug('Loaded thread from persistence, caching', {
+          requestedThreadId: threadId,
+          actualThreadId: thread.id,
+          eventCount: thread.events.length,
+        });
+        this._threadCache.set(threadId, thread);
+        return thread;
+      }
+      logger.debug('Thread not found in persistence', { requestedThreadId: threadId });
+      return undefined;
     } catch (error) {
       logger.debug('Failed to load thread from persistence', {
         requestedThreadId: threadId,
@@ -282,6 +299,8 @@ export class ThreadManager {
     // Save event to persistence immediately
     try {
       this._persistence.saveEvent(event);
+      // Update cache with modified thread
+      this._threadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to save event', { error });
     }
@@ -373,6 +392,9 @@ export class ThreadManager {
 
     try {
       this._persistence.saveThread(thread);
+      // Update cache with modified thread
+      this._threadCache.set(threadId, thread);
+      logger.debug('Updated thread metadata and cache', { threadId });
     } catch (error) {
       logger.error('Failed to update thread metadata', { threadId, error });
     }
@@ -389,6 +411,9 @@ export class ThreadManager {
     if (this._currentThread?.id === threadId) {
       this._currentThread = null;
     }
+
+    // Remove from cache
+    this._threadCache.delete(threadId);
 
     logger.info('Thread deleted', { threadId });
   }
@@ -487,6 +512,8 @@ export class ThreadManager {
   saveThread(thread: Thread): void {
     try {
       this._persistence.saveThread(thread);
+      // Update cache with saved thread
+      this._threadCache.set(thread.id, thread);
     } catch (error) {
       logger.error('Failed to save thread', { threadId: thread.id, error });
     }
@@ -669,8 +696,9 @@ export class ThreadManager {
     } catch {
       // Ignore save errors on close
     }
-    // Clear provider strategy cache
+    // Clear caches
     this._providerStrategyCache.clear();
+    this._threadCache.clear();
     this._persistence.close();
   }
 
