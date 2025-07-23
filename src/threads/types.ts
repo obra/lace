@@ -41,14 +41,6 @@ export interface Thread {
   };
 }
 
-export interface VersionHistoryEntry {
-  id: number;
-  canonicalId: string;
-  versionId: string;
-  createdAt: Date;
-  reason: string;
-}
-
 // Branded type for thread IDs
 export type ThreadId = string & { readonly __brand: 'ThreadId' };
 
