@@ -1,9 +1,10 @@
 // ABOUTME: RESTful task management API - list and create tasks under project/session
 // ABOUTME: Provides proper nested route structure for task CRUD operations
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { getSessionService } from '@/lib/server/session-service';
 import {
   ProjectIdSchema,
   SessionIdSchema,
@@ -33,16 +34,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
 
-    // Get project first
+    // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404);
     }
 
-    // Get session from project
-    const session = project.getSession(sessionId);
-    if (!session) {
+    // Verify session belongs to this project
+    const sessionData = project.getSession(sessionId);
+    if (!sessionData) {
       return createErrorResponse('Session not found in this project', 404);
+    }
+
+    // Get active session instance
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(asThreadId(sessionId));
+    if (!session) {
+      return createErrorResponse('Session not active', 404);
     }
 
     const taskManager = session.getTaskManager();
@@ -86,16 +94,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
       CreateTaskSchema
     );
 
-    // Get project first
+    // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404);
     }
 
-    // Get session from project
-    const session = project.getSession(sessionId);
-    if (!session) {
+    // Verify session belongs to this project
+    const sessionData = project.getSession(sessionId);
+    if (!sessionData) {
       return createErrorResponse('Session not found in this project', 404);
+    }
+
+    // Get active session instance
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(asThreadId(sessionId));
+    if (!session) {
+      return createErrorResponse('Session not active', 404);
     }
 
     const taskManager = session.getTaskManager();

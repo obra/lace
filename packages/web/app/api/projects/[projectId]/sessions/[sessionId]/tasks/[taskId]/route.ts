@@ -3,24 +3,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { getSessionService } from '@/lib/server/session-service';
 import {
   ProjectIdSchema,
   SessionIdSchema,
   TaskIdSchema,
-  UpdateTaskSchema,
-  validateRouteParams,
-  validateRequestBody,
   serializeTask,
   createErrorResponse,
   createSuccessResponse,
 } from '@/lib/server/api-utils';
-
-const TaskRouteParamsSchema = z.object({
-  projectId: ProjectIdSchema,
-  sessionId: SessionIdSchema,
-  taskId: TaskIdSchema,
-});
 
 interface RouteContext {
   params: Promise<{
@@ -34,16 +26,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { projectId, sessionId, taskId } = await context.params;
 
-    // Get project first
+    // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404);
     }
 
-    // Get session from project
-    const session = project.getSession(sessionId);
-    if (!session) {
+    // Verify session belongs to this project
+    const sessionData = project.getSession(sessionId);
+    if (!sessionData) {
       return createErrorResponse('Session not found in this project', 404);
+    }
+
+    // Get active session instance
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(asThreadId(sessionId));
+    if (!session) {
+      return createErrorResponse('Session not active', 404);
     }
 
     const taskManager = session.getTaskManager();
@@ -73,16 +72,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Parse request body
     const body = (await request.json()) as Record<string, unknown>;
 
-    // Get project first
+    // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404);
     }
 
-    // Get session from project
-    const session = project.getSession(sessionId);
-    if (!session) {
+    // Verify session belongs to this project
+    const sessionData = project.getSession(sessionId);
+    if (!sessionData) {
       return createErrorResponse('Session not found in this project', 404);
+    }
+
+    // Get active session instance
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(asThreadId(sessionId));
+    if (!session) {
+      return createErrorResponse('Session not active', 404);
     }
 
     const taskManager = session.getTaskManager();
@@ -115,16 +121,23 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { projectId, sessionId, taskId } = await context.params;
 
-    // Get project first
+    // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404);
     }
 
-    // Get session from project
-    const session = project.getSession(sessionId);
-    if (!session) {
+    // Verify session belongs to this project
+    const sessionData = project.getSession(sessionId);
+    if (!sessionData) {
       return createErrorResponse('Session not found in this project', 404);
+    }
+
+    // Get active session instance
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(asThreadId(sessionId));
+    if (!session) {
+      return createErrorResponse('Session not active', 404);
     }
 
     const taskManager = session.getTaskManager();

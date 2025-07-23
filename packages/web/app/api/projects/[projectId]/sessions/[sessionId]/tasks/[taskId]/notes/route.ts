@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { getSessionService } from '@/lib/server/session-service';
 import {
   ProjectIdSchema,
   SessionIdSchema,
@@ -11,9 +12,7 @@ import {
   AddNoteSchema,
   validateRouteParams,
   validateRequestBody,
-  serializeTask,
   createErrorResponse,
-  createSuccessResponse,
 } from '@/lib/server/api-utils';
 
 const NotesRouteParamsSchema = z.object({
@@ -40,16 +39,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const body = await request.json();
     const { content, author } = validateRequestBody(body, AddNoteSchema);
 
-    // Get project first
+    // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404);
     }
 
-    // Get session from project
-    const session = project.getSession(sessionId);
-    if (!session) {
+    // Verify session belongs to this project
+    const sessionData = project.getSession(sessionId);
+    if (!sessionData) {
       return createErrorResponse('Session not found in this project', 404);
+    }
+
+    // Get active session instance
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(asThreadId(sessionId));
+    if (!session) {
+      return createErrorResponse('Session not active', 404);
     }
 
     const taskManager = session.getTaskManager();
