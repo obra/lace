@@ -24,8 +24,6 @@ export function createMockThreadManager(threadId?: string) {
       provider: 'test-provider',
     }),
     getCurrentThreadId: vi.fn().mockReturnValue(testThreadId),
-    needsCompaction: vi.fn().mockResolvedValue(false),
-    createCompactedVersion: vi.fn(),
     close: vi.fn().mockResolvedValue(undefined),
   } as unknown as ThreadManager;
 }
