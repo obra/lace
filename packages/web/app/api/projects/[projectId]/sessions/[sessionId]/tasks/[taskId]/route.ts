@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { serializeTask, createErrorResponse, createSuccessResponse } from '@/lib/server/api-utils';
-import { logger } from '@/lib/server/lace-imports';
+import { logger } from '~/utils/logger';
 
 interface RouteContext {
   params: Promise<{
@@ -50,8 +50,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return createSuccessResponse({ task: serializedTask });
   } catch (error: unknown) {
-    const errorToLog = error instanceof Error ? error : new Error(String(error));
-    logger.error('Error fetching task:', errorToLog);
+    logger.error('Error fetching task', { error });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch task' },
       { status: 500 }

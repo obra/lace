@@ -113,14 +113,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const taskManager = session.getTaskManager();
 
-    // Create task with human context (same logic as before)
-    const createRequest = {
+    // Create task with human context
+    const createRequest: {
+      title: string;
+      prompt: string;
+      priority: TaskPriority;
+      description?: string;
+      assignedTo?: string;
+    } = {
       title,
       prompt,
       priority: (priority as TaskPriority) || 'medium',
-      ...(description && { description }),
-      ...(assignedTo && { assignedTo }),
-    } as const;
+    };
+
+    if (description) {
+      createRequest.description = description;
+    }
+    if (assignedTo && typeof assignedTo === 'string') {
+      createRequest.assignedTo = assignedTo;
+    }
 
     const task = await taskManager.createTask(createRequest, {
       actor: 'human',

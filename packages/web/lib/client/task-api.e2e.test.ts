@@ -12,7 +12,10 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 
 // Import API routes to test against
-import { GET as listTasks, POST as createTask } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
+import {
+  GET as listTasks,
+  POST as createTask,
+} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
 import {
   GET as getTask,
   PATCH as updateTask,
@@ -87,7 +90,9 @@ describe('TaskAPIClient E2E Tests', () => {
           if (urlString.includes('/api/tasks') && !urlString.includes('/notes')) {
             if (method === 'POST' && urlString === '/api/tasks') {
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await createTask(request);
+              return await createTask(request, {
+                params: Promise.resolve({ projectId: 'test', sessionId: 'test' }),
+              });
             } else if (
               method === 'GET' &&
               urlString.includes('/api/tasks/') &&
@@ -97,7 +102,7 @@ describe('TaskAPIClient E2E Tests', () => {
               const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
               const response = await getTask(request, {
-                params: { taskId: taskId! },
+                params: Promise.resolve({ projectId: 'test', sessionId: 'test', taskId: taskId! }),
               });
               const responseData = (await response.json()) as unknown;
               return new Response(JSON.stringify(responseData), {
@@ -107,15 +112,21 @@ describe('TaskAPIClient E2E Tests', () => {
             } else if (method === 'GET' && urlString.includes('?sessionId=')) {
               // Handle GET /api/tasks?sessionId={sessionId} - list tasks
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await listTasks(request);
+              return await listTasks(request, {
+                params: Promise.resolve({ projectId: 'test', sessionId: 'test' }),
+              });
             } else if (method === 'PATCH' && urlString.includes('/api/tasks/')) {
               const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await updateTask(request, { params: { taskId: taskId! } });
+              return await updateTask(request, {
+                params: Promise.resolve({ projectId: 'test', sessionId: 'test', taskId: taskId! }),
+              });
             } else if (method === 'DELETE' && urlString.includes('/api/tasks/')) {
               const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await deleteTask(request, { params: { taskId: taskId! } });
+              return await deleteTask(request, {
+                params: Promise.resolve({ projectId: 'test', sessionId: 'test', taskId: taskId! }),
+              });
             }
           } else if (urlString.includes('/notes') && method === 'POST') {
             const taskId = urlString.split('/api/tasks/')[1]?.split('/notes')[0];
