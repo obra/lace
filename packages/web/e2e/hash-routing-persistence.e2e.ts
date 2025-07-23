@@ -245,7 +245,10 @@ test.describe('Hash-Based URL Persistence E2E', () => {
         }
       } catch (error) {
         // Agent functionality may not work due to server configuration issues
-        console.log('Agent functionality not available:', error.message);
+        console.log(
+          'Agent functionality not available:',
+          error instanceof Error ? error.message : String(error)
+        );
       }
     }
 

@@ -108,7 +108,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
         } else if (urlString.includes('/notes') && method === 'POST') {
           const taskId = urlString.split('/api/tasks/')[1]?.split('/notes')[0];
           const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-          return await addNote(request, { params: { taskId: taskId! } });
+          return await addNote(request, { params: Promise.resolve({ taskId: taskId! }) });
         }
         
         throw new Error(`Unhandled API route: ${method} ${urlString}`);
