@@ -7,6 +7,7 @@ import {
   SendButton, 
   FileAttachButton 
 } from '@/components/ui';
+import type { ChatTextareaRef } from './ChatTextarea';
 import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
 
 interface ChatInputComposerProps {
@@ -48,7 +49,7 @@ export default function ChatInputComposer({
 }: ChatInputComposerProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<ChatTextareaRef>(null);
 
   useEffect(() => {
     const checkMobile = () => {

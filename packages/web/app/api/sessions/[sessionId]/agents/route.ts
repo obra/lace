@@ -66,13 +66,13 @@ export async function POST(
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
     setupAgentApprovals(agent, sessionId);
 
-    // Convert to API format
+    // Convert to API format - use agent's improved API
     const agentResponse = {
       threadId: agent.threadId,
-      name: body.name,
-      provider: body.provider || 'anthropic',
-      model: body.model || 'claude-3-haiku-20240307',
-      status: 'idle' as const,
+      name: agent.name,
+      provider: agent.provider,
+      model: agent.model,
+      status: agent.status,
       createdAt: new Date().toISOString(),
     };
 
@@ -122,18 +122,14 @@ export async function GET(
     // Get agents from Session instance
     const agents = session.getAgents();
     return NextResponse.json({
-      agents: agents.map((agent) => {
-        // Safely extract createdAt if available, otherwise use current timestamp
-        const agentWithTimestamp = agent as unknown as { createdAt?: string };
-        return {
-          threadId: agent.threadId,
-          name: agent.name,
-          provider: agent.provider,
-          model: agent.model,
-          status: agent.status,
-          createdAt: agentWithTimestamp.createdAt ?? new Date().toISOString(),
-        };
-      }),
+      agents: agents.map((agent) => ({
+        threadId: agent.threadId,
+        name: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        status: agent.status,
+        createdAt: new Date().toISOString(),
+      })),
     });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);

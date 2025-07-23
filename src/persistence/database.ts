@@ -421,6 +421,8 @@ export class DatabasePersistence {
     const currentVersionId = this.getCurrentVersion(threadId);
     const actualThreadId = currentVersionId || threadId;
 
+    // Load thread from database with version mapping support
+
     const threadStmt = this.db.prepare(`
       SELECT * FROM threads WHERE id = ?
     `);
@@ -499,6 +501,8 @@ export class DatabasePersistence {
       data: string;
     }>;
 
+    // Load events from database for thread
+
     return rows.map((row) => {
       try {
         return {
@@ -544,14 +548,19 @@ export class DatabasePersistence {
   }
 
   getAllThreadsWithMetadata(): Thread[] {
+    return this.executeThreadQuery('', '');
+  }
+
+  private executeThreadQuery(whereClause: string, param: string): Thread[] {
     if (this._disabled || !this.db) return [];
 
     const stmt = this.db.prepare(`
       SELECT id, session_id, project_id, created_at, updated_at, metadata FROM threads
+      ${whereClause}
       ORDER BY updated_at DESC
     `);
 
-    const rows = stmt.all() as Array<{
+    const rows = (whereClause ? stmt.all(param) : stmt.all()) as Array<{
       id: string;
       session_id: string | null;
       project_id: string | null;
@@ -580,6 +589,10 @@ export class DatabasePersistence {
         metadata,
       };
     });
+  }
+
+  getThreadsBySession(sessionId: string): Thread[] {
+    return this.executeThreadQuery('WHERE session_id = ?', sessionId);
   }
 
   getCurrentVersion(canonicalId: string): string | null {
@@ -1163,7 +1176,7 @@ export class DatabasePersistence {
     `);
 
     const rows = stmt.all(projectId) as Array<{
-      id: string;
+      id: ThreadId;
       project_id: string;
       name: string;
       description: string;

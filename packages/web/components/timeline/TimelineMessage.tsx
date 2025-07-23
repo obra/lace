@@ -3,6 +3,7 @@
 import { TimelineEntry } from '@/types';
 import { MessageDisplay } from '@/components/ui';
 import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
+import { UnknownEventEntry } from '@/components/timeline/UnknownEventEntry';
 import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faImages, faExternalLinkAlt, faUser, faRobot } from '@/lib/fontawesome';
@@ -37,6 +38,19 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
         agent={entry.agent}
         tool={entry.tool}
         result={entry.result}
+      />
+    );
+  }
+
+  // Unknown events with expandable content and metadata
+  if (entry.type === 'unknown') {
+    return (
+      <UnknownEventEntry
+        id={entry.id.toString()}
+        eventType={entry.eventType || 'UNKNOWN'}
+        content={entry.content || ''}
+        timestamp={entry.timestamp}
+        metadata={entry.metadata}
       />
     );
   }

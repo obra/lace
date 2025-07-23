@@ -555,8 +555,8 @@ describe('Agent Spawning API', () => {
         provider: 'anthropic',
         model: 'claude-3-haiku-20240307',
         status: 'thinking',
-        createdAt: '2025-01-13T10:00:00Z',
       });
+      expect(data.agents[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     });
 
     it('should return empty array for session with no agents', async () => {

@@ -63,5 +63,9 @@ export {
   faReply,
   faFileText,
   faExternalLinkAlt,
+  faChevronDown,
+  faChevronRight,
+  faCode,
+  faQuestion,
   faExternalLinkAlt as faExternalLink,
 } from '@fortawesome/free-solid-svg-icons';

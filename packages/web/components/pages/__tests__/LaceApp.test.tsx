@@ -11,13 +11,8 @@ import { render, screen, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { LaceApp } from '@/components/pages/LaceApp';
 
-// Mock the theme context
-vi.mock('@/components/providers/ThemeProvider', () => ({
-  useTheme: () => ({
-    theme: 'dark',
-    setTheme: vi.fn(),
-  }),
-}));
+// Use real theme provider instead of mocking internal business logic
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
@@ -72,13 +67,16 @@ vi.mock('@/types/events', () => ({
 const mockFetch = vi.fn(() => new Promise(() => {})); // Promise that never resolves
 global.fetch = mockFetch as unknown as typeof fetch;
 
-// Mock EventSource
-global.EventSource = vi.fn().mockImplementation(() => ({
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  close: vi.fn(),
-  onerror: vi.fn(),
-}));
+// Try without mocking EventSource - let's see if the component actually needs it
+
+// Helper to render with real theme provider
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <ThemeProvider>
+      {component}
+    </ThemeProvider>
+  );
+};
 
 describe('LaceApp', () => {
   beforeEach(() => {
@@ -91,14 +89,14 @@ describe('LaceApp', () => {
   });
 
   it('renders without crashing', () => {
-    render(<LaceApp />);
+    renderWithProviders(<LaceApp />);
     
     // Should show the basic layout elements
     expect(screen.getByText('Select a Project')).toBeInTheDocument();
   });
 
   it('shows correct initial layout structure', () => {
-    render(<LaceApp />);
+    renderWithProviders(<LaceApp />);
     
     // Should have sidebar
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
@@ -108,7 +106,7 @@ describe('LaceApp', () => {
   });
 
   it('has mobile navigation button', () => {
-    render(<LaceApp />);
+    renderWithProviders(<LaceApp />);
     
     // Should have a mobile navigation button (hamburger menu)
     const mobileNavButton = screen.getByRole('button');
@@ -116,7 +114,7 @@ describe('LaceApp', () => {
   });
 
   it('applies correct CSS classes for theme', () => {
-    const { container } = render(<LaceApp />);
+    const { container } = renderWithProviders(<LaceApp />);
     
     // Should have base theme classes
     const mainContainer = container.firstChild as HTMLElement | null;

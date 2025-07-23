@@ -202,7 +202,7 @@ export const Sizes: Story = {
             isOpen={openModal === size.id}
             onClose={() => setOpenModal(null)}
             title={`${size.name} Modal`}
-            size={size.id}
+            size={size.id as "sm" | "md" | "lg" | "xl" | "full"}
           >
             <div className="space-y-4">
               <p><strong>Size:</strong> {size.name}</p>

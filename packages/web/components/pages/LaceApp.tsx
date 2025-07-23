@@ -20,7 +20,6 @@ import type {
   ThreadId,
   SessionEvent,
   ToolApprovalRequestData,
-  ApprovalDecision,
   Agent,
   SessionsResponse,
   SessionResponse,
@@ -29,13 +28,25 @@ import type {
   ProvidersResponse,
   CreateAgentRequest,
 } from '@/types/api';
-import { isApiError } from '@/types/api';
+import { isApiError, ApprovalDecision } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
-import { getAllEventTypes } from '@/types/events';
+import { useHashRouter } from '@/hooks/useHashRouter';
+import { useSessionEvents } from '@/hooks/useSessionEvents';
 
 export function LaceApp() {
   // Theme state
   const { theme, setTheme } = useTheme();
+
+  // Hash-based routing state (replaces selectedProject, selectedSession, selectedAgent)
+  const {
+    project: selectedProject,
+    session: selectedSession,
+    agent: selectedAgent,
+    setProject: setSelectedProject,
+    setSession: setSelectedSession,
+    setAgent: setSelectedAgent,
+    isHydrated: urlStateHydrated,
+  } = useHashRouter();
 
   // UI State (from AnimatedLaceApp but remove demo data)
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -44,27 +55,31 @@ export function LaceApp() {
 
   // Business Logic State (from current app/page.tsx)
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSession, setSelectedSession] = useState<ThreadId | null>(null);
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState<SessionEvent[]>([]);
   const [message, setMessage] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState<ThreadId | undefined>(undefined);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
   const [creatingSession, setCreatingSession] = useState(false);
+
+  // Use session events hook for event management
+  const {
+    filteredEvents: events,
+    approvalRequest,
+    loadingHistory,
+    connected,
+    clearApprovalRequest,
+  } = useSessionEvents(selectedSession, selectedAgent);
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
     const entries = convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
-      selectedAgent,
+      selectedAgent: selectedAgent || undefined,
     });
     
     return entries;
@@ -169,127 +184,10 @@ export function LaceApp() {
 
   // Handle project selection
   const handleProjectSelect = (project: { id: string }) => {
+    // Hash router automatically clears session/agent when project changes
     setSelectedProject(project.id);
-    // Clear session selection when switching projects
-    setSelectedSession(null);
-    setSelectedAgent(undefined);
-    setEvents([]);
   };
 
-  // Connect to SSE when agent selected
-  useEffect(() => {
-    if (!selectedAgent) {
-      setEvents([]);
-      return;
-    }
-
-    // Clear events when switching agents
-    setEvents([]);
-
-    // Load conversation history for the session (contains all agent events)
-    void loadConversationHistory(selectedSession);
-
-    const eventSource = new EventSource(`/api/sessions/${selectedSession}/events/stream`);
-
-    // Store event listeners for cleanup
-    const eventListeners = new Map<string, (event: MessageEvent) => void>();
-
-    // Listen to all event types
-    const eventTypes = getAllEventTypes();
-
-    eventTypes.forEach((eventType) => {
-      const listener = (event: MessageEvent) => {
-        try {
-          const data: unknown = JSON.parse(String(event.data));
-
-          // Type guard for event structure
-          if (typeof data === 'object' && data !== null && 'type' in data) {
-            const eventData = data as { type: string; data: unknown; timestamp?: string | Date };
-
-            // Handle approval requests separately
-            if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
-              setApprovalRequest(eventData.data as ToolApprovalRequestData);
-            } else {
-              // Convert timestamp from string to Date if needed
-              const timestamp = eventData.timestamp 
-                ? (typeof eventData.timestamp === 'string' ? new Date(eventData.timestamp) : eventData.timestamp)
-                : new Date();
-
-              // Create the session event with proper type narrowing
-              const sessionEvent = {
-                ...eventData,
-                threadId: selectedAgent as ThreadId,
-                timestamp
-              } as SessionEvent;
-
-              setEvents((prev) => [...prev, sessionEvent]);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to parse event:', error);
-        }
-      };
-
-      eventListeners.set(eventType, listener);
-      eventSource.addEventListener(eventType, listener);
-    });
-
-    const connectionListener = (_event: Event) => {
-      const connectionEvent: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedAgent as ThreadId,
-        timestamp: new Date(),
-        data: { content: 'Connected to agent stream' },
-      };
-      setEvents((prev) => [...prev, connectionEvent]);
-    };
-
-    eventSource.addEventListener('connection', connectionListener);
-
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
-      const errorEvent: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: selectedAgent as ThreadId,
-        timestamp: new Date(),
-        data: { content: 'Connection lost' },
-      };
-      setEvents((prev) => [...prev, errorEvent]);
-    };
-
-    return () => {
-      // Remove all event listeners before closing
-      eventListeners.forEach((listener, eventType) => {
-        eventSource.removeEventListener(eventType, listener);
-      });
-      eventSource.removeEventListener('connection', connectionListener);
-      eventSource.close();
-    };
-  }, [selectedAgent, selectedSession]);
-
-  async function loadConversationHistory(sessionId: ThreadId) {
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/history`);
-      const data: unknown = await res.json();
-
-      if (isApiError(data)) {
-        console.error('Failed to load conversation history:', data.error);
-        return;
-      }
-
-      const historyData = data as { events: Array<SessionEvent & { timestamp: string }> };
-      
-      // Convert string timestamps to Date objects
-      const eventsWithDateTimestamps: SessionEvent[] = (historyData.events || []).map(event => ({
-        ...event,
-        timestamp: new Date(event.timestamp)
-      }));
-      
-      setEvents(eventsWithDateTimestamps);
-    } catch (error) {
-      console.error('Failed to load conversation history:', error);
-    }
-  }
 
   async function sendMessage() {
     if (!selectedAgent || !message.trim()) return;
@@ -323,7 +221,7 @@ export function LaceApp() {
       });
 
       if (res.ok) {
-        setApprovalRequest(null);
+        clearApprovalRequest();
       } else {
         console.error('Failed to submit approval decision');
       }
@@ -403,17 +301,20 @@ export function LaceApp() {
 
   // Handle session selection - load session details but don't auto-select agent
   const handleSessionSelect = (sessionId: string) => {
-    const threadId = sessionId as ThreadId;
-    setSelectedSession(threadId);
-    // Don't automatically select an agent - let user choose
-    setSelectedAgent(undefined);
-    setEvents([]);
+    // Hash router automatically clears agent when session changes
+    setSelectedSession(sessionId as ThreadId);
   };
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
     setSelectedAgent(agentThreadId as ThreadId);
-    setEvents([]);
+  };
+
+  // Handle agent updates - refresh session details to show updated agent info
+  const handleAgentUpdate = async () => {
+    if (selectedSession) {
+      await loadSessionDetails(selectedSession);
+    }
   };
 
   // Handle project updates (archive/unarchive/edit)
@@ -437,9 +338,30 @@ export function LaceApp() {
   };
 
   // Convert projects to format expected by Sidebar
-  const currentProject = selectedProject 
-    ? projects.find(p => p.id === selectedProject) || { id: '', name: 'Unknown', workingDirectory: '/' }
-    : { id: '', name: 'No project selected', workingDirectory: '/' };
+  // If selectedProject ID doesn't match any actual project, clear the selection
+  const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
+  const currentProject = foundProject || { 
+    id: '', 
+    name: 'No project selected', 
+    description: 'Select a project to get started',
+    workingDirectory: '/',
+    isArchived: false,
+    createdAt: new Date(),
+    lastUsedAt: new Date()
+  };
+  
+  // Clear invalid project selection from URL  
+  // useEffect(() => {
+  //   // Clear any project ID that doesn't match loaded projects after loading is complete
+  //   // This handles invalid URLs gracefully by falling back to project selection
+  //   if (selectedProject && 
+  //       !loadingProjects && 
+  //       projects.length > 0 && 
+  //       !foundProject) {
+  //     console.log('Clearing invalid project ID from URL:', selectedProject);
+  //     setSelectedProject(null, true); // Use replaceState to avoid polluting history
+  //   }
+  // }, [selectedProject, projects, foundProject, setSelectedProject, loadingProjects]);
 
   const projectsForSidebar = projects.map(p => ({
     id: p.id,
@@ -452,7 +374,14 @@ export function LaceApp() {
     sessionCount: p.sessionCount || 0,
   }));
 
-  // These timeline variables are no longer needed with the new composable sidebar
+  // Wait for URL state hydration before rendering to avoid hydration mismatches
+  if (!urlStateHydrated) {
+    return (
+      <div className="flex h-screen bg-base-200 text-base-content font-sans items-center justify-center">
+        <div className="loading loading-spinner loading-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -502,9 +431,6 @@ export function LaceApp() {
                   <SidebarButton
                     onClick={() => {
                       setSelectedProject(null);
-                      setSelectedSession(null);
-                      setSelectedAgent(undefined);
-                      setEvents([]);
                       setShowMobileNav(false);
                     }}
                     variant="ghost"
@@ -537,7 +463,6 @@ export function LaceApp() {
                   <SidebarButton
                     onClick={() => {
                       setSelectedAgent(undefined);
-                      setEvents([]);
                       setShowMobileNav(false);
                     }}
                     variant="ghost"
@@ -566,18 +491,13 @@ export function LaceApp() {
                           />
                           <span className="font-medium">{agent.name}</span>
                         </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-xs text-base-content/60">
-                            {agent.provider}
-                          </span>
-                          <span className={`text-xs badge badge-xs ${
-                            agent.status === 'idle' ? 'badge-success' :
-                            agent.status === 'busy' ? 'badge-warning' :
-                            'badge-neutral'
-                          }`}>
-                            {agent.status}
-                          </span>
-                        </div>
+                        <span className={`text-xs badge badge-xs ${
+                          agent.status === 'idle' ? 'badge-success' :
+                          (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
+                          'badge-neutral'
+                        }`}>
+                          {agent.status}
+                        </span>
                       </div>
                     </SidebarItem>
                   )) || []}
@@ -623,9 +543,6 @@ export function LaceApp() {
               <SidebarButton
                 onClick={() => {
                   setSelectedProject(null);
-                  setSelectedSession(null);
-                  setSelectedAgent(undefined);
-                  setEvents([]);
                 }}
                 variant="ghost"
               >
@@ -657,7 +574,6 @@ export function LaceApp() {
               <SidebarButton
                 onClick={() => {
                   setSelectedAgent(undefined);
-                  setEvents([]);
                 }}
                 variant="ghost"
               >
@@ -682,18 +598,13 @@ export function LaceApp() {
                       />
                       <span className="font-medium">{agent.name}</span>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-xs text-base-content/60">
-                        {agent.provider}
-                      </span>
-                      <span className={`text-xs badge badge-xs ${
-                        agent.status === 'idle' ? 'badge-success' :
-                        agent.status === 'busy' ? 'badge-warning' :
-                        'badge-neutral'
-                      }`}>
-                        {agent.status}
-                      </span>
-                    </div>
+                    <span className={`text-xs badge badge-xs ${
+                      agent.status === 'idle' ? 'badge-success' :
+                      (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
+                      'badge-neutral'
+                    }`}>
+                      {agent.status}
+                    </span>
                   </div>
                 </SidebarItem>
               )) || []}
@@ -716,7 +627,13 @@ export function LaceApp() {
               </motion.button>
               <div className="flex items-center gap-2">
                 <h1 className="font-semibold text-base-content truncate">
-                  {selectedProject ? currentProject.name : 'Select a Project'}
+                  {selectedAgent && selectedSessionDetails?.agents ? 
+                    (() => {
+                      const currentAgent = selectedSessionDetails.agents.find(a => a.threadId === selectedAgent);
+                      return currentAgent ? `${currentAgent.name} - ${currentAgent.model}` : (selectedProject ? currentProject.name : 'Select a Project');
+                    })() :
+                    (selectedProject ? currentProject.name : 'Select a Project')
+                  }
                 </h1>
               </div>
             </motion.div>
@@ -732,7 +649,7 @@ export function LaceApp() {
                 <span>Loading...</span>
               </div>
             </div>
-          ) : selectedProject ? (
+          ) : selectedProject && foundProject ? (
             selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
@@ -773,6 +690,8 @@ export function LaceApp() {
                   onSessionCreate={handleSessionCreate}
                   onSessionSelect={(session) => handleSessionSelect(session.id)}
                   onAgentCreate={handleAgentCreate}
+                  onAgentSelect={handleAgentSelect}
+                  onAgentUpdate={handleAgentUpdate}
                   loading={loading}
                 />
               </div>
@@ -785,7 +704,7 @@ export function LaceApp() {
               </div>
             </div>
           ) : (
-            /* Project Selection Panel - When no project selected */
+            /* Project Selection Panel - When no project selected or invalid project ID */
             <div className="flex-1 p-6 min-h-0">
               <ProjectSelectorPanel
                 projects={projectsForSidebar}

@@ -168,29 +168,34 @@ function convertEvent(
         timestamp,
       };
 
-    case 'SYSTEM_PROMPT':
-      return {
-        id,
-        type: 'admin',
-        content: `System prompt loaded`,
-        timestamp,
-      };
-
-    case 'USER_SYSTEM_PROMPT':
-      return {
-        id,
-        type: 'admin',
-        content: `User instructions loaded`,
-        timestamp,
-      };
-
     default:
-      // Fallback for unknown events
+      // Fallback for unknown events - provide rich metadata for proper rendering
+      const unknownEvent = event as {
+        type: string;
+        data?: unknown;
+        threadId?: string;
+        [key: string]: unknown;
+      };
       return {
         id,
-        type: 'admin',
-        content: `Unknown event: ${(event as { type: string }).type}`,
+        type: 'unknown',
+        eventType: unknownEvent.type,
+        content:
+          typeof unknownEvent.data === 'string'
+            ? unknownEvent.data
+            : JSON.stringify(unknownEvent.data, null, 2) ||
+              `Unknown event of type: ${unknownEvent.type}`,
         timestamp,
+        metadata: {
+          originalType: unknownEvent.type,
+          threadId: unknownEvent.threadId,
+          // Include all event properties except the core ones we already handle
+          ...Object.fromEntries(
+            Object.entries(unknownEvent).filter(
+              ([key]) => !['type', 'data', 'timestamp', 'threadId'].includes(key)
+            )
+          ),
+        },
       };
   }
 }

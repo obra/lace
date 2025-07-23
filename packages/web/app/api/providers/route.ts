@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import type { ProviderInfo, ModelInfo } from '@/lib/server/core-types';
 import { ApiErrorResponse } from '@/types/api';
-
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
   return error instanceof Error;

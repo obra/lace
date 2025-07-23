@@ -20,6 +20,9 @@ export interface ThreadSessionInfo {
   resumeError?: string;
 }
 
+// Shared cache across all ThreadManager instances to ensure consistency
+const sharedThreadCache = new Map<string, Thread>();
+
 export class ThreadManager {
   private _currentThread: Thread | null = null;
   private _persistence: DatabasePersistence;
@@ -229,15 +232,30 @@ export class ThreadManager {
   }
 
   getThread(threadId: string): Thread | undefined {
+    // Check current thread first
     if (this._currentThread?.id === threadId) {
       return this._currentThread;
     }
 
-    // For delegation support, try to load thread from persistence
+    // Check shared cache
+    const cachedThread = sharedThreadCache.get(threadId);
+    if (cachedThread) {
+      return cachedThread;
+    }
+
+    // Load from persistence and cache
     try {
       const thread = this._persistence.loadThread(threadId);
-      return thread || undefined;
-    } catch {
+      if (thread) {
+        sharedThreadCache.set(threadId, thread);
+        return thread;
+      }
+      return undefined;
+    } catch (error) {
+      logger.debug('Failed to load thread from persistence', {
+        requestedThreadId: threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return undefined;
     }
   }
@@ -262,6 +280,8 @@ export class ThreadManager {
     // Save event to persistence immediately
     try {
       this._persistence.saveEvent(event);
+      // Update shared cache with modified thread
+      sharedThreadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to save event', { error });
     }
@@ -283,7 +303,7 @@ export class ThreadManager {
     allEvents.push(...this.getEvents(mainThreadId));
 
     // Get delegate thread events
-    const delegateThreads = this.getThreadsForSession(mainThreadId);
+    const delegateThreads = this.listThreadIdsForSession(mainThreadId);
     for (const delegateThreadId of delegateThreads) {
       const delegateEvents = this._persistence.loadEvents(delegateThreadId);
       allEvents.push(...delegateEvents);
@@ -293,7 +313,12 @@ export class ThreadManager {
     return allEvents.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
-  getThreadsForSession(sessionId: string): string[] {
+  /**
+   * Get thread IDs for all delegate threads belonging to a session.
+   * Returns only the IDs, not full thread objects. Use getThreadsBySession()
+   * if you need full Thread objects with events.
+   */
+  listThreadIdsForSession(sessionId: string): string[] {
     // Use the persistence layer's SQL-based filtering instead
     return this._persistence.getDelegateThreadsFor(sessionId);
   }
@@ -303,46 +328,19 @@ export class ThreadManager {
     return this._persistence.getAllThreadsWithMetadata();
   }
 
+  /**
+   * Get full Thread objects (with events loaded) for all threads belonging to a session.
+   * This is more expensive than listThreadIdsForSession() as it loads all events.
+   */
   getThreadsBySession(sessionId: string): Thread[] {
-    if (!this._persistence.database) return [];
+    // Get threads without events first
+    const threadsWithoutEvents = this._persistence.getThreadsBySession(sessionId);
 
-    const stmt = this._persistence.database.prepare(`
-      SELECT * FROM threads 
-      WHERE session_id = ?
-      ORDER BY updated_at DESC
-    `);
-
-    const rows = stmt.all(sessionId) as Array<{
-      id: string;
-      session_id: string;
-      project_id: string;
-      created_at: string;
-      updated_at: string;
-      metadata: string | null;
-    }>;
-
-    return rows.map((row) => {
-      const events = this._persistence.loadEvents(row.id);
-      let metadata: Thread['metadata'] = undefined;
-
-      if (row.metadata) {
-        try {
-          metadata = JSON.parse(row.metadata) as Record<string, unknown>;
-        } catch (error) {
-          logger.warn('Failed to parse thread metadata', { threadId: row.id, error });
-        }
-      }
-
-      return {
-        id: row.id,
-        sessionId: row.session_id,
-        projectId: row.project_id,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
-        events,
-        metadata,
-      };
-    });
+    // Load events for each thread
+    return threadsWithoutEvents.map((thread) => ({
+      ...thread,
+      events: this._persistence.loadEvents(thread.id),
+    }));
   }
 
   // Update existing methods to not treat threads as sessions
@@ -364,6 +362,8 @@ export class ThreadManager {
 
     try {
       this._persistence.saveThread(thread);
+      // Update shared cache with modified thread
+      sharedThreadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to update thread metadata', { threadId, error });
     }
@@ -380,6 +380,9 @@ export class ThreadManager {
     if (this._currentThread?.id === threadId) {
       this._currentThread = null;
     }
+
+    // Remove from shared cache
+    sharedThreadCache.delete(threadId);
 
     logger.info('Thread deleted', { threadId });
   }
@@ -478,6 +481,8 @@ export class ThreadManager {
   saveThread(thread: Thread): void {
     try {
       this._persistence.saveThread(thread);
+      // Update shared cache with saved thread
+      sharedThreadCache.set(thread.id, thread);
     } catch (error) {
       logger.error('Failed to save thread', { threadId: thread.id, error });
     }
@@ -660,8 +665,9 @@ export class ThreadManager {
     } catch {
       // Ignore save errors on close
     }
-    // Clear provider strategy cache
+    // Clear caches
     this._providerStrategyCache.clear();
+    sharedThreadCache.clear();
     this._persistence.close();
   }
 

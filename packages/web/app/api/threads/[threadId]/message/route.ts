@@ -95,7 +95,7 @@ export async function POST(
     const messageId = randomUUID();
 
     // Process message asynchronously
-    // Log message processing (could use structured logging if available)
+
     agent
       .sendMessage(body.message)
       .then(() => {

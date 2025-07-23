@@ -1042,6 +1042,137 @@ describe('Enhanced Agent', () => {
       const assistantMessages = messages.filter((m) => m.role === 'assistant');
       expect(assistantMessages).toHaveLength(0);
     });
+
+    describe('duplicate system prompt prevention', () => {
+      it('should add SYSTEM_PROMPT events on first start with empty thread', async () => {
+        agent = createAgent();
+
+        // Verify thread is initially empty
+        const initialEvents = threadManager.getEvents(threadId);
+        expect(initialEvents).toHaveLength(0);
+
+        await agent.start();
+
+        // Should have added both system prompt events
+        const events = threadManager.getEvents(threadId);
+        const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
+        const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
+
+        expect(systemPrompts).toHaveLength(1);
+        expect(userSystemPrompts).toHaveLength(1);
+        expect(events).toHaveLength(2);
+      });
+
+      it('should NOT add duplicate SYSTEM_PROMPT events on restart', async () => {
+        agent = createAgent();
+
+        // First start - should add prompts
+        await agent.start();
+        const afterFirstStart = threadManager.getEvents(threadId);
+        expect(afterFirstStart.filter((e) => e.type === 'SYSTEM_PROMPT')).toHaveLength(1);
+        expect(afterFirstStart.filter((e) => e.type === 'USER_SYSTEM_PROMPT')).toHaveLength(1);
+
+        // Simulate agent restart by creating new agent with same thread
+        const agent2 = createAgent();
+        await agent2.start();
+
+        // Should NOT have added more prompt events
+        const afterRestart = threadManager.getEvents(threadId);
+        expect(afterRestart.filter((e) => e.type === 'SYSTEM_PROMPT')).toHaveLength(1);
+        expect(afterRestart.filter((e) => e.type === 'USER_SYSTEM_PROMPT')).toHaveLength(1);
+        expect(afterRestart).toHaveLength(2); // Same total count
+      });
+
+      it('should NOT add SYSTEM_PROMPT events if conversation already started', async () => {
+        // Pre-populate thread with a user message (conversation started)
+        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello there!');
+
+        agent = createAgent();
+        await agent.start();
+
+        // Should NOT have added system prompt events since conversation exists
+        const events = threadManager.getEvents(threadId);
+        const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
+        const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
+
+        expect(systemPrompts).toHaveLength(0);
+        expect(userSystemPrompts).toHaveLength(0);
+        expect(events).toHaveLength(1); // Only the original user message
+      });
+
+      it('should NOT add SYSTEM_PROMPT events if existing prompts are already present', async () => {
+        // Pre-populate thread with system prompts (e.g., from previous agent run)
+        threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'Existing system prompt');
+
+        agent = createAgent();
+        await agent.start();
+
+        // Should NOT have added more prompt events
+        const events = threadManager.getEvents(threadId);
+        const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
+        const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
+
+        expect(systemPrompts).toHaveLength(1); // Only the original one
+        expect(userSystemPrompts).toHaveLength(0);
+        expect(events).toHaveLength(1); // Only the original system prompt
+      });
+
+      it('should prevent duplicates across multiple rapid starts', async () => {
+        agent = createAgent();
+
+        // Simulate rapid multiple starts (race condition scenario)
+        const startPromises = [agent.start(), agent.start(), agent.start()];
+
+        await Promise.all(startPromises);
+
+        // Should only have one set of prompts despite multiple starts
+        const events = threadManager.getEvents(threadId);
+        const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
+        const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
+
+        expect(systemPrompts).toHaveLength(1);
+        expect(userSystemPrompts).toHaveLength(1);
+        expect(events).toHaveLength(2);
+      });
+
+      it('should handle complex scenarios with mixed existing events', async () => {
+        // Pre-populate thread with some system messages but no conversation or prompts
+        threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', 'Connection established');
+
+        agent = createAgent();
+        await agent.start();
+
+        // Should have added prompts since no conversation or existing prompts
+        const events = threadManager.getEvents(threadId);
+        const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
+        const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
+        const localMessages = events.filter((e) => e.type === 'LOCAL_SYSTEM_MESSAGE');
+
+        expect(systemPrompts).toHaveLength(1);
+        expect(userSystemPrompts).toHaveLength(1);
+        expect(localMessages).toHaveLength(1); // Original message preserved
+        expect(events).toHaveLength(3); // All events present
+      });
+
+      it('should not add prompts when both conversation and existing prompts are present', async () => {
+        // Pre-populate with both conversation events and existing prompts
+        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there!');
+        threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'You are helpful');
+
+        agent = createAgent();
+        await agent.start();
+
+        // Should NOT have added any new prompts
+        const events = threadManager.getEvents(threadId);
+        const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
+        const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
+
+        expect(systemPrompts).toHaveLength(1); // Only the existing one
+        expect(userSystemPrompts).toHaveLength(0);
+        expect(events).toHaveLength(3); // No new events added
+      });
+    });
   });
 
   describe('conversation_complete event emission', () => {

@@ -16,10 +16,12 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 class Logger {
   private _level: LogLevel = 'info';
   private _logFile?: string;
+  private _useStderr: boolean = false;
 
-  configure(level: LogLevel, logFile?: string) {
+  configure(level: LogLevel, logFile?: string, useStderr: boolean = false) {
     this._level = level;
     this._logFile = logFile;
+    this._useStderr = useStderr;
 
     if (logFile) {
       const logDir = dirname(logFile);
@@ -39,7 +41,7 @@ class Logger {
   }
 
   private _write(level: LogLevel, message: string, data?: unknown) {
-    if (!this._shouldLog(level) || !this._logFile) {
+    if (!this._shouldLog(level)) {
       return;
     }
 
@@ -48,10 +50,18 @@ class Logger {
       ? `${timestamp} [${level.toUpperCase()}] ${message} ${JSON.stringify(data)}\n`
       : `${timestamp} [${level.toUpperCase()}] ${message}\n`;
 
-    try {
-      appendFileSync(this._logFile, logEntry);
-    } catch {
-      // Ignore write errors to avoid breaking the app
+    // Write to file if configured
+    if (this._logFile) {
+      try {
+        appendFileSync(this._logFile, logEntry);
+      } catch {
+        // Ignore write errors to avoid breaking the app
+      }
+    }
+
+    // Write to stderr if configured
+    if (this._useStderr) {
+      process.stderr.write(logEntry);
     }
   }
 
@@ -72,5 +82,25 @@ class Logger {
   }
 }
 
-// Global logger instance
-export const logger = new Logger();
+// Global logger instance using globalThis to work across Next.js bundle isolation
+declare global {
+  var __laceLogger: Logger | undefined;
+}
+
+const getLogger = (): Logger => {
+  if (!globalThis.__laceLogger) {
+    globalThis.__laceLogger = new Logger();
+
+    // Auto-configure from environment variables for multi-process scenarios
+    const logLevel = process.env.LACE_LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug' | undefined;
+    const logFile = process.env.LACE_LOG_FILE;
+    const useStderr = process.env.LACE_LOG_STDERR === 'true';
+
+    if (logLevel || logFile || useStderr) {
+      globalThis.__laceLogger.configure(logLevel || 'info', logFile, useStderr);
+    }
+  }
+  return globalThis.__laceLogger;
+};
+
+export const logger = getLogger();

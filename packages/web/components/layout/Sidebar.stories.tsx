@@ -84,30 +84,6 @@ A complex, self-contained component that forms the primary navigation interface.
       control: { type: 'boolean' },
       description: 'Whether the sidebar is expanded or collapsed',
     },
-    currentProject: {
-      control: { type: 'object' },
-      description: 'The currently selected project',
-    },
-    projects: {
-      control: { type: 'object' },
-      description: 'Available projects',
-    },
-    currentTimeline: {
-      control: { type: 'object' },
-      description: 'The currently active timeline',
-    },
-    timelines: {
-      control: { type: 'object' },
-      description: 'Available timelines',
-    },
-    activeTasks: {
-      control: { type: 'object' },
-      description: 'Active tasks to display',
-    },
-    recentFiles: {
-      control: { type: 'object' },
-      description: 'Recent files to display',
-    },
     currentTheme: {
       control: { type: 'select' },
       options: ['light', 'dark', 'system'],
@@ -156,31 +132,19 @@ const mockProjects: Project[] = [
 
 const mockTimelines: Timeline[] = [
   {
-    id: '1',
+    id: 1,
     name: 'Feature Development',
     agent: 'Claude',
-    created: new Date('2024-01-15T10:00:00Z'),
-    lastMessage: new Date('2024-01-15T10:30:00Z'),
-    messageCount: 15,
-    isActive: true,
   },
   {
-    id: '2',
+    id: 2,
     name: 'Bug Fixes',
     agent: 'GPT-4',
-    created: new Date('2024-01-14T14:00:00Z'),
-    lastMessage: new Date('2024-01-14T16:45:00Z'),
-    messageCount: 8,
-    isActive: false,
   },
   {
-    id: '3',
+    id: 3,
     name: 'Code Review',
     agent: 'Gemini',
-    created: new Date('2024-01-13T09:00:00Z'),
-    lastMessage: new Date('2024-01-13T11:20:00Z'),
-    messageCount: 12,
-    isActive: false,
   },
 ];
 
@@ -322,25 +286,16 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
       <Sidebar
         isOpen={isOpen}
         onToggle={handleToggle}
-        currentProject={currentProject}
-        projects={mockProjects}
-        currentTimeline={currentTimeline}
-        timelines={props.timelines || mockTimelines}
-        activeTasks={props.activeTasks || mockTasks}
-        recentFiles={mockRecentFiles}
         currentTheme={props.currentTheme || currentTheme}
-        onProjectChange={handleProjectChange}
-        onTimelineChange={handleTimelineChange}
-        onNewTimeline={handleNewTimeline}
-        onOpenTask={handleOpenTask}
-        onOpenFile={handleOpenFile}
-        onTriggerTool={handleTriggerTool}
-        onOpenTaskBoard={handleOpenTaskBoard}
-        onOpenFileManager={handleOpenFileManager}
-        onOpenRulesFile={handleOpenRulesFile}
         onThemeChange={handleThemeChange}
-        {...props}
-      />
+      >
+        {/* Sidebar content rendered as children */}
+        <div className="p-4">
+          <p className="text-sm text-base-content/60">
+            Sidebar content is composed using SidebarSection and SidebarItem components.
+          </p>
+        </div>
+      </Sidebar>
       <div className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-2xl">
           <h1 className="text-2xl font-bold mb-4">Main Content Area</h1>
@@ -431,22 +386,14 @@ export const WithManyTimelines: Story = {
       timelines={[
         ...mockTimelines,
         {
-          id: '4',
+          id: 4,
           name: 'Performance Optimization',
           agent: 'Claude',
-          created: new Date('2024-01-15T11:00:00Z'),
-          lastMessage: new Date('2024-01-15T11:30:00Z'),
-          messageCount: 5,
-          isActive: false,
         },
         {
-          id: '5',
+          id: 5,
           name: 'UI/UX Improvements',
           agent: 'GPT-4',
-          created: new Date('2024-01-15T12:00:00Z'),
-          lastMessage: new Date('2024-01-15T12:15:00Z'),
-          messageCount: 3,
-          isActive: false,
         },
       ]}
     />
@@ -561,24 +508,16 @@ export const InteractiveDemo: Story = {
           <Sidebar
             isOpen={isOpen}
             onToggle={handleToggle}
-            currentProject={currentProject}
-            projects={mockProjects}
-            currentTimeline={currentTimeline}
-            timelines={mockTimelines}
-            activeTasks={mockTasks}
-            recentFiles={mockRecentFiles}
             currentTheme={currentTheme}
-            onProjectChange={handleProjectChange}
-            onTimelineChange={handleTimelineChange}
-            onNewTimeline={handleNewTimeline}
-            onOpenTask={handleOpenTask}
-            onOpenFile={handleOpenFile}
-            onTriggerTool={handleTriggerTool}
-            onOpenTaskBoard={handleOpenTaskBoard}
-            onOpenFileManager={handleOpenFileManager}
-            onOpenRulesFile={handleOpenRulesFile}
             onThemeChange={handleThemeChange}
-          />
+          >
+            {/* Interactive demo sidebar content */}
+            <div className="p-4">
+              <p className="text-sm text-base-content/60">
+                Interactive demo - content rendered as children
+              </p>
+            </div>
+          </Sidebar>
           
           <div className="flex-1 p-8 overflow-y-auto">
             <div className="max-w-2xl">

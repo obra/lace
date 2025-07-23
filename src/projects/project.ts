@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level interface for project CRUD operations and session management
 
 import { randomUUID } from 'crypto';
-import { getPersistence, ProjectData, DatabasePersistence } from '~/persistence/database';
+import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
@@ -59,12 +59,9 @@ export class Project {
     return new Project(projectData.id);
   }
 
-  static getAll(dbPath?: string): ProjectInfo[] {
-    const persistence = dbPath ? new DatabasePersistence(dbPath) : getPersistence();
+  static getAll(): ProjectInfo[] {
+    const persistence = getPersistence();
     const projects = persistence.loadAllProjects();
-    if (dbPath) {
-      persistence.close();
-    }
 
     return projects.map((project) => {
       // Create a temporary Project instance to get session count
@@ -82,12 +79,9 @@ export class Project {
     });
   }
 
-  static getById(projectId: string, dbPath?: string): Project | null {
-    const persistence = dbPath ? new DatabasePersistence(dbPath) : getPersistence();
+  static getById(projectId: string): Project | null {
+    const persistence = getPersistence();
     const projectData = persistence.loadProject(projectId);
-    if (dbPath) {
-      persistence.close();
-    }
 
     if (!projectData) {
       return null;
@@ -103,7 +97,6 @@ export class Project {
   getInfo(): ProjectInfo | null {
     const persistence = getPersistence();
     const projectData = persistence.loadProject(this._id);
-    // Don't close the global persistence - it's managed by the persistence system
 
     if (!projectData) {
       return null;
@@ -203,20 +196,30 @@ export class Project {
     this.updateInfo({});
   }
 
-  getSessions(): import('~/persistence/database').SessionData[] {
+  getSessions(): (SessionData & { agentCount: number })[] {
     const persistence = getPersistence();
-    return persistence.loadSessionsByProject(this._id);
+    const sessionDataList = persistence.loadSessionsByProject(this._id);
+
+    // Use persistence layer directly for agent counts to avoid async complexity
+    return sessionDataList.map((sessionData) => {
+      const agentCount = persistence.getThreadsBySession(sessionData.id).length;
+
+      return {
+        ...sessionData,
+        agentCount,
+      };
+    });
   }
 
   createSession(
     name: string,
     description = '',
     configuration: Record<string, unknown> = {}
-  ): import('~/persistence/database').SessionData {
+  ): SessionData {
     // Create session directly in database only - threads will be created by SessionService
     const persistence = getPersistence();
 
-    const sessionData: import('~/persistence/database').SessionData = {
+    const sessionData: SessionData = {
       id: randomUUID(),
       projectId: this._id,
       name,
@@ -233,7 +236,7 @@ export class Project {
     return sessionData;
   }
 
-  getSession(sessionId: string): import('~/persistence/database').SessionData | null {
+  getSession(sessionId: string): SessionData | null {
     const persistence = getPersistence();
     const session = persistence.loadSession(sessionId);
 
@@ -245,10 +248,7 @@ export class Project {
     return session;
   }
 
-  updateSession(
-    sessionId: string,
-    updates: Partial<import('~/persistence/database').SessionData>
-  ): import('~/persistence/database').SessionData | null {
+  updateSession(sessionId: string, updates: Partial<SessionData>): SessionData | null {
     const persistence = getPersistence();
 
     // Verify session belongs to this project
@@ -351,7 +351,7 @@ export class Project {
   }
 
   // Prompt Templates Management
-  savePromptTemplate(template: import('~/projects/prompt-templates').PromptTemplate): void {
+  savePromptTemplate(template: PromptTemplate): void {
     this._promptTemplateManager.saveTemplate(template);
   }
 
@@ -374,13 +374,11 @@ export class Project {
     return template;
   }
 
-  getPromptTemplate(
-    templateId: string
-  ): import('~/projects/prompt-templates').PromptTemplate | undefined {
+  getPromptTemplate(templateId: string): PromptTemplate | undefined {
     return this._promptTemplateManager.getTemplate(this._id, templateId);
   }
 
-  getAllPromptTemplates(): import('~/projects/prompt-templates').PromptTemplate[] {
+  getAllPromptTemplates(): PromptTemplate[] {
     return this._promptTemplateManager.getTemplatesForProject(this._id);
   }
 

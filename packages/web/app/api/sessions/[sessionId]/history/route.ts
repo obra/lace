@@ -148,12 +148,11 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     default: {
-      // For unknown event types, return a generic system message
-      const eventType = threadEvent.type as string;
+      // For unknown event types, preserve the original event so frontend can handle it properly
       return {
         ...baseEvent,
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event: ${eventType}` },
+        type: threadEvent.type as string,
+        data: threadEvent.data,
       };
     }
   }

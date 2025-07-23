@@ -79,9 +79,10 @@ function InteractiveMobileSidebar({ children, ...props }: { children: React.Reac
       </div>
       
       <MobileSidebar 
-        {...props} 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)}
+        currentTheme="dark"
+        onThemeChange={() => {}}
       >
         {children}
       </MobileSidebar>

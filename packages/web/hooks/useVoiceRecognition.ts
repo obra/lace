@@ -80,6 +80,15 @@ export function useVoiceRecognition({
     typeof window !== 'undefined' &&
     (window.SpeechRecognition !== undefined || window.webkitSpeechRecognition !== undefined);
 
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setInterimTranscript('');
+  }, []);
+
   const startListening = useCallback(() => {
     if (!isSupported) {
       onError?.('Voice recognition not supported in this browser');
@@ -150,16 +159,7 @@ export function useVoiceRecognition({
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [isListening, isSupported, lang, onResult, onError]);
-
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-    setInterimTranscript('');
-  }, []);
+  }, [isListening, isSupported, lang, onResult, onError, stopListening]);
 
   return {
     isListening,

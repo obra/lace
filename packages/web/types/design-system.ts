@@ -59,7 +59,7 @@ export interface GoogleDocAttachment {
 
 export interface TimelineEntry {
   id: string | number;
-  type: 'admin' | 'human' | 'ai' | 'tool' | 'integration' | 'carousel' | 'google-doc';
+  type: 'admin' | 'human' | 'ai' | 'tool' | 'integration' | 'carousel' | 'google-doc' | 'unknown';
   content?: string;
   timestamp: Date;
   agent?: string;
@@ -71,6 +71,9 @@ export interface TimelineEntry {
   link?: string;
   items?: CarouselItem[];
   document?: GoogleDocAttachment;
+  // Unknown event specific fields
+  eventType?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CarouselItem {
@@ -82,13 +85,11 @@ export interface CarouselItem {
   commit: string;
 }
 
-
 export interface Timeline {
   id: number;
   name: string;
   agent: 'Claude' | 'GPT-4' | 'Gemini';
 }
-
 
 export interface RecentFile {
   name: string;

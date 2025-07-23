@@ -111,10 +111,12 @@ describe('Tool Approval Flow Integration', () => {
 
     // Add event logging to agent
     const originalEmit = agent.emit.bind(agent);
-    agent.emit = vi.fn().mockImplementation((event: keyof AgentEvents, ...args: unknown[]) => {
-      logEvent(`agent.emit(${String(event)})`, args[0]);
-      return (originalEmit as typeof agent.emit)(event, ...args);
-    });
+    agent.emit = vi
+      .fn()
+      .mockImplementation(<K extends keyof AgentEvents>(event: K, ...args: AgentEvents[K]) => {
+        logEvent(`agent.emit(${String(event)})`, args[0]);
+        return (originalEmit as typeof agent.emit)(event, ...args);
+      });
 
     // Add event logging to approval manager
     const originalRequestApproval = approvalManager.requestApproval.bind(approvalManager);
