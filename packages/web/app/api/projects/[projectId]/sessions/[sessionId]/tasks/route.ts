@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const taskManager = session.getTaskManager();
 
-    // Build filters from query params (same logic as before)
+    // Build filters from query params
     const { searchParams } = new URL(request.url);
     const filters: Partial<TaskFilters> = {};
     const status = searchParams.get('status') as TaskStatus | null;
@@ -88,11 +88,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
 
-    const body = await request.json();
-    const { title, description, prompt, priority, assignedTo } = validateRequestBody(
-      body,
-      CreateTaskSchema
-    );
+    const body = (await request.json()) as Record<string, unknown>;
+    const validatedBody = validateRequestBody(body, CreateTaskSchema);
+    const { title, description, prompt, priority, assignedTo } = validatedBody;
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -119,18 +117,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const createRequest = {
       title,
       prompt,
-      priority: priority || 'medium',
+      priority: (priority as TaskPriority) || 'medium',
       ...(description && { description }),
       ...(assignedTo && { assignedTo }),
-    };
+    } as const;
 
-    const task = await taskManager.createTask(
-      createRequest as Parameters<typeof taskManager.createTask>[0],
-      {
-        actor: 'human',
-        isHuman: true,
-      }
-    );
+    const task = await taskManager.createTask(createRequest, {
+      actor: 'human',
+      isHuman: true,
+    });
 
     // Serialize task for JSON response
     const serializedTask = serializeTask(task);

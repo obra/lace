@@ -12,6 +12,7 @@ import {
   AddNoteSchema,
   validateRouteParams,
   validateRequestBody,
+  serializeTask,
   createErrorResponse,
 } from '@/lib/server/api-utils';
 
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       NotesRouteParamsSchema
     );
 
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     const { content, author } = validateRequestBody(body, AddNoteSchema);
 
     // Get project first to verify it exists
@@ -73,16 +74,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: 'Task not found' }, { status: 404 });
       }
 
-      // Convert dates to strings for JSON serialization
-      const serializedTask: Task = {
-        ...task,
-        createdAt: task.createdAt instanceof Date ? task.createdAt.toISOString() : task.createdAt,
-        updatedAt: task.updatedAt instanceof Date ? task.updatedAt.toISOString() : task.updatedAt,
-        notes: task.notes.map((note) => ({
-          ...note,
-          timestamp: note.timestamp instanceof Date ? note.timestamp.toISOString() : note.timestamp,
-        })),
-      };
+      // Get updated task to return (use serializeTask utility)
+      const serializedTask = serializeTask(task);
 
       return NextResponse.json(
         { message: 'Note added successfully', task: serializedTask },

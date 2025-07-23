@@ -2,17 +2,10 @@
 // ABOUTME: Individual task operations with proper nested route validation
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import {
-  ProjectIdSchema,
-  SessionIdSchema,
-  TaskIdSchema,
-  serializeTask,
-  createErrorResponse,
-  createSuccessResponse,
-} from '@/lib/server/api-utils';
+import { serializeTask, createErrorResponse, createSuccessResponse } from '@/lib/server/api-utils';
+import { logger } from '@/lib/server/lace-imports';
 
 interface RouteContext {
   params: Promise<{
@@ -57,7 +50,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return createSuccessResponse({ task: serializedTask });
   } catch (error: unknown) {
-    logger.error('Error fetching task:', error);
+    const errorToLog = error instanceof Error ? error : new Error(String(error));
+    logger.error('Error fetching task:', errorToLog);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch task' },
       { status: 500 }

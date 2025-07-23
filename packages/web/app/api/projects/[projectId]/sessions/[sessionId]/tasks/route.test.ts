@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 import { GET, POST } from './route';
 import { Project } from '@/lib/server/lace-imports';
 import type { TaskFilters } from '@/lib/server/core-types';
-import type { Task, TaskStatus, TaskPriority } from '@/types/api';
+import type { Task } from '@/types/api';
 
 // Mock Project
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -81,7 +81,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions/sess1/tasks');
+      const request = new NextRequest(
+        'http://localhost/api/projects/nonexistent/sessions/sess1/tasks'
+      );
       const context = { params: Promise.resolve({ projectId: 'nonexistent', sessionId: 'sess1' }) };
 
       const response = await GET(request, context);
@@ -94,7 +96,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should return 404 for non-existent session', async () => {
       mockProject.getSession.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/nonexistent/tasks');
+      const request = new NextRequest(
+        'http://localhost/api/projects/proj1/sessions/nonexistent/tasks'
+      );
       const context = { params: Promise.resolve({ projectId: 'proj1', sessionId: 'nonexistent' }) };
 
       const response = await GET(request, context);
@@ -107,7 +111,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should apply status filter', async () => {
       mockTaskManager.getTasks.mockReturnValue([mockTask]);
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks?status=pending');
+      const request = new NextRequest(
+        'http://localhost/api/projects/proj1/sessions/sess1/tasks?status=pending'
+      );
       const context = { params: Promise.resolve({ projectId: 'proj1', sessionId: 'sess1' }) };
 
       const response = await GET(request, context);
@@ -119,7 +125,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should apply priority filter', async () => {
       mockTaskManager.getTasks.mockReturnValue([mockTask]);
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks?priority=high');
+      const request = new NextRequest(
+        'http://localhost/api/projects/proj1/sessions/sess1/tasks?priority=high'
+      );
       const context = { params: Promise.resolve({ projectId: 'proj1', sessionId: 'sess1' }) };
 
       const response = await GET(request, context);
@@ -131,7 +139,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should apply multiple filters', async () => {
       mockTaskManager.getTasks.mockReturnValue([mockTask]);
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks?status=pending&priority=high&assignedTo=user1');
+      const request = new NextRequest(
+        'http://localhost/api/projects/proj1/sessions/sess1/tasks?status=pending&priority=high&assignedTo=user1'
+      );
       const context = { params: Promise.resolve({ projectId: 'proj1', sessionId: 'sess1' }) };
 
       const response = await GET(request, context);
@@ -206,11 +216,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions/sess1/tasks', {
-        method: 'POST',
-        body: JSON.stringify({ title: 'Test Task', prompt: 'Test prompt' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        'http://localhost/api/projects/nonexistent/sessions/sess1/tasks',
+        {
+          method: 'POST',
+          body: JSON.stringify({ title: 'Test Task', prompt: 'Test prompt' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
       const context = { params: Promise.resolve({ projectId: 'nonexistent', sessionId: 'sess1' }) };
 
@@ -224,11 +237,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should return 404 for non-existent session', async () => {
       mockProject.getSession.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/nonexistent/tasks', {
-        method: 'POST',
-        body: JSON.stringify({ title: 'Test Task', prompt: 'Test prompt' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        'http://localhost/api/projects/proj1/sessions/nonexistent/tasks',
+        {
+          method: 'POST',
+          body: JSON.stringify({ title: 'Test Task', prompt: 'Test prompt' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
       const context = { params: Promise.resolve({ projectId: 'proj1', sessionId: 'nonexistent' }) };
 
