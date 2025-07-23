@@ -121,7 +121,7 @@ describe('Agent retry event forwarding', () => {
     // Mock ThreadManager
     mockThreadManager = createMockThreadManager();
 
-    const testThreadId = mockThreadManager.getCurrentThreadId();
+    const testThreadId = mockThreadManager.getCurrentThreadId()!;
 
     agent = new Agent({
       provider: mockProvider,
