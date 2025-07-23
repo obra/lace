@@ -191,7 +191,7 @@ export class Agent extends EventEmitter {
 
     if (content.trim()) {
       // Add user message to active thread
-      this._addEventAndEmit(this._getActiveThreadId(), 'USER_MESSAGE', content);
+      this._addEventAndEmit(this._threadId, 'USER_MESSAGE', content);
     }
 
     try {
@@ -315,18 +315,6 @@ export class Agent extends EventEmitter {
     return this._threadId;
   }
 
-  // Get the current active thread ID
-  private _getActiveThreadId(): string {
-    // Always use the agent's own thread ID - don't rely on ThreadManager's "current" thread
-    // which may point to a different thread (like the parent session for delegate agents)
-    const activeThreadId = this._threadId;
-
-    // Always use the agent's own thread ID - don't rely on ThreadManager's "current" thread
-    // which may point to a different thread (like the parent session for delegate agents)
-
-    return activeThreadId;
-  }
-
   getAvailableTools(): Tool[] {
     return [...this._tools]; // Return copy to prevent mutation
   }
@@ -408,7 +396,7 @@ export class Agent extends EventEmitter {
   // Thread message processing for agent-facing conversation
   buildThreadMessages(): ProviderMessage[] {
     // Use the current active thread
-    const activeThreadId = this._getActiveThreadId();
+    const activeThreadId = this._threadId;
     // Building conversation messages from thread events
 
     const events = this._threadManager.getEvents(activeThreadId);
@@ -568,7 +556,7 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context
-        this._addEventAndEmit(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
+        this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', response.content);
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -865,7 +853,7 @@ export class Agent extends EventEmitter {
       };
 
       // Add tool call to thread
-      this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
+      this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
 
       // Emit tool call start event
       this.emit('tool_call_start', {
@@ -915,7 +903,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add tool result to thread
-        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', result);
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
 
         // Add tool output tokens to current turn metrics (estimated)
         this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
@@ -941,7 +929,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add failed tool result to thread
-        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', failedResult);
       }
     }
   }
@@ -1354,7 +1342,7 @@ export class Agent extends EventEmitter {
    * Used during --continue and session resumption
    */
   replaySessionEvents(): void {
-    const events = this._threadManager.getEvents(this._getActiveThreadId());
+    const events = this._threadManager.getEvents(this._threadId);
 
     logger.debug('Agent: Replaying session events', {
       threadId: this._threadId,
@@ -1378,7 +1366,7 @@ export class Agent extends EventEmitter {
   }
 
   getThreadEvents(threadId?: string): ThreadEvent[] {
-    const targetThreadId = threadId || this._getActiveThreadId();
+    const targetThreadId = threadId || this._threadId;
     return this._threadManager.getEvents(targetThreadId);
   }
 
