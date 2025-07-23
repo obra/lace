@@ -336,7 +336,7 @@ export const WithDifferentIcons: Story = {
         title="Notifications"
         subtitle="Recent alerts"
         badge="3"
-        status="warning"
+        status="error"
         onClick={() => console.log('Notifications clicked')}
       />
       <NavigationItem
@@ -427,7 +427,7 @@ export const InteractiveDemo: Story = {
                 title={item.title}
                 subtitle={item.subtitle}
                 badge={item.badge}
-                status={item.status}
+                status={item.status === 'warning' ? 'error' : item.status}
                 isActive={index === 1} // Make AI Assistant active
                 actions={
                   <div className="flex gap-1">
