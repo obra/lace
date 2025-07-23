@@ -150,12 +150,32 @@ export class Session {
 
     logger.debug(`Reconstructing session agent for ${sessionId}`);
 
-    // Get provider and model from session configuration
+    // Get provider and model - prefer thread metadata over session config
     const sessionConfig = sessionData.configuration || {};
-    const provider = (sessionConfig.provider as string) || 'anthropic';
-    const model = (sessionConfig.model as string) || 'claude-3-haiku-20240307';
+    const tempThreadManager = new ThreadManager();
+    const existingThread = tempThreadManager.getThread(sessionId);
 
-    // Create provider and tool executor (same as Agent.createSession)
+    // Determine provider (thread metadata > session config > default)
+    const provider =
+      (existingThread?.metadata?.provider as string) ||
+      (sessionConfig.provider as string) ||
+      'anthropic';
+
+    // Determine model (thread metadata > session config > provider default)
+    let model: string;
+    if (existingThread?.metadata?.model) {
+      model = existingThread.metadata.model;
+    } else if (sessionConfig.model) {
+      model = sessionConfig.model as string;
+    } else {
+      // Get provider default by creating temporary instance
+      const registry = ProviderRegistry.createWithAutoDiscovery();
+      const tempProvider = registry.createProvider(provider);
+      model = tempProvider.defaultModel;
+      tempProvider.cleanup();
+    }
+
+    // Create provider and tool executor
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerInstance = registry.createProvider(provider, { model });
 
@@ -405,22 +425,35 @@ export class Session {
   }
 
   spawnAgent(name: string, provider?: string, model?: string): Agent {
-    // Create delegate agent using the session agent
-    // This uses the same provider as the session agent
-    const agent = this._sessionAgent.createDelegateAgent(this._sessionAgent.toolExecutor);
+    const targetProvider = provider || this._sessionAgent.providerName;
+    const targetModel = model || this._sessionAgent.providerInstance.modelName;
 
-    // Store the agent metadata including provider and model
+    // Create new provider instance if configuration differs from session
+    let providerInstance = this._sessionAgent.providerInstance;
+    if (
+      targetProvider !== this._sessionAgent.providerName ||
+      targetModel !== this._sessionAgent.providerInstance.modelName
+    ) {
+      const registry = ProviderRegistry.createWithAutoDiscovery();
+      providerInstance = registry.createProvider(targetProvider, { model: targetModel });
+    }
+
+    // Create delegate agent with the appropriate provider instance
+    const agent = this._sessionAgent.createDelegateAgent(
+      this._sessionAgent.toolExecutor,
+      providerInstance
+    );
+
+    // Store the agent metadata
     agent.updateThreadMetadata({
       name,
       isAgent: true,
       parentSessionId: this._sessionId,
-      provider: provider || this._sessionAgent.providerName,
-      model: model || this._sessionAgent.providerInstance.modelName,
+      provider: targetProvider,
+      model: targetModel,
     });
 
-    // Store agent
     this._agents.set(asThreadId(agent.threadId), agent);
-
     return agent;
   }
 

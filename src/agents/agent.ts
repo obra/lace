@@ -30,13 +30,6 @@ export interface AgentConfig {
   tokenBudget?: TokenBudgetConfig;
 }
 
-export interface SessionConfig {
-  providerType: string;
-  model?: string;
-  name?: string;
-  dbPath?: string;
-}
-
 export interface AgentResponse {
   content: string;
   toolCalls: ProviderToolCall[];
@@ -108,38 +101,6 @@ export class Agent extends EventEmitter {
   private readonly _threadId: string;
   private readonly _tools: Tool[];
 
-  /**
-   * Static factory method to create a new Agent with session infrastructure
-   * This encapsulates all the infrastructure setup (ThreadManager, ToolExecutor, etc.)
-   */
-  static createSession(config: SessionConfig): Agent {
-    // Create provider
-    const registry = ProviderRegistry.createWithAutoDiscovery();
-    const provider = registry.createProvider(config.providerType, { model: config.model });
-
-    // Create tool executor
-    const toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
-
-    // Create thread manager
-    const threadManager = new ThreadManager();
-
-    // Create new thread
-    const sessionInfo = threadManager.resumeOrCreate();
-    const threadId = sessionInfo.threadId;
-
-    // Create agent
-    const agent = new Agent({
-      provider,
-      toolExecutor,
-      threadManager,
-      threadId,
-      tools: toolExecutor.getAllTools(),
-    });
-
-    return agent;
-  }
-
   // Public access to tool executor for interfaces
   get toolExecutor(): ToolExecutor {
     return this._toolExecutor;
@@ -172,6 +133,8 @@ export class Agent extends EventEmitter {
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
   private _configuration: AgentConfiguration = {};
+  private _cachedProviderInstance: AIProvider | null = null;
+  private _cachedProviderKey: string | null = null;
 
   constructor(config: AgentConfig) {
     super();
@@ -262,7 +225,7 @@ export class Agent extends EventEmitter {
     });
 
     // Configure provider with loaded system prompt
-    this._provider.setSystemPrompt(promptConfig.systemPrompt);
+    this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
 
     // Record events for new conversations only - check for existing prompts too
     const events = this._threadManager.getEvents(this._threadId);
@@ -361,7 +324,17 @@ export class Agent extends EventEmitter {
   // - agent.getThreadId() STILL returns "abc123" (stable external contract)
   // - ThreadManager.getCanonicalId("abc123_v2") resolves back to "abc123"
   private _getActiveThreadId(): string {
-    return this._threadManager.getCurrentThreadId() || this._threadId;
+    // Always use the agent's own thread ID - don't rely on ThreadManager's "current" thread
+    // which may point to a different thread (like the parent session for delegate agents)
+    const activeThreadId = this._threadId;
+
+    logger.debug('Getting active thread ID', {
+      agentThreadId: this._threadId,
+      activeThreadId,
+      note: 'Using agent own thread ID',
+    });
+
+    return activeThreadId;
   }
 
   getAvailableTools(): Tool[] {
@@ -369,7 +342,93 @@ export class Agent extends EventEmitter {
   }
 
   get providerInstance(): AIProvider {
-    return this._provider;
+    const metadata = this.getThreadMetadata();
+    const targetProvider = (metadata?.provider as string) || this._provider.providerName;
+    const targetModel = (metadata?.model as string) || this._provider.modelName;
+
+    // Create cache key based on provider and model
+    const cacheKey = `${targetProvider}:${targetModel}`;
+
+    // Safe logging to avoid circular reference issues
+    try {
+      logger.debug('Agent.providerInstance getter called', {
+        threadId: this._threadId,
+        metadataProvider: metadata?.provider,
+        metadataModel: metadata?.model,
+        constructorProvider: this._provider.providerName,
+        constructorModel: this._provider.modelName,
+        targetProvider,
+        targetModel,
+        cacheKey,
+        cachedKey: this._cachedProviderKey,
+        willUseCache: this._cachedProviderKey === cacheKey && !!this._cachedProviderInstance,
+      });
+    } catch (_error) {
+      // Fallback logging if there are circular references
+      logger.debug('Agent.providerInstance getter called (safe mode)', {
+        threadId: this._threadId,
+        targetProvider,
+        targetModel,
+        cacheKey,
+        willUseCache: this._cachedProviderKey === cacheKey && !!this._cachedProviderInstance,
+      });
+    }
+
+    // If current metadata matches the constructor provider, return it
+    if (
+      targetProvider === this._provider.providerName &&
+      targetModel === this._provider.modelName
+    ) {
+      logger.debug('Using constructor provider instance', {
+        threadId: this._threadId,
+        provider: this._provider.providerName,
+        model: this._provider.modelName,
+      });
+      return this._provider;
+    }
+
+    // Check if we have a cached provider for this configuration
+    if (this._cachedProviderKey === cacheKey && this._cachedProviderInstance) {
+      logger.debug('Using cached provider instance', {
+        threadId: this._threadId,
+        provider: targetProvider,
+        model: targetModel,
+        cacheKey,
+      });
+      return this._cachedProviderInstance;
+    }
+
+    // Clean up old cached provider if it exists
+    if (this._cachedProviderInstance && this._cachedProviderKey !== cacheKey) {
+      logger.debug('Cleaning up old cached provider', {
+        threadId: this._threadId,
+        oldCacheKey: this._cachedProviderKey,
+        newCacheKey: cacheKey,
+      });
+      this._cachedProviderInstance.cleanup();
+    }
+
+    // Create new provider instance and cache it
+    logger.debug('Creating new provider instance from metadata', {
+      threadId: this._threadId,
+      targetProvider,
+      targetModel,
+      cacheKey,
+    });
+    const registry = ProviderRegistry.createWithAutoDiscovery();
+    const newProvider = registry.createProvider(targetProvider, { model: targetModel });
+
+    // Cache the new provider
+    this._cachedProviderInstance = newProvider;
+    this._cachedProviderKey = cacheKey;
+
+    logger.debug('Created and cached new provider instance', {
+      threadId: this._threadId,
+      newProviderName: newProvider.providerName,
+      newModelName: newProvider.modelName,
+      cacheKey,
+    });
+    return newProvider;
   }
 
   get provider(): string {
@@ -407,8 +466,29 @@ export class Agent extends EventEmitter {
   // Thread message processing for agent-facing conversation
   buildThreadMessages(): ProviderMessage[] {
     // Use the current active thread (which might be a compacted thread after compaction)
-    const events = this._threadManager.getEvents(this._getActiveThreadId());
-    return this._buildConversationFromEvents(events);
+    const activeThreadId = this._getActiveThreadId();
+    logger.debug('Building thread messages', {
+      agentThreadId: this._threadId,
+      activeThreadId,
+      match: this._threadId === activeThreadId,
+    });
+
+    const events = this._threadManager.getEvents(activeThreadId);
+    logger.debug('Loaded events for thread', {
+      activeThreadId,
+      eventCount: events.length,
+      firstEventThreadId: events.length > 0 ? events[0].threadId : 'no-events',
+      lastEventThreadId: events.length > 0 ? events[events.length - 1].threadId : 'no-events',
+    });
+
+    const messages = this._buildConversationFromEvents(events);
+    logger.debug('Built conversation messages', {
+      activeThreadId,
+      messageCount: messages.length,
+      firstMessageRole: messages.length > 0 ? messages[0].role : 'no-messages',
+    });
+
+    return messages;
   }
 
   // Private implementation methods
@@ -468,18 +548,18 @@ export class Agent extends EventEmitter {
       }
 
       // Check context window before making request
-      const contextWindow = this._provider.contextWindow;
-      const maxOutputTokens = this._provider.maxCompletionTokens;
+      const contextWindow = this.providerInstance.contextWindow;
+      const maxOutputTokens = this.providerInstance.maxCompletionTokens;
 
       // Try provider-specific token counting first, fall back to estimation
       let promptTokens: number;
-      const providerCount = await this._provider.countTokens(conversation, this._tools);
+      const providerCount = await this.providerInstance.countTokens(conversation, this._tools);
       if (providerCount !== null) {
         promptTokens = providerCount;
         logger.debug('Using provider-specific token count', {
           threadId: this._threadId,
           promptTokens,
-          provider: this._provider.providerName,
+          provider: this.providerInstance.providerName,
         });
       } else {
         promptTokens = this._estimateConversationTokens(conversation);
@@ -552,7 +632,7 @@ export class Agent extends EventEmitter {
         if (error instanceof Error && error.name === 'AbortError') {
           logger.debug('AGENT: Request was aborted', {
             threadId: this._threadId,
-            providerName: this._provider.providerName,
+            providerName: this.providerInstance.providerName,
           });
           // Abort was called - don't treat as error, metrics already emitted by abort()
           return;
@@ -562,7 +642,7 @@ export class Agent extends EventEmitter {
           threadId: this._threadId,
           errorMessage: error instanceof Error ? error.message : String(error),
           errorStack: error instanceof Error ? error.stack : undefined,
-          providerName: this._provider.providerName,
+          providerName: this.providerInstance.providerName,
         });
 
         this.emit('error', {
@@ -636,7 +716,7 @@ export class Agent extends EventEmitter {
   ): Promise<AgentResponse> {
     // Default to streaming if provider supports it (unless explicitly disabled)
     const useStreaming =
-      this._provider.supportsStreaming && this._provider.config?.streaming !== false;
+      this.providerInstance.supportsStreaming && this.providerInstance.config?.streaming !== false;
 
     if (useStreaming) {
       return this._createStreamingResponse(messages, tools, signal);
@@ -718,14 +798,14 @@ export class Agent extends EventEmitter {
     };
 
     // Subscribe to provider events
-    this._provider.on('token', tokenListener);
-    this._provider.on('token_usage_update', tokenUsageListener);
-    this._provider.on('error', errorListener);
-    this._provider.on('retry_attempt', retryAttemptListener);
-    this._provider.on('retry_exhausted', retryExhaustedListener);
+    this.providerInstance.on('token', tokenListener);
+    this.providerInstance.on('token_usage_update', tokenUsageListener);
+    this.providerInstance.on('error', errorListener);
+    this.providerInstance.on('retry_attempt', retryAttemptListener);
+    this.providerInstance.on('retry_exhausted', retryExhaustedListener);
 
     try {
-      const response = await this._provider.createStreamingResponse(messages, tools, signal);
+      const response = await this.providerInstance.createStreamingResponse(messages, tools, signal);
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -759,11 +839,11 @@ export class Agent extends EventEmitter {
       };
     } finally {
       // Clean up event listeners
-      this._provider.removeListener('token', tokenListener);
-      this._provider.removeListener('token_usage_update', tokenUsageListener);
-      this._provider.removeListener('error', errorListener);
-      this._provider.removeListener('retry_attempt', retryAttemptListener);
-      this._provider.removeListener('retry_exhausted', retryExhaustedListener);
+      this.providerInstance.removeListener('token', tokenListener);
+      this.providerInstance.removeListener('token_usage_update', tokenUsageListener);
+      this.providerInstance.removeListener('error', errorListener);
+      this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
+      this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
     }
   }
 
@@ -808,11 +888,11 @@ export class Agent extends EventEmitter {
     };
 
     // Subscribe to provider retry events
-    this._provider.on('retry_attempt', retryAttemptListener);
-    this._provider.on('retry_exhausted', retryExhaustedListener);
+    this.providerInstance.on('retry_attempt', retryAttemptListener);
+    this.providerInstance.on('retry_exhausted', retryExhaustedListener);
 
     try {
-      const response = await this._provider.createResponse(messages, tools, signal);
+      const response = await this.providerInstance.createResponse(messages, tools, signal);
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -846,8 +926,8 @@ export class Agent extends EventEmitter {
       };
     } finally {
       // Clean up retry event listeners
-      this._provider.removeListener('retry_attempt', retryAttemptListener);
-      this._provider.removeListener('retry_exhausted', retryExhaustedListener);
+      this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
+      this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
     }
   }
 
@@ -968,6 +1048,14 @@ export class Agent extends EventEmitter {
 
   // Agent-specific conversation building (preserves thinking blocks for model context)
   private _buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
+    logger.debug('Building conversation from events', {
+      threadId: this._threadId,
+      totalEvents: events.length,
+      eventTypes: events.map((e) => e.type),
+      eventThreadIds: events.map((e) => e.threadId),
+      uniqueThreadIds: [...new Set(events.map((e) => e.threadId))],
+    });
+
     const messages: ProviderMessage[] = [];
 
     // Track which events have been processed to avoid duplicates

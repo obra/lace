@@ -17,9 +17,7 @@ import { getApprovalManager } from '@/lib/server/approval-manager';
 const activeSessions = new Map<ThreadId, Session>();
 
 export class SessionService {
-  constructor() {
-    // No need for direct ThreadManager access - use Agent methods instead
-  }
+  constructor() {}
 
   async createSession(
     name: string,

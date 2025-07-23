@@ -229,15 +229,35 @@ export class ThreadManager {
   }
 
   getThread(threadId: string): Thread | undefined {
+    logger.debug('ThreadManager.getThread', {
+      requestedThreadId: threadId,
+      currentThreadId: this._currentThread?.id,
+      matchesCurrent: this._currentThread?.id === threadId,
+    });
+
     if (this._currentThread?.id === threadId) {
+      logger.debug('Returning current thread', {
+        threadId: this._currentThread.id,
+        eventCount: this._currentThread.events.length,
+      });
       return this._currentThread;
     }
 
     // For delegation support, try to load thread from persistence
     try {
       const thread = this._persistence.loadThread(threadId);
+      logger.debug('Loaded thread from persistence', {
+        requestedThreadId: threadId,
+        foundThread: !!thread,
+        actualThreadId: thread?.id,
+        eventCount: thread?.events?.length || 0,
+      });
       return thread || undefined;
-    } catch {
+    } catch (error) {
+      logger.debug('Failed to load thread from persistence', {
+        requestedThreadId: threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return undefined;
     }
   }
@@ -273,7 +293,18 @@ export class ThreadManager {
 
   getEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
-    return thread?.events || [];
+    const events = thread?.events || [];
+
+    logger.debug('ThreadManager.getEvents', {
+      requestedThreadId: threadId,
+      foundThread: !!thread,
+      actualThreadId: thread?.id,
+      eventCount: events.length,
+      eventThreadIds: events.map((e) => e.threadId),
+      uniqueEventThreadIds: [...new Set(events.map((e) => e.threadId))],
+    });
+
+    return events;
   }
 
   getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {

@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "next lint",
+    "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true npm run dev",
+    "dev:debug-file": "LACE_LOG_LEVEL=debug LACE_LOG_FILE=/tmp/lace-web.log npm run dev",
     "lint:fix": "next lint --fix",
     "format": "prettier --write",
     "test": "vitest",
