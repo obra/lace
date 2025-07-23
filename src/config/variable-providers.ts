@@ -125,9 +125,32 @@ export class GitVariableProvider implements VariableProvider {
  * Provides project context variables
  */
 export class ProjectVariableProvider implements VariableProvider {
+  constructor(
+    private session?: { getWorkingDirectory(): string },
+    private project?: { getWorkingDirectory(): string }
+  ) {}
+
   getVariables(): Record<string, unknown> {
     try {
-      const cwd = process.cwd();
+      // Use session working directory if available, fall back to project, then process.cwd()
+      let cwd = process.cwd();
+      let source = 'process.cwd()';
+
+      if (this.session) {
+        cwd = this.session.getWorkingDirectory();
+        source = 'session.getWorkingDirectory()';
+      } else if (this.project) {
+        cwd = this.project.getWorkingDirectory();
+        source = 'project.getWorkingDirectory()';
+      }
+
+      logger.debug('ProjectVariableProvider.getVariables() - resolved working directory', {
+        hasSession: !!this.session,
+        hasProject: !!this.project,
+        workingDirectory: cwd,
+        source: source,
+        processCwd: process.cwd(),
+      });
 
       // Generate a simple project tree (limit depth to avoid too much content)
       const tree = this.generateProjectTree(cwd, 2);
@@ -142,7 +165,24 @@ export class ProjectVariableProvider implements VariableProvider {
       logger.error('Failed to get project variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return { project: { cwd: process.cwd(), tree: '' } };
+
+      // Fallback working directory for error case
+      let fallbackCwd = process.cwd();
+      if (this.session) {
+        try {
+          fallbackCwd = this.session.getWorkingDirectory();
+        } catch {
+          // Ignore error, use process.cwd()
+        }
+      } else if (this.project) {
+        try {
+          fallbackCwd = this.project.getWorkingDirectory();
+        } catch {
+          // Ignore error, use process.cwd()
+        }
+      }
+
+      return { project: { cwd: fallbackCwd, tree: '' } };
     }
   }
 

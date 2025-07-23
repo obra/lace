@@ -19,6 +19,8 @@ import { logger } from '~/utils/logger';
 export interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;
   templateDirs?: string[];
+  session?: { getWorkingDirectory(): string };
+  project?: { getWorkingDirectory(): string };
 }
 
 export class PromptManager {
@@ -36,7 +38,7 @@ export class PromptManager {
     // Add default variable providers
     this.variableManager.addProvider(new SystemVariableProvider());
     this.variableManager.addProvider(new GitVariableProvider());
-    this.variableManager.addProvider(new ProjectVariableProvider());
+    this.variableManager.addProvider(new ProjectVariableProvider(options.session, options.project));
     this.variableManager.addProvider(new ContextDisclaimerProvider());
 
     // Add tool provider if tools are provided
