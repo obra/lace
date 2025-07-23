@@ -2,9 +2,25 @@
 // ABOUTME: Provides note creation with proper nested route validation
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { Project } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
-import type { Task } from '@/types/api';
+import {
+  ProjectIdSchema,
+  SessionIdSchema,
+  TaskIdSchema,
+  AddNoteSchema,
+  validateRouteParams,
+  validateRequestBody,
+  serializeTask,
+  createErrorResponse,
+  createSuccessResponse,
+} from '@/lib/server/api-utils';
+
+const NotesRouteParamsSchema = z.object({
+  projectId: ProjectIdSchema,
+  sessionId: SessionIdSchema,
+  taskId: TaskIdSchema,
+});
 
 interface RouteContext {
   params: Promise<{
@@ -16,28 +32,24 @@ interface RouteContext {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId, taskId } = await context.params;
-    
-    const body = (await request.json()) as {
-      content?: string;
-      author?: string;
-    };
-    const { content, author } = body;
+    const { projectId, sessionId, taskId } = await validateRouteParams(
+      context.params,
+      NotesRouteParamsSchema
+    );
 
-    if (!content) {
-      return NextResponse.json({ error: 'Note content is required' }, { status: 400 });
-    }
+    const body = await request.json();
+    const { content, author } = validateRequestBody(body, AddNoteSchema);
 
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Get session from project
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     const taskManager = session.getTaskManager();

@@ -2,8 +2,25 @@
 // ABOUTME: Individual task operations with proper nested route validation
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { Project } from '@/lib/server/lace-imports';
-import type { Task } from '@/types/api';
+import {
+  ProjectIdSchema,
+  SessionIdSchema,
+  TaskIdSchema,
+  UpdateTaskSchema,
+  validateRouteParams,
+  validateRequestBody,
+  serializeTask,
+  createErrorResponse,
+  createSuccessResponse,
+} from '@/lib/server/api-utils';
+
+const TaskRouteParamsSchema = z.object({
+  projectId: ProjectIdSchema,
+  sessionId: SessionIdSchema,
+  taskId: TaskIdSchema,
+});
 
 interface RouteContext {
   params: Promise<{
@@ -20,13 +37,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Get session from project
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     const taskManager = session.getTaskManager();
@@ -59,13 +76,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Get session from project
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     const taskManager = session.getTaskManager();
@@ -101,13 +118,13 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Get session from project
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     const taskManager = session.getTaskManager();

@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { Project } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
 import {
   ProjectIdSchema,
   SessionIdSchema,
@@ -16,7 +15,7 @@ import {
   createSuccessResponse,
 } from '@/lib/server/api-utils';
 import type { TaskFilters } from '@/lib/server/core-types';
-import type { Task, TaskStatus, TaskPriority } from '@/types/api';
+import type { TaskStatus, TaskPriority } from '@/types/api';
 
 const RouteParamsSchema = z.object({
   projectId: ProjectIdSchema,
@@ -37,13 +36,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Get session from project
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     const taskManager = session.getTaskManager();
@@ -80,20 +79,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
-    
+
     const body = await request.json();
-    const { title, description, prompt, priority, assignedTo } = validateRequestBody(body, CreateTaskSchema);
+    const { title, description, prompt, priority, assignedTo } = validateRequestBody(
+      body,
+      CreateTaskSchema
+    );
 
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Get session from project
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     const taskManager = session.getTaskManager();
