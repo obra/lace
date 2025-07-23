@@ -39,6 +39,7 @@ interface ErrorResponse {
 
 // Mock external dependencies (database persistence) but not business logic
 const projectStore = new Map<string, Record<string, unknown>>();
+const sessionStore = new Map<string, Record<string, unknown>>();
 
 vi.mock('~/persistence/database', () => {
   return {
@@ -58,6 +59,13 @@ vi.mock('~/persistence/database', () => {
         // Return empty sessions for now - we can add session testing later if needed
         return [];
       }),
+      // Session methods needed by Session.create()
+      saveSession: vi.fn((session: Record<string, unknown> & { id: string }) => {
+        sessionStore.set(session.id, session);
+      }),
+      loadSession: vi.fn((sessionId: string) => {
+        return sessionStore.get(sessionId) || null;
+      }),
     })),
   };
 });
@@ -66,14 +74,39 @@ vi.mock('~/persistence/database', () => {
 vi.mock('~/threads/thread-manager', () => ({
   ThreadManager: vi.fn(() => ({
     getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
+    generateThreadId: vi.fn(() => {
+      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const random = Math.random().toString(36).substring(2, 8);
+      return `lace_${date}_${random}`;
+    }),
+    createThread: vi.fn((threadId?: string, _sessionId?: string, _projectId?: string) => {
+      // Return the provided threadId or generate a new one
+      return (
+        threadId ||
+        `lace_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_${Math.random().toString(36).substring(2, 8)}`
+      );
+    }),
+    getThread: vi.fn((threadId: string) => {
+      // Return a mock thread object when requested
+      return {
+        id: threadId,
+        metadata: {},
+        events: [],
+      };
+    }),
+    saveThread: vi.fn((thread: unknown) => {
+      // Mock saving thread - just return success
+      return thread as typeof thread;
+    }),
   })),
 }));
 
 describe('Projects API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clear the in-memory project store between tests
+    // Clear the in-memory stores between tests
     projectStore.clear();
+    sessionStore.clear();
   });
 
   describe('GET /api/projects', () => {

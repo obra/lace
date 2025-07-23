@@ -31,23 +31,14 @@ describe('Project configuration', () => {
   });
 
   it('should inherit project configuration in sessions', () => {
-    // Create session data directly to avoid provider creation
-    const sessionData = {
-      id: 'session1',
-      projectId,
+    const session = Session.create({
       name: 'Test Session',
-      description: '',
-      configuration: {},
-      status: 'active' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    Session.createSession(sessionData);
+      projectId,
+    });
 
     // Test configuration inheritance - this will be implemented
     const projectConfig = project.getConfiguration();
-    const sessionConfig = Session.getSession('session1')?.configuration || {};
+    const sessionConfig = Session.getSession(session.getId())?.configuration || {};
 
     // The effective configuration should combine both
     expect(projectConfig.provider).toBe('anthropic');
@@ -55,59 +46,52 @@ describe('Project configuration', () => {
     expect(projectConfig.maxTokens).toBe(4000);
     expect(projectConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
 
-    // Session should have empty config since we didn't override anything
-    expect(sessionConfig).toEqual({});
+    // Session should have basic config with provider and model set by Session.create()
+    expect(sessionConfig.provider).toBeDefined();
+    expect(sessionConfig.model).toBeDefined();
   });
 
   it('should allow session to override project configuration', () => {
-    const sessionData = {
-      id: 'session1',
-      projectId,
+    const session = Session.create({
       name: 'Test Session',
-      description: '',
-      configuration: {
-        model: 'claude-3-haiku',
-        maxTokens: 2000,
-      },
-      status: 'active' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      projectId,
+      model: 'claude-3-haiku',
+    });
 
-    Session.createSession(sessionData);
-    const session = Session.getSession('session1');
+    // Update configuration with maxTokens
+    session.updateConfiguration({
+      maxTokens: 2000,
+    });
+
+    const sessionFromGet = Session.getSession(session.getId());
     const projectConfig = project.getConfiguration();
 
-    expect(session).toBeDefined();
+    expect(sessionFromGet).toBeDefined();
     expect(projectConfig.provider).toBe('anthropic'); // From project
-    expect(session?.configuration.model).toBe('claude-3-haiku'); // Overridden
-    expect(session?.configuration.maxTokens).toBe(2000); // Overridden
+    expect(sessionFromGet?.configuration.model).toBe('claude-3-haiku'); // Overridden
+    expect(sessionFromGet?.configuration.maxTokens).toBe(2000); // Overridden
     expect(projectConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // From project
   });
 
   it('should merge tool policies correctly', () => {
-    const sessionData = {
-      id: 'session1',
-      projectId,
+    const session = Session.create({
       name: 'Test Session',
-      description: '',
-      configuration: {
-        toolPolicies: {
-          'file-write': 'require-approval', // Override
-          'url-fetch': 'allow', // Add new
-        },
-      },
-      status: 'active' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      projectId,
+    });
 
-    Session.createSession(sessionData);
-    const session = Session.getSession('session1');
+    // Update configuration with toolPolicies
+    session.updateConfiguration({
+      toolPolicies: {
+        'file-write': 'require-approval', // Override
+        'url-fetch': 'allow', // Add new
+      },
+    });
+
+    const sessionFromGet = Session.getSession(session.getId());
     const projectConfig = project.getConfiguration();
 
-    expect(session).toBeDefined();
-    expect(session?.configuration.toolPolicies).toEqual({
+    expect(sessionFromGet).toBeDefined();
+    expect(sessionFromGet?.configuration.toolPolicies).toEqual({
       'file-write': 'require-approval', // Overridden
       'url-fetch': 'allow', // Added
     });

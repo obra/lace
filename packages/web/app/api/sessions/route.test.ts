@@ -92,7 +92,7 @@ describe('Session API Routes', () => {
 
       // Assert: Verify real HTTP response with real data
       expect(response.status).toBe(200);
-      expect(data.sessions).toHaveLength(2);
+      expect(data.sessions).toHaveLength(3); // 1 auto-created + 2 explicitly created
 
       // Find sessions by name since IDs are generated
       const returnedSession1 = data.sessions.find((s) => s.name === 'Test Session 1');

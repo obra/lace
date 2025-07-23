@@ -1,21 +1,16 @@
 // ABOUTME: Tests for Project class functionality including CRUD operations and session management
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
-// Mock the session class
-vi.mock('~/sessions/session', () => ({
-  Session: {
-    getById: vi.fn(),
-  },
-}));
+// Use real Session class - no mocking needed
 
 describe('Project', () => {
   beforeEach(() => {
     setupTestPersistence();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -118,7 +113,7 @@ describe('Project', () => {
           isArchived: false,
           createdAt: expect.any(Date) as Date,
           lastUsedAt: expect.any(Date) as Date,
-          sessionCount: 0,
+          sessionCount: 1,
         });
       });
 
@@ -238,65 +233,89 @@ describe('Project', () => {
 
     describe('session management', () => {
       describe('getSessions', () => {
-        it('should return empty array when no sessions exist', () => {
+        it('should return auto-created session', () => {
           const sessions = project.getSessions();
-          expect(sessions).toHaveLength(0);
+          expect(sessions).toHaveLength(1);
+          expect(sessions[0].projectId).toBe(project.getId());
         });
 
         it('should return sessions for the project', () => {
-          // Create a session
-          const session = project.createSession('Test Session', 'A test session');
+          // Create a session (in addition to auto-created one)
+          const session = Session.create({
+            name: 'Test Session',
+            projectId: project.getId(),
+            description: 'A test session',
+          });
 
           const sessions = project.getSessions();
-          expect(sessions).toHaveLength(1);
-          expect(sessions[0].id).toBe(session.id);
-          expect(sessions[0].name).toBe('Test Session');
-          expect(sessions[0].projectId).toBe(project.getId());
+          expect(sessions).toHaveLength(2);
+          expect(sessions.find((s) => s.id === session.getId())).toBeDefined();
+          expect(sessions.find((s) => s.name === 'Test Session')).toBeDefined();
+          expect(sessions.every((s) => s.projectId === project.getId())).toBe(true);
         });
 
         it('should not return sessions from other projects', () => {
           const otherProject = Project.create('Other Project', '/other/path');
 
-          // Create sessions in both projects
-          project.createSession('Project 1 Session');
-          otherProject.createSession('Project 2 Session');
+          // Create sessions in both projects (in addition to auto-created ones)
+          Session.create({ name: 'Project 1 Session', projectId: project.getId() });
+          Session.create({ name: 'Project 2 Session', projectId: otherProject.getId() });
 
           const sessions = project.getSessions();
-          expect(sessions).toHaveLength(1);
-          expect(sessions[0].name).toBe('Project 1 Session');
+          expect(sessions).toHaveLength(2); // Auto-created + manually created
+          expect(sessions.find((s) => s.name === 'Project 1 Session')).toBeDefined();
+          expect(sessions.find((s) => s.name === 'Project 2 Session')).toBeUndefined();
+          expect(sessions.every((s) => s.projectId === project.getId())).toBe(true);
         });
       });
 
       describe('createSession', () => {
         it('should create session with required fields', () => {
-          const session = project.createSession('Test Session', 'A test session', { key: 'value' });
+          const session = Session.create({
+            name: 'Test Session',
+            projectId: project.getId(),
+            description: 'A test session',
+            configuration: { key: 'value' },
+          });
 
-          expect(session.id).toBeDefined();
-          expect(session.projectId).toBe(project.getId());
-          expect(session.name).toBe('Test Session');
-          expect(session.description).toBe('A test session');
-          expect(session.configuration).toEqual({ key: 'value' });
-          expect(session.status).toBe('active');
-          expect(session.createdAt).toBeInstanceOf(Date);
-          expect(session.updatedAt).toBeInstanceOf(Date);
+          expect(session.getId()).toBeDefined();
+          const sessionData = Session.getSession(session.getId());
+          expect(sessionData?.projectId).toBe(project.getId());
+          expect(sessionData?.name).toBe('Test Session');
+          expect(sessionData?.description).toBe('A test session');
+          expect(sessionData?.configuration).toEqual({
+            key: 'value',
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+          });
+          expect(sessionData?.status).toBe('active');
+          expect(sessionData?.createdAt).toBeInstanceOf(Date);
+          expect(sessionData?.updatedAt).toBeInstanceOf(Date);
         });
 
         it('should create session with default values', () => {
-          const session = project.createSession('Test Session');
+          const session = Session.create({ name: 'Test Session', projectId: project.getId() });
 
-          expect(session.description).toBe('');
-          expect(session.configuration).toEqual({});
-          expect(session.status).toBe('active');
+          const sessionData = Session.getSession(session.getId());
+          expect(sessionData?.description).toBe('');
+          expect(sessionData?.configuration).toEqual({
+            provider: 'anthropic',
+            model: 'claude-3-haiku-20240307',
+          });
+          expect(sessionData?.status).toBe('active');
         });
       });
 
       describe('getSession', () => {
         it('should return session when it exists and belongs to project', () => {
-          const createdSession = project.createSession('Test Session');
+          const createdSession = Session.create({
+            name: 'Test Session',
+            projectId: project.getId(),
+          });
 
-          const session = project.getSession(createdSession.id);
+          const session = project.getSession(createdSession.getId());
           expect(session).not.toBeNull();
-          expect(session!.id).toBe(createdSession.id);
+          expect(session!.id).toBe(createdSession.getId());
           expect(session!.name).toBe('Test Session');
         });
 
@@ -307,22 +326,29 @@ describe('Project', () => {
 
         it('should return null when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path');
-          const otherSession = otherProject.createSession('Other Session');
+          const otherSession = Session.create({
+            name: 'Other Session',
+            projectId: otherProject.getId(),
+          });
 
-          const session = project.getSession(otherSession.id);
+          const session = project.getSession(otherSession.getId());
           expect(session).toBeNull();
         });
       });
 
       describe('updateSession', () => {
-        let session: any;
+        let session: ReturnType<typeof Session.create>;
 
         beforeEach(() => {
-          session = project.createSession('Test Session', 'Original description');
+          session = Session.create({
+            name: 'Test Session',
+            projectId: project.getId(),
+            description: 'Original description',
+          });
         });
 
         it('should update session successfully', () => {
-          const updatedSession = project.updateSession((session as { id: string }).id, {
+          const updatedSession = project.updateSession(session.getId(), {
             name: 'Updated Session',
             description: 'Updated description',
             status: 'completed',
@@ -343,37 +369,41 @@ describe('Project', () => {
 
         it('should return null when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path');
-          const otherSession = otherProject.createSession('Other Session');
+          const otherSession = Session.create({
+            name: 'Other Session',
+            projectId: otherProject.getId(),
+          });
 
-          const updatedSession = project.updateSession(otherSession.id, { name: 'Updated' });
+          const updatedSession = project.updateSession(otherSession.getId(), { name: 'Updated' });
           expect(updatedSession).toBeNull();
         });
 
         it('should update timestamp', async () => {
-          const originalUpdatedAt = (session as { updatedAt: Date }).updatedAt;
+          const originalSessionData = Session.getSession(session.getId());
+          const originalUpdatedAt = originalSessionData?.updatedAt;
 
           // Wait a bit to ensure timestamp difference
           await new Promise((resolve) => setTimeout(resolve, 10));
 
-          const updatedSession = project.updateSession((session as { id: string }).id, {
+          const updatedSession = project.updateSession(session.getId(), {
             name: 'Updated',
           });
-          expect(updatedSession!.updatedAt > originalUpdatedAt).toBe(true);
+          expect(updatedSession!.updatedAt > originalUpdatedAt!).toBe(true);
         });
       });
 
       describe('deleteSession', () => {
-        let session: any;
+        let session: ReturnType<typeof Session.create>;
 
         beforeEach(() => {
-          session = project.createSession('Test Session');
+          session = Session.create({ name: 'Test Session', projectId: project.getId() });
         });
 
         it('should delete session successfully', () => {
-          const result = project.deleteSession((session as { id: string }).id);
+          const result = project.deleteSession(session.getId());
 
           expect(result).toBe(true);
-          expect(project.getSession((session as { id: string }).id)).toBeNull();
+          expect(project.getSession(session.getId())).toBeNull();
         });
 
         it('should return false when session does not exist', () => {
@@ -383,36 +413,39 @@ describe('Project', () => {
 
         it('should return false when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path');
-          const otherSession = otherProject.createSession('Other Session');
+          const otherSession = Session.create({
+            name: 'Other Session',
+            projectId: otherProject.getId(),
+          });
 
-          const result = project.deleteSession(otherSession.id);
+          const result = project.deleteSession(otherSession.getId());
           expect(result).toBe(false);
         });
       });
 
       describe('getSessionCount', () => {
-        it('should return 0 when no sessions exist', () => {
-          expect(project.getSessionCount()).toBe(0);
+        it('should return 1 for auto-created session', () => {
+          expect(project.getSessionCount()).toBe(1);
         });
 
         it('should return correct count', () => {
-          project.createSession('Session 1');
-          project.createSession('Session 2');
+          Session.create({ name: 'Session 1', projectId: project.getId() });
+          Session.create({ name: 'Session 2', projectId: project.getId() });
 
-          expect(project.getSessionCount()).toBe(2);
+          expect(project.getSessionCount()).toBe(3); // Auto-created + 2 manual
         });
 
         it('should update when sessions are deleted', () => {
-          const session1 = project.createSession('Session 1');
-          const session2 = project.createSession('Session 2');
+          const session1 = Session.create({ name: 'Session 1', projectId: project.getId() });
+          const session2 = Session.create({ name: 'Session 2', projectId: project.getId() });
 
+          expect(project.getSessionCount()).toBe(3); // Auto-created + 2 manual
+
+          project.deleteSession(session1.getId());
           expect(project.getSessionCount()).toBe(2);
 
-          project.deleteSession(session1.id);
-          expect(project.getSessionCount()).toBe(1);
-
-          project.deleteSession(session2.id);
-          expect(project.getSessionCount()).toBe(0);
+          project.deleteSession(session2.getId());
+          expect(project.getSessionCount()).toBe(1); // Auto-created session remains
         });
       });
     });

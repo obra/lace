@@ -109,8 +109,8 @@ describe('API Endpoints E2E Tests', () => {
 
       // Verify session was actually created in the service
       const sessions = await sessionService.listSessions();
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0]?.name).toBe('API Test Session');
+      expect(sessions).toHaveLength(2); // 1 auto-created + 1 explicitly created
+      expect(sessions.find((s) => s.name === 'API Test Session')).toBeDefined();
     });
 
     it('should list sessions via API', async () => {
@@ -139,8 +139,8 @@ describe('API Endpoints E2E Tests', () => {
 
       const responseData: unknown = await response.json();
       const data = responseData as { sessions: SessionType[] };
-      expect(data.sessions).toHaveLength(1);
-      expect(data.sessions[0]?.name).toBe('Listable Session');
+      expect(data.sessions).toHaveLength(2); // 1 auto-created + 1 explicitly created
+      expect(data.sessions.find((s) => s.name === 'Listable Session')).toBeDefined();
     });
 
     it('should get specific session via API', async () => {

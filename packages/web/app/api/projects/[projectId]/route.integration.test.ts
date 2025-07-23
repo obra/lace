@@ -9,6 +9,7 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 vi.mock('server-only', () => ({}));
 
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
+import { Session } from '@/lib/server/lace-imports';
 
 // Type interfaces for API responses
 interface ProjectResponse {
@@ -62,15 +63,15 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.description).toBe('A test project');
       expect(data.project.workingDirectory).toBe('/test/path');
       expect(data.project.isArchived).toBe(false);
-      expect(data.project.sessionCount).toBe(0);
+      expect(data.project.sessionCount).toBe(1); // Project.create() auto-creates a default session
       expect(data.project.createdAt).toBeDefined();
       expect(data.project.lastUsedAt).toBeDefined();
     });
 
     it('should return project with correct session count', async () => {
       // Add some sessions to the project
-      testProject.createSession('Session 1');
-      testProject.createSession('Session 2');
+      Session.create({ name: 'Session 1', projectId: testProject.getId() });
+      Session.create({ name: 'Session 2', projectId: testProject.getId() });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await GET(request, {
@@ -79,7 +80,7 @@ describe('Individual Project API Integration Tests', () => {
       const data = (await response.json()) as ProjectResponse;
 
       expect(response.status).toBe(200);
-      expect(data.project.sessionCount).toBe(2);
+      expect(data.project.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -323,8 +324,8 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should delete project with sessions', async () => {
       // Add sessions to the project
-      testProject.createSession('Session 1');
-      testProject.createSession('Session 2');
+      Session.create({ name: 'Session 1', projectId: testProject.getId() });
+      Session.create({ name: 'Session 2', projectId: testProject.getId() });
 
       const projectId = testProject.getId();
       const request = new NextRequest(`http://localhost/api/projects/${projectId}`);

@@ -334,9 +334,14 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result[0]).toEqual(
       expect.objectContaining({
         id: expect.stringMatching(/^session-123-\d+-0$/) as string,
-        type: 'admin',
-        content: 'Unknown event: UNKNOWN_EVENT_TYPE',
+        type: 'unknown',
+        eventType: 'UNKNOWN_EVENT_TYPE',
+        content: '{\n  "someData": "test"\n}',
         timestamp: new Date('2025-07-21T10:38:00Z'),
+        metadata: {
+          originalType: 'UNKNOWN_EVENT_TYPE',
+          threadId: 'session-123',
+        },
       })
     );
   });

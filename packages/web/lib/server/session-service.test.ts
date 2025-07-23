@@ -83,11 +83,16 @@ vi.mock('@/lib/server/lace-imports', async () => {
 
 describe('SessionService Missing Methods', () => {
   let sessionService: ReturnType<typeof getSessionService>;
+  let Session: typeof import('@/lib/server/lace-imports').Session;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     sessionService = getSessionService();
     sessionService.clearActiveSessions();
+
+    // Import Session for use in tests
+    const imports = await import('@/lib/server/lace-imports');
+    Session = imports.Session;
   });
 
   afterEach(() => {
@@ -97,7 +102,6 @@ describe('SessionService Missing Methods', () => {
   describe('updateSession', () => {
     it('should update session metadata and persist changes', async () => {
       // Arrange: Create a session first
-      const { Session } = await import('@/lib/server/lace-imports');
       const sessionId = asThreadId('test-session-id');
 
       // Create a session record in our mocked persistence
@@ -111,7 +115,9 @@ describe('SessionService Missing Methods', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      Session.createSession(initialSessionData);
+      // Save directly to mocked persistence
+      const { getPersistence } = await import('~/persistence/database');
+      getPersistence().saveSession(initialSessionData);
 
       const updates = { name: 'Updated Session', description: 'New description' };
 
@@ -121,14 +127,13 @@ describe('SessionService Missing Methods', () => {
       // Assert: Verify the session was actually updated in persistence
       const updatedSession = Session.getSession(sessionId);
       expect(updatedSession).not.toBeNull();
-      expect(updatedSession!.name).toBe('Updated Session');
-      expect(updatedSession!.description).toBe('New description');
-      expect(updatedSession!.updatedAt).toBeInstanceOf(Date);
+      expect(updatedSession?.name).toBe('Updated Session');
+      expect(updatedSession?.description).toBe('New description');
+      expect(updatedSession?.updatedAt).toBeInstanceOf(Date);
     });
 
     it('should handle partial updates correctly', async () => {
       // Arrange: Create a session with multiple properties
-      const { Session } = await import('@/lib/server/lace-imports');
       const sessionId = asThreadId('test-session-partial');
 
       const initialSessionData = {
@@ -141,7 +146,9 @@ describe('SessionService Missing Methods', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      Session.createSession(initialSessionData);
+      // Save directly to mocked persistence
+      const { getPersistence } = await import('~/persistence/database');
+      getPersistence().saveSession(initialSessionData);
 
       // Act: Update only one property
       const partialUpdates = { description: 'Partially updated description' };
@@ -149,9 +156,9 @@ describe('SessionService Missing Methods', () => {
 
       // Assert: Verify only the specified field was updated
       const updatedSession = Session.getSession(sessionId);
-      expect(updatedSession!.name).toBe('Original Session'); // unchanged
-      expect(updatedSession!.description).toBe('Partially updated description'); // changed
-      expect(updatedSession!.projectId).toBe('test-project'); // unchanged
+      expect(updatedSession?.name).toBe('Original Session'); // unchanged
+      expect(updatedSession?.description).toBe('Partially updated description'); // changed
+      expect(updatedSession?.projectId).toBe('test-project'); // unchanged
     });
   });
 });

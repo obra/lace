@@ -6,6 +6,7 @@ import { getPersistence, ProjectData, SessionData } from '~/persistence/database
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
+import { Session } from '~/sessions/session';
 import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -56,7 +57,37 @@ export class Project {
     // Don't close the global persistence - it's managed by the persistence system
 
     logger.info('Project created', { projectId: projectData.id, name, workingDirectory });
-    return new Project(projectData.id);
+
+    // Create the project instance
+    const project = new Project(projectData.id);
+
+    // Automatically create a default session with coordinator agent for the new project
+    const sessionOptions: {
+      name: string;
+      projectId: string;
+      provider?: string;
+      model?: string;
+    } = {
+      name: `Session ${new Date().toLocaleString()}`,
+      projectId: projectData.id,
+    };
+
+    // Let Session.create() handle provider/model defaults unless overridden
+    if (configuration.provider) {
+      sessionOptions.provider = configuration.provider as string;
+    }
+    if (configuration.model) {
+      sessionOptions.model = configuration.model as string;
+    }
+
+    const session = Session.create(sessionOptions);
+
+    logger.info('Default session with coordinator agent created for new project', {
+      projectId: projectData.id,
+      sessionId: session.getId(),
+    });
+
+    return project;
   }
 
   static getAll(): ProjectInfo[] {
@@ -209,31 +240,6 @@ export class Project {
         agentCount,
       };
     });
-  }
-
-  createSession(
-    name: string,
-    description = '',
-    configuration: Record<string, unknown> = {}
-  ): SessionData {
-    // Create session directly in database only - threads will be created by SessionService
-    const persistence = getPersistence();
-
-    const sessionData: SessionData = {
-      id: randomUUID(),
-      projectId: this._id,
-      name,
-      description,
-      configuration,
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    persistence.saveSession(sessionData);
-    logger.info('Session created', { sessionId: sessionData.id, projectId: this._id, name });
-
-    return sessionData;
   }
 
   getSession(sessionId: string): SessionData | null {

@@ -32,8 +32,8 @@ export class SessionService {
       throw new Error('Project not found');
     }
 
-    // Create session using Session.createWithDefaults which handles both database and thread creation
-    const session = await Session.createWithDefaults({
+    // Create session using Session.create which handles both database and thread creation
+    const session = Session.create({
       name,
       provider,
       model,

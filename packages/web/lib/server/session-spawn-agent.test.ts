@@ -29,7 +29,12 @@ describe('Session.spawnAgent Method', () => {
     projectId = project.getId();
 
     // Create session
-    session = Session.create('Test Session', 'anthropic', 'claude-3-haiku-20240307', projectId);
+    session = Session.create({
+      name: 'Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId,
+    });
   });
 
   afterEach(() => {
