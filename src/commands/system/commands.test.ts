@@ -1,4 +1,4 @@
-// ABOUTME: Unit tests for all system commands (help, exit, clear, status, compact)
+// ABOUTME: Unit tests for all system commands (help, exit, clear, status, queue)
 // ABOUTME: Tests command behavior and output rather than mock interactions
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
@@ -6,7 +6,6 @@ import { createHelpCommand } from '~/commands/system/help';
 import { exitCommand } from '~/commands/system/exit';
 import { clearCommand } from '~/commands/system/clear';
 import { statusCommand } from '~/commands/system/status';
-import { compactCommand } from '~/commands/system/compact';
 import { queueCommand } from '~/commands/system/queue';
 import { CommandRegistry } from '~/commands/registry';
 import type { UserInterface, Command } from '~/commands/types';
@@ -16,7 +15,6 @@ type MockAgent = {
   getCurrentThreadId: MockedFunction<() => string | null>;
   generateThreadId: MockedFunction<() => string>;
   createThread: MockedFunction<() => void>;
-  compact: MockedFunction<(threadId: string) => void>;
   getThreadEvents: MockedFunction<(threadId: string) => Array<{ type: string; data: string }>>;
   providerName: string;
   getQueueStats: MockedFunction<() => { queueLength: number; highPriorityCount: number }>;
@@ -88,11 +86,10 @@ describe('System Commands', () => {
       getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
       generateThreadId: vi.fn().mockReturnValue('new-thread-456'),
       createThread: vi.fn(),
-      compact: vi.fn(),
       getThreadEvents: vi.fn().mockReturnValue([
         {
           type: 'LOCAL_SYSTEM_MESSAGE',
-          data: 'Compacted 5 tool results to save tokens',
+          data: 'Test system message',
         },
       ]),
       providerName: 'test-provider',
@@ -212,62 +209,6 @@ describe('System Commands', () => {
     });
   });
 
-  describe('compactCommand', () => {
-    it('should have correct metadata', () => {
-      expect(compactCommand.name).toBe('compact');
-      expect(compactCommand.description).toBe('Compress thread history to save tokens');
-      expect(typeof compactCommand.execute).toBe('function');
-    });
-
-    it('should compact current thread and show success message', async () => {
-      await compactCommand.execute('', testUI);
-
-      // Test actual behavior - compaction happened and user was informed
-      expect(testUI.hasMessage('✅ Compacted 5 tool results to save tokens')).toBe(true);
-      // The success message demonstrates that compaction was triggered and completed successfully
-    });
-
-    it('should handle no active thread gracefully', async () => {
-      mockAgent.getCurrentThreadId.mockReturnValue(null);
-
-      await compactCommand.execute('', testUI);
-
-      // Test actual behavior - proper error message displayed
-      expect(testUI.hasMessage('❌ No active thread to compact')).toBe(true);
-      // Error message demonstrates appropriate handling of no active thread scenario
-    });
-
-    it('should handle compact with no system message', async () => {
-      mockAgent.getThreadEvents.mockReturnValue([]);
-
-      await compactCommand.execute('', testUI);
-
-      // Test actual behavior - generic success message shown
-      expect(testUI.hasMessage('✅ Compacted thread test-thread-123')).toBe(true);
-      // Generic success message confirms compaction completed despite missing system messages
-    });
-
-    it('should handle events without system message', async () => {
-      mockAgent.getThreadEvents.mockReturnValue([
-        { type: 'USER_MESSAGE', data: 'Hello' },
-        { type: 'AGENT_MESSAGE', data: 'Hi there' },
-      ]);
-
-      await compactCommand.execute('', testUI);
-
-      // Test actual behavior - generic success message for non-system events
-      expect(testUI.hasMessage('✅ Compacted thread test-thread-123')).toBe(true);
-    });
-
-    it('should ignore arguments and compact', async () => {
-      await compactCommand.execute('some args', testUI);
-
-      // Test actual behavior - compaction happened regardless of args
-      expect(testUI.hasMessage('✅ Compacted 5 tool results to save tokens')).toBe(true);
-      // Success message confirms arguments are ignored and compaction proceeds normally
-    });
-  });
-
   describe('queueCommand', () => {
     it('should have correct metadata', () => {
       expect(queueCommand.name).toBe('queue');
@@ -295,14 +236,7 @@ describe('System Commands', () => {
 
   describe('command structure validation', () => {
     it('should have all required fields for each command', () => {
-      const commands = [
-        helpCommand,
-        exitCommand,
-        clearCommand,
-        statusCommand,
-        compactCommand,
-        queueCommand,
-      ];
+      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, queueCommand];
 
       commands.forEach((command) => {
         expect(command.name).toBeDefined();
@@ -319,28 +253,14 @@ describe('System Commands', () => {
     });
 
     it('should have unique command names', () => {
-      const commands = [
-        helpCommand,
-        exitCommand,
-        clearCommand,
-        statusCommand,
-        compactCommand,
-        queueCommand,
-      ];
+      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, queueCommand];
       const names = commands.map((cmd) => cmd.name);
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
     });
 
     it('should not have aliases defined (per YAGNI)', () => {
-      const commands = [
-        helpCommand,
-        exitCommand,
-        clearCommand,
-        statusCommand,
-        compactCommand,
-        queueCommand,
-      ];
+      const commands = [helpCommand, exitCommand, clearCommand, statusCommand, queueCommand];
       commands.forEach((command) => {
         expect(command.aliases).toBeUndefined();
       });
