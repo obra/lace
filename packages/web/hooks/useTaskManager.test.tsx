@@ -28,6 +28,7 @@ global.EventSource = MockEventSource as unknown as typeof EventSource;
 describe('useTaskManager Hook Logic', () => {
   let mockClient: Partial<TaskAPIClient>;
 
+  const mockProjectId = 'project_123';
   const mockSessionId = 'lace_20240101_session';
   const mockTask: Task = {
     id: 'task_20240101_abc123',
@@ -66,7 +67,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should manage loading state correctly', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     // Verify initial loading state
     expect(result.current.isLoading).toBe(true);
@@ -81,19 +82,19 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should call API client on initialization', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(mockClient.listTasks).toHaveBeenCalledWith(mockSessionId, undefined);
+    expect(mockClient.listTasks).toHaveBeenCalledWith(mockProjectId, mockSessionId, undefined);
   });
 
   it('should handle error state transitions', async () => {
     (mockClient.listTasks as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Test error'));
 
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -104,7 +105,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should call API client with filters on refetch', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -114,11 +115,11 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.refetch({ status: 'pending' });
     });
 
-    expect(mockClient.listTasks).toHaveBeenCalledWith(mockSessionId, { status: 'pending' });
+    expect(mockClient.listTasks).toHaveBeenCalledWith(mockProjectId, mockSessionId, { status: 'pending' });
   });
 
   it('should call create API and trigger refetch', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -134,7 +135,7 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.createTask(newTask);
     });
 
-    expect(mockClient.createTask).toHaveBeenCalledWith(mockSessionId, newTask);
+    expect(mockClient.createTask).toHaveBeenCalledWith(mockProjectId, mockSessionId, newTask);
     
     // Wait for the refetch to occur
     await waitFor(() => {
@@ -143,7 +144,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should call update API and trigger refetch', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -153,7 +154,7 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.updateTask('task_20240101_abc123', { status: 'completed' });
     });
 
-    expect(mockClient.updateTask).toHaveBeenCalledWith(mockSessionId, 'task_20240101_abc123', {
+    expect(mockClient.updateTask).toHaveBeenCalledWith(mockProjectId, mockSessionId, 'task_20240101_abc123', {
       status: 'completed',
     });
     
@@ -163,7 +164,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should call delete API and trigger refetch', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -173,7 +174,7 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.deleteTask('task_20240101_abc123');
     });
 
-    expect(mockClient.deleteTask).toHaveBeenCalledWith(mockSessionId, 'task_20240101_abc123');
+    expect(mockClient.deleteTask).toHaveBeenCalledWith(mockProjectId, mockSessionId, 'task_20240101_abc123');
     
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2);
@@ -181,7 +182,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should call addNote API and trigger refetch', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -192,6 +193,7 @@ describe('useTaskManager Hook Logic', () => {
     });
 
     expect(mockClient.addNote).toHaveBeenCalledWith(
+      mockProjectId,
       mockSessionId,
       'task_20240101_abc123',
       'Test note',
@@ -204,7 +206,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should handle concurrent operations correctly', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -225,7 +227,7 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should track operation loading states', async () => {
-    const { result } = renderHook(() => useTaskManager(mockSessionId));
+    const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
