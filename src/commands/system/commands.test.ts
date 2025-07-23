@@ -12,7 +12,7 @@ import type { UserInterface, Command } from '~/commands/types';
 import type { Agent } from '~/agents/agent';
 
 type MockAgent = {
-  getCurrentThreadId: MockedFunction<() => string | null>;
+  getThreadId: MockedFunction<() => string>;
   generateThreadId: MockedFunction<() => string>;
   createThread: MockedFunction<() => void>;
   getThreadEvents: MockedFunction<(threadId: string) => Array<{ type: string; data: string }>>;
@@ -83,7 +83,7 @@ describe('System Commands', () => {
 
     mockAgent = {
       // Agent API methods
-      getCurrentThreadId: vi.fn().mockReturnValue('test-thread-123'),
+      getThreadId: vi.fn().mockReturnValue('test-thread-123'),
       generateThreadId: vi.fn().mockReturnValue('new-thread-456'),
       createThread: vi.fn(),
       getThreadEvents: vi.fn().mockReturnValue([
@@ -193,7 +193,7 @@ describe('System Commands', () => {
     });
 
     it('should handle missing thread ID gracefully', async () => {
-      mockAgent.getCurrentThreadId.mockReturnValue(null);
+      mockAgent.getThreadId.mockReturnValue('');
 
       await statusCommand.execute('', testUI);
 
