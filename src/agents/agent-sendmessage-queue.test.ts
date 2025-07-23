@@ -61,7 +61,7 @@ describe('Agent sendMessage Queue Option', () => {
     let eventCount = 0;
 
     mockThreadManager = createMockThreadManager();
-    testThreadId = mockThreadManager.getCurrentThreadId()!;
+    testThreadId = 'lace_20250723_abc123';
 
     // Override addEvent to track event count for this specific test
     mockThreadManager.addEvent = vi.fn((): ThreadEvent => {

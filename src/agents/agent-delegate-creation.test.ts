@@ -59,21 +59,16 @@ describe('Agent Delegate Creation', () => {
       tools: [],
     });
 
-    // Create another thread and make it current in ThreadManager
-    const otherThreadId = threadManager.createThread();
-    threadManager.setCurrentThread(otherThreadId);
+    // Create another thread (just to show ThreadManager is stateless)
+    const _otherThreadId = threadManager.createThread();
 
-    // Verify ThreadManager current thread is different from main agent's thread
-    expect(threadManager.getCurrentThreadId()).toBe(otherThreadId);
-    expect(threadManager.getCurrentThreadId()).not.toBe(mainThreadId);
-
-    // Create delegate agent - should use main agent's thread ID as parent, not ThreadManager's current
+    // Create delegate agent - should use main agent's thread ID as parent
     const delegateAgent = mainAgent.createDelegateAgent(toolExecutor);
 
     // Verify delegate thread uses main agent's thread ID as parent
     const delegateThreadId = delegateAgent.threadId;
     expect(delegateThreadId).toBe(`${mainThreadId}.1`);
-    expect(delegateThreadId).not.toBe(`${otherThreadId}.1`);
+    expect(delegateThreadId).not.toBe(`${_otherThreadId}.1`);
   });
 
   it('should create multiple delegate agents with sequential IDs', () => {
@@ -113,7 +108,7 @@ describe('Agent Delegate Creation', () => {
     const delegateAgent = mainAgent.createDelegateAgent(toolExecutor);
 
     // Verify delegate agent returns its own thread ID
-    expect(delegateAgent.getCurrentThreadId()).toBe(delegateAgent.threadId);
+    expect(delegateAgent.getThreadId()).toBe(delegateAgent.threadId);
 
     // Both agents should be able to access their respective threads
     const mainThread = threadManager.getThread(mainThreadId);

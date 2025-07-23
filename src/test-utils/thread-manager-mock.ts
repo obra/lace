@@ -23,7 +23,6 @@ export function createMockThreadManager(threadId?: string) {
       model: 'test-model',
       provider: 'test-provider',
     }),
-    getCurrentThreadId: vi.fn().mockReturnValue(testThreadId),
     close: vi.fn().mockResolvedValue(undefined),
   } as unknown as ThreadManager;
 }

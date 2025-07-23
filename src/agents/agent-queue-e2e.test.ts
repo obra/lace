@@ -60,7 +60,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
     } as unknown as ToolExecutor;
 
     mockThreadManager = createMockThreadManager();
-    const testThreadId = mockThreadManager.getCurrentThreadId()!;
+    const testThreadId = 'lace_20250723_abc123';
 
     agent = new Agent({
       provider: longProvider,
