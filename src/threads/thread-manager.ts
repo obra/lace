@@ -12,7 +12,6 @@ import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
 import { estimateTokens } from '~/utils/token-estimation';
-import { AIProvider } from '~/providers/base-provider';
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -27,7 +26,6 @@ export class ThreadManager {
   private _currentThread: Thread | null = null;
   private _persistence: DatabasePersistence;
   private _compactionStrategy: SummarizeStrategy;
-  private _providerStrategyCache = new Map<string, SummarizeStrategy>();
 
   constructor() {
     this._persistence = getPersistence();
@@ -505,159 +503,6 @@ export class ThreadManager {
     return threadId;
   }
 
-  // Legacy method - use createCompactedVersion() instead
-  createShadowThread(reason: string, provider?: AIProvider): string {
-    return this.createCompactedVersion(reason, provider);
-  }
-
-  async needsCompaction(provider?: AIProvider): Promise<boolean> {
-    if (!this._currentThread) return false;
-
-    if (provider) {
-      // Use cached provider-aware strategy for accurate async token counting
-      const providerStrategy = this._getProviderStrategy(provider);
-      return await providerStrategy.shouldCompact(this._currentThread);
-    }
-
-    return await this._compactionStrategy.shouldCompact(this._currentThread);
-  }
-
-  async compactIfNeeded(provider?: AIProvider): Promise<boolean> {
-    const needsCompaction = await this.needsCompaction(provider);
-
-    if (!needsCompaction) return false;
-
-    this.createShadowThread('Automatic compaction due to size', provider);
-    return true;
-  }
-
-  getCanonicalId(threadId: string): string {
-    // CANONICAL ID MAPPING SYSTEM - This is the core of thread compaction design
-    //
-    // PURPOSE: Enable thread compaction while maintaining stable external thread IDs
-    //
-    // DESIGN PRINCIPLES:
-    // 1. External thread IDs NEVER change (canonical IDs are stable)
-    // 2. Internal working threads may be compacted versions
-    // 3. Canonical ID mapping resolves any thread to its stable external ID
-    //
-    // HOW IT WORKS:
-    // - Original thread "abc123" is created (canonical ID = "abc123")
-    // - After compaction, we create "abc123_v2" (working thread)
-    // - Mapping: "abc123_v2" → "abc123" (canonical ID remains stable)
-    // - External clients always see "abc123" as the thread ID
-    // - Internal operations use "abc123_v2" for actual work
-    //
-    // REVIEWER NOTE: This is NOT a broken contract - it's the designed behavior!
-    // The "contract" is that external thread IDs remain stable, which they do.
-    // Internal compaction is transparent to external clients.
-    const canonicalId = this._persistence.findCanonicalIdForVersion(threadId);
-    return canonicalId || threadId; // If no mapping, this IS the canonical ID
-  }
-
-  cleanupOldShadows(canonicalId?: string, keepLast: number = 3): void {
-    if (canonicalId) {
-      // Clean up specific canonical thread
-      this._persistence.cleanupOldShadows(canonicalId, keepLast);
-    } else if (this._currentThread) {
-      // Clean up current thread's shadows
-      const currentCanonicalId = this.getCanonicalId(this._currentThread.id);
-      this._persistence.cleanupOldShadows(currentCanonicalId, keepLast);
-    }
-  }
-
-  // TRANSPARENT THREAD COMPACTION - Creates compacted version while preserving external IDs
-  //
-  // WHAT THIS METHOD DOES:
-  // 1. Creates a new compacted thread with reduced event history
-  // 2. Establishes canonical ID mapping for transparent access
-  // 3. Switches internal operations to the compacted thread
-  // 4. Maintains external thread ID stability through canonical mapping
-  //
-  // EXTERNAL CONTRACT PRESERVED:
-  // - agent.getThreadId() continues returning the same canonical ID
-  // - Client code sees no change in thread IDs
-  // - All external references remain valid
-  //
-  // INTERNAL OPTIMIZATION:
-  // - New thread has compacted events (fewer tokens)
-  // - Operations use the compacted thread for efficiency
-  // - Canonical ID mapping enables transparent access
-  createCompactedVersion(reason: string, provider?: AIProvider): string {
-    if (!this._currentThread) {
-      throw new Error('No current thread to compact');
-    }
-
-    const originalThreadId = this._currentThread.id;
-    const canonicalId = this.getCanonicalId(originalThreadId);
-
-    try {
-      // Get compacted events using provider-aware strategy if available
-      const strategy = provider ? this._getProviderStrategy(provider) : this._compactionStrategy;
-
-      let compactedEvents: ThreadEvent[];
-      try {
-        compactedEvents = strategy.compact(this._currentThread.events);
-      } catch (compactionError) {
-        logger.error('Compaction strategy failed, using original events', {
-          error:
-            compactionError instanceof Error ? compactionError.message : String(compactionError),
-          threadId: originalThreadId,
-          eventCount: this._currentThread.events.length,
-        });
-        // Fallback: use original events if compaction fails
-        compactedEvents = [...this._currentThread.events];
-      }
-
-      // Create new thread (using existing method)
-      const newThreadId = this.generateThreadId();
-      this.createThread(newThreadId);
-
-      // Add compacted events (using existing method)
-      for (const event of compactedEvents) {
-        this.addEvent(newThreadId, event.type, event.data);
-      }
-
-      // Update version mapping
-      this._persistence.createVersion(canonicalId, newThreadId, reason);
-
-      // Switch to new thread (using existing method)
-      this.setCurrentThread(newThreadId);
-
-      logger.info('Compacted thread created successfully', {
-        originalThreadId,
-        newThreadId,
-        canonicalId,
-        originalEventCount: this._currentThread.events.length,
-        compactedEventCount: compactedEvents.length,
-        reason,
-      });
-
-      return newThreadId;
-    } catch (error) {
-      logger.error('Failed to create compacted thread', {
-        originalThreadId,
-        canonicalId,
-        error: error instanceof Error ? error.message : String(error),
-        reason,
-      });
-
-      throw new Error(
-        `Compacted thread creation failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  // Simplified compaction check and execution
-  async compactIfNeededSimplified(provider?: AIProvider): Promise<boolean> {
-    const needsCompaction = await this.needsCompaction(provider);
-
-    if (!needsCompaction) return false;
-
-    this.createCompactedVersion('Automatic compaction due to size', provider);
-    return true;
-  }
-
   // Cleanup
   close(): void {
     try {
@@ -666,21 +511,8 @@ export class ThreadManager {
       // Ignore save errors on close
     }
     // Clear caches
-    this._providerStrategyCache.clear();
     sharedThreadCache.clear();
     this._persistence.close();
-  }
-
-  private _getProviderStrategy(provider: AIProvider): SummarizeStrategy {
-    const cacheKey = `${provider.providerName}-${provider.defaultModel}`;
-    let strategy = this._providerStrategyCache.get(cacheKey);
-
-    if (!strategy) {
-      strategy = new SummarizeStrategy(undefined, provider);
-      this._providerStrategyCache.set(cacheKey, strategy);
-    }
-
-    return strategy;
   }
 }
 
