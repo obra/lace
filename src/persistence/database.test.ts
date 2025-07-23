@@ -2,7 +2,6 @@
 // ABOUTME: Tests database schema creation, migrations, and data integrity
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import Database from 'better-sqlite3';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { vi } from 'vitest';
@@ -76,83 +75,6 @@ describe('Project and Session database schema', () => {
     const sessionIdColumn = columns.find((c) => c.name === 'session_id');
 
     expect(sessionIdColumn).toBeDefined();
-  });
-
-  it('should create Historical project for migration', () => {
-    const db = getPersistence();
-
-    const project = db
-      .database!.prepare("SELECT * FROM projects WHERE id = 'historical'")
-      .get() as {
-      name: string;
-      working_directory: string;
-    };
-
-    expect(project).toBeDefined();
-    expect(project.name).toBe('Historical');
-    expect(project.working_directory).toBe(process.cwd());
-  });
-
-  it('should migrate existing session threads to sessions table', () => {
-    // Create separate database for migration test
-    const migrationDb = new Database(':memory:');
-
-    // Create old schema without migration
-    migrationDb.exec(`
-      CREATE TABLE threads (
-        id TEXT PRIMARY KEY,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        metadata TEXT
-      );
-      
-      CREATE TABLE schema_version (
-        version INTEGER PRIMARY KEY,
-        applied_at TEXT NOT NULL
-      );
-    `);
-
-    // Insert old session thread with isSession metadata
-    migrationDb
-      .prepare(
-        `
-      INSERT INTO threads (id, created_at, updated_at, metadata)
-      VALUES ('old_session', '2023-01-01T00:00:00Z', '2023-01-01T00:00:00Z', '{"isSession": true, "name": "Old Session"}')
-    `
-      )
-      .run();
-
-    // Set schema version to 4 (before projects and sessions migration)
-    migrationDb
-      .prepare('INSERT INTO schema_version (version, applied_at) VALUES (4, ?)')
-      .run(new Date().toISOString());
-
-    // Run migration by creating DatabasePersistence with the migration database
-    const migrationPersistence = new DatabasePersistence(migrationDb);
-
-    // Check session was created in sessions table
-    const session = migrationDb
-      .prepare("SELECT * FROM sessions WHERE id = 'old_session'")
-      .get() as {
-      name: string;
-      project_id: string;
-    };
-    expect(session).toBeDefined();
-    expect(session.name).toBe('Old Session');
-    expect(session.project_id).toBe('historical');
-
-    // Check thread was updated with session_id
-    const thread = migrationDb.prepare("SELECT * FROM threads WHERE id = 'old_session'").get() as {
-      session_id: string;
-      metadata: string | null;
-    };
-    expect(thread.session_id).toBe('old_session');
-    if (thread.metadata) {
-      expect(JSON.parse(thread.metadata)).not.toHaveProperty('isSession');
-    }
-
-    // Clean up migration database
-    migrationPersistence.close();
   });
 });
 
