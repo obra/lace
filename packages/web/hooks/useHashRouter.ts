@@ -1,9 +1,10 @@
 // ABOUTME: React hook for hash-based routing state management
 // ABOUTME: Provides URL persistence for project/session/agent selection with browser navigation support
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { AppState, getCurrentState, updateHash, onHashChange } from '@/lib/hash-router';
 import { ThreadId } from '@/lib/server/core-types';
+import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 
 export function useHashRouter() {
   const [state, setState] = useState<AppState>({});
@@ -29,6 +30,14 @@ export function useHashRouter() {
     return cleanup;
   }, [isUpdatingHash]);
 
+  // Reset isUpdatingHash flag with proper cleanup
+  useEffect(() => {
+    if (isUpdatingHash) {
+      const timer = setTimeout(() => setIsUpdatingHash(false), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isUpdatingHash]);
+
   // Update URL when state changes
   const updateState = (newState: Partial<AppState>, replace = true) => {
     const fullState = { ...state, ...newState };
@@ -37,8 +46,6 @@ export function useHashRouter() {
     if (isHydrated) {
       setIsUpdatingHash(true);
       updateHash(fullState, replace);
-      // Reset flag after a microtask to allow hash change to complete
-      setTimeout(() => setIsUpdatingHash(false), 0);
     }
   };
 
@@ -57,7 +64,13 @@ export function useHashRouter() {
       // Clear session clears agent too
       updateState({ session: undefined, agent: undefined }, replace);
     } else {
-      updateState({ session: session as string }, replace);
+      // Validate that session is a valid ThreadId
+      if (isValidThreadId(session)) {
+        updateState({ session }, replace);
+      } else {
+        console.warn(`Invalid session ID format: ${session}`);
+        updateState({ session: undefined, agent: undefined }, replace);
+      }
     }
   };
 
@@ -65,7 +78,13 @@ export function useHashRouter() {
     if (agent === null || agent === undefined) {
       updateState({ agent: undefined }, replace);
     } else {
-      updateState({ agent: agent as string }, replace);
+      // Validate that agent is a valid ThreadId
+      if (isValidThreadId(agent)) {
+        updateState({ agent }, replace);
+      } else {
+        console.warn(`Invalid agent ID format: ${agent}`);
+        updateState({ agent: undefined }, replace);
+      }
     }
   };
 
@@ -74,23 +93,32 @@ export function useHashRouter() {
     updateState({ project: undefined, session: undefined, agent: undefined }, replace);
   };
 
-  return {
-    // Current state (properly typed for Lace)
-    project: state.project || null,
-    session: (state.session as ThreadId) || null,
-    agent: (state.agent as ThreadId) || null,
+  // Memoize return object to prevent unnecessary re-renders
+  return useMemo(() => {
+    // Safely cast state values to ThreadId only if they're valid
+    const safeSession =
+      state.session && isValidThreadId(state.session) ? (state.session as ThreadId) : null;
+    const safeAgent =
+      state.agent && isValidThreadId(state.agent) ? (state.agent as ThreadId) : null;
 
-    // Setters
-    setProject,
-    setSession,
-    setAgent,
-    clearAll,
+    return {
+      // Current state (properly typed for Lace)
+      project: state.project || null,
+      session: safeSession,
+      agent: safeAgent,
 
-    // Raw state management
-    state,
-    updateState,
+      // Setters
+      setProject,
+      setSession,
+      setAgent,
+      clearAll,
 
-    // Hydration status
-    isHydrated,
-  };
+      // Raw state management
+      state,
+      updateState,
+
+      // Hydration status
+      isHydrated,
+    };
+  }, [state, setProject, setSession, setAgent, clearAll, updateState, isHydrated]);
 }
