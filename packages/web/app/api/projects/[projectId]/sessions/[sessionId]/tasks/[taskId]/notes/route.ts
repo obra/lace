@@ -89,10 +89,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       throw error;
     }
   } catch (error: unknown) {
-    logger.error('Error adding note:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to add note' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to add note',
+      500,
+      error
     );
   }
 }

@@ -143,10 +143,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       throw error;
     }
   } catch (error: unknown) {
-    logger.error('Error deleting task:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete task' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to delete task',
+      500,
+      error
     );
   }
 }
