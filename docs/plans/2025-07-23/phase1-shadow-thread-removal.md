@@ -50,23 +50,122 @@ npm run lint   # Check linting rules
 
 **Commit:** "Setup: verify build and test environment"
 
-### Task 2: Remove Shadow Thread Database Schema
+### Task 2: Create Clean Database Schema (Breaking Change)
 
-**Context:** The database uses SQLite with migration system. You need to remove shadow thread tables.
+**Context:** We're doing a clean break - no backward compatibility. Create a single v10 migration with clean schema.
 
 **Files to modify:**
 - `src/persistence/database.ts`
 
 **What to do:**
-1. **Delete migration v2 completely** - Remove `migrateToV2()` method (lines 170-199)
-2. **Remove migration v2 call** - Delete line 99-101 in `runMigrations()`
-3. **Renumber migrations** - Change `currentVersion < 3` to `currentVersion < 2` (line 103), etc.
-4. **Update schema version check** - The highest version should now be 5 (was 6)
+1. **Delete ALL existing migration methods:** Remove `migrateToV1()` through `migrateToV6()`
+2. **Replace runMigrations() completely:**
+```typescript
+private runMigrations(): void {
+  if (!this.db) return;
+
+  const currentVersion = this.getSchemaVersion();
+  
+  if (currentVersion < 10) {
+    this.migrateToV10();
+  }
+}
+```
+
+3. **Create new migrateToV10() method:**
+```typescript
+private migrateToV10(): void {
+  if (!this.db) return;
+
+  // Clean schema without shadow thread complexity
+  this.db.exec(`
+    -- Core thread storage
+    CREATE TABLE IF NOT EXISTS threads (
+      id TEXT PRIMARY KEY,
+      session_id TEXT,
+      project_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      metadata TEXT DEFAULT NULL
+    );
+
+    -- Event storage
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      data JSONB NOT NULL,
+      FOREIGN KEY (thread_id) REFERENCES threads(id)
+    );
+
+    -- Task management
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      prompt TEXT NOT NULL,
+      status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'blocked')) DEFAULT 'pending',
+      priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+      assigned_to TEXT,
+      created_by TEXT NOT NULL,
+      thread_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS task_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT NOT NULL,
+      author TEXT NOT NULL,
+      content TEXT NOT NULL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    );
+
+    -- Project management
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      working_directory TEXT NOT NULL,
+      configuration TEXT DEFAULT '{}',
+      is_archived BOOLEAN DEFAULT FALSE,
+      created_at TEXT DEFAULT (datetime('now')),
+      last_used_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Session management
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      configuration TEXT DEFAULT '{}',
+      status TEXT CHECK(status IN ('active', 'archived', 'completed')) DEFAULT 'active',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    );
+
+    -- Essential indexes only
+    CREATE INDEX IF NOT EXISTS idx_events_thread_timestamp ON events(thread_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_threads_updated ON threads(updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_tasks_thread_id ON tasks(thread_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_task_notes_task_id ON task_notes(task_id);
+  `);
+
+  this.setSchemaVersion(10);
+}
+```
 
 **Critical details:**
-- The `migrateToV2()` method creates `thread_versions` and `version_history` tables
-- These tables are ONLY used for shadow threads
-- Removing them will not break existing conversations
+- This completely breaks backward compatibility (intentional)
+- Users will lose existing data (acceptable for clean slate)
+- No shadow thread tables (`thread_versions`, `version_history`)
+- Clean, simple schema focused on core functionality
 
 **Test your changes:**
 ```bash
@@ -74,7 +173,7 @@ npm run build
 # Should build without errors
 ```
 
-**Commit:** "Remove shadow thread database schema migration"
+**Commit:** "BREAKING: Replace all migrations with clean v10 schema"
 
 ### Task 3: Remove Shadow Thread Methods from DatabasePersistence
 
