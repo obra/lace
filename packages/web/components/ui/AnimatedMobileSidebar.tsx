@@ -219,7 +219,7 @@ export function AnimatedMobileSidebar({
                   className="select select-bordered w-full"
                   value={currentProject.id}
                   onChange={(e) => {
-                    const project = projects.find((p) => p.id === parseInt(e.target.value));
+                    const project = projects.find((p) => p.id === e.target.value);
                     if (project) onProjectChange(project);
                   }}
                   whileFocus={{

@@ -104,6 +104,7 @@ describe('SessionService Missing Methods', () => {
       const initialSessionData = {
         id: sessionId,
         name: 'Original Session',
+        description: 'Original description',
         projectId: 'test-project',
         configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
         status: 'active' as const,

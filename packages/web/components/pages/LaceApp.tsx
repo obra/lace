@@ -79,7 +79,7 @@ export function LaceApp() {
   const timelineEntries = useMemo(() => {
     const entries = convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
-      selectedAgent,
+      selectedAgent: selectedAgent || undefined,
     });
     
     return entries;
@@ -493,7 +493,7 @@ export function LaceApp() {
                         </div>
                         <span className={`text-xs badge badge-xs ${
                           agent.status === 'idle' ? 'badge-success' :
-                          agent.status === 'busy' ? 'badge-warning' :
+                          (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
                           'badge-neutral'
                         }`}>
                           {agent.status}
@@ -600,7 +600,7 @@ export function LaceApp() {
                     </div>
                     <span className={`text-xs badge badge-xs ${
                       agent.status === 'idle' ? 'badge-success' :
-                      agent.status === 'busy' ? 'badge-warning' :
+                      (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
                       'badge-neutral'
                     }`}>
                       {agent.status}

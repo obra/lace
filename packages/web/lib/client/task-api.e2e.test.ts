@@ -74,12 +74,19 @@ describe('TaskAPIClient E2E Tests', () => {
       .mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
         const urlString = typeof url === 'string' ? url : url.toString();
         const method = init?.method || 'GET';
+        // Convert null signal to undefined for NextRequest compatibility
+        const sanitizedInit = init
+          ? {
+              ...init,
+              signal: init.signal || undefined,
+            }
+          : undefined;
 
         try {
           // Route to appropriate API handler based on URL pattern
           if (urlString.includes('/api/tasks') && !urlString.includes('/notes')) {
             if (method === 'POST' && urlString === '/api/tasks') {
-              const request = new NextRequest('http://localhost' + urlString, init);
+              const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
               return await createTask(request);
             } else if (
               method === 'GET' &&
@@ -88,9 +95,9 @@ describe('TaskAPIClient E2E Tests', () => {
             ) {
               // Handle GET /api/tasks/{id}?sessionId={sessionId} - this should come before the general list case
               const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
-              const request = new NextRequest('http://localhost' + urlString, init);
+              const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
               const response = await getTask(request, {
-                params: Promise.resolve({ taskId: taskId! }),
+                params: { taskId: taskId! },
               });
               const responseData = (await response.json()) as unknown;
               return new Response(JSON.stringify(responseData), {
@@ -99,21 +106,21 @@ describe('TaskAPIClient E2E Tests', () => {
               });
             } else if (method === 'GET' && urlString.includes('?sessionId=')) {
               // Handle GET /api/tasks?sessionId={sessionId} - list tasks
-              const request = new NextRequest('http://localhost' + urlString, init);
+              const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
               return await listTasks(request);
             } else if (method === 'PATCH' && urlString.includes('/api/tasks/')) {
               const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
-              const request = new NextRequest('http://localhost' + urlString, init);
-              return await updateTask(request, { params: Promise.resolve({ taskId: taskId! }) });
+              const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
+              return await updateTask(request, { params: { taskId: taskId! } });
             } else if (method === 'DELETE' && urlString.includes('/api/tasks/')) {
               const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
-              const request = new NextRequest('http://localhost' + urlString, init);
-              return await deleteTask(request, { params: Promise.resolve({ taskId: taskId! }) });
+              const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
+              return await deleteTask(request, { params: { taskId: taskId! } });
             }
           } else if (urlString.includes('/notes') && method === 'POST') {
             const taskId = urlString.split('/api/tasks/')[1]?.split('/notes')[0];
-            const request = new NextRequest('http://localhost' + urlString, init);
-            return await addNote(request, { params: Promise.resolve({ taskId: taskId! }) });
+            const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
+            return await addNote(request, { params: { taskId: taskId! } });
           }
 
           throw new Error(`Unhandled API route: ${method} ${urlString}`);

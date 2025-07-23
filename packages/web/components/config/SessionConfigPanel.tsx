@@ -24,6 +24,7 @@ interface SessionConfiguration {
   toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
+  [key: string]: unknown;
 }
 
 interface SessionConfigPanelProps {
