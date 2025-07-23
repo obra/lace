@@ -92,28 +92,8 @@ export class DatabasePersistence {
 
     const currentVersion = this.getSchemaVersion();
 
-    if (currentVersion < 1) {
-      this.migrateToV1();
-    }
-
-    if (currentVersion < 2) {
-      this.migrateToV2();
-    }
-
-    if (currentVersion < 3) {
-      this.migrateToV3();
-    }
-
-    if (currentVersion < 4) {
-      this.migrateToV4();
-    }
-
-    if (currentVersion < 5) {
-      this.migrateToV5();
-    }
-
-    if (currentVersion < 6) {
-      this.migrateToV6();
+    if (currentVersion < 10) {
+      this.migrateToV10();
     }
   }
 
@@ -137,17 +117,22 @@ export class DatabasePersistence {
       .run(version, new Date().toISOString());
   }
 
-  private migrateToV1(): void {
+  private migrateToV10(): void {
     if (!this.db) return;
 
-    // Create basic threads and events tables
+    // Clean schema without shadow thread complexity
     this.db.exec(`
+      -- Core thread storage
       CREATE TABLE IF NOT EXISTS threads (
         id TEXT PRIMARY KEY,
+        session_id TEXT,
+        project_id TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        metadata TEXT DEFAULT NULL
       );
 
+      -- Event storage
       CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY,
         thread_id TEXT NOT NULL,
@@ -157,52 +142,7 @@ export class DatabasePersistence {
         FOREIGN KEY (thread_id) REFERENCES threads(id)
       );
 
-      CREATE INDEX IF NOT EXISTS idx_events_thread_timestamp 
-      ON events(thread_id, timestamp);
-      
-      CREATE INDEX IF NOT EXISTS idx_threads_updated 
-      ON threads(updated_at DESC);
-    `);
-
-    this.setSchemaVersion(1);
-  }
-
-  private migrateToV2(): void {
-    if (!this.db) return;
-
-    // Create thread versioning tables
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS thread_versions (
-        canonical_id TEXT PRIMARY KEY,
-        current_version_id TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (current_version_id) REFERENCES threads(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS version_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        canonical_id TEXT NOT NULL,
-        version_id TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        reason TEXT,
-        FOREIGN KEY (canonical_id) REFERENCES thread_versions(canonical_id)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_version_history_canonical 
-      ON version_history(canonical_id, created_at DESC);
-      
-      CREATE INDEX IF NOT EXISTS idx_version_history_version 
-      ON version_history(version_id);
-    `);
-
-    this.setSchemaVersion(2);
-  }
-
-  private migrateToV3(): void {
-    if (!this.db) return;
-
-    // Create task management tables
-    this.db.exec(`
+      -- Task management
       CREATE TABLE IF NOT EXISTS tasks (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
@@ -226,31 +166,7 @@ export class DatabasePersistence {
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
       );
 
-      CREATE INDEX IF NOT EXISTS idx_tasks_thread_id ON tasks(thread_id);
-      CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
-      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-      CREATE INDEX IF NOT EXISTS idx_task_notes_task_id ON task_notes(task_id);
-    `);
-
-    this.setSchemaVersion(3);
-  }
-
-  private migrateToV4(): void {
-    if (!this.db) return;
-
-    // Add metadata column to threads table for session persistence
-    this.db.exec(`
-      ALTER TABLE threads ADD COLUMN metadata TEXT DEFAULT NULL;
-    `);
-
-    this.setSchemaVersion(4);
-  }
-
-  private migrateToV5(): void {
-    if (!this.db) return;
-
-    // Create projects table
-    this.db.exec(`
+      -- Project management
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -260,27 +176,9 @@ export class DatabasePersistence {
         is_archived BOOLEAN DEFAULT FALSE,
         created_at TEXT DEFAULT (datetime('now')),
         last_used_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
+      );
 
-    // Create "Historical" project for migration
-    this.db
-      .prepare(
-        `
-      INSERT OR IGNORE INTO projects (id, name, description, working_directory, configuration, is_archived, created_at, last_used_at)
-      VALUES ('historical', 'Historical', 'Legacy sessions before project support', ?, '{}', FALSE, datetime('now'), datetime('now'))
-    `
-      )
-      .run(process.cwd());
-
-    this.setSchemaVersion(5);
-  }
-
-  private migrateToV6(): void {
-    if (!this.db) return;
-
-    // Create sessions table
-    this.db.exec(`
+      -- Session management
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
@@ -291,104 +189,18 @@ export class DatabasePersistence {
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY (project_id) REFERENCES projects(id)
-      )
+      );
+
+      -- Essential indexes only
+      CREATE INDEX IF NOT EXISTS idx_events_thread_timestamp ON events(thread_id, timestamp);
+      CREATE INDEX IF NOT EXISTS idx_threads_updated ON threads(updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_tasks_thread_id ON tasks(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_task_notes_task_id ON task_notes(task_id);
     `);
 
-    // Add session_id to threads table
-    const hasSessionId =
-      (
-        this.db
-          .prepare(
-            "SELECT COUNT(*) as count FROM pragma_table_info('threads') WHERE name='session_id'"
-          )
-          .get() as { count: number }
-      ).count > 0;
-
-    if (!hasSessionId) {
-      this.db.exec('ALTER TABLE threads ADD COLUMN session_id TEXT');
-    }
-
-    // Add project_id to threads table
-    const hasProjectId =
-      (
-        this.db
-          .prepare(
-            "SELECT COUNT(*) as count FROM pragma_table_info('threads') WHERE name='project_id'"
-          )
-          .get() as { count: number }
-      ).count > 0;
-
-    if (!hasProjectId) {
-      this.db.exec('ALTER TABLE threads ADD COLUMN project_id TEXT');
-    }
-
-    // Migrate existing session threads to sessions table
-    const sessionThreads = this.db
-      .prepare(
-        `
-      SELECT id, created_at, updated_at, metadata
-      FROM threads 
-      WHERE metadata IS NOT NULL 
-      AND json_extract(metadata, '$.isSession') = 1
-    `
-      )
-      .all() as Array<{
-      id: string;
-      created_at: string;
-      updated_at: string;
-      metadata: string;
-    }>;
-
-    for (const sessionThread of sessionThreads) {
-      const metadata = JSON.parse(sessionThread.metadata) as {
-        isSession?: boolean;
-        name?: string;
-        description?: string;
-        configuration?: Record<string, unknown>;
-        [key: string]: unknown;
-      };
-
-      // Create session record
-      this.db
-        .prepare(
-          `
-        INSERT OR IGNORE INTO sessions (id, project_id, name, description, configuration, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `
-        )
-        .run(
-          sessionThread.id,
-          'historical',
-          metadata.name || 'Untitled Session',
-          metadata.description || '',
-          JSON.stringify(metadata.configuration || {}),
-          sessionThread.created_at,
-          sessionThread.updated_at
-        );
-
-      // Update thread to reference session and remove isSession metadata
-      const cleanMetadata = { ...metadata };
-      delete cleanMetadata.isSession;
-      delete cleanMetadata.name;
-      delete cleanMetadata.description;
-      delete cleanMetadata.configuration;
-
-      this.db
-        .prepare(
-          `
-        UPDATE threads 
-        SET session_id = ?, metadata = ?
-        WHERE id = ?
-      `
-        )
-        .run(
-          sessionThread.id,
-          Object.keys(cleanMetadata).length > 0 ? JSON.stringify(cleanMetadata) : null,
-          sessionThread.id
-        );
-    }
-
-    this.setSchemaVersion(6);
+    this.setSchemaVersion(10);
   }
 
   // ===============================
