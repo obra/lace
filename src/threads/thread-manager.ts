@@ -230,29 +230,14 @@ export class ThreadManager {
   }
 
   getThread(threadId: string): Thread | undefined {
-    logger.debug('ThreadManager.getThread', {
-      requestedThreadId: threadId,
-      currentThreadId: this._currentThread?.id,
-      matchesCurrent: this._currentThread?.id === threadId,
-      inCache: this._threadCache.has(threadId),
-    });
-
     // Check current thread first
     if (this._currentThread?.id === threadId) {
-      logger.debug('Returning current thread', {
-        threadId: this._currentThread.id,
-        eventCount: this._currentThread.events.length,
-      });
       return this._currentThread;
     }
 
     // Check cache
     const cachedThread = this._threadCache.get(threadId);
     if (cachedThread) {
-      logger.debug('Returning cached thread', {
-        threadId: cachedThread.id,
-        eventCount: cachedThread.events.length,
-      });
       return cachedThread;
     }
 
@@ -260,15 +245,9 @@ export class ThreadManager {
     try {
       const thread = this._persistence.loadThread(threadId);
       if (thread) {
-        logger.debug('Loaded thread from persistence, caching', {
-          requestedThreadId: threadId,
-          actualThreadId: thread.id,
-          eventCount: thread.events.length,
-        });
         this._threadCache.set(threadId, thread);
         return thread;
       }
-      logger.debug('Thread not found in persistence', { requestedThreadId: threadId });
       return undefined;
     } catch (error) {
       logger.debug('Failed to load thread from persistence', {
@@ -312,18 +291,7 @@ export class ThreadManager {
 
   getEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
-    const events = thread?.events || [];
-
-    logger.debug('ThreadManager.getEvents', {
-      requestedThreadId: threadId,
-      foundThread: !!thread,
-      actualThreadId: thread?.id,
-      eventCount: events.length,
-      eventThreadIds: events.map((e) => e.threadId),
-      uniqueEventThreadIds: [...new Set(events.map((e) => e.threadId))],
-    });
-
-    return events;
+    return thread?.events || [];
   }
 
   getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
@@ -394,7 +362,6 @@ export class ThreadManager {
       this._persistence.saveThread(thread);
       // Update cache with modified thread
       this._threadCache.set(threadId, thread);
-      logger.debug('Updated thread metadata and cache', { threadId });
     } catch (error) {
       logger.error('Failed to update thread metadata', { threadId, error });
     }

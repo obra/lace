@@ -328,11 +328,8 @@ export class Agent extends EventEmitter {
     // which may point to a different thread (like the parent session for delegate agents)
     const activeThreadId = this._threadId;
 
-    logger.debug('Getting active thread ID', {
-      agentThreadId: this._threadId,
-      activeThreadId,
-      note: 'Using agent own thread ID',
-    });
+    // Always use the agent's own thread ID - don't rely on ThreadManager's "current" thread
+    // which may point to a different thread (like the parent session for delegate agents)
 
     return activeThreadId;
   }
@@ -349,72 +346,29 @@ export class Agent extends EventEmitter {
     // Create cache key based on provider and model
     const cacheKey = `${targetProvider}:${targetModel}`;
 
-    // Safe logging to avoid circular reference issues
-    try {
-      logger.debug('Agent.providerInstance getter called', {
-        threadId: this._threadId,
-        metadataProvider: metadata?.provider,
-        metadataModel: metadata?.model,
-        constructorProvider: this._provider.providerName,
-        constructorModel: this._provider.modelName,
-        targetProvider,
-        targetModel,
-        cacheKey,
-        cachedKey: this._cachedProviderKey,
-        willUseCache: this._cachedProviderKey === cacheKey && !!this._cachedProviderInstance,
-      });
-    } catch (_error) {
-      // Fallback logging if there are circular references
-      logger.debug('Agent.providerInstance getter called (safe mode)', {
-        threadId: this._threadId,
-        targetProvider,
-        targetModel,
-        cacheKey,
-        willUseCache: this._cachedProviderKey === cacheKey && !!this._cachedProviderInstance,
-      });
-    }
+    // Create cache key based on provider and model
 
     // If current metadata matches the constructor provider, return it
     if (
       targetProvider === this._provider.providerName &&
       targetModel === this._provider.modelName
     ) {
-      logger.debug('Using constructor provider instance', {
-        threadId: this._threadId,
-        provider: this._provider.providerName,
-        model: this._provider.modelName,
-      });
+      // Using constructor provider - no need to create new instance
       return this._provider;
     }
 
     // Check if we have a cached provider for this configuration
     if (this._cachedProviderKey === cacheKey && this._cachedProviderInstance) {
-      logger.debug('Using cached provider instance', {
-        threadId: this._threadId,
-        provider: targetProvider,
-        model: targetModel,
-        cacheKey,
-      });
       return this._cachedProviderInstance;
     }
 
     // Clean up old cached provider if it exists
     if (this._cachedProviderInstance && this._cachedProviderKey !== cacheKey) {
-      logger.debug('Cleaning up old cached provider', {
-        threadId: this._threadId,
-        oldCacheKey: this._cachedProviderKey,
-        newCacheKey: cacheKey,
-      });
       this._cachedProviderInstance.cleanup();
     }
 
     // Create new provider instance and cache it
-    logger.debug('Creating new provider instance from metadata', {
-      threadId: this._threadId,
-      targetProvider,
-      targetModel,
-      cacheKey,
-    });
+    // Creating new provider instance from metadata
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const newProvider = registry.createProvider(targetProvider, { model: targetModel });
 
@@ -422,12 +376,7 @@ export class Agent extends EventEmitter {
     this._cachedProviderInstance = newProvider;
     this._cachedProviderKey = cacheKey;
 
-    logger.debug('Created and cached new provider instance', {
-      threadId: this._threadId,
-      newProviderName: newProvider.providerName,
-      newModelName: newProvider.modelName,
-      cacheKey,
-    });
+    // Provider instance created and cached
     return newProvider;
   }
 
@@ -467,27 +416,10 @@ export class Agent extends EventEmitter {
   buildThreadMessages(): ProviderMessage[] {
     // Use the current active thread (which might be a compacted thread after compaction)
     const activeThreadId = this._getActiveThreadId();
-    logger.debug('Building thread messages', {
-      agentThreadId: this._threadId,
-      activeThreadId,
-      match: this._threadId === activeThreadId,
-    });
+    // Building conversation messages from thread events
 
     const events = this._threadManager.getEvents(activeThreadId);
-    logger.debug('Loaded events for thread', {
-      activeThreadId,
-      eventCount: events.length,
-      firstEventThreadId: events.length > 0 ? events[0].threadId : 'no-events',
-      lastEventThreadId: events.length > 0 ? events[events.length - 1].threadId : 'no-events',
-    });
-
     const messages = this._buildConversationFromEvents(events);
-    logger.debug('Built conversation messages', {
-      activeThreadId,
-      messageCount: messages.length,
-      firstMessageRole: messages.length > 0 ? messages[0].role : 'no-messages',
-    });
-
     return messages;
   }
 
@@ -1048,14 +980,6 @@ export class Agent extends EventEmitter {
 
   // Agent-specific conversation building (preserves thinking blocks for model context)
   private _buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
-    logger.debug('Building conversation from events', {
-      threadId: this._threadId,
-      totalEvents: events.length,
-      eventTypes: events.map((e) => e.type),
-      eventThreadIds: events.map((e) => e.threadId),
-      uniqueThreadIds: [...new Set(events.map((e) => e.threadId))],
-    });
-
     const messages: ProviderMessage[] = [];
 
     // Track which events have been processed to avoid duplicates

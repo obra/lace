@@ -421,12 +421,7 @@ export class DatabasePersistence {
     const currentVersionId = this.getCurrentVersion(threadId);
     const actualThreadId = currentVersionId || threadId;
 
-    logger.debug('Database.loadThread', {
-      requestedThreadId: threadId,
-      currentVersionId,
-      actualThreadId,
-      versionMapping: threadId !== actualThreadId,
-    });
+    // Load thread from database with version mapping support
 
     const threadStmt = this.db.prepare(`
       SELECT * FROM threads WHERE id = ?
@@ -506,13 +501,7 @@ export class DatabasePersistence {
       data: string;
     }>;
 
-    logger.debug('Database.loadEvents', {
-      requestedThreadId: threadId,
-      foundRows: rows.length,
-      eventThreadIds: rows.map((r) => r.thread_id),
-      uniqueThreadIds: [...new Set(rows.map((r) => r.thread_id))],
-      eventTypes: rows.map((r) => r.type),
-    });
+    // Load events from database for thread
 
     return rows.map((row) => {
       try {
