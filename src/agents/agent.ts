@@ -112,9 +112,6 @@ export class Agent extends EventEmitter {
   }
 
   // Public access to thread ID for delegation
-  // IMPORTANT: This returns the CANONICAL thread ID, which remains stable across compactions
-  // The canonical ID is the external identifier that clients see and should never change
-  // Internally, we may switch to compacted threads, but this API maintains the stable contract
   get threadId(): string {
     return this._threadId;
   }
@@ -193,7 +190,7 @@ export class Agent extends EventEmitter {
     this._addTokensToCurrentTurn('in', this._estimateTokens(content));
 
     if (content.trim()) {
-      // Add user message to active thread (could be compacted thread after compaction)
+      // Add user message to active thread
       this._addEventAndEmit(this._getActiveThreadId(), 'USER_MESSAGE', content);
     }
 
@@ -410,7 +407,7 @@ export class Agent extends EventEmitter {
 
   // Thread message processing for agent-facing conversation
   buildThreadMessages(): ProviderMessage[] {
-    // Use the current active thread (which might be a compacted thread after compaction)
+    // Use the current active thread
     const activeThreadId = this._getActiveThreadId();
     // Building conversation messages from thread events
 
@@ -1354,7 +1351,7 @@ export class Agent extends EventEmitter {
 
   /**
    * Replay all historical events from current thread for session resumption
-   * Used during --continue and post-compaction state rebuilding
+   * Used during --continue and session resumption
    */
   replaySessionEvents(): void {
     const events = this._threadManager.getEvents(this._getActiveThreadId());

@@ -9,7 +9,6 @@ A **thread** is a conversation session between a user and an agent, identified b
 
 - **ThreadId**: Branded type following the pattern `lace_YYYYMMDD_xxxxxx` (e.g., `lace_20250113_abc123`)
 - **Delegate Thread**: Sub-conversation spawned from a parent thread, with IDs like `lace_20250113_abc123.1`, `lace_20250113_abc123.2`
-- **Canonical ID**: Stable thread identifier that persists through compaction and versioning
 
 ### Agent
 The **agent** is your AI counterparty in a thread - the entity you're having a conversation with. It's effectively a facade that:
@@ -111,8 +110,6 @@ The **token budget** tracks conversation size to prevent exceeding model limits.
 ### Compaction
 **Compaction** reduces token usage by summarizing old conversation parts:
 - **CompactionStrategy**: Interface for compaction approaches
-- **Shadow Thread**: New thread version created during compaction
-- **Thread Shadowing**: Automatic versioning for token optimization
 
 ## Streaming and Real-time
 

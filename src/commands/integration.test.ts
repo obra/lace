@@ -35,8 +35,7 @@ class TestUI implements UserInterface {
   commandExecutionResults: {
     lastCommandName?: string;
     executionSuccess: boolean;
-    compactionPerformed: boolean;
-  } = { executionSuccess: false, compactionPerformed: false };
+  } = { executionSuccess: false };
 
   constructor(agent: MockAgent) {
     this.agent = agent as unknown as Agent;
@@ -74,7 +73,6 @@ class TestUI implements UserInterface {
       unknownCommandError: this.hasMessage('Unknown command:'),
       exitTriggered: this.exitCalled,
       sessionCleared: this.clearSessionCalled,
-      compactionTriggered: this.hasMessage('✅ Compacted thread'), // Check for actual compaction success message
     };
   }
 
@@ -82,7 +80,7 @@ class TestUI implements UserInterface {
     this.messages = [];
     this.exitCalled = false;
     this.clearSessionCalled = false;
-    this.commandExecutionResults = { executionSuccess: false, compactionPerformed: false };
+    this.commandExecutionResults = { executionSuccess: false };
   }
 }
 
@@ -182,19 +180,6 @@ describe('Command System Integration', () => {
       // Test actual behavior - session was cleared
       const results = testUI.getCommandResults();
       expect(results.sessionCleared).toBe(true);
-    });
-
-    it('should execute compact command successfully', async () => {
-      const registry = await CommandRegistry.createWithAutoDiscovery();
-      const executor = new CommandExecutor(registry);
-
-      // Execute compact command
-      await executor.execute('/compact', testUI);
-
-      // Test actual behavior - compaction command executed and displayed success message
-      const results = testUI.getCommandResults();
-      expect(results.compactionTriggered).toBe(true);
-      expect(testUI.hasMessage('✅ Compacted thread test-thread')).toBe(true);
     });
 
     it('should handle unknown commands gracefully', async () => {
