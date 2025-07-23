@@ -39,7 +39,7 @@ node dist/debug-thread.js --thread-id lace_20250706_abc123 --provider anthropic
 ```
 
 This outputs a JSON structure with:
-- Thread metadata (ID, canonical ID, provider)
+- Thread metadata (ID, provider)
 - Token count analysis
 - Provider-specific conversation format
 - Raw events from the thread
