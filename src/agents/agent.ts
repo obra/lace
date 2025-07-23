@@ -1361,9 +1361,6 @@ export class Agent extends EventEmitter {
   }
 
   // Thread management API - proxies to ThreadManager
-  getCurrentThreadId(): string | null {
-    return this._threadId;
-  }
 
   getThreadEvents(threadId?: string): ThreadEvent[] {
     const targetThreadId = threadId || this._threadId;
