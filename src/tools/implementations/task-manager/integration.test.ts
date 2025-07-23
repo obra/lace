@@ -12,7 +12,7 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Multi-Agent Task Manager Integration', () => {
   const _tempDirContext = useTempLaceDir();

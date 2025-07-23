@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { OllamaProvider } from '~/providers/ollama-provider';
 import { Tool } from '~/tools/tool';
 import { ToolContext, ToolResult } from '~/tools/types';
-import { checkProviderAvailability } from '~/test-utils-dir/provider-test-helpers';
+import { checkProviderAvailability } from '~/test-utils/provider-test-helpers';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects

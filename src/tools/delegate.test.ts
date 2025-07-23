@@ -8,7 +8,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { AnthropicProvider } from '~/providers/anthropic-provider';
 import type { AIProvider } from '~/providers/base-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Note: Tool approval is not yet implemented in lace
 // When it is, subagent tool calls should use the same approval flow

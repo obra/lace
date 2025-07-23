@@ -9,8 +9,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
-import { createMockProvider } from '~/test-utils-dir/mock-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { createMockProvider } from '~/test-utils/mock-provider';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Agent Delegate Creation', () => {
   let threadManager: ThreadManager;

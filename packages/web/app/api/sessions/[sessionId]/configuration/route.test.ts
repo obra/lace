@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {

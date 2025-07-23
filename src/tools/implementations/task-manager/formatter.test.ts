@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskFormatter } from '~/tools/implementations/task-manager/formatter';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { createThreadId, createNewAgentSpec } from '~/threads/types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('TaskFormatter', () => {
   const parentThreadId = createThreadId('lace_20250703_parent');

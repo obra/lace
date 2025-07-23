@@ -10,7 +10,7 @@ import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-import
 import type { ToolExecutor } from '@/lib/server/lace-imports';
 import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));

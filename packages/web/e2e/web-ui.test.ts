@@ -30,7 +30,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId, Project } from '@/lib/server/lace-imports';
 import type { Session as SessionType } from '@/types/api';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Web UI E2E Tests', () => {
   let sessionService: ReturnType<typeof getSessionService>;

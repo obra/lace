@@ -12,9 +12,9 @@ import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface'
 // Don't import TerminalInterface at top level - it loads React/Ink
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { OllamaProvider } from '~/providers/ollama-provider';
-import { withConsoleCapture } from '~/test-setup-dir/console-capture';
+import { withConsoleCapture } from '~/test-utils/console-capture';
 import { resetPersistence } from '~/persistence/database';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies at the module level

@@ -14,7 +14,7 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { Session } from '@/types/api';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('SSE Stream E2E Tests', () => {
   let sessionService: ReturnType<typeof getSessionService>;

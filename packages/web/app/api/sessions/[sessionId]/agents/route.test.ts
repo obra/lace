@@ -7,7 +7,7 @@ import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import type { ThreadId, Agent } from '@/types/api';
 // Import SessionService type is not needed since we define our own mock interface
 import type { Session } from '@/types/api';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Response types
 interface AgentResponse {

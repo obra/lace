@@ -9,10 +9,10 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { BaseMockProvider } from '~/test-utils-dir/base-mock-provider';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { Tool } from '~/tools/tool';
 import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {

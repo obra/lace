@@ -11,7 +11,7 @@ import { ProviderMessage, AIProvider } from '~/providers/base-provider';
 import { convertToAnthropicFormat } from '~/providers/format-converters';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-setup-dir/persistence-helper';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Helper function for type-safe private method access
 function buildConversationFromEvents(agent: Agent, events: ThreadEvent[]): ProviderMessage[] {

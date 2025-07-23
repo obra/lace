@@ -1,7 +1,7 @@
 // ABOUTME: Helper function to create mock provider for CLI testing
 // ABOUTME: Returns a test provider with realistic responses for conversation flow testing
 
-import { TestProvider } from '~/test-utils-dir/test-provider';
+import { TestProvider } from '~/test-utils/test-provider';
 
 export function createMockProvider() {
   return new TestProvider({
