@@ -34,7 +34,23 @@ const availableThemes = [
   { name: 'cyberpunk', colors: { primary: '#FF7598', secondary: '#75D1F0', accent: '#C07F00' } },
 ];
 
-export function AnimatedLaceApp() {
+interface AnimatedLaceAppProps {
+  initialProjects?: Project[];
+  initialCurrentProject?: Project;
+  initialTimelines?: Timeline[];
+  initialCurrentTimeline?: Timeline;
+  initialTasks?: Task[];
+  initialRecentFiles?: RecentFile[];
+}
+
+export function AnimatedLaceApp({
+  initialProjects = [],
+  initialCurrentProject,
+  initialTimelines = [],
+  initialCurrentTimeline,
+  initialTasks = [],
+  initialRecentFiles = []
+}: AnimatedLaceAppProps = {}) {
   // UI State
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
@@ -66,109 +82,29 @@ export function AnimatedLaceApp() {
   });
 
   // Data State
-  const [currentProject, setCurrentProject] = useState<Project>({
-    id: "1",
-    name: 'AI Research',
-    workingDirectory: '/projects/ai-research',
-  });
-
-  const [projects] = useState<Project[]>([
-    { 
-      id: 'ai-research-project',
+  const [currentProject, setCurrentProject] = useState<Project>(
+    initialCurrentProject || {
+      id: "1",
       name: 'AI Research',
-      description: 'Advanced AI research and development project',
+      description: 'AI Research Project',
       workingDirectory: '/projects/ai-research',
       isArchived: false,
-      createdAt: new Date('2024-01-01T08:00:00Z'),
-      lastUsedAt: new Date('2024-01-15T10:00:00Z'),
-      sessionCount: 42,
-    },
-    { 
-      id: 'web-app-project',
-      name: 'Web App',
-      description: 'Full-stack web application development',
-      workingDirectory: '/projects/webapp',
-      isArchived: false,
-      createdAt: new Date('2023-12-20T10:00:00Z'),
-      lastUsedAt: new Date('2024-01-14T15:30:00Z'),
-      sessionCount: 28,
-    },
-    { 
-      id: 'data-pipeline-project',
-      name: 'Data Pipeline',
-      description: 'ETL data processing pipeline',
-      workingDirectory: '/projects/data-pipeline',
-      isArchived: false,
-      createdAt: new Date('2023-11-15T12:00:00Z'),
-      lastUsedAt: new Date('2024-01-13T09:15:00Z'),
-      sessionCount: 32,
-    },
-  ]);
+      createdAt: new Date(),
+      lastUsedAt: new Date(),
+    }
+  );
 
-  const [currentTimeline, setCurrentTimeline] = useState<Timeline>({
-    id: 1,
-    name: 'Main Dev',
-    agent: 'Claude',
-  });
+  const [projects] = useState<Project[]>(initialProjects);
 
-  const [timelines, setTimelines] = useState<Timeline[]>([
-    { id: 2, name: 'Code Review', agent: 'Claude' },
-    { id: 3, name: 'Research', agent: 'Gemini' },
-    { id: 4, name: 'Testing', agent: 'Claude' },
-    { id: 5, name: 'Data Analysis', agent: 'GPT-4' },
-  ]);
+  const [currentTimeline, setCurrentTimeline] = useState<Timeline>(
+    initialCurrentTimeline || { id: 1, name: 'Main Dev', agent: 'Claude' }
+  );
 
-  const [recentFiles] = useState<RecentFile[]>([
-    { name: 'app.py', path: '/src/app.py' },
-    { name: 'config.yaml', path: '/config/config.yaml' },
-    { name: 'README.md', path: '/README.md' },
-    { name: 'test_models.py', path: '/tests/test_models.py' },
-  ]);
+  const [timelines, setTimelines] = useState<Timeline[]>(initialTimelines);
 
-  const [activeTasks] = useState<Task[]>([
-    {
-      id: 'animated-task-001',
-      title: 'AI Model Integration',
-      description: 'Integrate latest language model',
-      prompt: 'Integrate the latest language model API with our existing codebase, ensuring proper error handling and performance optimization',
-      priority: 'high',
-      assignedTo: asThreadId('lace_20240115_claude001'),
-      status: 'in_progress',
-      createdBy: asThreadId('lace_20240115_session001'),
-      threadId: asThreadId('lace_20240115_session001'),
-      createdAt: new Date('2024-01-15T09:00:00Z'),
-      updatedAt: new Date('2024-01-15T10:30:00Z'),
-      notes: [],
-    },
-    {
-      id: 'animated-task-002',
-      title: 'Auth Bug Fix',
-      description: 'Fix login timeout',
-      prompt: 'Investigate and fix the authentication timeout issue occurring in production environment',
-      priority: 'medium',
-      assignedTo: undefined,
-      status: 'pending',
-      createdBy: asThreadId('lace_20240115_session001'),
-      threadId: asThreadId('lace_20240115_session001'),
-      createdAt: new Date('2024-01-14T14:00:00Z'),
-      updatedAt: new Date('2024-01-14T14:00:00Z'),
-      notes: [],
-    },
-    {
-      id: 'animated-task-003',
-      title: 'Update Docs',
-      description: 'API documentation',
-      prompt: 'Update the API documentation to reflect the recent changes in authentication endpoints and response formats',
-      priority: 'low',
-      assignedTo: asThreadId('lace_20240115_claude001'),
-      status: 'blocked',
-      createdBy: asThreadId('lace_20240115_session001'),
-      threadId: asThreadId('lace_20240115_session001'),
-      createdAt: new Date('2024-01-13T16:00:00Z'),
-      updatedAt: new Date('2024-01-13T16:30:00Z'),
-      notes: [],
-    },
-  ]);
+  const [recentFiles] = useState<RecentFile[]>(initialRecentFiles);
+
+  const [activeTasks] = useState<Task[]>(initialTasks);
 
   const [timelineEntries, setTimelineEntries] = useState<TimelineEntry[]>([
     {
@@ -427,21 +363,16 @@ export function AnimatedLaceApp() {
               <MobileSidebar
                 isOpen={showMobileNav}
                 onClose={() => setShowMobileNav(false)}
-                currentProject={currentProject}
-                projects={projects}
-                currentTimeline={currentTimeline}
-                timelines={timelines}
-                activeTasks={activeTasks}
                 currentTheme={currentTheme}
-                availableThemes={availableThemes}
-                onProjectChange={handleProjectChange}
-                onTimelineChange={handleTimelineChange}
                 onThemeChange={handleThemeChange}
-                onTriggerTool={handleTriggerTool}
-                onOpenTaskBoard={handleOpenTaskBoard}
-                onOpenFileManager={handleOpenFileManager}
-                onOpenTaskDetail={handleOpenTask}
-              />
+              >
+                <div className="p-4">
+                  <h2 className="text-lg font-semibold mb-4">Demo Content</h2>
+                  <p className="text-sm text-base-content/70">
+                    This is a demo version of the mobile sidebar.
+                  </p>
+                </div>
+              </MobileSidebar>
             </motion.div>
           </motion.div>
         )}
@@ -457,24 +388,27 @@ export function AnimatedLaceApp() {
         <Sidebar
           isOpen={showDesktopSidebar}
           onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
-          currentProject={currentProject}
-          projects={projects}
-          currentTimeline={currentTimeline}
-          timelines={timelines}
-          activeTasks={activeTasks}
-          recentFiles={recentFiles}
           currentTheme={currentTheme}
-          onProjectChange={handleProjectChange}
-          onTimelineChange={handleTimelineChange}
-          onNewTimeline={handleNewTimeline}
-          onOpenTask={handleOpenTask}
-          onOpenFile={handleOpenFile}
-          onTriggerTool={handleTriggerTool}
-          onOpenTaskBoard={handleOpenTaskBoard}
-          onOpenFileManager={handleOpenFileManager}
-          onOpenRulesFile={handleOpenRulesFile}
           onThemeChange={handleThemeChange}
-        />
+        >
+          <div className="p-4">
+            <h2 className="text-lg font-semibold mb-4">Demo Sidebar</h2>
+            <p className="text-sm text-base-content/70 mb-4">
+              This is a demo version of the desktop sidebar.
+            </p>
+            <div className="space-y-2">
+              <div className="p-2 rounded bg-base-200">
+                Project: {currentProject.name}
+              </div>
+              <div className="p-2 rounded bg-base-200">
+                Timeline: {currentTimeline.name}
+              </div>
+              <div className="p-2 rounded bg-base-200">
+                Tasks: {activeTasks.length}
+              </div>
+            </div>
+          </div>
+        </Sidebar>
       </motion.div>
 
       {/* Main Content Area */}

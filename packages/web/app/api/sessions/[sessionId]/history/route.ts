@@ -151,8 +151,8 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       // For unknown event types, preserve the original event so frontend can handle it properly
       return {
         ...baseEvent,
-        type: threadEvent.type,
-        data: threadEvent.data,
+        type: threadEvent.type as any,
+        data: threadEvent.data as any,
       };
     }
   }

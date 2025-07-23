@@ -20,7 +20,6 @@ import type {
   ThreadId,
   SessionEvent,
   ToolApprovalRequestData,
-  ApprovalDecision,
   Agent,
   SessionsResponse,
   SessionResponse,
@@ -29,7 +28,7 @@ import type {
   ProvidersResponse,
   CreateAgentRequest,
 } from '@/types/api';
-import { isApiError } from '@/types/api';
+import { isApiError, ApprovalDecision } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
@@ -341,7 +340,15 @@ export function LaceApp() {
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
   const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
-  const currentProject = foundProject || { id: '', name: 'No project selected', workingDirectory: '/' };
+  const currentProject = foundProject || { 
+    id: '', 
+    name: 'No project selected', 
+    description: 'Select a project to get started',
+    workingDirectory: '/',
+    isArchived: false,
+    createdAt: new Date(),
+    lastUsedAt: new Date()
+  };
   
   // Clear invalid project selection from URL  
   // useEffect(() => {
