@@ -41,7 +41,7 @@ if (harFile) {
     .then(() => {
       logger.info('HAR recording enabled', { harFile });
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       logger.error('Failed to enable HAR recording', { error, harFile });
     });
 }

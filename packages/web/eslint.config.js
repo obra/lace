@@ -76,6 +76,12 @@ const config = [
     rules: {
       'no-console': 'off', // Allow console.log in Storybook stories for debugging
       'react-hooks/rules-of-hooks': 'off', // Allow hooks in Storybook render functions
+      '@typescript-eslint/no-explicit-any': 'off', // Allow any types in Storybook stories
+      '@typescript-eslint/no-unsafe-assignment': 'off', // Allow unsafe assignments in stories
+      '@typescript-eslint/no-unsafe-member-access': 'off', // Allow unsafe member access in stories
+      '@typescript-eslint/no-unsafe-call': 'off', // Allow unsafe calls in stories
+      '@typescript-eslint/no-unsafe-return': 'off', // Allow unsafe returns in stories
+      '@typescript-eslint/no-unsafe-argument': 'off', // Allow unsafe arguments in stories
     },
   },
   {
