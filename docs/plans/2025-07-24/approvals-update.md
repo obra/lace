@@ -1,7 +1,7 @@
 # Tool Approval System Redesign
 
 **Date:** 2025-07-24  
-**Status:** Design Phase  
+**Status:** Implementation Phase - Phase 1 COMPLETED ✅  
 **Author:** Claude & Jesse  
 
 ## Executive Summary
@@ -179,7 +179,7 @@ LIMIT 1;
 
 ### Phase 1: Core Event System Updates
 
-#### 1.1 Update Event Types
+#### 1.1 Update Event Types ✅ COMPLETED
 **File:** `src/threads/types.ts`
 
 ```typescript
@@ -197,11 +197,14 @@ export const EVENT_TYPES = [
 ] as const;
 ```
 
-#### 1.2 Database Migration
-**File:** `src/persistence/migrations/add_approval_indexes.sql`
+**Test Coverage:** `src/threads/approval-events.test.ts` - validates new event types are properly included and typed.
 
+#### 1.2 Database Migration ✅ COMPLETED
+**File:** `src/persistence/database.ts` (migrateToV10 method)
+
+**Added Indexes:**
 ```sql
--- Optimize approval queries
+-- Approval query optimization indexes
 CREATE INDEX IF NOT EXISTS idx_approval_tool_call_id 
 ON events ((data->>'toolCallId')) 
 WHERE type IN ('TOOL_APPROVAL_REQUEST', 'TOOL_APPROVAL_RESPONSE');
@@ -211,85 +214,214 @@ ON events ((data->>'id'))
 WHERE type = 'TOOL_CALL';
 ```
 
+**Query Methods Added:**
+- `getPendingApprovals(threadId)` - Returns all pending approvals for a thread
+- `getApprovalDecision(toolCallId)` - Returns approval decision for specific tool call
+
+**Test Coverage:** `src/threads/approval-queries.test.ts` - validates SQL queries and database methods work correctly with real SQLite data.
+
 ### Phase 2: Core Approval Logic
 
-#### 2.1 Replace ApprovalCallback Implementation
+#### 2.1 Create Event-Based ApprovalCallback in Core ✅ COMPLETED
+**File:** `src/tools/event-approval-callback.ts` (NEW)
+
+```typescript
+// ABOUTME: Event-based approval callback that uses ThreadManager for persistence
+// ABOUTME: Replaces Promise-based approval system with durable event storage
+
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ThreadManager } from '~/threads/thread-manager';
+import { Agent } from '~/agents/agent';
+import { ToolCall } from '~/tools/types';
+
+export class EventApprovalCallback implements ApprovalCallback {
+  constructor(
+    private agent: Agent,
+    private threadManager: ThreadManager,
+    private threadId: string
+  ) {}
+
+  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+    // Find the TOOL_CALL event that triggered this approval
+    const toolCallEvent = this.findRecentToolCallEvent(toolName, input);
+    if (!toolCallEvent) {
+      throw new Error(`Could not find TOOL_CALL event for ${toolName}`);
+    }
+    
+    // Create TOOL_APPROVAL_REQUEST event
+    this.threadManager.addEvent(
+      this.threadId,
+      'TOOL_APPROVAL_REQUEST',
+      { toolCallId: toolCallEvent.data.id }
+    );
+    
+    // Wait for TOOL_APPROVAL_RESPONSE event
+    return this.waitForApprovalResponse(toolCallEvent.data.id);
+  }
+
+  private findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
+    const events = this.threadManager.getEvents(this.threadId);
+    
+    // Find most recent TOOL_CALL for this tool with matching input
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (event.type === 'TOOL_CALL') {
+        const toolCall = event.data as ToolCall;
+        if (toolCall.name === toolName && 
+            JSON.stringify(toolCall.arguments) === JSON.stringify(input)) {
+          return event;
+        }
+      }
+    }
+    return null;
+  }
+
+  private waitForApprovalResponse(toolCallId: string): Promise<ApprovalDecision> {
+    return new Promise((resolve) => {
+      // Check if response already exists (recovery case)
+      const existingResponse = this.checkExistingApprovalResponse(toolCallId);
+      if (existingResponse) {
+        resolve(existingResponse);
+        return;
+      }
+
+      // Listen for new events via ThreadManager
+      const eventHandler = (event: ThreadEvent) => {
+        if (event.type === 'TOOL_APPROVAL_RESPONSE' && 
+            event.data.toolCallId === toolCallId) {
+          this.threadManager.off('event_added', eventHandler);
+          resolve(event.data.decision);
+        }
+      };
+      
+      this.threadManager.on('event_added', eventHandler);
+    });
+  }
+
+  private checkExistingApprovalResponse(toolCallId: string): ApprovalDecision | null {
+    const events = this.threadManager.getEvents(this.threadId);
+    const responseEvent = events.find(e => 
+      e.type === 'TOOL_APPROVAL_RESPONSE' && 
+      e.data.toolCallId === toolCallId
+    );
+    return responseEvent?.data.decision || null;
+  }
+}
+```
+
+**Implementation Notes:**
+- ✅ Core `EventApprovalCallback` class implemented with full TDD coverage
+- ✅ Handles tool call matching by name and input arguments  
+- ✅ Prevents duplicate TOOL_APPROVAL_REQUEST events
+- ✅ Supports existing approval response recovery
+- ✅ Uses polling approach (event emission to be added later)
+
+**Test Coverage:** `src/tools/event-approval-callback.test.ts` - validates core approval logic with real ThreadManager and database.
+
+#### 2.2 Add Approval Query Methods to ThreadManager ✅ COMPLETED
+**File:** `src/threads/thread-manager.ts`
+
+```typescript
+/**
+ * Get all pending tool approvals for a thread
+ * Returns TOOL_CALLs that have approval requests but no responses
+ */
+getPendingApprovals(threadId: string): Array<{
+  toolCallId: string;
+  toolCall: ToolCall;
+  requestedAt: Date;
+}> {
+  if (!this._persistence.database) return [];
+  
+  const query = `
+    SELECT 
+      req.data->>'toolCallId' as tool_call_id,
+      tc.data as tool_call_data,
+      req.timestamp as requested_at
+    FROM events req
+    JOIN events tc ON tc.data->>'id' = req.data->>'toolCallId'
+    WHERE req.type = 'TOOL_APPROVAL_REQUEST'
+      AND req.thread_id = ?
+      AND tc.type = 'TOOL_CALL'  
+      AND NOT EXISTS (
+        SELECT 1 FROM events resp
+        WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
+          AND resp.data->>'toolCallId' = req.data->>'toolCallId'
+      )
+    ORDER BY req.timestamp ASC
+  `;
+  
+  const results = this._persistence.database.prepare(query).all(threadId);
+  
+  return results.map(row => ({
+    toolCallId: row.tool_call_id,
+    toolCall: JSON.parse(row.tool_call_data),
+    requestedAt: new Date(row.requested_at)
+  }));
+}
+
+/**
+ * Get approval decision for a specific tool call
+ */
+getApprovalDecision(toolCallId: string): ApprovalDecision | null {
+  if (!this._persistence.database) return null;
+  
+  const query = `
+    SELECT resp.data->>'decision' as decision
+    FROM events resp
+    WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
+      AND resp.data->>'toolCallId' = ?
+    LIMIT 1
+  `;
+  
+  const result = this._persistence.database.prepare(query).get(toolCallId);
+  return result?.decision || null;
+}
+```
+
+#### 2.3 Update Web Agent Setup to Use Core Approval
 **File:** `packages/web/lib/server/agent-utils.ts`
 
-**Current (Broken):**
+**Replace entire file with:**
 ```typescript
-async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
-  return new Promise<ApprovalDecision>((resolve) => {
-    const requestId = `${toolName}-${Date.now()}`;
-    
-    // Emit ephemeral event with Promise resolver
-    agent.emit('approval_request', {
-      toolName, input, isReadOnly, requestId, resolve
-    });
-  });
+// ABOUTME: Thin web integration layer for core approval system  
+// ABOUTME: Sets up event-based approval callback from core tools system
+
+import { Agent } from '@/lib/server/lace-imports';
+import { EventApprovalCallback } from '@/lib/server/lace-imports'; // Import from core
+import type { ThreadId } from '@/lib/server/core-types';
+
+export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
+  // Use core event-based approval callback
+  const approvalCallback = new EventApprovalCallback(
+    agent,
+    agent.threadManager, // Access ThreadManager through Agent
+    agent.threadId      // Access current thread ID
+  );
+  
+  // Set the approval callback on the agent's ToolExecutor
+  agent.toolExecutor.setApprovalCallback(approvalCallback);
 }
 ```
 
-**New (Event-Based):**
-```typescript
-async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
-  // Find the TOOL_CALL event that triggered this approval
-  const toolCallEvent = this.findRecentToolCallEvent(toolName, input);
-  
-  // Create TOOL_APPROVAL_REQUEST event
-  const requestEvent = this.agent.threadManager.addEvent(
-    this.threadId,
-    'TOOL_APPROVAL_REQUEST',
-    { toolCallId: toolCallEvent.data.id }
-  );
-  
-  // Wait for TOOL_APPROVAL_RESPONSE event
-  return this.waitForApprovalResponse(toolCallEvent.data.id);
-}
-
-private waitForApprovalResponse(toolCallId: string): Promise<ApprovalDecision> {
-  return new Promise((resolve) => {
-    // Listen for new events
-    this.agent.threadManager.on('event_added', (event) => {
-      if (event.type === 'TOOL_APPROVAL_RESPONSE' && 
-          event.data.toolCallId === toolCallId) {
-        resolve(event.data.decision);
-      }
-    });
-    
-    // Check if response already exists (recovery case)
-    const existingResponse = this.checkExistingApprovalResponse(toolCallId);
-    if (existingResponse) {
-      resolve(existingResponse);
-    }
-  });
-}
-
-private checkExistingApprovalResponse(toolCallId: string): ApprovalDecision | null {
-  const events = this.agent.threadManager.getEvents(this.threadId);
-  const responseEvent = events.find(e => 
-    e.type === 'TOOL_APPROVAL_RESPONSE' && 
-    e.data.toolCallId === toolCallId
-  );
-  return responseEvent?.data.decision || null;
-}
-```
-
-#### 2.2 Remove Broken ApprovalManager
+#### 2.4 Remove Broken ApprovalManager
 **Files to delete:**
 - `packages/web/lib/server/approval-manager.ts` 
 - `packages/web/lib/server/approval-manager.test.ts`
 
-**Rationale:** This entire system is fundamentally broken and replaced by event-based approach.
+**Rationale:** This entire system is fundamentally broken and replaced by core event-based approach.
 
 ### Phase 3: Web Interface Updates
 
-#### 3.1 Update API Routes
+#### 3.1 Update API Routes (Thin Layer)
 **Delete:** `packages/web/app/api/approvals/[requestId]/route.ts`
 
 **Create:** `packages/web/app/api/threads/[threadId]/approvals/[toolCallId]/route.ts`
 
 ```typescript
+// ABOUTME: Thin API layer that uses core ThreadManager for approval responses
+// ABOUTME: Web-specific route that delegates to core event system
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { threadId: string; toolCallId: string } }
@@ -297,17 +429,40 @@ export async function POST(
   const { threadId, toolCallId } = await params;
   const { decision } = await request.json();
   
-  // Get core thread manager
+  // Delegate to core ThreadManager (no web-specific logic)
   const sessionService = getSessionService();
-  const threadManager = sessionService.getThreadManager();
+  const agent = sessionService.getAgent(threadId);
   
-  // Create TOOL_APPROVAL_RESPONSE event
-  threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+  // Use core ThreadManager to create approval response event
+  agent.threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
     toolCallId,
     decision
   });
   
   return NextResponse.json({ success: true });
+}
+```
+
+**Create:** `packages/web/app/api/threads/[threadId]/approvals/pending/route.ts`
+
+```typescript
+// ABOUTME: Recovery API that uses core ThreadManager query methods
+// ABOUTME: Thin web layer over core approval system
+
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: { threadId: string } }
+) {
+  const { threadId } = await params;
+  
+  // Delegate to core ThreadManager query method
+  const sessionService = getSessionService(); 
+  const agent = sessionService.getAgent(threadId);
+  
+  // Use core method to get pending approvals
+  const pendingApprovals = agent.threadManager.getPendingApprovals(threadId);
+  
+  return NextResponse.json({ pendingApprovals });
 }
 ```
 
@@ -526,54 +681,197 @@ export const DEFAULT_SESSION_CONFIG: SessionConfiguration = {
 2. `packages/web/lib/server/approval-manager.test.ts` - Tests for broken system
 3. `packages/web/app/api/approvals/[requestId]/route.ts` - API route for broken system
 
-### Cleanup Session Service
+### Remove Broken Session Service Approval Handler
 **File:** `packages/web/lib/server/session-service.ts`
 
 Remove approval_request event handler (lines 228-274):
 ```typescript
-// DELETE THIS ENTIRE BLOCK
+// DELETE THIS ENTIRE BLOCK - no longer needed with core event system
 agent.on('approval_request', ({ toolName, input, isReadOnly, requestId, resolve }) => {
-  // ... broken Promise-based approval logic
+  const approvalManager = getApprovalManager();
+  // ... all this Promise-based approval logic is broken
 });
+```
+
+**Rationale:** The core `EventApprovalCallback` handles approval logic directly through ThreadManager events. The web layer no longer needs to listen to ephemeral `approval_request` events or manage Promise resolvers.
+
+### Required Core System Updates
+
+#### Agent Public API Extensions
+**File:** `src/agents/agent.ts`
+
+The Agent class needs to expose ThreadManager access for the approval system:
+
+```typescript
+// Already exists - no changes needed
+get threadManager(): ThreadManager {
+  return this._threadManager;
+}
+
+get threadId(): string {
+  return this._threadId;
+}
+```
+
+**Rationale:** The `EventApprovalCallback` needs access to the Agent's ThreadManager and current thread ID. These getters should already exist based on the system-reminder showing recent changes.
+
+#### ThreadManager Event Emission
+**File:** `src/threads/thread-manager.ts`
+
+Ensure ThreadManager emits events when new events are added:
+
+```typescript
+addEvent(/* ... */): ThreadEvent {
+  // ... existing event creation logic ...
+  
+  // Emit event for approval system listeners
+  this.emit('event_added', event);
+  
+  return event;
+}
+```
+
+**Note:** The system-reminder shows that event emission was removed from ThreadManager with the comment "Agent will handle event emission for UI synchronization". We may need to add back event emission specifically for the approval system, or route through the Agent's event emission.
+
+#### Core System Exports for Web Layer
+**File:** `src/tools/index.ts` or similar
+
+The web layer needs to import these core classes:
+
+```typescript
+// Export approval system for web layer
+export { EventApprovalCallback } from './event-approval-callback';
+export { ApprovalCallback, ApprovalDecision } from './approval-types';
+```
+
+**File:** `packages/web/lib/server/lace-imports.ts`
+
+Update imports to use core approval system:
+
+```typescript
+// Import from core tools system
+export { 
+  Agent,
+  EventApprovalCallback,  // New core approval system
+  ApprovalDecision 
+} from '@/../../../src/tools';  // Adjust path as needed
 ```
 
 ## Testing Strategy
 
-### Unit Tests
+### Unit Tests (Focus on Core System)
 
-#### 5.1 Event Creation Tests
-**File:** `src/threads/approval-events.test.ts`
+#### Core Approval Logic Tests
+**File:** `src/tools/event-approval-callback.test.ts`
 
 ```typescript
-describe('Approval Events', () => {
-  it('should create TOOL_APPROVAL_REQUEST event', () => {
-    const threadManager = new ThreadManager();
-    const threadId = threadManager.generateThreadId();
+describe('EventApprovalCallback', () => {
+  it('should create TOOL_APPROVAL_REQUEST event when approval needed', async () => {
+    const mockAgent = createMockAgent();
+    const mockThreadManager = createMockThreadManager();
+    const callback = new EventApprovalCallback(mockAgent, mockThreadManager, 'thread_123');
     
-    // Create TOOL_CALL first
-    const toolCallEvent = threadManager.addEvent(threadId, 'TOOL_CALL', {
+    // Setup: Create TOOL_CALL event first
+    mockThreadManager.addEvent('thread_123', 'TOOL_CALL', {
       id: 'call_123',
-      name: 'bash',
+      name: 'bash', 
       arguments: { command: 'ls' }
     });
     
-    // Create approval request
-    const requestEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: toolCallEvent.data.id
-    });
+    // Trigger approval request
+    const approvalPromise = callback.requestApproval('bash', { command: 'ls' });
     
-    expect(requestEvent.type).toBe('TOOL_APPROVAL_REQUEST');
-    expect(requestEvent.data.toolCallId).toBe('call_123');
+    // Verify TOOL_APPROVAL_REQUEST event was created
+    expect(mockThreadManager.addEvent).toHaveBeenCalledWith(
+      'thread_123',
+      'TOOL_APPROVAL_REQUEST',
+      { toolCallId: 'call_123' }
+    );
   });
   
-  it('should create TOOL_APPROVAL_RESPONSE event', () => {
-    // Similar test for response event
+  it('should resolve when TOOL_APPROVAL_RESPONSE event is created', async () => {
+    // Test the waiting mechanism
+  });
+  
+  it('should find existing approval response during recovery', async () => {
+    // Test recovery scenario
   });
 });
 ```
 
-#### 5.2 Query Tests  
+#### ThreadManager Approval Query Tests  
 **File:** `src/threads/approval-queries.test.ts`
+
+```typescript
+describe('ThreadManager Approval Queries', () => {
+  it('should find pending approvals', () => {
+    const threadManager = new ThreadManager();
+    const threadId = threadManager.generateThreadId();
+    
+    // Create TOOL_CALL → TOOL_APPROVAL_REQUEST
+    const toolCallEvent = threadManager.addEvent(threadId, 'TOOL_CALL', {
+      id: 'call_123', name: 'bash', arguments: { command: 'ls' }
+    });
+    threadManager.addEvent(threadId, 'TOOL_APPROVAL_REQUEST', {
+      toolCallId: 'call_123'
+    });
+    
+    // Query should find pending approval
+    const pending = threadManager.getPendingApprovals(threadId);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].toolCallId).toBe('call_123');
+    expect(pending[0].toolCall.name).toBe('bash');
+  });
+  
+  it('should not find resolved approvals', () => {
+    // Create request + response, verify not returned by pending query
+  });
+  
+  it('should get approval decision for specific tool call', () => {
+    // Test getApprovalDecision method
+  });
+});
+```
+
+### Web Integration Tests (Thin Layer)
+
+#### Web API Integration
+**File:** `packages/web/app/api/threads/approvals.integration.test.ts`
+
+```typescript
+describe('Approval API Integration', () => {
+  it('should delegate approval response to core ThreadManager', async () => {
+    // Test that web API properly calls core system methods
+    // Focus on integration, not reimplementation of core logic
+  });
+  
+  it('should delegate pending approvals query to core ThreadManager', async () => {
+    // Test recovery API uses core query methods
+  });
+});
+```
+
+## Summary of Architectural Changes
+
+### What Moved to Core (`src/tools/`)
+1. **Event-based ApprovalCallback implementation** - `EventApprovalCallback` class
+2. **Approval event management** - Creating REQUEST/RESPONSE events
+3. **Tool call event matching** - Finding TOOL_CALL events by name/input
+4. **Approval response waiting** - Promise-based waiting for RESPONSE events
+5. **Recovery logic** - Checking for existing approval responses
+
+### What Stayed in Web (`packages/web/`)
+1. **Thin API routes** - Delegate to core ThreadManager methods
+2. **SSE event broadcasting** - Web-specific event streaming to UI
+3. **UI recovery calls** - Browser refresh recovery API calls
+4. **Session service integration** - Mapping agents to web concerns
+
+### Benefits of This Architecture
+- ✅ **Reusable**: CLI interface can also use `EventApprovalCallback`
+- ✅ **Testable**: Core approval logic can be unit tested independently
+- ✅ **Maintainable**: Web package focused on web concerns only
+- ✅ **Consistent**: Same approval system across all interfaces
+- ✅ **Process-safe**: Core system handles all approval persistence
 
 ```typescript
 describe('Approval Queries', () => {

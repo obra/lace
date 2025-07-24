@@ -605,6 +605,29 @@ export class ThreadManager {
     return this._persistence.getLatestThreadId();
   }
 
+  // ===============================
+  // Approval query methods
+  // ===============================
+
+  /**
+   * Get all pending tool approvals for a thread
+   * Returns TOOL_CALLs that have approval requests but no responses
+   */
+  getPendingApprovals(threadId: string): Array<{
+    toolCallId: string;
+    toolCall: any;
+    requestedAt: Date;
+  }> {
+    return this._persistence.getPendingApprovals(threadId);
+  }
+
+  /**
+   * Get approval decision for a specific tool call
+   */
+  getApprovalDecision(toolCallId: string): string | null {
+    return this._persistence.getApprovalDecision(toolCallId);
+  }
+
   // Cleanup
   close(): void {
     // Clear process-local cache

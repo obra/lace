@@ -191,6 +191,15 @@ export class DatabasePersistence {
       CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_task_notes_task_id ON task_notes(task_id);
+      
+      -- Approval query optimization indexes
+      CREATE INDEX IF NOT EXISTS idx_approval_tool_call_id 
+      ON events ((data->>'toolCallId')) 
+      WHERE type IN ('TOOL_APPROVAL_REQUEST', 'TOOL_APPROVAL_RESPONSE');
+      
+      CREATE INDEX IF NOT EXISTS idx_tool_call_id
+      ON events ((data->>'id'))
+      WHERE type = 'TOOL_CALL';
     `);
 
     this.setSchemaVersion(10);
@@ -1013,6 +1022,63 @@ export class DatabasePersistence {
     if (result.changes === 0) {
       throw new Error(`Project ${projectId} not found`);
     }
+  }
+
+  // ===============================
+  // Approval-related methods
+  // ===============================
+
+  getPendingApprovals(threadId: string): Array<{
+    toolCallId: string;
+    toolCall: any;
+    requestedAt: Date;
+  }> {
+    if (this._disabled || !this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT 
+        req.data->>'toolCallId' as tool_call_id,
+        tc.data as tool_call_data,
+        req.timestamp as requested_at
+      FROM events req
+      JOIN events tc ON tc.data->>'id' = req.data->>'toolCallId'  
+      WHERE req.type = 'TOOL_APPROVAL_REQUEST'
+        AND req.thread_id = ?
+        AND tc.type = 'TOOL_CALL'
+        AND NOT EXISTS (
+          SELECT 1 FROM events resp 
+          WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
+            AND resp.data->>'toolCallId' = req.data->>'toolCallId'
+        )
+      ORDER BY req.timestamp ASC
+    `);
+
+    const rows = stmt.all(threadId) as Array<{
+      tool_call_id: string;
+      tool_call_data: string;
+      requested_at: string;
+    }>;
+
+    return rows.map(row => ({
+      toolCallId: row.tool_call_id,
+      toolCall: JSON.parse(row.tool_call_data),
+      requestedAt: new Date(row.requested_at)
+    }));
+  }
+
+  getApprovalDecision(toolCallId: string): string | null {
+    if (this._disabled || !this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT resp.data->>'decision' as decision
+      FROM events resp
+      WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
+        AND resp.data->>'toolCallId' = ?
+      LIMIT 1
+    `);
+
+    const row = stmt.get(toolCallId) as { decision: string } | undefined;
+    return row?.decision || null;
   }
 
   close(): void {
