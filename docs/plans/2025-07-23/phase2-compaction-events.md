@@ -31,15 +31,17 @@ A compaction system that:
 ## Core Concepts
 
 ### Event-Based Compaction
-Instead of creating new threads, compaction creates special events:
+Instead of creating new threads, compaction creates special COMPACTION events with structured data:
 ```typescript
-interface CompactionEvent extends ThreadEvent {
-  type: 'COMPACTION';
+interface CompactionData {
   strategyId: string;                    // Which strategy was used
   originalEventCount: number;            // How many events were replaced
   compactedEvents: ThreadEvent[];        // The new replacement events
   metadata?: Record<string, unknown>;    // Strategy-specific data
 }
+
+// CompactionEvent is just a regular ThreadEvent with COMPACTION type and CompactionData
+// No need for a separate type - just use: ThreadEvent with type: 'COMPACTION'
 ```
 
 ### Conversation Reconstruction
@@ -69,17 +71,18 @@ import type { ThreadEvent } from '~/threads/types';
 import type { AIProvider } from '~/providers/base-provider';
 import type { ToolExecutor } from '~/tools/tool-executor';
 
-export interface CompactionEvent extends ThreadEvent {
-  type: 'COMPACTION';
+export interface CompactionData {
   strategyId: string;
   originalEventCount: number;
   compactedEvents: ThreadEvent[];
   metadata?: Record<string, unknown>;
 }
 
+// CompactionEvent is just a regular ThreadEvent with COMPACTION type and CompactionData
+
 export interface CompactionStrategy {
   id: string;
-  compact(events: ThreadEvent[], context: CompactionContext): Promise<CompactionEvent>;
+  compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent>;
 }
 
 export interface CompactionContext {
@@ -143,7 +146,7 @@ npm run build
 // ABOUTME: Core logic for reconstructing conversations post-compaction
 
 import type { ThreadEvent } from '~/threads/types';
-import type { CompactionEvent } from '~/threads/compaction/types';
+import type { CompactionData } from '~/threads/compaction/types';
 
 export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
   const lastCompaction = findLastCompactionEvent(events);
@@ -154,8 +157,9 @@ export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
   
   // Use compacted events + everything after compaction
   const eventsAfterCompaction = getEventsAfter(events, lastCompaction.id);
+  const compactionData = lastCompaction.data as CompactionData;
   return [
-    ...lastCompaction.compactedEvents,
+    ...compactionData.compactedEvents,
     ...eventsAfterCompaction
   ];
 }
@@ -165,11 +169,11 @@ export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {
   return events;
 }
 
-function findLastCompactionEvent(events: ThreadEvent[]): CompactionEvent | null {
+function findLastCompactionEvent(events: ThreadEvent[]): ThreadEvent | null {
   // Find the most recent COMPACTION event
   for (let i = events.length - 1; i >= 0; i--) {
     if (events[i].type === 'COMPACTION') {
-      return events[i] as CompactionEvent;
+      return events[i];
     }
   }
   return null;
@@ -205,7 +209,7 @@ npm run build
 import { describe, it, expect } from 'vitest';
 import { buildWorkingConversation, buildCompleteHistory } from './conversation-builder';
 import type { ThreadEvent } from './types';
-import type { CompactionEvent } from './compaction/types';
+import type { CompactionData } from './compaction/types';
 
 describe('conversation-builder', () => {
   const mockEvents: ThreadEvent[] = [
@@ -239,23 +243,24 @@ describe('conversation-builder', () => {
     });
 
     it('uses compacted events when compaction exists', () => {
-      const compactionEvent: CompactionEvent = {
+      const compactionEvent: ThreadEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {},
-        strategyId: 'test-strategy',
-        originalEventCount: 2,
-        compactedEvents: [
-          {
-            id: 'c1',
-            threadId: 'test-thread',
-            type: 'AGENT_MESSAGE',
-            timestamp: new Date('2024-01-01T10:01:00Z'),
-            data: 'Summary: User said hello, I replied'
-          }
-        ]
+        data: {
+          strategyId: 'test-strategy',
+          originalEventCount: 2,
+          compactedEvents: [
+            {
+              id: 'c1',
+              threadId: 'test-thread',
+              type: 'AGENT_MESSAGE',
+              timestamp: new Date('2024-01-01T10:01:00Z'),
+              data: 'Summary: User said hello, I replied'
+            }
+          ]
+        }
       };
 
       const newEvent: ThreadEvent = {
@@ -270,65 +275,68 @@ describe('conversation-builder', () => {
       const result = buildWorkingConversation(eventsWithCompaction);
 
       expect(result).toEqual([
-        compactionEvent.compactedEvents[0],
+        (compactionEvent.data as CompactionData).compactedEvents[0],
         mockEvents[2], // Event after compaction
         newEvent
       ]);
     });
 
     it('uses latest compaction when multiple exist', () => {
-      const firstCompaction: CompactionEvent = {
+      const firstCompaction: ThreadEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {},
-        strategyId: 'test-strategy',
-        originalEventCount: 2,
-        compactedEvents: [{
-          id: 'c1',
-          threadId: 'test-thread', 
-          type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: 'First summary'
-        }]
+        data: {
+          strategyId: 'test-strategy',
+          originalEventCount: 2,
+          compactedEvents: [{
+            id: 'c1',
+            threadId: 'test-thread', 
+            type: 'AGENT_MESSAGE',
+            timestamp: new Date('2024-01-01T10:01:00Z'),
+            data: 'First summary'
+          }]
+        }
       };
 
-      const secondCompaction: CompactionEvent = {
+      const secondCompaction: ThreadEvent = {
         id: 'comp2',
         threadId: 'test-thread',
         type: 'COMPACTION', 
         timestamp: new Date('2024-01-01T10:05:00Z'),
-        data: {},
-        strategyId: 'test-strategy',
-        originalEventCount: 3,
-        compactedEvents: [{
-          id: 'c2',
-          threadId: 'test-thread',
-          type: 'AGENT_MESSAGE',
-          timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: 'Second summary'
-        }]
+        data: {
+          strategyId: 'test-strategy',
+          originalEventCount: 3,
+          compactedEvents: [{
+            id: 'c2',
+            threadId: 'test-thread',
+            type: 'AGENT_MESSAGE',
+            timestamp: new Date('2024-01-01T10:01:00Z'),
+            data: 'Second summary'
+          }]
+        }
       };
 
       const eventsWithTwoCompactions = [...mockEvents, firstCompaction, secondCompaction];
       const result = buildWorkingConversation(eventsWithTwoCompactions);
 
-      expect(result).toEqual(secondCompaction.compactedEvents);
+      expect(result).toEqual((secondCompaction.data as CompactionData).compactedEvents);
     });
   });
 
   describe('buildCompleteHistory', () => {
     it('returns all events including compaction events', () => {
-      const compactionEvent: CompactionEvent = {
+      const compactionEvent: ThreadEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:03:00Z'), 
-        data: {},
-        strategyId: 'test-strategy',
-        originalEventCount: 2,
-        compactedEvents: []
+        data: {
+          strategyId: 'test-strategy',
+          originalEventCount: 2,
+          compactedEvents: []
+        }
       };
 
       const allEvents = [...mockEvents, compactionEvent];
@@ -417,7 +425,8 @@ async compact(threadId: string, strategyId: string, params?: unknown): Promise<v
   const compactionEvent = await strategy.compact(thread.events, context);
   
   // Add the compaction event to the thread
-  this.addEvent(threadId, 'COMPACTION', compactionEvent);
+  // The compactionEvent is already a complete ThreadEvent with data in the data field
+  await this.addEvent(threadId, 'COMPACTION', compactionEvent.data);
 }
 ```
 
@@ -445,13 +454,12 @@ npm run build
 // ABOUTME: Preserves conversation flow while reducing tool output size
 
 import type { ThreadEvent } from '~/threads/types';  
-import type { CompactionStrategy, CompactionEvent, CompactionContext } from './types';
-import { generateEventId } from '~/utils/id-generation'; // Use existing ID generator
+import type { CompactionStrategy, CompactionContext } from './types';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
   id = 'trim-tool-results';
   
-  async compact(events: ThreadEvent[], context: CompactionContext): Promise<CompactionEvent> {
+  async compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent> {
     const compactedEvents: ThreadEvent[] = [];
     let modifiedCount = 0;
 
@@ -469,24 +477,29 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
       }
     }
 
-    // Create the compaction event
-    const compactionEvent: CompactionEvent = {
-      id: generateEventId(),
+    // Create the compaction event with data in the data field
+    const compactionEvent: ThreadEvent = {
+      id: this.generateEventId(),
       threadId: context.threadId,
       type: 'COMPACTION',
       timestamp: new Date(),
-      data: {}, // CompactionEvent uses other fields, data can be empty
-      strategyId: this.id,
-      originalEventCount: events.length,
-      compactedEvents,
-      metadata: {
-        toolResultsModified: modifiedCount,
-        maxLines: 3,
-        truncationMessage: '[results truncated to save space.]'
+      data: {
+        strategyId: this.id,
+        originalEventCount: events.length,
+        compactedEvents,
+        metadata: {
+          toolResultsModified: modifiedCount,
+          maxLines: 3,
+          truncationMessage: '[results truncated to save space.]'
+        }
       }
     };
 
     return compactionEvent;
+  }
+
+  private generateEventId(): string {
+    return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private trimToolResult(event: ThreadEvent): ThreadEvent {
@@ -589,9 +602,10 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
       
-      expect(result.compactedEvents).toEqual(events);
-      expect(result.strategyId).toBe('trim-tool-results');
-      expect(result.originalEventCount).toBe(2);
+      expect(result.type).toBe('COMPACTION');
+      expect(result.data.compactedEvents).toEqual(events);
+      expect(result.data.strategyId).toBe('trim-tool-results');
+      expect(result.data.originalEventCount).toBe(2);
     });
 
     it('truncates string tool results longer than 3 lines', async () => {
@@ -608,7 +622,7 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
       
-      expect(result.compactedEvents[0].data).toBe(
+      expect(result.data.compactedEvents[0].data).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
     });
@@ -627,7 +641,7 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
       
-      expect(result.compactedEvents[0].data).toBe(shortResult);
+      expect(result.data.compactedEvents[0].data).toBe(shortResult);
     });
 
     it('handles ToolResult objects with content array', async () => {
@@ -654,7 +668,7 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
       
-      const compactedData = result.compactedEvents[0].data as typeof toolResult;
+      const compactedData = result.data.compactedEvents[0].data as typeof toolResult;
       expect(compactedData.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
@@ -682,7 +696,7 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
       
-      expect(result.metadata).toEqual({
+      expect(result.data.metadata).toEqual({
         toolResultsModified: 1,
         maxLines: 3,
         truncationMessage: '[results truncated to save space.]'
@@ -1097,3 +1111,21 @@ These are NOT required for Phase 2 completion, but could be added later:
 4. **Build errors:** Check all imports and exports are correct
 
 Remember: The goal is working compaction with clean, maintainable code. When in doubt, keep it simple and well-tested.
+
+## Implementation Status (2025-07-23)
+
+**NOT STARTED:** Phase 2 compaction events implementation is ready to begin.
+
+### Prerequisites Completed
+- Phase 1 shadow thread removal is complete
+- Core thread management functionality is working
+- Database is reset to clean state
+- Codebase is ready for compaction event implementation
+
+### Current Status
+**⏳ Ready to Begin:** All 14 tasks in Phase 2 are pending implementation  
+**🔄 Next: Task 1** - Define Core Types (CompactionData, CompactionStrategy interfaces)
+**⏳ Pending: Tasks 2-14** - Event types, conversation builder, ThreadManager API, strategies, tests
+
+### What Needs to Be Built
+The compaction event system as specified in the task breakdown above, starting with Task 1: Define Core Types.

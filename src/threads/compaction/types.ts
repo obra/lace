@@ -1,18 +1,26 @@
-// ABOUTME: Type definitions for thread compaction strategies
-// ABOUTME: Defines interface for analyzing and compacting thread events
+// ABOUTME: Core interfaces for the compaction event system
+// ABOUTME: Defines strategy pattern and event types for conversation compaction
 
-import type { Thread, ThreadEvent } from '~/threads/types';
+import type { ThreadEvent } from '~/threads/types';
+import type { AIProvider } from '~/providers/base-provider';
+import type { ToolExecutor } from '~/tools/executor';
 
-export interface CompactionConfig {
-  maxTokens?: number;
-  preserveRecentEvents?: number;
-  preserveTaskEvents?: boolean;
+export interface CompactionData {
+  strategyId: string;
+  originalEventCount: number;
+  compactedEvents: ThreadEvent[];
+  metadata?: Record<string, unknown>;
 }
 
-export interface CompactionStrategy {
-  // Analyze thread and determine if compaction needed (async for provider-aware token counting)
-  shouldCompact(thread: Thread): Promise<boolean>;
+// CompactionEvent is just a regular ThreadEvent with COMPACTION type and CompactionData
 
-  // Create compacted version of events
-  compact(events: ThreadEvent[]): ThreadEvent[];
+export interface CompactionStrategy {
+  id: string;
+  compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent>;
+}
+
+export interface CompactionContext {
+  threadId: string;
+  provider?: AIProvider;
+  toolExecutor?: ToolExecutor;
 }
