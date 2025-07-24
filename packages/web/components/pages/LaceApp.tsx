@@ -35,6 +35,7 @@ import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
+import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 export function LaceApp() {
   // Theme state
@@ -544,6 +545,29 @@ export function LaceApp() {
                   )) || []}
                 </SidebarSection>
               )}
+
+              {/* Tasks Section - Show when session is selected */}
+              {selectedSessionDetails && selectedProject && selectedSession && (
+                <SidebarSection 
+                  title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+                  icon={faTasks}
+                  defaultCollapsed={false}
+                  collapsible={false}
+                >
+                  <TaskListSidebar
+                    projectId={selectedProject}
+                    sessionId={selectedSession}
+                    onTaskClick={(taskId) => {
+                      console.log('Task clicked:', taskId);
+                      setShowMobileNav(false); // Close mobile nav when task is clicked
+                    }}
+                    onOpenTaskBoard={() => {
+                      setShowTaskBoard(true);
+                      setShowMobileNav(false); // Close mobile nav when opening task board
+                    }}
+                  />
+                </SidebarSection>
+              )}
             </MobileSidebar>
           </motion.div>
         )}
@@ -649,6 +673,25 @@ export function LaceApp() {
                   </div>
                 </SidebarItem>
               )) || []}
+            </SidebarSection>
+          )}
+
+          {/* Tasks Section - Show when session is selected */}
+          {selectedSessionDetails && selectedProject && selectedSession && (
+            <SidebarSection 
+              title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+              icon={faTasks}
+              defaultCollapsed={false}
+            >
+              <TaskListSidebar
+                projectId={selectedProject}
+                sessionId={selectedSession}
+                onTaskClick={(taskId) => {
+                  // For now, just log - could open task detail modal in future
+                  console.log('Task clicked:', taskId);
+                }}
+                onOpenTaskBoard={() => setShowTaskBoard(true)}
+              />
             </SidebarSection>
           )}
         </Sidebar>
