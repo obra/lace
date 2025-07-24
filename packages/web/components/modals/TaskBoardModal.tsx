@@ -150,7 +150,7 @@ export function TaskBoardModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="full" className="h-[90vh]">
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col" style={{ height: 'calc(90vh - 140px)' }}>
 
         {/* New task form */}
         {showNewTaskForm && (
