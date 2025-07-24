@@ -83,6 +83,38 @@ describe('Session', () => {
     teardownTestPersistence();
   });
 
+  describe('generateSessionName', () => {
+    beforeEach(() => {
+      // Mock Date to get predictable results
+      vi.setSystemTime(new Date('2025-07-24T14:30:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should generate human-readable date format', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+        // name omitted to trigger auto-generation
+      });
+
+      const info = session.getInfo();
+      expect(info?.name).toBe('Thursday, Jul 24');
+    });
+
+    it('should handle different dates correctly', () => {
+      vi.setSystemTime(new Date('2025-12-31T10:00:00Z'));
+
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const info = session.getInfo();
+      expect(info?.name).toBe('Wednesday, Dec 31');
+    });
+  });
+
   describe('create', () => {
     it('should create a session with default parameters', () => {
       const session = Session.create({

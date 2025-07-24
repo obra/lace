@@ -608,6 +608,10 @@ export class Session {
   }
 
   private static generateSessionName(): string {
-    return `Session ${new Date().toLocaleString()}`;
+    const date = new Date();
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${weekday}, ${month} ${day}`;
   }
 }
