@@ -8,7 +8,9 @@ import type { Task } from '@/types/api';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
-export const SessionIdSchema = z.string().uuid('Invalid session ID format');  
+export const SessionIdSchema = z
+  .string()
+  .regex(/^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/, 'Invalid session ID format');
 export const TaskIdSchema = z.string().min(1, 'Task ID cannot be empty');
 
 // Request body validation schemas
@@ -33,11 +35,21 @@ export const AddNoteSchema = z.object({
 });
 
 // Validation helper
-export async function validateRouteParams<T>(params: Promise<unknown>, schema: z.ZodSchema<T>): Promise<T> {
+export async function validateRouteParams<T>(
+  params: Promise<unknown>,
+  schema: z.ZodSchema<T>
+): Promise<T> {
   try {
     const resolvedParams = await params;
     return schema.parse(resolvedParams);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      const messages = error.errors
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      logger.error('Route parameter validation failed', { error: messages, params: await params });
+      throw new Error(`Invalid route parameters: ${messages}`);
+    }
     logger.error('Route parameter validation failed', { error, params });
     throw new Error('Invalid route parameters');
   }
@@ -47,6 +59,13 @@ export function validateRequestBody<T>(body: unknown, schema: z.ZodSchema<T>): T
   try {
     return schema.parse(body);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      const messages = error.errors
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      logger.error('Request body validation failed', { error: messages, body });
+      throw new Error(`Invalid request body: ${messages}`);
+    }
     logger.error('Request body validation failed', { error, body });
     throw new Error('Invalid request body');
   }
@@ -64,7 +83,7 @@ export function serializeTask(task: Task): Task {
     ...task,
     createdAt: serializeDate(task.createdAt),
     updatedAt: serializeDate(task.updatedAt),
-    notes: task.notes?.map(note => ({
+    notes: task.notes?.map((note) => ({
       ...note,
       timestamp: serializeDate(note.timestamp),
     })),

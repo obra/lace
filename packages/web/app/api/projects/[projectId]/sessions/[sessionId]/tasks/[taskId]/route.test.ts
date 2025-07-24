@@ -107,13 +107,35 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       expect(data.task.title).toBe('Test Task');
     });
 
-    it('should return 404 for non-existent project', async () => {
+    it('should return detailed validation error for invalid parameters', async () => {
       const request = new NextRequest(
-        `http://localhost/api/projects/nonexistent/sessions/${testSessionId}/tasks/${testTaskId}`
+        `http://localhost/api/projects/invalid-uuid/sessions/invalid-session/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'nonexistent',
+          projectId: 'invalid-uuid',
+          sessionId: 'invalid-session',
+          taskId: testTaskId,
+        }),
+      };
+
+      const response = (await GET(request, context)) as NextResponse;
+      expect(response.status).toBe(500);
+
+      const data = (await response.json()) as { error: string };
+      expect(data.error).toContain('Invalid route parameters:');
+      expect(data.error).toContain('projectId');
+      expect(data.error).toContain('sessionId');
+    });
+
+    it('should return 404 for non-existent project', async () => {
+      const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
+      const request = new NextRequest(
+        `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+      );
+      const context = {
+        params: Promise.resolve({
+          projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
         }),
@@ -127,13 +149,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent session', async () => {
+      const nonExistentSessionId = 'lace_20000101_000000';
       const request = new NextRequest(
-        `http://localhost/api/projects/${testProjectId}/sessions/nonexistent/tasks/${testTaskId}`
+        `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
           projectId: testProjectId,
-          sessionId: 'nonexistent',
+          sessionId: nonExistentSessionId,
           taskId: testTaskId,
         }),
       };
@@ -195,8 +218,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent project', async () => {
+      const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
       const request = new NextRequest(
-        `http://localhost/api/projects/nonexistent/sessions/${testSessionId}/tasks/${testTaskId}`,
+        `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
           body: JSON.stringify({ title: 'Updated Title' }),
@@ -206,7 +230,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
       const context = {
         params: Promise.resolve({
-          projectId: 'nonexistent',
+          projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
         }),
@@ -267,12 +291,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent project', async () => {
+      const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
       const request = new NextRequest(
-        `http://localhost/api/projects/nonexistent/sessions/${testSessionId}/tasks/${testTaskId}`
+        `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'nonexistent',
+          projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
         }),
