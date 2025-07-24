@@ -1415,8 +1415,9 @@ export class Agent extends EventEmitter {
     return this._threadManager.getMainAndDelegateEvents(mainThreadId);
   }
 
-  compact(threadId: string): void {
-    this._threadManager.compact(threadId);
+  async compact(threadId: string): Promise<void> {
+    // TODO: Use a configurable strategy once registry is set up
+    await this._threadManager.compact(threadId, 'trim-tool-results');
   }
 
   createDelegateAgent(

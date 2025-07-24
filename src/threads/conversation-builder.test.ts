@@ -67,7 +67,7 @@ describe('conversation-builder', () => {
       const result = buildWorkingConversation(eventsWithCompaction);
 
       expect(result).toEqual([
-        (compactionEvent.data as CompactionData).compactedEvents[0],
+        (compactionEvent.data as unknown as CompactionData).compactedEvents[0],
         newEvent,
       ]);
     });
@@ -116,7 +116,7 @@ describe('conversation-builder', () => {
       const eventsWithTwoCompactions = [...mockEvents, firstCompaction, secondCompaction];
       const result = buildWorkingConversation(eventsWithTwoCompactions);
 
-      expect(result).toEqual((secondCompaction.data as CompactionData).compactedEvents);
+      expect(result).toEqual((secondCompaction.data as unknown as CompactionData).compactedEvents);
     });
   });
 
