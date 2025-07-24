@@ -221,6 +221,47 @@ describe('TaskListSidebar', () => {
     expect(mockOnCreateTask).toHaveBeenCalled();
   });
 
+  it('should filter tasks when search term is entered', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TaskListSidebar
+        projectId="test-project"
+        sessionId="test-session"
+      />
+    );
+
+    // Should show all tasks initially
+    expect(screen.getByText('High Priority Task')).toBeInTheDocument();
+    expect(screen.getByText('Pending Task')).toBeInTheDocument();
+    expect(screen.getByText('Blocked Task')).toBeInTheDocument();
+
+    // Find and type in search input
+    const searchInput = screen.getByPlaceholderText('Search tasks...');
+    await user.type(searchInput, 'High');
+
+    // Should only show matching task
+    expect(screen.getByText('High Priority Task')).toBeInTheDocument();
+    expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
+    expect(screen.queryByText('Blocked Task')).not.toBeInTheDocument();
+  });
+
+  it('should show no results message when search has no matches', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TaskListSidebar
+        projectId="test-project"
+        sessionId="test-session"
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText('Search tasks...');
+    await user.type(searchInput, 'nonexistent');
+
+    expect(screen.getByText('No tasks match your search')).toBeInTheDocument();
+  });
+
   it('should show loading state', () => {
     mockUseTaskManager.mockReturnValue({
       tasks: [],

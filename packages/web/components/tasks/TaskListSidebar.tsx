@@ -3,9 +3,9 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTasks, faPlus } from '@/lib/fontawesome';
+import { faTasks, faPlus, faSearch } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
@@ -27,13 +27,23 @@ export function TaskListSidebar({
   onCreateTask
 }: TaskListSidebarProps) {
   const { tasks, isLoading } = useTaskManager(projectId, sessionId);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filter tasks based on search term
+  const filteredTasks = useMemo(() => {
+    if (!searchTerm.trim()) return tasks;
+    return tasks.filter(task => 
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [tasks, searchTerm]);
   
   const tasksByStatus = useMemo(() => ({
-    pending: tasks.filter(t => t.status === 'pending'),
-    in_progress: tasks.filter(t => t.status === 'in_progress'),
-    blocked: tasks.filter(t => t.status === 'blocked'),
-    completed: tasks.filter(t => t.status === 'completed'),
-  }), [tasks]);
+    pending: filteredTasks.filter(t => t.status === 'pending'),
+    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
+    blocked: filteredTasks.filter(t => t.status === 'blocked'),
+    completed: filteredTasks.filter(t => t.status === 'completed'),
+  }), [filteredTasks]);
 
   if (isLoading) {
     return (
@@ -67,9 +77,24 @@ export function TaskListSidebar({
         </SidebarButton>
       </div>
 
+      {/* Search Input */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search tasks..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full text-xs pl-7 pr-2 py-1.5 bg-base-100 border border-base-300 rounded focus:outline-none focus:border-primary"
+        />
+        <FontAwesomeIcon 
+          icon={faSearch} 
+          className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-base-content/40" 
+        />
+      </div>
+
       {/* Task Summary */}
       <div className="text-xs text-base-content/60 px-2">
-        {tasks.length} tasks • {tasksByStatus.in_progress.length} in progress
+        {filteredTasks.length} tasks • {tasksByStatus.in_progress.length} in progress
       </div>
 
       {/* Active Tasks - In Progress */}
@@ -121,7 +146,7 @@ export function TaskListSidebar({
       )}
 
       {/* View All Link */}
-      {tasks.length > 5 && (
+      {tasks.length > 5 && !searchTerm && (
         <SidebarButton 
           onClick={onOpenTaskBoard} 
           variant="ghost" 
@@ -131,8 +156,17 @@ export function TaskListSidebar({
         </SidebarButton>
       )}
 
+      {/* Empty Search Results */}
+      {searchTerm && filteredTasks.length === 0 && (
+        <div className="text-center py-4">
+          <div className="text-xs text-base-content/40">
+            No tasks match your search
+          </div>
+        </div>
+      )}
+
       {/* Empty State */}
-      {tasks.length === 0 && (
+      {tasks.length === 0 && !searchTerm && (
         <div className="text-center py-4">
           <div className="text-xs text-base-content/40">
             No tasks yet
