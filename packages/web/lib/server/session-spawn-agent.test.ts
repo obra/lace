@@ -201,7 +201,7 @@ describe('Session.spawnAgent Method', () => {
     expect(sessionThreadManager).toBeDefined();
 
     // Create another thread (ThreadManager is stateless, no "current" concept)
-    const otherThreadId = asThreadId(String(sessionThreadManager.createThread()));
+    const _otherThreadId = asThreadId(String(sessionThreadManager.createThread()));
 
     // Verify the delegate thread is still accessible
     const delegateThread = sessionThreadManager.getThread(asThreadId(agentThreadId));

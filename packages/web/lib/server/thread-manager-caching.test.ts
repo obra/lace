@@ -116,7 +116,7 @@ describe('ThreadManager Caching Issues', () => {
 
   it('should handle delegate thread when parent exists', () => {
     // Create another thread (ThreadManager is stateless, no "current" concept)
-    const otherThreadId = threadManager.createThread();
+    const _otherThreadId = threadManager.createThread();
 
     // Create delegate thread for original parent
     const delegateThread = threadManager.createDelegateThreadFor(parentThreadId);
