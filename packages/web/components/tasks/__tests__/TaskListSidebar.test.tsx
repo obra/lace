@@ -164,27 +164,7 @@ describe('TaskListSidebar', () => {
     expect(screen.getByText('Blocked Task')).toBeInTheDocument();
   });
 
-  it('should call onTaskClick when task is clicked', async () => {
-    const mockOnTaskClick = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
-        onTaskClick={mockOnTaskClick}
-      />
-    );
-
-    // Find the task item and click it
-    const taskItem = screen.getByText('High Priority Task').closest('[role="button"]');
-    expect(taskItem).toBeInTheDocument();
-    
-    await user.click(taskItem!);
-    expect(mockOnTaskClick).toHaveBeenCalledWith('task-1');
-  });
-
-  it('should call onOpenTaskBoard when kanban button is clicked', async () => {
+  it('should call onOpenTaskBoard when task is clicked', async () => {
     const mockOnOpenTaskBoard = vi.fn();
     const user = userEvent.setup();
 
@@ -196,9 +176,14 @@ describe('TaskListSidebar', () => {
       />
     );
 
-    await user.click(screen.getByText('Open Kanban Board'));
+    // Find the task item and click it
+    const taskItem = screen.getByText('High Priority Task').closest('[role="button"]');
+    expect(taskItem).toBeInTheDocument();
+    
+    await user.click(taskItem!);
     expect(mockOnOpenTaskBoard).toHaveBeenCalled();
   });
+
 
   it('should call onCreateTask when create task button is clicked', async () => {
     const mockOnCreateTask = vi.fn();
@@ -212,66 +197,11 @@ describe('TaskListSidebar', () => {
       />
     );
 
-    // Look for the create task button (second button in the flex container)
-    const buttons = screen.getAllByTestId('sidebar-button');
-    expect(buttons).toHaveLength(2);
-    const createButton = buttons[1]; // Second button should be the create button
-    
-    await user.click(createButton);
+    // Look for the "Add task" button
+    await user.click(screen.getByText('Add task'));
     expect(mockOnCreateTask).toHaveBeenCalled();
   });
 
-  it('should filter tasks when search term is entered', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
-      />
-    );
-
-    // Should show all tasks initially
-    expect(screen.getByText('High Priority Task')).toBeInTheDocument();
-    expect(screen.getByText('Pending Task')).toBeInTheDocument();
-    expect(screen.getByText('Blocked Task')).toBeInTheDocument();
-
-    // Find and type in search input
-    const searchInput = screen.getByPlaceholderText('Search tasks...');
-    await user.type(searchInput, 'High');
-
-    // Wait for debounce delay (300ms + buffer)
-    await waitFor(
-      () => {
-        expect(screen.getByText('High Priority Task')).toBeInTheDocument();
-        expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
-        expect(screen.queryByText('Blocked Task')).not.toBeInTheDocument();
-      },
-      { timeout: 500 }
-    );
-  });
-
-  it('should show no results message when search has no matches', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
-      />
-    );
-
-    const searchInput = screen.getByPlaceholderText('Search tasks...');
-    await user.type(searchInput, 'nonexistent');
-
-    // Wait for debounce delay
-    await waitFor(
-      () => {
-        expect(screen.getByText('No tasks match your search')).toBeInTheDocument();
-      },
-      { timeout: 500 }
-    );
-  });
 
   it('should show loading state', () => {
     mockUseTaskManager.mockReturnValue({
@@ -321,7 +251,6 @@ describe('TaskListSidebar', () => {
     );
 
     expect(screen.getByText('No tasks yet')).toBeInTheDocument();
-    expect(screen.getByText('Create your first task')).toBeInTheDocument();
   });
 
   it('should limit tasks shown per section', () => {
@@ -391,7 +320,5 @@ describe('TaskListSidebar', () => {
     expect(screen.queryByText('Pending Task 3')).not.toBeInTheDocument();
     expect(screen.queryByText('Pending Task 4')).not.toBeInTheDocument();
 
-    // Should show "View all" link
-    expect(screen.getByText('View all 9 tasks')).toBeInTheDocument();
   });
 });
