@@ -70,18 +70,23 @@ export class EventApprovalCallback implements ApprovalCallback {
         return;
       }
 
-      // Poll for approval response (temporary approach until event emission is added)
-      const pollInterval = setInterval(() => {
-        const response = this.checkExistingApprovalResponse(toolCallId);
-        if (response) {
-          clearInterval(pollInterval);
-          resolve(response);
+      // Listen for thread_event_added events on Agent
+      const eventListener = (data: { event: ThreadEvent; threadId: string }) => {
+        const { event } = data;
+        if (
+          event.type === 'TOOL_APPROVAL_RESPONSE' &&
+          (event.data as ToolApprovalResponseData).toolCallId === toolCallId
+        ) {
+          this.agent.off('thread_event_added', eventListener);
+          resolve((event.data as ToolApprovalResponseData).decision);
         }
-      }, 100); // Poll every 100ms
+      };
+
+      this.agent.on('thread_event_added', eventListener);
 
       // Set a reasonable timeout
       setTimeout(() => {
-        clearInterval(pollInterval);
+        this.agent.off('thread_event_added', eventListener);
         // For testing purposes, we'll throw an error instead of hanging
         // In real usage, this would continue polling
         const finalCheck = this.checkExistingApprovalResponse(toolCallId);

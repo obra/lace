@@ -23,6 +23,7 @@ interface MockAgent {
   threadManager: MockThreadManager;
   emit: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
+  off: ReturnType<typeof vi.fn>;
 }
 
 interface ApprovalCallback {
@@ -48,7 +49,8 @@ describe('Event-Based Approval Callback', () => {
         getEvents: vi.fn(() => [])
       },
       emit: vi.fn(),
-      on: vi.fn()
+      on: vi.fn(),
+      off: vi.fn()
     };
     
     sessionId = asThreadId('lace_20240101_test01');
@@ -88,14 +90,22 @@ describe('Event-Based Approval Callback', () => {
       { toolCallId: 'call_123' }
     );
 
-    // Simulate approval response by triggering the event listener
-    const eventListener = mockAgent.threadManager.on.mock.calls.find(
-      call => call[0] === 'event_added'
-    )?.[1] as (event: { type: string; data: { toolCallId: string; decision: string } }) => void;
+    // Simulate approval response by finding and calling the event listener
+    const onCall = mockAgent.on.mock.calls.find(
+      call => call[0] === 'thread_event_added'
+    );
+    expect(onCall).toBeDefined();
+    
+    const eventListener = onCall?.[1] as (data: { event: { type: string; data: { toolCallId: string; decision: string } }; threadId: string }) => void;
+    expect(eventListener).toBeDefined();
 
+    // Trigger approval response
     eventListener({
-      type: 'TOOL_APPROVAL_RESPONSE',
-      data: { toolCallId: 'call_123', decision: 'allow_once' }
+      event: {
+        type: 'TOOL_APPROVAL_RESPONSE',
+        data: { toolCallId: 'call_123', decision: 'allow_once' }
+      },
+      threadId: 'test_thread_123'
     });
 
     // Now the promise should resolve
@@ -181,20 +191,29 @@ describe('Event-Based Approval Callback', () => {
     );
 
     // Get the event listener
-    const eventListener = mockAgent.threadManager.on.mock.calls.find(
-      call => call[0] === 'event_added'
-    )?.[1] as (event: { type: string; data: { toolCallId: string; decision: string } }) => void;
+    const onCall = mockAgent.on.mock.calls.find(
+      call => call[0] === 'thread_event_added'
+    );
+    expect(onCall).toBeDefined();
+    
+    const eventListener = onCall?.[1] as (data: { event: { type: string; data: { toolCallId: string; decision: string } }; threadId: string }) => void;
 
     // Respond to first approval
     eventListener({
-      type: 'TOOL_APPROVAL_RESPONSE',
-      data: { toolCallId: 'call_123', decision: 'allow_once' }
+      event: {
+        type: 'TOOL_APPROVAL_RESPONSE',
+        data: { toolCallId: 'call_123', decision: 'allow_once' }
+      },
+      threadId: 'test_thread_123'
     });
 
     // Respond to second approval
     eventListener({
-      type: 'TOOL_APPROVAL_RESPONSE',
-      data: { toolCallId: 'call_456', decision: 'deny' }
+      event: {
+        type: 'TOOL_APPROVAL_RESPONSE',
+        data: { toolCallId: 'call_456', decision: 'deny' }
+      },
+      threadId: 'test_thread_123'
     });
 
     // Both promises should resolve with correct decisions
