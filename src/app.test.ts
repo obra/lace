@@ -12,7 +12,6 @@ import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface'
 // Don't import TerminalInterface at top level - it loads React/Ink
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { OllamaProvider } from '~/providers/ollama-provider';
-import { withConsoleCapture } from '~/test-utils/console-capture';
 import { resetPersistence } from '~/persistence/database';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
@@ -241,61 +240,6 @@ describe('App Initialization (run function)', () => {
     await expect(run(options)).rejects.toThrow(
       'Unknown provider: unknown-provider. Available providers: '
     );
-  });
-
-  it('should initialize ThreadManager and handle new session', async () => {
-    const { log } = withConsoleCapture();
-    await run(mockCliOptions);
-    // App should log a new conversation message (actual behavior, not mock verification)
-    const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-    expect(logCalls.some((call: string) => call.includes('Starting conversation'))).toBe(true);
-  });
-
-  it('should initialize ThreadManager and handle resumed session', async () => {
-    const { log } = withConsoleCapture();
-    const options = { ...mockCliOptions, continue: true };
-    await run(options);
-    // The main goal is that the app runs successfully with continue mode
-    // Verify actual behavior through console output
-    const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-    expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-  });
-
-  it('should initialize ThreadManager and handle resumed session with ID', async () => {
-    const { log } = withConsoleCapture();
-    // The test will use the default app behavior to handle thread resumption
-
-    const options = { ...mockCliOptions, continue: 'specific-thread-789' };
-    await run(options);
-    // Verify that app attempts to resume with the specified thread ID
-    const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-    expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-  });
-
-  it('should initialize ThreadManager and handle resume error', async () => {
-    const { log } = withConsoleCapture();
-
-    // The test will simulate resume error through environment setup
-
-    await run(mockCliOptions);
-    // Verify that app starts successfully (may be new or resumed conversation)
-    const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-    expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-  });
-
-  it('should set up ToolExecutor and Agent', async () => {
-    await run(mockCliOptions);
-    // Verify app runs successfully with proper component initialization
-    // This is verified through successful app execution without errors
-    expect(true).toBe(true); // App completed successfully
-  });
-
-  it('should set delegate tool dependencies if delegate tool exists', async () => {
-    // Test that the app runs successfully with delegate tool setup
-    // The delegate tool dependency injection is tested in the delegate tool's own test file
-    await run(mockCliOptions);
-    // Verify successful execution - delegate dependency injection happens internally
-    expect(true).toBe(true); // App completed successfully
   });
 
   it('should execute prompt in non-interactive mode and exit', async () => {

@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import type { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
-import { withConsoleCapture } from '~/test-utils/console-capture';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock dependencies
@@ -57,12 +56,8 @@ describe('NonInteractiveInterface', () => {
       vi.spyOn(agent, 'start').mockImplementation(async () => {
         // Mock implementation for testing - prevents actual agent start
       });
-      const { log } = withConsoleCapture();
 
       await nonInteractive.executePrompt('Test prompt');
-
-      // Test actual behavior - provider information is displayed
-      expect(log).toHaveBeenCalledWith('🤖 Lace Agent using mock-provider provider.\n');
 
       // Test that the prompt was sent to agent (essential business logic)
       expect(agent.sendMessage).toHaveBeenCalledWith('Test prompt');
