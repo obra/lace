@@ -91,20 +91,12 @@ export class ProviderRegistry {
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
         const apiKey = (config.apiKey as string) || getEnvVar('ANTHROPIC_KEY');
-        if (!apiKey) {
-          throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
-        }
-        return new AnthropicProvider({ ...config, apiKey });
+        return new AnthropicProvider({ ...config, apiKey: apiKey || '' });
       }
       case 'openai': {
         const apiKey =
           (config.apiKey as string) || getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-        if (!apiKey) {
-          throw new Error(
-            'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
-          );
-        }
-        return new OpenAIProvider({ ...config, apiKey });
+        return new OpenAIProvider({ ...config, apiKey: apiKey || '' });
       }
       case 'lmstudio': {
         return new LMStudioProvider(config);

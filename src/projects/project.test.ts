@@ -1,12 +1,19 @@
 // ABOUTME: Tests for Project class functionality including CRUD operations and session management
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
-// Use real Session class - no mocking needed
+// Mock env-loader to control default provider detection
+vi.mock('~/config/env-loader', () => ({
+  getEnvVar: vi.fn((key: string) => {
+    // Mock ANTHROPIC_KEY as present so it defaults to anthropic
+    if (key === 'ANTHROPIC_KEY') return 'mock-anthropic-key';
+    return undefined;
+  }),
+}));
 
 describe('Project', () => {
   beforeEach(() => {

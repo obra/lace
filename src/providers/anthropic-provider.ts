@@ -21,14 +21,24 @@ export interface AnthropicProviderConfig extends ProviderConfig {
 }
 
 export class AnthropicProvider extends AIProvider {
-  private readonly _anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
 
   constructor(config: AnthropicProviderConfig) {
     super(config);
-    this._anthropic = new Anthropic({
-      apiKey: config.apiKey,
-      dangerouslyAllowBrowser: true, // Allow in test environments
-    });
+  }
+
+  private getAnthropicClient(): Anthropic {
+    if (!this._anthropic) {
+      const config = this._config as AnthropicProviderConfig;
+      if (!config.apiKey) {
+        throw new Error('ANTHROPIC_KEY environment variable required for Anthropic provider');
+      }
+      this._anthropic = new Anthropic({
+        apiKey: config.apiKey,
+        dangerouslyAllowBrowser: true, // Allow in test environments
+      });
+    }
+    return this._anthropic;
   }
 
   // Provider-specific token counting using Anthropic's beta API
@@ -46,7 +56,7 @@ export class AnthropicProvider extends AIProvider {
       }));
 
       // Use beta API to count tokens
-      const result = await this._anthropic.beta.messages.countTokens({
+      const result = await this.getAnthropicClient().beta.messages.countTokens({
         model: this.modelName,
         messages: anthropicMessages,
         system: systemPrompt,
@@ -161,7 +171,7 @@ export class AnthropicProvider extends AIProvider {
           payload: JSON.stringify(requestPayload, null, 2),
         });
 
-        const response = (await this._anthropic.messages.create(requestPayload, {
+        const response = (await this.getAnthropicClient().messages.create(requestPayload, {
           signal,
         })) as Anthropic.Messages.Message;
 
@@ -242,7 +252,7 @@ export class AnthropicProvider extends AIProvider {
         });
 
         // Use the streaming API
-        const stream = this._anthropic.messages.stream(requestPayload, {
+        const stream = this.getAnthropicClient().messages.stream(requestPayload, {
           signal,
         });
 
