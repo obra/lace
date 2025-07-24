@@ -794,13 +794,6 @@ export function LaceApp() {
                 />
               </div>
             )
-          ) : projects.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">No Projects Found</h2>
-                <p className="text-base-content/60">Create a project to get started</p>
-              </div>
-            </div>
           ) : (
             /* Project Selection Panel - When no project selected or invalid project ID */
             <div className="flex-1 p-6 min-h-0">
