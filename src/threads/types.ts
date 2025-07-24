@@ -37,7 +37,14 @@ export interface ThreadEvent {
   threadId: string;
   type: EventType;
   timestamp: Date;
-  data: string | ToolCall | ToolResult | CompactionData | ToolApprovalRequestData | ToolApprovalResponseData | Record<string, unknown>;
+  data:
+    | string
+    | ToolCall
+    | ToolResult
+    | CompactionData
+    | ToolApprovalRequestData
+    | ToolApprovalResponseData
+    | Record<string, unknown>;
 }
 
 export interface Thread {

@@ -1059,10 +1059,10 @@ export class DatabasePersistence {
       requested_at: string;
     }>;
 
-    return rows.map(row => ({
+    return rows.map((row) => ({
       toolCallId: row.tool_call_id,
       toolCall: JSON.parse(row.tool_call_data),
-      requestedAt: new Date(row.requested_at)
+      requestedAt: new Date(row.requested_at),
     }));
   }
 

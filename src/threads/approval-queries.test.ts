@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence } from '~/persistence/database';
-import { ThreadEvent } from './types';
+import { ThreadEvent } from '~/threads/types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Approval Database Queries', () => {
@@ -13,13 +13,13 @@ describe('Approval Database Queries', () => {
   beforeEach(() => {
     db = setupTestPersistence();
     threadId = 'test_thread_123';
-    
+
     // Create a test thread
     db.saveThread({
       id: threadId,
       createdAt: new Date(),
       updatedAt: new Date(),
-      events: []
+      events: [],
     });
   });
 
@@ -35,17 +35,17 @@ describe('Approval Database Queries', () => {
         threadId,
         type: 'TOOL_CALL',
         timestamp: new Date('2025-01-01T10:00:00Z'),
-        data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } }
+        data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } },
       };
       db.saveEvent(toolCallEvent);
 
       // Create TOOL_APPROVAL_REQUEST event
       const requestEvent: ThreadEvent = {
-        id: 'event_2', 
+        id: 'event_2',
         threadId,
         type: 'TOOL_APPROVAL_REQUEST',
         timestamp: new Date('2025-01-01T10:01:00Z'),
-        data: { toolCallId: 'call_123' }
+        data: { toolCallId: 'call_123' },
       };
       db.saveEvent(requestEvent);
 
@@ -63,23 +63,23 @@ describe('Approval Database Queries', () => {
         threadId,
         type: 'TOOL_CALL',
         timestamp: new Date('2025-01-01T10:00:00Z'),
-        data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } }
+        data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } },
       });
 
       db.saveEvent({
         id: 'event_2',
-        threadId, 
+        threadId,
         type: 'TOOL_APPROVAL_REQUEST',
         timestamp: new Date('2025-01-01T10:01:00Z'),
-        data: { toolCallId: 'call_123' }
+        data: { toolCallId: 'call_123' },
       });
 
       db.saveEvent({
         id: 'event_3',
         threadId,
-        type: 'TOOL_APPROVAL_RESPONSE', 
+        type: 'TOOL_APPROVAL_RESPONSE',
         timestamp: new Date('2025-01-01T10:02:00Z'),
-        data: { toolCallId: 'call_123', decision: 'allow_once' }
+        data: { toolCallId: 'call_123', decision: 'allow_once' },
       });
 
       // Should not return any pending approvals
@@ -95,15 +95,15 @@ describe('Approval Database Queries', () => {
           threadId,
           type: 'TOOL_CALL',
           timestamp: new Date(`2025-01-01T10:0${index}:00Z`),
-          data: { id: callId, name: 'bash', arguments: { command: 'ls' } }
+          data: { id: callId, name: 'bash', arguments: { command: 'ls' } },
         });
 
         db.saveEvent({
           id: `request_event_${index + 1}`,
           threadId,
-          type: 'TOOL_APPROVAL_REQUEST', 
+          type: 'TOOL_APPROVAL_REQUEST',
           timestamp: new Date(`2025-01-01T10:0${index + 1}:00Z`),
-          data: { toolCallId: callId }
+          data: { toolCallId: callId },
         });
       });
 
@@ -122,7 +122,7 @@ describe('Approval Database Queries', () => {
         threadId,
         type: 'TOOL_APPROVAL_RESPONSE',
         timestamp: new Date(),
-        data: { toolCallId: 'call_123', decision: 'allow_session' }
+        data: { toolCallId: 'call_123', decision: 'allow_session' },
       });
 
       const decision = db.getApprovalDecision('call_123');
