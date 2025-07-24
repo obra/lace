@@ -5,14 +5,14 @@ import type { ThreadEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
 
 export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
-  const lastCompaction = findLastCompactionEvent(events);
+  const { lastCompaction, lastCompactionIndex } = findLastCompactionEventWithIndex(events);
 
   if (!lastCompaction) {
     return events; // No compaction yet, use all events
   }
 
   // Use compacted events + compaction event + everything after compaction
-  const eventsAfterCompaction = getEventsAfter(events, lastCompaction.id);
+  const eventsAfterCompaction = events.slice(lastCompactionIndex + 1);
   const compactionData = lastCompaction.data as unknown as CompactionData;
   return [...compactionData.compactedEvents, lastCompaction, ...eventsAfterCompaction];
 }
@@ -22,18 +22,26 @@ export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {
   return events;
 }
 
-function findLastCompactionEvent(events: ThreadEvent[]): ThreadEvent | null {
-  // Find the most recent COMPACTION event
+/**
+ * Finds the last COMPACTION event and its index in a single pass
+ * @param events Array of thread events
+ * @returns Object with the last compaction event and its index, or null if no compaction found
+ */
+function findLastCompactionEventWithIndex(events: ThreadEvent[]): {
+  lastCompaction: ThreadEvent | null;
+  lastCompactionIndex: number;
+} {
+  // Single reverse pass to find the most recent COMPACTION event
   for (let i = events.length - 1; i >= 0; i--) {
     if (events[i].type === 'COMPACTION') {
-      return events[i];
+      return {
+        lastCompaction: events[i],
+        lastCompactionIndex: i,
+      };
     }
   }
-  return null;
-}
-
-function getEventsAfter(events: ThreadEvent[], afterEventId: string): ThreadEvent[] {
-  const afterIndex = events.findIndex((e) => e.id === afterEventId);
-  if (afterIndex === -1) return [];
-  return events.slice(afterIndex + 1);
+  return {
+    lastCompaction: null,
+    lastCompactionIndex: -1,
+  };
 }
