@@ -40,7 +40,9 @@ export function useTaskStream({
     if (!projectId || !sessionId) return;
 
     // Create SSE connection
-    const eventSource = new EventSource(`/api/projects/${projectId}/sessions/${sessionId}/tasks/stream`);
+    const eventSource = new EventSource(
+      `/api/projects/${projectId}/sessions/${sessionId}/tasks/stream`
+    );
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
@@ -71,13 +73,11 @@ export function useTaskStream({
             break;
         }
       } catch (error) {
-        console.error('Error parsing task event:', error);
         onError?.(error as Error);
       }
     };
 
     eventSource.onerror = (error) => {
-      console.error('Task stream error:', error);
       onError?.(new Error('Task stream connection failed'));
     };
 

@@ -5,8 +5,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { ProjectIdSchema, SessionIdSchema, validateRouteParams } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
+import {
+  ProjectIdSchema,
+  SessionIdSchema,
+  validateRouteParams,
+  createErrorResponse,
+} from '@/lib/server/api-utils';
 import type { TaskEvent } from '@/hooks/useTaskStream';
 
 const RouteParamsSchema = z.object({
@@ -27,29 +31,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
     try {
       ({ projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema));
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Invalid route parameters' },
-        { status: 400 }
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Invalid route parameters',
+        400
       );
     }
 
     // Get project first
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404);
     }
 
     // Verify session belongs to this project
     const sessionData = project.getSession(sessionId);
     if (!sessionData) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createErrorResponse('Session not found in this project', 404);
     }
 
     // Get active session instance
     const sessionService = getSessionService();
     const session = await sessionService.getSession(asThreadId(sessionId));
     if (!session) {
-      return NextResponse.json({ error: 'Session not active' }, { status: 404 });
+      return createErrorResponse('Session not active', 404);
     }
 
     // Create SSE stream
@@ -95,10 +99,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (error: unknown) {
-    logger.error('Error in task SSE stream:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to establish SSE connection' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to establish SSE connection',
+      500,
+      error
     );
   }
 }

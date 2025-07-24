@@ -10,6 +10,8 @@ import {
   SessionIdSchema,
   TaskIdSchema,
   validateRouteParams,
+  validateRequestBody,
+  UpdateTaskSchema,
   serializeTask,
   createErrorResponse,
   createSuccessResponse,
@@ -82,8 +84,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       TaskRouteParamsSchema
     );
 
-    // Parse request body
-    const body = (await request.json()) as Record<string, unknown>;
+    // Validate request body
+    let validatedBody;
+    try {
+      validatedBody = await validateRequestBody(await request.json(), UpdateTaskSchema);
+    } catch (error) {
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Invalid request body',
+        400
+      );
+    }
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -108,7 +118,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     // Filter out undefined properties
     const filteredUpdates = Object.fromEntries(
-      Object.entries(body).filter(([_, value]) => value !== undefined)
+      Object.entries(validatedBody).filter(([_, value]) => value !== undefined)
     );
 
     // Update task with human context
