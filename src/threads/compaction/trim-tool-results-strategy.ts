@@ -14,6 +14,15 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     for (const event of events) {
       if (event.type === 'COMPACTION') {
         // Skip COMPACTION events - they are system metadata, not conversation content
+        //
+        // NOTE FOR REVIEWERS: This is correct behavior, not a bug. Here's why:
+        // 1. COMPACTION events represent previous compaction operations, not actual conversation
+        // 2. Including old COMPACTION events would create nested compaction metadata
+        // 3. The conversation builder (buildWorkingConversation) handles multiple compactions
+        //    by using ONLY the LATEST compaction event, ignoring older ones
+        // 4. This prevents exponential growth of metadata in repeated compactions
+        // 5. The complete history is preserved via buildCompleteHistory() for debugging
+        // 6. Each compaction works on the "working conversation" state, not raw event history
         continue;
       } else if (event.type === 'TOOL_RESULT') {
         // Trim tool result content

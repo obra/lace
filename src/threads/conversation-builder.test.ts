@@ -144,4 +144,54 @@ describe('conversation-builder', () => {
       expect(result).toEqual(allEvents);
     });
   });
+
+  describe('malformed compaction data handling', () => {
+    it('gracefully handles malformed compaction data by falling back to all events', () => {
+      const malformedCompactionEvent: ThreadEvent = {
+        id: 'compaction-bad',
+        threadId: 'test-thread',
+        type: 'COMPACTION',
+        timestamp: new Date('2024-01-01T10:03:00Z'),
+        data: { invalid: 'data' }, // Missing required CompactionData fields
+      };
+
+      const newEvent: ThreadEvent = {
+        id: 'e4',
+        threadId: 'test-thread',
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date('2024-01-01T10:04:00Z'),
+        data: 'After malformed compaction',
+      };
+
+      const events = [...mockEvents, malformedCompactionEvent, newEvent];
+      const result = buildWorkingConversation(events);
+
+      // Should fall back to returning all events when compaction data is malformed
+      expect(result).toEqual(events);
+    });
+
+    it('handles null compaction data gracefully', () => {
+      const nullCompactionEvent: ThreadEvent = {
+        id: 'compaction-null',
+        threadId: 'test-thread',
+        type: 'COMPACTION',
+        timestamp: new Date('2024-01-01T10:03:00Z'),
+        data: null,
+      };
+
+      const newEvent: ThreadEvent = {
+        id: 'e4',
+        threadId: 'test-thread',
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date('2024-01-01T10:04:00Z'),
+        data: 'After null compaction',
+      };
+
+      const events = [...mockEvents, nullCompactionEvent, newEvent];
+      const result = buildWorkingConversation(events);
+
+      // Should fall back to returning all events when compaction data is null
+      expect(result).toEqual(events);
+    });
+  });
 });
