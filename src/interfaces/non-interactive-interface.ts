@@ -40,8 +40,6 @@ export class NonInteractiveInterface implements UserInterface {
    * Execute a single prompt and exit
    */
   async executePrompt(prompt: string): Promise<void> {
-    console.log(`🤖 Lace Agent using ${this.agent.providerName} provider.\n`);
-
     // Start agent and process the prompt
     await this.agent.start();
 

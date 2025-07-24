@@ -14,6 +14,10 @@ import { asThreadId } from '@/lib/server/core-types';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
+// Console capture for verifying error output
+let consoleLogs: string[] = [];
+let originalConsoleError: typeof console.error;
+
 // Mock SSE manager to capture events
 const mockSSEManager = {
   broadcast: vi.fn(),
@@ -35,6 +39,13 @@ describe('Thread Messaging API', () => {
   beforeEach(async () => {
     setupTestPersistence();
     vi.clearAllMocks();
+
+    // Set up console capture
+    consoleLogs = [];
+    originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      consoleLogs.push(args.map((arg) => String(arg)).join(' '));
+    };
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
@@ -59,6 +70,7 @@ describe('Thread Messaging API', () => {
   });
 
   afterEach(() => {
+    console.error = originalConsoleError;
     sessionService.clearActiveSessions();
     teardownTestPersistence();
   });
@@ -165,11 +177,19 @@ describe('Thread Messaging API', () => {
       body: 'invalid json',
     });
 
+    // Clear any previous console logs for this specific test
+    consoleLogs = [];
+
     const response = await POST(request, {
       params: Promise.resolve({ threadId: realThreadId }),
     });
 
     expect(response.status).toBe(500);
+
+    // Verify that the JSON parsing error was logged
+    expect(consoleLogs.length).toBeGreaterThan(0);
+    const errorLog = consoleLogs.join(' ').toLowerCase();
+    expect(errorLog).toMatch(/error.*syntaxerror.*unexpected token.*invalid json/);
   });
 
   it('should work with delegate agents', async () => {

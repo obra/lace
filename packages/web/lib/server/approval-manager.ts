@@ -75,7 +75,6 @@ class ApprovalManager {
         data: approvalData,
       };
 
-      console.warn(`Sending approval request ${requestId} for tool ${toolName}`);
       SSEManager.getInstance().broadcast(sessionId, event);
     });
   }

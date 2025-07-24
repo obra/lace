@@ -1,14 +1,27 @@
 // ABOUTME: Test for LMStudio connection timeout handling
 // ABOUTME: Ensures LMStudio provider doesn't hang indefinitely when server is unavailable
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
 
-describe('LMStudio Provider Timeout Handling', () => {
-  it('should timeout quickly when LMStudio server is unavailable', async () => {
-    // Console output is automatically suppressed by global setup
-    // No need for manual stderr suppression
+// Console capture for verifying error output
+let consoleLogs: string[] = [];
+let originalConsoleError: typeof console.error;
 
+describe('LMStudio Provider Timeout Handling', () => {
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      consoleLogs.push(args.map((arg) => String(arg)).join(' '));
+    };
+  });
+
+  afterEach(() => {
+    console.error = originalConsoleError;
+  });
+
+  it('should timeout quickly when LMStudio server is unavailable', async () => {
     // Use a non-existent port to simulate unavailable server
     const provider = new LMStudioProvider({
       baseUrl: 'ws://localhost:9999', // Non-existent port
@@ -25,5 +38,10 @@ describe('LMStudio Provider Timeout Handling', () => {
     expect(elapsedMs).toBeLessThan(5000);
     expect(result.connected).toBe(false);
     expect(result.error).toBeDefined();
+
+    // Verify that error was logged to console
+    expect(consoleLogs.length).toBeGreaterThan(0);
+    const errorLog = consoleLogs.join(' ').toLowerCase();
+    expect(errorLog).toMatch(/error|timeout|connection|failed|econnrefused/);
   }, 10000); // 10 second test timeout
 });
