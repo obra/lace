@@ -13,6 +13,7 @@ interface TaskBoardModalProps {
   columns?: TaskColumn[];
   onTaskUpdate?: (task: Task) => void;
   onTaskCreate?: (task: Omit<Task, 'id'>) => void;
+  onTaskClick?: (task: Task) => void;
 }
 
 interface TaskColumn {
@@ -27,25 +28,25 @@ const DEFAULT_TASK_COLUMNS: TaskColumn[] = [
     id: 'todo',
     title: 'To Do',
     status: 'pending',
-    color: 'bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
+    color: 'bg-info/10 border-info/20',
   },
   {
     id: 'progress',
     title: 'In Progress',
     status: 'in_progress',
-    color: 'bg-yellow-100 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800',
+    color: 'bg-warning/10 border-warning/20',
   },
   {
     id: 'blocked',
     title: 'Blocked',
     status: 'blocked',
-    color: 'bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800',
+    color: 'bg-secondary/10 border-secondary/20',
   },
   {
     id: 'done',
     title: 'Done',
     status: 'completed',
-    color: 'bg-green-100 border-green-200 dark:bg-green-900/20 dark:border-green-800',
+    color: 'bg-success/10 border-success/20',
   },
 ];
 
@@ -56,8 +57,10 @@ export function TaskBoardModal({
   columns = DEFAULT_TASK_COLUMNS,
   onTaskUpdate,
   onTaskCreate,
+  onTaskClick,
 }: TaskBoardModalProps) {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [showNewTaskForm, setShowNewTaskForm] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
@@ -69,13 +72,13 @@ export function TaskBoardModal({
   const getPriorityColor = (priority: Task['priority']) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'badge-error';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'badge-warning';
       case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'badge-success';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'badge-neutral';
     }
   };
 
@@ -85,6 +88,7 @@ export function TaskBoardModal({
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     setDraggedTask(task);
+    setIsDragging(true);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -100,6 +104,19 @@ export function TaskBoardModal({
       onTaskUpdate?.(updatedTask);
     }
     setDraggedTask(null);
+    setIsDragging(false);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTask(null);
+    setIsDragging(false);
+  };
+
+  const handleTaskClick = (task: Task) => {
+    // Only handle click if we're not dragging
+    if (!isDragging && onTaskClick) {
+      onTaskClick(task);
+    }
   };
 
   const handleCreateTask = (e: React.FormEvent) => {
@@ -117,22 +134,23 @@ export function TaskBoardModal({
     }
   };
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Task Board" size="full" className="h-[90vh]">
-      <div className="h-full flex flex-col">
-        {/* Header with actions */}
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-base-300">
-          <div className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faTasks} className="w-5 h-5 text-primary" />
-            <span className="text-lg font-medium">Project Tasks</span>
-            <span className="badge badge-primary">{tasks.length}</span>
-          </div>
+  const modalTitle = (
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-2">
+        <FontAwesomeIcon icon={faTasks} className="w-5 h-5 text-primary" />
+        <span className="text-lg font-semibold">Project Tasks</span>
+        <span className="badge badge-primary">{tasks.length}</span>
+      </div>
+      <button onClick={() => setShowNewTaskForm(true)} className="btn btn-primary btn-sm">
+        <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-1" />
+        New Task
+      </button>
+    </div>
+  );
 
-          <button onClick={() => setShowNewTaskForm(true)} className="btn btn-primary btn-sm">
-            <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-1" />
-            New Task
-          </button>
-        </div>
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="full" className="h-[90vh]">
+      <div className="h-full flex flex-col">
 
         {/* New task form */}
         {showNewTaskForm && (
@@ -192,13 +210,13 @@ export function TaskBoardModal({
             return (
               <div
                 key={column.id}
-                className="flex flex-col h-full"
+                className="flex flex-col min-h-0"
                 data-testid="task-column"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, column.status)}
               >
                 {/* Column header */}
-                <div className={`p-3 rounded-t-lg border-2 ${column.color}`}>
+                <div className={`p-3 rounded-t-lg border-2 ${column.color} flex-shrink-0`}>
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-base-content">{column.title}</h3>
                     <span className="badge badge-sm">{columnTasks.length}</span>
@@ -213,7 +231,9 @@ export function TaskBoardModal({
                         key={task.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, task)}
-                        className="bg-base-200 border border-base-300 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow"
+                        onDragEnd={handleDragEnd}
+                        onClick={() => handleTaskClick(task)}
+                        className="bg-base-200 border border-base-300 rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
                       >
                         <div className="space-y-2">
                           <div className="flex items-start justify-between">
@@ -221,7 +241,7 @@ export function TaskBoardModal({
                               {task.title}
                             </h4>
                             <span
-                              className={`px-1.5 py-0.5 text-xs rounded border ${getPriorityColor(task.priority)}`}
+                              className={`badge badge-xs ${getPriorityColor(task.priority)}`}
                             >
                               {task.priority}
                             </span>
