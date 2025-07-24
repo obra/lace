@@ -265,20 +265,9 @@ export class SessionService {
 
             resolve(decision);
           } catch (error) {
-            // On timeout or error, deny the request
+            // On error, deny the request
             console.error(`Approval request failed for ${toolName}:`, error);
             resolve(ApprovalDecision.DENY as CoreApprovalDecision);
-
-            // Notify UI about the timeout/error
-            const event: SessionEvent = {
-              type: 'LOCAL_SYSTEM_MESSAGE',
-              threadId,
-              timestamp: new Date(),
-              data: {
-                content: `Tool "${toolName}" was denied (${error instanceof Error ? error.message : 'approval failed'})`,
-              },
-            };
-            sseManager.broadcast(sessionId, event);
           }
         })();
       }

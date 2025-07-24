@@ -207,7 +207,6 @@ export interface ToolApprovalRequestData {
     safeInternal?: boolean;
   };
   riskLevel: 'safe' | 'moderate' | 'destructive';
-  timeout?: number; // Seconds until auto-deny
 }
 
 // API request/response for approval decisions

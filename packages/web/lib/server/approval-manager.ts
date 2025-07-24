@@ -1,5 +1,5 @@
 // ABOUTME: Server-side approval manager for handling tool approval requests
-// ABOUTME: Manages pending approvals, timeouts, and decision resolution
+// ABOUTME: Manages pending approvals and decision resolution
 
 import { randomUUID } from 'crypto';
 import { ThreadId, SessionEvent, ToolApprovalRequestData } from '@/types/api';
@@ -9,7 +9,6 @@ import { ApprovalDecision, type ToolAnnotations } from '@/lib/server/lace-import
 interface PendingApproval {
   resolve: (decision: ApprovalDecision) => void;
   reject: (error: Error) => void;
-  timeout: NodeJS.Timeout;
   threadId: ThreadId;
   toolName: string;
   sessionId: ThreadId;
@@ -26,8 +25,7 @@ class ApprovalManager {
     toolDescription: string | undefined,
     toolAnnotations: ToolAnnotations | undefined,
     input: unknown,
-    isReadOnly: boolean,
-    timeoutMs: number = 30000
+    isReadOnly: boolean
   ): Promise<ApprovalDecision> {
     // Check if already approved for session
     const sessionApproved = this.sessionApprovals.get(sessionId);
@@ -39,18 +37,10 @@ class ApprovalManager {
     const requestId = randomUUID();
 
     return new Promise((resolve, reject) => {
-      // Set timeout
-      const timeout = setTimeout(() => {
-        this.pendingApprovals.delete(requestId);
-        console.error(`Approval request ${requestId} timed out`);
-        reject(new Error('Approval request timed out'));
-      }, timeoutMs);
-
       // Store pending approval
       this.pendingApprovals.set(requestId, {
         resolve,
         reject,
-        timeout,
         threadId,
         toolName,
         sessionId,
@@ -65,7 +55,6 @@ class ApprovalManager {
         ...(toolDescription && { toolDescription }),
         ...(toolAnnotations && { toolAnnotations }),
         riskLevel: this.getRiskLevel(toolName, isReadOnly, toolAnnotations),
-        timeout: Math.floor(timeoutMs / 1000),
       };
 
       const event: SessionEvent = {
@@ -86,8 +75,6 @@ class ApprovalManager {
       console.warn(`No pending approval found for ${requestId}`);
       return false;
     }
-
-    clearTimeout(pending.timeout);
 
     // Handle session-wide approvals
     if (decision === ApprovalDecision.ALLOW_SESSION) {
@@ -111,7 +98,6 @@ class ApprovalManager {
     // Also clear any pending approvals for this session
     for (const [requestId, pending] of this.pendingApprovals.entries()) {
       if (pending.sessionId === sessionId) {
-        clearTimeout(pending.timeout);
         pending.reject(new Error('Session ended'));
         this.pendingApprovals.delete(requestId);
       }
