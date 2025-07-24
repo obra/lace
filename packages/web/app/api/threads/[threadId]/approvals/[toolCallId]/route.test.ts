@@ -18,13 +18,18 @@ interface MockAgent {
   threadManager: MockThreadManager;
 }
 
-interface MockSessionService {
+interface MockSession {
   getAgent: ReturnType<typeof vi.fn>;
+}
+
+interface MockSessionService {
+  getSession: ReturnType<typeof vi.fn>;
 }
 
 describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   let mockAgent: MockAgent;
   let mockThreadManager: MockThreadManager;
+  let mockSession: MockSession;
   let mockSessionService: MockSessionService;
 
   beforeEach(() => {
@@ -38,9 +43,14 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       threadManager: mockThreadManager,
     };
 
+    // Create mock Session
+    mockSession = {
+      getAgent: vi.fn().mockReturnValue(mockAgent),
+    };
+
     // Create mock SessionService
     mockSessionService = {
-      getAgent: vi.fn().mockReturnValue(mockAgent),
+      getSession: vi.fn().mockReturnValue(mockSession),
     };
 
     mockGetSessionService.mockReturnValue(mockSessionService);
@@ -80,7 +90,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
     // Verify response
     expect(response.status).toBe(200);
-    const data = await response.json();
+    const data = (await response.json()) as { success: boolean };
     expect(data).toEqual({ success: true });
   });
 
@@ -109,12 +119,14 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       );
 
       expect(response.status).toBe(200);
-      const data = await response.json();
+      const data = (await response.json()) as { success: boolean };
       expect(data).toEqual({ success: true });
 
       // Clear mocks between iterations
       vi.clearAllMocks();
       mockGetSessionService.mockReturnValue(mockSessionService);
+      mockSessionService.getSession.mockReturnValue(mockSession);
+      mockSession.getAgent.mockReturnValue(mockAgent);
     }
   });
 
@@ -124,7 +136,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const decision = 'allow_once';
 
     // Mock agent not found
-    mockSessionService.getAgent.mockReturnValue(null);
+    mockSession.getAgent.mockReturnValue(null);
 
     const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
       method: 'POST',
@@ -139,7 +151,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(mockThreadManager.addEvent).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = await response.json();
+    const data = (await response.json()) as { error: string };
     expect(data).toEqual({ error: 'Agent not found for thread' });
   });
 
@@ -157,7 +169,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
-    const data = await response.json();
+    const data = (await response.json()) as { error: string };
     expect(data).toHaveProperty('error');
   });
 
@@ -175,7 +187,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
-    const data = await response.json();
+    const data = (await response.json()) as { error: string };
     expect(data).toEqual({ error: 'Missing decision in request body' });
   });
 });

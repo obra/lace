@@ -25,10 +25,20 @@ export async function POST(
       return NextResponse.json({ error: 'Missing decision in request body' }, { status: 400 });
     }
     
-    // Delegate to core ThreadManager (no web-specific logic)
+    // Get session first, then agent (following existing pattern)
     const sessionService = getSessionService();
-    const agent = sessionService.getAgent(threadId);
     
+    // Determine session ID (parent thread for agents, or self for sessions)
+    const sessionIdStr: string = threadId.includes('.')
+      ? (threadId.split('.')[0] ?? threadId)
+      : threadId;
+    
+    const session = await sessionService.getSession(sessionIdStr);
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+    
+    const agent = session.getAgent(threadId);
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }

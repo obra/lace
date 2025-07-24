@@ -3,12 +3,35 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
-import { Agent, ApprovalDecision } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/lib/server/core-types';
+import { Agent } from '@/lib/server/lace-imports';
+import { asThreadId, type ThreadId } from '@/lib/server/core-types';
+
+interface MockThreadManager {
+  addEvent: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  getEvents: ReturnType<typeof vi.fn>;
+}
+
+interface MockToolExecutor {
+  setApprovalCallback: ReturnType<typeof vi.fn>;
+  getTool: ReturnType<typeof vi.fn>;
+}
+
+interface MockAgent {
+  threadId: string;
+  toolExecutor: MockToolExecutor;
+  threadManager: MockThreadManager;
+  emit: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+}
+
+interface ApprovalCallback {
+  requestApproval: (toolName: string, args: unknown) => Promise<string>;
+}
 
 describe('Event-Based Approval Callback', () => {
-  let mockAgent: any;
-  let sessionId: any;
+  let mockAgent: MockAgent;
+  let sessionId: ThreadId;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,7 +58,7 @@ describe('Event-Based Approval Callback', () => {
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
     // Get the approval callback that was set
-    const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0][0];
+    const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0]?.[0] as ApprovalCallback;
 
     // Mock finding a recent TOOL_CALL event
     mockAgent.threadManager.getEvents.mockReturnValue([
@@ -68,7 +91,7 @@ describe('Event-Based Approval Callback', () => {
     // Simulate approval response by triggering the event listener
     const eventListener = mockAgent.threadManager.on.mock.calls.find(
       call => call[0] === 'event_added'
-    )[1];
+    )?.[1] as (event: { type: string; data: { toolCallId: string; decision: string } }) => void;
 
     eventListener({
       type: 'TOOL_APPROVAL_RESPONSE',
@@ -83,7 +106,7 @@ describe('Event-Based Approval Callback', () => {
   it('should return existing approval if response already exists', async () => {
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
-    const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0][0];
+    const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0]?.[0] as ApprovalCallback;
 
     // Mock finding recent TOOL_CALL and existing response
     mockAgent.threadManager.getEvents.mockReturnValue([
@@ -111,7 +134,7 @@ describe('Event-Based Approval Callback', () => {
   it('should handle multiple concurrent approval requests', async () => {
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
-    const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0][0];
+    const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0]?.[0] as ApprovalCallback;
 
     // Mock two different TOOL_CALL events
     mockAgent.threadManager.getEvents.mockReturnValue([
@@ -130,7 +153,7 @@ describe('Event-Based Approval Callback', () => {
     ]);
 
     let addEventCallCount = 0;
-    mockAgent.threadManager.addEvent.mockImplementation((threadId, type, data) => {
+    mockAgent.threadManager.addEvent.mockImplementation((_threadId: string, type: string, data: unknown) => {
       addEventCallCount++;
       return {
         id: `event_${addEventCallCount + 2}`,
@@ -160,7 +183,7 @@ describe('Event-Based Approval Callback', () => {
     // Get the event listener
     const eventListener = mockAgent.threadManager.on.mock.calls.find(
       call => call[0] === 'event_added'
-    )[1];
+    )?.[1] as (event: { type: string; data: { toolCallId: string; decision: string } }) => void;
 
     // Respond to first approval
     eventListener({

@@ -53,7 +53,7 @@ describe('Approval Database Queries', () => {
       const pending = db.getPendingApprovals(threadId);
       expect(pending).toHaveLength(1);
       expect(pending[0].toolCallId).toBe('call_123');
-      expect(pending[0].toolCall.name).toBe('bash');
+      expect((pending[0].toolCall as { name: string }).name).toBe('bash');
     });
 
     it('should not return approvals that have responses', () => {

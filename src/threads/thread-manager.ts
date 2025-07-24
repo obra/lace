@@ -615,7 +615,7 @@ export class ThreadManager {
    */
   getPendingApprovals(threadId: string): Array<{
     toolCallId: string;
-    toolCall: any;
+    toolCall: unknown;
     requestedAt: Date;
   }> {
     return this._persistence.getPendingApprovals(threadId);
