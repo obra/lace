@@ -1,33 +1,28 @@
-// ABOUTME: Test suite for RESTful task notes API - add notes to tasks under project/session
-// ABOUTME: Tests note creation with proper nested route validation
+// ABOUTME: Integration tests for RESTful task notes API - add notes to tasks under project/session
+// ABOUTME: Tests note creation with real implementations and proper nested route validation
 
-import { NextRequest } from 'next/server';
-import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
+/**
+ * @vitest-environment node
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { POST } from './route';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { getSessionService } from '@/lib/server/session-service';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { Task } from '@/types/api';
 
-// Mock Project
-vi.mock('@/lib/server/lace-imports', () => ({
-  Project: {
-    getById: vi.fn(),
-  },
-}));
+// Mock external dependencies only
+vi.mock('server-only', () => ({}));
 
 describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', () => {
-  let mockProject: {
-    getSession: MockedFunction<(id: string) => unknown>;
-  };
-  let mockSession: {
-    getTaskManager: MockedFunction<() => unknown>;
-  };
-  let mockTaskManager: {
-    addNote: MockedFunction<(taskId: string, content: string, context: unknown) => Promise<void>>;
-    getTaskById: MockedFunction<(id: string) => Task | null>;
-  };
+  let sessionService: ReturnType<typeof getSessionService>;
+  let testProjectId: string;
+  let testSessionId: string;
+  let testTaskId: string;
 
-  const mockTask: Task = {
-    id: 'task1',
+  const mockTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
     title: 'Test Task',
     description: 'Test description',
     prompt: 'Test prompt',
@@ -36,145 +31,224 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     assignedTo: 'user1',
     createdBy: 'human',
     threadId: 'session1',
-    createdAt: '2023-01-01T00:00:00.000Z',
-    updatedAt: '2023-01-01T00:00:00.000Z',
-    notes: [
-      {
-        id: 'note1',
-        content: 'Test note content',
-        author: 'human',
-        timestamp: '2023-01-01T00:00:00.000Z',
-      },
-    ],
+    notes: [],
   };
 
-  beforeEach(() => {
-    mockTaskManager = {
-      addNote: vi.fn(),
-      getTaskById: vi.fn(),
-    };
+  beforeEach(async () => {
+    setupTestPersistence();
 
-    mockSession = {
-      getTaskManager: vi.fn().mockReturnValue(mockTaskManager),
-    };
+    // Set up environment for session service
+    process.env.ANTHROPIC_KEY = 'test-key';
+    process.env.LACE_DB_PATH = ':memory:';
 
-    mockProject = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-    };
+    sessionService = getSessionService();
 
-    const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-    mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
+    // Create a real test project
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    testProjectId = project.getId();
+
+    // Create a real session
+    const newSession = await sessionService.createSession(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307',
+      testProjectId
+    );
+    testSessionId = newSession.id;
+
+    // Get the active session instance to access task manager
+    const session = await sessionService.getSession(asThreadId(testSessionId));
+    if (!session) {
+      throw new Error('Failed to get active session');
+    }
+
+    // Create a real task for testing
+    const taskManager = session.getTaskManager();
+    const task = await taskManager.createTask(
+      {
+        title: mockTask.title,
+        description: mockTask.description,
+        prompt: mockTask.prompt,
+        priority: mockTask.priority,
+        assignedTo: mockTask.assignedTo,
+      },
+      {
+        actor: 'human',
+        isHuman: true,
+      }
+    );
+    testTaskId = task.id;
+  });
+
+  afterEach(() => {
+    sessionService.clearActiveSessions();
+    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('POST', () => {
     it('should add note to task successfully', async () => {
-      mockTaskManager.addNote.mockResolvedValue();
-      mockTaskManager.getTaskById.mockReturnValue(mockTask);
-
       const requestBody = {
         content: 'Test note content',
       };
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
       };
 
-      const response = await POST(request, context);
+      const response = (await POST(request, context)) as NextResponse;
       expect(response.status).toBe(201);
 
       const data = (await response.json()) as { message: string; task: Task };
       expect(data.message).toBe('Note added successfully');
-      expect(data.task.id).toBe('task1');
+      expect(data.task.id).toBe(testTaskId);
       expect(data.task.notes).toHaveLength(1);
+      expect(data.task.notes[0].content).toBe('Test note content');
     });
 
     it('should add note with specified author', async () => {
-      mockTaskManager.addNote.mockResolvedValue();
-      mockTaskManager.getTaskById.mockReturnValue(mockTask);
-
       const requestBody = {
         content: 'Agent note content',
         author: 'agent',
       };
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
-      };
-
-      const response = await POST(request, context);
-      expect(response.status).toBe(201);
-
-      expect(mockTaskManager.addNote).toHaveBeenCalledWith(
-        'task1',
-        'Agent note content',
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
-          actor: 'agent',
-          isHuman: false,
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+          headers: { 'Content-Type': 'application/json' },
         }
       );
-    });
 
-    it('should return 400 for missing content', async () => {
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify({}),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
       };
 
-      const response = await POST(request, context);
+      const response = (await POST(request, context)) as NextResponse;
+      expect(response.status).toBe(201);
+
+      const data = (await response.json()) as { message: string; task: Task };
+      expect(data.message).toBe('Note added successfully');
+      expect(data.task.notes).toHaveLength(1);
+      expect(data.task.notes[0].content).toBe('Agent note content');
+      expect(data.task.notes[0].author).toBe('agent');
+    });
+
+    it('should return 400 for empty content', async () => {
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: '' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
+      };
+
+      const response = (await POST(request, context)) as NextResponse;
       expect(response.status).toBe(400);
 
       const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Note content is required');
+      expect(data.error).toBe('Invalid request body: content: Note content is required');
+    });
+
+    it('should return 400 for missing content field', async () => {
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
+      };
+
+      const response = (await POST(request, context)) as NextResponse;
+      expect(response.status).toBe(400);
+
+      const data = (await response.json()) as { error: string };
+      expect(data.error).toBe('Invalid request body: content: Required');
+    });
+
+    it('should return detailed validation error for invalid parameters', async () => {
+      const request = new NextRequest(
+        `http://localhost/api/projects/invalid-uuid/sessions/invalid-session/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: 'Test note' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const context = {
+        params: Promise.resolve({
+          projectId: 'invalid-uuid',
+          sessionId: 'invalid-session',
+          taskId: testTaskId,
+        }),
+      };
+
+      const response = (await POST(request, context)) as NextResponse;
+      expect(response.status).toBe(500);
+
+      const data = (await response.json()) as { error: string };
+      expect(data.error).toContain('Invalid route parameters:');
+      expect(data.error).toContain('projectId');
+      expect(data.error).toContain('sessionId');
     });
 
     it('should return 404 for non-existent project', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
+      const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
+      const request = new NextRequest(
+        `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: 'Test note' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify({ content: 'Test note' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'nonexistent', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
+      const context = {
+        params: Promise.resolve({
+          projectId: nonExistentProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
       };
 
-      const response = await POST(request, context);
+      const response = (await POST(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
       const data = (await response.json()) as { error: string };
@@ -182,23 +256,25 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should return 404 for non-existent session', async () => {
-      mockProject.getSession.mockReturnValue(null);
+      const nonExistentSessionId = 'lace_20000101_000000';
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: 'Test note' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/nonexistent/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify({ content: 'Test note' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'nonexistent', 
-          taskId: 'task1' 
-        }) 
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: nonExistentSessionId,
+          taskId: testTaskId,
+        }),
       };
 
-      const response = await POST(request, context);
+      const response = (await POST(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
       const data = (await response.json()) as { error: string };
@@ -206,48 +282,24 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should return 404 for non-existent task', async () => {
-      mockTaskManager.addNote.mockRejectedValue(new Error('Task not found'));
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/nonexistent/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: 'Test note' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/nonexistent/notes', {
-        method: 'POST',
-        body: JSON.stringify({ content: 'Test note' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'nonexistent' 
-        }) 
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: 'nonexistent',
+        }),
       };
 
-      const response = await POST(request, context);
-      expect(response.status).toBe(404);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Task not found');
-    });
-
-    it('should return 404 when task not found after adding note', async () => {
-      mockTaskManager.addNote.mockResolvedValue();
-      mockTaskManager.getTaskById.mockReturnValue(null);
-
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify({ content: 'Test note' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
-      };
-
-      const response = await POST(request, context);
+      const response = (await POST(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
       const data = (await response.json()) as { error: string };
@@ -255,62 +307,68 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should handle database errors', async () => {
-      mockTaskManager.addNote.mockRejectedValue(new Error('Database error'));
+      // Simulate database error by trying to add note to already deleted task
+      const session = await sessionService.getSession(asThreadId(testSessionId));
+      if (!session) throw new Error('Session not found');
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify({ content: 'Test note' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const taskManager = session.getTaskManager();
+      // Delete the task first to cause an error
+      await taskManager.deleteTask(testTaskId, { actor: 'human', isHuman: true });
 
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: 'Test note' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
       };
 
-      const response = await POST(request, context);
-      expect(response.status).toBe(500);
+      const response = (await POST(request, context)) as NextResponse;
+      expect(response.status).toBe(404);
 
       const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Database error');
+      expect(data.error).toBe('Task not found');
     });
 
     it('should default to human author when not specified', async () => {
-      mockTaskManager.addNote.mockResolvedValue();
-      mockTaskManager.getTaskById.mockReturnValue(mockTask);
-
       const requestBody = {
         content: 'Human note content',
       };
 
-      const request = new NextRequest('http://localhost/api/projects/proj1/sessions/sess1/tasks/task1/notes', {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const context = { 
-        params: Promise.resolve({ 
-          projectId: 'proj1', 
-          sessionId: 'sess1', 
-          taskId: 'task1' 
-        }) 
-      };
-
-      const response = await POST(request, context);
-      expect(response.status).toBe(201);
-
-      expect(mockTaskManager.addNote).toHaveBeenCalledWith(
-        'task1',
-        'Human note content',
+      const request = new NextRequest(
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
-          actor: 'human',
-          isHuman: true,
+          method: 'POST',
+          body: JSON.stringify(requestBody),
+          headers: { 'Content-Type': 'application/json' },
         }
       );
+
+      const context = {
+        params: Promise.resolve({
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
+        }),
+      };
+
+      const response = (await POST(request, context)) as NextResponse;
+      expect(response.status).toBe(201);
+
+      const data = (await response.json()) as { message: string; task: Task };
+      expect(data.message).toBe('Note added successfully');
+      expect(data.task.notes).toHaveLength(1);
+      expect(data.task.notes[0].content).toBe('Human note content');
+      expect(data.task.notes[0].author).toBe('human');
     });
   });
 });

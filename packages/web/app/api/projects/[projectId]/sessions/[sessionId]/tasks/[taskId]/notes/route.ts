@@ -39,7 +39,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
 
     const body = (await request.json()) as Record<string, unknown>;
-    const { content, author } = validateRequestBody(body, AddNoteSchema);
+    let validatedBody;
+    try {
+      validatedBody = validateRequestBody(body, AddNoteSchema);
+    } catch (error) {
+      // Return validation errors as 400 Bad Request
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Invalid request body',
+        400
+      );
+    }
+    const { content, author } = validatedBody;
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
