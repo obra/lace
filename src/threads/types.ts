@@ -2,6 +2,7 @@
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
 import { ToolCall, ToolResult } from '~/tools/types';
+import type { CompactionData } from '~/threads/compaction/types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [
@@ -12,6 +13,7 @@ export const EVENT_TYPES = [
   'LOCAL_SYSTEM_MESSAGE',
   'SYSTEM_PROMPT',
   'USER_SYSTEM_PROMPT',
+  'COMPACTION',
 ] as const;
 
 // Derive EventType union from the array
@@ -22,7 +24,7 @@ export interface ThreadEvent {
   threadId: string;
   type: EventType;
   timestamp: Date;
-  data: string | ToolCall | ToolResult;
+  data: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>;
 }
 
 export interface Thread {
@@ -39,14 +41,6 @@ export interface Thread {
     model?: string;
     [key: string]: unknown;
   };
-}
-
-export interface VersionHistoryEntry {
-  id: number;
-  canonicalId: string;
-  versionId: string;
-  createdAt: Date;
-  reason: string;
 }
 
 // Branded type for thread IDs

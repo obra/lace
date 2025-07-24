@@ -12,6 +12,7 @@ A **thread** represents a complete conversation history. Each thread has:
 - An ordered sequence of events
 - Creation and update timestamps
 - Support for parent-child relationships (delegation)
+- **Stable ID**: Thread IDs never change, even during compaction
 
 ### Events
 Events are immutable records of actions within a conversation:
@@ -22,12 +23,13 @@ Events are immutable records of actions within a conversation:
 - `THINKING` - Agent reasoning process
 - `SYSTEM_PROMPT` - System instructions
 - `LOCAL_SYSTEM_MESSAGE` - UI-only messages
+- `COMPACTION` - Compaction event containing compacted conversation state
 
-### Thread Versioning
-To handle context window limits, threads support versioning:
-- **Canonical Thread**: The original thread ID that remains stable
-- **Compacted Versions**: New threads with compressed event history
-- **Version History**: Audit trail of all versions for a canonical thread
+### Compaction Events
+To handle context window limits, threads use compaction events:
+- **Compaction Event**: Special event containing compacted conversation history
+- **Working Conversation**: Current conversation state built from latest compaction + recent events
+- **Complete History**: All events including compaction events (for debugging/audit)
 
 ## Architecture
 
@@ -52,23 +54,22 @@ Central coordinator for thread operations:
 - Thread creation and lifecycle management
 - Event addition and retrieval
 - Parent-child thread relationships (delegation)
-- Compaction coordination
-- Version management
+- Compaction strategy registration and execution
 
 Key methods:
 ```typescript
 createThread(threadId: string): Thread
 addEvent(threadId: string, type: EventType, data: any): ThreadEvent
-getEvents(threadId: string): ThreadEvent[]
-createCompactedVersion(reason: string): Promise<string>
-getCanonicalId(threadId: string): string
+getEvents(threadId: string): ThreadEvent[]  // Returns working conversation
+getAllEvents(threadId: string): ThreadEvent[]  // Returns complete history
+registerCompactionStrategy(strategy: CompactionStrategy): void
+compact(threadId: string, strategyId: string): Promise<void>
 ```
 
 #### ThreadPersistence (`src/threads/persistence.ts`)
 SQLite-based storage layer with graceful degradation:
 - Database schema management with migrations
 - Thread and event persistence
-- Version mapping tables
 - Transaction support for atomic operations
 - Memory-only fallback when disk unavailable
 
@@ -77,19 +78,22 @@ Database schema:
 -- Core tables
 threads (id, created_at, updated_at)
 events (id, thread_id, type, data, created_at)
-
--- Version management
-thread_versions (canonical_id, current_version_id)
-version_history (canonical_id, version_id, created_at, reason)
 ```
 
 #### Compaction System (`src/threads/compaction/`)
-Pluggable strategy for managing context window limits:
+Event-based strategy for managing context window limits:
 - `CompactionStrategy` interface for extensibility
-- `SummarizeStrategy` default implementation
-- Preserves all user/agent messages
-- Compresses tool operations and metadata
-- Creates new thread versions transparently
+- `TrimToolResultsStrategy` example implementation
+- Creates `COMPACTION` events containing compacted conversation state
+- Preserves thread ID stability (no new threads created)
+- Strategy registry for pluggable compaction approaches
+
+#### Conversation Builder (`src/threads/conversation-builder.ts`)
+Logic for reconstructing conversations from events:
+- `buildWorkingConversation()` - Returns current conversation state (post-compaction)
+- `buildCompleteHistory()` - Returns all events including compaction events
+- Automatically uses latest compaction + events after compaction
+- Transparent handling of compaction events
 
 ## Thread Lifecycle
 
@@ -105,20 +109,21 @@ threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
 threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi! How can I help?');
 ```
 
-### 3. Compaction (Automatic)
+### 3. Compaction (Manual or Automatic)
 When approaching token limits:
 ```typescript
-if (threadManager.needsCompaction()) {
-  const compactedId = await threadManager.createCompactedVersion('Auto-compaction');
-  // ThreadManager automatically switches to compacted version
-}
+await threadManager.compact(threadId, 'trim-tool-results');
+// Creates COMPACTION event within same thread
+// Thread ID remains stable
 ```
 
-### 4. Version Resolution
-External references always use canonical ID:
+### 4. Working Conversation Retrieval
+Get current conversation state:
 ```typescript
-const canonicalId = threadManager.getCanonicalId(anyThreadId);
-// Returns original thread ID regardless of compaction
+const workingEvents = threadManager.getEvents(threadId);
+// Returns compacted conversation (latest compaction + events after)
+const allEvents = threadManager.getAllEvents(threadId);
+// Returns complete history including all COMPACTION events
 ```
 
 ## Delegation Pattern
@@ -133,27 +138,33 @@ parent_thread_id
 
 ## Compaction Strategy
 
-### Token Management
-The default `SummarizeStrategy`:
-1. Monitors token usage (configurable threshold, default 100K)
-2. Preserves all user and agent messages
-3. Compresses tool calls/results into summaries
-4. Maintains conversation continuity
+### Event-Based Compaction
+The system uses `COMPACTION` events to manage token usage:
+1. Strategy determines how to compact conversation events
+2. Creates new `COMPACTION` event containing compacted conversation state
+3. Conversation rebuilder uses latest compaction + subsequent events
+4. Thread ID remains stable throughout compaction process
 
-### Version Management
-- Original thread preserved for audit trail
-- New versions created with compacted events
-- Automatic switching to latest version
-- Cleanup of old versions available (manual)
+### Strategy Types
+- **TrimToolResultsStrategy**: Truncates tool outputs to save tokens
+- **Future strategies**: Summarization, semantic clustering, etc.
 
-Example compaction:
+### Compaction Process
+```typescript
+interface CompactionData {
+  strategyId: string;
+  originalEventCount: number;
+  compactedEvents: ThreadEvent[];
+  metadata?: Record<string, unknown>;
+}
 ```
-Original: 15 events, 120K tokens
-    ↓
-Compacted: 11 events, 45K tokens
-- All user/agent messages preserved
-- Tool operations summarized
-- Metadata compressed
+
+Example compaction workflow:
+```
+Thread events: [USER_MESSAGE, TOOL_CALL, TOOL_RESULT(long), AGENT_MESSAGE]
+                           ↓ (compact using trim-tool-results)
+Compacted thread: [COMPACTION_EVENT{compactedEvents: [USER_MESSAGE, TOOL_CALL, TOOL_RESULT(trimmed), AGENT_MESSAGE]}]
+Working conversation: [USER_MESSAGE, TOOL_CALL, TOOL_RESULT(trimmed), AGENT_MESSAGE]
 ```
 
 ## Implementation Details
@@ -186,60 +197,61 @@ lace_YYYYMMDD_randomid
 
 ### Graceful Degradation
 - SQLite unavailable → memory-only operation
-- Compaction failure → continue with original thread
-- Version lookup miss → treat as canonical ID
+- Compaction failure → continue with uncompacted thread
+- Strategy not found → throw descriptive error
 
 ### Recovery Mechanisms
 - Database corruption → reinitialize schema
 - Missing events → fail safely with error
 - Orphaned tool calls → handle in conversation builder
+- Invalid compaction data → skip compaction and use all events
 
 ## Future Enhancements
 
 ### Advanced Compaction
-- Semantic clustering of conversations
+- AI-powered conversation summarization strategies
 - User-configurable preservation rules
-- Multi-stage compaction strategies
-- ML-based importance scoring
+- Multi-stage compaction (e.g., trim then summarize)
+- Context-aware compaction based on conversation topics
 
 ### Performance
-- Event streaming for large threads
-- Distributed storage backends
-- Read replicas for scaling
-- Event compression
+- Auto-compaction triggers based on token thresholds
+- Lazy loading of compacted events
+- Background compaction processing
+- Configurable compaction policies
 
 ### Features
-- Thread branching/merging
-- Collaborative editing
-- Version diffing
-- Export/import capabilities
+- Compaction analytics and effectiveness tracking
+- Custom compaction strategies via plugins
+- Conversation diffing before/after compaction
+- Export/import of compacted conversations
 
 ## Best Practices
 
 ### For Developers
-1. Always use canonical IDs for external references
-2. Let ThreadManager handle version switching
-3. Don't modify events after creation
+1. Use `getEvents()` for working conversation, `getAllEvents()` for debugging
+2. Register compaction strategies during ThreadManager initialization
+3. Don't modify events after creation (immutability principle)
 4. Use transactions for multi-step operations
 
 ### For Thread Design
 1. Keep events focused and atomic
 2. Include sufficient context in each event
 3. Use appropriate event types
-4. Consider compaction when designing event data
+4. Design event data with compaction in mind (avoid excessive nesting)
 
-### For Performance
-1. Monitor token usage proactively
-2. Configure appropriate compaction thresholds
-3. Clean up old versions periodically
-4. Index custom queries appropriately
+### For Compaction
+1. Test compaction strategies thoroughly with real conversation data
+2. Monitor compaction effectiveness (token reduction ratios)
+3. Choose strategies appropriate for conversation patterns
+4. Consider multiple compaction stages for large conversations
 
 ## Migration Path
 
 The system supports incremental enhancement:
 1. Existing threads work without modification
-2. Compaction applied only when needed
-3. Version tables created on first use
+2. Compaction applied only when manually triggered or auto-compaction enabled
+3. No database schema changes required (uses existing events table)
 4. Full backward compatibility maintained
 
 ## Security Considerations
@@ -253,8 +265,8 @@ The system supports incremental enhancement:
 
 The thread management system provides a robust foundation for conversational AI with:
 - Immutable event sourcing for reliability
-- Transparent compaction for scalability
-- Version management for continuity
-- Extensible architecture for future enhancements
+- Event-based compaction for scalability
+- Thread ID stability for simplicity
+- Extensible strategy pattern for different compaction approaches
 
-This design enables Lace to handle conversations of any length while maintaining performance, reliability, and full conversation history.
+This design enables Lace to handle conversations of any length while maintaining performance, reliability, and full conversation history. The elimination of complex dual-ID systems and thread versioning makes the system much more maintainable and easier to reason about.

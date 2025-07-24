@@ -112,9 +112,6 @@ export class Agent extends EventEmitter {
   }
 
   // Public access to thread ID for delegation
-  // IMPORTANT: This returns the CANONICAL thread ID, which remains stable across compactions
-  // The canonical ID is the external identifier that clients see and should never change
-  // Internally, we may switch to compacted threads, but this API maintains the stable contract
   get threadId(): string {
     return this._threadId;
   }
@@ -193,8 +190,8 @@ export class Agent extends EventEmitter {
     this._addTokensToCurrentTurn('in', this._estimateTokens(content));
 
     if (content.trim()) {
-      // Add user message to active thread (could be compacted thread after compaction)
-      this._addEventAndEmit(this._getActiveThreadId(), 'USER_MESSAGE', content);
+      // Add user message to active thread
+      this._addEventAndEmit(this._threadId, 'USER_MESSAGE', content);
     }
 
     try {
@@ -318,35 +315,6 @@ export class Agent extends EventEmitter {
     return this._threadId;
   }
 
-  // Get the current active thread ID for INTERNAL operations
-  // DESIGN EXPLANATION: This is the heart of the canonical ID mapping system
-  //
-  // EXTERNAL CONTRACT: agent.getThreadId() always returns the stable canonical ID
-  // INTERNAL OPERATIONS: We use the current working thread (may be compacted)
-  //
-  // Why this works:
-  // 1. External clients see stable thread IDs that never change
-  // 2. Internal operations automatically use the latest compacted version
-  // 3. ThreadManager maintains the mapping between canonical and working threads
-  // 4. This enables seamless compaction without breaking external thread ID contracts
-  //
-  // Example flow:
-  // - User creates thread "abc123"
-  // - agent.getThreadId() returns "abc123" (canonical ID)
-  // - After compaction, internal operations use "abc123_v2" (compacted thread)
-  // - agent.getThreadId() STILL returns "abc123" (stable external contract)
-  // - ThreadManager.getCanonicalId("abc123_v2") resolves back to "abc123"
-  private _getActiveThreadId(): string {
-    // Always use the agent's own thread ID - don't rely on ThreadManager's "current" thread
-    // which may point to a different thread (like the parent session for delegate agents)
-    const activeThreadId = this._threadId;
-
-    // Always use the agent's own thread ID - don't rely on ThreadManager's "current" thread
-    // which may point to a different thread (like the parent session for delegate agents)
-
-    return activeThreadId;
-  }
-
   getAvailableTools(): Tool[] {
     return [...this._tools]; // Return copy to prevent mutation
   }
@@ -427,8 +395,8 @@ export class Agent extends EventEmitter {
 
   // Thread message processing for agent-facing conversation
   buildThreadMessages(): ProviderMessage[] {
-    // Use the current active thread (which might be a compacted thread after compaction)
-    const activeThreadId = this._getActiveThreadId();
+    // Use the current active thread
+    const activeThreadId = this._threadId;
     // Building conversation messages from thread events
 
     const events = this._threadManager.getEvents(activeThreadId);
@@ -441,21 +409,6 @@ export class Agent extends EventEmitter {
     this._abortController = new AbortController();
 
     try {
-      // Check if compaction is needed before building conversation (simplified approach)
-      if (await this._threadManager.needsCompaction(this._provider)) {
-        logger.info('Thread compaction triggered', { threadId: this._threadId });
-        const newThreadId = this._threadManager.createCompactedVersion(
-          'Auto-compaction',
-          this._provider
-        );
-        // ThreadManager already switched to the new compacted thread
-        logger.info('Thread compacted successfully', {
-          canonicalThreadId: this._threadId, // Stable external ID
-          newCompactedThreadId: newThreadId, // New compacted thread ID
-          canonicalId: this._threadManager.getCanonicalId(this._threadId),
-        });
-      }
-
       // Rebuild conversation from thread events
       const conversation = this.buildThreadMessages();
 
@@ -603,7 +556,7 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context
-        this._addEventAndEmit(this._getActiveThreadId(), 'AGENT_MESSAGE', response.content);
+        this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', response.content);
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -900,7 +853,7 @@ export class Agent extends EventEmitter {
       };
 
       // Add tool call to thread
-      this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_CALL', toolCall);
+      this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
 
       // Emit tool call start event
       this.emit('tool_call_start', {
@@ -950,7 +903,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add tool result to thread
-        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', result);
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
 
         // Add tool output tokens to current turn metrics (estimated)
         this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
@@ -976,7 +929,7 @@ export class Agent extends EventEmitter {
         });
 
         // Add failed tool result to thread
-        this._addEventAndEmit(this._getActiveThreadId(), 'TOOL_RESULT', failedResult);
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', failedResult);
       }
     }
   }
@@ -1386,10 +1339,10 @@ export class Agent extends EventEmitter {
 
   /**
    * Replay all historical events from current thread for session resumption
-   * Used during --continue and post-compaction state rebuilding
+   * Used during --continue and session resumption
    */
   replaySessionEvents(): void {
-    const events = this._threadManager.getEvents(this._getActiveThreadId());
+    const events = this._threadManager.getEvents(this._threadId);
 
     logger.debug('Agent: Replaying session events', {
       threadId: this._threadId,
@@ -1408,12 +1361,9 @@ export class Agent extends EventEmitter {
   }
 
   // Thread management API - proxies to ThreadManager
-  getCurrentThreadId(): string | null {
-    return this._threadId;
-  }
 
   getThreadEvents(threadId?: string): ThreadEvent[] {
-    const targetThreadId = threadId || this._getActiveThreadId();
+    const targetThreadId = threadId || this._threadId;
     return this._threadManager.getEvents(targetThreadId);
   }
 
@@ -1465,8 +1415,9 @@ export class Agent extends EventEmitter {
     return this._threadManager.getMainAndDelegateEvents(mainThreadId);
   }
 
-  compact(threadId: string): void {
-    this._threadManager.compact(threadId);
+  async compact(threadId: string): Promise<void> {
+    // TODO: Use a configurable strategy once registry is set up
+    await this._threadManager.compact(threadId, 'trim-tool-results');
   }
 
   createDelegateAgent(

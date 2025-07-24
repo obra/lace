@@ -138,27 +138,6 @@ Benefits:
 - System can queue important notifications
 - Maintains conversation coherence
 
-## Thread Versioning for Compaction
-
-To handle context window limits, we use shadow threads:
-
-```typescript
-interface ThreadVersion {
-  canonicalId: string;      // Original thread ID (stable external reference)
-  currentVersion: string;   // Active working thread ID
-  versions: Array<{
-    id: string;
-    created: Date;
-    reason: string;         // "original", "optimized", etc.
-  }>;
-}
-```
-
-Benefits:
-- Thread IDs remain stable for external references
-- Compaction strategies can evolve independently
-- Original history preserved for audit
-- Clean runtime implementation
 
 ## User Interface
 

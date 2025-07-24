@@ -62,7 +62,7 @@ describe('Agent Single Event Source Integration', () => {
     threadManager.createThread('integration-test-thread');
 
     // Test Agent API methods exist and work
-    expect(agent.getCurrentThreadId()).toBe('integration-test-thread');
+    expect(agent.getThreadId()).toBe('integration-test-thread');
     expect(typeof agent.getThreadEvents).toBe('function');
     expect(typeof agent.compact).toBe('function');
     expect(typeof agent.resumeOrCreateThread).toBe('function');

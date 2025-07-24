@@ -22,7 +22,6 @@ interface DebugOptions {
 
 interface ThreadDebugInfo {
   threadId: string;
-  canonicalId: string;
   provider: string;
   format: string;
   eventCount: number;
@@ -52,9 +51,6 @@ function debugThread(options: DebugOptions): ThreadDebugInfo {
   if (!thread) {
     throw new Error(`Thread ${options.threadId} not found`);
   }
-
-  // Get canonical ID
-  const canonicalId = threadManager.getCanonicalId(options.threadId);
 
   // Initialize provider registry and get provider
   const registry = ProviderRegistry.createWithAutoDiscovery();
@@ -97,7 +93,6 @@ function debugThread(options: DebugOptions): ThreadDebugInfo {
 
   return {
     threadId: options.threadId,
-    canonicalId,
     provider: options.provider,
     format: options.format,
     eventCount: thread.events.length,
@@ -183,7 +178,6 @@ function formatAsText(debugInfo: ThreadDebugInfo): string {
   lines.push(`Thread Debug Report`);
   lines.push(`==================`);
   lines.push(`Thread ID: ${debugInfo.threadId}`);
-  lines.push(`Canonical ID: ${debugInfo.canonicalId}`);
   lines.push(`Provider: ${debugInfo.provider}`);
   lines.push(`Event Count: ${debugInfo.eventCount}`);
   lines.push('');

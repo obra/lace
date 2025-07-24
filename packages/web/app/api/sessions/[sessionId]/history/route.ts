@@ -7,6 +7,7 @@ import { SessionEvent, ApiErrorResponse } from '@/types/api';
 import type { ThreadEvent } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/core-types';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import type { CompactionData } from '@/lib/core-types-import';
 
 // Use core ThreadId validation instead of custom validation
 // isThreadId is imported from core-types and handles proper format validation
@@ -147,13 +148,51 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       };
     }
 
-    default: {
-      // For unknown event types, preserve the original event so frontend can handle it properly
+    case 'COMPACTION': {
+      // Convert CompactionData from core to web format
+      const compactionData = threadEvent.data as CompactionData;
       return {
         ...baseEvent,
-        type: threadEvent.type as string,
-        data: threadEvent.data,
+        type: 'COMPACTION',
+        data: {
+          strategyId: compactionData.strategyId,
+          originalEventCount: compactionData.originalEventCount,
+          compactedEvents: compactionData.compactedEvents,
+          metadata: compactionData.metadata,
+        },
       };
+    }
+
+    case 'SYSTEM_PROMPT': {
+      const content =
+        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
+      return {
+        ...baseEvent,
+        type: 'SYSTEM_PROMPT',
+        data: { content },
+      };
+    }
+
+    case 'USER_SYSTEM_PROMPT': {
+      const content =
+        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
+      return {
+        ...baseEvent,
+        type: 'USER_SYSTEM_PROMPT',
+        data: { content },
+      };
+    }
+
+    default: {
+      // Exhaustive check - this should never be reached if all event types are handled
+      const _exhaustiveCheck: never = threadEvent.type;
+      console.warn('Unknown event type encountered:', _exhaustiveCheck);
+      // Return a fallback for runtime safety
+      return {
+        ...baseEvent,
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: { content: `Unknown event type: ${String(_exhaustiveCheck)}` },
+      } as SessionEvent;
     }
   }
 }

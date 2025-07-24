@@ -1,213 +1,231 @@
-// ABOUTME: Integration tests for thread compaction with Agent
-// ABOUTME: Tests end-to-end compaction workflow including agent-triggered compaction
-
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { Agent } from '~/agents/agent';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { Tool } from '~/tools/tool';
-import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { logger } from '~/utils/logger';
-
-// Mock provider for testing
-class MockProvider extends BaseMockProvider {
-  private mockResponse: ProviderResponse = {
-    content: 'I understand.',
-    toolCalls: [],
-  };
-
-  constructor() {
-    super({});
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
-  // Use context window that allows for testing but not too restrictive
-  get contextWindow(): number {
-    return 4000;
-  }
-
-  get maxCompletionTokens(): number {
-    return 2000;
-  }
-
-  setMockResponse(content: string): void {
-    this.mockResponse = {
-      content,
-      toolCalls: [],
-    };
-  }
-
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return Promise.resolve(this.mockResponse);
-  }
-}
 
 describe('Compaction Integration', () => {
-  let tempDbPath: string;
   let threadManager: ThreadManager;
-  let agent: Agent;
-  let mockProvider: MockProvider;
-  let toolExecutor: ToolExecutor;
+  let threadId: string;
 
-  beforeEach(async () => {
-    setupTestPersistence();
-    tempDbPath = path.join(os.tmpdir(), `lace-test-${Date.now()}.db`);
+  beforeEach(() => {
     threadManager = new ThreadManager();
+    threadId = threadManager.createThread();
+  });
 
-    // Configure compaction strategy with lower token limit for testing
-    threadManager['_compactionStrategy'] = new SummarizeStrategy({
-      maxTokens: 500, // Very low for testing to ensure compaction triggers
-      preserveRecentEvents: 2,
+  it('creates working conversation without compaction', () => {
+    // Add some events
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
+
+    const workingEvents = threadManager.getEvents(threadId);
+    const allEvents = threadManager.getAllEvents(threadId);
+
+    expect(workingEvents).toHaveLength(2);
+    expect(allEvents).toHaveLength(2);
+    expect(workingEvents).toEqual(allEvents);
+  });
+
+  it('compacts conversation using trim-tool-results strategy', async () => {
+    // Add events including a long tool result
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files');
+    threadManager.addEvent(threadId, 'TOOL_CALL', {
+      id: 'call1',
+      name: 'list_files',
+      arguments: {},
     });
-
-    mockProvider = new MockProvider();
-    toolExecutor = new ToolExecutor();
-
-    const threadId = threadManager.generateThreadId();
-    threadManager.createThread(threadId);
-
-    agent = new Agent({
-      provider: mockProvider,
-      toolExecutor,
-      threadManager,
+    threadManager.addEvent(
       threadId,
-      tools: [],
-    });
-
-    await agent.start();
-  });
-
-  afterEach(() => {
-    agent?.stop();
-    threadManager?.close();
-    if (fs.existsSync(tempDbPath)) {
-      fs.unlinkSync(tempDbPath);
-    }
-    teardownTestPersistence();
-  });
-
-  it('should trigger compaction and preserve conversational flow', async () => {
-    const originalThreadId = agent.getThreadId();
-
-    // Manually add large tool results to trigger compaction
-    const longToolResult = 'Very long tool output that takes up lots of tokens. '.repeat(200);
-
-    // Add a mix of events that will trigger compaction
-    threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'Please run a command');
-    threadManager.addEvent(originalThreadId, 'AGENT_MESSAGE', 'I will run that for you');
-
-    // Add several large tool results that should trigger compaction
-    for (let i = 0; i < 5; i++) {
-      threadManager.addEvent(originalThreadId, 'TOOL_CALL', {
-        id: `call_${i}`,
-        name: 'bash',
-        arguments: { command: 'ls -la' },
-      });
-      threadManager.addEvent(originalThreadId, 'TOOL_RESULT', {
-        id: `call_${i}`,
-        content: [{ type: 'text', text: longToolResult }],
-        isError: false,
-      });
-    }
-
-    // Trigger compaction manually using simplified approach
-    expect(await threadManager.needsCompaction()).toBe(true);
-    const newThreadId = threadManager.createCompactedVersion('Test compaction');
-    expect(newThreadId).toBeDefined();
-
-    // Check if compaction occurred - Agent threadId should remain stable (canonical ID)
-    const finalThreadId = agent.getThreadId();
-    expect(finalThreadId).toBe(originalThreadId);
-
-    // ThreadManager's current thread should be different if compaction occurred
-    const currentShadowThreadId = threadManager.getCurrentThreadId();
-    expect(currentShadowThreadId).not.toBe(originalThreadId);
-
-    // Get events from the compacted thread
-    const eventsAfterCompaction = threadManager.getEvents(currentShadowThreadId!);
-
-    // Should have: the 2 user/agent messages preserved + tool events (now preserved) + any summary
-    expect(eventsAfterCompaction.length).toBeGreaterThan(2); // At least the preserved messages
-    // With tool preservation, we may have close to the original count but with truncated tool results
-    expect(eventsAfterCompaction.length).toBeLessThanOrEqual(15); // Allow for preserved tool events
-
-    // All user and agent messages should be preserved
-    const userAgentEvents = eventsAfterCompaction.filter(
-      (e) => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE'
+      'TOOL_RESULT',
+      'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt'
     );
-    expect(userAgentEvents).toHaveLength(2);
-    expect(userAgentEvents[0].data).toBe('Please run a command');
-    expect(userAgentEvents[1].data).toBe('I will run that for you');
+    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Found 5 files');
 
-    // With new strategy, summary may or may not be created depending on whether events needed summarization
-    // If all events are preserved (as important), no summary is created
-    // This is fine - compaction still occurred (thread shadowing)
+    expect(threadManager.getAllEvents(threadId)).toHaveLength(4);
 
-    // Should maintain canonical ID mapping
-    expect(threadManager.getCanonicalId(currentShadowThreadId!)).toBe(originalThreadId);
+    // Perform compaction
+    await threadManager.compact(threadId, 'trim-tool-results');
+
+    // Check results
+    const allEvents = threadManager.getAllEvents(threadId);
+    const workingEvents = threadManager.getEvents(threadId);
+
+    expect(allEvents).toHaveLength(5); // Original 4 + 1 compaction event
+    expect(workingEvents).toHaveLength(5); // Compacted conversation + compaction event
+
+    // Verify detailed structure of working conversation after compaction
+    expect(workingEvents[0]).toEqual(
+      expect.objectContaining({ type: 'USER_MESSAGE', data: 'List files' })
+    );
+    expect(workingEvents[1]).toEqual(expect.objectContaining({ type: 'TOOL_CALL' }));
+    expect(workingEvents[2]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+        data: 'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]',
+      })
+    );
+    expect(workingEvents[3]).toEqual(
+      expect.objectContaining({ type: 'AGENT_MESSAGE', data: 'Found 5 files' })
+    );
+    expect(workingEvents[4]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
   });
 
-  it('should continue conversation normally after compaction', async () => {
-    const originalThreadId = agent.getThreadId();
+  it('continues conversation after compaction', async () => {
+    // Set up conversation and compact it
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+    threadManager.addEvent(threadId, 'TOOL_RESULT', 'line1\nline2\nline3\nline4\nline5');
 
-    // Manually create a compaction scenario and trigger it
-    const longToolResult = 'Long tool output. '.repeat(100); // Smaller to avoid context window issues after compaction
+    await threadManager.compact(threadId, 'trim-tool-results');
 
-    threadManager.addEvent(originalThreadId, 'USER_MESSAGE', 'First message');
-    threadManager.addEvent(originalThreadId, 'AGENT_MESSAGE', 'First response');
+    // Add more events after compaction
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'What next?');
+    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Let me help');
 
-    for (let i = 0; i < 3; i++) {
-      threadManager.addEvent(originalThreadId, 'TOOL_RESULT', {
-        id: `result_${i}`,
-        content: [{ type: 'text', text: longToolResult }],
-        isError: false,
-      });
-    }
+    const workingEvents = threadManager.getEvents(threadId);
+    const allEvents = threadManager.getAllEvents(threadId);
 
-    // Trigger compaction using simplified approach
-    if (await threadManager.needsCompaction()) {
-      threadManager.createCompactedVersion('Test compaction for conversation');
-    }
+    // Working conversation should include compacted events + compaction event + new events
+    expect(workingEvents).toHaveLength(5); // 2 compacted + 1 compaction + 2 new
 
-    // Verify compaction occurred - Agent threadId should remain stable
-    const compactedThreadId = agent.getThreadId();
-    expect(compactedThreadId).toBe(originalThreadId); // Agent threadId stays stable
+    // All events should include original + compaction event + new events
+    expect(allEvents).toHaveLength(5); // 2 original + 1 compaction + 2 new = 5 total
 
-    // Continue conversation after compaction
-    mockProvider.setMockResponse('Hello there!');
-    await agent.sendMessage('Hello after compaction');
+    // Verify detailed structure of working conversation after adding more events
+    expect(workingEvents[0]).toEqual(
+      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Hello' })
+    );
+    expect(workingEvents[1]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+        data: 'line1\nline2\nline3\n[results truncated to save space.]',
+      })
+    );
+    expect(workingEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+    expect(workingEvents[3]).toEqual(
+      expect.objectContaining({ type: 'USER_MESSAGE', data: 'What next?' })
+    );
+    expect(workingEvents[4]).toEqual(
+      expect.objectContaining({ type: 'AGENT_MESSAGE', data: 'Let me help' })
+    );
+  });
 
-    // Get the active thread ID (compacted thread or original)
-    const activeThreadId = threadManager.getCurrentThreadId() || originalThreadId;
-    const finalEvents = threadManager.getEvents(activeThreadId);
+  it('handles multiple compactions', async () => {
+    // Create initial conversation
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+    threadManager.addEvent(threadId, 'TOOL_RESULT', 'long\nresult\nhere\nextra\nlines');
 
-    // Debug: log final events to understand the sequence
-    logger.debug('Final events:', {
-      count: finalEvents.length,
-      events: finalEvents.map((e) => ({
-        type: e.type,
-        data: typeof e.data === 'string' ? e.data : JSON.stringify(e.data),
-      })),
-    });
+    // First compaction
+    await threadManager.compact(threadId, 'trim-tool-results');
 
-    // Should have events and the last should be the new response
-    expect(finalEvents.length).toBeGreaterThan(0);
-    const lastEvent = finalEvents[finalEvents.length - 1];
+    // Add more events
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Continue');
+    threadManager.addEvent(threadId, 'TOOL_RESULT', 'another\nlong\nresult\nwith\nextra\nlines');
 
-    expect(lastEvent.type).toBe('AGENT_MESSAGE');
-    expect(lastEvent.data).toBe('Hello there!');
+    // Second compaction
+    await threadManager.compact(threadId, 'trim-tool-results');
+
+    const workingEvents = threadManager.getEvents(threadId);
+    const allEvents = threadManager.getAllEvents(threadId);
+
+    // Detailed verification of event structure
+    const compactionEvents = allEvents.filter((e) => e.type === 'COMPACTION');
+    expect(compactionEvents).toHaveLength(2);
+
+    // All events should be exactly: [original1, original2, compaction1, more1, more2, compaction2]
+    expect(allEvents).toHaveLength(6);
+    expect(allEvents[0]).toEqual(expect.objectContaining({ type: 'USER_MESSAGE', data: 'Hello' }));
+    expect(allEvents[1]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+        data: expect.stringContaining('long\nresult\nhere') as string,
+      })
+    );
+    expect(allEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+    expect(allEvents[3]).toEqual(
+      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Continue' })
+    );
+    expect(allEvents[4]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+        data: expect.stringContaining('another\nlong\nresult') as string,
+      })
+    );
+    expect(allEvents[5]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+
+    // Working events should contain: compacted events from latest compaction + latest compaction event
+    expect(workingEvents).toHaveLength(5);
+
+    // First 4 events should be the compacted conversation (original events with tool results trimmed, no old compaction)
+    expect(workingEvents[0]).toEqual(
+      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Hello' })
+    );
+    expect(workingEvents[1]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+        data: 'long\nresult\nhere\n[results truncated to save space.]',
+      })
+    );
+    expect(workingEvents[2]).toEqual(
+      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Continue' })
+    );
+    expect(workingEvents[3]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+        data: 'another\nlong\nresult\n[results truncated to save space.]',
+      })
+    );
+
+    // Last event should be the latest compaction event
+    expect(workingEvents[4]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+
+    // Verify working conversation contains only the latest compaction, not the earlier one
+    const workingCompactionEvents = workingEvents.filter((e) => e.type === 'COMPACTION');
+    expect(workingCompactionEvents).toHaveLength(1);
+    expect(workingCompactionEvents[0].id).toBe(allEvents[5].id); // Should be the second/latest compaction
+  });
+
+  it('throws error for unknown strategy', async () => {
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+
+    await expect(threadManager.compact(threadId, 'unknown-strategy')).rejects.toThrow(
+      'Unknown compaction strategy: unknown-strategy'
+    );
+  });
+
+  it('throws error for non-existent thread', async () => {
+    await expect(threadManager.compact('non-existent-thread', 'trim-tool-results')).rejects.toThrow(
+      'Thread non-existent-thread not found'
+    );
+  });
+
+  it('auto-registers default strategies', () => {
+    const newThreadManager = new ThreadManager();
+    const newThreadId = newThreadManager.createThread();
+
+    // Should be able to use the trim-tool-results strategy without manual registration
+    newThreadManager.addEvent(newThreadId, 'TOOL_RESULT', 'line1\nline2\nline3\nline4');
+
+    expect(async () => {
+      await newThreadManager.compact(newThreadId, 'trim-tool-results');
+    }).not.toThrow();
+  });
+
+  it('preserves event order in compacted conversation', async () => {
+    // Add events in specific order
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message');
+    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'First response');
+    threadManager.addEvent(threadId, 'TOOL_RESULT', 'long\ntool\nresult\nwith\nmany\nlines');
+    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message');
+
+    await threadManager.compact(threadId, 'trim-tool-results');
+
+    const workingEvents = threadManager.getEvents(threadId);
+
+    // Check that order is preserved
+    expect(workingEvents[0].type).toBe('USER_MESSAGE');
+    expect(workingEvents[0].data).toBe('First message');
+    expect(workingEvents[1].type).toBe('AGENT_MESSAGE');
+    expect(workingEvents[1].data).toBe('First response');
+    expect(workingEvents[2].type).toBe('TOOL_RESULT');
+    expect(workingEvents[2].data).toBe('long\ntool\nresult\n[results truncated to save space.]');
+    expect(workingEvents[3].type).toBe('USER_MESSAGE');
+    expect(workingEvents[3].data).toBe('Second message');
   });
 });

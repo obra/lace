@@ -47,7 +47,7 @@ describe('Agent ThreadManager Encapsulation', () => {
     it('should provide all needed functionality through Agent API without exposing ThreadManager', () => {
       // Verify Agent provides all the functionality that would be needed
       // Thread ID operations
-      expect(typeof agent.getCurrentThreadId).toBe('function');
+      expect(typeof agent.getThreadId).toBe('function');
       expect(typeof agent.generateThreadId).toBe('function');
 
       // Thread management
@@ -68,7 +68,7 @@ describe('Agent ThreadManager Encapsulation', () => {
 
       agent.createThread(newThreadId);
 
-      const currentThreadId = agent.getCurrentThreadId();
+      const currentThreadId = agent.getThreadId();
       expect(typeof currentThreadId).toBe('string');
 
       const events = agent.getThreadEvents();
@@ -79,7 +79,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       // Test that common operations work without accessing threadManager
 
       // Thread identification
-      const threadId = agent.getCurrentThreadId();
+      const threadId = agent.getThreadId();
       expect(threadId).toBeDefined();
 
       // Event access
@@ -106,7 +106,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       expect(typeof agent.resumeOrCreateThread).toBe('function');
 
       // Thread identification
-      expect(typeof agent.getCurrentThreadId).toBe('function');
+      expect(typeof agent.getThreadId).toBe('function');
 
       // Event access
       expect(typeof agent.getThreadEvents).toBe('function');

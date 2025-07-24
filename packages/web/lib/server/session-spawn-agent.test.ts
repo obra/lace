@@ -180,7 +180,7 @@ describe('Session.spawnAgent Method', () => {
     expect((eventsFromNew[0] as { id: string } | undefined)?.id).toBe(event.id);
   });
 
-  it('should handle thread persistence when current thread changes', () => {
+  it('should handle thread persistence with multiple threads', () => {
     // Spawn agent
     const agent = session.spawnAgent('Thread Switch Agent', 'anthropic', 'claude-3-haiku-20240307');
     const agentThreadId = agent.threadId;
@@ -193,7 +193,6 @@ describe('Session.spawnAgent Method', () => {
       sessionAgent as unknown as {
         _threadManager: {
           createThread: () => unknown;
-          setCurrentThread: (id: ThreadId) => void;
           getThread: (id: ThreadId) => unknown;
           addEvent: (id: ThreadId, type: string, data: string) => unknown;
         };
@@ -201,9 +200,8 @@ describe('Session.spawnAgent Method', () => {
     )._threadManager;
     expect(sessionThreadManager).toBeDefined();
 
-    // Create another thread and make it current
-    const otherThreadId = asThreadId(String(sessionThreadManager.createThread()));
-    sessionThreadManager.setCurrentThread(otherThreadId);
+    // Create another thread (ThreadManager is stateless, no "current" concept)
+    const _otherThreadId = asThreadId(String(sessionThreadManager.createThread()));
 
     // Verify the delegate thread is still accessible
     const delegateThread = sessionThreadManager.getThread(asThreadId(agentThreadId));

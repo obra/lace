@@ -111,7 +111,7 @@ describe('Agent Thread Events', () => {
   describe('replaySessionEvents', () => {
     it('should emit thread_event_added for all historical events', () => {
       // Arrange - Clear existing events and add test events
-      const threadId = threadManager.getCurrentThreadId()!;
+      const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
 
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message');
@@ -151,7 +151,7 @@ describe('Agent Thread Events', () => {
 
     it('should replay events in chronological order', () => {
       // Arrange - Clear existing events and create test events with different timestamps
-      const threadId = threadManager.getCurrentThreadId()!;
+      const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
 
       const event1 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 1');
@@ -180,7 +180,7 @@ describe('Agent Thread Events', () => {
 
     it('should handle empty thread gracefully', () => {
       // Arrange - Clear thread to make it empty
-      const threadId = threadManager.getCurrentThreadId()!;
+      const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
 
       const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
@@ -197,16 +197,16 @@ describe('Agent Thread Events', () => {
   describe('thread management API', () => {
     it('should provide getCurrentThreadId method', () => {
       // Act
-      const threadId = agent.getCurrentThreadId();
+      const threadId = agent.getThreadId();
 
       // Assert
-      expect(threadId).toBe(threadManager.getCurrentThreadId());
+      expect(threadId).toBe(agent.getThreadId());
       expect(typeof threadId).toBe('string');
     });
 
     it('should provide getThreadEvents method', () => {
       // Arrange
-      const threadId = threadManager.getCurrentThreadId()!;
+      const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
 
@@ -221,7 +221,7 @@ describe('Agent Thread Events', () => {
 
     it('should provide getThreadEvents with specific threadId', () => {
       // Arrange
-      const threadId = threadManager.getCurrentThreadId()!;
+      const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Specific thread message');
 
@@ -257,7 +257,7 @@ describe('Agent Thread Events', () => {
 
     it('should provide resumeOrCreateThread method that replays events on resume', () => {
       // Arrange
-      const existingThreadId = threadManager.getCurrentThreadId()!;
+      const existingThreadId = agent.getThreadId();
       threadManager.clearEvents(existingThreadId);
       threadManager.addEvent(existingThreadId, 'USER_MESSAGE', 'Existing message');
 

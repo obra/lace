@@ -79,7 +79,7 @@ describe('Projects API Integration Tests', () => {
       const data = (await response.json()) as ProjectsResponse;
 
       expect(response.status).toBe(200);
-      expect(data.projects).toHaveLength(3); // 2 created + 1 historical project
+      expect(data.projects).toHaveLength(2); // 2 created projects
 
       // Find our created projects
       const proj1 = data.projects.find((p) => p.name === 'Project 1');
@@ -103,8 +103,7 @@ describe('Projects API Integration Tests', () => {
       const data = (await response.json()) as ProjectsResponse;
 
       expect(response.status).toBe(200);
-      expect(data.projects).toHaveLength(1); // Only the historical project
-      expect(data.projects[0].name).toBe('Historical');
+      expect(data.projects).toHaveLength(0); // No projects in clean database
     });
   });
 
