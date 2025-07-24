@@ -51,6 +51,38 @@ describe('Project', () => {
       expect(retrieved!.getName()).toBe('Test Project');
       expect(retrieved!.getWorkingDirectory()).toBe('/test/path');
     });
+
+    it('should auto-generate name from directory path', () => {
+      const project = Project.create(
+        '', // empty name to trigger auto-generation
+        '/home/user/my-awesome-project',
+        'Test description'
+      );
+
+      const info = project.getInfo();
+      expect(info?.name).toBe('my-awesome-project');
+    });
+
+    it('should handle trailing slashes in directory path', () => {
+      const project = Project.create('', '/home/user/my-project/', 'Test description');
+
+      const info = project.getInfo();
+      expect(info?.name).toBe('my-project');
+    });
+
+    it('should handle root directory', () => {
+      const project = Project.create('', '/', 'Test description');
+
+      const info = project.getInfo();
+      expect(info?.name).toBe('root');
+    });
+
+    it('should use provided name when given', () => {
+      const project = Project.create('Custom Name', '/home/user/my-project', 'Test description');
+
+      const info = project.getInfo();
+      expect(info?.name).toBe('Custom Name');
+    });
   });
 
   describe('getAll', () => {
@@ -290,7 +322,7 @@ describe('Project', () => {
           expect(sessionData?.configuration).toEqual({
             key: 'value',
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-sonnet-4-20250514',
           });
           expect(sessionData?.status).toBe('active');
           expect(sessionData?.createdAt).toBeInstanceOf(Date);
@@ -304,7 +336,7 @@ describe('Project', () => {
           expect(sessionData?.description).toBe('');
           expect(sessionData?.configuration).toEqual({
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-sonnet-4-20250514',
           });
           expect(sessionData?.status).toBe('active');
         });
