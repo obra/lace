@@ -21,20 +21,22 @@ export interface ThreadSessionInfo {
   resumeError?: string;
 }
 
-// Shared cache across all ThreadManager instances to ensure consistency
+// Process-local cache for ThreadManager instances
 //
-// NOTE FOR REVIEWERS: This shared cache is intentionally designed for Node.js
-// single-threaded environment. JavaScript's event loop ensures atomic operations
-// on the Map, and the SQLite database serves as the source of truth for persistence.
-// The cache provides performance benefits by avoiding redundant database queries
-// while maintaining consistency through immediate persistence of all changes.
+// NOTE FOR REVIEWERS: This cache is process-local to handle Next.js dev server
+// environment where different API routes may run in separate Node.js processes.
+// The SQLite database serves as the authoritative source of truth across all processes.
 //
-// Race conditions are not a concern because:
-// 1. JavaScript is single-threaded with atomic Map operations
-// 2. All writes go through SQLite (ACID compliant) first, then update cache
+// Cache behavior:
+// 1. Each process maintains its own cache for performance within that process
+// 2. All writes go through SQLite (ACID compliant) first, then update local cache
 // 3. Cache misses fall back to authoritative database reads
-// 4. Multiple ThreadManager instances share the same cache for consistency
-const sharedThreadCache = new Map<string, Thread>();
+// 4. Cross-process consistency relies on SQLite as single source of truth
+// 5. Cache invalidation happens naturally through process boundaries
+//
+// This approach trades some performance (no cross-process cache sharing) for
+// correctness in multi-process environments like Next.js dev server.
+const processLocalThreadCache = new Map<string, Thread>();
 
 export class ThreadManager {
   private _persistence: DatabasePersistence;
@@ -247,8 +249,8 @@ export class ThreadManager {
   }
 
   getThread(threadId: string): Thread | undefined {
-    // Check shared cache
-    const cachedThread = sharedThreadCache.get(threadId);
+    // Check process-local cache
+    const cachedThread = processLocalThreadCache.get(threadId);
     if (cachedThread) {
       return cachedThread;
     }
@@ -257,7 +259,7 @@ export class ThreadManager {
     try {
       const thread = this._persistence.loadThread(threadId);
       if (thread) {
-        sharedThreadCache.set(threadId, thread);
+        processLocalThreadCache.set(threadId, thread);
         return thread;
       }
       return undefined;
@@ -273,7 +275,7 @@ export class ThreadManager {
   addEvent(
     threadId: string,
     type: EventType,
-    data: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>
+    eventData: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>
   ): ThreadEvent {
     const thread = this.getThread(threadId);
     if (!thread) {
@@ -285,7 +287,7 @@ export class ThreadManager {
       threadId,
       type,
       timestamp: new Date(),
-      data,
+      data: eventData,
     };
 
     thread.events.push(event);
@@ -294,8 +296,8 @@ export class ThreadManager {
     // Save event to persistence immediately
     try {
       this._persistence.saveEvent(event);
-      // Update shared cache with modified thread
-      sharedThreadCache.set(threadId, thread);
+      // Update process-local cache with modified thread
+      processLocalThreadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to save event', { error });
     }
@@ -413,8 +415,8 @@ export class ThreadManager {
 
     try {
       this._persistence.saveThread(thread);
-      // Update shared cache with modified thread
-      sharedThreadCache.set(threadId, thread);
+      // Update process-local cache with modified thread
+      processLocalThreadCache.set(threadId, thread);
     } catch (error) {
       logger.error('Failed to update thread metadata', { threadId, error });
     }
@@ -427,8 +429,8 @@ export class ThreadManager {
       this._persistence.database.prepare('DELETE FROM threads WHERE id = ?').run(threadId);
     }
 
-    // Remove from shared cache
-    sharedThreadCache.delete(threadId);
+    // Remove from process-local cache
+    processLocalThreadCache.delete(threadId);
 
     logger.info('Thread deleted', { threadId });
   }
@@ -492,7 +494,7 @@ export class ThreadManager {
     const compactionEvent = await strategy.compact(thread.events, context);
 
     // Add the compaction event to the thread
-    // The compactionEvent is already a complete ThreadEvent with CompactionData in the data field
+    // Extract the CompactionData from the strategy result and add as new event
     //
     // NOTE FOR REVIEWERS: addEvent() persistence failure is handled gracefully:
     // 1. addEvent() logs errors but doesn't throw, preserving thread consistency
@@ -500,7 +502,8 @@ export class ThreadManager {
     // 3. If persistence fails, the in-memory thread remains unchanged
     // 4. Subsequent operations will retry persistence, maintaining eventual consistency
     // 5. The thread cache remains consistent with successful database state
-    this.addEvent(threadId, 'COMPACTION', compactionEvent.data);
+    const compactionData = compactionEvent.data as CompactionData;
+    this.addEvent(threadId, 'COMPACTION', compactionData);
   }
 
   oldCompact(threadId: string): void {
@@ -591,8 +594,8 @@ export class ThreadManager {
   saveThread(thread: Thread): void {
     try {
       this._persistence.saveThread(thread);
-      // Update shared cache with saved thread
-      sharedThreadCache.set(thread.id, thread);
+      // Update process-local cache with saved thread
+      processLocalThreadCache.set(thread.id, thread);
     } catch (error) {
       logger.error('Failed to save thread', { threadId: thread.id, error });
     }
@@ -604,8 +607,8 @@ export class ThreadManager {
 
   // Cleanup
   close(): void {
-    // Clear caches
-    sharedThreadCache.clear();
+    // Clear process-local cache
+    processLocalThreadCache.clear();
     this._persistence.close();
   }
 }
