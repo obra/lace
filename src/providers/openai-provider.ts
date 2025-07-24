@@ -14,6 +14,7 @@ import {
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { convertToOpenAIFormat } from '~/providers/format-converters';
+import { getEnvVar } from '~/config/env-loader';
 
 export interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string;
@@ -21,24 +22,34 @@ export interface OpenAIProviderConfig extends ProviderConfig {
 }
 
 export class OpenAIProvider extends AIProvider {
-  private readonly _openai: OpenAI;
+  private _openai: OpenAI | null = null;
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
+  }
 
-    const openaiConfig: ClientOptions = {
-      apiKey: config.apiKey,
-      dangerouslyAllowBrowser: true, // Allow in test environments
-    };
+  private getOpenAIClient(): OpenAI {
+    if (!this._openai) {
+      const config = this._config as OpenAIProviderConfig;
+      if (!config.apiKey) {
+        throw new Error('OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider');
+      }
 
-    // Support custom base URL for OpenAI-compatible APIs
-    const baseURL = process.env.OPENAI_BASE_URL;
-    if (baseURL) {
-      openaiConfig.baseURL = baseURL;
-      logger.info('Using custom OpenAI base URL', { baseURL });
+      const openaiConfig: ClientOptions = {
+        apiKey: config.apiKey,
+        dangerouslyAllowBrowser: true, // Allow in test environments
+      };
+
+      // Support custom base URL for OpenAI-compatible APIs
+      const baseURL = getEnvVar('OPENAI_BASE_URL');
+      if (baseURL) {
+        openaiConfig.baseURL = baseURL;
+        logger.info('Using custom OpenAI base URL', { baseURL });
+      }
+
+      this._openai = new OpenAI(openaiConfig);
     }
-
-    this._openai = new OpenAI(openaiConfig);
+    return this._openai;
   }
 
   get providerName(): string {
@@ -187,7 +198,7 @@ export class OpenAIProvider extends AIProvider {
           payload: JSON.stringify(requestPayload, null, 2),
         });
 
-        const response = (await this._openai.chat.completions.create(requestPayload, {
+        const response = (await this.getOpenAIClient().chat.completions.create(requestPayload, {
           signal,
         })) as OpenAI.Chat.ChatCompletion;
 
@@ -265,7 +276,7 @@ export class OpenAIProvider extends AIProvider {
 
         try {
           // Use the streaming API
-          const stream = (await this._openai.chat.completions.create(requestPayload, {
+          const stream = (await this.getOpenAIClient().chat.completions.create(requestPayload, {
             signal,
           })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
 
