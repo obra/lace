@@ -244,7 +244,7 @@ npm run test:coverage -- packages/web/components/settings/
 - Fixed ThemeSelector React import issue for proper test execution
 - All tests passing (40 total across settings components)
 
-### Task 3: Update Sidebar to Remove Theme Selector
+### Task 3: Update Sidebar to Remove Theme Selector ✅
 
 **Objective**: Clean up sidebar by removing embedded theme selector and connecting settings button
 
@@ -301,6 +301,15 @@ npm run test:coverage -- packages/web/components/settings/
 - Check collapsed sidebar state works
 
 **Commit**: "refactor: remove theme selector from sidebar, add settings button handler"
+
+**✅ COMPLETED**: Sidebar successfully updated with TDD approach:
+- Removed `currentTheme` and `onThemeChange` props from SidebarProps interface
+- Added optional `onSettingsClick` prop for settings button handling
+- Removed ThemeSelector component from footer (lines 102-104)
+- Added settings button with onClick handler in both collapsed and expanded states
+- Created comprehensive test suite with 9 tests covering settings button, theme removal, and regression testing
+- All tests passing with no regressions - sidebar functionality preserved
+- Removed unused ThemeSelector import for clean dependencies
 
 ### Task 4: Wire Up Complete Settings Flow
 
