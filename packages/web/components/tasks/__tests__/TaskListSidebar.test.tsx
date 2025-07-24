@@ -10,7 +10,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { TaskListSidebar } from '../TaskListSidebar';
+import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import type { Task } from '@/types/api';
 
 // Mock the useTaskManager hook
@@ -240,10 +240,15 @@ describe('TaskListSidebar', () => {
     const searchInput = screen.getByPlaceholderText('Search tasks...');
     await user.type(searchInput, 'High');
 
-    // Should only show matching task
-    expect(screen.getByText('High Priority Task')).toBeInTheDocument();
-    expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
-    expect(screen.queryByText('Blocked Task')).not.toBeInTheDocument();
+    // Wait for debounce delay (300ms + buffer)
+    await waitFor(
+      () => {
+        expect(screen.getByText('High Priority Task')).toBeInTheDocument();
+        expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
+        expect(screen.queryByText('Blocked Task')).not.toBeInTheDocument();
+      },
+      { timeout: 500 }
+    );
   });
 
   it('should show no results message when search has no matches', async () => {
@@ -259,7 +264,13 @@ describe('TaskListSidebar', () => {
     const searchInput = screen.getByPlaceholderText('Search tasks...');
     await user.type(searchInput, 'nonexistent');
 
-    expect(screen.getByText('No tasks match your search')).toBeInTheDocument();
+    // Wait for debounce delay
+    await waitFor(
+      () => {
+        expect(screen.getByText('No tasks match your search')).toBeInTheDocument();
+      },
+      { timeout: 500 }
+    );
   });
 
   it('should show loading state', () => {

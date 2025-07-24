@@ -3,13 +3,23 @@
 
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTasks, faPlus, faSearch } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
 import type { Task } from '@/types/api';
+
+// Task display limits for each status section
+const TASK_DISPLAY_LIMITS = {
+  in_progress: 3,
+  pending: 2,
+  blocked: 1,
+} as const;
+
+// Debounce delay for search input (in milliseconds)
+const SEARCH_DEBOUNCE_DELAY = 300;
 
 interface TaskListSidebarProps {
   projectId: string;
@@ -26,17 +36,40 @@ export function TaskListSidebar({
   onOpenTaskBoard,
   onCreateTask
 }: TaskListSidebarProps) {
-  const { tasks, isLoading } = useTaskManager(projectId, sessionId);
+  const { tasks, isLoading, error } = useTaskManager(projectId, sessionId);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Filter tasks based on search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // Debounce search term to improve performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, SEARCH_DEBOUNCE_DELAY);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Pre-compute tasks with lowercase search fields for better performance
+  const tasksWithSearchData = useMemo(() => {
+    return tasks.map((task) => ({
+      ...task,
+      searchableTitle: task.title.toLowerCase(),
+      searchableDescription: task.description?.toLowerCase() || '',
+    }));
+  }, [tasks]);
+
+  // Filter tasks based on debounced search term
   const filteredTasks = useMemo(() => {
-    if (!searchTerm.trim()) return tasks;
-    return tasks.filter(task => 
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [tasks, searchTerm]);
+    if (!debouncedSearchTerm.trim()) return tasks;
+    const searchLower = debouncedSearchTerm.toLowerCase();
+    return tasksWithSearchData
+      .filter(
+        (task) =>
+          task.searchableTitle.includes(searchLower) ||
+          task.searchableDescription.includes(searchLower)
+      )
+      .map(({ searchableTitle, searchableDescription, ...task }) => task);
+  }, [tasks, tasksWithSearchData, debouncedSearchTerm]);
   
   const tasksByStatus = useMemo(() => ({
     pending: filteredTasks.filter(t => t.status === 'pending'),
@@ -49,6 +82,15 @@ export function TaskListSidebar({
     return (
       <div className="p-2 flex justify-center">
         <div className="loading loading-spinner loading-sm" role="status"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-2 text-center">
+        <div className="text-xs text-error mb-2">Failed to load tasks</div>
+        <div className="text-xs text-base-content/60">{error.message || 'An error occurred'}</div>
       </div>
     );
   }
@@ -103,7 +145,7 @@ export function TaskListSidebar({
           <div className="text-xs font-medium text-base-content/80 px-2">
             In Progress
           </div>
-          {tasksByStatus.in_progress.slice(0, 3).map(task => (
+          {tasksByStatus.in_progress.slice(0, TASK_DISPLAY_LIMITS.in_progress).map(task => (
             <TaskSidebarItem 
               key={task.id} 
               task={task} 
@@ -119,7 +161,7 @@ export function TaskListSidebar({
           <div className="text-xs font-medium text-base-content/80 px-2">
             Pending
           </div>
-          {tasksByStatus.pending.slice(0, 2).map(task => (
+          {tasksByStatus.pending.slice(0, TASK_DISPLAY_LIMITS.pending).map(task => (
             <TaskSidebarItem 
               key={task.id} 
               task={task} 
@@ -135,7 +177,7 @@ export function TaskListSidebar({
           <div className="text-xs font-medium text-base-content/80 px-2">
             Blocked
           </div>
-          {tasksByStatus.blocked.slice(0, 1).map(task => (
+          {tasksByStatus.blocked.slice(0, TASK_DISPLAY_LIMITS.blocked).map(task => (
             <TaskSidebarItem 
               key={task.id} 
               task={task} 

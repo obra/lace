@@ -81,8 +81,7 @@ export function LaceApp() {
   } = useSessionEvents(selectedSession, selectedAgent);
 
   // Add task manager hook when project and session are selected
-  const taskManager = selectedProject && selectedSession ? 
-    useTaskManager(selectedProject, selectedSession) : null;
+  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
@@ -547,7 +546,7 @@ export function LaceApp() {
               )}
 
               {/* Tasks Section - Show when session is selected */}
-              {selectedSessionDetails && selectedProject && selectedSession && (
+              {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
                 <SidebarSection 
                   title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
                   icon={faTasks}
@@ -558,7 +557,7 @@ export function LaceApp() {
                     projectId={selectedProject}
                     sessionId={selectedSession}
                     onTaskClick={(taskId) => {
-                      console.log('Task clicked:', taskId);
+                      // For now, just close mobile nav - could open task detail modal in future
                       setShowMobileNav(false); // Close mobile nav when task is clicked
                     }}
                     onOpenTaskBoard={() => {
@@ -681,7 +680,7 @@ export function LaceApp() {
           )}
 
           {/* Tasks Section - Show when session is selected */}
-          {selectedSessionDetails && selectedProject && selectedSession && (
+          {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
             <SidebarSection 
               title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
               icon={faTasks}
@@ -691,8 +690,7 @@ export function LaceApp() {
                 projectId={selectedProject}
                 sessionId={selectedSession}
                 onTaskClick={(taskId) => {
-                  // For now, just log - could open task detail modal in future
-                  console.log('Task clicked:', taskId);
+                  // For now, just ignore - could open task detail modal in future
                 }}
                 onOpenTaskBoard={() => setShowTaskBoard(true)}
                 onCreateTask={() => setShowTaskBoard(true)}
