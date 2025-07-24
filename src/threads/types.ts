@@ -23,7 +23,7 @@ export interface ThreadEvent {
   threadId: string;
   type: EventType;
   timestamp: Date;
-  data: string | ToolCall | ToolResult;
+  data: string | ToolCall | ToolResult | Record<string, unknown>;
 }
 
 export interface Thread {

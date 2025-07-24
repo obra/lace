@@ -11,6 +11,8 @@ import { Thread, ThreadEvent, EventType } from '~/threads/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 import { estimateTokens } from '~/utils/token-estimation';
+import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
+import type { CompactionStrategy } from '~/threads/compaction/types';
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -23,6 +25,7 @@ const sharedThreadCache = new Map<string, Thread>();
 
 export class ThreadManager {
   private _persistence: DatabasePersistence;
+  private _compactionStrategies = new Map<string, CompactionStrategy>();
 
   constructor() {
     this._persistence = getPersistence();
@@ -280,9 +283,26 @@ export class ThreadManager {
     return event;
   }
 
+  /**
+   * Get current conversation state (post-compaction events)
+   * This is what should be passed to AI providers
+   */
   getEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
-    return thread?.events || [];
+    if (!thread) return [];
+
+    return buildWorkingConversation(thread.events);
+  }
+
+  /**
+   * Get complete event history including compaction events
+   * This is for debugging and inspection
+   */
+  getAllEvents(threadId: string): ThreadEvent[] {
+    const thread = this.getThread(threadId);
+    if (!thread) return [];
+
+    return buildCompleteHistory(thread.events);
   }
 
   getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
@@ -371,7 +391,42 @@ export class ThreadManager {
     logger.info('Thread deleted', { threadId });
   }
 
-  compact(threadId: string): void {
+  /**
+   * Register a compaction strategy
+   */
+  registerCompactionStrategy(strategy: CompactionStrategy): void {
+    this._compactionStrategies.set(strategy.id, strategy);
+  }
+
+  /**
+   * Perform compaction using specified strategy
+   */
+  async compact(threadId: string, strategyId: string, params?: unknown): Promise<void> {
+    const strategy = this._compactionStrategies.get(strategyId);
+    if (!strategy) {
+      throw new Error(`Unknown compaction strategy: ${strategyId}`);
+    }
+
+    const thread = this.getThread(threadId);
+    if (!thread) {
+      throw new Error(`Thread ${threadId} not found`);
+    }
+
+    // Create compaction context
+    const context = {
+      threadId,
+      params,
+    };
+
+    // Run compaction strategy
+    const compactionEvent = await strategy.compact(thread.events, context);
+
+    // Add the compaction event to the thread
+    // The compactionEvent is already a complete ThreadEvent with data in the data field
+    this.addEvent(threadId, 'COMPACTION', compactionEvent.data as unknown as string);
+  }
+
+  oldCompact(threadId: string): void {
     const thread = this.getThread(threadId);
     if (!thread) return;
 
