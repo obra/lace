@@ -1,8 +1,6 @@
 // ABOUTME: Simple provider availability checking for local server providers
 // ABOUTME: Returns availability status for conditional test execution
 
-import { withConsoleCapture } from '~/test-utils/console-capture';
-
 /**
  * Check if a local provider (LMStudio, Ollama) is available.
  * Use the return value to conditionally run tests.
@@ -15,9 +13,6 @@ export async function checkProviderAvailability(
   providerName: string,
   provider: { diagnose(): Promise<{ connected: boolean; models: string[]; error?: string }> }
 ): Promise<boolean> {
-  // Use console capture for logging (stderr is automatically suppressed by global setup)
-  withConsoleCapture();
-
   try {
     // Add timeout to prevent hanging (give extra time for provider's own timeout)
     const timeoutPromise = new Promise<never>((_, reject) => {

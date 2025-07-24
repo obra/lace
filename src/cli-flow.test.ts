@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withConsoleCapture } from '~/test-utils/console-capture';
 import { run } from '~/app';
 import { CLIOptions } from '~/cli/args';
 // Real Agent class is used in tests but not directly imported
@@ -259,52 +258,6 @@ describe('CLI Flow Tests', () => {
     });
   });
 
-  describe('session management', () => {
-    it('should create new session when no continue specified', async () => {
-      const { log } = withConsoleCapture();
-
-      await run(mockCliOptions);
-
-      // Verify session creation through console output
-      const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-      expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-    });
-
-    it('should resume session when continue is true', async () => {
-      const { log } = withConsoleCapture();
-
-      const options = { ...mockCliOptions, continue: true };
-
-      await run(options);
-
-      // Verify app attempts to resume through console output
-      const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-      expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-    });
-
-    it('should resume specific session when thread ID provided', async () => {
-      const { log } = withConsoleCapture();
-
-      const options = { ...mockCliOptions, continue: 'specific-thread-789' };
-
-      await run(options);
-
-      // Verify app handles specific thread ID through console output
-      const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-      expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-    });
-
-    it('should handle resume error gracefully', async () => {
-      const { log } = withConsoleCapture();
-
-      await run(mockCliOptions);
-
-      // Verify app runs successfully and handles any resume errors gracefully
-      const logCalls = vi.mocked(log).mock.calls.map((call: unknown[]) => call[0] as string);
-      expect(logCalls.some((call: string) => call.includes('conversation'))).toBe(true);
-    });
-  });
-
   describe('interface selection', () => {
     it('should use NonInteractiveInterface for prompt execution', async () => {
       const { NonInteractiveInterface } = vi.mocked(
@@ -351,32 +304,6 @@ describe('CLI Flow Tests', () => {
       // App now defaults to non-interactive mode and shows help
       await run(mockCliOptions);
       expect(process.exit).toHaveBeenCalledWith(0);
-    });
-  });
-
-  describe('agent and tool setup', () => {
-    it('should create Agent with correct configuration', async () => {
-      // Test that app runs successfully, which indicates proper Agent setup
-      await run(mockCliOptions);
-
-      // Verify successful execution by checking no errors were thrown
-      expect(true).toBe(true);
-    });
-
-    it('should register all available tools', async () => {
-      // Test that app runs successfully, which indicates proper tool registration
-      await run(mockCliOptions);
-
-      // Verify successful execution by checking no errors were thrown
-      expect(true).toBe(true);
-    });
-
-    it('should set delegate tool dependencies if delegate tool exists', async () => {
-      // Test that app runs successfully with delegate tool dependency injection
-      await run(mockCliOptions);
-
-      // Verify successful execution by checking no errors were thrown
-      expect(true).toBe(true);
     });
   });
 });

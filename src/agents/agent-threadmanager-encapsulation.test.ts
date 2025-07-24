@@ -91,7 +91,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       agent.createThread(newThreadId);
 
       // All operations completed without needing direct ThreadManager access
-      expect(true).toBe(true);
+      // Success is verified by operations completing without errors
     });
   });
 
