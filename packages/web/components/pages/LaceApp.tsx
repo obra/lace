@@ -6,12 +6,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faFolder, faComments, faRobot, faPlus, faCog } from '@/lib/fontawesome';
+import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
+import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -27,11 +28,13 @@ import type {
   ProviderInfo,
   ProvidersResponse,
   CreateAgentRequest,
+  Task,
 } from '@/types/api';
 import { isApiError, ApprovalDecision } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
+import { useTaskManager } from '@/hooks/useTaskManager';
 
 export function LaceApp() {
   // Theme state
@@ -51,6 +54,7 @@ export function LaceApp() {
   // UI State (from AnimatedLaceApp but remove demo data)
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
+  const [showTaskBoard, setShowTaskBoard] = useState(false);
   
 
   // Business Logic State (from current app/page.tsx)
@@ -74,6 +78,10 @@ export function LaceApp() {
     connected,
     clearApprovalRequest,
   } = useSessionEvents(selectedSession, selectedAgent);
+
+  // Add task manager hook when project and session are selected
+  const taskManager = selectedProject && selectedSession ? 
+    useTaskManager(selectedProject, selectedSession) : null;
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
@@ -334,6 +342,39 @@ export function LaceApp() {
       }
     } catch (error) {
       console.error('Failed to update project:', error);
+    }
+  };
+
+  // Handle task updates
+  const handleTaskUpdate = async (task: Task) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.updateTask(task.id, { 
+        status: task.status,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        assignedTo: task.assignedTo,
+      });
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.createTask({
+        title: taskData.title,
+        description: taskData.description,
+        prompt: taskData.prompt || taskData.description || taskData.title,
+        priority: taskData.priority,
+        assignedTo: taskData.assignedTo,
+      });
+    } catch (error) {
+      console.error('Failed to create task:', error);
     }
   };
 
@@ -635,6 +676,17 @@ export function LaceApp() {
                     (selectedProject ? currentProject.name : 'Select a Project')
                   }
                 </h1>
+                
+                {/* Add Tasks button when session is selected */}
+                {selectedSession && (
+                  <button
+                    onClick={() => setShowTaskBoard(true)}
+                    className="btn btn-primary btn-sm ml-4"
+                  >
+                    <FontAwesomeIcon icon={faTasks} className="w-4 h-4 mr-1" />
+                    Tasks
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -726,6 +778,17 @@ export function LaceApp() {
           request={approvalRequest}
           onDecision={handleApprovalDecision}
           onTimeout={handleApprovalTimeout}
+        />
+      )}
+
+      {/* Task Board Modal */}
+      {showTaskBoard && selectedProject && selectedSession && taskManager && (
+        <TaskBoardModal
+          isOpen={showTaskBoard}
+          onClose={() => setShowTaskBoard(false)}
+          tasks={taskManager.tasks}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskCreate={handleTaskCreate}
         />
       )}
     </motion.div>
