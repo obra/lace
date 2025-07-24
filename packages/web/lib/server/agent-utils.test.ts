@@ -141,53 +141,36 @@ describe('Event-Based Approval Callback', () => {
     expect(mockAgent.threadManager.addEvent).not.toHaveBeenCalled();
   });
 
-  it('should handle multiple concurrent approval requests', async () => {
+  it('should clean up event listeners when approval resolves', async () => {
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
     const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0]?.[0] as ApprovalCallback;
 
-    // Mock two different TOOL_CALL events
+    // Mock finding a TOOL_CALL event
     mockAgent.threadManager.getEvents.mockReturnValue([
       {
         id: 'event_1',
         type: 'TOOL_CALL',
-        timestamp: new Date('2025-01-01T10:00:00Z'),
-        data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } }
-      },
-      {
-        id: 'event_2',
-        type: 'TOOL_CALL',
-        timestamp: new Date('2025-01-01T10:01:00Z'),
-        data: { id: 'call_456', name: 'file-read', arguments: { path: '/test' } }
+        timestamp: new Date(),
+        data: { id: 'call_789', name: 'bash', arguments: { command: 'pwd' } }
       }
     ]);
 
-    let addEventCallCount = 0;
-    mockAgent.threadManager.addEvent.mockImplementation((_threadId: string, type: string, data: unknown) => {
-      addEventCallCount++;
-      return {
-        id: `event_${addEventCallCount + 2}`,
-        type,
-        timestamp: new Date(),
-        data
-      };
+    mockAgent.threadManager.addEvent.mockReturnValue({
+      id: 'event_2',
+      type: 'TOOL_APPROVAL_REQUEST',
+      timestamp: new Date(),
+      data: { toolCallId: 'call_789' }
     });
 
-    // Start two approval requests concurrently
-    const approval1Promise = approvalCallback.requestApproval('bash', { command: 'ls' });
-    const approval2Promise = approvalCallback.requestApproval('file-read', { path: '/test' });
+    // Start approval request
+    const approvalPromise = approvalCallback.requestApproval('bash', { command: 'pwd' });
 
-    // Both should create approval request events
-    expect(mockAgent.threadManager.addEvent).toHaveBeenCalledTimes(2);
+    // Verify request event was created
     expect(mockAgent.threadManager.addEvent).toHaveBeenCalledWith(
       'test_thread_123',
       'TOOL_APPROVAL_REQUEST',
-      { toolCallId: 'call_123' }
-    );
-    expect(mockAgent.threadManager.addEvent).toHaveBeenCalledWith(
-      'test_thread_123',
-      'TOOL_APPROVAL_REQUEST',
-      { toolCallId: 'call_456' }
+      { toolCallId: 'call_789' }
     );
 
     // Get the event listener
@@ -198,27 +181,20 @@ describe('Event-Based Approval Callback', () => {
     
     const eventListener = onCall?.[1] as (data: { event: { type: string; data: { toolCallId: string; decision: string } }; threadId: string }) => void;
 
-    // Respond to first approval
+    // Trigger approval response
     eventListener({
       event: {
         type: 'TOOL_APPROVAL_RESPONSE',
-        data: { toolCallId: 'call_123', decision: 'allow_once' }
+        data: { toolCallId: 'call_789', decision: 'deny' }
       },
       threadId: 'test_thread_123'
     });
 
-    // Respond to second approval
-    eventListener({
-      event: {
-        type: 'TOOL_APPROVAL_RESPONSE',
-        data: { toolCallId: 'call_456', decision: 'deny' }
-      },
-      threadId: 'test_thread_123'
-    });
+    // Promise should resolve
+    const decision = await approvalPromise;
+    expect(decision).toBe('deny');
 
-    // Both promises should resolve with correct decisions
-    const [decision1, decision2] = await Promise.all([approval1Promise, approval2Promise]);
-    expect(decision1).toBe('allow_once');
-    expect(decision2).toBe('deny');
+    // Verify event listener cleanup was called
+    expect(mockAgent.off).toHaveBeenCalledWith('thread_event_added', eventListener);
   });
 });

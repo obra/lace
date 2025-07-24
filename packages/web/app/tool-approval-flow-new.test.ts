@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Agent, Project } from '@/lib/server/lace-imports';
-import { asThreadId, type ThreadId } from '@/lib/server/core-types';
+import { type ThreadId } from '@/lib/server/core-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -117,11 +117,14 @@ describe('Event-Based Tool Approval Integration', () => {
     expect(approvalRequestEvent).toBeDefined();
     expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
 
-    // Simulate approval response by adding TOOL_APPROVAL_RESPONSE event
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+    // Simulate approval response by adding TOOL_APPROVAL_RESPONSE event and triggering agent emission
+    const approvalResponseEvent = agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'test-call-123',
       decision: 'allow_once',
     });
+    
+    // Manually trigger the agent's event emission (since we're bypassing the private _addEventAndEmit)
+    agent.emit('thread_event_added', { event: approvalResponseEvent, threadId: agent.threadId });
 
     // Now the promise should resolve
     const decision = await approvalPromise;
