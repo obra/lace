@@ -80,6 +80,10 @@ export function ProjectSelectorPanel({
   const [createNewEnvKey, setCreateNewEnvKey] = useState('');
   const [createNewEnvValue, setCreateNewEnvValue] = useState('');
 
+  // State for simplified mode
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const isSimplifiedMode = autoOpenCreate && !showAdvancedOptions;
+
   // Auto-open project creation modal when requested
   useEffect(() => {
     if (autoOpenCreate && !showCreateProject) {
@@ -87,6 +91,18 @@ export function ProjectSelectorPanel({
       onAutoCreateHandled?.();
     }
   }, [autoOpenCreate, showCreateProject, onAutoCreateHandled]);
+
+  // Auto-populate name from directory in simplified mode
+  const handleCreateDirectoryChange = (directory: string) => {
+    setCreateWorkingDirectory(directory);
+    
+    if (isSimplifiedMode) {
+      const baseName = directory.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || '';
+      if (baseName) {
+        setCreateName(baseName);
+      }
+    }
+  };
 
   // Get available models for project configuration
   const availableModels = useMemo(() => {
@@ -865,7 +881,9 @@ export function ProjectSelectorPanel({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Create New Project</h3>
+              <h3 className="text-xl font-semibold">
+                {isSimplifiedMode ? 'Welcome to Lace' : 'Create New Project'}
+              </h3>
               <button
                 onClick={handleCancelCreateProject}
                 className="btn btn-ghost btn-sm"
@@ -876,6 +894,57 @@ export function ProjectSelectorPanel({
 
             <form onSubmit={handleCreateProject} className="flex-1 flex flex-col min-h-0">
               <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                {isSimplifiedMode ? (
+                  // Simplified Mode UI
+                  <>
+                    <div className="text-center mb-6">
+                      <p className="text-base-content/60">
+                        Let&apos;s get you started with your first AI coding project.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-medium text-lg">Choose your project directory</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={createWorkingDirectory}
+                        onChange={(e) => handleCreateDirectoryChange(e.target.value)}
+                        className="input input-bordered w-full input-lg"
+                        placeholder="/path/to/your/project"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    {createName && (
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-medium">Project Name</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={createName}
+                          className="input input-bordered w-full"
+                          readOnly
+                        />
+                      </div>
+                    )}
+
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvancedOptions(true)}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        Advanced Options
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  // Full Advanced Mode UI (existing complex form)
+                  <>
                 {/* Basic Information */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -1061,6 +1130,8 @@ export function ProjectSelectorPanel({
                     ))}
                   </div>
                 </div>
+                  </>
+                )}
               </div>
 
               {/* Actions */}
@@ -1083,7 +1154,7 @@ export function ProjectSelectorPanel({
                       Creating...
                     </>
                   ) : (
-                    'Create Project'
+                    isSimplifiedMode ? 'Get Started' : 'Create Project'
                   )}
                 </button>
               </div>
