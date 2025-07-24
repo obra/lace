@@ -67,9 +67,11 @@ export class ProviderRegistry {
     try {
       switch (providerName.toLowerCase()) {
         case 'anthropic': {
+          // Create temporary instance for metadata access only - not for API calls
           return new AnthropicProvider({ apiKey: 'dummy' });
         }
         case 'openai': {
+          // Create temporary instance for metadata access only - not for API calls
           return new OpenAIProvider({ apiKey: 'dummy' });
         }
         case 'lmstudio': {
@@ -91,12 +93,12 @@ export class ProviderRegistry {
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
         const apiKey = (config.apiKey as string) || getEnvVar('ANTHROPIC_KEY');
-        return new AnthropicProvider({ ...config, apiKey: apiKey || '' });
+        return new AnthropicProvider({ ...config, apiKey: apiKey || null });
       }
       case 'openai': {
         const apiKey =
           (config.apiKey as string) || getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-        return new OpenAIProvider({ ...config, apiKey: apiKey || '' });
+        return new OpenAIProvider({ ...config, apiKey: apiKey || null });
       }
       case 'lmstudio': {
         return new LMStudioProvider(config);
