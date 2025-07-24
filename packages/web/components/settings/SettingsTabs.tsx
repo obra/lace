@@ -28,8 +28,8 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
     ? tabs.map(tab => tab.id)
     : childrenArray
         .filter(isValidElement)
-        .map(child => child.props['data-tab'])
-        .filter(Boolean);
+        .map(child => child.props['data-tab'] as string)
+        .filter((id): id is string => typeof id === 'string' && Boolean(id));
 
   // Generate tab labels if not provided
   const tabConfigs = tabs || tabIds.map(id => ({
@@ -69,7 +69,7 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
   // Find active content
   const activeContent = childrenArray
     .filter(isValidElement)
-    .find(child => child.props['data-tab'] === activeTab);
+    .find(child => (child.props['data-tab'] as string) === activeTab);
 
   return (
     <div className="flex flex-col h-full">

@@ -69,6 +69,12 @@ const config = [
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }], // Allow only warn/error in tests
       'no-restricted-imports': 'off',
+      // Disable unsafe TypeScript rules for test files (testing library returns any types)
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
     },
   },
   {
