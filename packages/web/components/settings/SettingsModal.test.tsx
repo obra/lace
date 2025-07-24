@@ -1,9 +1,14 @@
 // ABOUTME: Tests for SettingsModal component covering open/close behavior and keyboard navigation
 // ABOUTME: Ensures modal renders correctly with proper ARIA attributes and accessibility features
 
+/**
+ * @vitest-environment jsdom
+ */
+
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { SettingsModal } from './SettingsModal';
 
 describe('SettingsModal', () => {

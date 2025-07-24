@@ -1,9 +1,14 @@
 // ABOUTME: Integration test for settings components verifying they work together
 // ABOUTME: Tests complete settings workflow with all components composed
 
+/**
+ * @vitest-environment jsdom
+ */
+
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { SettingsModal, SettingsTabs, SettingsPanel, SettingField } from './index';
 
 describe('Settings Components Integration', () => {

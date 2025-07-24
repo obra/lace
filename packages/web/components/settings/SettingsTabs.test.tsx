@@ -1,9 +1,14 @@
 // ABOUTME: Tests for SettingsTabs component covering tab navigation and content switching
 // ABOUTME: Ensures proper tab behavior, accessibility, and keyboard navigation support
 
+/**
+ * @vitest-environment jsdom
+ */
+
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { SettingsTabs } from './SettingsTabs';
 
 describe('SettingsTabs', () => {

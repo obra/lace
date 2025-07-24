@@ -1,8 +1,13 @@
 // ABOUTME: Tests for SettingsPanel component covering content display and layout
 // ABOUTME: Ensures proper panel structure, title rendering, and content area management
 
+/**
+ * @vitest-environment jsdom
+ */
+
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 import { SettingsPanel } from './SettingsPanel';
 
 describe('SettingsPanel', () => {

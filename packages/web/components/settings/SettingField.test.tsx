@@ -1,8 +1,13 @@
 // ABOUTME: Tests for SettingField component covering field layout and content display
 // ABOUTME: Ensures proper label, description, and control area rendering with accessibility
 
+/**
+ * @vitest-environment jsdom
+ */
+
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 import { SettingField } from './SettingField';
 
 describe('SettingField', () => {
