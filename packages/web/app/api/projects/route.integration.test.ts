@@ -192,10 +192,10 @@ describe('Projects API Integration Tests', () => {
       expect(data.details).toBeDefined();
     });
 
-    it('should validate empty name', async () => {
+    it('should auto-generate name from directory when name is empty', async () => {
       const requestBody = {
         name: '',
-        workingDirectory: '/test/path',
+        workingDirectory: '/test/my-awesome-project',
       };
 
       const request = new NextRequest('http://localhost/api/projects', {
@@ -205,11 +205,11 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = (await response.json()) as ProjectResponse;
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
-      expect(data.details).toBeDefined();
+      expect(response.status).toBe(201);
+      expect(data.project.name).toBe('my-awesome-project');
+      expect(data.project.workingDirectory).toBe('/test/my-awesome-project');
     });
 
     it('should validate empty working directory', async () => {
