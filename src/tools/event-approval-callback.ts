@@ -5,7 +5,7 @@ import { ApprovalCallback, ApprovalDecision } from './approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
 import { ToolCall } from './types';
-import { ThreadEvent } from '~/threads/types';
+import { ThreadEvent, ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
 
 export class EventApprovalCallback implements ApprovalCallback {
   constructor(
@@ -21,7 +21,7 @@ export class EventApprovalCallback implements ApprovalCallback {
       throw new Error(`Could not find TOOL_CALL event for ${toolName}`);
     }
     
-    const toolCallId = toolCallEvent.data.id;
+    const toolCallId = (toolCallEvent.data as ToolCall).id;
     
     // Check if approval response already exists (recovery case)
     const existingResponse = this.checkExistingApprovalResponse(toolCallId);
@@ -99,7 +99,7 @@ export class EventApprovalCallback implements ApprovalCallback {
     const events = this.threadManager.getEvents(this.threadId);
     return events.some(e => 
       e.type === 'TOOL_APPROVAL_REQUEST' && 
-      e.data.toolCallId === toolCallId
+      (e.data as ToolApprovalRequestData).toolCallId === toolCallId
     );
   }
 
@@ -107,8 +107,8 @@ export class EventApprovalCallback implements ApprovalCallback {
     const events = this.threadManager.getEvents(this.threadId);
     const responseEvent = events.find(e => 
       e.type === 'TOOL_APPROVAL_RESPONSE' && 
-      e.data.toolCallId === toolCallId
+      (e.data as ToolApprovalResponseData).toolCallId === toolCallId
     );
-    return responseEvent?.data.decision || null;
+    return responseEvent ? (responseEvent.data as ToolApprovalResponseData).decision : null;
   }
 }

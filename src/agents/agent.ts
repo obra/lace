@@ -116,6 +116,11 @@ export class Agent extends EventEmitter {
     return this._threadId;
   }
 
+  // Public access to thread manager for approval system
+  get threadManager(): ThreadManager {
+    return this._threadManager;
+  }
+
   get isRunning(): boolean {
     return this._isRunning;
   }
