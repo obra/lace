@@ -2,7 +2,7 @@
 // ABOUTME: Global test configuration and mocks for server-only modules
 
 import { vi } from 'vitest';
-// Note: jest-dom setup removed to fix import issues in worktree
+import '@testing-library/jest-dom';
 
 // Mock server-only to avoid import issues in tests
 // This is the current workaround as suggested in Next.js GitHub issue #60038
