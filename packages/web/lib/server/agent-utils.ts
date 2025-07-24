@@ -1,31 +1,17 @@
-// ABOUTME: Utilities for agent-specific web concerns
-// ABOUTME: Handles tool approval and SSE setup for individual agents
+// ABOUTME: Thin web integration layer for core approval system  
+// ABOUTME: Sets up event-based approval callback from core tools system
 
-import { Agent, ApprovalDecision } from '@/lib/server/lace-imports';
+import { Agent, EventApprovalCallback } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/lib/server/core-types';
 
 export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
-  // Create ApprovalCallback implementation that emits events (like CLI)
-  const approvalCallback = {
-    async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
-      const tool = agent.toolExecutor?.getTool(toolName);
-      const isReadOnly = tool?.annotations?.readOnlyHint === true;
-
-      return new Promise<ApprovalDecision>((resolve) => {
-        const requestId = `${toolName}-${Date.now()}`;
-
-        // Emit event for SessionService to handle
-        agent.emit('approval_request', {
-          toolName,
-          input,
-          isReadOnly,
-          requestId,
-          resolve,
-        });
-      });
-    },
-  };
-
+  // Use core event-based approval callback
+  const approvalCallback = new EventApprovalCallback(
+    agent,
+    agent.threadManager,
+    agent.threadId
+  );
+  
   // Set the approval callback on the agent's ToolExecutor
   agent.toolExecutor.setApprovalCallback(approvalCallback);
 }
