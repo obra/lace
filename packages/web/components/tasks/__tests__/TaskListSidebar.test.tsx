@@ -200,6 +200,27 @@ describe('TaskListSidebar', () => {
     expect(mockOnOpenTaskBoard).toHaveBeenCalled();
   });
 
+  it('should call onCreateTask when create task button is clicked', async () => {
+    const mockOnCreateTask = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <TaskListSidebar
+        projectId="test-project"
+        sessionId="test-session"
+        onCreateTask={mockOnCreateTask}
+      />
+    );
+
+    // Look for the create task button (second button in the flex container)
+    const buttons = screen.getAllByTestId('sidebar-button');
+    expect(buttons).toHaveLength(2);
+    const createButton = buttons[1]; // Second button should be the create button
+    
+    await user.click(createButton);
+    expect(mockOnCreateTask).toHaveBeenCalled();
+  });
+
   it('should show loading state', () => {
     mockUseTaskManager.mockReturnValue({
       tasks: [],

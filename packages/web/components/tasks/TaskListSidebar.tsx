@@ -5,7 +5,7 @@
 
 import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTasks } from '@/lib/fontawesome';
+import { faTasks, faPlus } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
@@ -16,13 +16,15 @@ interface TaskListSidebarProps {
   sessionId: string;
   onTaskClick?: (taskId: string) => void;
   onOpenTaskBoard?: () => void;
+  onCreateTask?: () => void;
 }
 
 export function TaskListSidebar({ 
   projectId, 
   sessionId, 
   onTaskClick, 
-  onOpenTaskBoard 
+  onOpenTaskBoard,
+  onCreateTask
 }: TaskListSidebarProps) {
   const { tasks, isLoading } = useTaskManager(projectId, sessionId);
   
@@ -44,14 +46,26 @@ export function TaskListSidebar({
   return (
     <div className="space-y-2">
       {/* Quick Actions */}
-      <SidebarButton 
-        onClick={onOpenTaskBoard} 
-        variant="primary" 
-        size="sm"
-      >
-        <FontAwesomeIcon icon={faTasks} className="w-4 h-4" />
-        Open Kanban Board
-      </SidebarButton>
+      <div className="flex gap-1">
+        <SidebarButton 
+          onClick={onOpenTaskBoard} 
+          variant="primary" 
+          size="sm"
+          className="flex-1"
+        >
+          <FontAwesomeIcon icon={faTasks} className="w-4 h-4" />
+          Open Kanban Board
+        </SidebarButton>
+        <SidebarButton 
+          onClick={onCreateTask} 
+          variant="ghost" 
+          size="sm"
+          className="px-2"
+          aria-label="Create new task"
+        >
+          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+        </SidebarButton>
+      </div>
 
       {/* Task Summary */}
       <div className="text-xs text-base-content/60 px-2">

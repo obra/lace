@@ -565,6 +565,10 @@ export function LaceApp() {
                       setShowTaskBoard(true);
                       setShowMobileNav(false); // Close mobile nav when opening task board
                     }}
+                    onCreateTask={() => {
+                      setShowTaskBoard(true);
+                      setShowMobileNav(false); // Close mobile nav when creating task
+                    }}
                   />
                 </SidebarSection>
               )}
@@ -691,6 +695,7 @@ export function LaceApp() {
                   console.log('Task clicked:', taskId);
                 }}
                 onOpenTaskBoard={() => setShowTaskBoard(true)}
+                onCreateTask={() => setShowTaskBoard(true)}
               />
             </SidebarSection>
           )}
