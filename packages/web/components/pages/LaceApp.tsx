@@ -61,6 +61,7 @@ export function LaceApp() {
   const [showTaskCreation, setShowTaskCreation] = useState(false);
   const [showTaskDisplay, setShowTaskDisplay] = useState(false);
   const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
+  const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
   
 
   // Business Logic State (from current app/page.tsx)
@@ -163,6 +164,15 @@ export function LaceApp() {
     void loadProjects();
     void loadProviders();
   }, [loadProjects, loadProviders]);
+
+  // Auto-open project creation modal when no projects exist
+  useEffect(() => {
+    if (projects.length === 0 && !loadingProjects) {
+      setAutoOpenCreateProject(true);
+    } else {
+      setAutoOpenCreateProject(false);
+    }
+  }, [projects.length, loadingProjects]);
 
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
@@ -847,6 +857,8 @@ export function LaceApp() {
                 onProjectCreate={loadProjects}
                 onProjectUpdate={handleProjectUpdate}
                 loading={loadingProjects}
+                autoOpenCreate={autoOpenCreateProject}
+                onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
               />
             </div>
           )}

@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
 import type { ProjectInfo, ProviderInfo } from '@/types/api';
@@ -16,6 +16,8 @@ interface ProjectSelectorPanelProps {
   onProjectCreate?: () => void;
   onProjectUpdate?: (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: ProjectConfiguration }) => void;
   loading?: boolean;
+  autoOpenCreate?: boolean;
+  onAutoCreateHandled?: () => void;
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
@@ -54,6 +56,8 @@ export function ProjectSelectorPanel({
   onProjectCreate,
   onProjectUpdate,
   loading = false,
+  autoOpenCreate = false,
+  onAutoCreateHandled,
 }: ProjectSelectorPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ProjectFilter>('active');
@@ -75,6 +79,14 @@ export function ProjectSelectorPanel({
   const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
   const [createNewEnvKey, setCreateNewEnvKey] = useState('');
   const [createNewEnvValue, setCreateNewEnvValue] = useState('');
+
+  // Auto-open project creation modal when requested
+  useEffect(() => {
+    if (autoOpenCreate && !showCreateProject) {
+      setShowCreateProject(true);
+      onAutoCreateHandled?.();
+    }
+  }, [autoOpenCreate, showCreateProject, onAutoCreateHandled]);
 
   // Get available models for project configuration
   const availableModels = useMemo(() => {
