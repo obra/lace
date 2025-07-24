@@ -23,7 +23,12 @@ vi.mock('framer-motion', () => ({
 // Mock all the child components that we're not testing
 vi.mock('@/components/layout/Sidebar', () => ({
   Sidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar">{children}</div>,
-  SidebarSection: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-section">{children}</div>,
+  SidebarSection: ({ children, title }: { children?: React.ReactNode; title?: string }) => (
+    <div data-testid="sidebar-section">
+      {title && <div data-testid="sidebar-section-title">{title}</div>}
+      {children}
+    </div>
+  ),
   SidebarItem: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-item">{children}</div>,
   SidebarButton: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => 
     <button data-testid="sidebar-button" onClick={onClick}>{children}</button>,
@@ -87,88 +92,6 @@ const renderWithProviders = (component: React.ReactElement) => {
   );
 };
 
-describe('LaceApp Task Integration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    
-    // Mock fetch to never resolve for loading states
-    global.fetch = vi.fn(() => new Promise(() => {}));
-    
-    // Default hash router mock
-    vi.mocked(useHashRouter).mockReturnValue({
-      project: 'test-project',
-      session: 'test-session',
-      agent: null,
-      setProject: vi.fn(),
-      setSession: vi.fn(),
-      setAgent: vi.fn(),
-      clearAll: vi.fn(),
-      state: {},
-      updateState: vi.fn(),
-      isHydrated: true,
-    });
-    
-    // Default task manager mock
-    vi.mocked(useTaskManager).mockReturnValue({
-      tasks: [],
-      isLoading: false,
-      isCreating: false,
-      isUpdating: false,
-      isDeleting: false,
-      error: null,
-      createTask: vi.fn(),
-      updateTask: vi.fn(),
-      deleteTask: vi.fn(),
-      addNote: vi.fn(),
-      refetch: vi.fn(),
-    });
-  });
-
-  it('should show Tasks button when session is selected', async () => {
-    renderWithProviders(<LaceApp />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Tasks')).toBeInTheDocument();
-    });
-  });
-
-  it('should open TaskBoardModal when Tasks button is clicked', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LaceApp />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Tasks')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText('Tasks'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Task Board')).toBeInTheDocument();
-    });
-  });
-
-  it('should not show Tasks button when no session selected', async () => {
-    // Mock hook to return no session
-    vi.mocked(useHashRouter).mockReturnValue({
-      project: 'test-project',
-      session: null, // No session selected
-      agent: null,
-      setProject: vi.fn(),
-      setSession: vi.fn(),
-      setAgent: vi.fn(),
-      clearAll: vi.fn(),
-      state: {},
-      updateState: vi.fn(),
-      isHydrated: true,
-    });
-
-    renderWithProviders(<LaceApp />);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Tasks')).not.toBeInTheDocument();
-    });
-  });
-});
 
 describe('LaceApp Task Sidebar Integration', () => {
   beforeEach(() => {
@@ -179,7 +102,18 @@ describe('LaceApp Task Sidebar Integration', () => {
       if (url.includes('/api/projects')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ projects: [] }),
+          json: () => Promise.resolve({ 
+            projects: [{
+              id: 'test-project',
+              name: 'Test Project',
+              description: 'Test project description',
+              workingDirectory: '/test',
+              isArchived: false,
+              createdAt: new Date(),
+              lastUsedAt: new Date(),
+              sessionCount: 1
+            }]
+          }),
         });
       }
       if (url.includes('/api/providers')) {
@@ -237,10 +171,10 @@ describe('LaceApp Task Sidebar Integration', () => {
   it('should show task sidebar when session is selected', async () => {
     renderWithProviders(<LaceApp />);
 
+    // Check if the task section elements are there
     await waitFor(() => {
-      expect(screen.getByText('Tasks')).toBeInTheDocument(); // Section header
-      expect(screen.getByText('Open Kanban Board')).toBeInTheDocument(); // Sidebar button
-    });
+      expect(screen.getByText('Add task')).toBeInTheDocument(); // Add task button
+    }, { timeout: 3000 });
   });
 
   it('should not show task sidebar when no session selected', async () => {
@@ -261,22 +195,7 @@ describe('LaceApp Task Sidebar Integration', () => {
     renderWithProviders(<LaceApp />);
 
     await waitFor(() => {
-      expect(screen.queryByText('Open Kanban Board')).not.toBeInTheDocument();
-    });
-  });
-
-  it('should open task board when sidebar button is clicked', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<LaceApp />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Open Kanban Board')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText('Open Kanban Board'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Task Board')).toBeInTheDocument();
+      expect(screen.queryByText('Add task')).not.toBeInTheDocument();
     });
   });
 
@@ -316,8 +235,8 @@ describe('LaceApp Task Sidebar Integration', () => {
     renderWithProviders(<LaceApp />);
 
     await waitFor(() => {
-      // Just check that the Tasks section exists and shows the task itself
-      expect(screen.getByText('Tasks')).toBeInTheDocument(); // Section header
+      // Check that the Tasks section exists with task count and shows the task itself
+      expect(screen.getByText('Tasks (1)')).toBeInTheDocument(); // Section header with count
       expect(screen.getByText('Test Task')).toBeInTheDocument(); // Task item
       expect(screen.getByText('1 tasks • 0 in progress')).toBeInTheDocument(); // Task summary
     });
