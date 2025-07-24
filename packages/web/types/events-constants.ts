@@ -1,20 +1,11 @@
 // ABOUTME: Shared event type constants for client and server
-// ABOUTME: Pure constants with no dependencies to prevent client/server boundary violations
+// ABOUTME: Uses core thread types as single source of truth
 
-// Thread event types that are persisted to database
-// This mirrors the EVENT_TYPES constant from the main project's src/threads/types.ts
-export const EVENT_TYPES = [
-  'USER_MESSAGE',
-  'AGENT_MESSAGE',
-  'TOOL_CALL',
-  'TOOL_RESULT',
-  'LOCAL_SYSTEM_MESSAGE',
-  'SYSTEM_PROMPT',
-  'USER_SYSTEM_PROMPT',
-] as const;
+// Import thread event types from core package to maintain consistency
+import { EVENT_TYPES, type EventType } from '@/lib/core-types-import';
 
-// Type derived from the array
-export type EventType = (typeof EVENT_TYPES)[number];
+// Re-export for backward compatibility
+export { EVENT_TYPES, type EventType };
 
 // UI-only event types that are NOT persisted to the database
 export const UI_EVENT_TYPES = [

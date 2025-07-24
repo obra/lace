@@ -170,13 +170,13 @@ describe('conversation-builder', () => {
       expect(result).toEqual(events);
     });
 
-    it('handles null compaction data gracefully', () => {
-      const nullCompactionEvent: ThreadEvent = {
-        id: 'compaction-null',
+    it('handles invalid compaction data gracefully', () => {
+      const invalidCompactionEvent: ThreadEvent = {
+        id: 'compaction-invalid',
         threadId: 'test-thread',
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: null,
+        data: {}, // Empty object missing required CompactionData fields
       };
 
       const newEvent: ThreadEvent = {
@@ -184,13 +184,13 @@ describe('conversation-builder', () => {
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: 'After null compaction',
+        data: 'After invalid compaction',
       };
 
-      const events = [...mockEvents, nullCompactionEvent, newEvent];
+      const events = [...mockEvents, invalidCompactionEvent, newEvent];
       const result = buildWorkingConversation(events);
 
-      // Should fall back to returning all events when compaction data is null
+      // Should fall back to returning all events when compaction data is invalid
       expect(result).toEqual(events);
     });
   });

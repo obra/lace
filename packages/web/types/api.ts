@@ -109,6 +109,13 @@ export interface UserSystemPromptEventData {
   content: string;
 }
 
+export interface CompactionEventData {
+  strategyId: string;
+  originalEventCount: number;
+  compactedEvents: unknown[]; // Array of events, kept as unknown for simplicity
+  metadata?: Record<string, unknown>;
+}
+
 // Discriminated union for session events
 export type SessionEvent =
   | {
@@ -176,6 +183,12 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: Date;
       data: UserSystemPromptEventData;
+    }
+  | {
+      type: 'COMPACTION';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: CompactionEventData;
     };
 
 // Tool approval event data - extends what the agent emits
