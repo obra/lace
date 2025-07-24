@@ -12,6 +12,7 @@ A **thread** represents a complete conversation history. Each thread has:
 - An ordered sequence of events
 - Creation and update timestamps
 - Support for parent-child relationships (delegation)
+- **Stable ID**: Thread IDs never change, even during compaction
 
 ### Events
 Events are immutable records of actions within a conversation:
@@ -22,12 +23,13 @@ Events are immutable records of actions within a conversation:
 - `THINKING` - Agent reasoning process
 - `SYSTEM_PROMPT` - System instructions
 - `LOCAL_SYSTEM_MESSAGE` - UI-only messages
+- `COMPACTION` - Compaction event containing compacted conversation state
 
-### Thread Versioning
-To handle context window limits, threads support versioning:
-- **Canonical Thread**: The original thread ID that remains stable
-- **Compacted Versions**: New threads with compressed event history
-- **Version History**: Audit trail of all versions for a canonical thread
+### Compaction Events
+To handle context window limits, threads use compaction events:
+- **Compaction Event**: Special event containing compacted conversation history
+- **Working Conversation**: Current conversation state built from latest compaction + recent events
+- **Complete History**: All events including compaction events (for debugging/audit)
 
 ## Architecture
 
@@ -52,23 +54,22 @@ Central coordinator for thread operations:
 - Thread creation and lifecycle management
 - Event addition and retrieval
 - Parent-child thread relationships (delegation)
-- Compaction coordination
-- Version management
+- Compaction strategy registration and execution
 
 Key methods:
 ```typescript
 createThread(threadId: string): Thread
 addEvent(threadId: string, type: EventType, data: any): ThreadEvent
-getEvents(threadId: string): ThreadEvent[]
-createCompactedVersion(reason: string): Promise<string>
-getCanonicalId(threadId: string): string
+getEvents(threadId: string): ThreadEvent[]  // Returns working conversation
+getAllEvents(threadId: string): ThreadEvent[]  // Returns complete history
+registerCompactionStrategy(strategy: CompactionStrategy): void
+compact(threadId: string, strategyId: string): Promise<void>
 ```
 
 #### ThreadPersistence (`src/threads/persistence.ts`)
 SQLite-based storage layer with graceful degradation:
 - Database schema management with migrations
 - Thread and event persistence
-- Version mapping tables
 - Transaction support for atomic operations
 - Memory-only fallback when disk unavailable
 
@@ -77,10 +78,6 @@ Database schema:
 -- Core tables
 threads (id, created_at, updated_at)
 events (id, thread_id, type, data, created_at)
-
--- Version management
-thread_versions (canonical_id, current_version_id)
-version_history (canonical_id, version_id, created_at, reason)
 ```
 
 #### Compaction System (`src/threads/compaction/`)

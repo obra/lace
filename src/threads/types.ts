@@ -12,6 +12,7 @@ export const EVENT_TYPES = [
   'LOCAL_SYSTEM_MESSAGE',
   'SYSTEM_PROMPT',
   'USER_SYSTEM_PROMPT',
+  'COMPACTION',
 ] as const;
 
 // Derive EventType union from the array
