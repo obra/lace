@@ -13,6 +13,8 @@ import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
+import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
+import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -56,6 +58,9 @@ export function LaceApp() {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
   const [showTaskBoard, setShowTaskBoard] = useState(false);
+  const [showTaskCreation, setShowTaskCreation] = useState(false);
+  const [showTaskDisplay, setShowTaskDisplay] = useState(false);
+  const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
   
 
   // Business Logic State (from current app/page.tsx)
@@ -378,6 +383,58 @@ export function LaceApp() {
     }
   };
 
+  // Handle task creation from modal
+  const handleTaskCreateFromModal = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.createTask({
+        title: taskData.title,
+        description: taskData.description,
+        prompt: taskData.prompt,
+        priority: taskData.priority,
+        assignedTo: taskData.assignedTo,
+      });
+      setShowTaskCreation(false);
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
+  };
+
+  // Handle opening task display modal
+  const handleTaskDisplay = (task: Task) => {
+    setSelectedTaskForDisplay(task);
+    setShowTaskDisplay(true);
+  };
+
+  // Handle updating task from display modal
+  const handleTaskUpdateFromModal = async (taskId: string, updates: Partial<Task>) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.updateTask(taskId, {
+        title: updates.title,
+        description: updates.description,
+        status: updates.status,
+        priority: updates.priority,
+        assignedTo: updates.assignedTo,
+      });
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  // Handle adding task note
+  const handleTaskAddNote = async (taskId: string, content: string) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.addNote(taskId, content);
+    } catch (error) {
+      console.error('Failed to add task note:', error);
+    }
+  };
+
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
   const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
@@ -565,7 +622,7 @@ export function LaceApp() {
                       setShowMobileNav(false); // Close mobile nav when opening task board
                     }}
                     onCreateTask={() => {
-                      setShowTaskBoard(true);
+                      setShowTaskCreation(true);
                       setShowMobileNav(false); // Close mobile nav when creating task
                     }}
                   />
@@ -693,7 +750,7 @@ export function LaceApp() {
                   // For now, just ignore - could open task detail modal in future
                 }}
                 onOpenTaskBoard={() => setShowTaskBoard(true)}
-                onCreateTask={() => setShowTaskBoard(true)}
+                onCreateTask={() => setShowTaskCreation(true)}
               />
             </SidebarSection>
           )}
@@ -722,17 +779,6 @@ export function LaceApp() {
                     (selectedProject ? currentProject.name : 'Select a Project')
                   }
                 </h1>
-                
-                {/* Add Tasks button when session is selected */}
-                {selectedSession && (
-                  <button
-                    onClick={() => setShowTaskBoard(true)}
-                    className="btn btn-primary btn-sm ml-4"
-                  >
-                    <FontAwesomeIcon icon={faTasks} className="w-4 h-4 mr-1" />
-                    Tasks
-                  </button>
-                )}
               </div>
             </motion.div>
           </motion.div>
@@ -828,6 +874,34 @@ export function LaceApp() {
           tasks={taskManager.tasks}
           onTaskUpdate={handleTaskUpdate}
           onTaskCreate={handleTaskCreate}
+          onTaskClick={handleTaskDisplay}
+        />
+      )}
+
+      {/* Task Creation Modal */}
+      {showTaskCreation && selectedProject && selectedSession && (
+        <TaskCreationModal
+          isOpen={showTaskCreation}
+          onClose={() => setShowTaskCreation(false)}
+          onCreateTask={handleTaskCreateFromModal}
+          agents={selectedSessionDetails?.agents || []}
+          loading={taskManager?.isCreating || false}
+        />
+      )}
+
+      {/* Task Display Modal */}
+      {showTaskDisplay && selectedTaskForDisplay && (
+        <TaskDisplayModal
+          isOpen={showTaskDisplay}
+          onClose={() => {
+            setShowTaskDisplay(false);
+            setSelectedTaskForDisplay(null);
+          }}
+          task={selectedTaskForDisplay}
+          onUpdateTask={handleTaskUpdateFromModal}
+          onAddNote={handleTaskAddNote}
+          agents={selectedSessionDetails?.agents || []}
+          loading={taskManager?.isUpdating || false}
         />
       )}
     </motion.div>
