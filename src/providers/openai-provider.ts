@@ -17,7 +17,7 @@ import { convertToOpenAIFormat } from '~/providers/format-converters';
 import { getEnvVar } from '~/config/env-loader';
 
 export interface OpenAIProviderConfig extends ProviderConfig {
-  apiKey: string;
+  apiKey: string | null;
   [key: string]: unknown; // Allow for additional properties
 }
 
@@ -32,7 +32,7 @@ export class OpenAIProvider extends AIProvider {
     if (!this._openai) {
       const config = this._config as OpenAIProviderConfig;
       if (!config.apiKey) {
-        throw new Error('OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider');
+        throw new Error('Missing required environment variable: OPENAI_API_KEY or OPENAI_KEY');
       }
 
       const openaiConfig: ClientOptions = {
