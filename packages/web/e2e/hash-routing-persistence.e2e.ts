@@ -243,12 +243,9 @@ test.describe('Hash-Based URL Persistence E2E', () => {
         } else if ((await launchButton.count()) > 0) {
           await launchButton.click();
         }
-      } catch (error) {
+      } catch (_error) {
         // Agent functionality may not work due to server configuration issues
-        console.log(
-          'Agent functionality not available:',
-          error instanceof Error ? error.message : String(error)
-        );
+        // Agent functionality not available - error captured
       }
     }
 
@@ -332,7 +329,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
         await sessionHeading.click();
       } else {
         // Session creation failed due to server issues, continue without session navigation
-        console.log('Session creation failed as expected due to server configuration');
+        // Session creation failed as expected due to server configuration
       }
     }
 

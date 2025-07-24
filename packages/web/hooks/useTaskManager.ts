@@ -5,11 +5,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TaskAPIClient } from '@/lib/client/task-api';
-import { useTaskStream, type TaskEvent } from '~/../packages/web/hooks/useTaskStream';
+import { useTaskStream, type TaskEvent } from '@/hooks/useTaskStream';
 import type { Task } from '@/types/api';
 import type { TaskFilters, CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
 
-export function useTaskManager(sessionId: string) {
+export function useTaskManager(projectId: string, sessionId: string) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -29,7 +29,7 @@ export function useTaskManager(sessionId: string) {
     async (filters?: TaskFilters) => {
       try {
         setError(null);
-        const fetchedTasks = await client.current.listTasks(sessionId, filters);
+        const fetchedTasks = await client.current.listTasks(projectId, sessionId, filters);
         setTasks(fetchedTasks);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
@@ -38,7 +38,7 @@ export function useTaskManager(sessionId: string) {
         setIsLoading(false);
       }
     },
-    [sessionId]
+    [projectId, sessionId]
   );
 
   // Batch refetch after operations
@@ -56,6 +56,7 @@ export function useTaskManager(sessionId: string) {
 
   // Subscribe to real-time task updates
   useTaskStream({
+    projectId,
     sessionId,
     onTaskCreated: useCallback((event: TaskEvent) => {
       if (event.task) {
@@ -110,7 +111,7 @@ export function useTaskManager(sessionId: string) {
       setError(null);
 
       try {
-        await client.current.createTask(sessionId, task);
+        await client.current.createTask(projectId, sessionId, task);
         scheduleRefetch();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to create task');
@@ -120,7 +121,7 @@ export function useTaskManager(sessionId: string) {
         pendingOperations.current--;
       }
     },
-    [sessionId, scheduleRefetch]
+    [projectId, sessionId, scheduleRefetch]
   );
 
   // Update task
@@ -131,7 +132,7 @@ export function useTaskManager(sessionId: string) {
       setError(null);
 
       try {
-        await client.current.updateTask(sessionId, taskId, updates);
+        await client.current.updateTask(projectId, sessionId, taskId, updates);
         scheduleRefetch();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to update task');
@@ -141,7 +142,7 @@ export function useTaskManager(sessionId: string) {
         pendingOperations.current--;
       }
     },
-    [sessionId, scheduleRefetch]
+    [projectId, sessionId, scheduleRefetch]
   );
 
   // Delete task
@@ -152,7 +153,7 @@ export function useTaskManager(sessionId: string) {
       setError(null);
 
       try {
-        await client.current.deleteTask(sessionId, taskId);
+        await client.current.deleteTask(projectId, sessionId, taskId);
         scheduleRefetch();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete task');
@@ -162,7 +163,7 @@ export function useTaskManager(sessionId: string) {
         pendingOperations.current--;
       }
     },
-    [sessionId, scheduleRefetch]
+    [projectId, sessionId, scheduleRefetch]
   );
 
   // Add note
@@ -173,7 +174,7 @@ export function useTaskManager(sessionId: string) {
       setError(null);
 
       try {
-        await client.current.addNote(sessionId, taskId, content, author);
+        await client.current.addNote(projectId, sessionId, taskId, content, author);
         scheduleRefetch();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to add note');
@@ -183,7 +184,7 @@ export function useTaskManager(sessionId: string) {
         pendingOperations.current--;
       }
     },
-    [sessionId, scheduleRefetch]
+    [projectId, sessionId, scheduleRefetch]
   );
 
   return {

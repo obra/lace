@@ -16,6 +16,7 @@ export interface TaskEvent {
 }
 
 interface UseTaskStreamOptions {
+  projectId: string;
   sessionId: string;
   onTaskCreated?: (event: TaskEvent) => void;
   onTaskUpdated?: (event: TaskEvent) => void;
@@ -25,6 +26,7 @@ interface UseTaskStreamOptions {
 }
 
 export function useTaskStream({
+  projectId,
   sessionId,
   onTaskCreated,
   onTaskUpdated,
@@ -35,10 +37,12 @@ export function useTaskStream({
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!projectId || !sessionId) return;
 
     // Create SSE connection
-    const eventSource = new EventSource(`/api/tasks/stream?sessionId=${sessionId}`);
+    const eventSource = new EventSource(
+      `/api/projects/${projectId}/sessions/${sessionId}/tasks/stream`
+    );
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
@@ -69,13 +73,11 @@ export function useTaskStream({
             break;
         }
       } catch (error) {
-        console.error('Error parsing task event:', error);
         onError?.(error as Error);
       }
     };
 
     eventSource.onerror = (error) => {
-      console.error('Task stream error:', error);
       onError?.(new Error('Task stream connection failed'));
     };
 
@@ -84,7 +86,7 @@ export function useTaskStream({
       eventSource.close();
       eventSourceRef.current = null;
     };
-  }, [sessionId, onTaskCreated, onTaskUpdated, onTaskDeleted, onTaskNoteAdded, onError]);
+  }, [projectId, sessionId, onTaskCreated, onTaskUpdated, onTaskDeleted, onTaskNoteAdded, onError]);
 
   // Return a function to manually close the stream if needed
   const close = () => {

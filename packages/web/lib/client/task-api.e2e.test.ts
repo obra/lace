@@ -12,13 +12,16 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 
 // Import API routes to test against
-import { GET as listTasks, POST as createTask } from '@/app/api/tasks/route';
+import {
+  GET as listTasks,
+  POST as createTask,
+} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
 import {
   GET as getTask,
   PATCH as updateTask,
   DELETE as deleteTask,
-} from '@/app/api/tasks/[taskId]/route';
-import { POST as addNote } from '@/app/api/tasks/[taskId]/notes/route';
+} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/route';
+import { POST as addNote } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes/route';
 import { NextRequest } from 'next/server';
 
 // Mock external dependencies only
@@ -40,6 +43,7 @@ vi.mock('@/lib/sse-manager', () => ({
 describe('TaskAPIClient E2E Tests', () => {
   let client: TaskAPIClient;
   let sessionId: string;
+  let projectId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -59,13 +63,14 @@ describe('TaskAPIClient E2E Tests', () => {
       'Test project for TaskAPIClient E2E testing',
       {}
     );
-    const projectId = testProject.getId();
+    projectId = testProject.getId();
     const session = await sessionService.createSession(
       'TaskAPIClient E2E Test Session',
       'anthropic',
       'claude-3-haiku-20240307',
       projectId
     );
+    // Extract string value from ThreadId branded type
     sessionId = session.id as string;
 
     // Mock fetch to route requests to real API handlers (same pattern as useTaskManager.e2e.test.tsx)
@@ -84,48 +89,106 @@ describe('TaskAPIClient E2E Tests', () => {
 
         try {
           // Route to appropriate API handler based on URL pattern
-          if (urlString.includes('/api/tasks') && !urlString.includes('/notes')) {
-            if (method === 'POST' && urlString === '/api/tasks') {
+          if (
+            urlString.includes('/api/projects/') &&
+            urlString.includes('/sessions/') &&
+            urlString.includes('/tasks')
+          ) {
+            // Extract projectId, sessionId, and taskId from URL (ignoring query parameters)
+            const urlPath = urlString.split('?')[0]; // Remove query parameters
+            const urlParts = urlPath.split('/');
+            const projectIdIndex = urlParts.indexOf('projects') + 1;
+            const sessionIdIndex = urlParts.indexOf('sessions') + 1;
+            const tasksIndex = urlParts.indexOf('tasks');
+
+            const extractedProjectId = urlParts[projectIdIndex];
+            const extractedSessionId = urlParts[sessionIdIndex];
+
+            if (method === 'POST' && urlString.endsWith('/tasks')) {
+              // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await createTask(request);
+              return await createTask(request, {
+                params: Promise.resolve({
+                  projectId: extractedProjectId!,
+                  sessionId: extractedSessionId!,
+                }),
+              });
+            } else if (method === 'GET' && urlParts.length === tasksIndex + 1) {
+              // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks[?params]
+              const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
+              return await listTasks(request, {
+                params: Promise.resolve({
+                  projectId: extractedProjectId!,
+                  sessionId: extractedSessionId!,
+                }),
+              });
             } else if (
               method === 'GET' &&
-              urlString.includes('/api/tasks/') &&
-              urlString.includes('?sessionId=')
+              urlParts.length > tasksIndex + 1 &&
+              !urlString.includes('/notes')
             ) {
-              // Handle GET /api/tasks/{id}?sessionId={sessionId} - this should come before the general list case
-              const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
+              // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
+              const taskId = urlParts[tasksIndex + 1];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
               const response = await getTask(request, {
-                params: { taskId: taskId! },
+                params: Promise.resolve({
+                  projectId: extractedProjectId!,
+                  sessionId: extractedSessionId!,
+                  taskId: taskId!,
+                }),
               });
               const responseData = (await response.json()) as unknown;
               return new Response(JSON.stringify(responseData), {
                 status: response.status,
                 headers: { 'Content-Type': 'application/json' },
               });
-            } else if (method === 'GET' && urlString.includes('?sessionId=')) {
-              // Handle GET /api/tasks?sessionId={sessionId} - list tasks
+            } else if (
+              method === 'PATCH' &&
+              urlParts.length > tasksIndex + 1 &&
+              !urlString.includes('/notes')
+            ) {
+              // Handle PATCH /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
+              const taskId = urlParts[tasksIndex + 1];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await listTasks(request);
-            } else if (method === 'PATCH' && urlString.includes('/api/tasks/')) {
-              const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
+              return await updateTask(request, {
+                params: Promise.resolve({
+                  projectId: extractedProjectId!,
+                  sessionId: extractedSessionId!,
+                  taskId: taskId!,
+                }),
+              });
+            } else if (
+              method === 'DELETE' &&
+              urlParts.length > tasksIndex + 1 &&
+              !urlString.includes('/notes')
+            ) {
+              // Handle DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
+              const taskId = urlParts[tasksIndex + 1];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await updateTask(request, { params: { taskId: taskId! } });
-            } else if (method === 'DELETE' && urlString.includes('/api/tasks/')) {
-              const taskId = urlString.split('/api/tasks/')[1]?.split('?')[0];
+              return await deleteTask(request, {
+                params: Promise.resolve({
+                  projectId: extractedProjectId!,
+                  sessionId: extractedSessionId!,
+                  taskId: taskId!,
+                }),
+              });
+            } else if (method === 'POST' && urlString.includes('/notes')) {
+              // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
+              const taskId = urlParts[tasksIndex + 1];
               const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-              return await deleteTask(request, { params: { taskId: taskId! } });
+              return await addNote(request, {
+                params: Promise.resolve({
+                  projectId: extractedProjectId!,
+                  sessionId: extractedSessionId!,
+                  taskId: taskId!,
+                }),
+              });
             }
-          } else if (urlString.includes('/notes') && method === 'POST') {
-            const taskId = urlString.split('/api/tasks/')[1]?.split('/notes')[0];
-            const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-            return await addNote(request, { params: Promise.resolve({ taskId: taskId! }) });
           }
 
           throw new Error(`Unhandled API route: ${method} ${urlString}`);
         } catch (error) {
-          console.error('API route error:', error);
+          // API route error - rethrow for test handling
           throw error;
         }
       });
@@ -144,7 +207,7 @@ describe('TaskAPIClient E2E Tests', () => {
   describe('Task CRUD Operations', () => {
     it('should create and list tasks', async () => {
       // Create a task
-      const newTask = await client.createTask(sessionId, {
+      const newTask = await client.createTask(projectId, sessionId, {
         title: 'E2E Test Task',
         description: 'Task created via E2E test',
         prompt: 'This is a test prompt',
@@ -157,7 +220,7 @@ describe('TaskAPIClient E2E Tests', () => {
       expect(newTask.status).toBe('pending');
 
       // List tasks to verify it was created
-      const tasks = await client.listTasks(sessionId);
+      const tasks = await client.listTasks(projectId, sessionId);
       expect(tasks).toHaveLength(1);
       expect(tasks[0]?.title).toBe('E2E Test Task');
       expect(tasks[0]?.id).toBe(newTask.id);
@@ -165,14 +228,14 @@ describe('TaskAPIClient E2E Tests', () => {
 
     it('should get a specific task', async () => {
       // Create a task first
-      const createdTask = await client.createTask(sessionId, {
+      const createdTask = await client.createTask(projectId, sessionId, {
         title: 'Task to Fetch',
         prompt: 'Test prompt for fetching',
         priority: 'medium',
       });
 
       // Get the specific task
-      const fetchedTask = await client.getTask(sessionId, createdTask.id);
+      const fetchedTask = await client.getTask(projectId, sessionId, createdTask.id);
 
       expect(fetchedTask.id).toBe(createdTask.id);
       expect(fetchedTask.title).toBe('Task to Fetch');
@@ -181,14 +244,14 @@ describe('TaskAPIClient E2E Tests', () => {
 
     it('should update a task', async () => {
       // Create a task first
-      const createdTask = await client.createTask(sessionId, {
+      const createdTask = await client.createTask(projectId, sessionId, {
         title: 'Task to Update',
         prompt: 'Initial task',
         priority: 'low',
       });
 
       // Update the task
-      const updatedTask = await client.updateTask(sessionId, createdTask.id, {
+      const updatedTask = await client.updateTask(projectId, sessionId, createdTask.id, {
         title: 'Updated Task Title',
         status: 'in_progress',
         priority: 'high',
@@ -200,28 +263,28 @@ describe('TaskAPIClient E2E Tests', () => {
       expect(updatedTask.priority).toBe('high');
 
       // Verify the update persisted by fetching again
-      const fetchedTask = await client.getTask(sessionId, createdTask.id);
+      const fetchedTask = await client.getTask(projectId, sessionId, createdTask.id);
       expect(fetchedTask.title).toBe('Updated Task Title');
       expect(fetchedTask.status).toBe('in_progress');
     });
 
     it('should delete a task', async () => {
       // Create a task first
-      const createdTask = await client.createTask(sessionId, {
+      const createdTask = await client.createTask(projectId, sessionId, {
         title: 'Task to Delete',
         prompt: 'This task will be deleted',
         priority: 'low',
       });
 
       // Verify task exists
-      let tasks = await client.listTasks(sessionId);
+      let tasks = await client.listTasks(projectId, sessionId);
       expect(tasks).toHaveLength(1);
 
       // Delete the task
-      await client.deleteTask(sessionId, createdTask.id);
+      await client.deleteTask(projectId, sessionId, createdTask.id);
 
       // Verify task was deleted
-      tasks = await client.listTasks(sessionId);
+      tasks = await client.listTasks(projectId, sessionId);
       expect(tasks).toHaveLength(0);
     });
   });
@@ -229,14 +292,19 @@ describe('TaskAPIClient E2E Tests', () => {
   describe('Task Notes', () => {
     it('should add notes to tasks', async () => {
       // Create a task first
-      const createdTask = await client.createTask(sessionId, {
+      const createdTask = await client.createTask(projectId, sessionId, {
         title: 'Task with Notes',
         prompt: 'Task for note testing',
         priority: 'medium',
       });
 
       // Add a note
-      const taskWithNote = await client.addNote(sessionId, createdTask.id, 'This is a test note');
+      const taskWithNote = await client.addNote(
+        projectId,
+        sessionId,
+        createdTask.id,
+        'This is a test note'
+      );
 
       expect(taskWithNote.notes).toHaveLength(1);
       expect(taskWithNote.notes[0]?.content).toBe('This is a test note');
@@ -244,7 +312,12 @@ describe('TaskAPIClient E2E Tests', () => {
       expect(taskWithNote.notes[0]?.timestamp).toBeDefined();
 
       // Add another note
-      const taskWithTwoNotes = await client.addNote(sessionId, createdTask.id, 'Second note');
+      const taskWithTwoNotes = await client.addNote(
+        projectId,
+        sessionId,
+        createdTask.id,
+        'Second note'
+      );
 
       expect(taskWithTwoNotes.notes).toHaveLength(2);
       expect(taskWithTwoNotes.notes[1]?.content).toBe('Second note');
@@ -254,24 +327,24 @@ describe('TaskAPIClient E2E Tests', () => {
   describe('Task Filtering', () => {
     beforeEach(async () => {
       // Create multiple tasks with different properties for filtering tests
-      await client.createTask(sessionId, {
+      await client.createTask(projectId, sessionId, {
         title: 'High Priority Pending Task',
         prompt: 'High priority task',
         priority: 'high',
       });
 
-      const mediumTask = await client.createTask(sessionId, {
+      const mediumTask = await client.createTask(projectId, sessionId, {
         title: 'Medium Priority Task',
         prompt: 'Medium priority task',
         priority: 'medium',
       });
 
       // Update one task to in_progress status
-      await client.updateTask(sessionId, mediumTask.id, {
+      await client.updateTask(projectId, sessionId, mediumTask.id, {
         status: 'in_progress',
       });
 
-      await client.createTask(sessionId, {
+      await client.createTask(projectId, sessionId, {
         title: 'Low Priority Task',
         prompt: 'Low priority task',
         priority: 'low',
@@ -279,27 +352,29 @@ describe('TaskAPIClient E2E Tests', () => {
     });
 
     it('should filter tasks by status', async () => {
-      const pendingTasks = await client.listTasks(sessionId, { status: 'pending' });
+      const pendingTasks = await client.listTasks(projectId, sessionId, { status: 'pending' });
       expect(pendingTasks).toHaveLength(2);
       expect(pendingTasks.every((task) => task.status === 'pending')).toBe(true);
 
-      const inProgressTasks = await client.listTasks(sessionId, { status: 'in_progress' });
+      const inProgressTasks = await client.listTasks(projectId, sessionId, {
+        status: 'in_progress',
+      });
       expect(inProgressTasks).toHaveLength(1);
       expect(inProgressTasks[0]?.status).toBe('in_progress');
     });
 
     it('should filter tasks by priority', async () => {
-      const highPriorityTasks = await client.listTasks(sessionId, { priority: 'high' });
+      const highPriorityTasks = await client.listTasks(projectId, sessionId, { priority: 'high' });
       expect(highPriorityTasks).toHaveLength(1);
       expect(highPriorityTasks[0]?.priority).toBe('high');
 
-      const lowPriorityTasks = await client.listTasks(sessionId, { priority: 'low' });
+      const lowPriorityTasks = await client.listTasks(projectId, sessionId, { priority: 'low' });
       expect(lowPriorityTasks).toHaveLength(1);
       expect(lowPriorityTasks[0]?.priority).toBe('low');
     });
 
     it('should filter tasks by multiple criteria', async () => {
-      const filteredTasks = await client.listTasks(sessionId, {
+      const filteredTasks = await client.listTasks(projectId, sessionId, {
         status: 'pending',
         priority: 'high',
       });
@@ -312,16 +387,16 @@ describe('TaskAPIClient E2E Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle invalid task IDs', async () => {
-      await expect(client.getTask(sessionId, 'invalid-task-id')).rejects.toThrow();
+      await expect(client.getTask(projectId, sessionId, 'invalid-task-id')).rejects.toThrow();
     });
 
     it('should handle invalid session IDs', async () => {
-      await expect(client.listTasks('invalid-session-id')).rejects.toThrow();
+      await expect(client.listTasks(projectId, 'invalid-session-id')).rejects.toThrow();
     });
 
     it('should handle malformed requests', async () => {
       await expect(
-        client.createTask(sessionId, {
+        client.createTask(projectId, sessionId, {
           title: '', // Empty title should fail validation
           prompt: '',
         })
@@ -333,7 +408,7 @@ describe('TaskAPIClient E2E Tests', () => {
       const originalFetch = global.fetch;
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
-      await expect(client.listTasks(sessionId)).rejects.toThrow();
+      await expect(client.listTasks(projectId, sessionId)).rejects.toThrow();
 
       // Restore fetch
       global.fetch = originalFetch;
@@ -344,7 +419,7 @@ describe('TaskAPIClient E2E Tests', () => {
     it('should handle concurrent task creation', async () => {
       // Create multiple tasks concurrently
       const taskPromises = Array.from({ length: 5 }, (_, i) =>
-        client.createTask(sessionId, {
+        client.createTask(projectId, sessionId, {
           title: `Concurrent Task ${i + 1}`,
           prompt: `Concurrent task prompt ${i + 1}`,
           priority: 'medium',
@@ -359,19 +434,19 @@ describe('TaskAPIClient E2E Tests', () => {
       });
 
       // Verify all tasks were persisted
-      const allTasks = await client.listTasks(sessionId);
+      const allTasks = await client.listTasks(projectId, sessionId);
       expect(allTasks).toHaveLength(5);
     });
 
     it('should handle concurrent updates to different tasks', async () => {
       // Create two tasks
-      const task1 = await client.createTask(sessionId, {
+      const task1 = await client.createTask(projectId, sessionId, {
         title: 'Task 1',
         prompt: 'First task',
         priority: 'high',
       });
 
-      const task2 = await client.createTask(sessionId, {
+      const task2 = await client.createTask(projectId, sessionId, {
         title: 'Task 2',
         prompt: 'Second task',
         priority: 'low',
@@ -379,8 +454,8 @@ describe('TaskAPIClient E2E Tests', () => {
 
       // Update both tasks concurrently
       const [updatedTask1, updatedTask2] = await Promise.all([
-        client.updateTask(sessionId, task1.id, { status: 'in_progress' }),
-        client.updateTask(sessionId, task2.id, { status: 'completed' }),
+        client.updateTask(projectId, sessionId, task1.id, { status: 'in_progress' }),
+        client.updateTask(projectId, sessionId, task2.id, { status: 'completed' }),
       ]);
 
       expect(updatedTask1.status).toBe('in_progress');

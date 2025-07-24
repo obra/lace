@@ -2,12 +2,7 @@
 // ABOUTME: Global test configuration and mocks for server-only modules
 
 import { vi } from 'vitest';
-import '@testing-library/jest-dom/vitest';
-import { expect } from 'vitest';
-import * as matchers from '@testing-library/jest-dom/matchers';
-
-// Extend expect with jest-dom matchers
-expect.extend(matchers);
+import '@testing-library/jest-dom';
 
 // Mock server-only to avoid import issues in tests
 // This is the current workaround as suggested in Next.js GitHub issue #60038
@@ -87,6 +82,3 @@ vi.mock('@anthropic-ai/sdk', () => {
     Anthropic: vi.fn().mockImplementation(() => mockClient),
   };
 });
-
-// Ensure global expects are available for all tests
-(global as typeof globalThis & { expect: typeof expect }).expect = expect;

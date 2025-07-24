@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: './test-setup.ts',
-    exclude: ['**/node_modules/**', '**/dist/**', '**/*.e2e.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**'],
     environmentMatchGlobs: [
       // Use jsdom for component and hook tests
       ['**/*.{test,spec}.{ts,tsx}', 'jsdom'],

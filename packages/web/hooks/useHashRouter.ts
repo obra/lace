@@ -1,7 +1,7 @@
 // ABOUTME: React hook for hash-based routing state management
 // ABOUTME: Provides URL persistence for project/session/agent selection with browser navigation support
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { AppState, getCurrentState, updateHash, onHashChange } from '@/lib/hash-router';
 import { ThreadId } from '@/lib/server/core-types';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
@@ -39,59 +39,74 @@ export function useHashRouter() {
   }, [isUpdatingHash]);
 
   // Update URL when state changes
-  const updateState = (newState: Partial<AppState>, replace = true) => {
-    const fullState = { ...state, ...newState };
-    setState(fullState);
+  const updateState = useCallback(
+    (newState: Partial<AppState>, replace = true) => {
+      const fullState = { ...state, ...newState };
+      setState(fullState);
 
-    if (isHydrated) {
-      setIsUpdatingHash(true);
-      updateHash(fullState, replace);
-    }
-  };
+      if (isHydrated) {
+        setIsUpdatingHash(true);
+        updateHash(fullState, replace);
+      }
+    },
+    [state, isHydrated]
+  );
 
   // Individual setters for convenience
-  const setProject = (project: string | null, replace = true) => {
-    if (project === null) {
-      // Clear project clears everything downstream
-      updateState({ project: undefined, session: undefined, agent: undefined }, replace);
-    } else {
-      updateState({ project }, replace);
-    }
-  };
-
-  const setSession = (session: ThreadId | string | null, replace = true) => {
-    if (session === null) {
-      // Clear session clears agent too
-      updateState({ session: undefined, agent: undefined }, replace);
-    } else {
-      // Validate that session is a valid ThreadId
-      if (isValidThreadId(session)) {
-        updateState({ session }, replace);
+  const setProject = useCallback(
+    (project: string | null, replace = true) => {
+      if (project === null) {
+        // Clear project clears everything downstream
+        updateState({ project: undefined, session: undefined, agent: undefined }, replace);
       } else {
-        console.warn(`Invalid session ID format: ${session}`);
+        updateState({ project }, replace);
+      }
+    },
+    [updateState]
+  );
+
+  const setSession = useCallback(
+    (session: ThreadId | string | null, replace = true) => {
+      if (session === null) {
+        // Clear session clears agent too
         updateState({ session: undefined, agent: undefined }, replace);
-      }
-    }
-  };
-
-  const setAgent = (agent: ThreadId | string | null | undefined, replace = true) => {
-    if (agent === null || agent === undefined) {
-      updateState({ agent: undefined }, replace);
-    } else {
-      // Validate that agent is a valid ThreadId
-      if (isValidThreadId(agent)) {
-        updateState({ agent }, replace);
       } else {
-        console.warn(`Invalid agent ID format: ${agent}`);
-        updateState({ agent: undefined }, replace);
+        // Validate that session is a valid ThreadId
+        if (isValidThreadId(session)) {
+          updateState({ session }, replace);
+        } else {
+          console.warn(`Invalid session ID format: ${session}`);
+          updateState({ session: undefined, agent: undefined }, replace);
+        }
       }
-    }
-  };
+    },
+    [updateState]
+  );
+
+  const setAgent = useCallback(
+    (agent: ThreadId | string | null | undefined, replace = true) => {
+      if (agent === null || agent === undefined) {
+        updateState({ agent: undefined }, replace);
+      } else {
+        // Validate that agent is a valid ThreadId
+        if (isValidThreadId(agent)) {
+          updateState({ agent }, replace);
+        } else {
+          console.warn(`Invalid agent ID format: ${agent}`);
+          updateState({ agent: undefined }, replace);
+        }
+      }
+    },
+    [updateState]
+  );
 
   // Clear all state
-  const clearAll = (replace = true) => {
-    updateState({ project: undefined, session: undefined, agent: undefined }, replace);
-  };
+  const clearAll = useCallback(
+    (replace = true) => {
+      updateState({ project: undefined, session: undefined, agent: undefined }, replace);
+    },
+    [updateState]
+  );
 
   // Memoize return object to prevent unnecessary re-renders
   return useMemo(() => {
