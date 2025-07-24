@@ -30,6 +30,7 @@ vi.mock('~/providers/anthropic-provider', () => ({
   AnthropicProvider: vi.fn(() => ({
     providerName: 'anthropic',
     cleanup: vi.fn(),
+    isConfigured: vi.fn(() => true),
     createResponse: vi.fn().mockResolvedValue({
       content: 'Mock response from Anthropic',
       toolCalls: [],
@@ -42,6 +43,7 @@ vi.mock('~/providers/openai-provider', () => ({
   OpenAIProvider: vi.fn(() => ({
     providerName: 'openai',
     cleanup: vi.fn(),
+    isConfigured: vi.fn(() => true),
     createResponse: vi.fn().mockResolvedValue({
       content: 'Mock response from OpenAI',
       toolCalls: [],
@@ -54,6 +56,7 @@ vi.mock('~/providers/lmstudio-provider', () => ({
   LMStudioProvider: vi.fn(() => ({
     providerName: 'lmstudio',
     cleanup: vi.fn(),
+    isConfigured: vi.fn(() => true),
     createResponse: vi.fn().mockResolvedValue({
       content: 'Mock response from LMStudio',
       toolCalls: [],
@@ -66,6 +69,7 @@ vi.mock('~/providers/ollama-provider', () => ({
   OllamaProvider: vi.fn(() => ({
     providerName: 'ollama',
     cleanup: vi.fn(),
+    isConfigured: vi.fn(() => true),
     createResponse: vi.fn().mockResolvedValue({
       content: 'Mock response from Ollama',
       toolCalls: [],
@@ -197,8 +201,24 @@ describe('CLI Flow Tests', () => {
         return undefined;
       });
 
+      // Mock provider as not configured
+      const { AnthropicProvider } = vi.mocked(await import('~/providers/anthropic-provider'));
+      vi.mocked(AnthropicProvider).mockImplementation(
+        () =>
+          ({
+            providerName: 'anthropic',
+            cleanup: vi.fn(),
+            isConfigured: vi.fn(() => false),
+            createResponse: vi.fn().mockResolvedValue({
+              content: 'Mock response from Anthropic',
+              toolCalls: [],
+              stopReason: 'stop',
+            }),
+          }) as unknown as InstanceType<typeof AnthropicProvider>
+      );
+
       await expect(run(mockCliOptions)).rejects.toThrow(
-        'ANTHROPIC_KEY environment variable required for Anthropic provider'
+        'Missing required environment variable: ANTHROPIC_KEY'
       );
     });
 
@@ -208,10 +228,27 @@ describe('CLI Flow Tests', () => {
         if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
         return undefined;
       });
+
+      // Mock provider as not configured
+      const { OpenAIProvider } = vi.mocked(await import('~/providers/openai-provider'));
+      vi.mocked(OpenAIProvider).mockImplementation(
+        () =>
+          ({
+            providerName: 'openai',
+            cleanup: vi.fn(),
+            isConfigured: vi.fn(() => false),
+            createResponse: vi.fn().mockResolvedValue({
+              content: 'Mock response from OpenAI',
+              toolCalls: [],
+              stopReason: 'stop',
+            }),
+          }) as unknown as InstanceType<typeof OpenAIProvider>
+      );
+
       const options = { ...mockCliOptions, provider: 'openai' };
 
       await expect(run(options)).rejects.toThrow(
-        'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+        'Missing required environment variable: OPENAI_API_KEY or OPENAI_KEY'
       );
     });
 

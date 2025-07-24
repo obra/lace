@@ -183,9 +183,27 @@ describe('App Initialization (run function)', () => {
       if (key === 'ANTHROPIC_KEY') return undefined;
       return undefined;
     });
+
+    // Mock provider as not configured
+    const { AnthropicProvider } = vi.mocked(await import('~/providers/anthropic-provider'));
+    vi.mocked(AnthropicProvider).mockImplementation(
+      () =>
+        ({
+          providerName: 'anthropic',
+          cleanup: vi.fn(),
+          getProviderInfo: vi.fn(() => ({
+            name: 'anthropic',
+            displayName: 'Anthropic',
+            requiresApiKey: true,
+          })),
+          getAvailableModels: vi.fn(() => []),
+          isConfigured: vi.fn(() => false),
+        }) as unknown as InstanceType<typeof AnthropicProvider>
+    );
+
     const options = { ...mockCliOptions, provider: 'anthropic' };
     await expect(run(options)).rejects.toThrow(
-      'ANTHROPIC_KEY environment variable required for Anthropic provider'
+      'Missing required environment variable: ANTHROPIC_KEY'
     );
   });
 
@@ -194,9 +212,27 @@ describe('App Initialization (run function)', () => {
       if (key === 'OPENAI_API_KEY' || key === 'OPENAI_KEY') return undefined;
       return undefined;
     });
+
+    // Mock provider as not configured
+    const { OpenAIProvider } = vi.mocked(await import('~/providers/openai-provider'));
+    vi.mocked(OpenAIProvider).mockImplementation(
+      () =>
+        ({
+          providerName: 'openai',
+          cleanup: vi.fn(),
+          getProviderInfo: vi.fn(() => ({
+            name: 'openai',
+            displayName: 'OpenAI',
+            requiresApiKey: true,
+          })),
+          getAvailableModels: vi.fn(() => []),
+          isConfigured: vi.fn(() => false),
+        }) as unknown as InstanceType<typeof OpenAIProvider>
+    );
+
     const options = { ...mockCliOptions, provider: 'openai' };
     await expect(run(options)).rejects.toThrow(
-      'OPENAI_API_KEY or OPENAI_KEY environment variable required for OpenAI provider'
+      'Missing required environment variable: OPENAI_API_KEY or OPENAI_KEY'
     );
   });
 

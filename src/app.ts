@@ -16,7 +16,27 @@ import { ProviderRegistry } from '~/providers/registry';
 export function createProvider(providerType: string, model?: string): AIProvider {
   try {
     const registry = ProviderRegistry.createWithAutoDiscovery();
-    return registry.createProvider(providerType, { model });
+    const provider = registry.createProvider(providerType, { model });
+
+    // Check if provider is properly configured for CLI usage
+    if (!provider.isConfigured()) {
+      // Determine appropriate error message based on provider type
+      let errorMessage: string;
+      switch (providerType.toLowerCase()) {
+        case 'anthropic':
+          errorMessage = 'Missing required environment variable: ANTHROPIC_KEY';
+          break;
+        case 'openai':
+          errorMessage = 'Missing required environment variable: OPENAI_API_KEY or OPENAI_KEY';
+          break;
+        default:
+          errorMessage = `Provider ${providerType} is not properly configured`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    return provider;
   } catch (error) {
     if (error instanceof Error && error.message.includes('environment variable required')) {
       console.error(`Error: ${error.message}`);

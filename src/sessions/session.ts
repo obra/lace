@@ -23,6 +23,7 @@ import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
+import { getEnvVar } from '~/config/env-loader';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -602,7 +603,7 @@ export class Session {
   }
 
   private static detectDefaultProvider(): string {
-    return process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
+    return getEnvVar('ANTHROPIC_KEY') || getEnvVar('ANTHROPIC_API_KEY') ? 'anthropic' : 'openai';
   }
 
   private static getDefaultModel(provider: string): string {
