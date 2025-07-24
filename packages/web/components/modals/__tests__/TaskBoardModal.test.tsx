@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import type { Task } from '@/types';
