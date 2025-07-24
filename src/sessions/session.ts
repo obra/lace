@@ -604,7 +604,7 @@ export class Session {
   }
 
   private static getDefaultModel(provider: string): string {
-    return provider === 'anthropic' ? 'claude-3-haiku-20240307' : 'gpt-4';
+    return provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4';
   }
 
   private static generateSessionName(): string {

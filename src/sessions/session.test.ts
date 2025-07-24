@@ -115,6 +115,37 @@ describe('Session', () => {
     });
   });
 
+  describe('default model selection', () => {
+    it('should create session with claude-sonnet-4-20250514 when anthropic key present', () => {
+      // Mock environment to ensure anthropic is detected
+      vi.stubEnv('ANTHROPIC_KEY', 'test-key');
+      delete process.env.OPENAI_API_KEY;
+
+      const session = Session.create({
+        projectId: testProject.getId(),
+        // provider/model omitted to trigger defaults
+      });
+
+      const agents = session.getAgents();
+      expect(agents[0]?.model).toBe('claude-sonnet-4-20250514');
+    });
+
+    it('should create session with gpt-4 when openai key present and no anthropic key', () => {
+      // Mock environment to ensure openai is detected
+      delete process.env.ANTHROPIC_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+
+      const session = Session.create({
+        projectId: testProject.getId(),
+        // provider/model omitted to trigger defaults
+      });
+
+      const agents = session.getAgents();
+      expect(agents[0]?.model).toBe('gpt-4');
+    });
+  });
+
   describe('create', () => {
     it('should create a session with default parameters', () => {
       const session = Session.create({
