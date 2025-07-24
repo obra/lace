@@ -4,7 +4,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState } from 'react';
 import { UISettingsPanel } from './UISettingsPanel';
-import { SettingsModal } from '../SettingsModal';
+import { SettingsModal } from '@/components/settings/SettingsModal';
 
 const meta: Meta<typeof UISettingsPanel> = {
   title: 'Organisms/UISettingsPanel',

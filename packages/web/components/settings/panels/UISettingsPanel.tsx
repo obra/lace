@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
-import { SettingsPanel } from '../SettingsPanel';
-import { SettingField } from '../SettingField';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { SettingField } from '@/components/settings/SettingField';
 
 interface UISettingsPanelProps {
   currentTheme?: string;
