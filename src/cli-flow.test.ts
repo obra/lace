@@ -12,6 +12,13 @@ import { CLIOptions } from '~/cli/args';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
+// Console capture for suppressing CLI output during tests
+let originalConsole: {
+  log: typeof console.log;
+  error: typeof console.error;
+  warn: typeof console.warn;
+};
+
 // Mock external dependencies only - use real business logic instances
 // Agent, ThreadManager, ToolExecutor use real instances for proper behavior testing
 // Use real temporary directory instead of mocking lace-dir - tests real file system behavior
@@ -101,6 +108,16 @@ describe('CLI Flow Tests', () => {
     setupTestPersistence();
     vi.clearAllMocks();
 
+    // Capture console output to suppress CLI messages during tests
+    originalConsole = {
+      log: console.log,
+      error: console.error,
+      warn: console.warn,
+    };
+    console.log = vi.fn();
+    console.error = vi.fn();
+    console.warn = vi.fn();
+
     // Setup mocks for external dependencies only
     const { getEnvVar } = vi.mocked(await import('~/config/env-loader'));
     const { logger } = vi.mocked(await import('~/utils/logger'));
@@ -143,6 +160,11 @@ describe('CLI Flow Tests', () => {
   });
 
   afterEach(() => {
+    // Restore console
+    console.log = originalConsole.log;
+    console.error = originalConsole.error;
+    console.warn = originalConsole.warn;
+
     vi.restoreAllMocks();
     teardownTestPersistence();
   });
