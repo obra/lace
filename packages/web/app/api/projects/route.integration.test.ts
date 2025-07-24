@@ -5,6 +5,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
+// Mock environment variables to provide test API keys
+vi.mock('~/config/env-loader', () => ({
+  getEnvVar: vi.fn((key: string) => {
+    const envVars: Record<string, string> = {
+      ANTHROPIC_KEY: 'test-anthropic-key',
+      OPENAI_API_KEY: 'test-openai-key',
+    };
+    return envVars[key] || '';
+  }),
+}));
+
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 

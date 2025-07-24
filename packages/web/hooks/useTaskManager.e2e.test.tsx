@@ -81,7 +81,9 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
         // Route to appropriate API handler based on URL pattern - RESTful nested routes
         if (urlString.includes('/api/projects/') && urlString.includes('/sessions/') && urlString.includes('/tasks')) {
           // Parse RESTful URL to extract projectId, sessionId, taskId
-          const urlParts = urlString.split('/');
+          // First, separate the path from query parameters
+          const [urlPath, queryString] = urlString.split('?');
+          const urlParts = urlPath.split('/');
           const projectIndex = urlParts.indexOf('projects');
           const sessionIndex = urlParts.indexOf('sessions');
           const tasksIndex = urlParts.indexOf('tasks');
@@ -100,7 +102,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
           
           const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
           
-          if (urlString.includes('/notes') && method === 'POST' && taskIdFromUrl) {
+          if (urlPath.includes('/notes') && method === 'POST' && taskIdFromUrl) {
             // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
             return await addNote(request, { 
               params: Promise.resolve({ 
@@ -109,7 +111,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
                 taskId: taskIdFromUrl 
               }) 
             });
-          } else if (taskIdFromUrl && !urlString.includes('/notes')) {
+          } else if (taskIdFromUrl && !urlPath.includes('/notes')) {
             // Handle individual task operations: GET/PATCH/DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
             const response = await (method === 'GET' ? getTask : method === 'PATCH' ? updateTask : deleteTask)(
               request, 
@@ -131,7 +133,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
             }
             
             return response;
-          } else if (method === 'POST' && urlString.endsWith('/tasks')) {
+          } else if (method === 'POST' && urlPath.endsWith('/tasks')) {
             // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
             return await createTask(request, { 
               params: Promise.resolve({ 
@@ -139,7 +141,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
                 sessionId: routeSessionId 
               }) 
             });
-          } else if (method === 'GET' && urlString.endsWith('/tasks')) {
+          } else if (method === 'GET' && urlPath.endsWith('/tasks')) {
             // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks
             return await listTasks(request, { 
               params: Promise.resolve({ 

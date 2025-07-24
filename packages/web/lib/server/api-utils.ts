@@ -19,6 +19,7 @@ export const CreateTaskSchema = z.object({
   description: z.string().optional(),
   prompt: z.string().min(1, 'Prompt is required'),
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
+  assignedTo: z.string().optional(),
 });
 
 export const UpdateTaskSchema = z.object({

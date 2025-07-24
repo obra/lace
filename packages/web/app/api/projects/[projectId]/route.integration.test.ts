@@ -5,6 +5,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
+// Mock environment variables to provide test API keys
+vi.mock('~/config/env-loader', () => ({
+  getEnvVar: vi.fn((key: string) => {
+    const envVars: Record<string, string> = {
+      ANTHROPIC_KEY: 'test-anthropic-key',
+      OPENAI_API_KEY: 'test-openai-key',
+    };
+    return envVars[key] || '';
+  }),
+}));
+
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
@@ -84,9 +95,10 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const request = new NextRequest('http://localhost/api/projects/non-existent-id');
+      const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
+      const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`);
       const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'non-existent-id' }),
+        params: Promise.resolve({ projectId: nonExistentId }),
       });
       const data = (await response.json()) as ErrorResponse;
 
@@ -270,15 +282,16 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
+      const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
       const updateData = { name: 'Updated Name' };
-      const request = new NextRequest('http://localhost/api/projects/non-existent-id', {
+      const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'non-existent-id' }),
+        params: Promise.resolve({ projectId: nonExistentId }),
       });
       const data = (await response.json()) as ErrorResponse;
 
@@ -343,10 +356,11 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return 404 when project does not exist', async () => {
-      const request = new NextRequest('http://localhost/api/projects/non-existent-id');
+      const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
+      const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`);
 
       const response = await DELETE(request, {
-        params: Promise.resolve({ projectId: 'non-existent-id' }),
+        params: Promise.resolve({ projectId: nonExistentId }),
       });
       const data = (await response.json()) as ErrorResponse;
 

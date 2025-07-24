@@ -89,7 +89,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
 
     const body = (await request.json()) as Record<string, unknown>;
-    const validatedBody = validateRequestBody(body, CreateTaskSchema);
+    let validatedBody;
+    try {
+      validatedBody = validateRequestBody(body, CreateTaskSchema);
+    } catch (error) {
+      // Return validation errors as 400 Bad Request
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Invalid request body',
+        400
+      );
+    }
     const { title, description, prompt, priority, assignedTo } = validatedBody;
 
     // Get project first to verify it exists

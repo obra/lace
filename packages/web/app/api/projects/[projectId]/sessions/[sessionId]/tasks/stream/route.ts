@@ -2,10 +2,17 @@
 // ABOUTME: Streams task events with proper nested route validation
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
+import { ProjectIdSchema, SessionIdSchema, validateRouteParams } from '@/lib/server/api-utils';
 import { logger } from '~/utils/logger';
 import type { TaskEvent } from '@/hooks/useTaskStream';
+
+const RouteParamsSchema = z.object({
+  projectId: ProjectIdSchema,
+  sessionId: SessionIdSchema,
+});
 
 interface RouteContext {
   params: Promise<{
@@ -16,7 +23,15 @@ interface RouteContext {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { projectId, sessionId } = await context.params;
+    let projectId: string, sessionId: string;
+    try {
+      ({ projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema));
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Invalid route parameters' },
+        { status: 400 }
+      );
+    }
 
     // Get project first
     const project = Project.getById(projectId);
