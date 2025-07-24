@@ -22,7 +22,6 @@ describe('ThreadManager Delegate Thread Creation', () => {
 
     // Create a parent thread
     parentThreadId = threadManager.createThread();
-    threadManager.setCurrentThread(parentThreadId);
   });
 
   afterEach(() => {
@@ -108,12 +107,11 @@ describe('ThreadManager Delegate Thread Creation', () => {
     expect(delegate3.id).toBe(`${parentThreadId}.3`);
   });
 
-  it('should handle delegate thread creation when parent thread is not current', () => {
-    // Create another thread and make it current
+  it('should handle delegate thread creation when parent thread exists', () => {
+    // Create another thread (ThreadManager is stateless, no "current" concept)
     const otherThreadId = threadManager.createThread();
-    threadManager.setCurrentThread(otherThreadId);
 
-    // Create delegate thread for original parent (not current)
+    // Create delegate thread for original parent
     const delegateThread = threadManager.createDelegateThreadFor(parentThreadId);
 
     // Verify delegate thread was created correctly
