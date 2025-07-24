@@ -1,7 +1,7 @@
 # Tool Approval System Redesign
 
 **Date:** 2025-07-24  
-**Status:** Implementation Phase - Phase 1 COMPLETED ✅  
+**Status:** Implementation Phase - Phase 3 COMPLETED ✅  
 **Author:** Claude & Jesse  
 
 ## Executive Summary
@@ -379,30 +379,35 @@ getApprovalDecision(toolCallId: string): ApprovalDecision | null {
 }
 ```
 
-#### 2.3 Update Web Agent Setup to Use Core Approval
+#### 2.3 Update Web Agent Setup to Use Core Approval ✅ COMPLETED
 **File:** `packages/web/lib/server/agent-utils.ts`
 
-**Replace entire file with:**
+**Replaced entire file with:**
 ```typescript
 // ABOUTME: Thin web integration layer for core approval system  
 // ABOUTME: Sets up event-based approval callback from core tools system
 
-import { Agent } from '@/lib/server/lace-imports';
-import { EventApprovalCallback } from '@/lib/server/lace-imports'; // Import from core
+import { Agent, EventApprovalCallback } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/lib/server/core-types';
 
-export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
+export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
   // Use core event-based approval callback
   const approvalCallback = new EventApprovalCallback(
     agent,
-    agent.threadManager, // Access ThreadManager through Agent
-    agent.threadId      // Access current thread ID
+    agent.threadManager,
+    agent.threadId
   );
   
   // Set the approval callback on the agent's ToolExecutor
   agent.toolExecutor.setApprovalCallback(approvalCallback);
 }
 ```
+
+**Additional Implementation Notes:**
+- ✅ Added EventApprovalCallback export to `packages/web/lib/server/lace-imports.ts`
+- ✅ Added proper TypeScript types for approval events (`ToolApprovalRequestData`, `ToolApprovalResponseData`)
+- ✅ Updated EventApprovalCallback with proper type casting for type safety
+- ✅ All tests passing with complete web integration
 
 #### 2.4 Remove Broken ApprovalManager
 **Files to delete:**
