@@ -68,4 +68,8 @@ export {
   faCode,
   faQuestion,
   faExternalLinkAlt as faExternalLink,
+  faFlag,
+  faClipboard,
+  faClock,
+  faSave,
 } from '@fortawesome/free-solid-svg-icons';

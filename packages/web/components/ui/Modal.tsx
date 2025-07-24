@@ -7,7 +7,7 @@ import { faTimes } from '@/lib/fontawesome';
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: string | React.ReactNode;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   showCloseButton?: boolean;
@@ -116,14 +116,18 @@ export function Modal({
           {(title || showCloseButton) && (
             <div className="flex items-center justify-between p-4 border-b border-base-300">
               {title && (
-                <h2 id="modal-title" className="text-lg font-semibold text-base-content">
-                  {title}
-                </h2>
+                <div id="modal-title" className="flex-1 mr-4">
+                  {typeof title === 'string' ? (
+                    <h2 className="text-lg font-semibold text-base-content">{title}</h2>
+                  ) : (
+                    title
+                  )}
+                </div>
               )}
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-1 hover:bg-base-200 rounded-full transition-colors"
+                  className="p-1 hover:bg-base-200 rounded-full transition-colors flex-shrink-0"
                   aria-label="Close modal"
                 >
                   <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />

@@ -6,12 +6,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faFolder, faComments, faRobot, faPlus, faCog } from '@/lib/fontawesome';
+import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
+import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
+import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
+import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -27,11 +30,14 @@ import type {
   ProviderInfo,
   ProvidersResponse,
   CreateAgentRequest,
+  Task,
 } from '@/types/api';
 import { isApiError, ApprovalDecision } from '@/types/api';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
+import { useTaskManager } from '@/hooks/useTaskManager';
+import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 export function LaceApp() {
   // Theme state
@@ -51,6 +57,10 @@ export function LaceApp() {
   // UI State (from AnimatedLaceApp but remove demo data)
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
+  const [showTaskBoard, setShowTaskBoard] = useState(false);
+  const [showTaskCreation, setShowTaskCreation] = useState(false);
+  const [showTaskDisplay, setShowTaskDisplay] = useState(false);
+  const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
   
 
   // Business Logic State (from current app/page.tsx)
@@ -74,6 +84,9 @@ export function LaceApp() {
     connected,
     clearApprovalRequest,
   } = useSessionEvents(selectedSession, selectedAgent);
+
+  // Add task manager hook when project and session are selected
+  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
@@ -333,6 +346,91 @@ export function LaceApp() {
     }
   };
 
+  // Handle task updates
+  const handleTaskUpdate = async (task: Task) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.updateTask(task.id, { 
+        status: task.status,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        assignedTo: task.assignedTo,
+      });
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.createTask({
+        title: taskData.title,
+        description: taskData.description,
+        prompt: taskData.prompt || taskData.description || taskData.title,
+        priority: taskData.priority,
+        assignedTo: taskData.assignedTo,
+      });
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
+  };
+
+  // Handle task creation from modal
+  const handleTaskCreateFromModal = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.createTask({
+        title: taskData.title,
+        description: taskData.description,
+        prompt: taskData.prompt,
+        priority: taskData.priority,
+        assignedTo: taskData.assignedTo,
+      });
+      setShowTaskCreation(false);
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
+  };
+
+  // Handle opening task display modal
+  const handleTaskDisplay = (task: Task) => {
+    setSelectedTaskForDisplay(task);
+    setShowTaskDisplay(true);
+  };
+
+  // Handle updating task from display modal
+  const handleTaskUpdateFromModal = async (taskId: string, updates: Partial<Task>) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.updateTask(taskId, {
+        title: updates.title,
+        description: updates.description,
+        status: updates.status,
+        priority: updates.priority,
+        assignedTo: updates.assignedTo,
+      });
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  // Handle adding task note
+  const handleTaskAddNote = async (taskId: string, content: string) => {
+    if (!taskManager) return;
+    
+    try {
+      await taskManager.addNote(taskId, content);
+    } catch (error) {
+      console.error('Failed to add task note:', error);
+    }
+  };
+
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
   const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
@@ -499,6 +597,33 @@ export function LaceApp() {
                   )) || []}
                 </SidebarSection>
               )}
+
+              {/* Tasks Section - Show when session is selected */}
+              {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
+                <SidebarSection 
+                  title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+                  icon={faTasks}
+                  defaultCollapsed={false}
+                  collapsible={false}
+                >
+                  <TaskListSidebar
+                    projectId={selectedProject}
+                    sessionId={selectedSession}
+                    onTaskClick={(taskId) => {
+                      // For now, just close mobile nav - could open task detail modal in future
+                      setShowMobileNav(false); // Close mobile nav when task is clicked
+                    }}
+                    onOpenTaskBoard={() => {
+                      setShowTaskBoard(true);
+                      setShowMobileNav(false); // Close mobile nav when opening task board
+                    }}
+                    onCreateTask={() => {
+                      setShowTaskCreation(true);
+                      setShowMobileNav(false); // Close mobile nav when creating task
+                    }}
+                  />
+                </SidebarSection>
+              )}
             </MobileSidebar>
           </motion.div>
         )}
@@ -606,6 +731,25 @@ export function LaceApp() {
               )) || []}
             </SidebarSection>
           )}
+
+          {/* Tasks Section - Show when session is selected */}
+          {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
+            <SidebarSection 
+              title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+              icon={faTasks}
+              defaultCollapsed={false}
+            >
+              <TaskListSidebar
+                projectId={selectedProject}
+                sessionId={selectedSession}
+                onTaskClick={(taskId) => {
+                  // For now, just ignore - could open task detail modal in future
+                }}
+                onOpenTaskBoard={() => setShowTaskBoard(true)}
+                onCreateTask={() => setShowTaskCreation(true)}
+              />
+            </SidebarSection>
+          )}
         </Sidebar>
       </div>
 
@@ -692,13 +836,6 @@ export function LaceApp() {
                 />
               </div>
             )
-          ) : projects.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center space-y-2">
-                <h2 className="text-lg font-medium">No Projects Found</h2>
-                <p className="text-base-content/60">Create a project to get started</p>
-              </div>
-            </div>
           ) : (
             /* Project Selection Panel - When no project selected or invalid project ID */
             <div className="flex-1 p-6 min-h-0">
@@ -721,6 +858,45 @@ export function LaceApp() {
         <ToolApprovalModal
           request={approvalRequest}
           onDecision={handleApprovalDecision}
+        />
+      )}
+
+      {/* Task Board Modal */}
+      {showTaskBoard && selectedProject && selectedSession && taskManager && (
+        <TaskBoardModal
+          isOpen={showTaskBoard}
+          onClose={() => setShowTaskBoard(false)}
+          tasks={taskManager.tasks}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskCreate={handleTaskCreate}
+          onTaskClick={handleTaskDisplay}
+        />
+      )}
+
+      {/* Task Creation Modal */}
+      {showTaskCreation && selectedProject && selectedSession && (
+        <TaskCreationModal
+          isOpen={showTaskCreation}
+          onClose={() => setShowTaskCreation(false)}
+          onCreateTask={handleTaskCreateFromModal}
+          agents={selectedSessionDetails?.agents || []}
+          loading={taskManager?.isCreating || false}
+        />
+      )}
+
+      {/* Task Display Modal */}
+      {showTaskDisplay && selectedTaskForDisplay && (
+        <TaskDisplayModal
+          isOpen={showTaskDisplay}
+          onClose={() => {
+            setShowTaskDisplay(false);
+            setSelectedTaskForDisplay(null);
+          }}
+          task={selectedTaskForDisplay}
+          onUpdateTask={handleTaskUpdateFromModal}
+          onAddNote={handleTaskAddNote}
+          agents={selectedSessionDetails?.agents || []}
+          loading={taskManager?.isUpdating || false}
         />
       )}
     </motion.div>
