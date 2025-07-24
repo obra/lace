@@ -12,7 +12,7 @@ import { ToolCall, ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 import { estimateTokens } from '~/utils/token-estimation';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
-import type { CompactionStrategy } from '~/threads/compaction/types';
+import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
 import { registerDefaultStrategies } from '~/threads/compaction/registry';
 
 export interface ThreadSessionInfo {
@@ -258,7 +258,11 @@ export class ThreadManager {
     }
   }
 
-  addEvent(threadId: string, type: EventType, data: string | ToolCall | ToolResult): ThreadEvent {
+  addEvent(
+    threadId: string,
+    type: EventType,
+    data: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>
+  ): ThreadEvent {
     const thread = this.getThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found`);
@@ -291,7 +295,17 @@ export class ThreadManager {
 
   /**
    * Get current conversation state (post-compaction events)
-   * This is what should be passed to AI providers
+   * This is what should be passed to AI providers for conversation processing.
+   *
+   * If the thread has been compacted, this returns:
+   * - The compacted events from the latest compaction
+   * - The COMPACTION event itself (for transparency)
+   * - All events that occurred after the compaction
+   *
+   * If no compaction has occurred, returns all events in chronological order.
+   *
+   * @param threadId - The ID of the thread to get events for
+   * @returns Array of thread events representing the working conversation
    */
   getEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
@@ -301,8 +315,18 @@ export class ThreadManager {
   }
 
   /**
-   * Get complete event history including compaction events
-   * This is for debugging and inspection
+   * Get complete event history including all compaction events
+   *
+   * This method returns the raw, unprocessed event sequence including:
+   * - All original events that were later compacted
+   * - All COMPACTION events that were created
+   * - All events added after compactions
+   *
+   * This is primarily useful for debugging, inspection, and audit trails.
+   * For normal conversation processing, use getEvents() instead.
+   *
+   * @param threadId - The ID of the thread to get complete history for
+   * @returns Array of all thread events in chronological order
    */
   getAllEvents(threadId: string): ThreadEvent[] {
     const thread = this.getThread(threadId);
@@ -398,14 +422,42 @@ export class ThreadManager {
   }
 
   /**
-   * Register a compaction strategy
+   * Register a compaction strategy that can be used to compact conversations
+   *
+   * Compaction strategies implement the CompactionStrategy interface and define
+   * how to reduce conversation size while preserving essential information.
+   *
+   * @param strategy - The compaction strategy to register
+   * @example
+   * ```typescript
+   * const trimStrategy = new TrimToolResultsStrategy();
+   * threadManager.registerCompactionStrategy(trimStrategy);
+   * ```
    */
   registerCompactionStrategy(strategy: CompactionStrategy): void {
     this._compactionStrategies.set(strategy.id, strategy);
   }
 
   /**
-   * Perform compaction using specified strategy
+   * Perform compaction on a thread using the specified strategy
+   *
+   * Compaction replaces the existing conversation history with a more compact
+   * version while preserving essential information. The original events are
+   * preserved in the complete history for debugging purposes.
+   *
+   * After compaction:
+   * - getEvents() returns the compacted conversation + new events
+   * - getAllEvents() still returns the complete uncompacted history
+   * - A COMPACTION event is added to mark the compaction point
+   *
+   * @param threadId - The ID of the thread to compact
+   * @param strategyId - The ID of the compaction strategy to use
+   * @param params - Optional parameters to pass to the compaction strategy
+   * @throws {Error} If the strategy is unknown or the thread doesn't exist
+   * @example
+   * ```typescript
+   * await threadManager.compact('thread-123', 'trim-tool-results');
+   * ```
    */
   async compact(threadId: string, strategyId: string, params?: unknown): Promise<void> {
     const strategy = this._compactionStrategies.get(strategyId);
@@ -428,8 +480,8 @@ export class ThreadManager {
     const compactionEvent = await strategy.compact(thread.events, context);
 
     // Add the compaction event to the thread
-    // The compactionEvent is already a complete ThreadEvent with data in the data field
-    this.addEvent(threadId, 'COMPACTION', compactionEvent.data as unknown as string);
+    // The compactionEvent is already a complete ThreadEvent with CompactionData in the data field
+    this.addEvent(threadId, 'COMPACTION', compactionEvent.data);
   }
 
   oldCompact(threadId: string): void {
