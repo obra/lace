@@ -12,7 +12,10 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     let modifiedCount = 0;
 
     for (const event of events) {
-      if (event.type === 'TOOL_RESULT') {
+      if (event.type === 'COMPACTION') {
+        // Skip COMPACTION events - they are system metadata, not conversation content
+        continue;
+      } else if (event.type === 'TOOL_RESULT') {
         // Trim tool result content
         const trimmedEvent = this.trimToolResult(event);
         compactedEvents.push(trimmedEvent);

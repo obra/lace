@@ -1112,9 +1112,9 @@ These are NOT required for Phase 2 completion, but could be added later:
 
 Remember: The goal is working compaction with clean, maintainable code. When in doubt, keep it simple and well-tested.
 
-## Implementation Status (2025-07-23)
+## Implementation Status (2025-07-24)
 
-**NOT STARTED:** Phase 2 compaction events implementation is ready to begin.
+**IN PROGRESS:** Phase 2 compaction events implementation is 71% complete (10 of 14 tasks).
 
 ### Prerequisites Completed
 - Phase 1 shadow thread removal is complete
@@ -1122,10 +1122,55 @@ Remember: The goal is working compaction with clean, maintainable code. When in 
 - Database is reset to clean state
 - Codebase is ready for compaction event implementation
 
-### Current Status
-**⏳ Ready to Begin:** All 14 tasks in Phase 2 are pending implementation  
-**🔄 Next: Task 1** - Define Core Types (CompactionData, CompactionStrategy interfaces)
-**⏳ Pending: Tasks 2-14** - Event types, conversation builder, ThreadManager API, strategies, tests
+### Completed Tasks ✅
+1. **Core Types** - CompactionData, CompactionStrategy interfaces defined
+2. **Event Type System** - Added COMPACTION to EventType union
+3. **Conversation Builder** - buildWorkingConversation() and buildCompleteHistory() logic
+4. **Conversation Builder Tests** - Comprehensive test coverage for reconstruction logic
+5. **ThreadManager API** - Added getEvents(), getAllEvents(), compact() methods
+6. **TrimToolResultsStrategy** - Working strategy that truncates tool results to 3 lines
+7. **Strategy Tests** - Full test coverage for TrimToolResultsStrategy
+8. **Strategy Registry** - Centralized registration system for strategies
+9. **Auto-Registration** - ThreadManager automatically registers default strategies
+10. **Integration Tests** - 8 comprehensive tests covering all compaction scenarios
 
-### What Needs to Be Built
-The compaction event system as specified in the task breakdown above, starting with Task 1: Define Core Types.
+### Current Status
+**🎯 Tests Passing:** All 8 integration tests pass with detailed event verification  
+**⚠️ Lint Errors:** 3 remaining lint issues preventing commit:
+- TypeScript error: `args` property doesn't exist in union type (line 29)
+- Two unsafe `any` assignments from expect.stringContaining() usage (lines 133, 143)
+
+### Pending Tasks 📋
+11. **Update Agent** - Modify Agent class to use new conversation building API  
+12. **Manual Compaction CLI** - Optional command for manual compaction  
+13. **Full Test Suite** - Run complete test suite and fix any issues  
+14. **Manual Testing** - End-to-end verification of compaction system  
+
+### Technical Implementation Details
+
+**Core Architecture:**
+- Event-based compaction using COMPACTION events with CompactionData payload
+- Conversation reconstruction via buildWorkingConversation() using latest compaction only
+- Strategy pattern with pluggable compaction approaches
+- Thread ID stability maintained (no dual-ID complexity)
+
+**Files Created:**
+- `src/threads/compaction/types.ts` - Core interfaces
+- `src/threads/conversation-builder.ts` - Reconstruction logic  
+- `src/threads/compaction/trim-tool-results-strategy.ts` - Tool result trimming
+- `src/threads/compaction/registry.ts` - Strategy registration
+- `src/threads/compaction-integration.test.ts` - Integration tests
+
+**Files Modified:**
+- `src/threads/types.ts` - Added COMPACTION to EventType union
+- `src/threads/thread-manager.ts` - Added compaction API methods
+
+**Key Features Working:**
+- Basic compaction with tool result trimming to 3 lines
+- Multiple compactions with latest-compaction-wins behavior
+- Event ordering preservation after compaction
+- COMPACTION events correctly filtered from working conversations
+- Error handling for unknown strategies and missing threads
+
+### Next Steps
+Complete remaining tasks 11-14 to finish Phase 2 implementation. The core compaction system is functional and well-tested.

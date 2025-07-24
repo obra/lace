@@ -42,7 +42,7 @@ describe('conversation-builder', () => {
         timestamp: new Date('2024-01-01T10:03:00Z'),
         data: {
           strategyId: 'test-strategy',
-          originalEventCount: 2,
+          originalEventCount: 3,
           compactedEvents: [
             {
               id: 'c1',
@@ -68,7 +68,8 @@ describe('conversation-builder', () => {
 
       expect(result).toEqual([
         (compactionEvent.data as unknown as CompactionData).compactedEvents[0],
-        newEvent,
+        compactionEvent, // Include COMPACTION event itself
+        newEvent, // Only events after compaction timestamp
       ]);
     });
 
@@ -116,7 +117,10 @@ describe('conversation-builder', () => {
       const eventsWithTwoCompactions = [...mockEvents, firstCompaction, secondCompaction];
       const result = buildWorkingConversation(eventsWithTwoCompactions);
 
-      expect(result).toEqual((secondCompaction.data as unknown as CompactionData).compactedEvents);
+      expect(result).toEqual([
+        ...(secondCompaction.data as unknown as CompactionData).compactedEvents,
+        secondCompaction, // Include COMPACTION event itself
+      ]);
     });
   });
 

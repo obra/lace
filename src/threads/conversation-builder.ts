@@ -11,10 +11,10 @@ export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
     return events; // No compaction yet, use all events
   }
 
-  // Use compacted events + everything after compaction
+  // Use compacted events + compaction event + everything after compaction
   const eventsAfterCompaction = getEventsAfter(events, lastCompaction.id);
   const compactionData = lastCompaction.data as unknown as CompactionData;
-  return [...compactionData.compactedEvents, ...eventsAfterCompaction];
+  return [...compactionData.compactedEvents, lastCompaction, ...eventsAfterCompaction];
 }
 
 export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {
