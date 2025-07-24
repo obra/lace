@@ -5,3 +5,4 @@ export { SettingsModal } from './SettingsModal';
 export { SettingsTabs } from './SettingsTabs';
 export { SettingsPanel } from './SettingsPanel';
 export { SettingField } from './SettingField';
+export { UISettingsPanel } from './panels/UISettingsPanel';
