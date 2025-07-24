@@ -356,6 +356,17 @@ export function LaceApp() {
     }
   };
 
+  // Handle onboarding completion - navigate directly to chat
+  const handleOnboardingComplete = (projectId: string, sessionId: string, agentId: string) => {
+    // Set all three selections to navigate directly to chat
+    setSelectedProject(projectId);
+    setSelectedSession(sessionId as ThreadId);
+    setSelectedAgent(agentId as ThreadId);
+    
+    // Clear auto-open state
+    setAutoOpenCreateProject(false);
+  };
+
   // Handle task updates
   const handleTaskUpdate = async (task: Task) => {
     if (!taskManager) return;
@@ -859,6 +870,7 @@ export function LaceApp() {
                 loading={loadingProjects}
                 autoOpenCreate={autoOpenCreateProject}
                 onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
+                onOnboardingComplete={handleOnboardingComplete}
               />
             </div>
           )}

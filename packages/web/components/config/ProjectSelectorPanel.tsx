@@ -18,6 +18,7 @@ interface ProjectSelectorPanelProps {
   loading?: boolean;
   autoOpenCreate?: boolean;
   onAutoCreateHandled?: () => void;
+  onOnboardingComplete?: (projectId: string, sessionId: string, agentId: string) => void;
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
@@ -58,6 +59,7 @@ export function ProjectSelectorPanel({
   loading = false,
   autoOpenCreate = false,
   onAutoCreateHandled,
+  onOnboardingComplete,
 }: ProjectSelectorPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ProjectFilter>('active');
@@ -323,7 +325,8 @@ export function ProjectSelectorPanel({
     if (!createName.trim() || !createWorkingDirectory.trim()) return;
 
     try {
-      const res = await fetch('/api/projects', {
+      // Step 1: Create project
+      const projectRes = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -334,22 +337,54 @@ export function ProjectSelectorPanel({
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json() as { project: ProjectInfo };
-        
-        // Call the callback to refresh projects list if available
-        if (onProjectCreate) {
-          onProjectCreate();
-        }
-        
-        // Optionally select the newly created project
-        onProjectSelect(data.project);
-        
-        handleCancelCreateProject();
-      } else {
-        const errorData = await res.json() as { error: string };
+      if (!projectRes.ok) {
+        const errorData = await projectRes.json() as { error: string };
         console.error('Failed to create project:', errorData.error);
+        return;
       }
+
+      const projectData = await projectRes.json() as { project: ProjectInfo };
+      const projectId = projectData.project.id;
+
+      // Call the callback to refresh projects list if available
+      if (onProjectCreate) {
+        onProjectCreate();
+      }
+
+      // If this is simplified onboarding mode, continue the chain
+      if (isSimplifiedMode && onOnboardingComplete) {
+        // Step 2: Get sessions (project creation should have created a default session)
+        const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
+        if (sessionsRes.ok) {
+          const sessionsData = await sessionsRes.json() as { sessions: Array<{ id: string }> };
+          const sessionId = sessionsData.sessions[0]?.id;
+
+          if (sessionId) {
+            // Step 3: Create Lace agent
+            const agentRes = await fetch(`/api/sessions/${sessionId}/agents`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                // name omitted to trigger "Lace" default
+                // provider/model omitted to use defaults
+              }),
+            });
+
+            if (agentRes.ok) {
+              const agentData = await agentRes.json() as { agent: { threadId: string } };
+              const agentId = agentData.agent.threadId;
+
+              // Complete onboarding - navigate to chat
+              onOnboardingComplete(projectId, sessionId, agentId);
+            }
+          }
+        }
+      } else {
+        // Regular project creation - just select the project
+        onProjectSelect(projectData.project);
+      }
+
+      handleCancelCreateProject();
     } catch (error) {
       console.error('Error creating project:', error);
     }
