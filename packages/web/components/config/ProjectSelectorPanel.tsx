@@ -90,9 +90,9 @@ export function ProjectSelectorPanel({
   useEffect(() => {
     if (autoOpenCreate && !showCreateProject) {
       setShowCreateProject(true);
-      onAutoCreateHandled?.();
+      // Don't call onAutoCreateHandled here - keep autoOpenCreate true for simplified mode
     }
-  }, [autoOpenCreate, showCreateProject, onAutoCreateHandled]);
+  }, [autoOpenCreate, showCreateProject]);
 
   // Auto-populate name from directory in simplified mode
   const handleCreateDirectoryChange = (directory: string) => {
@@ -399,6 +399,12 @@ export function ProjectSelectorPanel({
     setCreateConfig(DEFAULT_PROJECT_CONFIG);
     setCreateNewEnvKey('');
     setCreateNewEnvValue('');
+    setShowAdvancedOptions(false); // Reset simplified mode state
+    
+    // Clear auto-open state when cancelled
+    if (autoOpenCreate) {
+      onAutoCreateHandled?.();
+    }
   };
 
   // Handle create project environment variables
