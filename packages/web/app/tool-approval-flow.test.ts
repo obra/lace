@@ -228,11 +228,9 @@ describe('Tool Approval Flow Integration', () => {
       approvalRequestReceived = true;
       approvalResolveFunction = approvalData.resolve;
 
-      // Automatically approve after a short delay to complete the flow
-      setTimeout(() => {
-        logEvent('approval_request.resolving', { decision: 'ALLOW_ONCE' });
-        approvalData.resolve(ApprovalDecision.ALLOW_ONCE);
-      }, 100);
+      // Automatically approve to complete the flow
+      logEvent('approval_request.resolving', { decision: 'ALLOW_ONCE' });
+      approvalData.resolve(ApprovalDecision.ALLOW_ONCE);
     });
 
     // Execute the tool with correct ToolCall format (no context to force approval)

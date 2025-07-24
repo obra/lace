@@ -230,10 +230,6 @@ export function LaceApp() {
     }
   };
 
-  // Handle approval timeout
-  const handleApprovalTimeout = () => {
-    void handleApprovalDecision(ApprovalDecision.DENY);
-  };
 
   // Session creation function with configuration
   const handleSessionCreate = async (sessionData: { 
@@ -725,7 +721,6 @@ export function LaceApp() {
         <ToolApprovalModal
           request={approvalRequest}
           onDecision={handleApprovalDecision}
-          onTimeout={handleApprovalTimeout}
         />
       )}
     </motion.div>

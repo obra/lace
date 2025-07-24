@@ -130,8 +130,6 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await expect(page.getByRole('button', { name: /Allow Session/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Deny/ })).toBeVisible();
 
-    // Verify countdown timer is present
-    await expect(page.locator('text=until auto-deny')).toBeVisible();
 
     // Verify keyboard shortcuts are shown
     await expect(page.locator('text=[Y/A]')).toBeVisible();
@@ -318,44 +316,6 @@ test.describe('Tool Approval Modal E2E Tests', () => {
     await expect(page.locator('text=Deny: Reject this tool call')).toBeVisible();
   });
 
-  test('should handle timeout and auto-deny', async ({ page }) => {
-    // Setup session and agent
-    await page.fill('[data-testid="session-name-input"]', 'Timeout Test');
-    await page.click('[data-testid="create-session-button"]');
-    await page.waitForSelector('[data-testid="spawn-agent-button"]');
-
-    await page.click('[data-testid="spawn-agent-button"]');
-    await page.fill('[data-testid="agent-name-input"]', 'Test Agent');
-    await page.click('[data-testid="confirm-spawn-agent"]');
-    await page.waitForSelector('[data-testid="message-input"]');
-
-    await page.locator('text=Test Agent').first().click();
-
-    // Trigger tool approval
-    await page.fill('[data-testid="message-input"]', 'Please read package.json');
-    await page.click('[data-testid="send-message-button"]');
-
-    // Wait for modal
-    await page.waitForSelector('text=Tool Approval Required');
-
-    // Verify countdown timer is present and decreasing
-    await expect(page.locator('text=until auto-deny')).toBeVisible();
-
-    // Check that the timer shows a number (like "30s", "29s", etc.)
-    const timerElement = page
-      .locator('div:has-text("until auto-deny")')
-      .locator('..')
-      .locator('div')
-      .first();
-    await expect(timerElement).toContainText('s');
-
-    // Wait for modal to auto-close (timeout is 30 seconds, but we'll wait a bit longer)
-    await expect(page.locator('text=Tool Approval Required')).not.toBeVisible({ timeout: 35000 });
-
-    // Verify tool was denied due to timeout
-    await page.waitForSelector('[data-testid="agent-response"]', { timeout: 10000 });
-    await expect(page.locator('text=denied')).toBeVisible();
-  });
 
   test('should handle multiple keyboard shortcuts', async ({ page }) => {
     // Setup session and agent

@@ -1,32 +1,16 @@
 // ABOUTME: Tool approval modal component for interactive approval decisions  
 // ABOUTME: Updated with DaisyUI styling and integrated with new design system
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import type { ToolApprovalRequestData } from '@/types/api';
 import { ApprovalDecision } from '@/types/api';
 
 interface ToolApprovalModalProps {
   request: ToolApprovalRequestData;
   onDecision: (decision: ApprovalDecision) => void;
-  onTimeout: () => void;
 }
 
-export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprovalModalProps) {
-  const [timeLeft, setTimeLeft] = useState(request.timeout || 30);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          onTimeout();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [onTimeout]);
+export function ToolApprovalModal({ request, onDecision }: ToolApprovalModalProps) {
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -100,10 +84,6 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
                 {request.isReadOnly ? 'Read-only' : 'May modify data'}
               </span>
             </div>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-mono font-bold text-base-content">{timeLeft}s</div>
-            <div className="text-xs text-base-content/40">until auto-deny</div>
           </div>
         </div>
 
