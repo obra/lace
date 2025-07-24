@@ -461,6 +461,7 @@ export class Session {
   }
 
   spawnAgent(name: string, provider?: string, model?: string): Agent {
+    const agentName = name.trim() || 'Lace';
     const targetProvider = provider || this._sessionAgent.providerName;
     const targetModel = model || this._sessionAgent.providerInstance.modelName;
 
@@ -482,7 +483,7 @@ export class Session {
 
     // Store the agent metadata
     agent.updateThreadMetadata({
-      name,
+      name: agentName, // Use processed name
       isAgent: true,
       parentSessionId: this._sessionId,
       provider: targetProvider,

@@ -146,6 +146,44 @@ describe('Session', () => {
     });
   });
 
+  describe('spawnAgent default naming', () => {
+    it('should use "Lace" as default agent name', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const agent = session.spawnAgent(''); // Empty name to trigger default
+
+      const agents = session.getAgents();
+      const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
+      expect(spawnedAgent?.name).toBe('Lace');
+    });
+
+    it('should use provided name when given', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const agent = session.spawnAgent('Custom Agent Name');
+
+      const agents = session.getAgents();
+      const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
+      expect(spawnedAgent?.name).toBe('Custom Agent Name');
+    });
+
+    it('should handle whitespace-only names', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const agent = session.spawnAgent('   '); // Whitespace-only
+
+      const agents = session.getAgents();
+      const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
+      expect(spawnedAgent?.name).toBe('Lace');
+    });
+  });
+
   describe('create', () => {
     it('should create a session with default parameters', () => {
       const session = Session.create({
