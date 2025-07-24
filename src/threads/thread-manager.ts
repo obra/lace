@@ -13,6 +13,7 @@ import { logger } from '~/utils/logger';
 import { estimateTokens } from '~/utils/token-estimation';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy } from '~/threads/compaction/types';
+import { registerDefaultStrategies } from '~/threads/compaction/registry';
 
 export interface ThreadSessionInfo {
   threadId: string;
@@ -29,6 +30,11 @@ export class ThreadManager {
 
   constructor() {
     this._persistence = getPersistence();
+
+    // Register default compaction strategies
+    registerDefaultStrategies((strategy) => {
+      this.registerCompactionStrategy(strategy);
+    });
   }
 
   generateThreadId(): string {
