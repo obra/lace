@@ -22,7 +22,6 @@ describe('ThreadManager Caching Issues', () => {
 
     // Create a parent thread
     parentThreadId = threadManager.createThread();
-    threadManager.setCurrentThread(parentThreadId);
   });
 
   afterEach(() => {
@@ -115,12 +114,11 @@ describe('ThreadManager Caching Issues', () => {
     expect(event2.threadId).toBe(delegate2.id);
   });
 
-  it('should handle delegate thread when parent is not current thread', () => {
-    // Create another thread and make it current
+  it('should handle delegate thread when parent exists', () => {
+    // Create another thread (ThreadManager is stateless, no "current" concept)
     const otherThreadId = threadManager.createThread();
-    threadManager.setCurrentThread(otherThreadId);
 
-    // Create delegate thread for original parent (not current)
+    // Create delegate thread for original parent
     const delegateThread = threadManager.createDelegateThreadFor(parentThreadId);
     const delegateThreadId = delegateThread.id;
 
