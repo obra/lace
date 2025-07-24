@@ -1030,7 +1030,7 @@ export class DatabasePersistence {
 
   getPendingApprovals(threadId: string): Array<{
     toolCallId: string;
-    toolCall: any;
+    toolCall: unknown;
     requestedAt: Date;
   }> {
     if (this._disabled || !this.db) return [];
@@ -1061,7 +1061,7 @@ export class DatabasePersistence {
 
     return rows.map((row) => ({
       toolCallId: row.tool_call_id,
-      toolCall: JSON.parse(row.tool_call_data),
+      toolCall: JSON.parse(row.tool_call_data) as unknown,
       requestedAt: new Date(row.requested_at),
     }));
   }

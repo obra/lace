@@ -6,11 +6,18 @@ import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { ThreadManager } from '~/threads/thread-manager';
-import { Agent } from '~/agents/agent';
+
+interface MockAgent {
+  threadId: string;
+  threadManager: ThreadManager;
+  toolExecutor: {
+    getTool: ReturnType<typeof vi.fn>;
+  };
+}
 
 describe('EventApprovalCallback', () => {
   let threadManager: ThreadManager;
-  let mockAgent: any;
+  let mockAgent: MockAgent;
   let threadId: string;
   let callback: EventApprovalCallback;
 
@@ -31,7 +38,7 @@ describe('EventApprovalCallback', () => {
       },
     };
 
-    callback = new EventApprovalCallback(mockAgent, threadManager, threadId);
+    callback = new EventApprovalCallback(mockAgent as never, threadManager, threadId);
   });
 
   afterEach(() => {
@@ -40,7 +47,7 @@ describe('EventApprovalCallback', () => {
 
   it('should create TOOL_APPROVAL_REQUEST event when approval needed', async () => {
     // Create a TOOL_CALL event first
-    const toolCallEvent = threadManager.addEvent(threadId, 'TOOL_CALL', {
+    const _toolCallEvent = threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_123',
       name: 'bash',
       arguments: { command: 'ls' },
