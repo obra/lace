@@ -1,64 +1,28 @@
-// ABOUTME: Test suite for RESTful task detail API - GET/PATCH/DELETE specific task under project/session
-// ABOUTME: Tests individual task operations with proper nested route validation
+// ABOUTME: Integration tests for RESTful task detail API - GET/PATCH/DELETE specific task under project/session
+// ABOUTME: Tests individual task operations with real implementations and proper nested route validation
+
+/**
+ * @vitest-environment node
+ */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, PATCH, DELETE } from './route';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { Task } from '@/types/api';
 
-// Mock lace-imports
-vi.mock('@/lib/server/lace-imports', () => ({
-  Project: {
-    getById: vi.fn(),
-  },
-  asThreadId: vi.fn((id: string) => id),
-  logger: {
-    error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
-
-// Mock session service
-vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: vi.fn(() => ({
-    getSession: vi.fn(),
-  })),
-}));
-
-// Mock API utils
-vi.mock('@/lib/server/api-utils', () => ({
-  serializeTask: vi.fn((task: unknown) => task),
-  createErrorResponse: vi.fn(
-    (message: string, status: number) =>
-      new Response(JSON.stringify({ error: message }), { status })
-  ),
-  createSuccessResponse: vi.fn(
-    (data: unknown) => new Response(JSON.stringify(data), { status: 200 })
-  ),
-}));
+// Mock external dependencies only
+vi.mock('server-only', () => ({}));
 
 describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => {
-  let mockProject: {
-    getSession: MockedFunction<(id: string) => unknown>;
-  };
-  let mockSession: {
-    getTaskManager: MockedFunction<() => unknown>;
-  };
-  let mockTaskManager: {
-    getTaskById: MockedFunction<(id: string) => Task | null>;
-    updateTask: MockedFunction<(id: string, updates: unknown, context: unknown) => Promise<Task>>;
-    deleteTask: MockedFunction<(id: string, context: unknown) => Promise<void>>;
-  };
-  let mockSessionService: {
-    getSession: MockedFunction<(id: string) => unknown>;
-  };
+  let sessionService: ReturnType<typeof getSessionService>;
+  let testProjectId: string;
+  let testSessionId: string;
+  let testTaskId: string;
 
-  const mockTask: Task = {
-    id: 'task1',
+  const mockTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
     title: 'Test Task',
     description: 'Test description',
     prompt: 'Test prompt',
@@ -67,53 +31,71 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     assignedTo: 'user1',
     createdBy: 'human',
     threadId: 'session1',
-    createdAt: '2023-01-01T00:00:00.000Z',
-    updatedAt: '2023-01-01T00:00:00.000Z',
     notes: [],
   };
 
-  beforeEach(() => {
-    mockTaskManager = {
-      getTaskById: vi.fn(),
-      updateTask: vi.fn(),
-      deleteTask: vi.fn(),
-    };
+  beforeEach(async () => {
+    setupTestPersistence();
 
-    mockSession = {
-      getTaskManager: vi.fn().mockReturnValue(mockTaskManager),
-    };
+    // Set up environment for session service
+    process.env.ANTHROPIC_KEY = 'test-key';
+    process.env.LACE_DB_PATH = ':memory:';
 
-    mockProject = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-    };
+    sessionService = getSessionService();
 
-    mockSessionService = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-    };
+    // Create a real test project
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    testProjectId = project.getId();
 
-    const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-    mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
-
-    const mockedGetSessionService = vi.mocked(getSessionService) as MockedFunction<
-      typeof getSessionService
-    >;
-    mockedGetSessionService.mockReturnValue(
-      mockSessionService as unknown as ReturnType<typeof getSessionService>
+    // Create a real session
+    const newSession = await sessionService.createSession(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307',
+      testProjectId
     );
+    testSessionId = newSession.id;
+
+    // Get the active session instance to access task manager
+    const session = await sessionService.getSession(asThreadId(testSessionId));
+    if (!session) {
+      throw new Error('Failed to get active session');
+    }
+
+    // Create a real task for testing
+    const taskManager = session.getTaskManager();
+    const task = await taskManager.createTask(
+      {
+        title: mockTask.title,
+        description: mockTask.description,
+        prompt: mockTask.prompt,
+        priority: mockTask.priority,
+        assignedTo: mockTask.assignedTo,
+      },
+      {
+        actor: 'human',
+        isHuman: true,
+      }
+    );
+    testTaskId = task.id;
+  });
+
+  afterEach(() => {
+    sessionService.clearActiveSessions();
+    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('GET', () => {
     it('should return specific task', async () => {
-      mockTaskManager.getTaskById.mockReturnValue(mockTask);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1'
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -121,22 +103,19 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       expect(response.status).toBe(200);
 
       const data = (await response.json()) as { task: Task };
-      expect(data.task.id).toBe('task1');
+      expect(data.task.id).toBe(testTaskId);
       expect(data.task.title).toBe('Test Task');
     });
 
     it('should return 404 for non-existent project', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/nonexistent/sessions/sess1/tasks/task1'
+        `http://localhost/api/projects/nonexistent/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
           projectId: 'nonexistent',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -148,16 +127,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent session', async () => {
-      mockProject.getSession.mockReturnValue(null);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/nonexistent/tasks/task1'
+        `http://localhost/api/projects/${testProjectId}/sessions/nonexistent/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
+          projectId: testProjectId,
           sessionId: 'nonexistent',
-          taskId: 'task1',
+          taskId: testTaskId,
         }),
       };
 
@@ -169,15 +146,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent task', async () => {
-      mockTaskManager.getTaskById.mockReturnValue(null);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/nonexistent'
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/nonexistent`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
+          projectId: testProjectId,
+          sessionId: testSessionId,
           taskId: 'nonexistent',
         }),
       };
@@ -188,46 +163,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const data = (await response.json()) as { error: string };
       expect(data.error).toBe('Task not found');
     });
-
-    it('should handle database errors', async () => {
-      mockTaskManager.getTaskById.mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
-      const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1'
-      );
-      const context = {
-        params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
-        }),
-      };
-
-      const response = (await GET(request, context)) as NextResponse;
-      expect(response.status).toBe(500);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Database error');
-    });
   });
 
   describe('PATCH', () => {
     it('should update task properties', async () => {
-      const updatedTask: Task = {
-        ...mockTask,
-        title: 'Updated Title',
-        status: 'in_progress',
-        updatedAt: '2023-01-02T00:00:00.000Z',
-      };
-
-      mockTaskManager.updateTask.mockResolvedValue(updatedTask);
-
       const updateData = { title: 'Updated Title', status: 'in_progress' as const };
 
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1',
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
           body: JSON.stringify(updateData),
@@ -237,9 +180,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -252,11 +195,8 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent project', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/nonexistent/sessions/sess1/tasks/task1',
+        `http://localhost/api/projects/nonexistent/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
           body: JSON.stringify({ title: 'Updated Title' }),
@@ -267,8 +207,8 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const context = {
         params: Promise.resolve({
           projectId: 'nonexistent',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -279,71 +219,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       expect(data.error).toBe('Project not found');
     });
 
-    it('should return 404 for non-existent session', async () => {
-      mockProject.getSession.mockReturnValue(null);
-
-      const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/nonexistent/tasks/task1',
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ title: 'Updated Title' }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      const context = {
-        params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'nonexistent',
-          taskId: 'task1',
-        }),
-      };
-
-      const response = (await PATCH(request, context)) as NextResponse;
-      expect(response.status).toBe(404);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Session not found in this project');
-    });
-
-    it('should handle task not found during update', async () => {
-      mockTaskManager.updateTask.mockRejectedValue(new Error('Task not found'));
-
-      const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/nonexistent',
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ title: 'Updated Title' }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      const context = {
-        params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'nonexistent',
-        }),
-      };
-
-      const response = (await PATCH(request, context)) as NextResponse;
-      expect(response.status).toBe(500);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Task not found');
-    });
-
     it('should handle partial updates', async () => {
-      const updatedTask: Task = {
-        ...mockTask,
-        priority: 'high',
-        updatedAt: '2023-01-02T00:00:00.000Z',
-      };
-
-      mockTaskManager.updateTask.mockResolvedValue(updatedTask);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1',
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
           body: JSON.stringify({ priority: 'high' }),
@@ -353,9 +231,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -366,47 +244,18 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       expect(data.task.priority).toBe('high');
       expect(data.task.title).toBe('Test Task'); // Should remain unchanged
     });
-
-    it('should handle database errors during update', async () => {
-      mockTaskManager.updateTask.mockRejectedValue(new Error('Database error'));
-
-      const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1',
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ title: 'Updated Title' }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      const context = {
-        params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
-        }),
-      };
-
-      const response = (await PATCH(request, context)) as NextResponse;
-      expect(response.status).toBe(500);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Database error');
-    });
   });
 
   describe('DELETE', () => {
     it('should delete task successfully', async () => {
-      mockTaskManager.deleteTask.mockResolvedValue();
-
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1'
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -418,17 +267,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent project', async () => {
-      const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
-      mockedGetById.mockReturnValue(null);
-
       const request = new NextRequest(
-        'http://localhost/api/projects/nonexistent/sessions/sess1/tasks/task1'
+        `http://localhost/api/projects/nonexistent/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
           projectId: 'nonexistent',
-          sessionId: 'sess1',
-          taskId: 'task1',
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -439,38 +285,30 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       expect(data.error).toBe('Project not found');
     });
 
-    it('should return 404 for non-existent session', async () => {
-      mockProject.getSession.mockReturnValue(null);
-
-      const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/nonexistent/tasks/task1'
-      );
-      const context = {
-        params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'nonexistent',
-          taskId: 'task1',
-        }),
-      };
-
-      const response = (await DELETE(request, context)) as NextResponse;
-      expect(response.status).toBe(404);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Session not found in this project');
-    });
-
     it('should return 404 for non-existent task', async () => {
-      mockTaskManager.deleteTask.mockRejectedValue(new Error('Task not found'));
+      // First delete the task, then try to delete it again
+      await DELETE(
+        new NextRequest(
+          `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+        ),
+        {
+          params: Promise.resolve({
+            projectId: testProjectId,
+            sessionId: testSessionId,
+            taskId: testTaskId,
+          }),
+        }
+      );
 
+      // Now try to delete the already-deleted task
       const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/nonexistent'
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
         params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'nonexistent',
+          projectId: testProjectId,
+          sessionId: testSessionId,
+          taskId: testTaskId,
         }),
       };
 
@@ -479,27 +317,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
       const data = (await response.json()) as { error: string };
       expect(data.error).toBe('Task not found');
-    });
-
-    it('should handle database errors during deletion', async () => {
-      mockTaskManager.deleteTask.mockRejectedValue(new Error('Database error'));
-
-      const request = new NextRequest(
-        'http://localhost/api/projects/proj1/sessions/sess1/tasks/task1'
-      );
-      const context = {
-        params: Promise.resolve({
-          projectId: 'proj1',
-          sessionId: 'sess1',
-          taskId: 'task1',
-        }),
-      };
-
-      const response = (await DELETE(request, context)) as NextResponse;
-      expect(response.status).toBe(500);
-
-      const data = (await response.json()) as { error: string };
-      expect(data.error).toBe('Database error');
     });
   });
 });

@@ -82,6 +82,3 @@ vi.mock('@anthropic-ai/sdk', () => {
     Anthropic: vi.fn().mockImplementation(() => mockClient),
   };
 });
-
-// Ensure global expects are available for all tests
-(global as typeof globalThis & { expect: typeof expect }).expect = expect;

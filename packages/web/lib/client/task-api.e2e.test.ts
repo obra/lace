@@ -69,7 +69,7 @@ describe('TaskAPIClient E2E Tests', () => {
       'claude-3-haiku-20240307',
       projectId
     );
-    sessionId = session.id as string;
+    sessionId = session.id;
 
     // Mock fetch to route requests to real API handlers (same pattern as useTaskManager.e2e.test.tsx)
     global.fetch = vi
