@@ -12,10 +12,10 @@ export async function POST(
     const { threadId, toolCallId } = params;
     
     // Parse request body
-    let body;
+    let body: { decision?: string };
     try {
-      body = await request.json();
-    } catch (error) {
+      body = await request.json() as { decision?: string };
+    } catch (_error) {
       return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
     
@@ -40,7 +40,7 @@ export async function POST(
     });
     
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

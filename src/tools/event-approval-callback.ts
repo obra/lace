@@ -1,10 +1,10 @@
 // ABOUTME: Event-based approval callback that uses ThreadManager for persistence
 // ABOUTME: Replaces Promise-based approval system with durable event storage
 
-import { ApprovalCallback, ApprovalDecision } from './approval-types';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
-import { ToolCall } from './types';
+import { ToolCall } from '~/tools/types';
 import { ThreadEvent, ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
 
 export class EventApprovalCallback implements ApprovalCallback {
@@ -20,40 +20,40 @@ export class EventApprovalCallback implements ApprovalCallback {
     if (!toolCallEvent) {
       throw new Error(`Could not find TOOL_CALL event for ${toolName}`);
     }
-    
+
     const toolCallId = (toolCallEvent.data as ToolCall).id;
-    
+
     // Check if approval response already exists (recovery case)
     const existingResponse = this.checkExistingApprovalResponse(toolCallId);
     if (existingResponse) {
       return existingResponse;
     }
-    
+
     // Check if approval request already exists to avoid duplicates
     const existingRequest = this.checkExistingApprovalRequest(toolCallId);
     if (!existingRequest) {
       // Create TOOL_APPROVAL_REQUEST event only if it doesn't exist
-      this.threadManager.addEvent(
-        this.threadId,
-        'TOOL_APPROVAL_REQUEST',
-        { toolCallId: toolCallId }
-      );
+      this.threadManager.addEvent(this.threadId, 'TOOL_APPROVAL_REQUEST', {
+        toolCallId: toolCallId,
+      });
     }
-    
+
     // Wait for TOOL_APPROVAL_RESPONSE event
     return this.waitForApprovalResponse(toolCallId);
   }
 
   private findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
     const events = this.threadManager.getEvents(this.threadId);
-    
+
     // Find most recent TOOL_CALL for this tool with matching input
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
       if (event.type === 'TOOL_CALL') {
         const toolCall = event.data as ToolCall;
-        if (toolCall.name === toolName && 
-            JSON.stringify(toolCall.arguments) === JSON.stringify(input)) {
+        if (
+          toolCall.name === toolName &&
+          JSON.stringify(toolCall.arguments) === JSON.stringify(input)
+        ) {
           return event;
         }
       }
@@ -97,17 +97,19 @@ export class EventApprovalCallback implements ApprovalCallback {
 
   private checkExistingApprovalRequest(toolCallId: string): boolean {
     const events = this.threadManager.getEvents(this.threadId);
-    return events.some(e => 
-      e.type === 'TOOL_APPROVAL_REQUEST' && 
-      (e.data as ToolApprovalRequestData).toolCallId === toolCallId
+    return events.some(
+      (e) =>
+        e.type === 'TOOL_APPROVAL_REQUEST' &&
+        (e.data as ToolApprovalRequestData).toolCallId === toolCallId
     );
   }
 
   private checkExistingApprovalResponse(toolCallId: string): ApprovalDecision | null {
     const events = this.threadManager.getEvents(this.threadId);
-    const responseEvent = events.find(e => 
-      e.type === 'TOOL_APPROVAL_RESPONSE' && 
-      (e.data as ToolApprovalResponseData).toolCallId === toolCallId
+    const responseEvent = events.find(
+      (e) =>
+        e.type === 'TOOL_APPROVAL_RESPONSE' &&
+        (e.data as ToolApprovalResponseData).toolCallId === toolCallId
     );
     return responseEvent ? (responseEvent.data as ToolApprovalResponseData).decision : null;
   }

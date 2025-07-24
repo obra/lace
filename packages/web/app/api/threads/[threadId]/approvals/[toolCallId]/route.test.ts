@@ -4,17 +4,28 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
-import { Agent, ThreadManager } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');
 const mockGetSessionService = vi.mocked(getSessionService);
 
+interface MockThreadManager {
+  addEvent: ReturnType<typeof vi.fn>;
+}
+
+interface MockAgent {
+  threadManager: MockThreadManager;
+}
+
+interface MockSessionService {
+  getAgent: ReturnType<typeof vi.fn>;
+}
+
 describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
-  let mockAgent: any;
-  let mockThreadManager: any;
-  let mockSessionService: any;
+  let mockAgent: MockAgent;
+  let mockThreadManager: MockThreadManager;
+  let mockSessionService: MockSessionService;
 
   beforeEach(() => {
     // Create mock ThreadManager

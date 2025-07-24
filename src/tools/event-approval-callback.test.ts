@@ -2,8 +2,8 @@
 // ABOUTME: Validates approval logic that creates events and waits for responses
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventApprovalCallback } from './event-approval-callback';
-import { ApprovalDecision } from './approval-types';
+import { EventApprovalCallback } from '~/tools/event-approval-callback';
+import { ApprovalDecision } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
@@ -18,17 +18,17 @@ describe('EventApprovalCallback', () => {
     setupTestPersistence();
     threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
-    
+
     // Create the thread before adding events
     threadManager.createThread(threadId);
-    
+
     // Create mock agent
     mockAgent = {
       threadId,
       threadManager,
       toolExecutor: {
-        getTool: vi.fn(() => ({ annotations: { readOnlyHint: false } }))
-      }
+        getTool: vi.fn(() => ({ annotations: { readOnlyHint: false } })),
+      },
     };
 
     callback = new EventApprovalCallback(mockAgent, threadManager, threadId);
@@ -43,7 +43,7 @@ describe('EventApprovalCallback', () => {
     const toolCallEvent = threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_123',
       name: 'bash',
-      arguments: { command: 'ls' }
+      arguments: { command: 'ls' },
     });
 
     // Start approval request (don't await yet)
@@ -51,15 +51,15 @@ describe('EventApprovalCallback', () => {
 
     // Check that TOOL_APPROVAL_REQUEST event was created
     const events = threadManager.getEvents(threadId);
-    const approvalRequestEvent = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
-    
+    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+
     expect(approvalRequestEvent).toBeDefined();
     expect(approvalRequestEvent?.data).toEqual({ toolCallId: 'call_123' });
 
     // Resolve the approval by adding response event
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_123',
-      decision: ApprovalDecision.ALLOW_ONCE
+      decision: ApprovalDecision.ALLOW_ONCE,
     });
 
     // Promise should now resolve
@@ -72,16 +72,16 @@ describe('EventApprovalCallback', () => {
     threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_123',
       name: 'bash',
-      arguments: { command: 'ls' }
+      arguments: { command: 'ls' },
     });
 
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: 'call_123'
+      toolCallId: 'call_123',
     });
 
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_123',
-      decision: ApprovalDecision.ALLOW_SESSION
+      decision: ApprovalDecision.ALLOW_SESSION,
     });
 
     // Request approval - should return existing decision immediately
@@ -90,7 +90,7 @@ describe('EventApprovalCallback', () => {
 
     // Should not create duplicate TOOL_APPROVAL_REQUEST
     const events = threadManager.getEvents(threadId);
-    const approvalRequests = events.filter(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequests).toHaveLength(1); // Only the one we created manually
   });
 
@@ -99,13 +99,13 @@ describe('EventApprovalCallback', () => {
     threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_123',
       name: 'bash',
-      arguments: { command: 'ls' }
+      arguments: { command: 'ls' },
     });
 
     threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_456',
       name: 'file-read',
-      arguments: { path: '/test' }
+      arguments: { path: '/test' },
     });
 
     // Start two approval requests concurrently
@@ -114,18 +114,18 @@ describe('EventApprovalCallback', () => {
 
     // Both should create approval request events
     const events = threadManager.getEvents(threadId);
-    const approvalRequests = events.filter(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequests).toHaveLength(2);
 
     // Respond to both approvals
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_123',
-      decision: ApprovalDecision.ALLOW_ONCE
+      decision: ApprovalDecision.ALLOW_ONCE,
     });
 
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_456',
-      decision: ApprovalDecision.DENY
+      decision: ApprovalDecision.DENY,
     });
 
     // Both promises should resolve with correct decisions
@@ -136,9 +136,9 @@ describe('EventApprovalCallback', () => {
 
   it('should throw error if no matching TOOL_CALL event found', async () => {
     // Try to request approval without creating TOOL_CALL first
-    await expect(
-      callback.requestApproval('bash', { command: 'ls' })
-    ).rejects.toThrow('Could not find TOOL_CALL event for bash');
+    await expect(callback.requestApproval('bash', { command: 'ls' })).rejects.toThrow(
+      'Could not find TOOL_CALL event for bash'
+    );
   });
 
   it('should match tool call by name and arguments', async () => {
@@ -146,13 +146,13 @@ describe('EventApprovalCallback', () => {
     threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_123',
       name: 'bash',
-      arguments: { command: 'ls' }
+      arguments: { command: 'ls' },
     });
 
     threadManager.addEvent(threadId, 'TOOL_CALL', {
       id: 'call_456',
       name: 'bash',
-      arguments: { command: 'pwd' }
+      arguments: { command: 'pwd' },
     });
 
     // Request approval for specific arguments
@@ -160,13 +160,13 @@ describe('EventApprovalCallback', () => {
 
     // Should match the second TOOL_CALL (call_456)
     const events = threadManager.getEvents(threadId);
-    const approvalRequest = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    const approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequest?.data).toEqual({ toolCallId: 'call_456' });
 
     // Resolve the approval
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_456',
-      decision: ApprovalDecision.ALLOW_ONCE
+      decision: ApprovalDecision.ALLOW_ONCE,
     });
 
     const decision = await approvalPromise;
