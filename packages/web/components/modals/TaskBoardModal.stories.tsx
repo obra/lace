@@ -1,7 +1,42 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TaskBoardModal } from './TaskBoardModal';
-import { Task } from '@/types';
+import { Task } from '@/types/api';
 import { asThreadId } from '@/lib/server/core-types';
+
+// Demo columns definition for stories
+interface TaskColumn {
+  id: string;
+  title: string;
+  status: Task['status'];
+  color: string;
+}
+
+const DEMO_TASK_COLUMNS: TaskColumn[] = [
+  {
+    id: 'todo',
+    title: 'To Do',
+    status: 'pending',
+    color: 'bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
+  },
+  {
+    id: 'progress',
+    title: 'In Progress',
+    status: 'in_progress',
+    color: 'bg-yellow-100 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800',
+  },
+  {
+    id: 'blocked',
+    title: 'Blocked',
+    status: 'blocked',
+    color: 'bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800',
+  },
+  {
+    id: 'done',
+    title: 'Done',
+    status: 'completed',
+    color: 'bg-green-100 border-green-200 dark:bg-green-900/20 dark:border-green-800',
+  },
+];
 
 const meta: Meta<typeof TaskBoardModal> = {
   title: 'Organisms/TaskBoardModal',
@@ -250,6 +285,7 @@ export const Default: Story = {
     isOpen: true,
     onClose: () => {},
     tasks: sampleTasks,
+    columns: DEMO_TASK_COLUMNS,
     onTaskUpdate: (task) => console.log('Task updated:', task), // Task updated
     onTaskCreate: (task) => console.log('Task created:', task), // Task created
   },
@@ -467,6 +503,49 @@ export const PriorityDistribution: Story = {
     docs: {
       description: {
         story: 'Task board showing distribution of tasks across different priority levels.',
+      },
+    },
+  },
+};
+
+export const CustomColumns: Story = {
+  args: {
+    isOpen: true,
+    onClose: () => {},
+    tasks: sampleTasks,
+    columns: [
+      {
+        id: 'backlog',
+        title: 'Backlog',
+        status: 'pending',
+        color: 'bg-gray-100 border-gray-200 dark:bg-gray-900/20 dark:border-gray-800',
+      },
+      {
+        id: 'active',
+        title: 'Active Sprint',
+        status: 'in_progress',
+        color: 'bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
+      },
+      {
+        id: 'review',
+        title: 'Code Review',
+        status: 'blocked',
+        color: 'bg-orange-100 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800',
+      },
+      {
+        id: 'shipped',
+        title: 'Shipped',
+        status: 'completed',
+        color: 'bg-emerald-100 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800',
+      },
+    ],
+    onTaskUpdate: (task) => console.log('Task updated:', task),
+    onTaskCreate: (task) => console.log('Task created:', task),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Task board with custom column configuration showing different titles and colors.',
       },
     },
   },

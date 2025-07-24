@@ -4,12 +4,13 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTasks, faUser } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { Task } from '@/types';
+import { Task } from '@/types/api';
 
 interface TaskBoardModalProps {
   isOpen: boolean;
   onClose: () => void;
   tasks: Task[];
+  columns?: TaskColumn[];
   onTaskUpdate?: (task: Task) => void;
   onTaskCreate?: (task: Omit<Task, 'id'>) => void;
 }
@@ -21,7 +22,7 @@ interface TaskColumn {
   color: string;
 }
 
-const taskColumns: TaskColumn[] = [
+const DEFAULT_TASK_COLUMNS: TaskColumn[] = [
   {
     id: 'todo',
     title: 'To Do',
@@ -52,6 +53,7 @@ export function TaskBoardModal({
   isOpen,
   onClose,
   tasks,
+  columns = DEFAULT_TASK_COLUMNS,
   onTaskUpdate,
   onTaskCreate,
 }: TaskBoardModalProps) {
@@ -184,13 +186,14 @@ export function TaskBoardModal({
 
         {/* Kanban board */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-0">
-          {taskColumns.map((column) => {
+          {columns.map((column) => {
             const columnTasks = getTasksByStatus(column.status);
 
             return (
               <div
                 key={column.id}
                 className="flex flex-col h-full"
+                data-testid="task-column"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, column.status)}
               >
