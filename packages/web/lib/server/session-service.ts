@@ -2,17 +2,15 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadId, ApprovalDecision as CoreApprovalDecision } from '@/lib/server/lace-imports';
+import type { ThreadId } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
 import {
   Session as SessionType,
   Agent as AgentType,
   SessionEvent,
-  ApprovalDecision,
 } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
-import { getApprovalManager } from '@/lib/server/approval-manager';
 
 // Active session instances
 const activeSessions = new Map<ThreadId, Session>();
@@ -226,53 +224,7 @@ export class SessionService {
       // Conversation complete - no logging needed
     });
 
-    // Handle tool approval requests
-    agent.on(
-      'approval_request',
-      ({
-        toolName,
-        input,
-        isReadOnly,
-        requestId: _requestId,
-        resolve,
-      }: {
-        toolName: string;
-        input: unknown;
-        isReadOnly: boolean;
-        requestId: string;
-        resolve: (decision: CoreApprovalDecision) => void;
-      }) => {
-        const approvalManager = getApprovalManager();
-
-        // Handle async approval in a separate function
-        void (async () => {
-          try {
-            // Get tool metadata from the tool executor
-            // Use the public toolExecutor property instead of unsafe casting
-            const tool = agent.toolExecutor?.getTool(toolName);
-            const toolDescription = tool?.description;
-            const toolAnnotations = tool?.annotations;
-
-            // Request approval through the manager
-            const decision = await approvalManager.requestApproval(
-              threadId,
-              sessionId,
-              toolName,
-              toolDescription,
-              toolAnnotations,
-              input,
-              isReadOnly
-            );
-
-            resolve(decision);
-          } catch (error) {
-            // On error, deny the request
-            console.error(`Approval request failed for ${toolName}:`, error);
-            resolve(ApprovalDecision.DENY as CoreApprovalDecision);
-          }
-        })();
-      }
-    );
+    // Note: Tool approval is now handled by core EventApprovalCallback via ThreadManager events
 
     // Handle thread events (including approval events)
     agent.on('thread_event_added', ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
