@@ -89,9 +89,7 @@ export function LaceApp() {
   } = useSessionEvents(selectedSession, selectedAgent);
 
   // Add task manager hook when project and session are selected
-  const taskManager = selectedProject && selectedSession 
-    ? useTaskManager(selectedProject, selectedSession) 
-    : null;
+  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
