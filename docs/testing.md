@@ -11,6 +11,42 @@ This document outlines testing patterns and best practices for the Lace codebase
 
 ## Code Standards
 
+### Test File Setup Requirements
+
+**CRITICAL**: ALL test files MUST include these imports:
+
+```typescript
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+```
+
+**Never assume `expect` is globally available.** Missing this import causes TypeScript `@typescript-eslint/no-unsafe-call` errors.
+
+#### Before Writing Any Test File:
+1. Check existing test files in the same directory for correct import patterns
+2. Copy the import block exactly from working test files
+3. Run `npm run lint` immediately after writing tests to catch import issues
+
+#### Test File Template:
+```typescript
+// ABOUTME: Unit tests for [ComponentName] component
+// ABOUTME: Tests [brief description of what this tests]
+
+/**
+ * @vitest-environment jsdom
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { ComponentName } from '@/path/to/ComponentName';
+
+describe('ComponentName', () => {
+  // Your tests here
+});
+```
+
 ### TypeScript Requirements
 - **NEVER use `any` type** - Use `unknown` and type guards instead
 - **Always type test data** - Use factory functions with `Partial<T>` for fixtures
