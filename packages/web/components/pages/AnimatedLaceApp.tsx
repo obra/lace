@@ -11,6 +11,7 @@ import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
+import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { TimelineEntry, Project, Timeline, Task, RecentFile } from '@/types';
 import { asThreadId } from '@/lib/server/core-types';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
@@ -55,7 +56,6 @@ export function AnimatedLaceApp({
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState('dark');
   const [showTaskBoard, setShowTaskBoard] = useState(false);
   const [showVoiceUI, setShowVoiceUI] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -180,10 +180,7 @@ export function AnimatedLaceApp({
   ]);
 
   useEffect(() => {
-    // Set theme on mount
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setCurrentTheme(savedTheme);
-    document.documentElement.setAttribute('data-theme', savedTheme);
+    // Theme is now managed by SettingsContainer
   }, []);
 
   // Auto-dismiss notifications
@@ -252,12 +249,7 @@ export function AnimatedLaceApp({
     addSystemMessage(`New timeline created: ${newTimeline.name}`);
   };
 
-  const handleThemeChange = (theme: string) => {
-    setCurrentTheme(theme);
-    localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-    setNotification(`Theme changed to ${theme}`);
-  };
+  // Theme change handling is now managed by SettingsContainer
 
   const handleTriggerTool = (toolName: string) => {
     setIsToolRunning(true);
@@ -360,19 +352,22 @@ export function AnimatedLaceApp({
               exit="closed"
               className="relative w-80 h-full"
             >
-              <MobileSidebar
-                isOpen={showMobileNav}
-                onClose={() => setShowMobileNav(false)}
-                currentTheme={currentTheme}
-                onThemeChange={handleThemeChange}
-              >
+              <SettingsContainer>
+                {({ onOpenSettings }) => (
+                  <MobileSidebar
+                    isOpen={showMobileNav}
+                    onClose={() => setShowMobileNav(false)}
+                    onSettingsClick={onOpenSettings}
+                  >
                 <div className="p-4">
                   <h2 className="text-lg font-semibold mb-4">Demo Content</h2>
                   <p className="text-sm text-base-content/70">
                     This is a demo version of the mobile sidebar.
                   </p>
                 </div>
-              </MobileSidebar>
+                  </MobileSidebar>
+                )}
+              </SettingsContainer>
             </motion.div>
           </motion.div>
         )}
@@ -385,12 +380,13 @@ export function AnimatedLaceApp({
         transition={springConfig.smooth}
         className="hidden lg:block"
       >
-        <Sidebar
-          isOpen={showDesktopSidebar}
-          onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
-          currentTheme={currentTheme}
-          onThemeChange={handleThemeChange}
-        >
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <Sidebar
+              isOpen={showDesktopSidebar}
+              onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
+              onSettingsClick={onOpenSettings}
+            >
           <div className="p-4">
             <h2 className="text-lg font-semibold mb-4">Demo Sidebar</h2>
             <p className="text-sm text-base-content/70 mb-4">
@@ -408,7 +404,9 @@ export function AnimatedLaceApp({
               </div>
             </div>
           </div>
-        </Sidebar>
+            </Sidebar>
+          )}
+        </SettingsContainer>
       </motion.div>
 
       {/* Main Content Area */}

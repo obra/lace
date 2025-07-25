@@ -39,3 +39,4 @@ export { FileAttachment } from './FileAttachment';
 export { DragDropOverlay } from './DragDropOverlay';
 export { AnimatedModal } from './AnimatedModal';
 export { Modal } from './Modal';
+export { TextAreaField } from './TextAreaField';

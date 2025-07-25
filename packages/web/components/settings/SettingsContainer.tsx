@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { SettingsModal } from './SettingsModal';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
+import { UserSettingsPanel } from './panels/UserSettingsPanel';
 
 interface SettingsContainerProps {
   children: (props: { onOpenSettings: () => void }) => React.ReactNode;
@@ -42,6 +43,9 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
               currentTheme={currentTheme}
               onThemeChange={handleThemeChange}
             />
+          </div>
+          <div data-tab="user">
+            <UserSettingsPanel />
           </div>
         </SettingsTabs>
       </SettingsModal>

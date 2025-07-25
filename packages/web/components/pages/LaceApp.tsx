@@ -18,6 +18,7 @@ import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
+import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type {
   Session,
   ThreadId,
@@ -530,12 +531,13 @@ export function LaceApp() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 lg:hidden"
           >
-            <MobileSidebar
-              isOpen={showMobileNav}
-              onClose={() => setShowMobileNav(false)}
-              currentTheme={theme}
-              onThemeChange={setTheme}
-            >
+            <SettingsContainer>
+              {({ onOpenSettings }) => (
+                <MobileSidebar
+                  isOpen={showMobileNav}
+                  onClose={() => setShowMobileNav(false)}
+                  onSettingsClick={onOpenSettings}
+                >
               {/* Current Project - Show only when project selected */}
               {selectedProject && (
                 <SidebarSection 
@@ -662,19 +664,22 @@ export function LaceApp() {
                   />
                 </SidebarSection>
               )}
-            </MobileSidebar>
+                </MobileSidebar>
+              )}
+            </SettingsContainer>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block flex-shrink-0">
-        <Sidebar
-          isOpen={showDesktopSidebar}
-          onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
-          currentTheme={theme}
-          onThemeChange={setTheme}
-        >
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <Sidebar
+              isOpen={showDesktopSidebar}
+              onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
+              onSettingsClick={onOpenSettings}
+            >
           {/* Current Project - Show only when project selected */}
           {selectedProject && (
             <SidebarSection 
@@ -788,7 +793,9 @@ export function LaceApp() {
               />
             </SidebarSection>
           )}
-        </Sidebar>
+            </Sidebar>
+          )}
+        </SettingsContainer>
       </div>
 
       {/* Main Content - copy structure from AnimatedLaceApp */}

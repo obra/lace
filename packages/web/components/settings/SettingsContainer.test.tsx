@@ -246,4 +246,31 @@ describe('SettingsContainer', () => {
     expect(screen.getByText('Test Content')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
   });
+
+  it('displays User settings tab with UserSettingsPanel', () => {
+    render(
+      <SettingsContainer>
+        {({ onOpenSettings }) => (
+          <button onClick={onOpenSettings} data-testid="settings-trigger">
+            Settings
+          </button>
+        )}
+      </SettingsContainer>
+    );
+
+    fireEvent.click(screen.getByTestId('settings-trigger'));
+    
+    // Check that User tab is available
+    const userTab = screen.getByRole('tab', { name: /user/i });
+    expect(userTab).toBeInTheDocument();
+    
+    // Click on User tab
+    fireEvent.click(userTab);
+    
+    // Verify UserSettingsPanel content is displayed
+    expect(screen.getByText('User Settings')).toBeInTheDocument();
+    expect(screen.getByLabelText('Display Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(screen.getByLabelText('Bio')).toBeInTheDocument();
+  });
 });
