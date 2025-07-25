@@ -2,7 +2,7 @@
 // ABOUTME: Handles event loading, filtering, and real-time updates for agent conversations
 
 import { useState, useEffect, useCallback } from 'react';
-import { SessionEvent, ThreadId, ToolApprovalRequestData } from '@/types/api';
+import { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { getAllEventTypes } from '@/types/events';
 
@@ -11,8 +11,8 @@ interface UseSessionEventsReturn {
   allEvents: SessionEvent[];
   filteredEvents: SessionEvent[];
 
-  // Tool approval
-  approvalRequest: ToolApprovalRequestData | null;
+  // Tool approval - updated for multiple approvals per spec Phase 3.2
+  pendingApprovals: PendingApproval[];
 
   // Loading states
   loadingHistory: boolean;
@@ -27,7 +27,7 @@ export function useSessionEvents(
   selectedAgent: ThreadId | null
 ): UseSessionEventsReturn {
   const [allEvents, setAllEvents] = useState<SessionEvent[]>([]);
-  const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [connected, setConnected] = useState(false);
 
@@ -75,12 +75,17 @@ export function useSessionEvents(
         return;
       }
 
-      const approvalData = data as { pendingApprovals: Array<{ toolCallId: string; toolCall: unknown; requestData: ToolApprovalRequestData }> };
+      const approvalData = data as { pendingApprovals: Array<{ toolCallId: string; toolCall: unknown; requestData: ToolApprovalRequestData; requestedAt: string }> };
       
-      // If there are pending approvals, set the first one to show the modal
+      // Set all pending approvals (spec Phase 3.2: support multiple approvals)
       if (approvalData.pendingApprovals && approvalData.pendingApprovals.length > 0) {
-        const pendingApproval = approvalData.pendingApprovals[0];
-        setApprovalRequest(pendingApproval.requestData);
+        const approvals = approvalData.pendingApprovals.map(approval => ({
+          toolCallId: approval.toolCallId,
+          toolCall: approval.toolCall as { name: string; arguments: unknown },
+          requestedAt: new Date(approval.requestedAt),
+          requestData: approval.requestData,
+        }));
+        setPendingApprovals(approvals);
       }
     } catch (error) {
       console.error('Failed to check pending approvals:', error);
@@ -89,7 +94,7 @@ export function useSessionEvents(
 
   // Clear approval request
   const clearApprovalRequest = useCallback(() => {
-    setApprovalRequest(null);
+    setPendingApprovals([]);
   }, []);
 
   // SSE connection effect
@@ -126,9 +131,28 @@ export function useSessionEvents(
               timestamp?: string | Date;
             };
 
-            // Handle approval requests separately (these don't have threadId filtering)
+            // Handle approval events separately (spec Phase 3.2: multiple approval support)
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
-              setApprovalRequest(eventData.data as ToolApprovalRequestData);
+              const approvalData = eventData.data as ToolApprovalRequestData;
+              
+              // Create PendingApproval from the event data
+              const pendingApproval: PendingApproval = {
+                toolCallId: approvalData.requestId,
+                toolCall: {
+                  name: approvalData.toolName,
+                  arguments: approvalData.input,
+                },
+                requestedAt: eventData.timestamp || new Date(),
+                requestData: approvalData,
+              };
+              
+              setPendingApprovals(prev => [...prev, pendingApproval]);
+            } else if (eventData.type === 'TOOL_APPROVAL_RESPONSE') {
+              // Remove approved item from pending list (spec Phase 3.2)
+              const responseData = eventData.data as { toolCallId: string; decision: string };
+              setPendingApprovals(prev => 
+                prev.filter(approval => approval.toolCallId !== responseData.toolCallId)
+              );
             } else if (eventData.threadId) {
               // Convert timestamp from string to Date if needed
               const timestamp = eventData.timestamp
@@ -201,7 +225,7 @@ export function useSessionEvents(
   useEffect(() => {
     if (!sessionId) {
       setAllEvents([]);
-      setApprovalRequest(null);
+      setPendingApprovals([]);
     }
   }, [sessionId]);
 
@@ -210,15 +234,15 @@ export function useSessionEvents(
     if (sessionId && selectedAgent) {
       void checkPendingApprovals(sessionId, selectedAgent);
     } else {
-      // Clear approval request when no agent is selected
-      setApprovalRequest(null);
+      // Clear approvals when no agent is selected
+      setPendingApprovals([]);
     }
   }, [sessionId, selectedAgent, checkPendingApprovals]);
 
   return {
     allEvents,
     filteredEvents,
-    approvalRequest,
+    pendingApprovals,
     loadingHistory,
     connected,
     clearApprovalRequest,
