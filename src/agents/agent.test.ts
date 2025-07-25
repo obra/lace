@@ -459,6 +459,117 @@ describe('Enhanced Agent', () => {
       expect(responseEvents[0]).toBe('Using tool');
       expect(responseEvents[1]).toBe('Tool completed, here is the result');
     });
+
+    // New tests for non-blocking behavior
+    it('should go idle immediately after processing tool calls', async () => {
+      const mockProvider = new MockProvider({
+        content: 'I will execute the tool.',
+        toolCalls: [
+          { id: 'call_1', name: 'mock_tool', input: { command: 'ls' } },
+          { id: 'call_2', name: 'mock_tool', input: { command: 'pwd' } },
+        ],
+      });
+
+      agent = createAgent({ provider: mockProvider });
+      await agent.start();
+
+      const stateChanges: string[] = [];
+      agent.on('state_change', ({ from, to }) => stateChanges.push(`${from}->${to}`));
+
+      const conversationPromise = agent.sendMessage('Run commands');
+
+      // Agent should complete conversation immediately
+      await conversationPromise;
+      expect(agent.getCurrentState()).toBe('idle');
+
+      // Should have transitioned to tool_execution then back to idle
+      expect(stateChanges).toContain('thinking->tool_execution');
+      expect(stateChanges).toContain('tool_execution->idle');
+
+      // Tool calls should be created but no results yet
+      const events = threadManager.getEvents(agent.threadId);
+      const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
+      const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+
+      expect(toolCalls).toHaveLength(2);
+      expect(toolResults).toHaveLength(0);
+    });
+
+    it('should create tool call events without executing tools', async () => {
+      const mockProvider = new MockProvider({
+        content: 'I will execute the tool.',
+        toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { command: 'ls' } }],
+      });
+
+      agent = createAgent({ provider: mockProvider });
+      await agent.start();
+
+      const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
+      const toolCompleteEvents: unknown[] = [];
+
+      agent.on('tool_call_start', (data) => toolStartEvents.push(data));
+      agent.on('tool_call_complete', (data) => toolCompleteEvents.push(data));
+
+      await agent.sendMessage('Run command');
+
+      // Should emit tool_call_start but NOT tool_call_complete
+      expect(toolStartEvents).toHaveLength(1);
+      expect(toolCompleteEvents).toHaveLength(0);
+
+      expect(toolStartEvents[0]).toEqual({
+        toolName: 'mock_tool',
+        input: { command: 'ls' },
+        callId: 'call_1',
+      });
+
+      // Verify tool call event was created in thread
+      const events = threadManager.getEvents(agent.threadId);
+      const toolCallEvents = events.filter((e) => e.type === 'TOOL_CALL');
+      expect(toolCallEvents).toHaveLength(1);
+
+      const toolCall = toolCallEvents[0].data as ToolCall;
+      expect(toolCall).toEqual({
+        id: 'call_1',
+        name: 'mock_tool',
+        arguments: { command: 'ls' },
+      });
+    });
+
+    it('should create multiple tool call events for multiple tool calls', async () => {
+      const mockProvider = new MockProvider({
+        content: 'I will execute multiple tools.',
+        toolCalls: [
+          { id: 'call_1', name: 'mock_tool', input: { command: 'ls' } },
+          { id: 'call_2', name: 'mock_tool', input: { command: 'pwd' } },
+          { id: 'call_3', name: 'mock_tool', input: { command: 'date' } },
+        ],
+      });
+
+      agent = createAgent({ provider: mockProvider });
+      await agent.start();
+
+      const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
+      agent.on('tool_call_start', (data) => toolStartEvents.push(data));
+
+      await agent.sendMessage('Run multiple commands');
+
+      // Should emit tool_call_start for all tools but no completions
+      expect(toolStartEvents).toHaveLength(3);
+      expect(toolStartEvents[0].callId).toBe('call_1');
+      expect(toolStartEvents[1].callId).toBe('call_2');
+      expect(toolStartEvents[2].callId).toBe('call_3');
+
+      // Verify all tool calls were created in thread events
+      const events = threadManager.getEvents(agent.threadId);
+      const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
+      const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+
+      expect(toolCalls).toHaveLength(3);
+      expect(toolResults).toHaveLength(0); // No execution yet
+
+      // Verify agent went idle after creating all tool calls
+      expect(agent.getCurrentState()).toBe('idle');
+    });
   });
 
   describe('error handling', () => {

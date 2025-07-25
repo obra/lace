@@ -8,7 +8,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, EventType, asThreadId } from '~/threads/types';
+import { ThreadEvent, EventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -137,6 +137,10 @@ export class Agent extends EventEmitter {
   private _configuration: AgentConfiguration = {};
   private _cachedProviderInstance: AIProvider | null = null;
   private _cachedProviderKey: string | null = null;
+
+  // Simple tool batch tracking
+  private _pendingToolCount = 0;
+  private _hasRejectionsInBatch = false;
 
   constructor(config: AgentConfig) {
     super();
@@ -573,9 +577,9 @@ export class Agent extends EventEmitter {
 
       // Handle tool calls
       if (response.toolCalls && response.toolCalls.length > 0) {
-        await this._executeToolCalls(response.toolCalls);
-        // Recurse to get next response after tool execution
-        await this._processConversation();
+        this._executeToolCalls(response.toolCalls); // No await
+        // NO RECURSIVE CALL - tools will auto-continue or wait for user input
+        // DON'T complete turn yet - wait for all tools to finish
       } else {
         // No tool calls, conversation is complete for this turn
         this._completeTurn();
@@ -834,7 +838,8 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private async _executeToolCalls(toolCalls: ProviderToolCall[]): Promise<void> {
+  private _executeToolCalls(toolCalls: ProviderToolCall[]): void {
+    // No longer async - doesn't block
     this._setState('tool_execution');
 
     logger.debug('AGENT: Processing tool calls', {
@@ -843,8 +848,12 @@ export class Agent extends EventEmitter {
       toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name })),
     });
 
+    // Initialize tool batch tracking
+    this._pendingToolCount = toolCalls.length;
+    this._hasRejectionsInBatch = false;
+
     for (const providerToolCall of toolCalls) {
-      logger.debug('AGENT: Executing individual tool call', {
+      logger.debug('AGENT: Creating tool call event', {
         threadId: this._threadId,
         toolCallId: providerToolCall.id,
         toolName: providerToolCall.name,
@@ -860,83 +869,19 @@ export class Agent extends EventEmitter {
       // Add tool call to thread
       this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
 
-      // Emit tool call start event
+      // Emit tool call start event for UI
       this.emit('tool_call_start', {
         toolName: providerToolCall.name,
         input: providerToolCall.input,
         callId: providerToolCall.id,
       });
 
-      try {
-        // Get working directory for context
-        const workingDirectory = this._getWorkingDirectory();
-        const toolContext = {
-          threadId: asThreadId(this._threadId),
-          parentThreadId: asThreadId(this._getParentThreadId()),
-          workingDirectory,
-        };
-
-        logger.debug('Agent - executing tool with context', {
-          threadId: this._threadId,
-          toolName: toolCall.name,
-          toolId: toolCall.id,
-          toolArguments: toolCall.arguments,
-          context: toolContext,
-          workingDirectoryFromMethod: workingDirectory,
-          processCwd: process.cwd(),
-        });
-
-        // Execute tool
-        const result = await this._toolExecutor.executeTool(toolCall, toolContext);
-
-        const outputText = result.content[0]?.text || '';
-
-        logger.debug('AGENT: Tool execution completed', {
-          threadId: this._threadId,
-          toolCallId: providerToolCall.id,
-          toolName: providerToolCall.name,
-          success: !result.isError,
-          outputLength: outputText.length,
-          hasError: result.isError,
-        });
-
-        // Emit tool call complete event
-        this.emit('tool_call_complete', {
-          toolName: providerToolCall.name,
-          result,
-          callId: providerToolCall.id,
-        });
-
-        // Add tool result to thread
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
-
-        // Add tool output tokens to current turn metrics (estimated)
-        this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
-      } catch (error: unknown) {
-        logger.error('AGENT: Tool execution error', {
-          threadId: this._threadId,
-          toolCallId: providerToolCall.id,
-          toolName: providerToolCall.name,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        // Create a failed tool result
-        const failedResult: ToolResult = {
-          id: providerToolCall.id,
-          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-          isError: true,
-        };
-
-        this.emit('tool_call_complete', {
-          toolName: providerToolCall.name,
-          result: failedResult,
-          callId: providerToolCall.id,
-        });
-
-        // Add failed tool result to thread
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', failedResult);
-      }
+      // NO EXECUTION HERE - just fire approval request
+      // Tool execution will be triggered by approval events
     }
+
+    // Agent goes idle immediately - no waiting
+    this._setState('idle');
   }
 
   private _setState(newState: AgentState): void {
