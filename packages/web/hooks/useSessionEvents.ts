@@ -14,12 +14,14 @@ const ToolApprovalRequestDataSchema = z.object({
   input: z.unknown(),
   isReadOnly: z.boolean(),
   toolDescription: z.string().optional(),
-  toolAnnotations: z.object({
-    title: z.string().optional(),
-    readOnlyHint: z.boolean().optional(),
-    destructiveHint: z.boolean().optional(),
-    riskLevel: z.enum(['safe', 'moderate', 'destructive']).optional(),
-  }).optional(),
+  toolAnnotations: z
+    .object({
+      title: z.string().optional(),
+      readOnlyHint: z.boolean().optional(),
+      destructiveHint: z.boolean().optional(),
+      riskLevel: z.enum(['safe', 'moderate', 'destructive']).optional(),
+    })
+    .optional(),
   riskLevel: z.enum(['safe', 'moderate', 'destructive']),
 });
 
@@ -34,7 +36,7 @@ const PendingApprovalSchema = z.object({
 });
 
 const PendingApprovalsResponseSchema = z.object({
-  pendingApprovals: z.array(PendingApprovalSchema)
+  pendingApprovals: z.array(PendingApprovalSchema),
 });
 
 interface UseSessionEventsReturn {
@@ -112,12 +114,12 @@ export function useSessionEvents(
         console.error('Invalid pending approvals response format:', parseResult.error);
         return;
       }
-      
+
       const approvalData = parseResult.data;
-      
+
       // Set all pending approvals (spec Phase 3.2: support multiple approvals)
       if (approvalData.pendingApprovals && approvalData.pendingApprovals.length > 0) {
-        const approvals = approvalData.pendingApprovals.map(approval => ({
+        const approvals = approvalData.pendingApprovals.map((approval) => ({
           toolCallId: approval.toolCallId,
           toolCall: approval.toolCall as { name: string; arguments: unknown },
           requestedAt: new Date(approval.requestedAt),
@@ -172,7 +174,7 @@ export function useSessionEvents(
             // Handle approval events separately (spec Phase 3.2: multiple approval support)
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
               const approvalData = eventData.data as ToolApprovalRequestData;
-              
+
               // Create PendingApproval from the event data
               const pendingApproval: PendingApproval = {
                 toolCallId: approvalData.requestId,
@@ -187,13 +189,13 @@ export function useSessionEvents(
                   : new Date(),
                 requestData: approvalData,
               };
-              
-              setPendingApprovals(prev => [...prev, pendingApproval]);
+
+              setPendingApprovals((prev) => [...prev, pendingApproval]);
             } else if (eventData.type === 'TOOL_APPROVAL_RESPONSE') {
               // Remove approved item from pending list (spec Phase 3.2)
               const responseData = eventData.data as { toolCallId: string; decision: string };
-              setPendingApprovals(prev => 
-                prev.filter(approval => approval.toolCallId !== responseData.toolCallId)
+              setPendingApprovals((prev) =>
+                prev.filter((approval) => approval.toolCallId !== responseData.toolCallId)
               );
             } else if (eventData.threadId) {
               // Convert timestamp from string to Date if needed
@@ -226,15 +228,27 @@ export function useSessionEvents(
     const connectionListener = (_event: Event) => {
       setConnected(true);
 
-      // Add a local connection event to the events list
-      const connectionEvent: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: sessionId, // Use session ID as thread ID for system messages
-        timestamp: new Date(),
-        data: { content: 'Connected to session stream' },
-      };
-      setAllEvents((prev) => [...prev, connectionEvent]);
-      
+      // Add connection event only if the last message wasn't already "Connected to session stream"
+      setAllEvents((prev) => {
+        const lastEvent = prev[prev.length - 1];
+        const isLastEventConnectionRestored =
+          lastEvent?.type === 'LOCAL_SYSTEM_MESSAGE' &&
+          lastEvent?.data?.content === 'Connected to session stream';
+
+        if (isLastEventConnectionRestored) {
+          // Don't add duplicate connection restored messages
+          return prev;
+        }
+
+        const connectionEvent: SessionEvent = {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId: sessionId, // Use session ID as thread ID for system messages
+          timestamp: new Date(),
+          data: { content: 'Connected to session stream' },
+        };
+        return [...prev, connectionEvent];
+      });
+
       // Phase 3.5: Recovery on Connection - check for pending approvals when connected
       if (selectedAgent) {
         void checkPendingApprovals(sessionId, selectedAgent);
@@ -246,14 +260,26 @@ export function useSessionEvents(
     eventSource.onerror = (_error) => {
       setConnected(false);
 
-      // Add error event
-      const errorEvent: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: sessionId,
-        timestamp: new Date(),
-        data: { content: 'Connection lost' },
-      };
-      setAllEvents((prev) => [...prev, errorEvent]);
+      // Add error event only if the last message wasn't already "Connection lost"
+      setAllEvents((prev) => {
+        const lastEvent = prev[prev.length - 1];
+        const isLastEventConnectionLost =
+          lastEvent?.type === 'LOCAL_SYSTEM_MESSAGE' &&
+          lastEvent?.data?.content === 'Connection lost';
+
+        if (isLastEventConnectionLost) {
+          // Don't add duplicate connection lost messages
+          return prev;
+        }
+
+        const errorEvent: SessionEvent = {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId: sessionId,
+          timestamp: new Date(),
+          data: { content: 'Connection lost' },
+        };
+        return [...prev, errorEvent];
+      });
     };
 
     // Cleanup function
