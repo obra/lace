@@ -5,6 +5,37 @@ import { useState, useEffect, useCallback } from 'react';
 import { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { getAllEventTypes } from '@/types/events';
+import { z } from 'zod';
+
+// Zod schemas matching the TypeScript types
+const ToolApprovalRequestDataSchema = z.object({
+  requestId: z.string(),
+  toolName: z.string(),
+  input: z.unknown(),
+  isReadOnly: z.boolean(),
+  toolDescription: z.string().optional(),
+  toolAnnotations: z.object({
+    title: z.string().optional(),
+    readOnlyHint: z.boolean().optional(),
+    destructiveHint: z.boolean().optional(),
+    riskLevel: z.enum(['safe', 'moderate', 'destructive']).optional(),
+  }).optional(),
+  riskLevel: z.enum(['safe', 'moderate', 'destructive']),
+});
+
+const PendingApprovalSchema = z.object({
+  toolCallId: z.string(),
+  toolCall: z.object({
+    name: z.string(),
+    arguments: z.unknown(),
+  }),
+  requestData: ToolApprovalRequestDataSchema,
+  requestedAt: z.string(),
+});
+
+const PendingApprovalsResponseSchema = z.object({
+  pendingApprovals: z.array(PendingApprovalSchema)
+});
 
 interface UseSessionEventsReturn {
   // Event data
@@ -75,7 +106,14 @@ export function useSessionEvents(
         return;
       }
 
-      const approvalData = data as { pendingApprovals: Array<{ toolCallId: string; toolCall: unknown; requestData: ToolApprovalRequestData; requestedAt: string }> };
+      // Runtime type validation using Zod
+      const parseResult = PendingApprovalsResponseSchema.safeParse(data);
+      if (!parseResult.success) {
+        console.error('Invalid pending approvals response format:', parseResult.error);
+        return;
+      }
+      
+      const approvalData = parseResult.data;
       
       // Set all pending approvals (spec Phase 3.2: support multiple approvals)
       if (approvalData.pendingApprovals && approvalData.pendingApprovals.length > 0) {

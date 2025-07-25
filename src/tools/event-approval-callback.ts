@@ -6,6 +6,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
 import { ToolCall } from '~/tools/types';
 import { ThreadEvent, ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
+import { isDeepStrictEqual } from 'util';
 
 export class EventApprovalCallback implements ApprovalCallback {
   constructor(
@@ -55,7 +56,7 @@ export class EventApprovalCallback implements ApprovalCallback {
         const toolCall = event.data as ToolCall;
         if (
           toolCall.name === toolName &&
-          JSON.stringify(toolCall.arguments) === JSON.stringify(input)
+          isDeepStrictEqual(toolCall.arguments, input)
         ) {
           return event;
         }
