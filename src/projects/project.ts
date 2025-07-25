@@ -67,12 +67,10 @@ export class Project {
 
     // Automatically create a default session with coordinator agent for the new project
     const sessionOptions: {
-      name: string;
       projectId: string;
       provider?: string;
       model?: string;
     } = {
-      name: `Session ${new Date().toLocaleString()}`,
       projectId: projectData.id,
     };
 
