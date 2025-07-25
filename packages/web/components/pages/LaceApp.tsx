@@ -51,6 +51,7 @@ export function LaceApp() {
     setProject: setSelectedProject,
     setSession: setSelectedSession,
     setAgent: setSelectedAgent,
+    updateState: updateHashState,
     isHydrated: urlStateHydrated,
   } = useHashRouter();
 
@@ -100,7 +101,7 @@ export function LaceApp() {
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   // Project loading function
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
@@ -110,11 +111,14 @@ export function LaceApp() {
       if (typeof data === 'object' && data !== null && 'projects' in data) {
         const projectsData = data as { projects: ProjectInfo[] };
         setProjects(projectsData.projects);
+        setLoadingProjects(false);
+        return projectsData.projects;
       }
     } catch (error) {
       console.error('Failed to load projects:', error);
     }
     setLoadingProjects(false);
+    return [];
   }, []);
 
   // Provider loading function
@@ -175,7 +179,6 @@ export function LaceApp() {
   }, [projects.length, loadingProjects]);
 
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
-    console.log('loadSessionDetails called for:', sessionId);
     try {
       const res = await fetch(`/api/sessions/${sessionId}`);
       const data: unknown = await res.json();
@@ -186,7 +189,6 @@ export function LaceApp() {
       }
 
       const sessionResponse = data as SessionResponse;
-      console.log('Session details loaded:', sessionResponse.session);
       setSelectedSessionDetails(sessionResponse.session);
     } catch (error) {
       console.error('Failed to load session details:', error);
@@ -200,15 +202,19 @@ export function LaceApp() {
 
   // Load session details when session is selected
   useEffect(() => {
-    console.log('Session selection changed:', selectedSession);
     if (!selectedSession) {
-      console.log('Clearing session details');
       setSelectedSessionDetails(null);
       return;
     }
-    console.log('Loading session details for:', selectedSession);
     void loadSessionDetails(selectedSession);
   }, [selectedSession, loadSessionDetails]);
+
+  // Auto-select agent if session has only one agent
+  useEffect(() => {
+    if (selectedSessionDetails && selectedSessionDetails.agents && selectedSessionDetails.agents.length === 1 && !selectedAgent) {
+      setSelectedAgent(selectedSessionDetails.agents[0].threadId as ThreadId);
+    }
+  }, [selectedSessionDetails, selectedAgent, setSelectedAgent]);
 
   // Handle project selection
   const handleProjectSelect = (project: { id: string }) => {
@@ -362,18 +368,19 @@ export function LaceApp() {
   };
 
   // Handle onboarding completion - navigate directly to chat
-  const handleOnboardingComplete = (projectId: string, sessionId: string, agentId: string) => {
-    console.log('handleOnboardingComplete called with:', { projectId, sessionId, agentId });
+  const handleOnboardingComplete = async (projectId: string, sessionId: string, agentId: string) => {
+    // Reload projects first to ensure the newly created project is in the array
+    await loadProjects();
     
-    // Set all three selections to navigate directly to chat
-    setSelectedProject(projectId);
-    setSelectedSession(sessionId as ThreadId);
-    setSelectedAgent(agentId as ThreadId);
+    // Set all three selections atomically to navigate directly to chat
+    updateHashState({
+      project: projectId,
+      session: sessionId,
+      agent: agentId
+    });
     
     // Clear auto-open state
     setAutoOpenCreateProject(false);
-    
-    console.log('Navigation state set, should show chat interface');
   };
 
   // Handle task updates
@@ -473,6 +480,7 @@ export function LaceApp() {
     createdAt: new Date(),
     lastUsedAt: new Date()
   };
+  
   
   // Clear invalid project selection from URL  
   // useEffect(() => {
@@ -874,7 +882,7 @@ export function LaceApp() {
                 selectedProject={currentProject.id ? currentProject : null}
                 providers={providers}
                 onProjectSelect={handleProjectSelect}
-                onProjectCreate={loadProjects}
+                onProjectCreate={() => void loadProjects()}
                 onProjectUpdate={handleProjectUpdate}
                 loading={loadingProjects}
                 autoOpenCreate={autoOpenCreateProject}

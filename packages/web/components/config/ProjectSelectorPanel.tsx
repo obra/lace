@@ -18,7 +18,7 @@ interface ProjectSelectorPanelProps {
   loading?: boolean;
   autoOpenCreate?: boolean;
   onAutoCreateHandled?: () => void;
-  onOnboardingComplete?: (projectId: string, sessionId: string, agentId: string) => void;
+  onOnboardingComplete?: (projectId: string, sessionId: string, agentId: string) => Promise<void>;
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
@@ -352,26 +352,20 @@ export function ProjectSelectorPanel({
       }
 
       // If this is simplified onboarding mode, navigate directly to the coordinator agent
-      console.log('Project created, checking onboarding chain:', { isSimplifiedMode, hasCallback: !!onOnboardingComplete });
       if (isSimplifiedMode && onOnboardingComplete) {
-        console.log('Starting simplified onboarding navigation...');
         // Step 2: Get sessions (project creation should have created a default session)
-        console.log('Fetching sessions for project:', projectId);
         const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
         if (sessionsRes.ok) {
           const sessionsData = await sessionsRes.json() as { sessions: Array<{ id: string }> };
           const sessionId = sessionsData.sessions[0]?.id;
-          console.log('Found sessions:', sessionsData.sessions, 'Selected:', sessionId);
 
           if (sessionId) {
             // Navigate directly to the coordinator agent (which is named "Lace")
             // The coordinator agent has the same threadId as the session
             const coordinatorAgentId = sessionId;
-            console.log('Navigating to coordinator agent:', coordinatorAgentId);
 
             // Complete onboarding - navigate to chat with coordinator agent
-            console.log('Calling onboardingComplete with:', { projectId, sessionId, agentId: coordinatorAgentId });
-            onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+            await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
           } else {
             console.error('No session found in project');
           }
