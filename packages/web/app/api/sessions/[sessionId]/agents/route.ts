@@ -49,9 +49,7 @@ export async function POST(
 
     const body: CreateAgentRequest = bodyData;
 
-    if (!body.name) {
-      return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
-    }
+    // Allow empty names - spawnAgent will provide default
 
     // Get session and spawn agent directly
     const session = await sessionService.getSession(sessionId);
