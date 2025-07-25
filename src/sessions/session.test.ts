@@ -83,6 +83,107 @@ describe('Session', () => {
     teardownTestPersistence();
   });
 
+  describe('generateSessionName', () => {
+    beforeEach(() => {
+      // Mock Date to get predictable results
+      vi.setSystemTime(new Date('2025-07-24T14:30:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should generate human-readable date format', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+        // name omitted to trigger auto-generation
+      });
+
+      const info = session.getInfo();
+      expect(info?.name).toBe('Thursday, Jul 24');
+    });
+
+    it('should handle different dates correctly', () => {
+      vi.setSystemTime(new Date('2025-12-31T10:00:00Z'));
+
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const info = session.getInfo();
+      expect(info?.name).toBe('Wednesday, Dec 31');
+    });
+  });
+
+  describe('default model selection', () => {
+    it('should create session with claude-sonnet-4-20250514 when anthropic key present', () => {
+      // Mock environment to ensure anthropic is detected
+      vi.stubEnv('ANTHROPIC_KEY', 'test-key');
+      delete process.env.OPENAI_API_KEY;
+
+      const session = Session.create({
+        projectId: testProject.getId(),
+        // provider/model omitted to trigger defaults
+      });
+
+      const agents = session.getAgents();
+      expect(agents[0]?.model).toBe('claude-sonnet-4-20250514');
+    });
+
+    it('should create session with gpt-4 when openai key present and no anthropic key', () => {
+      // Mock environment to ensure openai is detected
+      delete process.env.ANTHROPIC_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
+      vi.stubEnv('OPENAI_API_KEY', 'test-key');
+
+      const session = Session.create({
+        projectId: testProject.getId(),
+        // provider/model omitted to trigger defaults
+      });
+
+      const agents = session.getAgents();
+      expect(agents[0]?.model).toBe('gpt-4');
+    });
+  });
+
+  describe('spawnAgent default naming', () => {
+    it('should use "Lace" as default agent name', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const agent = session.spawnAgent(''); // Empty name to trigger default
+
+      const agents = session.getAgents();
+      const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
+      expect(spawnedAgent?.name).toBe('Lace');
+    });
+
+    it('should use provided name when given', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const agent = session.spawnAgent('Custom Agent Name');
+
+      const agents = session.getAgents();
+      const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
+      expect(spawnedAgent?.name).toBe('Custom Agent Name');
+    });
+
+    it('should handle whitespace-only names', () => {
+      const session = Session.create({
+        projectId: testProject.getId(),
+      });
+
+      const agent = session.spawnAgent('   '); // Whitespace-only
+
+      const agents = session.getAgents();
+      const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
+      expect(spawnedAgent?.name).toBe('Lace');
+    });
+  });
+
   describe('create', () => {
     it('should create a session with default parameters', () => {
       const session = Session.create({
@@ -140,7 +241,7 @@ describe('Session', () => {
         agents: expect.arrayContaining([
           expect.objectContaining({
             threadId: session.getId(),
-            name: 'Test Session',
+            name: 'Lace', // Coordinator agent is always named "Lace"
             provider: 'anthropic',
             model: 'claude-3-haiku-20240307',
             status: expect.any(String) as string,
@@ -274,7 +375,7 @@ describe('Session', () => {
       expect(agents[0]).toEqual(
         expect.objectContaining({
           threadId: session.getId(),
-          name: 'Test Session',
+          name: 'Lace', // Coordinator agent is always named "Lace"
           provider: 'anthropic',
           model: 'claude-3-haiku-20240307',
           status: expect.any(String) as string,

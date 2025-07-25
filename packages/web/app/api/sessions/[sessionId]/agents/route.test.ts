@@ -100,9 +100,11 @@ function createMockSession(props: {
     getAgent: vi.fn(),
     getTaskManager: vi.fn(),
     spawnAgent: vi.fn().mockImplementation((name: string, provider?: string, model?: string) => {
+      // Implement auto-naming behavior: use "Lace" for empty/whitespace names
+      const agentName = (name || '').trim() || 'Lace';
       const newAgent: Agent = {
         threadId: createThreadId(`${props.id}.${agents.length + 1}`),
-        name,
+        name: agentName,
         provider: provider || 'anthropic',
         model: model || 'claude-3-haiku-20240307',
         status: 'idle',
@@ -426,15 +428,15 @@ describe('Agent Spawning API', () => {
       expect(data.error).toBe('Invalid session ID');
     });
 
-    it('should validate required agent name', async () => {
-      mockSessionService.getSession.mockResolvedValueOnce(
-        createMockSession({
-          id: sessionId,
-          name: 'Test Session',
-          createdAt: new Date().toISOString(),
-          agents: [],
-        }) as unknown as Session
-      );
+    it('should auto-generate agent name when missing', async () => {
+      const mockSession = createMockSession({
+        id: sessionId,
+        name: 'Test Session',
+        createdAt: new Date().toISOString(),
+        agents: [],
+      }) as unknown as Session;
+
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -443,22 +445,22 @@ describe('Agent Spawning API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      const data = await parseResponse<ErrorResponse>(response);
+      const data = await parseResponse<{ agent: Agent }>(response);
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request body');
+      expect(response.status).toBe(201);
+      expect(data.agent.name).toBe('Lace'); // Auto-generated default name
     });
 
-    it('should validate agent name is not empty', async () => {
+    it('should auto-generate agent name when empty', async () => {
       const sessionId: ThreadId = createThreadId('lace_20250113_session1');
 
-      mockSessionService.getSession.mockResolvedValueOnce(
-        createMockSession({
-          id: sessionId,
-          name: 'Test Session',
-          agents: [],
-        }) as unknown as Session
-      );
+      const mockSession = createMockSession({
+        id: sessionId,
+        name: 'Test Session',
+        agents: [],
+      }) as unknown as Session;
+
+      mockSessionService.getSession.mockResolvedValueOnce(mockSession);
 
       const request = new NextRequest(`http://localhost:3000/api/sessions/${sessionId}/agents`, {
         method: 'POST',
@@ -467,10 +469,10 @@ describe('Agent Spawning API', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      const data = await parseResponse<ErrorResponse>(response);
+      const data = await parseResponse<{ agent: Agent }>(response);
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Agent name is required');
+      expect(response.status).toBe(201);
+      expect(data.agent.name).toBe('Lace'); // Auto-generated default name
     });
   });
 

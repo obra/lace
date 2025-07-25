@@ -6,7 +6,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 
 const CreateProjectSchema = z.object({
-  name: z.string().min(1, 'Project name is required'),
+  name: z.string().optional(), // Made optional for auto-generation
   description: z.string().optional(),
   workingDirectory: z.string().min(1, 'Working directory is required'),
   configuration: z.record(z.unknown()).optional(),
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const validatedData = CreateProjectSchema.parse(body);
 
     const project = Project.create(
-      validatedData.name,
+      validatedData.name || '', // Pass empty string to trigger auto-generation
       validatedData.workingDirectory,
       validatedData.description || '',
       validatedData.configuration || {}

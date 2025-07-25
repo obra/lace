@@ -112,7 +112,7 @@ export class Session {
     // Mark the agent's thread as a session thread
     sessionAgent.updateThreadMetadata({
       isSession: true,
-      name,
+      name: 'Lace', // Always name the coordinator agent "Lace"
       provider,
       model,
     });
@@ -449,10 +449,11 @@ export class Session {
   getInfo(): SessionInfo | null {
     const agents = this.getAgents();
     const metadata = this._sessionAgent.getThreadMetadata();
+    const sessionData = this.getSessionData();
 
     return {
       id: this._sessionId,
-      name: (metadata?.name as string) || 'Session ' + this._sessionId,
+      name: sessionData?.name || 'Session ' + this._sessionId,
       createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
       provider: this._sessionAgent.providerName,
       model: (metadata?.model as string) || 'unknown',
@@ -461,6 +462,7 @@ export class Session {
   }
 
   spawnAgent(name: string, provider?: string, model?: string): Agent {
+    const agentName = name.trim() || 'Lace';
     const targetProvider = provider || this._sessionAgent.providerName;
     const targetModel = model || this._sessionAgent.providerInstance.modelName;
 
@@ -482,7 +484,7 @@ export class Session {
 
     // Store the agent metadata
     agent.updateThreadMetadata({
-      name,
+      name: agentName, // Use processed name
       isAgent: true,
       parentSessionId: this._sessionId,
       provider: targetProvider,
@@ -604,10 +606,14 @@ export class Session {
   }
 
   private static getDefaultModel(provider: string): string {
-    return provider === 'anthropic' ? 'claude-3-haiku-20240307' : 'gpt-4';
+    return provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4';
   }
 
   private static generateSessionName(): string {
-    return `Session ${new Date().toLocaleString()}`;
+    const date = new Date();
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${weekday}, ${month} ${day}`;
   }
 }

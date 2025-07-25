@@ -66,7 +66,7 @@ describe('TaskBoardModal', () => {
       />
     );
 
-    expect(screen.getByText(/task board/i)).toBeInTheDocument();
+    expect(screen.getByText(/project tasks/i)).toBeInTheDocument();
     expect(screen.getByText('Test Task 1')).toBeInTheDocument();
     expect(screen.getByText('Test Task 2')).toBeInTheDocument();
   });
@@ -82,7 +82,7 @@ describe('TaskBoardModal', () => {
       />
     );
 
-    expect(screen.queryByText(/task board/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/project tasks/i)).not.toBeInTheDocument();
   });
 
   it('should call onClose when close button is clicked', async () => {
@@ -130,7 +130,7 @@ describe('TaskBoardModal', () => {
       />
     );
 
-    expect(screen.getByText(/task board/i)).toBeInTheDocument();
+    expect(screen.getByText(/project tasks/i)).toBeInTheDocument();
     // Should still show columns even with no tasks
     expect(screen.getByText('To Do')).toBeInTheDocument();
     expect(screen.getByText('In Progress')).toBeInTheDocument();

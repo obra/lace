@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
 import type { ProjectInfo, ProviderInfo } from '@/types/api';
@@ -16,6 +16,9 @@ interface ProjectSelectorPanelProps {
   onProjectCreate?: () => void;
   onProjectUpdate?: (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: ProjectConfiguration }) => void;
   loading?: boolean;
+  autoOpenCreate?: boolean;
+  onAutoCreateHandled?: () => void;
+  onOnboardingComplete?: (projectId: string, sessionId: string, agentId: string) => Promise<void>;
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
@@ -54,6 +57,9 @@ export function ProjectSelectorPanel({
   onProjectCreate,
   onProjectUpdate,
   loading = false,
+  autoOpenCreate = false,
+  onAutoCreateHandled,
+  onOnboardingComplete,
 }: ProjectSelectorPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ProjectFilter>('active');
@@ -75,6 +81,30 @@ export function ProjectSelectorPanel({
   const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
   const [createNewEnvKey, setCreateNewEnvKey] = useState('');
   const [createNewEnvValue, setCreateNewEnvValue] = useState('');
+
+  // State for simplified mode
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const isSimplifiedMode = autoOpenCreate && !showAdvancedOptions;
+
+  // Auto-open project creation modal when requested
+  useEffect(() => {
+    if (autoOpenCreate && !showCreateProject) {
+      setShowCreateProject(true);
+      // Don't call onAutoCreateHandled here - keep autoOpenCreate true for simplified mode
+    }
+  }, [autoOpenCreate, showCreateProject]);
+
+  // Auto-populate name from directory in simplified mode
+  const handleCreateDirectoryChange = (directory: string) => {
+    setCreateWorkingDirectory(directory);
+    
+    if (isSimplifiedMode) {
+      const baseName = directory.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || '';
+      if (baseName) {
+        setCreateName(baseName);
+      }
+    }
+  };
 
   // Get available models for project configuration
   const availableModels = useMemo(() => {
@@ -295,7 +325,8 @@ export function ProjectSelectorPanel({
     if (!createName.trim() || !createWorkingDirectory.trim()) return;
 
     try {
-      const res = await fetch('/api/projects', {
+      // Step 1: Create project
+      const projectRes = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,22 +337,47 @@ export function ProjectSelectorPanel({
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json() as { project: ProjectInfo };
-        
-        // Call the callback to refresh projects list if available
-        if (onProjectCreate) {
-          onProjectCreate();
-        }
-        
-        // Optionally select the newly created project
-        onProjectSelect(data.project);
-        
-        handleCancelCreateProject();
-      } else {
-        const errorData = await res.json() as { error: string };
+      if (!projectRes.ok) {
+        const errorData = await projectRes.json() as { error: string };
         console.error('Failed to create project:', errorData.error);
+        return;
       }
+
+      const projectData = await projectRes.json() as { project: ProjectInfo };
+      const projectId = projectData.project.id;
+
+      // Call the callback to refresh projects list if available
+      if (onProjectCreate) {
+        onProjectCreate();
+      }
+
+      // If this is simplified onboarding mode, navigate directly to the coordinator agent
+      if (isSimplifiedMode && onOnboardingComplete) {
+        // Step 2: Get sessions (project creation should have created a default session)
+        const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
+        if (sessionsRes.ok) {
+          const sessionsData = await sessionsRes.json() as { sessions: Array<{ id: string }> };
+          const sessionId = sessionsData.sessions[0]?.id;
+
+          if (sessionId) {
+            // Navigate directly to the coordinator agent (which is named "Lace")
+            // The coordinator agent has the same threadId as the session
+            const coordinatorAgentId = sessionId;
+
+            // Complete onboarding - navigate to chat with coordinator agent
+            await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+          } else {
+            console.error('No session found in project');
+          }
+        } else {
+          console.error('Failed to fetch sessions:', await sessionsRes.text());
+        }
+      } else {
+        // Regular project creation - just select the project
+        onProjectSelect(projectData.project);
+      }
+
+      handleCancelCreateProject();
     } catch (error) {
       console.error('Error creating project:', error);
     }
@@ -336,6 +392,12 @@ export function ProjectSelectorPanel({
     setCreateConfig(DEFAULT_PROJECT_CONFIG);
     setCreateNewEnvKey('');
     setCreateNewEnvValue('');
+    setShowAdvancedOptions(false); // Reset simplified mode state
+    
+    // Clear auto-open state when cancelled
+    if (autoOpenCreate) {
+      onAutoCreateHandled?.();
+    }
   };
 
   // Handle create project environment variables
@@ -853,7 +915,9 @@ export function ProjectSelectorPanel({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Create New Project</h3>
+              <h3 className="text-xl font-semibold">
+                {isSimplifiedMode ? 'Welcome to Lace' : 'Create New Project'}
+              </h3>
               <button
                 onClick={handleCancelCreateProject}
                 className="btn btn-ghost btn-sm"
@@ -864,6 +928,57 @@ export function ProjectSelectorPanel({
 
             <form onSubmit={handleCreateProject} className="flex-1 flex flex-col min-h-0">
               <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                {isSimplifiedMode ? (
+                  // Simplified Mode UI
+                  <>
+                    <div className="text-center mb-6">
+                      <p className="text-base-content/60">
+                        Let&apos;s get you started with your first AI coding project.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-medium text-lg">Choose your project directory</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={createWorkingDirectory}
+                        onChange={(e) => handleCreateDirectoryChange(e.target.value)}
+                        className="input input-bordered w-full input-lg"
+                        placeholder="/path/to/your/project"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    {createName && (
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-medium">Project Name</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={createName}
+                          className="input input-bordered w-full"
+                          readOnly
+                        />
+                      </div>
+                    )}
+
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvancedOptions(true)}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        Advanced Options
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  // Full Advanced Mode UI (existing complex form)
+                  <>
                 {/* Basic Information */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -1049,6 +1164,8 @@ export function ProjectSelectorPanel({
                     ))}
                   </div>
                 </div>
+                  </>
+                )}
               </div>
 
               {/* Actions */}
@@ -1071,7 +1188,7 @@ export function ProjectSelectorPanel({
                       Creating...
                     </>
                   ) : (
-                    'Create Project'
+                    isSimplifiedMode ? 'Get Started' : 'Create Project'
                   )}
                 </button>
               </div>

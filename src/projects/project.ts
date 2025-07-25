@@ -2,6 +2,7 @@
 // ABOUTME: Provides high-level interface for project CRUD operations and session management
 
 import { randomUUID } from 'crypto';
+import { basename } from 'path';
 import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
@@ -42,9 +43,12 @@ export class Project {
   ): Project {
     const persistence = getPersistence();
 
+    // Auto-generate name from directory if not provided
+    const projectName = name.trim() || Project.generateNameFromDirectory(workingDirectory);
+
     const projectData: ProjectData = {
       id: randomUUID(),
-      name,
+      name: projectName,
       description,
       workingDirectory,
       configuration,
@@ -63,12 +67,10 @@ export class Project {
 
     // Automatically create a default session with coordinator agent for the new project
     const sessionOptions: {
-      name: string;
       projectId: string;
       provider?: string;
       model?: string;
     } = {
-      name: `Session ${new Date().toLocaleString()}`,
       projectId: projectData.id,
     };
 
@@ -394,5 +396,11 @@ export class Project {
 
   deletePromptTemplate(templateId: string): boolean {
     return this._promptTemplateManager.deleteTemplate(this._id, templateId);
+  }
+
+  private static generateNameFromDirectory(workingDirectory: string): string {
+    const cleanPath = workingDirectory.replace(/[/\\]+$/, '');
+    const dirName = basename(cleanPath);
+    return dirName || 'root';
   }
 }

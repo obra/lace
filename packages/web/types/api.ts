@@ -225,7 +225,7 @@ export interface CreateSessionRequest {
 }
 
 export interface CreateAgentRequest {
-  name: string;
+  name?: string; // Made optional for default
   provider?: string;
   model?: string;
 }

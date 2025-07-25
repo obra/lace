@@ -153,7 +153,7 @@ describe('Session Detail API Route', () => {
           agents: expect.arrayContaining([
             expect.objectContaining({
               threadId: sessionId,
-              name: 'Test Session',
+              name: 'Lace', // Coordinator agent is always named "Lace"
               provider: 'anthropic',
               model: 'claude-3-haiku-20240307',
               status: expect.any(String) as string,

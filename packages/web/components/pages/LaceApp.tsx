@@ -51,6 +51,7 @@ export function LaceApp() {
     setProject: setSelectedProject,
     setSession: setSelectedSession,
     setAgent: setSelectedAgent,
+    updateState: updateHashState,
     isHydrated: urlStateHydrated,
   } = useHashRouter();
 
@@ -61,6 +62,7 @@ export function LaceApp() {
   const [showTaskCreation, setShowTaskCreation] = useState(false);
   const [showTaskDisplay, setShowTaskDisplay] = useState(false);
   const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
+  const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
   
 
   // Business Logic State (from current app/page.tsx)
@@ -99,7 +101,7 @@ export function LaceApp() {
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   // Project loading function
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
@@ -109,11 +111,14 @@ export function LaceApp() {
       if (typeof data === 'object' && data !== null && 'projects' in data) {
         const projectsData = data as { projects: ProjectInfo[] };
         setProjects(projectsData.projects);
+        setLoadingProjects(false);
+        return projectsData.projects;
       }
     } catch (error) {
       console.error('Failed to load projects:', error);
     }
     setLoadingProjects(false);
+    return [];
   }, []);
 
   // Provider loading function
@@ -164,6 +169,15 @@ export function LaceApp() {
     void loadProviders();
   }, [loadProjects, loadProviders]);
 
+  // Auto-open project creation modal when no projects exist
+  useEffect(() => {
+    if (projects.length === 0 && !loadingProjects) {
+      setAutoOpenCreateProject(true);
+    } else {
+      setAutoOpenCreateProject(false);
+    }
+  }, [projects.length, loadingProjects]);
+
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}`);
@@ -194,6 +208,13 @@ export function LaceApp() {
     }
     void loadSessionDetails(selectedSession);
   }, [selectedSession, loadSessionDetails]);
+
+  // Auto-select agent if session has only one agent
+  useEffect(() => {
+    if (selectedSessionDetails && selectedSessionDetails.agents && selectedSessionDetails.agents.length === 1 && !selectedAgent) {
+      setSelectedAgent(selectedSessionDetails.agents[0].threadId as ThreadId);
+    }
+  }, [selectedSessionDetails, selectedAgent, setSelectedAgent]);
 
   // Handle project selection
   const handleProjectSelect = (project: { id: string }) => {
@@ -346,6 +367,22 @@ export function LaceApp() {
     }
   };
 
+  // Handle onboarding completion - navigate directly to chat
+  const handleOnboardingComplete = async (projectId: string, sessionId: string, agentId: string) => {
+    // Reload projects first to ensure the newly created project is in the array
+    await loadProjects();
+    
+    // Set all three selections atomically to navigate directly to chat
+    updateHashState({
+      project: projectId,
+      session: sessionId,
+      agent: agentId
+    });
+    
+    // Clear auto-open state
+    setAutoOpenCreateProject(false);
+  };
+
   // Handle task updates
   const handleTaskUpdate = async (task: Task) => {
     if (!taskManager) return;
@@ -443,6 +480,7 @@ export function LaceApp() {
     createdAt: new Date(),
     lastUsedAt: new Date()
   };
+  
   
   // Clear invalid project selection from URL  
   // useEffect(() => {
@@ -844,9 +882,12 @@ export function LaceApp() {
                 selectedProject={currentProject.id ? currentProject : null}
                 providers={providers}
                 onProjectSelect={handleProjectSelect}
-                onProjectCreate={loadProjects}
+                onProjectCreate={() => void loadProjects()}
                 onProjectUpdate={handleProjectUpdate}
                 loading={loadingProjects}
+                autoOpenCreate={autoOpenCreateProject}
+                onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
+                onOnboardingComplete={handleOnboardingComplete}
               />
             </div>
           )}

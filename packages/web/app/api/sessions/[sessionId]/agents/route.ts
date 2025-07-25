@@ -17,8 +17,7 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   return (
     typeof body === 'object' &&
     body !== null &&
-    'name' in body &&
-    typeof (body as { name: unknown }).name === 'string'
+    (!('name' in body) || typeof (body as { name: unknown }).name === 'string')
   );
 }
 
@@ -50,9 +49,7 @@ export async function POST(
 
     const body: CreateAgentRequest = bodyData;
 
-    if (!body.name) {
-      return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
-    }
+    // Allow empty names - spawnAgent will provide default
 
     // Get session and spawn agent directly
     const session = await sessionService.getSession(sessionId);
@@ -60,7 +57,7 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const agent = await session.spawnAgent(body.name, body.provider, body.model);
+    const agent = await session.spawnAgent(body.name || '', body.provider, body.model);
 
     // Setup agent approvals using utility
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
