@@ -36,7 +36,7 @@ export class EventApprovalCallback implements ApprovalCallback {
       const event = this.threadManager.addEvent(this.threadId, 'TOOL_APPROVAL_REQUEST', {
         toolCallId: toolCallId,
       });
-      
+
       // Emit the event so the SSE stream delivers it to the frontend immediately
       this.agent.emit('thread_event_added', { event, threadId: this.threadId });
     }
