@@ -175,6 +175,7 @@ export function LaceApp() {
   }, [projects.length, loadingProjects]);
 
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
+    console.log('loadSessionDetails called for:', sessionId);
     try {
       const res = await fetch(`/api/sessions/${sessionId}`);
       const data: unknown = await res.json();
@@ -185,6 +186,7 @@ export function LaceApp() {
       }
 
       const sessionResponse = data as SessionResponse;
+      console.log('Session details loaded:', sessionResponse.session);
       setSelectedSessionDetails(sessionResponse.session);
     } catch (error) {
       console.error('Failed to load session details:', error);
@@ -198,10 +200,13 @@ export function LaceApp() {
 
   // Load session details when session is selected
   useEffect(() => {
+    console.log('Session selection changed:', selectedSession);
     if (!selectedSession) {
+      console.log('Clearing session details');
       setSelectedSessionDetails(null);
       return;
     }
+    console.log('Loading session details for:', selectedSession);
     void loadSessionDetails(selectedSession);
   }, [selectedSession, loadSessionDetails]);
 
