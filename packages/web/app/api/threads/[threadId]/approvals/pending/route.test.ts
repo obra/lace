@@ -14,8 +14,13 @@ interface MockThreadManager {
   getPendingApprovals: ReturnType<typeof vi.fn>;
 }
 
+interface MockToolExecutor {
+  getTool?: ReturnType<typeof vi.fn>;
+}
+
 interface MockAgent {
   threadManager: MockThreadManager;
+  toolExecutor: MockToolExecutor;
 }
 
 interface MockSession {
@@ -41,6 +46,12 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     // Create mock Agent
     mockAgent = {
       threadManager: mockThreadManager,
+      toolExecutor: {
+        getTool: vi.fn().mockReturnValue({
+          description: 'Mock tool description',
+          annotations: { readOnlyHint: false }
+        })
+      },
     };
 
     // Create mock Session
@@ -75,17 +86,35 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
     ];
 
-    // Expected JSON response (dates become ISO strings)
+    // Expected JSON response (dates become ISO strings, includes requestData)
     const expectedJsonResponse = [
       {
         toolCallId: 'call_456',
         toolCall: { name: 'bash', arguments: { command: 'ls' } },
         requestedAt: '2025-01-24T12:00:00.000Z',
+        requestData: {
+          requestId: 'call_456',
+          toolName: 'bash',
+          input: { command: 'ls' },
+          isReadOnly: false,
+          toolDescription: 'Mock tool description',
+          toolAnnotations: { readOnlyHint: false },
+          riskLevel: 'moderate',
+        },
       },
       {
         toolCallId: 'call_789',
         toolCall: { name: 'file-write', arguments: { path: '/test.txt', content: 'test' } },
         requestedAt: '2025-01-24T12:01:00.000Z',
+        requestData: {
+          requestId: 'call_789',
+          toolName: 'file-write',
+          input: { path: '/test.txt', content: 'test' },
+          isReadOnly: false,
+          toolDescription: 'Mock tool description',
+          toolAnnotations: { readOnlyHint: false },
+          riskLevel: 'moderate',
+        },
       },
     ];
 
@@ -170,7 +199,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
     ];
 
-    // Expected JSON response (dates become ISO strings)
+    // Expected JSON response (dates become ISO strings, includes requestData)
     const expectedJsonResponse = [
       {
         toolCallId: 'call_bash',
@@ -179,6 +208,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
           arguments: { command: 'rm -rf /important' } 
         },
         requestedAt: '2025-01-24T10:00:00.000Z',
+        requestData: {
+          requestId: 'call_bash',
+          toolName: 'bash',
+          input: { command: 'rm -rf /important' },
+          isReadOnly: false,
+          toolDescription: 'Mock tool description',
+          toolAnnotations: { readOnlyHint: false },
+          riskLevel: 'moderate',
+        },
       },
       {
         toolCallId: 'call_file_write',
@@ -187,6 +225,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
           arguments: { path: '/etc/passwd', content: 'malicious' } 
         },
         requestedAt: '2025-01-24T10:01:00.000Z',
+        requestData: {
+          requestId: 'call_file_write',
+          toolName: 'file-write',
+          input: { path: '/etc/passwd', content: 'malicious' },
+          isReadOnly: false,
+          toolDescription: 'Mock tool description',
+          toolAnnotations: { readOnlyHint: false },
+          riskLevel: 'moderate',
+        },
       },
       {
         toolCallId: 'call_url_fetch',
@@ -195,6 +242,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
           arguments: { url: 'https://malicious.com/data' } 
         },
         requestedAt: '2025-01-24T10:02:00.000Z',
+        requestData: {
+          requestId: 'call_url_fetch',
+          toolName: 'url-fetch',
+          input: { url: 'https://malicious.com/data' },
+          isReadOnly: false,
+          toolDescription: 'Mock tool description',
+          toolAnnotations: { readOnlyHint: false },
+          riskLevel: 'moderate',
+        },
       },
     ];
 

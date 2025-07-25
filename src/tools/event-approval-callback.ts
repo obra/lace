@@ -32,10 +32,13 @@ export class EventApprovalCallback implements ApprovalCallback {
     // Check if approval request already exists to avoid duplicates
     const existingRequest = this.checkExistingApprovalRequest(toolCallId);
     if (!existingRequest) {
-      // Create TOOL_APPROVAL_REQUEST event only if it doesn't exist
-      this.threadManager.addEvent(this.threadId, 'TOOL_APPROVAL_REQUEST', {
+      // Create TOOL_APPROVAL_REQUEST event and emit it so SSE stream can deliver it
+      const event = this.threadManager.addEvent(this.threadId, 'TOOL_APPROVAL_REQUEST', {
         toolCallId: toolCallId,
       });
+      
+      // Emit the event so the SSE stream delivers it to the frontend immediately
+      this.agent.emit('thread_event_added', { event, threadId: this.threadId });
     }
 
     // Wait for TOOL_APPROVAL_RESPONSE event
@@ -84,19 +87,7 @@ export class EventApprovalCallback implements ApprovalCallback {
 
       this.agent.on('thread_event_added', eventListener);
 
-      // Set a reasonable timeout
-      setTimeout(() => {
-        this.agent.off('thread_event_added', eventListener);
-        // For testing purposes, we'll throw an error instead of hanging
-        // In real usage, this would continue polling
-        const finalCheck = this.checkExistingApprovalResponse(toolCallId);
-        if (finalCheck) {
-          resolve(finalCheck);
-        } else {
-          // This is a timeout - in real usage we might continue or handle differently
-          throw new Error(`Approval timeout for tool call ${toolCallId}`);
-        }
-      }, 10000); // 10 second timeout for tests
+      // No timeout - wait indefinitely for user approval
     });
   }
 

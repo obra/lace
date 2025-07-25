@@ -1135,7 +1135,9 @@ export class Agent extends EventEmitter {
       } else if (
         event.type === 'LOCAL_SYSTEM_MESSAGE' ||
         event.type === 'SYSTEM_PROMPT' ||
-        event.type === 'USER_SYSTEM_PROMPT'
+        event.type === 'USER_SYSTEM_PROMPT' ||
+        event.type === 'TOOL_APPROVAL_REQUEST' ||
+        event.type === 'TOOL_APPROVAL_RESPONSE'
       ) {
         // Skip UI-only events - they're not sent to model
         continue;
