@@ -142,7 +142,11 @@ export function useSessionEvents(
                   name: approvalData.toolName,
                   arguments: approvalData.input,
                 },
-                requestedAt: eventData.timestamp || new Date(),
+                requestedAt: eventData.timestamp
+                  ? typeof eventData.timestamp === 'string'
+                    ? new Date(eventData.timestamp)
+                    : eventData.timestamp
+                  : new Date(),
                 requestData: approvalData,
               };
               
@@ -192,6 +196,11 @@ export function useSessionEvents(
         data: { content: 'Connected to session stream' },
       };
       setAllEvents((prev) => [...prev, connectionEvent]);
+      
+      // Phase 3.5: Recovery on Connection - check for pending approvals when connected
+      if (selectedAgent) {
+        void checkPendingApprovals(sessionId, selectedAgent);
+      }
     };
 
     eventSource.addEventListener('connection', connectionListener);
