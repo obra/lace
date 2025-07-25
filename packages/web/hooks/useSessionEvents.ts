@@ -2,17 +2,48 @@
 // ABOUTME: Handles event loading, filtering, and real-time updates for agent conversations
 
 import { useState, useEffect, useCallback } from 'react';
-import { SessionEvent, ThreadId, ToolApprovalRequestData } from '@/types/api';
+import { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { getAllEventTypes } from '@/types/events';
+import { z } from 'zod';
+
+// Zod schemas matching the TypeScript types
+const ToolApprovalRequestDataSchema = z.object({
+  requestId: z.string(),
+  toolName: z.string(),
+  input: z.unknown(),
+  isReadOnly: z.boolean(),
+  toolDescription: z.string().optional(),
+  toolAnnotations: z.object({
+    title: z.string().optional(),
+    readOnlyHint: z.boolean().optional(),
+    destructiveHint: z.boolean().optional(),
+    riskLevel: z.enum(['safe', 'moderate', 'destructive']).optional(),
+  }).optional(),
+  riskLevel: z.enum(['safe', 'moderate', 'destructive']),
+});
+
+const PendingApprovalSchema = z.object({
+  toolCallId: z.string(),
+  toolCall: z.object({
+    name: z.string(),
+    arguments: z.unknown(),
+  }),
+  requestData: ToolApprovalRequestDataSchema,
+  requestedAt: z.string(),
+});
+
+const PendingApprovalsResponseSchema = z.object({
+  pendingApprovals: z.array(PendingApprovalSchema)
+});
 
 interface UseSessionEventsReturn {
   // Event data
   allEvents: SessionEvent[];
   filteredEvents: SessionEvent[];
 
-  // Tool approval
-  approvalRequest: ToolApprovalRequestData | null;
+  // Tool approval - updated for multiple approvals per spec Phase 3.2
+  pendingApprovals: PendingApproval[];
 
   // Loading states
   loadingHistory: boolean;
@@ -27,7 +58,7 @@ export function useSessionEvents(
   selectedAgent: ThreadId | null
 ): UseSessionEventsReturn {
   const [allEvents, setAllEvents] = useState<SessionEvent[]>([]);
-  const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequestData | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [connected, setConnected] = useState(false);
 
@@ -64,9 +95,44 @@ export function useSessionEvents(
     }
   }, []);
 
+  // Check for pending approvals when agent is selected
+  const checkPendingApprovals = useCallback(async (sessionId: ThreadId, agentId: ThreadId) => {
+    try {
+      const res = await fetch(`/api/threads/${agentId}/approvals/pending`);
+      const data: unknown = await res.json();
+
+      if (isApiError(data)) {
+        console.error('Failed to check pending approvals:', data.error);
+        return;
+      }
+
+      // Runtime type validation using Zod
+      const parseResult = PendingApprovalsResponseSchema.safeParse(data);
+      if (!parseResult.success) {
+        console.error('Invalid pending approvals response format:', parseResult.error);
+        return;
+      }
+      
+      const approvalData = parseResult.data;
+      
+      // Set all pending approvals (spec Phase 3.2: support multiple approvals)
+      if (approvalData.pendingApprovals && approvalData.pendingApprovals.length > 0) {
+        const approvals = approvalData.pendingApprovals.map(approval => ({
+          toolCallId: approval.toolCallId,
+          toolCall: approval.toolCall as { name: string; arguments: unknown },
+          requestedAt: new Date(approval.requestedAt),
+          requestData: approval.requestData,
+        }));
+        setPendingApprovals(approvals);
+      }
+    } catch (error) {
+      console.error('Failed to check pending approvals:', error);
+    }
+  }, []);
+
   // Clear approval request
   const clearApprovalRequest = useCallback(() => {
-    setApprovalRequest(null);
+    setPendingApprovals([]);
   }, []);
 
   // SSE connection effect
@@ -103,9 +169,32 @@ export function useSessionEvents(
               timestamp?: string | Date;
             };
 
-            // Handle approval requests separately (these don't have threadId filtering)
+            // Handle approval events separately (spec Phase 3.2: multiple approval support)
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
-              setApprovalRequest(eventData.data as ToolApprovalRequestData);
+              const approvalData = eventData.data as ToolApprovalRequestData;
+              
+              // Create PendingApproval from the event data
+              const pendingApproval: PendingApproval = {
+                toolCallId: approvalData.requestId,
+                toolCall: {
+                  name: approvalData.toolName,
+                  arguments: approvalData.input,
+                },
+                requestedAt: eventData.timestamp
+                  ? typeof eventData.timestamp === 'string'
+                    ? new Date(eventData.timestamp)
+                    : eventData.timestamp
+                  : new Date(),
+                requestData: approvalData,
+              };
+              
+              setPendingApprovals(prev => [...prev, pendingApproval]);
+            } else if (eventData.type === 'TOOL_APPROVAL_RESPONSE') {
+              // Remove approved item from pending list (spec Phase 3.2)
+              const responseData = eventData.data as { toolCallId: string; decision: string };
+              setPendingApprovals(prev => 
+                prev.filter(approval => approval.toolCallId !== responseData.toolCallId)
+              );
             } else if (eventData.threadId) {
               // Convert timestamp from string to Date if needed
               const timestamp = eventData.timestamp
@@ -145,12 +234,16 @@ export function useSessionEvents(
         data: { content: 'Connected to session stream' },
       };
       setAllEvents((prev) => [...prev, connectionEvent]);
+      
+      // Phase 3.5: Recovery on Connection - check for pending approvals when connected
+      if (selectedAgent) {
+        void checkPendingApprovals(sessionId, selectedAgent);
+      }
     };
 
     eventSource.addEventListener('connection', connectionListener);
 
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
+    eventSource.onerror = (_error) => {
       setConnected(false);
 
       // Add error event
@@ -179,14 +272,24 @@ export function useSessionEvents(
   useEffect(() => {
     if (!sessionId) {
       setAllEvents([]);
-      setApprovalRequest(null);
+      setPendingApprovals([]);
     }
   }, [sessionId]);
+
+  // Check for pending approvals when agent is selected
+  useEffect(() => {
+    if (sessionId && selectedAgent) {
+      void checkPendingApprovals(sessionId, selectedAgent);
+    } else {
+      // Clear approvals when no agent is selected
+      setPendingApprovals([]);
+    }
+  }, [sessionId, selectedAgent, checkPendingApprovals]);
 
   return {
     allEvents,
     filteredEvents,
-    approvalRequest,
+    pendingApprovals,
     loadingHistory,
     connected,
     clearApprovalRequest,

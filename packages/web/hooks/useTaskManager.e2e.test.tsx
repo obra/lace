@@ -82,7 +82,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
         if (urlString.includes('/api/projects/') && urlString.includes('/sessions/') && urlString.includes('/tasks')) {
           // Parse RESTful URL to extract projectId, sessionId, taskId
           // First, separate the path from query parameters
-          const [urlPath, queryString] = urlString.split('?');
+          const [urlPath, _queryString] = urlString.split('?');
           const urlParts = urlPath.split('/');
           const projectIndex = urlParts.indexOf('projects');
           const sessionIndex = urlParts.indexOf('sessions');

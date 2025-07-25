@@ -77,7 +77,7 @@ export function useTaskStream({
       }
     };
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = (_error) => {
       onError?.(new Error('Task stream connection failed'));
     };
 

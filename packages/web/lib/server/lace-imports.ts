@@ -8,6 +8,7 @@ export { Agent, type AgentEvents } from '~/agents/agent';
 export { ProviderRegistry } from '~/providers/registry';
 export { ToolExecutor } from '~/tools/executor';
 export { DelegateTool } from '~/tools/implementations/delegate';
+export { EventApprovalCallback } from '~/tools/event-approval-callback';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
 export { ThreadManager } from '~/threads/thread-manager';

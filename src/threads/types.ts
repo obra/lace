@@ -3,12 +3,15 @@
 
 import { ToolCall, ToolResult } from '~/tools/types';
 import type { CompactionData } from '~/threads/compaction/types';
+import type { ApprovalDecision } from '~/tools/approval-types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [
   'USER_MESSAGE',
   'AGENT_MESSAGE',
   'TOOL_CALL',
+  'TOOL_APPROVAL_REQUEST',
+  'TOOL_APPROVAL_RESPONSE',
   'TOOL_RESULT',
   'LOCAL_SYSTEM_MESSAGE',
   'SYSTEM_PROMPT',
@@ -19,12 +22,29 @@ export const EVENT_TYPES = [
 // Derive EventType union from the array
 export type EventType = (typeof EVENT_TYPES)[number];
 
+// Tool approval event data types
+export interface ToolApprovalRequestData {
+  toolCallId: string;
+}
+
+export interface ToolApprovalResponseData {
+  toolCallId: string;
+  decision: ApprovalDecision;
+}
+
 export interface ThreadEvent {
   id: string;
   threadId: string;
   type: EventType;
   timestamp: Date;
-  data: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>;
+  data:
+    | string
+    | ToolCall
+    | ToolResult
+    | CompactionData
+    | ToolApprovalRequestData
+    | ToolApprovalResponseData
+    | Record<string, unknown>;
 }
 
 export interface Thread {
