@@ -122,7 +122,7 @@ export function UserSettingsPanel({
       setShowSuccessMessage(false);
       successTimeoutRef.current = null;
     }, 3000);
-  }, [userName, userEmail, userBio, isControlled, onSave]);
+  }, [userName, userEmail, userBio, onSave]);
 
   return (
     <SettingsPanel 
