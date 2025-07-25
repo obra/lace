@@ -902,7 +902,7 @@ export function LaceApp() {
       </motion.div>
 
       {/* Tool Approval Modal */}
-      {pendingApprovals.length > 0 && (
+      {pendingApprovals && pendingApprovals.length > 0 && (
         <ToolApprovalModal
           approvals={pendingApprovals}
           onDecision={handleApprovalDecision}
