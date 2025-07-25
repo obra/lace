@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@/lib/server/lace-imports';
 
 export async function POST(
   request: NextRequest,
@@ -33,24 +34,24 @@ export async function POST(
       ? (threadId.split('.')[0] ?? threadId)
       : threadId;
     
-    const session = await sessionService.getSession(sessionIdStr);
+    const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
     
-    const agent = session.getAgent(threadId);
+    const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
     
     // Create approval response event and emit it so EventApprovalCallback receives it
-    const event = agent.threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+    const event = agent.threadManager.addEvent(asThreadId(threadId), 'TOOL_APPROVAL_RESPONSE', {
       toolCallId,
       decision
     });
     
     // Emit the event so the EventApprovalCallback can receive it and continue tool execution
-    agent.emit('thread_event_added', { event, threadId });
+    agent.emit('thread_event_added', { event, threadId: asThreadId(threadId) });
     
     return NextResponse.json({ success: true });
   } catch (_error) {
