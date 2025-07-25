@@ -3,6 +3,7 @@
 
 import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadId, ApprovalDecision as CoreApprovalDecision } from '@/lib/server/lace-imports';
+import type { ThreadEvent, ToolCall } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
 import {
   Session as SessionType,
@@ -272,6 +273,51 @@ export class SessionService {
         })();
       }
     );
+
+    // Handle thread events (including approval events)
+    agent.on('thread_event_added', ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
+      // Convert thread events to session events and broadcast them
+      if (event.type === 'TOOL_APPROVAL_REQUEST') {
+        const toolCallData = event.data as { toolCallId: string };
+        
+        // Get the related TOOL_CALL event to reconstruct approval request data
+        const events = agent.threadManager.getEvents(eventThreadId);
+        const toolCallEvent = events.find(e => 
+          e.type === 'TOOL_CALL' && 
+          (e.data as ToolCall).id === toolCallData.toolCallId
+        );
+        
+        if (toolCallEvent) {
+          const toolCall = toolCallEvent.data as ToolCall;
+          
+          // Try to get tool metadata
+          let tool;
+          try {
+            tool = agent.toolExecutor?.getTool(toolCall.name);
+          } catch {
+            tool = null;
+          }
+          
+          const sessionEvent: SessionEvent = {
+            type: 'TOOL_APPROVAL_REQUEST',
+            threadId: asThreadId(eventThreadId),
+            timestamp: new Date(event.timestamp),
+            data: {
+              requestId: toolCallData.toolCallId,
+              toolName: toolCall.name,
+              input: toolCall.arguments,
+              isReadOnly: tool?.annotations?.readOnlyHint ?? false,
+              toolDescription: tool?.description,
+              toolAnnotations: tool?.annotations,
+              riskLevel: tool?.annotations?.readOnlyHint ? 'safe' : 
+                        tool?.annotations?.destructiveHint ? 'destructive' : 'moderate',
+            },
+          };
+          
+          sseManager.broadcast(sessionId, sessionEvent);
+        }
+      }
+    });
   }
 
   // Service layer methods to eliminate direct business logic calls from API routes
