@@ -34,7 +34,7 @@ A complex, self-contained component that forms the primary navigation interface.
 - **TaskCard** molecules for task preview
 - **ToggleButton** atoms for expand/collapse
 - **AccountDropdown** molecule for user management
-- **ThemeSelector** molecule for preference management
+- **SettingsButton** atom for accessing settings
 
 ### Design Tokens Used
 - **Layout**: Flexbox with responsive width (collapsed: 64px, expanded: 350px)
@@ -63,8 +63,7 @@ A complex, self-contained component that forms the primary navigation interface.
 - Timeline management and creation
 - Task filtering and interaction
 - File access and organization
-- Settings and preferences
-- Theme management
+- Settings and preferences access
 
 ### Organism Guidelines
 ✓ **Do**: Self-contained with clear boundaries  
@@ -84,10 +83,9 @@ A complex, self-contained component that forms the primary navigation interface.
       control: { type: 'boolean' },
       description: 'Whether the sidebar is expanded or collapsed',
     },
-    currentTheme: {
-      control: { type: 'select' },
-      options: ['light', 'dark', 'system'],
-      description: 'Current theme setting',
+    onSettingsClick: {
+      action: 'settingsClicked',
+      description: 'Callback when settings button is clicked',
     },
   },
   tags: ['autodocs'],
@@ -225,14 +223,12 @@ interface SidebarWrapperProps {
   initialOpen?: boolean;
   activeTasks?: Task[];
   timelines?: Timeline[];
-  currentTheme?: string;
 }
 
 const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) => {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [currentProject, setCurrentProject] = useState(mockProjects[0]);
   const [currentTimeline, setCurrentTimeline] = useState(mockTimelines[0]);
-  const [currentTheme, setCurrentTheme] = useState('light');
 
   const handleToggle = () => {
     setIsOpen(!isOpen);
@@ -276,9 +272,8 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
     console.log('Rules file opened');
   };
 
-  const handleThemeChange = (theme: string) => {
-    setCurrentTheme(theme);
-    console.log('Theme changed:', theme);
+  const handleSettingsClick = () => {
+    console.log('Settings clicked');
   };
 
   return (
@@ -286,8 +281,7 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
       <Sidebar
         isOpen={isOpen}
         onToggle={handleToggle}
-        currentTheme={props.currentTheme || currentTheme}
-        onThemeChange={handleThemeChange}
+        onSettingsClick={handleSettingsClick}
       >
         {/* Sidebar content rendered as children */}
         <div className="p-4">
@@ -309,7 +303,6 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
               <h3 className="font-semibold mb-2">Current State:</h3>
               <p>Project: {currentProject.name}</p>
               <p>Timeline: {currentTimeline.name}</p>
-              <p>Theme: {currentTheme}</p>
               <p>Sidebar: {isOpen ? 'Open' : 'Closed'}</p>
             </div>
             
@@ -403,7 +396,7 @@ export const WithManyTimelines: Story = {
 export const DarkTheme: Story = {
   render: () => (
     <div data-theme="dark">
-      <SidebarWrapper currentTheme="dark" />
+      <SidebarWrapper />
     </div>
   ),
 };
@@ -440,7 +433,6 @@ export const InteractiveDemo: Story = {
     const [isOpen, setIsOpen] = useState(true);
     const [currentProject, setCurrentProject] = useState(mockProjects[0]);
     const [currentTimeline, setCurrentTimeline] = useState(mockTimelines[0]);
-    const [currentTheme, setCurrentTheme] = useState('light');
     const [actions, setActions] = useState<string[]>([]);
 
     const addAction = (action: string) => {
@@ -490,9 +482,8 @@ export const InteractiveDemo: Story = {
       addAction('Rules file opened');
     };
 
-    const handleThemeChange = (theme: string) => {
-      setCurrentTheme(theme);
-      addAction(`Theme changed to: ${theme}`);
+    const handleSettingsClick = () => {
+      addAction('Settings opened');
     };
 
     return (
@@ -508,8 +499,7 @@ export const InteractiveDemo: Story = {
           <Sidebar
             isOpen={isOpen}
             onToggle={handleToggle}
-            currentTheme={currentTheme}
-            onThemeChange={handleThemeChange}
+            onSettingsClick={handleSettingsClick}
           >
             {/* Interactive demo sidebar content */}
             <div className="p-4">
@@ -528,7 +518,6 @@ export const InteractiveDemo: Story = {
                   <h3 className="font-semibold mb-2">Current State:</h3>
                   <p className="text-sm">Project: {currentProject.name}</p>
                   <p className="text-sm">Timeline: {currentTimeline.name}</p>
-                  <p className="text-sm">Theme: {currentTheme}</p>
                   <p className="text-sm">Sidebar: {isOpen ? 'Open' : 'Closed'}</p>
                 </div>
                 
@@ -556,7 +545,7 @@ export const InteractiveDemo: Story = {
                   <li>• <strong>Change timelines</strong> - Click on different conversations</li>
                   <li>• <strong>Expand sections</strong> - Click on Tasks, Files, Settings</li>
                   <li>• <strong>Click tasks and files</strong> - Interact with list items</li>
-                  <li>• <strong>Change theme</strong> - Use the theme selector in Settings</li>
+                  <li>• <strong>Open settings</strong> - Click the settings button</li>
                   <li>• <strong>Hover and click</strong> everything for tennis commentary!</li>
                 </ul>
               </div>

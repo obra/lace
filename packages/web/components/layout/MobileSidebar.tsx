@@ -6,18 +6,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@/lib/fontawesome';
-import { ThemeSelector } from '@/components/ui/ThemeSelector';
+import { faTimes, faCog } from '@/lib/fontawesome';
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  currentTheme: string;
-  onThemeChange: (theme: string) => void;
+  onSettingsClick?: () => void;
   children: React.ReactNode;
 }
 
-export function MobileSidebar({ isOpen, onClose, currentTheme, onThemeChange, children }: MobileSidebarProps) {
+export function MobileSidebar({ isOpen, onClose, onSettingsClick, children }: MobileSidebarProps) {
   if (!isOpen) return null;
 
   return (
@@ -78,7 +76,14 @@ export function MobileSidebar({ isOpen, onClose, currentTheme, onThemeChange, ch
 
         {/* Footer */}
         <div className="p-4 border-t border-base-300">
-          <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
+          <button
+            onClick={onSettingsClick}
+            className="btn btn-ghost w-full justify-start"
+            title="Settings"
+          >
+            <FontAwesomeIcon icon={faCog} className="w-4 h-4 mr-2" />
+            Settings
+          </button>
         </div>
       </motion.div>
     </>

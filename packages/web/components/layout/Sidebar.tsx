@@ -7,13 +7,11 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ChevronRightIcon } from '@/lib/heroicons';
 import { faCog } from '@/lib/fontawesome';
-import { ThemeSelector } from '@/components/ui/ThemeSelector';
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  currentTheme: string;
-  onThemeChange: (theme: string) => void;
+  onSettingsClick?: () => void;
   children: React.ReactNode;
 }
 
@@ -43,13 +41,14 @@ interface SidebarButtonProps {
   className?: string;
 }
 
-export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, children }: SidebarProps) {
+export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: SidebarProps) {
   // Collapsed state
   if (!isOpen) {
     return (
       <div className="bg-base-100 border-r border-base-300 flex flex-col items-center py-4 transition-all duration-300 w-16 relative">
         <div className="flex flex-col gap-2">
           <button
+            onClick={onSettingsClick}
             className="p-2 hover:bg-base-200 rounded-lg transition-colors"
             title="Settings"
           >
@@ -90,6 +89,13 @@ export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, childre
               </div>
               <span className="font-semibold text-base-content">Lace</span>
             </div>
+            <button
+              onClick={onSettingsClick}
+              className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+              title="Settings"
+            >
+              <FontAwesomeIcon icon={faCog} className="w-4 h-4 text-base-content/60" />
+            </button>
           </div>
         </div>
 
@@ -98,10 +104,6 @@ export function Sidebar({ isOpen, onToggle, currentTheme, onThemeChange, childre
           {children}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-base-300">
-          <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
-        </div>
 
         {/* Toggle Button */}
         <button

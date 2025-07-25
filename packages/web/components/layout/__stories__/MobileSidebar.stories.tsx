@@ -24,11 +24,6 @@ const meta: Meta<typeof MobileSidebar> = {
       control: 'boolean',
       description: 'Whether the mobile sidebar is open',
     },
-    currentTheme: {
-      control: 'select',
-      options: ['light', 'dark', 'cupcake', 'cyberpunk'],
-      description: 'Current theme name',
-    },
   },
 };
 
@@ -81,8 +76,6 @@ function InteractiveMobileSidebar({ children, ...props }: { children: React.Reac
       <MobileSidebar 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)}
-        currentTheme="dark"
-        onThemeChange={() => {}}
       >
         {children}
       </MobileSidebar>
@@ -93,9 +86,7 @@ function InteractiveMobileSidebar({ children, ...props }: { children: React.Reac
 export const ProjectsOnly: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onClose: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <InteractiveMobileSidebar {...args}>
@@ -123,9 +114,7 @@ export const ProjectsOnly: Story = {
 export const ProjectsAndSessions: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onClose: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <InteractiveMobileSidebar {...args}>
@@ -173,9 +162,7 @@ export const ProjectsAndSessions: Story = {
 export const FullHierarchy: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onClose: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <InteractiveMobileSidebar {...args}>
@@ -238,9 +225,7 @@ export const FullHierarchy: Story = {
 export const TouchInteractions: Story = {
   args: {
     isOpen: false,
-    currentTheme: 'dark',
     onClose: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <InteractiveMobileSidebar {...args}>

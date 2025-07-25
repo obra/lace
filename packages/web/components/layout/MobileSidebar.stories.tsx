@@ -239,8 +239,6 @@ const availableThemes = [
 const defaultArgs = {
   isOpen: true,
   onClose: () => {},
-  currentTheme: 'dark',
-  onThemeChange: () => {},
 };
 
 export const Default: Story = {
@@ -388,7 +386,6 @@ export const HighPriorityTasks: Story = {
 export const LightTheme: Story = {
   args: {
     ...defaultArgs,
-    currentTheme: 'light',
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -428,7 +425,6 @@ export const LightTheme: Story = {
 export const CyberpunkTheme: Story = {
   args: {
     ...defaultArgs,
-    currentTheme: 'cyberpunk',
   },
   parameters: {
     docs: {
