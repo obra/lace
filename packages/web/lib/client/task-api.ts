@@ -1,7 +1,7 @@
 // ABOUTME: Client-side API for task management operations
 // ABOUTME: Provides type-safe methods for interacting with task API endpoints
 
-import type { Task, TaskStatus, TaskPriority } from '@/types/api';
+import type { Task, TaskStatus, TaskPriority } from '@/types';
 
 export interface TaskFilters {
   status?: TaskStatus;
@@ -36,14 +36,14 @@ export class TaskAPIClient {
 
   async listTasks(projectId: string, sessionId: string, filters?: TaskFilters): Promise<Task[]> {
     let url = `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks`;
-    
+
     if (filters) {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.priority) params.append('priority', filters.priority);
       if (filters.assignedTo) params.append('assignedTo', filters.assignedTo);
       if (filters.createdBy) params.append('createdBy', filters.createdBy);
-      
+
       if (params.toString()) {
         url += `?${params}`;
       }
@@ -59,11 +59,14 @@ export class TaskAPIClient {
   }
 
   async createTask(projectId: string, sessionId: string, task: CreateTaskRequest): Promise<Task> {
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(task),
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(task),
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to create task');
@@ -74,7 +77,9 @@ export class TaskAPIClient {
   }
 
   async getTask(projectId: string, sessionId: string, taskId: string): Promise<Task> {
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`);
+    const response = await fetch(
+      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`
+    );
 
     if (!response.ok) {
       throw new Error('Failed to fetch task');
@@ -84,12 +89,20 @@ export class TaskAPIClient {
     return data.task;
   }
 
-  async updateTask(projectId: string, sessionId: string, taskId: string, updates: UpdateTaskRequest): Promise<Task> {
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    });
+  async updateTask(
+    projectId: string,
+    sessionId: string,
+    taskId: string,
+    updates: UpdateTaskRequest
+  ): Promise<Task> {
+    const response = await fetch(
+      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to update task');
@@ -100,9 +113,12 @@ export class TaskAPIClient {
   }
 
   async deleteTask(projectId: string, sessionId: string, taskId: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`,
+      {
+        method: 'DELETE',
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to delete task');
@@ -121,11 +137,14 @@ export class TaskAPIClient {
       requestBody.author = author;
     }
 
-    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}/notes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}/notes`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to add note');

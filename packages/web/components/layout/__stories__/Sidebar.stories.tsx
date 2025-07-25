@@ -22,11 +22,6 @@ const meta: Meta<typeof Sidebar> = {
       control: 'boolean',
       description: 'Whether the sidebar is open or collapsed',
     },
-    currentTheme: {
-      control: 'select',
-      options: ['light', 'dark', 'cupcake', 'cyberpunk'],
-      description: 'Current theme name',
-    },
   },
 };
 
@@ -55,9 +50,7 @@ const mockAgents = [
 export const ProjectsOnly: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onToggle: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <div style={{ height: '100vh', display: 'flex' }}>
@@ -90,9 +83,7 @@ export const ProjectsOnly: Story = {
 export const ProjectsAndSessions: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onToggle: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <div style={{ height: '100vh', display: 'flex' }}>
@@ -145,9 +136,7 @@ export const ProjectsAndSessions: Story = {
 export const FullHierarchy: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onToggle: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <div style={{ height: '100vh', display: 'flex' }}>
@@ -215,9 +204,7 @@ export const FullHierarchy: Story = {
 export const Collapsed: Story = {
   args: {
     isOpen: false,
-    currentTheme: 'dark',
     onToggle: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <div style={{ height: '100vh', display: 'flex' }}>
@@ -240,9 +227,7 @@ export const Collapsed: Story = {
 export const ButtonVariants: Story = {
   args: {
     isOpen: true,
-    currentTheme: 'dark',
     onToggle: () => {},
-    onThemeChange: () => {},
   },
   render: (args) => (
     <div style={{ height: '100vh', display: 'flex' }}>

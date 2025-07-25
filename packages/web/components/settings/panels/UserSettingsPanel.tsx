@@ -3,10 +3,11 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { TextAreaField } from '@/components/ui/TextAreaField';
+import { validateUserName, validateEmail, validateBio, sanitizeUserData } from '@/lib/validation';
 
 interface UserSettingsPanelProps {
   userName?: string;
@@ -31,6 +32,9 @@ export function UserSettingsPanel({
   const [internalUserEmail, setInternalUserEmail] = useState('');
   const [internalUserBio, setInternalUserBio] = useState('');
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  // Ref for timeout cleanup
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Determine if we're in controlled or uncontrolled mode
   const isControlled = controlledUserName !== undefined || controlledUserEmail !== undefined || controlledUserBio !== undefined;
@@ -41,60 +45,109 @@ export function UserSettingsPanel({
   // Load from localStorage on mount (only in uncontrolled mode)
   useEffect(() => {
     if (!isControlled) {
-      const savedUserName = localStorage.getItem('userName') || '';
-      const savedUserEmail = localStorage.getItem('userEmail') || '';
-      const savedUserBio = localStorage.getItem('userBio') || '';
-      setInternalUserName(savedUserName);
-      setInternalUserEmail(savedUserEmail);
-      setInternalUserBio(savedUserBio);
+      const rawUserName = localStorage.getItem('userName') || '';
+      const rawUserEmail = localStorage.getItem('userEmail') || '';
+      const rawUserBio = localStorage.getItem('userBio') || '';
+      
+      // Sanitize data loaded from localStorage
+      const sanitized = sanitizeUserData({
+        userName: rawUserName,
+        userEmail: rawUserEmail,
+        userBio: rawUserBio,
+      });
+      
+      setInternalUserName(sanitized.userName);
+      setInternalUserEmail(sanitized.userEmail);
+      setInternalUserBio(sanitized.userBio);
     }
   }, [isControlled]);
 
-  const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleUserNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
+    const validated = validateUserName(newName);
     
     if (isControlled) {
-      onUserNameChange?.(newName);
+      onUserNameChange?.(validated.value);
     } else {
-      setInternalUserName(newName);
+      setInternalUserName(validated.value);
     }
-  };
+  }, [isControlled, onUserNameChange]);
 
-  const handleUserEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUserEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newEmail = e.target.value;
+    const validated = validateEmail(newEmail);
     
     if (isControlled) {
-      onUserEmailChange?.(newEmail);
+      onUserEmailChange?.(validated.value);
     } else {
-      setInternalUserEmail(newEmail);
+      setInternalUserEmail(validated.value);
     }
-  };
+  }, [isControlled, onUserEmailChange]);
 
-  const handleUserBioChange = (newBio: string) => {
+  const handleUserBioChange = useCallback((newBio: string) => {
+    const validated = validateBio(newBio);
+    
     if (isControlled) {
-      onUserBioChange?.(newBio);
+      onUserBioChange?.(validated.value);
     } else {
-      setInternalUserBio(newBio);
+      setInternalUserBio(validated.value);
     }
-  };
+  }, [isControlled, onUserBioChange]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
+    // Clear any existing timeout
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+    }
+    
+    // Validate and sanitize all data before saving
+    const nameValidation = validateUserName(userName);
+    const emailValidation = validateEmail(userEmail);
+    const bioValidation = validateBio(userBio);
+    
+    // Check for validation errors
+    if (!nameValidation.isValid || !emailValidation.isValid || !bioValidation.isValid) {
+      // For now, we'll save what we can. In a real app, you might want to show error messages
+      console.warn('Validation errors detected:', {
+        name: nameValidation.error,
+        email: emailValidation.error,
+        bio: bioValidation.error,
+      });
+    }
+    
+    // Use validated/sanitized values
+    const sanitizedData = {
+      userName: nameValidation.value,
+      userEmail: emailValidation.value,
+      userBio: bioValidation.value,
+    };
+    
     // Save to localStorage (only in uncontrolled mode)
     if (!isControlled) {
-      localStorage.setItem('userName', userName);
-      localStorage.setItem('userEmail', userEmail);
-      localStorage.setItem('userBio', userBio);
+      localStorage.setItem('userName', sanitizedData.userName);
+      localStorage.setItem('userEmail', sanitizedData.userEmail);
+      localStorage.setItem('userBio', sanitizedData.userBio);
     }
 
-    // Call onSave callback
-    onSave?.({ userName, userEmail, userBio });
+    // Call onSave callback with sanitized data
+    onSave?.(sanitizedData);
 
-    // Show success message
+    // Show success message with proper cleanup
     setShowSuccessMessage(true);
-    setTimeout(() => {
+    successTimeoutRef.current = setTimeout(() => {
       setShowSuccessMessage(false);
+      successTimeoutRef.current = null;
     }, 3000);
-  };
+  }, [userName, userEmail, userBio, isControlled, onSave]);
 
   return (
     <SettingsPanel 

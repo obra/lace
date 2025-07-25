@@ -54,7 +54,7 @@ export function TaskListSidebar({
     return (
       <div className="p-2 text-center">
         <div className="text-xs text-error mb-2">Failed to load tasks</div>
-        <div className="text-xs text-base-content/60">{error.message || 'An error occurred'}</div>
+        <div className="text-xs text-base-content/60">{error || 'An error occurred'}</div>
       </div>
     );
   }

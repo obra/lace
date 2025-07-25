@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SettingsModal } from './SettingsModal';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
@@ -23,29 +23,48 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
-  const handleThemeChange = (theme: string) => {
+  const handleThemeChange = useCallback((theme: string) => {
+    // Update state and localStorage immediately for consistency
     setCurrentTheme(theme);
     localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-  };
+    
+    // Batch DOM operation to avoid unnecessary reflows
+    requestAnimationFrame(() => {
+      document.documentElement.setAttribute('data-theme', theme);
+    });
+  }, []);
 
-  const handleOpenSettings = () => setIsOpen(true);
-  const handleCloseSettings = () => setIsOpen(false);
+  const handleOpenSettings = useCallback(() => setIsOpen(true), []);
+  const handleCloseSettings = useCallback(() => setIsOpen(false), []);
+
+  // Memoize the children callback props to prevent unnecessary re-renders
+  const childrenProps = useMemo(() => ({ 
+    onOpenSettings: handleOpenSettings 
+  }), [handleOpenSettings]);
+
+  // Memoize the settings panels to avoid recreating on every render
+  const uiSettingsPanel = useMemo(() => (
+    <UISettingsPanel 
+      currentTheme={currentTheme}
+      onThemeChange={handleThemeChange}
+    />
+  ), [currentTheme, handleThemeChange]);
+
+  const userSettingsPanel = useMemo(() => (
+    <UserSettingsPanel />
+  ), []);
 
   return (
     <>
-      {children({ onOpenSettings: handleOpenSettings })}
+      {children(childrenProps)}
       
       <SettingsModal isOpen={isOpen} onClose={handleCloseSettings}>
         <SettingsTabs defaultTab="ui">
           <div data-tab="ui">
-            <UISettingsPanel 
-              currentTheme={currentTheme}
-              onThemeChange={handleThemeChange}
-            />
+            {uiSettingsPanel}
           </div>
           <div data-tab="user">
-            <UserSettingsPanel />
+            {userSettingsPanel}
           </div>
         </SettingsTabs>
       </SettingsModal>

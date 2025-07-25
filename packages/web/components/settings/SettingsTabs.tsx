@@ -24,17 +24,28 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
 
   // Extract tab IDs from children or use provided tabs config
   const childrenArray = Children.toArray(children);
+  
+  // Type guard for elements with data-tab prop
+  const isElementWithDataTab = (node: React.ReactNode): node is React.ReactElement<{ 'data-tab': string }> => {
+    return isValidElement(node) && 
+           typeof node.props === 'object' && 
+           node.props !== null && 
+           'data-tab' in node.props &&
+           typeof (node.props as Record<string, unknown>)['data-tab'] === 'string';
+  };
+  
   const tabIds = tabs 
     ? tabs.map(tab => tab.id)
     : childrenArray
-        .filter(isValidElement)
-        .map(child => child.props['data-tab'] as string)
+        .filter(isElementWithDataTab)
+        .map(child => child.props['data-tab'])
         .filter((id): id is string => typeof id === 'string' && Boolean(id));
 
   // Generate tab labels if not provided
-  const tabConfigs = tabs || tabIds.map(id => ({
+  const tabConfigs: TabConfig[] = tabs || tabIds.map(id => ({
     id,
     label: id.charAt(0).toUpperCase() + id.slice(1),
+    icon: undefined,
   }));
 
   const handleTabClick = (tabId: string) => {
@@ -68,8 +79,8 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
 
   // Find active content
   const activeContent = childrenArray
-    .filter(isValidElement)
-    .find(child => (child.props['data-tab'] as string) === activeTab);
+    .filter(isElementWithDataTab)
+    .find(child => child.props['data-tab'] === activeTab);
 
   return (
     <div className="flex flex-col h-full">

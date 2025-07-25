@@ -396,7 +396,7 @@ export const WithManyTimelines: Story = {
 export const DarkTheme: Story = {
   render: () => (
     <div data-theme="dark">
-      <SidebarWrapper currentTheme="dark" />
+      <SidebarWrapper />
     </div>
   ),
 };

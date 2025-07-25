@@ -77,4 +77,11 @@ describe('TextAreaField', () => {
     
     expect(screen.getByText('Max 500 characters')).toBeInTheDocument();
   });
+
+  it('applies maxLength attribute when specified', () => {
+    render(<TextAreaField label="Description" maxLength={500} />);
+    
+    const textarea = screen.getByLabelText('Description');
+    expect(textarea).toHaveAttribute('maxLength', '500');
+  });
 });

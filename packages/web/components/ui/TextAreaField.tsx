@@ -11,6 +11,7 @@ interface TextAreaFieldProps {
   onChange?: (value: string) => void;
   placeholder?: string;
   rows?: number;
+  maxLength?: number;
   required?: boolean;
   disabled?: boolean;
   error?: boolean;
@@ -24,6 +25,7 @@ export function TextAreaField({
   onChange,
   placeholder,
   rows = 4,
+  maxLength,
   required = false,
   disabled = false,
   error = false,
@@ -55,6 +57,7 @@ export function TextAreaField({
         onChange={handleChange}
         placeholder={placeholder}
         rows={rows}
+        maxLength={maxLength}
         required={required}
         disabled={disabled}
         className={textareaClasses}
