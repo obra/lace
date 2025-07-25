@@ -100,7 +100,7 @@ export function validateBio(input: string): ValidationResult {
 }
 
 /**
- * Sanitize data before localStorage operations
+ * Sanitize user data for general use
  */
 export function sanitizeUserData(userData: {
   userName: string;

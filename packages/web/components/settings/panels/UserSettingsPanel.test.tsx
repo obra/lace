@@ -1,5 +1,5 @@
-// ABOUTME: Tests for UserSettingsPanel component covering user preferences and localStorage persistence
-// ABOUTME: Validates user name saving, form interactions, and integration with settings system
+// ABOUTME: Tests for UserSettingsPanel component covering user preferences and form validation
+// ABOUTME: Validates user input handling, form interactions, and callback integration
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -8,7 +8,6 @@ import { UserSettingsPanel } from './UserSettingsPanel';
 
 describe('UserSettingsPanel', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -22,39 +21,8 @@ describe('UserSettingsPanel', () => {
     expect(screen.getByText('Save')).toBeInTheDocument();
   });
 
-  it('saves user name to localStorage', () => {
-    render(<UserSettingsPanel />);
-    
-    const nameInput = screen.getByLabelText('Display Name');
-    const saveButton = screen.getByText('Save');
-    
-    fireEvent.change(nameInput, { target: { value: 'John Doe' } });
-    fireEvent.click(saveButton);
-    
-    expect(localStorage.getItem('userName')).toBe('John Doe');
-  });
 
-  it('saves email to localStorage', () => {
-    render(<UserSettingsPanel />);
-    
-    const emailInput = screen.getByLabelText('Email');
-    const saveButton = screen.getByText('Save');
-    
-    fireEvent.change(emailInput, { target: { value: 'john@example.com' } });
-    fireEvent.click(saveButton);
-    
-    expect(localStorage.getItem('userEmail')).toBe('john@example.com');
-  });
 
-  it('loads saved values from localStorage on mount', () => {
-    localStorage.setItem('userName', 'Jane Smith');
-    localStorage.setItem('userEmail', 'jane@example.com');
-    
-    render(<UserSettingsPanel />);
-    
-    expect(screen.getByDisplayValue('Jane Smith')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('jane@example.com')).toBeInTheDocument();
-  });
 
   it('calls onSave callback when save button clicked', () => {
     const mockOnSave = vi.fn();
