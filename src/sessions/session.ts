@@ -112,7 +112,7 @@ export class Session {
     // Mark the agent's thread as a session thread
     sessionAgent.updateThreadMetadata({
       isSession: true,
-      name,
+      name: 'Lace', // Always name the coordinator agent "Lace"
       provider,
       model,
     });

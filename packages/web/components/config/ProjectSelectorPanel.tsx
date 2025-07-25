@@ -351,10 +351,10 @@ export function ProjectSelectorPanel({
         onProjectCreate();
       }
 
-      // If this is simplified onboarding mode, continue the chain
+      // If this is simplified onboarding mode, navigate directly to the coordinator agent
       console.log('Project created, checking onboarding chain:', { isSimplifiedMode, hasCallback: !!onOnboardingComplete });
       if (isSimplifiedMode && onOnboardingComplete) {
-        console.log('Starting onboarding chain...');
+        console.log('Starting simplified onboarding navigation...');
         // Step 2: Get sessions (project creation should have created a default session)
         console.log('Fetching sessions for project:', projectId);
         const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
@@ -364,28 +364,14 @@ export function ProjectSelectorPanel({
           console.log('Found sessions:', sessionsData.sessions, 'Selected:', sessionId);
 
           if (sessionId) {
-            // Step 3: Create Lace agent
-            console.log('Creating Lace agent for session:', sessionId);
-            const agentRes = await fetch(`/api/sessions/${sessionId}/agents`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                // name omitted to trigger "Lace" default
-                // provider/model omitted to use defaults
-              }),
-            });
+            // Navigate directly to the coordinator agent (which is named "Lace")
+            // The coordinator agent has the same threadId as the session
+            const coordinatorAgentId = sessionId;
+            console.log('Navigating to coordinator agent:', coordinatorAgentId);
 
-            if (agentRes.ok) {
-              const agentData = await agentRes.json() as { agent: { threadId: string } };
-              const agentId = agentData.agent.threadId;
-              console.log('Agent created:', agentData.agent);
-
-              // Complete onboarding - navigate to chat
-              console.log('Calling onboardingComplete with:', { projectId, sessionId, agentId });
-              onOnboardingComplete(projectId, sessionId, agentId);
-            } else {
-              console.error('Failed to create agent:', await agentRes.text());
-            }
+            // Complete onboarding - navigate to chat with coordinator agent
+            console.log('Calling onboardingComplete with:', { projectId, sessionId, agentId: coordinatorAgentId });
+            onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
           } else {
             console.error('No session found in project');
           }
