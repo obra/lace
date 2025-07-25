@@ -64,6 +64,29 @@ export function useSessionEvents(
     }
   }, []);
 
+  // Check for pending approvals when agent is selected
+  const checkPendingApprovals = useCallback(async (sessionId: ThreadId, agentId: ThreadId) => {
+    try {
+      const res = await fetch(`/api/threads/${agentId}/approvals/pending`);
+      const data: unknown = await res.json();
+
+      if (isApiError(data)) {
+        console.error('Failed to check pending approvals:', data.error);
+        return;
+      }
+
+      const approvalData = data as { pendingApprovals: Array<{ toolCallId: string; toolCall: unknown; requestData: ToolApprovalRequestData }> };
+      
+      // If there are pending approvals, set the first one to show the modal
+      if (approvalData.pendingApprovals && approvalData.pendingApprovals.length > 0) {
+        const pendingApproval = approvalData.pendingApprovals[0];
+        setApprovalRequest(pendingApproval.requestData);
+      }
+    } catch (error) {
+      console.error('Failed to check pending approvals:', error);
+    }
+  }, []);
+
   // Clear approval request
   const clearApprovalRequest = useCallback(() => {
     setApprovalRequest(null);
@@ -182,6 +205,16 @@ export function useSessionEvents(
       setApprovalRequest(null);
     }
   }, [sessionId]);
+
+  // Check for pending approvals when agent is selected
+  useEffect(() => {
+    if (sessionId && selectedAgent) {
+      void checkPendingApprovals(sessionId, selectedAgent);
+    } else {
+      // Clear approval request when no agent is selected
+      setApprovalRequest(null);
+    }
+  }, [sessionId, selectedAgent, checkPendingApprovals]);
 
   return {
     allEvents,

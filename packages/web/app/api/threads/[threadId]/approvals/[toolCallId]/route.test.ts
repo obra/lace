@@ -16,6 +16,7 @@ interface MockThreadManager {
 
 interface MockAgent {
   threadManager: MockThreadManager;
+  emit: ReturnType<typeof vi.fn>;
 }
 
 interface MockSession {
@@ -41,6 +42,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     // Create mock Agent
     mockAgent = {
       threadManager: mockThreadManager,
+      emit: vi.fn(),
     };
 
     // Create mock Session

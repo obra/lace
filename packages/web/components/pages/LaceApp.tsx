@@ -211,10 +211,10 @@ export function LaceApp() {
 
   // Handle tool approval decision
   const handleApprovalDecision = async (decision: ApprovalDecision) => {
-    if (!approvalRequest) return;
+    if (!approvalRequest || !selectedAgent) return;
 
     try {
-      const res = await fetch(`/api/approvals/${approvalRequest.requestId}`, {
+      const res = await fetch(`/api/threads/${selectedAgent}/approvals/${approvalRequest.requestId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),

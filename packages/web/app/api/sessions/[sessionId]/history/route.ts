@@ -183,6 +183,44 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       };
     }
 
+    case 'TOOL_APPROVAL_REQUEST': {
+      // Convert persisted TOOL_APPROVAL_REQUEST event to SessionEvent format
+      // Note: Persisted events only have minimal data (toolCallId), but SessionEvent expects rich data
+      // We provide minimal fallback data to prevent UI errors
+      const toolCallData = threadEvent.data as { toolCallId?: string } | string;
+      const toolCallId = typeof toolCallData === 'object' && toolCallData?.toolCallId 
+        ? toolCallData.toolCallId 
+        : String(threadEvent.data);
+      
+      return {
+        ...baseEvent,
+        type: 'TOOL_APPROVAL_REQUEST',
+        data: {
+          requestId: toolCallId,
+          toolName: 'unknown', // Not available in persisted data
+          input: {},           // Not available in persisted data
+          isReadOnly: false,   // Conservative default
+          riskLevel: 'moderate' as const,
+        },
+      };
+    }
+
+    case 'TOOL_APPROVAL_RESPONSE': {
+      // Convert persisted TOOL_APPROVAL_RESPONSE event to a generic SessionEvent
+      // Since TOOL_APPROVAL_RESPONSE is not currently defined as a SessionEvent type,
+      // we convert it to LOCAL_SYSTEM_MESSAGE for display
+      const responseData = threadEvent.data as { toolCallId?: string; decision?: string } | string;
+      const content = typeof responseData === 'object' && responseData 
+        ? `Tool approval response: ${responseData.decision || 'unknown'} for call ${responseData.toolCallId || 'unknown'}`
+        : `Tool approval response: ${String(threadEvent.data)}`;
+      
+      return {
+        ...baseEvent,
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: { content },
+      };
+    }
+
     default: {
       // Exhaustive check - this should never be reached if all event types are handled
       const _exhaustiveCheck: never = threadEvent.type;

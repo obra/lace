@@ -6,10 +6,10 @@ import { getSessionService } from '@/lib/server/session-service';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { threadId: string; toolCallId: string } }
+  { params }: { params: Promise<{ threadId: string; toolCallId: string }> }
 ): Promise<NextResponse> {
   try {
-    const { threadId, toolCallId } = params;
+    const { threadId, toolCallId } = await params;
     
     // Parse request body
     let body: { decision?: string };
@@ -43,11 +43,14 @@ export async function POST(
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
     
-    // Use core ThreadManager to create approval response event
-    agent.threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+    // Create approval response event and emit it so EventApprovalCallback receives it
+    const event = agent.threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId,
       decision
     });
+    
+    // Emit the event so the EventApprovalCallback can receive it and continue tool execution
+    agent.emit('thread_event_added', { event, threadId });
     
     return NextResponse.json({ success: true });
   } catch (_error) {
