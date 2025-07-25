@@ -1,45 +1,61 @@
 // ABOUTME: Tool approval modal component for interactive approval decisions  
-// ABOUTME: Updated with DaisyUI styling and integrated with new design system
+// ABOUTME: Updated to support multiple approvals per spec Phase 3.4
 
-import React, { useEffect } from 'react';
-import type { ToolApprovalRequestData } from '@/types/api';
+import React, { useEffect, useState } from 'react';
+import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/api';
 
 interface ToolApprovalModalProps {
-  request: ToolApprovalRequestData;
-  onDecision: (decision: ApprovalDecision) => void;
+  approvals: PendingApproval[];
+  onDecision: (toolCallId: string, decision: ApprovalDecision) => void;
 }
 
-export function ToolApprovalModal({ request, onDecision }: ToolApprovalModalProps) {
+export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const currentApproval = approvals[currentIndex];
+  const request = currentApproval?.requestData;
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (!currentApproval) return;
+    
     const handleKeyPress = (e: KeyboardEvent) => {
       switch (e.key.toLowerCase()) {
         case 'y':
         case 'a':
           e.preventDefault();
-          onDecision(ApprovalDecision.ALLOW_ONCE);
+          onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_ONCE);
           break;
         case 's':
           e.preventDefault();
-          onDecision(ApprovalDecision.ALLOW_SESSION);
+          onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_SESSION);
           break;
         case 'n':
         case 'd':
           e.preventDefault();
-          onDecision(ApprovalDecision.DENY);
+          onDecision(currentApproval.toolCallId, ApprovalDecision.DENY);
           break;
         case 'escape':
           e.preventDefault();
-          onDecision(ApprovalDecision.DENY);
+          onDecision(currentApproval.toolCallId, ApprovalDecision.DENY);
+          break;
+        case 'arrowleft':
+          e.preventDefault();
+          if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+          break;
+        case 'arrowright':
+          e.preventDefault();
+          if (currentIndex < approvals.length - 1) setCurrentIndex(currentIndex + 1);
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [onDecision]);
+  }, [onDecision, currentApproval, currentIndex, approvals.length]);
+
+  // Early return after hooks to satisfy React rules
+  if (!currentApproval || !request) return null;
 
   const getRiskClasses = () => {
     switch (request.riskLevel) {
@@ -85,6 +101,12 @@ export function ToolApprovalModal({ request, onDecision }: ToolApprovalModalProp
               </span>
             </div>
           </div>
+          {/* Approval Counter - spec Phase 3.4 */}
+          {approvals.length > 1 && (
+            <div className="text-sm font-medium text-base-content/60 bg-base-200 px-3 py-1 rounded">
+              {currentIndex + 1} of {approvals.length}
+            </div>
+          )}
         </div>
 
         {/* Tool Info */}
@@ -136,24 +158,49 @@ export function ToolApprovalModal({ request, onDecision }: ToolApprovalModalProp
           </div>
         </div>
 
+        {/* Navigation for multiple approvals - spec Phase 3.4 */}
+        {approvals.length > 1 && (
+          <div className="flex justify-between items-center mb-4 bg-base-200 rounded-lg p-3">
+            <button
+              onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+              disabled={currentIndex === 0}
+              className="btn btn-sm btn-ghost"
+            >
+              ← Previous
+              <span className="text-xs opacity-70 ml-1">[←]</span>
+            </button>
+            <span className="text-sm text-base-content/70">
+              Navigate between pending approvals
+            </span>
+            <button
+              onClick={() => setCurrentIndex(Math.min(approvals.length - 1, currentIndex + 1))}
+              disabled={currentIndex === approvals.length - 1}
+              className="btn btn-sm btn-ghost"
+            >
+              Next →
+              <span className="text-xs opacity-70 ml-1">[→]</span>
+            </button>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={() => onDecision(ApprovalDecision.ALLOW_ONCE)}
+            onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_ONCE)}
             className="btn btn-success flex-1"
           >
             Allow Once
             <span className="text-xs opacity-70 ml-2">[Y/A]</span>
           </button>
           <button
-            onClick={() => onDecision(ApprovalDecision.ALLOW_SESSION)}
+            onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_SESSION)}
             className="btn btn-info flex-1"
           >
             Allow Session
             <span className="text-xs opacity-70 ml-2">[S]</span>
           </button>
           <button
-            onClick={() => onDecision(ApprovalDecision.DENY)}
+            onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
             className="btn btn-error flex-1"
           >
             Deny
