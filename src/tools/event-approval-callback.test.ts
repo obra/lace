@@ -68,7 +68,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       toolExecutor,
       threadManager,
       threadId,
-      tools: ['bash'], // Enable bash tool
+      tools: [new BashTool()], // Enable bash tool
     });
 
     // Set up the EventApprovalCallback
@@ -281,10 +281,12 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Should have emitted the TOOL_APPROVAL_REQUEST event
     const approvalRequestCalls = eventSpy.mock.calls.filter(
-      (call) => call[0].event.type === 'TOOL_APPROVAL_REQUEST'
+      (call) => (call[0] as { event: { type: string } }).event.type === 'TOOL_APPROVAL_REQUEST'
     );
     expect(approvalRequestCalls).toHaveLength(1);
-    expect(approvalRequestCalls[0][0].event.data).toEqual({ toolCallId: 'call_emit_test' });
+    expect((approvalRequestCalls[0][0] as { event: { data: unknown } }).event.data).toEqual({
+      toolCallId: 'call_emit_test',
+    });
 
     // Complete the test
     const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
