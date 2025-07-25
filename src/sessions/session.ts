@@ -449,10 +449,11 @@ export class Session {
   getInfo(): SessionInfo | null {
     const agents = this.getAgents();
     const metadata = this._sessionAgent.getThreadMetadata();
+    const sessionData = this.getSessionData();
 
     return {
       id: this._sessionId,
-      name: (metadata?.name as string) || 'Session ' + this._sessionId,
+      name: sessionData?.name || 'Session ' + this._sessionId,
       createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
       provider: this._sessionAgent.providerName,
       model: (metadata?.model as string) || 'unknown',

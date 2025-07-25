@@ -241,7 +241,7 @@ describe('Session', () => {
         agents: expect.arrayContaining([
           expect.objectContaining({
             threadId: session.getId(),
-            name: 'Test Session',
+            name: 'Lace', // Coordinator agent is always named "Lace"
             provider: 'anthropic',
             model: 'claude-3-haiku-20240307',
             status: expect.any(String) as string,
@@ -375,7 +375,7 @@ describe('Session', () => {
       expect(agents[0]).toEqual(
         expect.objectContaining({
           threadId: session.getId(),
-          name: 'Test Session',
+          name: 'Lace', // Coordinator agent is always named "Lace"
           provider: 'anthropic',
           model: 'claude-3-haiku-20240307',
           status: expect.any(String) as string,

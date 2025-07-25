@@ -247,7 +247,7 @@ describe('Projects API', () => {
       expect(data.details).toBeDefined();
     });
 
-    it('should handle empty name', async () => {
+    it('should handle empty name by auto-generating', async () => {
       const requestBody = {
         name: '',
         workingDirectory: '/test/path',
@@ -260,10 +260,11 @@ describe('Projects API', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = (await response.json()) as ProjectResponse;
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(response.status).toBe(201);
+      expect(data.project.name).toBeTruthy(); // Auto-generated name should exist
+      expect(data.project.name).not.toBe(''); // Should not be empty
     });
 
     it('should handle creation errors gracefully', async () => {

@@ -180,7 +180,7 @@ describe('Web UI E2E Tests', () => {
       expect(updatedSession).toBeDefined();
       const updatedAgents = updatedSession!.getAgents();
       expect(updatedAgents).toHaveLength(3); // Coordinator + 2 agents
-      expect(updatedAgents.map((a) => a.name)).toContain('Agent Test Session');
+      expect(updatedAgents.map((a) => a.name)).toContain('Lace');
       expect(updatedAgents.map((a) => a.name)).toContain('Agent 1');
       expect(updatedAgents.map((a) => a.name)).toContain('Agent 2');
     });
@@ -227,7 +227,7 @@ describe('Web UI E2E Tests', () => {
       expect(retrievedInfo?.name).toBe('Persistence Test');
       const retrievedAgents = retrievedSession!.getAgents();
       expect(retrievedAgents).toHaveLength(2); // Coordinator + 1 agent
-      expect(retrievedAgents.map((a) => a.name)).toContain('Persistence Test');
+      expect(retrievedAgents.map((a) => a.name)).toContain('Lace');
       expect(retrievedAgents.map((a) => a.name)).toContain('Persistent Agent');
     });
 
