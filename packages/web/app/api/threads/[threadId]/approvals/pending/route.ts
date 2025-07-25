@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@/lib/server/lace-imports';
 
 export async function GET(
   request: NextRequest,
@@ -19,18 +20,18 @@ export async function GET(
       ? (threadId.split('.')[0] ?? threadId)
       : threadId;
     
-    const session = await sessionService.getSession(sessionIdStr);
+    const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
     
-    const agent = session.getAgent(threadId);
+    const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
     
     // Use core method to get pending approvals
-    const rawPendingApprovals = agent.threadManager.getPendingApprovals(threadId);
+    const rawPendingApprovals = agent.threadManager.getPendingApprovals(asThreadId(threadId));
     
     // Reconstruct ToolApprovalRequestData for each pending approval
     const pendingApprovals = rawPendingApprovals.map((approval) => {
