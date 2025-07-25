@@ -172,8 +172,7 @@ export function useSessionEvents(
 
     eventSource.addEventListener('connection', connectionListener);
 
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
+    eventSource.onerror = (_error) => {
       setConnected(false);
 
       // Add error event
