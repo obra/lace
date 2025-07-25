@@ -27,6 +27,14 @@ export function useTaskManager(projectId: string, sessionId: string) {
   // Fetch tasks
   const fetchTasks = useCallback(
     async (filters?: TaskFilters) => {
+      // Don't make API calls if projectId or sessionId are empty
+      if (!projectId || !sessionId) {
+        setTasks([]);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+
       try {
         setError(null);
         const fetchedTasks = await client.current.listTasks(projectId, sessionId, filters);
@@ -106,6 +114,11 @@ export function useTaskManager(projectId: string, sessionId: string) {
   // Create task
   const createTask = useCallback(
     async (task: CreateTaskRequest) => {
+      // Don't make API calls if projectId or sessionId are empty
+      if (!projectId || !sessionId) {
+        return;
+      }
+
       pendingOperations.current++;
       setIsCreating(true);
       setError(null);
@@ -127,6 +140,11 @@ export function useTaskManager(projectId: string, sessionId: string) {
   // Update task
   const updateTask = useCallback(
     async (taskId: string, updates: UpdateTaskRequest) => {
+      // Don't make API calls if projectId or sessionId are empty
+      if (!projectId || !sessionId) {
+        return;
+      }
+
       pendingOperations.current++;
       setIsUpdating(true);
       setError(null);
@@ -148,6 +166,11 @@ export function useTaskManager(projectId: string, sessionId: string) {
   // Delete task
   const deleteTask = useCallback(
     async (taskId: string) => {
+      // Don't make API calls if projectId or sessionId are empty
+      if (!projectId || !sessionId) {
+        return;
+      }
+
       pendingOperations.current++;
       setIsDeleting(true);
       setError(null);
@@ -169,6 +192,11 @@ export function useTaskManager(projectId: string, sessionId: string) {
   // Add note
   const addNote = useCallback(
     async (taskId: string, content: string, author?: string) => {
+      // Don't make API calls if projectId or sessionId are empty
+      if (!projectId || !sessionId) {
+        return;
+      }
+
       pendingOperations.current++;
       setIsUpdating(true);
       setError(null);
