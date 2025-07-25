@@ -352,15 +352,20 @@ export function ProjectSelectorPanel({
       }
 
       // If this is simplified onboarding mode, continue the chain
+      console.log('Project created, checking onboarding chain:', { isSimplifiedMode, hasCallback: !!onOnboardingComplete });
       if (isSimplifiedMode && onOnboardingComplete) {
+        console.log('Starting onboarding chain...');
         // Step 2: Get sessions (project creation should have created a default session)
+        console.log('Fetching sessions for project:', projectId);
         const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
         if (sessionsRes.ok) {
           const sessionsData = await sessionsRes.json() as { sessions: Array<{ id: string }> };
           const sessionId = sessionsData.sessions[0]?.id;
+          console.log('Found sessions:', sessionsData.sessions, 'Selected:', sessionId);
 
           if (sessionId) {
             // Step 3: Create Lace agent
+            console.log('Creating Lace agent for session:', sessionId);
             const agentRes = await fetch(`/api/sessions/${sessionId}/agents`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -373,11 +378,19 @@ export function ProjectSelectorPanel({
             if (agentRes.ok) {
               const agentData = await agentRes.json() as { agent: { threadId: string } };
               const agentId = agentData.agent.threadId;
+              console.log('Agent created:', agentData.agent);
 
               // Complete onboarding - navigate to chat
+              console.log('Calling onboardingComplete with:', { projectId, sessionId, agentId });
               onOnboardingComplete(projectId, sessionId, agentId);
+            } else {
+              console.error('Failed to create agent:', await agentRes.text());
             }
+          } else {
+            console.error('No session found in project');
           }
+        } else {
+          console.error('Failed to fetch sessions:', await sessionsRes.text());
         }
       } else {
         // Regular project creation - just select the project

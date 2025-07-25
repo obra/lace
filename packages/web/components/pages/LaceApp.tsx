@@ -358,6 +358,8 @@ export function LaceApp() {
 
   // Handle onboarding completion - navigate directly to chat
   const handleOnboardingComplete = (projectId: string, sessionId: string, agentId: string) => {
+    console.log('handleOnboardingComplete called with:', { projectId, sessionId, agentId });
+    
     // Set all three selections to navigate directly to chat
     setSelectedProject(projectId);
     setSelectedSession(sessionId as ThreadId);
@@ -365,6 +367,8 @@ export function LaceApp() {
     
     // Clear auto-open state
     setAutoOpenCreateProject(false);
+    
+    console.log('Navigation state set, should show chat interface');
   };
 
   // Handle task updates
