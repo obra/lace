@@ -245,12 +245,11 @@ export function LaceApp() {
   }
 
   // Handle tool approval decision
-  const handleApprovalDecision = async (decision: ApprovalDecision) => {
-    const currentApproval = pendingApprovals[0];
-    if (!currentApproval || !selectedAgent) return;
+  const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
+    if (!selectedAgent) return;
 
     try {
-      const res = await fetch(`/api/threads/${selectedAgent}/approvals/${currentApproval.toolCallId}`, {
+      const res = await fetch(`/api/threads/${selectedAgent}/approvals/${toolCallId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),
@@ -905,7 +904,7 @@ export function LaceApp() {
       {/* Tool Approval Modal */}
       {pendingApprovals.length > 0 && (
         <ToolApprovalModal
-          request={pendingApprovals[0].requestData}
+          approvals={pendingApprovals}
           onDecision={handleApprovalDecision}
         />
       )}
