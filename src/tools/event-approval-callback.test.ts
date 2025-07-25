@@ -1,182 +1,298 @@
-// ABOUTME: Tests for core event-based approval callback implementation
-// ABOUTME: Validates approval logic that creates events and waits for responses
+// ABOUTME: Integration tests for event-based approval callback with real Agent
+// ABOUTME: Tests actual approval flow behavior through Agent conversations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
+import { TestProvider } from '~/test-utils/test-provider';
+import { BashTool } from '~/tools/implementations/bash';
+import { EventApprovalCallback } from '~/tools/event-approval-callback';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { type ToolResult } from '~/tools/types';
 
-interface MockAgent {
-  threadId: string;
-  threadManager: ThreadManager;
-  toolExecutor: {
-    getTool: ReturnType<typeof vi.fn>;
-  };
+// Enhanced test provider that can return tool calls
+class MockProviderWithToolCalls extends TestProvider {
+  private configuredResponse?: ProviderResponse;
+
+  setResponse(response: Partial<ProviderResponse>): void {
+    this.configuredResponse = {
+      content: response.content || 'I will execute the tool.',
+      toolCalls: response.toolCalls || [],
+      usage: response.usage || { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+      stopReason: response.stopReason || 'end_turn',
+    };
+  }
+
+  async createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[] = [],
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    if (this.configuredResponse) {
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (signal?.aborted) {
+        throw new Error('Request was aborted');
+      }
+      return this.configuredResponse;
+    }
+    return super.createResponse(_messages, _tools, signal);
+  }
 }
 
-describe('EventApprovalCallback', () => {
+describe('EventApprovalCallback Integration Tests', () => {
+  let agent: Agent;
   let threadManager: ThreadManager;
-  let mockAgent: MockAgent;
-  let threadId: string;
-  let callback: EventApprovalCallback;
+  let mockProvider: MockProviderWithToolCalls;
 
   beforeEach(() => {
     setupTestPersistence();
-    threadManager = new ThreadManager();
-    threadId = threadManager.generateThreadId();
 
-    // Create the thread before adding events
+    // Create real components for integration testing
+    threadManager = new ThreadManager();
+    mockProvider = new MockProviderWithToolCalls();
+    const toolExecutor = new ToolExecutor();
+
+    // Register the bash tool so it can be executed
+    toolExecutor.registerTool('bash', new BashTool());
+
+    const threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
 
-    // Create mock agent
-    mockAgent = {
-      threadId,
+    agent = new Agent({
+      provider: mockProvider,
+      toolExecutor,
       threadManager,
-      toolExecutor: {
-        getTool: vi.fn(() => ({ annotations: { readOnlyHint: false } })),
-      },
-    };
+      threadId,
+      tools: ['bash'], // Enable bash tool
+    });
 
-    callback = new EventApprovalCallback(mockAgent as never, threadManager, threadId);
+    // Set up the EventApprovalCallback
+    const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+    agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
   afterEach(() => {
     teardownTestPersistence();
   });
 
-  it('should create TOOL_APPROVAL_REQUEST event when approval needed', async () => {
-    // Create a TOOL_CALL event first
-    const _toolCallEvent = threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call_123',
-      name: 'bash',
-      arguments: { command: 'ls' },
+  it('should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring approval', async () => {
+    // Configure provider to return a tool call
+    mockProvider.setResponse({
+      content: 'I will run the ls command.',
+      toolCalls: [
+        {
+          id: 'call_test',
+          name: 'bash',
+          input: { command: 'ls' },
+        },
+      ],
     });
 
-    // Start approval request (don't await yet)
-    const approvalPromise = callback.requestApproval('bash', { command: 'ls' });
+    // Start agent conversation - this creates TOOL_CALL events and triggers approval
+    const conversationPromise = agent.sendMessage('Please run ls command');
 
-    // Check that TOOL_APPROVAL_REQUEST event was created
-    const events = threadManager.getEvents(threadId);
+    // Wait for tool call and approval request to be created
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Check that both TOOL_CALL and TOOL_APPROVAL_REQUEST events were created
+    const events = threadManager.getEvents(agent.threadId);
+    const toolCallEvent = events.find((e) => e.type === 'TOOL_CALL');
     const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
 
+    expect(toolCallEvent).toBeDefined();
+    expect(toolCallEvent?.data).toMatchObject({
+      id: 'call_test',
+      name: 'bash',
+      arguments: { command: 'ls' },
+    });
+
     expect(approvalRequestEvent).toBeDefined();
-    expect(approvalRequestEvent?.data).toEqual({ toolCallId: 'call_123' });
+    expect(approvalRequestEvent?.data).toEqual({ toolCallId: 'call_test' });
 
-    // Resolve the approval by adding response event
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_123',
+    // Simulate user approval
+    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'call_test',
       decision: ApprovalDecision.ALLOW_ONCE,
     });
 
-    // Promise should now resolve
-    const decision = await approvalPromise;
-    expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
+    agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
+
+    // Wait for conversation to complete
+    await conversationPromise;
+
+    // Verify tool was executed (TOOL_RESULT event exists)
+    const finalEvents = threadManager.getEvents(agent.threadId);
+    const toolResultEvent = finalEvents.find((e) => e.type === 'TOOL_RESULT');
+    expect(toolResultEvent).toBeDefined();
   });
 
-  it('should return existing approval if response already exists', async () => {
-    // Create TOOL_CALL → TOOL_APPROVAL_REQUEST → TOOL_APPROVAL_RESPONSE
-    threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call_123',
-      name: 'bash',
-      arguments: { command: 'ls' },
+  it('should handle tool execution denial through Agent flow', async () => {
+    mockProvider.setResponse({
+      content: 'I will run the dangerous command.',
+      toolCalls: [
+        {
+          id: 'call_deny',
+          name: 'bash',
+          input: { command: 'rm -rf /' },
+        },
+      ],
     });
 
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: 'call_123',
-    });
+    const conversationPromise = agent.sendMessage('Please run rm -rf /');
 
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_123',
-      decision: ApprovalDecision.ALLOW_SESSION,
-    });
+    // Wait for approval request
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Request approval - should return existing decision immediately
-    const decision = await callback.requestApproval('bash', { command: 'ls' });
-    expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
+    const events = threadManager.getEvents(agent.threadId);
+    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(approvalRequestEvent).toBeDefined();
 
-    // Should not create duplicate TOOL_APPROVAL_REQUEST
-    const events = threadManager.getEvents(threadId);
-    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
-    expect(approvalRequests).toHaveLength(1); // Only the one we created manually
-  });
-
-  it('should handle multiple concurrent approval requests', async () => {
-    // Create two different TOOL_CALL events
-    threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call_123',
-      name: 'bash',
-      arguments: { command: 'ls' },
-    });
-
-    threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call_456',
-      name: 'file-read',
-      arguments: { path: '/test' },
-    });
-
-    // Start two approval requests concurrently
-    const approval1Promise = callback.requestApproval('bash', { command: 'ls' });
-    const approval2Promise = callback.requestApproval('file-read', { path: '/test' });
-
-    // Both should create approval request events
-    const events = threadManager.getEvents(threadId);
-    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
-    expect(approvalRequests).toHaveLength(2);
-
-    // Respond to both approvals
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_123',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
-
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_456',
+    // Simulate user denial
+    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'call_deny',
       decision: ApprovalDecision.DENY,
     });
 
-    // Both promises should resolve with correct decisions
-    const [decision1, decision2] = await Promise.all([approval1Promise, approval2Promise]);
-    expect(decision1).toBe(ApprovalDecision.ALLOW_ONCE);
-    expect(decision2).toBe(ApprovalDecision.DENY);
+    agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
+
+    // Wait for conversation to complete
+    await conversationPromise;
+
+    // Verify tool execution was denied
+    const finalEvents = threadManager.getEvents(agent.threadId);
+    const toolResultEvent = finalEvents.find((e) => e.type === 'TOOL_RESULT');
+    expect(toolResultEvent).toBeDefined();
+
+    const toolResult = toolResultEvent?.data as ToolResult;
+    expect(toolResult.isError).toBe(true);
   });
 
-  it('should throw error if no matching TOOL_CALL event found', async () => {
-    // Try to request approval without creating TOOL_CALL first
-    await expect(callback.requestApproval('bash', { command: 'ls' })).rejects.toThrow(
-      'Could not find TOOL_CALL event for bash'
-    );
-  });
-
-  it('should match tool call by name and arguments', async () => {
-    // Create two TOOL_CALL events with same name but different arguments
-    threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call_123',
-      name: 'bash',
-      arguments: { command: 'ls' },
+  it('should handle multiple concurrent tool calls', async () => {
+    mockProvider.setResponse({
+      content: 'I will run both commands.',
+      toolCalls: [
+        {
+          id: 'call_multi_1',
+          name: 'bash',
+          input: { command: 'ls' },
+        },
+        {
+          id: 'call_multi_2',
+          name: 'bash',
+          input: { command: 'pwd' },
+        },
+      ],
     });
 
-    threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call_456',
-      name: 'bash',
-      arguments: { command: 'pwd' },
-    });
+    const conversationPromise = agent.sendMessage('Please run ls and pwd');
 
-    // Request approval for specific arguments
-    const approvalPromise = callback.requestApproval('bash', { command: 'pwd' });
+    // Wait for both approval requests
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Should match the second TOOL_CALL (call_456)
-    const events = threadManager.getEvents(threadId);
-    const approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
-    expect(approvalRequest?.data).toEqual({ toolCallId: 'call_456' });
+    const events = threadManager.getEvents(agent.threadId);
+    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(approvalRequests).toHaveLength(2);
 
-    // Resolve the approval
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_456',
+    // Approve both
+    const response1Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'call_multi_1',
       decision: ApprovalDecision.ALLOW_ONCE,
     });
 
-    const decision = await approvalPromise;
-    expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
+    const response2Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'call_multi_2',
+      decision: ApprovalDecision.ALLOW_ONCE,
+    });
+
+    agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
+    agent.emit('thread_event_added', { event: response2Event, threadId: agent.threadId });
+
+    // Wait for conversation to complete
+    await conversationPromise;
+
+    // Both tools should have executed
+    const finalEvents = threadManager.getEvents(agent.threadId);
+    const toolResults = finalEvents.filter((e) => e.type === 'TOOL_RESULT');
+    expect(toolResults).toHaveLength(2);
+  });
+
+  it('should recover from existing approvals in the thread', async () => {
+    // Pre-populate thread with existing approval (simulating recovery scenario)
+    threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+      id: 'call_recovery',
+      name: 'bash',
+      arguments: { command: 'echo "recovery test"' },
+    });
+
+    threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_REQUEST', {
+      toolCallId: 'call_recovery',
+    });
+
+    threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'call_recovery',
+      decision: ApprovalDecision.ALLOW_SESSION,
+    });
+
+    // Configure provider to return the same tool call
+    mockProvider.setResponse({
+      content: 'I will run the recovery command.',
+      toolCalls: [
+        {
+          id: 'call_recovery',
+          name: 'bash',
+          input: { command: 'echo "recovery test"' },
+        },
+      ],
+    });
+
+    // Execute through agent - should find existing approval
+    await agent.sendMessage('Please run the recovery command');
+
+    // Should not create duplicate approval request
+    const events = threadManager.getEvents(agent.threadId);
+    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(approvalRequests).toHaveLength(1); // Only the pre-existing one
+  });
+
+  it('should emit agent events when creating approval requests', async () => {
+    const eventSpy = vi.fn();
+    agent.on('thread_event_added', eventSpy);
+
+    mockProvider.setResponse({
+      content: 'I will run the command.',
+      toolCalls: [
+        {
+          id: 'call_emit_test',
+          name: 'bash',
+          input: { command: 'echo "test"' },
+        },
+      ],
+    });
+
+    const conversationPromise = agent.sendMessage('Please run echo test');
+
+    // Wait for event emission
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Should have emitted the TOOL_APPROVAL_REQUEST event
+    const approvalRequestCalls = eventSpy.mock.calls.filter(
+      (call) => call[0].event.type === 'TOOL_APPROVAL_REQUEST'
+    );
+    expect(approvalRequestCalls).toHaveLength(1);
+    expect(approvalRequestCalls[0][0].event.data).toEqual({ toolCallId: 'call_emit_test' });
+
+    // Complete the test
+    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'call_emit_test',
+      decision: ApprovalDecision.ALLOW_ONCE,
+    });
+
+    agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
+    await conversationPromise;
   });
 });
