@@ -58,15 +58,24 @@ export function useSSEStream(sessionId: ThreadId | null) {
         'THINKING',
         'SYSTEM_MESSAGE',
         'LOCAL_SYSTEM_MESSAGE',
+        'TOOL_APPROVAL_REQUEST',
+        'AGENT_TOKEN',
       ];
 
       eventTypes.forEach((eventType) => {
         eventSource.addEventListener(eventType, (event: MessageEvent) => {
           const eventData = JSON.parse(event.data as string) as SessionEvent;
-          setState((prev) => ({
-            ...prev,
-            events: [...prev.events, eventData],
-          }));
+          setState((prev) => {
+            // Keep only the last 1000 events to prevent memory/quota issues
+            const newEvents = [...prev.events, eventData];
+            if (newEvents.length > 1000) {
+              newEvents.splice(0, newEvents.length - 1000);
+            }
+            return {
+              ...prev,
+              events: newEvents,
+            };
+          });
         });
       });
     } catch (_error) {
