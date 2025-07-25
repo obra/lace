@@ -77,8 +77,8 @@ export function useTaskStream({
       }
     };
 
-    eventSource.onerror = (error) => {
-      onError?.(new Error('Task stream connection failed', error));
+    eventSource.onerror = (_error) => {
+      onError?.(new Error('Task stream connection failed'));
     };
 
     // Cleanup on unmount
