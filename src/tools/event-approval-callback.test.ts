@@ -14,9 +14,10 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { type ToolResult } from '~/tools/types';
 
-// Enhanced test provider that can return tool calls
+// Enhanced test provider that can return tool calls once, then regular responses
 class MockProviderWithToolCalls extends TestProvider {
   private configuredResponse?: ProviderResponse;
+  private hasReturnedToolCalls = false;
 
   setResponse(response: Partial<ProviderResponse>): void {
     this.configuredResponse = {
@@ -25,6 +26,7 @@ class MockProviderWithToolCalls extends TestProvider {
       usage: response.usage || { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
       stopReason: response.stopReason || 'end_turn',
     };
+    this.hasReturnedToolCalls = false; // Reset on new response config
   }
 
   async createResponse(
@@ -38,7 +40,20 @@ class MockProviderWithToolCalls extends TestProvider {
       if (signal?.aborted) {
         throw new Error('Request was aborted');
       }
-      return this.configuredResponse;
+
+      // Return tool calls only once, then return regular responses
+      if (this.configuredResponse.toolCalls.length > 0 && !this.hasReturnedToolCalls) {
+        this.hasReturnedToolCalls = true;
+        return this.configuredResponse;
+      } else {
+        // Return response without tool calls for subsequent requests
+        return {
+          content: this.configuredResponse.content,
+          toolCalls: [],
+          usage: this.configuredResponse.usage,
+          stopReason: this.configuredResponse.stopReason,
+        };
+      }
     }
     return super.createResponse(_messages, _tools, signal);
   }
@@ -191,25 +206,34 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     const conversationPromise = agent.sendMessage('Please run ls and pwd');
 
-    // Wait for both approval requests
+    // Wait for first approval request (tool calls are processed sequentially)
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const events = threadManager.getEvents(agent.threadId);
-    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
-    expect(approvalRequests).toHaveLength(2);
+    let events = threadManager.getEvents(agent.threadId);
+    const firstApprovalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(firstApprovalRequest).toBeDefined();
 
-    // Approve both
+    // Approve first tool call to allow second one to be processed
     const response1Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_multi_1',
       decision: ApprovalDecision.ALLOW_ONCE,
     });
 
+    agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
+
+    // Wait for second approval request
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    events = threadManager.getEvents(agent.threadId);
+    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(approvalRequests).toHaveLength(2);
+
+    // Approve second tool call
     const response2Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_multi_2',
       decision: ApprovalDecision.ALLOW_ONCE,
     });
 
-    agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
     agent.emit('thread_event_added', { event: response2Event, threadId: agent.threadId });
 
     // Wait for conversation to complete
