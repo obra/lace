@@ -7,12 +7,7 @@ import { NextRequest } from 'next/server';
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-// Mock approval manager
-vi.mock('@/lib/server/approval-manager', () => ({
-  getApprovalManager: () => ({
-    requestApproval: vi.fn().mockResolvedValue('allow_once'),
-  }),
-}));
+// Note: ApprovalManager has been removed and replaced with event-based approval system
 
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
