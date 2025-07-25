@@ -69,7 +69,7 @@ export function LaceApp() {
   // Use session events hook for event management
   const {
     filteredEvents: events,
-    approvalRequest,
+    pendingApprovals,
     loadingHistory,
     connected,
     clearApprovalRequest,
@@ -211,10 +211,11 @@ export function LaceApp() {
 
   // Handle tool approval decision
   const handleApprovalDecision = async (decision: ApprovalDecision) => {
-    if (!approvalRequest || !selectedAgent) return;
+    const currentApproval = pendingApprovals[0];
+    if (!currentApproval || !selectedAgent) return;
 
     try {
-      const res = await fetch(`/api/threads/${selectedAgent}/approvals/${approvalRequest.requestId}`, {
+      const res = await fetch(`/api/threads/${selectedAgent}/approvals/${currentApproval.toolCallId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision }),
@@ -717,9 +718,9 @@ export function LaceApp() {
       </motion.div>
 
       {/* Tool Approval Modal */}
-      {approvalRequest && (
+      {pendingApprovals.length > 0 && (
         <ToolApprovalModal
-          request={approvalRequest}
+          request={pendingApprovals[0].requestData}
           onDecision={handleApprovalDecision}
         />
       )}

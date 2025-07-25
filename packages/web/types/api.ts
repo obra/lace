@@ -209,6 +209,17 @@ export interface ToolApprovalRequestData {
   riskLevel: 'safe' | 'moderate' | 'destructive';
 }
 
+// Multiple approval support - as defined in spec Phase 3.2
+export interface PendingApproval {
+  toolCallId: string;
+  toolCall: {
+    name: string;
+    arguments: unknown;
+  };
+  requestedAt: Date;
+  requestData: ToolApprovalRequestData;
+}
+
 // API request/response for approval decisions
 export interface ToolApprovalResponse {
   requestId: string;
