@@ -54,10 +54,7 @@ export class EventApprovalCallback implements ApprovalCallback {
       const event = events[i];
       if (event.type === 'TOOL_CALL') {
         const toolCall = event.data as ToolCall;
-        if (
-          toolCall.name === toolName &&
-          isDeepStrictEqual(toolCall.arguments, input)
-        ) {
+        if (toolCall.name === toolName && isDeepStrictEqual(toolCall.arguments, input)) {
           return event;
         }
       }
