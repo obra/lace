@@ -965,18 +965,33 @@ export class Agent extends EventEmitter {
       // Execute tool - this will handle its own approval if needed
       const result = await this._toolExecutor.executeTool(toolCall, toolContext);
 
-      // Only add TOOL_RESULT if not pending
-      if (!result.isPending) {
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
-
-        // Emit tool call complete event
-        this.emit('tool_call_complete', {
-          toolName: toolCall.name,
-          result,
-          callId: toolCall.id,
-        });
+      // Handle different result types
+      if (result.isPending) {
+        // Tool approval is pending - don't add TOOL_RESULT event
+        // Don't decrement pending count yet - wait for approval response
+        return;
       }
-      // If pending, the approval system will handle execution later
+
+      // Tool completed (success or error) - add result and update tracking
+      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+
+      // Emit tool call complete event
+      this.emit('tool_call_complete', {
+        toolName: toolCall.name,
+        result,
+        callId: toolCall.id,
+      });
+
+      // Update batch tracking
+      this._pendingToolCount--;
+      if (result.isError) {
+        this._hasRejectionsInBatch = true;
+      }
+
+      // Check if all tools are complete
+      if (this._pendingToolCount === 0) {
+        this._handleBatchComplete();
+      }
     } catch (error: unknown) {
       logger.error('AGENT: Tool execution failed', {
         threadId: this._threadId,
@@ -998,6 +1013,27 @@ export class Agent extends EventEmitter {
         result: errorResult,
         callId: toolCall.id,
       });
+
+      // Update batch tracking for errors
+      this._pendingToolCount--;
+      this._hasRejectionsInBatch = true;
+
+      if (this._pendingToolCount === 0) {
+        this._handleBatchComplete();
+      }
+    }
+  }
+
+  private _handleBatchComplete(): void {
+    if (this._hasRejectionsInBatch) {
+      // Has rejections - wait for user input
+      this._setState('idle');
+      // Don't auto-continue conversation
+    } else {
+      // All approved - auto-continue conversation
+      this._completeTurn();
+      this._setState('idle');
+      void this._processConversation();
     }
   }
 
