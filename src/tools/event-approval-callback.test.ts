@@ -334,9 +334,9 @@ describe('EventApprovalCallback Integration Tests', () => {
       const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
 
       // Should throw pending error instead of blocking
-      await expect(
-        approvalCallback.requestApproval('bash', { command: 'ls' })
-      ).rejects.toThrow(ApprovalPendingError);
+      await expect(approvalCallback.requestApproval('bash', { command: 'ls' })).rejects.toThrow(
+        ApprovalPendingError
+      );
 
       // Verify approval request was created
       const events = threadManager.getEvents(agent.threadId);

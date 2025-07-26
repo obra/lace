@@ -904,6 +904,89 @@ describe('Enhanced Agent', () => {
       completeTurnSpy.mockRestore();
       processConversationSpy.mockRestore();
     });
+
+    it('should handle approval responses without double-decrementing pending count', async () => {
+      // Mock ToolExecutor to return completed result on second attempt (after approval)
+      const completedResult = {
+        id: 'call_approval',
+        isError: false,
+        isPending: false,
+        content: [{ type: 'text' as const, text: 'Tool completed after approval' }],
+      };
+      const pendingResult = {
+        id: 'call_approval',
+        isError: false,
+        isPending: true,
+        content: [{ type: 'text' as const, text: 'Tool approval pending' }],
+      };
+
+      // First call returns pending, second call returns completed
+      const executeToolSpy = vi
+        .spyOn(toolExecutor, 'executeTool')
+        .mockResolvedValueOnce(pendingResult)
+        .mockResolvedValueOnce(completedResult);
+
+      // Use a provider that returns tool calls once, then regular response
+      class MockProviderOnce extends MockProvider {
+        private hasReturnedToolCalls = false;
+
+        async createResponse(...args: Parameters<MockProvider['createResponse']>): Promise<any> {
+          if (!this.hasReturnedToolCalls) {
+            this.hasReturnedToolCalls = true;
+            return super.createResponse(...args);
+          }
+          // Return regular response without tool calls for subsequent requests
+          return {
+            content: 'Task completed.',
+            toolCalls: [],
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            stopReason: 'end_turn',
+          };
+        }
+      }
+
+      const mockProvider = new MockProviderOnce({
+        content: 'I will execute tools.',
+        toolCalls: [{ id: 'call_approval', name: 'mock_tool', input: { action: 'test' } }],
+      });
+
+      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      await agent.start();
+
+      // Send message to trigger initial tool execution (returns pending)
+      const conversationPromise = agent.sendMessage('Run command');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify tool execution was attempted once and returned pending
+      expect(executeToolSpy).toHaveBeenCalledTimes(1);
+
+      // Verify no TOOL_RESULT events yet (tool is pending)
+      let events = threadManager.getEvents(agent.threadId);
+      let toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(0);
+
+      // Now approve the tool
+      const approvalEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_approval',
+        decision: 'allow_once',
+      });
+      agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
+
+      // Wait for approval processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await conversationPromise;
+
+      // Tool should be executed second time (after approval) and succeed
+      expect(executeToolSpy).toHaveBeenCalledTimes(2);
+
+      // Should have exactly one TOOL_RESULT (no double-counting)
+      events = threadManager.getEvents(agent.threadId);
+      toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as ToolResult).id).toBe('call_approval');
+
+      executeToolSpy.mockRestore();
+    });
   });
 
   describe('error handling', () => {
