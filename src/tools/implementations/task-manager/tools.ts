@@ -30,7 +30,52 @@ const createTaskSchema = z.union([singleTaskSchema, bulkTasksSchema]);
 
 export class TaskCreateTool extends Tool {
   name = 'task_add';
-  description = 'Create a new task with detailed instructions for execution';
+  description = `Create tasks to track work - your primary planning tool.
+
+TASK SIZING STRATEGY:
+- Each task = one logical commit (atomic, testable change)
+- Break down until you can clearly see the implementation path
+- If you can't describe specific acceptance criteria, break it down further
+- Include enough context for independent work (files, approach, constraints)
+
+WHEN TO BREAK DOWN FURTHER:
+- Success criteria contain "and" statements (probably multiple commits)
+- You're unsure of the technical approach (create investigation task first)
+- Multiple files/systems need coordinating changes
+- Task feels overwhelming or vague
+
+WHEN TO ASK FOR HELP:
+- Requirements/context unclear (can't write good acceptance criteria)
+- Uncertain about technical approach (need validation before proceeding)
+- Tried approach isn't working and no clear alternative visible
+- Discovered scope is different than initially understood
+- Need information/access/decisions you can't get yourself
+
+COMMUNICATION PATTERNS:
+- Creating task = claiming responsibility to track it to completion
+- Task exists = others will ask "what's the status?"
+- Good tasks enable clear progress tracking and independent work
+- Poor tasks create confusion, scope creep, and rework
+
+EXAMPLES:
+Single atomic task: task_add({
+  title: "Add failing test for bulk task creation", 
+  prompt: "Create test in bulk-tasks.test.ts that expects task_add to accept {tasks: []} format. Test should fail initially. Files: src/tools/implementations/task-manager/bulk-tasks.test.ts",
+  priority: "high"
+})
+
+Investigation task: task_add({
+  title: "Investigate auth timeout root cause",
+  prompt: "Users report 5min logout instead of 30min. Debug token expiration, session storage, renewal logic. Output: specific root cause + recommended fix approach. Context: blocking beta release",
+  priority: "high"
+})
+
+Bulk planning: task_add({ tasks: [
+  {title: "Write failing test for union schema", prompt: "Test that createTaskSchema accepts both single task and {tasks: array} formats"},
+  {title: "Update schema to union type", prompt: "Change createTaskSchema to z.union([singleTaskSchema, bulkTasksSchema])"},  
+  {title: "Implement bulk creation logic", prompt: "Handle both formats in executeValidated, validate all before creating any"},
+  {title: "Update tool description", prompt: "Add bulk examples and task sizing guidance to description"}
+]})`;
   schema = createTaskSchema;
   annotations = {
     safeInternal: true,
@@ -128,7 +173,23 @@ const listTasksSchema = z.object({
 
 export class TaskListTool extends Tool {
   name = 'task_list';
-  description = 'List tasks filtered by assignment, creation, or thread';
+  description = `List tasks filtered by assignment, creation, or thread context.
+
+Filters:
+- 'thread' (default): All tasks in current conversation
+- 'mine': Tasks assigned to me  
+- 'created': Tasks I created
+- 'all': All tasks I can see (assigned to me or in my thread)
+
+Options:
+- includeCompleted: false (default) | true to show completed tasks
+
+Use regularly to:
+- Check your current workload before starting new tasks
+- See what tasks are assigned to subagents
+- Track overall progress on complex requests
+
+Example: task_list({ filter: "mine", includeCompleted: false })`;
   schema = listTasksSchema;
   annotations = {
     safeInternal: true,
@@ -214,7 +275,21 @@ const completeTaskSchema = z.object({
 
 export class TaskCompleteTool extends Tool {
   name = 'task_complete';
-  description = 'Mark a task as completed with a completion message or result';
+  description = `Mark a task as completed with your results or findings.
+
+Required:
+- id: Task ID to complete
+- message: Description of what was accomplished, findings, or results
+
+The message becomes part of the permanent task record and helps others understand what was done.
+
+Always include:
+- What you accomplished or discovered
+- Key results or outputs
+- Any issues encountered  
+- Next steps if applicable
+
+Example: task_complete({ id: "task_123", message: "Fixed authentication bug in auth.js line 45. Token validation was checking wrong expiration field. All tests now pass. Updated documentation." })`;
   schema = completeTaskSchema;
   annotations = {
     safeInternal: true,
@@ -275,7 +350,18 @@ const updateTaskSchema = z
 
 export class TaskUpdateTool extends Tool {
   name = 'task_update';
-  description = 'Update task properties (status, assignment, priority, etc.)';
+  description = `Update task properties like status, assignment, priority, or content.
+
+Use for:
+- Marking tasks in progress: task_update({ taskId: "task_123", status: "in_progress" })
+- Changing priority: task_update({ taskId: "task_123", priority: "high" })
+- Reassigning work: task_update({ taskId: "task_123", assignTo: "new:anthropic/claude-3-5-haiku-20241022" })
+- Updating requirements: task_update({ taskId: "task_123", prompt: "Updated requirements..." })
+
+Status options: pending, in_progress, completed, blocked
+Priority options: high, medium, low
+
+Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked on API access - need credentials" })`;
   schema = updateTaskSchema;
   annotations = {
     safeInternal: true,
@@ -343,7 +429,34 @@ const addNoteSchema = z.object({
 
 export class TaskAddNoteTool extends Tool {
   name = 'task_add_note';
-  description = 'Add a note to a task for communication between agents';
+  description = `Add a note to a task for communication between agents or progress updates.
+
+COMMUNICATION STRATEGY:
+- Each note = specific progress update or finding (not just "working on it")
+- Include what you discovered, decided, or need
+- Help others understand current state without reading your mind
+- Good notes enable handoffs and collaboration
+
+WHEN TO ADD NOTES:
+- Found something significant (root cause, key insight, blocker)
+- Made a technical decision that affects the approach
+- Need input/clarification on requirements or constraints
+- Completed a meaningful subtask within larger work
+- Hit a blocker and need specific help
+
+EFFECTIVE NOTE PATTERNS:
+- Status: "Implemented user validation. Next: password hashing middleware"
+- Finding: "Root cause: database connection timeout after 30s. Need to tune connection pool"
+- Decision: "Using JWT over sessions for better API scalability. Refs: RFC 7519"
+- Blocker: "Need staging database credentials to test migration. Who can provide?"
+- Question: "Should user deletion be soft delete or hard delete? Affects audit requirements"
+
+EXAMPLES:
+- Progress: task_add_note({ taskId: "task_123", note: "Auth endpoints implemented and tested. Working on middleware integration. ETA: 2 hours" })
+- Technical finding: task_add_note({ taskId: "task_123", note: "Performance issue found: N+1 query in user.getPermissions(). Switching to eager loading. 40ms -> 4ms improvement" })
+- Blocker: task_add_note({ taskId: "task_123", note: "Blocked: staging API returns 403 for all requests. Need to verify API key configuration. @jesse can you check?" })
+
+Notes become part of permanent task history - write for future readers.`;
   schema = addNoteSchema;
   annotations = {
     safeInternal: true,
@@ -389,7 +502,21 @@ const viewTaskSchema = z.object({
 
 export class TaskViewTool extends Tool {
   name = 'task_view';
-  description = 'View detailed information about a specific task';
+  description = `View detailed information about a specific task including notes and history.
+
+Shows:
+- Task metadata (title, status, priority, assignments)  
+- Full prompt and description
+- All notes and communications
+- Creation and update timestamps
+
+Use for:
+- Understanding task requirements before starting work
+- Reviewing progress and decisions made
+- Getting context on tasks assigned to you
+- Checking task status and notes
+
+Example: task_view({ taskId: "task_123" })`;
   schema = viewTaskSchema;
   annotations = {
     safeInternal: true,
