@@ -927,9 +927,8 @@ export class Agent extends EventEmitter {
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
       this._hasRejectionsInBatch = true;
     } else {
-      // Execute the approved tool (this time it should succeed)
-      void this._executeSingleTool(toolCall);
-      // Note: Don't decrement pending count here - _executeSingleTool will handle it
+      // Execute the approved tool directly (permission already granted)
+      void this._executeApprovedTool(toolCall);
       return; // Early return to avoid double decrementing
     }
 
@@ -952,20 +951,83 @@ export class Agent extends EventEmitter {
         workingDirectory,
       };
 
-      // Execute tool - this will handle its own approval if needed
-      const result = await this._toolExecutor.executeTool(toolCall, toolContext);
+      // First: Check permission
+      const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
+      
+      if (permission === 'granted') {
+        // Execute immediately if allowed
+        const result = await this._toolExecutor.executeTool(toolCall, toolContext);
+        
+        // Add result and update tracking
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+        this.emit('tool_call_complete', {
+          toolName: toolCall.name,
+          result,
+          callId: toolCall.id,
+        });
 
-      // Handle different result types
-      if (result.isPending) {
-        // Tool approval is pending - don't add TOOL_RESULT event
+        // Update batch tracking
+        this._pendingToolCount--;
+        if (result.isError) {
+          this._hasRejectionsInBatch = true;
+        }
+
+        if (this._pendingToolCount === 0) {
+          this._handleBatchComplete();
+        }
+      } else {
+        // Permission pending - approval request was created
         // Don't decrement pending count yet - wait for approval response
         return;
       }
+      
+    } catch (error: unknown) {
+      // Handle permission/execution errors
+      logger.error('AGENT: Tool execution failed', {
+        threadId: this._threadId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
-      // Tool completed (success or error) - add result and update tracking
+      const errorResult: ToolResult = {
+        id: toolCall.id,
+        isError: true,
+        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+      };
+      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+
+      // Emit tool call complete event for failed execution
+      this.emit('tool_call_complete', {
+        toolName: toolCall.name,
+        result: errorResult,
+        callId: toolCall.id,
+      });
+
+      // Update batch tracking for errors
+      this._pendingToolCount--;
+      this._hasRejectionsInBatch = true;
+
+      if (this._pendingToolCount === 0) {
+        this._handleBatchComplete();
+      }
+    }
+  }
+
+  private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
+    try {
+      const workingDirectory = this._getWorkingDirectory();
+      const toolContext = {
+        threadId: asThreadId(this._threadId),
+        parentThreadId: asThreadId(this._getParentThreadId()),
+        workingDirectory,
+      };
+
+      // Execute directly (permission already granted)
+      const result = await this._toolExecutor.executeTool(toolCall, toolContext);
+      
+      // Add result and update tracking
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
-
-      // Emit tool call complete event
       this.emit('tool_call_complete', {
         toolName: toolCall.name,
         result,
@@ -978,12 +1040,13 @@ export class Agent extends EventEmitter {
         this._hasRejectionsInBatch = true;
       }
 
-      // Check if all tools are complete
       if (this._pendingToolCount === 0) {
         this._handleBatchComplete();
       }
+      
     } catch (error: unknown) {
-      logger.error('AGENT: Tool execution failed', {
+      // Handle execution errors
+      logger.error('AGENT: Approved tool execution failed', {
         threadId: this._threadId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
