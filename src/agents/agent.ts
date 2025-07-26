@@ -8,7 +8,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, EventType } from '~/threads/types';
+import { ThreadEvent, EventType, ToolApprovalResponseData, asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -153,6 +153,13 @@ export class Agent extends EventEmitter {
     this._tokenBudgetManager = config.tokenBudget
       ? new TokenBudgetManager(config.tokenBudget)
       : null;
+
+    // Listen for tool approval responses
+    this.on('thread_event_added', ({ event }) => {
+      if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+        this._handleToolApprovalResponse(event);
+      }
+    });
 
     // Events are emitted through _addEventAndEmit() helper method
   }
@@ -882,6 +889,112 @@ export class Agent extends EventEmitter {
 
     // Agent goes idle immediately - no waiting
     this._setState('idle');
+  }
+
+  /**
+   * Handle TOOL_APPROVAL_RESPONSE events by executing the approved tool
+   */
+  private _handleToolApprovalResponse(event: ThreadEvent): void {
+    if (event.type !== 'TOOL_APPROVAL_RESPONSE') return;
+
+    const responseData = event.data as ToolApprovalResponseData;
+    const { toolCallId, decision } = responseData;
+
+    // Find the corresponding TOOL_CALL event
+    const events = this._threadManager.getEvents(this._threadId);
+    const toolCallEvent = events.find(
+      (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId
+    );
+
+    if (!toolCallEvent) {
+      logger.error('AGENT: No TOOL_CALL event found for approval response', {
+        threadId: this._threadId,
+        toolCallId,
+      });
+      return;
+    }
+
+    const toolCall = toolCallEvent.data as ToolCall;
+
+    if (decision === ApprovalDecision.DENY) {
+      // Create error result for denied tool
+      const errorResult: ToolResult = {
+        id: toolCallId,
+        isError: true,
+        content: [{ type: 'text', text: 'Tool execution denied by user' }],
+      };
+      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+
+      // Track rejection
+      this._hasRejectionsInBatch = true;
+    } else {
+      // Execute the approved tool
+      void this._executeSingleTool(toolCall);
+    }
+
+    // Check if all tools are complete
+    this._pendingToolCount--;
+    if (this._pendingToolCount === 0) {
+      // All tools complete - decide what to do next
+      if (this._hasRejectionsInBatch) {
+        // Has rejections - wait for user input
+        this._setState('idle');
+        // Don't auto-continue conversation
+      } else {
+        // All approved - auto-continue conversation
+        this._completeTurn();
+        this._setState('idle');
+        void this._processConversation();
+      }
+    }
+  }
+
+  /**
+   * Execute a single tool call without blocking
+   */
+  private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
+    try {
+      const workingDirectory = this._getWorkingDirectory();
+      const toolContext = {
+        threadId: asThreadId(this._threadId),
+        parentThreadId: asThreadId(this._getParentThreadId()),
+        workingDirectory,
+      };
+
+      // Execute tool - this will handle its own approval if needed
+      const result = await this._toolExecutor.executeTool(toolCall, toolContext);
+
+      // Add result event
+      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+
+      // Emit tool call complete event
+      this.emit('tool_call_complete', {
+        toolName: toolCall.name,
+        result,
+        callId: toolCall.id,
+      });
+    } catch (error: unknown) {
+      logger.error('AGENT: Tool execution failed', {
+        threadId: this._threadId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      const errorResult: ToolResult = {
+        id: toolCall.id,
+        isError: true,
+        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+      };
+      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+
+      // Emit tool call complete event for failed execution
+      this.emit('tool_call_complete', {
+        toolName: toolCall.name,
+        result: errorResult,
+        callId: toolCall.id,
+      });
+    }
   }
 
   private _setState(newState: AgentState): void {
