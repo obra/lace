@@ -9,6 +9,7 @@ import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
@@ -415,7 +416,7 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Use the tool');
 
       expect(stateChanges).toContain('thinking->tool_execution');
-      expect(stateChanges).toContain('tool_execution->thinking'); // After recursion
+      expect(stateChanges).toContain('tool_execution->idle'); // New non-blocking behavior: goes idle immediately
     });
 
     it('should add tool calls and results to thread', async () => {
@@ -497,13 +498,10 @@ describe('Enhanced Agent', () => {
 
     // New tests for non-blocking behavior
     it('should go idle immediately after processing tool calls', async () => {
-      const mockProvider = new MockProvider({
-        content: 'I will execute the tool.',
-        toolCalls: [
-          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-        ],
-      });
+      const mockProvider = createOneTimeToolProvider([
+        { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
+        { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+      ], 'I will execute the tool.');
 
       agent = createAgent({ provider: mockProvider });
       await agent.start();
@@ -531,10 +529,10 @@ describe('Enhanced Agent', () => {
     });
 
     it('should create tool call events without executing tools', async () => {
-      const mockProvider = new MockProvider({
-        content: 'I will execute the tool.',
-        toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
-      });
+      const mockProvider = createOneTimeToolProvider(
+        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        'I will execute the tool.'
+      );
 
       agent = createAgent({ provider: mockProvider });
       await agent.start();
@@ -571,14 +569,11 @@ describe('Enhanced Agent', () => {
     });
 
     it('should create multiple tool call events for multiple tool calls', async () => {
-      const mockProvider = new MockProvider({
-        content: 'I will execute multiple tools.',
-        toolCalls: [
-          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-          { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
-        ],
-      });
+      const mockProvider = createOneTimeToolProvider([
+        { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
+        { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+        { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
+      ], 'I will execute multiple tools.');
 
       agent = createAgent({ provider: mockProvider });
       await agent.start();
@@ -679,12 +674,17 @@ describe('Enhanced Agent', () => {
 
     it('should create error result when tool is denied', async () => {
       // Create tool call
-      const mockProvider = new MockProvider({
-        content: 'I will execute the tool.',
-        toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
-      });
+      const mockProvider = createOneTimeToolProvider(
+        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        'I will execute the tool.'
+      );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      
+      // Set up proper EventApprovalCallback for approval workflow
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      toolExecutor.setApprovalCallback(approvalCallback);
+      
       await agent.start();
 
       await agent.sendMessage('Run command');
@@ -712,17 +712,19 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute multiple tools independently as approvals arrive', async () => {
-      // Create multiple tool calls
-      const mockProvider = new MockProvider({
-        content: 'I will execute multiple tools.',
-        toolCalls: [
-          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-          { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
-        ],
-      });
+      // Create multiple tool calls with one-time provider to prevent infinite recursion
+      const mockProvider = createOneTimeToolProvider([
+        { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
+        { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+        { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
+      ], 'I will execute multiple tools.');
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      
+      // Set up proper EventApprovalCallback for approval workflow
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      toolExecutor.setApprovalCallback(approvalCallback);
+      
       await agent.start();
 
       await agent.sendMessage('Run commands');
@@ -775,12 +777,17 @@ describe('Enhanced Agent', () => {
     });
 
     it('should emit tool_call_complete events when tools execute', async () => {
-      const mockProvider = new MockProvider({
-        content: 'I will execute the tool.',
-        toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
-      });
+      const mockProvider = createOneTimeToolProvider(
+        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        'I will execute the tool.'
+      );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      
+      // Set up proper EventApprovalCallback for approval workflow
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      toolExecutor.setApprovalCallback(approvalCallback);
+      
       await agent.start();
 
       const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =
@@ -812,10 +819,10 @@ describe('Enhanced Agent', () => {
       // Mock ToolExecutor.executeTool to track calls
       const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
 
-      const mockProvider = new MockProvider({
-        content: 'I will execute the tool.',
-        toolCalls: [{ id: 'call_immediate', name: 'mock_tool', input: { action: 'test' } }],
-      });
+      const mockProvider = createOneTimeToolProvider(
+        [{ id: 'call_immediate', name: 'mock_tool', input: { action: 'test' } }],
+        'I will execute the tool.'
+      );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
       await agent.start();
@@ -847,24 +854,17 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle pending tool results without completing batch tracking', async () => {
-      // Mock ToolExecutor to return pending result
-      const pendingResult = {
-        id: 'call_pending',
-        isError: false,
-        isPending: true,
-        content: [{ type: 'text' as const, text: 'Tool approval pending' }],
-      };
-      vi.spyOn(toolExecutor, 'executeTool').mockResolvedValue(pendingResult);
-
-      const mockProvider = new MockProvider({
-        content: 'I will execute tools.',
-        toolCalls: [
-          { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
-          { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
-        ],
-      });
+      const mockProvider = createOneTimeToolProvider([
+        { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
+        { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
+      ], 'I will execute tools.');
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      
+      // Set up proper EventApprovalCallback to create pending approvals
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      toolExecutor.setApprovalCallback(approvalCallback);
+      
       await agent.start();
 
       // Track if batch completion methods are called prematurely
@@ -956,26 +956,6 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle approval responses without double-decrementing pending count', async () => {
-      // Mock ToolExecutor to return completed result on second attempt (after approval)
-      const completedResult = {
-        id: 'call_approval',
-        isError: false,
-        isPending: false,
-        content: [{ type: 'text' as const, text: 'Tool completed after approval' }],
-      };
-      const pendingResult = {
-        id: 'call_approval',
-        isError: false,
-        isPending: true,
-        content: [{ type: 'text' as const, text: 'Tool approval pending' }],
-      };
-
-      // First call returns pending, second call returns completed
-      const executeToolSpy = vi
-        .spyOn(toolExecutor, 'executeTool')
-        .mockResolvedValueOnce(pendingResult)
-        .mockResolvedValueOnce(completedResult);
-
       // Use a provider that returns tool calls once, then regular response
       class MockProviderOnce extends MockProvider {
         private hasReturnedToolCalls = false;
@@ -1001,19 +981,31 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      
+      // Set up proper EventApprovalCallback for approval workflow
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      toolExecutor.setApprovalCallback(approvalCallback);
+      
       await agent.start();
 
-      // Send message to trigger initial tool execution (returns pending)
-      const conversationPromise = agent.sendMessage('Run command');
+      // Spy on executeTool to verify call patterns (important for double-decrement detection)
+      const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
+
+      // Send message to trigger tool execution - should wait for approval
+      await agent.sendMessage('Run command');
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Verify tool execution was attempted once and returned pending
-      expect(executeToolSpy).toHaveBeenCalledTimes(1);
+      // Verify executeTool was NOT called yet (waiting for approval)
+      expect(executeToolSpy).toHaveBeenCalledTimes(0);
 
-      // Verify no TOOL_RESULT events yet (tool is pending)
+      // Verify no TOOL_RESULT events yet (tool is waiting for approval)
       let events = threadManager.getEvents(agent.threadId);
       let toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(0);
+
+      // Verify TOOL_APPROVAL_REQUEST was created
+      const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      expect(approvalRequests).toHaveLength(1);
 
       // Now approve the tool
       const approvalEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
@@ -1023,11 +1015,10 @@ describe('Enhanced Agent', () => {
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
 
       // Wait for approval processing
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      await conversationPromise;
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Tool should be executed second time (after approval) and succeed
-      expect(executeToolSpy).toHaveBeenCalledTimes(2);
+      // Tool should be executed once (after approval)
+      expect(executeToolSpy).toHaveBeenCalledTimes(1);
 
       // Should have exactly one TOOL_RESULT (no double-counting)
       events = threadManager.getEvents(agent.threadId);
