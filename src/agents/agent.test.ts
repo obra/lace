@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/b
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
@@ -594,11 +594,42 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute tool when TOOL_APPROVAL_RESPONSE event received', async () => {
-      // First create a tool call
+      // Create a provider that returns tool calls only once, then normal responses
+      let callCount = 0;
       const mockProvider = new MockProvider({
         content: 'I will execute the tool.',
         toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
       });
+
+      // Override createResponse to stop returning tool calls after first call
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            content: 'I will execute the tool.',
+            toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            stopReason: 'end_turn',
+          });
+        } else {
+          return Promise.resolve({
+            content: 'Tool executed successfully.',
+            toolCalls: [],
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            stopReason: 'end_turn',
+          });
+        }
+      });
+
+      // Create an approval callback that requires approval (doesn't auto-approve)
+      const pendingApprovalCallback: ApprovalCallback = {
+        requestApproval: () => {
+          throw new ApprovalPendingError('call_1');
+        },
+      };
+
+      // Override the toolExecutor's approval callback for this specific test
+      toolExecutor.setApprovalCallback(pendingApprovalCallback);
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
       await agent.start();
@@ -633,6 +664,12 @@ describe('Enhanced Agent', () => {
       const toolResult = toolResults[0].data as ToolResult;
       expect(toolResult.id).toBe('call_1');
       expect(toolResult.isError).toBe(false);
+      
+      // Restore auto-approval callback for other tests
+      const autoApprovalCallback: ApprovalCallback = {
+        requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+      };
+      toolExecutor.setApprovalCallback(autoApprovalCallback);
     });
 
     it('should create error result when tool is denied', async () => {
