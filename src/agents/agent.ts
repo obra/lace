@@ -876,6 +876,21 @@ export class Agent extends EventEmitter {
       // Add tool call to thread
       this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
 
+      // Create approval request immediately
+      const approvalRequestEvent = this._threadManager.addEvent(
+        this._threadId,
+        'TOOL_APPROVAL_REQUEST',
+        {
+          toolCallId: providerToolCall.id,
+        }
+      );
+
+      // Emit approval request event for UI (SSE stream)
+      this.emit('thread_event_added', {
+        event: approvalRequestEvent,
+        threadId: this._threadId,
+      });
+
       // Emit tool call start event for UI
       this.emit('tool_call_start', {
         toolName: providerToolCall.name,
@@ -964,15 +979,18 @@ export class Agent extends EventEmitter {
       // Execute tool - this will handle its own approval if needed
       const result = await this._toolExecutor.executeTool(toolCall, toolContext);
 
-      // Add result event
-      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+      // Only add TOOL_RESULT if not pending
+      if (!result.isPending) {
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
 
-      // Emit tool call complete event
-      this.emit('tool_call_complete', {
-        toolName: toolCall.name,
-        result,
-        callId: toolCall.id,
-      });
+        // Emit tool call complete event
+        this.emit('tool_call_complete', {
+          toolName: toolCall.name,
+          result,
+          callId: toolCall.id,
+        });
+      }
+      // If pending, the approval system will handle execution later
     } catch (error: unknown) {
       logger.error('AGENT: Tool execution failed', {
         threadId: this._threadId,

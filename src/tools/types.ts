@@ -58,6 +58,7 @@ export interface ToolResult {
   id?: string; // Optional - set by tools if they have it
   content: ContentBlock[];
   isError: boolean; // Keep required (clearer than MCP's optional)
+  isPending?: boolean; // New field - indicates approval is pending
   metadata?: Record<string, unknown>; // For delegation threadId, etc.
 }
 
@@ -92,4 +93,18 @@ export function createErrorResult(
     return createToolResult(true, [{ type: 'text', text: input }], id, metadata);
   }
   return createToolResult(true, input, id, metadata);
+}
+
+export function createPendingResult(
+  message: string,
+  toolCallId?: string,
+  metadata?: Record<string, unknown>
+): ToolResult {
+  return {
+    id: toolCallId,
+    isError: false,
+    isPending: true,
+    content: [{ type: 'text', text: message }],
+    metadata,
+  };
 }
