@@ -268,6 +268,21 @@ export class SessionService {
           
           sseManager.broadcast(sessionId, sessionEvent);
         }
+      } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+        // Forward approval response events to UI so modal can refresh
+        const responseData = event.data as { toolCallId: string; decision: string };
+        
+        const sessionEvent: SessionEvent = {
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: asThreadId(eventThreadId),
+          timestamp: new Date(event.timestamp),
+          data: {
+            toolCallId: responseData.toolCallId,
+            decision: responseData.decision,
+          },
+        };
+        
+        sseManager.broadcast(sessionId, sessionEvent);
       }
     });
   }

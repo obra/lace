@@ -47,6 +47,15 @@ describe('SessionService after getSessionData removal', () => {
   });
 });
 
+// Mock SSEManager
+vi.mock('@/lib/sse-manager', () => ({
+  SSEManager: {
+    getInstance: vi.fn(() => ({
+      broadcast: vi.fn()
+    }))
+  }
+}));
+
 // Mock external dependencies (filesystem, database) but not business logic
 vi.mock('~/persistence/database', () => {
   // Keep a simple in-memory store to test real behavior
@@ -70,6 +79,11 @@ vi.mock('~/persistence/database', () => {
   };
 });
 
+// Mock agent-utils
+vi.mock('./agent-utils', () => ({
+  setupAgentApprovals: vi.fn()
+}));
+
 // Mock Project.getById - external dependency for project validation
 vi.mock('@/lib/server/lace-imports', async () => {
   const actual = await vi.importActual('@/lib/server/lace-imports');
@@ -77,6 +91,13 @@ vi.mock('@/lib/server/lace-imports', async () => {
     ...actual,
     Project: {
       getById: vi.fn((projectId: string) => ({ id: projectId, name: 'Test Project' })),
+    },
+    Session: {
+      create: vi.fn(),
+      getAll: vi.fn(),
+      getById: vi.fn(),
+      updateSession: vi.fn(),
+      getSession: vi.fn()
     },
   };
 });
@@ -160,5 +181,156 @@ describe('SessionService Missing Methods', () => {
       expect(updatedSession?.description).toBe('Partially updated description'); // changed
       expect(updatedSession?.projectId).toBe('test-project'); // unchanged
     });
+  });
+});
+
+describe('SessionService approval event forwarding', () => {
+  let sessionService: SessionService;
+  let mockSSEManager: { broadcast: vi.Mock };
+  let mockAgent: any;
+  let mockSession: any;
+  const sessionId = asThreadId('session-123');
+  const threadId = asThreadId('thread-456');
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    
+    // Import SSEManager properly
+    const { SSEManager } = await import('@/lib/sse-manager');
+    mockSSEManager = {
+      broadcast: vi.fn()
+    };
+    (SSEManager.getInstance as any).mockReturnValue(mockSSEManager);
+
+    // Create mock agent with event emitter capabilities
+    mockAgent = {
+      threadId: threadId,
+      on: vi.fn(),
+      emit: vi.fn(),
+      threadManager: {
+        getEvents: vi.fn()
+      },
+      toolExecutor: {
+        getTool: vi.fn()
+      }
+    };
+
+    // Create mock session
+    mockSession = {
+      getId: () => sessionId,
+      getAgent: vi.fn(() => mockAgent),
+      getAgents: vi.fn(() => [{ threadId, name: 'test-agent' }]),
+      getInfo: vi.fn(() => ({
+        name: 'Test Session',
+        createdAt: new Date()
+      }))
+    };
+
+    sessionService = new SessionService();
+  });
+
+  it('should forward TOOL_APPROVAL_RESPONSE events to SSE', async () => {
+    // Set up the agent event handlers
+    const setupHandlers = (sessionService as any).setupAgentEventHandlers;
+    setupHandlers.call(sessionService, mockAgent, sessionId);
+
+    // Verify thread_event_added handler was registered
+    expect(mockAgent.on).toHaveBeenCalledWith('thread_event_added', expect.any(Function));
+    const threadEventHandler = mockAgent.on.mock.calls.find(
+      (call: any) => call[0] === 'thread_event_added'
+    )?.[1];
+
+    expect(threadEventHandler).toBeDefined();
+
+    // Simulate TOOL_APPROVAL_RESPONSE event
+    const approvalResponseEvent = {
+      id: 'evt-response-123',
+      threadId: threadId,
+      type: 'TOOL_APPROVAL_RESPONSE',
+      timestamp: new Date(),
+      data: {
+        toolCallId: 'tool-call-123',
+        decision: 'approve'
+      }
+    };
+
+    // Call the handler
+    await threadEventHandler({ 
+      event: approvalResponseEvent, 
+      threadId: threadId 
+    });
+
+    // Verify SSE broadcast was called for the approval response
+    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
+      sessionId,
+      expect.objectContaining({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: threadId,
+        data: expect.objectContaining({
+          toolCallId: 'tool-call-123',
+          decision: 'approve'
+        })
+      })
+    );
+  });
+
+  it('should handle TOOL_APPROVAL_REQUEST events (existing behavior)', async () => {
+    // Set up the agent event handlers
+    const setupHandlers = (sessionService as any).setupAgentEventHandlers;
+    setupHandlers.call(sessionService, mockAgent, sessionId);
+
+    const threadEventHandler = mockAgent.on.mock.calls.find(
+      (call: any) => call[0] === 'thread_event_added'
+    )?.[1];
+
+    // Mock the tool call event lookup
+    const mockToolCall = {
+      id: 'tool-call-123',
+      name: 'test-tool',
+      arguments: { test: 'args' }
+    };
+    
+    mockAgent.threadManager.getEvents.mockReturnValue([
+      {
+        type: 'TOOL_CALL',
+        data: mockToolCall
+      }
+    ]);
+
+    // Mock tool metadata
+    mockAgent.toolExecutor.getTool.mockReturnValue({
+      description: 'Test tool',
+      annotations: { readOnlyHint: false }
+    });
+
+    // Simulate TOOL_APPROVAL_REQUEST event
+    const approvalRequestEvent = {
+      id: 'evt-request-123',
+      threadId: threadId,
+      type: 'TOOL_APPROVAL_REQUEST',
+      timestamp: new Date(),
+      data: {
+        toolCallId: 'tool-call-123'
+      }
+    };
+
+    // Call the handler
+    await threadEventHandler({ 
+      event: approvalRequestEvent, 
+      threadId: threadId 
+    });
+
+    // Verify SSE broadcast was called for the approval request
+    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
+      sessionId,
+      expect.objectContaining({
+        type: 'TOOL_APPROVAL_REQUEST',
+        threadId: threadId,
+        data: expect.objectContaining({
+          requestId: 'tool-call-123',
+          toolName: 'test-tool'
+        })
+      })
+    );
   });
 });
