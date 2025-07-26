@@ -57,7 +57,6 @@ Examples:
   // Dependencies injected by the main agent's context
   private parentAgent?: Agent;
   private parentToolExecutor?: ToolExecutor;
-  private defaultTimeout: number = 300000; // 5 minutes default
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
@@ -139,16 +138,10 @@ Examples:
           taskMessageLength: taskMessage.length,
         });
 
-        // Create promise that resolves when conversation completes or times out
+        // Create promise that resolves when conversation completes (no timeout)
         const resultPromise = new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            logger.error('DelegateTool: Subagent timed out', { title });
-            reject(new Error(`Subagent timeout after ${this.defaultTimeout}ms`));
-          }, this.defaultTimeout);
-
           const completeHandler = () => {
             logger.debug('DelegateTool: Subagent conversation complete', { title });
-            clearTimeout(timeout);
             resolve();
           };
 
@@ -157,7 +150,6 @@ Examples:
               title,
               error: error.message,
             });
-            clearTimeout(timeout);
             reject(error);
           };
 
