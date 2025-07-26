@@ -1018,8 +1018,8 @@ describe('Enhanced Agent', () => {
 
       await agent.start();
 
-      // Spy on executeTool to verify call patterns (important for double-decrement detection)
-      const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
+      // Spy on tool execute to verify call patterns (important for double-decrement detection)
+      const executeToolSpy = vi.spyOn(mockTool, 'execute');
 
       // Send message to trigger tool execution - should wait for approval
       await agent.sendMessage('Run command');
