@@ -80,8 +80,16 @@ describe('Event-Based Approval Callback', () => {
       data: { toolCallId: 'call_123' }
     });
 
-    // Start the approval request (don't await yet)
-    const approvalPromise = approvalCallback.requestApproval('bash', { command: 'ls' });
+    // Start the approval request - should throw ApprovalPendingError
+    try {
+      await approvalCallback.requestApproval('bash', { command: 'ls' });
+      throw new Error('Expected ApprovalPendingError to be thrown');
+    } catch (error: unknown) {
+      // Verify that ApprovalPendingError was thrown with correct toolCallId
+      expect(error).toBeInstanceOf(Error);
+      const approvalError = error as { toolCallId?: string };
+      expect(approvalError.toolCallId).toBe('call_123');
+    }
 
     // Verify TOOL_APPROVAL_REQUEST event was created
     expect(mockAgent.threadManager.addEvent).toHaveBeenCalledWith(
@@ -90,27 +98,14 @@ describe('Event-Based Approval Callback', () => {
       { toolCallId: 'call_123' }
     );
 
-    // Simulate approval response by finding and calling the event listener
-    const onCall = mockAgent.on.mock.calls.find(
-      call => call[0] === 'thread_event_added'
-    );
-    expect(onCall).toBeDefined();
-    
-    const eventListener = onCall?.[1] as (data: { event: { type: string; data: { toolCallId: string; decision: string } }; threadId: string }) => void;
-    expect(eventListener).toBeDefined();
-
-    // Trigger approval response
-    eventListener({
-      event: {
-        type: 'TOOL_APPROVAL_RESPONSE',
-        data: { toolCallId: 'call_123', decision: 'allow_once' }
-      },
+    // Verify agent.emit was called to notify SSE stream
+    expect(mockAgent.emit).toHaveBeenCalledWith('thread_event_added', {
+      event: expect.objectContaining({
+        type: 'TOOL_APPROVAL_REQUEST',
+        data: { toolCallId: 'call_123' }
+      }),
       threadId: 'test_thread_123'
     });
-
-    // Now the promise should resolve
-    const decision = await approvalPromise;
-    expect(decision).toBe('allow_once');
   });
 
   it('should return existing approval if response already exists', async () => {
@@ -142,6 +137,10 @@ describe('Event-Based Approval Callback', () => {
   });
 
   it('should clean up event listeners when approval resolves', async () => {
+    // This test is no longer relevant since EventApprovalCallback doesn't use event listeners
+    // It throws ApprovalPendingError immediately and doesn't wait for responses
+    // The Agent handles re-checking for approval responses during conversation processing
+    
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
     const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0]?.[0] as ApprovalCallback;
@@ -163,8 +162,16 @@ describe('Event-Based Approval Callback', () => {
       data: { toolCallId: 'call_789' }
     });
 
-    // Start approval request
-    const approvalPromise = approvalCallback.requestApproval('bash', { command: 'pwd' });
+    // Start approval request - should throw ApprovalPendingError
+    try {
+      await approvalCallback.requestApproval('bash', { command: 'pwd' });
+      throw new Error('Expected ApprovalPendingError to be thrown');
+    } catch (error: unknown) {
+      // Verify that ApprovalPendingError was thrown with correct toolCallId
+      expect(error).toBeInstanceOf(Error);
+      const approvalError = error as { toolCallId?: string };
+      expect(approvalError.toolCallId).toBe('call_789');
+    }
 
     // Verify request event was created
     expect(mockAgent.threadManager.addEvent).toHaveBeenCalledWith(
@@ -173,28 +180,9 @@ describe('Event-Based Approval Callback', () => {
       { toolCallId: 'call_789' }
     );
 
-    // Get the event listener
-    const onCall = mockAgent.on.mock.calls.find(
-      call => call[0] === 'thread_event_added'
-    );
-    expect(onCall).toBeDefined();
-    
-    const eventListener = onCall?.[1] as (data: { event: { type: string; data: { toolCallId: string; decision: string } }; threadId: string }) => void;
-
-    // Trigger approval response
-    eventListener({
-      event: {
-        type: 'TOOL_APPROVAL_RESPONSE',
-        data: { toolCallId: 'call_789', decision: 'deny' }
-      },
-      threadId: 'test_thread_123'
-    });
-
-    // Promise should resolve
-    const decision = await approvalPromise;
-    expect(decision).toBe('deny');
-
-    // Verify event listener cleanup was called
-    expect(mockAgent.off).toHaveBeenCalledWith('thread_event_added', eventListener);
+    // EventApprovalCallback doesn't register event listeners - it just throws
+    // The Agent handles checking for approval responses during tool execution retry
+    expect(mockAgent.on).not.toHaveBeenCalledWith('thread_event_added', expect.any(Function));
+    expect(mockAgent.off).not.toHaveBeenCalled();
   });
 });
