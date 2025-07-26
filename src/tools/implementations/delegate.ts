@@ -17,7 +17,7 @@ const ModelFormat = z.string().refine(
   },
   {
     message:
-      'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3-5-haiku-latest")',
+      'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3-5-haiku-20241022")',
   }
 );
 
@@ -29,21 +29,21 @@ const delegateSchema = z.object({
   expected_response: NonEmptyString.describe(
     'Description of the expected format/content of the response (guides the subagent)'
   ),
-  model: ModelFormat.default('anthropic:claude-3-5-haiku-latest').describe(
+  model: ModelFormat.default('anthropic:claude-3-5-haiku-20241022').describe(
     'Provider and model in format "provider:model"'
   ),
 });
 
 export class DelegateTool extends Tool {
   name = 'delegate';
-  description = `Delegate a specific task to a subagent using a less expensive model.
+  description = `Delegate a specific task to a subagent using a more cost-effective model.
 Ideal for research, data extraction, log analysis, or any focused task with clear outputs.
 The subagent starts fresh with only your instructions - no conversation history.
 
 Examples:
-- title: "Analyze test failures", prompt: "Review the test output and identify the root cause of failures", expected_response: "List of failing tests with specific error reasons"
-- title: "Search authentication logs", prompt: "grep through the application logs for authentication errors in the last hour", expected_response: "Timestamps and error messages for each auth failure"
-- title: "Count code statistics", prompt: "Count total lines of code, number of files, and test coverage percentage", expected_response: "JSON with {loc: number, files: number, coverage: number}"`;
+- title: "Analyze test failures", prompt: "Review the test output and identify the root cause of failures", expected_response: "List of failing tests with specific error reasons", model: "anthropic:claude-3-5-haiku-20241022"
+- title: "Search authentication logs", prompt: "grep through the application logs for authentication errors in the last hour", expected_response: "Timestamps and error messages for each auth failure", model: "anthropic:claude-3-5-haiku-20241022"  
+- title: "Complex code review", prompt: "Review this PR for architecture issues and suggest improvements", expected_response: "Detailed analysis with specific recommendations", model: "anthropic:claude-sonnet-4-20250514"`;
 
   schema = delegateSchema;
   annotations: ToolAnnotations = {

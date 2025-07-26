@@ -163,7 +163,7 @@ describe('DelegateTool', () => {
       title: 'Search logs',
       prompt: 'Find errors in logs',
       expected_response: 'Error list',
-      model: 'anthropic:claude-3.5-sonnet-latest',
+      model: 'anthropic:claude-sonnet-4-20250514',
     });
 
     // Test that delegation works with custom model specification
@@ -173,7 +173,7 @@ describe('DelegateTool', () => {
     // Verify the correct model was requested
     expect(AnthropicProvider).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'claude-3.5-sonnet-latest',
+        model: 'claude-sonnet-4-20250514',
       })
     );
   });
@@ -336,5 +336,26 @@ describe('DelegateTool', () => {
 
     // Verify delegation worked and returned expected content
     expect(result.content[0]?.text).toContain('Delegation complete');
+  });
+
+  it('should accept valid model formats', async () => {
+    // Test various valid model formats
+    const validModels = [
+      'anthropic:claude-3-5-haiku-20241022',
+      'anthropic:claude-sonnet-4-20250514',
+      'openai:gpt-4',
+    ];
+
+    for (const model of validModels) {
+      const result = await tool.execute({
+        title: 'Test Task',
+        prompt: 'Test prompt',
+        expected_response: 'Test response',
+        model,
+      });
+
+      // Should not fail on model validation
+      expect(result.isError).toBe(false);
+    }
   });
 });
