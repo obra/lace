@@ -82,9 +82,9 @@ export function ProjectSelectorPanel({
   const [createNewEnvKey, setCreateNewEnvKey] = useState('');
   const [createNewEnvValue, setCreateNewEnvValue] = useState('');
 
-  // State for simplified mode
+  // State for simplified mode - default to simplified for all project creation
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const isSimplifiedMode = autoOpenCreate && !showAdvancedOptions;
+  const isSimplifiedMode = !showAdvancedOptions;
 
   // Auto-open project creation modal when requested
   useEffect(() => {
@@ -351,8 +351,8 @@ export function ProjectSelectorPanel({
         onProjectCreate();
       }
 
-      // If this is simplified onboarding mode, navigate directly to the coordinator agent
-      if (isSimplifiedMode && onOnboardingComplete) {
+      // For any project creation, navigate directly to the coordinator agent
+      if (onOnboardingComplete) {
         // Step 2: Get sessions (project creation should have created a default session)
         const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
         if (sessionsRes.ok) {
@@ -368,12 +368,16 @@ export function ProjectSelectorPanel({
             await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
           } else {
             console.error('No session found in project');
+            // Fallback to regular project selection if session creation failed
+            onProjectSelect(projectData.project);
           }
         } else {
           console.error('Failed to fetch sessions:', await sessionsRes.text());
+          // Fallback to regular project selection if session fetch failed
+          onProjectSelect(projectData.project);
         }
       } else {
-        // Regular project creation - just select the project
+        // Fallback to regular project creation - just select the project
         onProjectSelect(projectData.project);
       }
 
@@ -916,7 +920,7 @@ export function ProjectSelectorPanel({
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">
-                {isSimplifiedMode ? 'Welcome to Lace' : 'Create New Project'}
+                {autoOpenCreate && isSimplifiedMode ? 'Welcome to Lace' : 'Create New Project'}
               </h3>
               <button
                 onClick={handleCancelCreateProject}
@@ -931,11 +935,13 @@ export function ProjectSelectorPanel({
                 {isSimplifiedMode ? (
                   // Simplified Mode UI
                   <>
-                    <div className="text-center mb-6">
-                      <p className="text-base-content/60">
-                        Let&apos;s get you started with your first AI coding project.
-                      </p>
-                    </div>
+                    {autoOpenCreate && (
+                      <div className="text-center mb-6">
+                        <p className="text-base-content/60">
+                          Let&apos;s get you started with your first AI coding project.
+                        </p>
+                      </div>
+                    )}
 
                     <div>
                       <label className="label">
@@ -1188,7 +1194,7 @@ export function ProjectSelectorPanel({
                       Creating...
                     </>
                   ) : (
-                    isSimplifiedMode ? 'Get Started' : 'Create Project'
+                    autoOpenCreate && isSimplifiedMode ? 'Get Started' : 'Create Project'
                   )}
                 </button>
               </div>
