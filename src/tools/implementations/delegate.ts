@@ -11,6 +11,8 @@ import { ToolExecutor } from '~/tools/executor';
 import { AIProvider } from '~/providers/base-provider';
 import { TokenBudgetConfig } from '~/token-management/types';
 import { ProviderRegistry } from '~/providers/registry';
+import type { TaskManager } from '~/tasks/task-manager';
+import type { Task } from '~/tasks/types';
 import { logger } from '~/utils/logger';
 
 // Model format validation
@@ -60,11 +62,20 @@ Examples:
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
       const { title, prompt, expected_response, model } = args;
 
+      // Check if we have TaskManager in context for new task-based approach
+      if (context?.taskManager) {
+        return await this.performTaskBasedDelegation(
+          { title, prompt, expected_response, model },
+          context
+        );
+      }
+
+      // Fall back to old delegation approach if no TaskManager
       return await this.performDelegation({ title, prompt, expected_response, model });
     } catch (error: unknown) {
       return this.createError(
@@ -258,5 +269,109 @@ IMPORTANT: Once you have gathered enough information to provide the expected res
     }
 
     return childExecutor;
+  }
+
+  private async performTaskBasedDelegation(
+    params: {
+      title: string;
+      prompt: string;
+      expected_response: string;
+      model: string;
+    },
+    context: ToolContext
+  ): Promise<ToolResult> {
+    const { title, prompt, expected_response, model } = params;
+    const taskManager = context.taskManager;
+
+    if (!taskManager) {
+      return this.createError('TaskManager context access needs implementation');
+    }
+
+    // Parse provider:model format
+    const [providerName, modelName] = model.split(':');
+
+    try {
+      // Create task with agent spawning
+      const task = await taskManager.createTask(
+        {
+          title,
+          prompt: this.formatDelegatePrompt(prompt, expected_response),
+          assignedTo: `new:${providerName}/${modelName}`,
+          priority: 'high',
+        },
+        {
+          actor: context.threadId || 'unknown',
+        }
+      );
+
+      logger.debug('DelegateTool: Created task for delegation', {
+        taskId: task.id,
+        title,
+        model: `${providerName}/${modelName}`,
+      });
+
+      // Wait for task completion via events
+      const result = await this.waitForTaskCompletion(
+        task.id,
+        taskManager,
+        context.threadId || 'unknown'
+      );
+
+      logger.debug('DelegateTool: Task completed', {
+        taskId: task.id,
+        resultLength: result.length,
+      });
+
+      return this.createResult(result, {
+        taskTitle: title,
+        taskId: task.id,
+      });
+    } catch (error: unknown) {
+      return this.createError(
+        `Task-based delegation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+      );
+    }
+  }
+
+  private formatDelegatePrompt(prompt: string, expectedResponse: string): string {
+    return `${prompt}
+
+IMPORTANT: Your response should match this format/structure:
+${expectedResponse}
+
+Please complete the task and provide your response in the expected format.`;
+  }
+
+  private async waitForTaskCompletion(
+    taskId: string,
+    taskManager: TaskManager,
+    creatorThreadId: string
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const handleTaskUpdate = (event: { task: Task; creatorThreadId: string }) => {
+        if (event.task.id === taskId && event.creatorThreadId === creatorThreadId) {
+          if (event.task.status === 'completed') {
+            taskManager.off('task:updated', handleTaskUpdate);
+            const response = this.extractResponseFromTask(event.task);
+            resolve(response);
+          } else if (event.task.status === 'blocked') {
+            taskManager.off('task:updated', handleTaskUpdate);
+            reject(new Error(`Task ${taskId} is blocked`));
+          }
+        }
+      };
+
+      taskManager.on('task:updated', handleTaskUpdate);
+    });
+  }
+
+  private extractResponseFromTask(task: Task): string {
+    // Get the agent's response from task notes
+    const response = task.notes
+      .filter((note) => note.author !== task.createdBy) // Exclude creator's notes
+      .map((note) => note.content)
+      .join('\n\n');
+
+    return response || 'Task completed without response';
   }
 }
