@@ -575,12 +575,12 @@ describe('Enhanced Agent', () => {
   describe('event-driven tool execution', () => {
     let mockTool: MockTool;
 
-    beforeEach(async () => {
+    beforeEach(() => {
       mockTool = new MockTool({
         isError: false,
         content: [{ type: 'text', text: 'Tool executed successfully' }],
       });
-      
+
       // Register the mock tool with the toolExecutor for these tests
       toolExecutor.registerTool('mock_tool', mockTool);
     });
@@ -733,7 +733,8 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
       await agent.start();
 
-      const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> = [];
+      const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =
+        [];
       agent.on('tool_call_complete', (data) => toolCompleteEvents.push(data));
 
       await agent.sendMessage('Run command');
@@ -755,6 +756,44 @@ describe('Enhanced Agent', () => {
       expect(toolCompleteEvents[0].toolName).toBe('mock_tool');
       expect(toolCompleteEvents[0].callId).toBe('call_1');
       expect(toolCompleteEvents[0].result.isError).toBe(false);
+    });
+
+    it('should attempt tool execution immediately instead of creating approval requests directly', async () => {
+      // Mock ToolExecutor.executeTool to track calls
+      const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
+
+      const mockProvider = new MockProvider({
+        content: 'I will execute the tool.',
+        toolCalls: [{ id: 'call_immediate', name: 'mock_tool', input: { action: 'test' } }],
+      });
+
+      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      await agent.start();
+
+      // Send message to trigger tool calls
+      await agent.sendMessage('Run command');
+
+      // Verify ToolExecutor.executeTool was called immediately
+      expect(executeToolSpy).toHaveBeenCalledTimes(1);
+      expect(executeToolSpy).toHaveBeenCalledWith(
+        {
+          id: 'call_immediate',
+          name: 'mock_tool',
+          arguments: { action: 'test' },
+        },
+        expect.objectContaining({
+          threadId: expect.any(String) as string,
+          parentThreadId: expect.any(String) as string,
+          workingDirectory: expect.any(String) as string,
+        }) as ToolContext
+      );
+
+      // Verify Agent should NOT create TOOL_APPROVAL_REQUEST events directly
+      const events = threadManager.getEvents(agent.threadId);
+      const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      expect(approvalRequests).toHaveLength(0); // Agent shouldn't create these directly
+
+      executeToolSpy.mockRestore();
     });
   });
 

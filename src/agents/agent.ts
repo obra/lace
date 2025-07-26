@@ -876,21 +876,6 @@ export class Agent extends EventEmitter {
       // Add tool call to thread
       this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
 
-      // Create approval request immediately
-      const approvalRequestEvent = this._threadManager.addEvent(
-        this._threadId,
-        'TOOL_APPROVAL_REQUEST',
-        {
-          toolCallId: providerToolCall.id,
-        }
-      );
-
-      // Emit approval request event for UI (SSE stream)
-      this.emit('thread_event_added', {
-        event: approvalRequestEvent,
-        threadId: this._threadId,
-      });
-
       // Emit tool call start event for UI
       this.emit('tool_call_start', {
         toolName: providerToolCall.name,
@@ -898,8 +883,9 @@ export class Agent extends EventEmitter {
         callId: providerToolCall.id,
       });
 
-      // NO EXECUTION HERE - just fire approval request
-      // Tool execution will be triggered by approval events
+      // Attempt tool execution immediately
+      // This will trigger approval flow and create approval requests
+      void this._executeSingleTool(toolCall);
     }
 
     // Agent goes idle immediately - no waiting
