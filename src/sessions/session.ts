@@ -6,7 +6,8 @@ import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
 import { ToolExecutor } from '~/tools/executor';
-import { TaskManager } from '~/tasks/task-manager';
+import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
+import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
 import { createTaskManagerTools } from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
@@ -94,6 +95,7 @@ export class Session {
     const threadId = threadManager.createThread(sessionData.id, sessionData.id, options.projectId);
 
     // Create TaskManager using global persistence
+    // Note: We'll update this with agent creation callback after session is created
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
     // Create tool executor with TaskManager injection
@@ -126,6 +128,9 @@ export class Session {
     const session = new Session(sessionAgent, options.projectId);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
+
+    // Set up agent creation callback for task-based agent spawning
+    session.setupAgentCreationCallback();
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getAgent(session.getId());
@@ -277,6 +282,9 @@ export class Session {
 
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
+
+    // Set up agent creation callback for task-based agent spawning
+    session.setupAgentCreationCallback();
 
     logger.debug(`Session reconstruction complete for ${sessionId}`);
     return session;
@@ -623,6 +631,59 @@ export class Session {
       agent.removeAllListeners();
     }
     this._agents.clear();
+  }
+
+  /**
+   * Set up the agent creation callback for task-based agent spawning
+   */
+  private setupAgentCreationCallback(): void {
+    const agentCreationCallback: AgentCreationCallback = async (
+      provider: string,
+      model: string,
+      task
+    ) => {
+      // Create a more descriptive agent name based on the task
+      const agentName = `task-${task.id.split('_').pop()}`;
+
+      // Use the existing spawnAgent method to create the agent
+      const agent = this.spawnAgent(agentName, provider, model);
+
+      // Send initial task notification to the new agent
+      await this.sendTaskNotification(agent, task);
+
+      return asThreadId(agent.threadId);
+    };
+
+    // Update the task manager with the callback
+    // Note: We need to create a new TaskManager instance with the callback
+    // since the constructor is the only way to set it
+    this._taskManager = new TaskManager(
+      this._sessionId,
+      this._taskManager['persistence'], // Access private field
+      agentCreationCallback
+    );
+  }
+
+  /**
+   * Send task assignment notification to an agent
+   */
+  private async sendTaskNotification(agent: Agent, task: Task): Promise<void> {
+    const taskMessage = this.formatTaskAssignment(task);
+    await agent.sendMessage(taskMessage);
+  }
+
+  /**
+   * Format task assignment notification message
+   */
+  private formatTaskAssignment(task: Task): string {
+    return `[LACE TASK SYSTEM] You have been assigned a new task:
+Title: "${task.title}"
+Created by: ${task.createdBy}
+Priority: ${task.priority}
+
+--- TASK DETAILS ---
+${task.prompt}
+--- END TASK DETAILS ---`;
   }
 
   private static detectDefaultProvider(): string {
