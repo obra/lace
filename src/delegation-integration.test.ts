@@ -180,7 +180,7 @@ describe('Delegation Integration Tests', () => {
       title: 'Code Analysis',
       prompt: 'Analyze the project structure and identify key patterns',
       expected_response: 'Brief summary of project structure',
-      model: 'anthropic:claude-3-5-haiku-latest', // Use real provider format, will be mocked
+      model: 'anthropic:claude-3-5-haiku-20241022', // Use real provider format, will be mocked
     };
 
     // Execute delegation (this will create a sub-thread and run a mock subagent)
