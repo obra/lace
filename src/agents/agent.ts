@@ -970,9 +970,8 @@ export class Agent extends EventEmitter {
 
           // Update batch tracking
           this._pendingToolCount--;
-          if (result.isError) {
-            this._hasRejectionsInBatch = true;
-          }
+          // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+          // Only user denials should pause conversation - tool failures should continue
 
           if (this._pendingToolCount === 0) {
             this._handleBatchComplete();
@@ -1010,7 +1009,8 @@ export class Agent extends EventEmitter {
 
         // Update batch tracking for errors
         this._pendingToolCount--;
-        this._hasRejectionsInBatch = true;
+        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+        // Only user denials should pause conversation - tool failures should continue
 
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();
@@ -1053,9 +1053,8 @@ export class Agent extends EventEmitter {
 
         // Update batch tracking
         this._pendingToolCount--;
-        if (result.isError) {
-          this._hasRejectionsInBatch = true;
-        }
+        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+        // Only user denials should pause conversation - tool failures should continue
 
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();
@@ -1088,7 +1087,8 @@ export class Agent extends EventEmitter {
 
         // Update batch tracking for errors
         this._pendingToolCount--;
-        this._hasRejectionsInBatch = true;
+        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+        // Only user denials should pause conversation - tool failures should continue
 
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();

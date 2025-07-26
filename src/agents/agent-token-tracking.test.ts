@@ -98,13 +98,13 @@ describe('Agent Token Tracking Integration', () => {
 
     provider = new MockTokenProvider(mockResponse);
     toolExecutor = new ToolExecutor();
-    
+
     // Set up auto-approval callback so tools actually execute and emit turn_complete
     const autoApprovalCallback = {
       requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
     };
     toolExecutor.setApprovalCallback(autoApprovalCallback);
-    
+
     threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);
@@ -202,7 +202,7 @@ describe('Agent Token Tracking Integration', () => {
       }
 
       const mockTool = new MockTool();
-      
+
       // Register the tool with the executor so it can be executed
       toolExecutor.registerTool('test_tool', mockTool);
 
@@ -305,7 +305,7 @@ describe('Agent Token Tracking Integration', () => {
       }
 
       const mockTool = new MockTool2();
-      
+
       // Register the tool with the executor so it can be executed
       toolExecutor.registerTool('test_tool', mockTool);
 
@@ -341,8 +341,8 @@ describe('Agent Token Tracking Integration', () => {
       // Should track output tokens from provider response(s)
       // The agent should accumulate tokens from all provider calls in the turn
       expect(finalMetrics.tokensOut).toBeGreaterThan(0);
-      
-      // At minimum, should have tokens from the first response 
+
+      // At minimum, should have tokens from the first response
       expect(finalMetrics.tokensOut).toBeGreaterThanOrEqual(15);
     });
   });

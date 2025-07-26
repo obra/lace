@@ -3,7 +3,7 @@
 
 import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
-import { ApprovalCallback, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
@@ -131,13 +131,13 @@ export class ToolExecutor {
 
     try {
       const decision = await this.approvalCallback.requestApproval(call.name, call.arguments);
-      
-      if (decision === 'allow_once' || decision === 'allow_session') {
+
+      if (decision === ApprovalDecision.ALLOW_ONCE || decision === ApprovalDecision.ALLOW_SESSION) {
         return 'granted';
-      } else if (decision === 'deny') {
+      } else if (decision === ApprovalDecision.DENY) {
         throw new Error('Tool execution denied by approval policy');
       } else {
-        throw new Error(`Unknown approval decision: ${decision}`);
+        throw new Error(`Unknown approval decision: ${String(decision)}`);
       }
     } catch (error) {
       // Check if this is a pending approval (not an error)
@@ -169,10 +169,7 @@ export class ToolExecutor {
       // permission === 'granted', continue to execution
     } catch (error) {
       // Permission denied or other permission error
-      return createErrorResult(
-        error instanceof Error ? error.message : String(error),
-        call.id
-      );
+      return createErrorResult(error instanceof Error ? error.message : String(error), call.id);
     }
 
     // 3. Execute the tool (permissions already checked)
