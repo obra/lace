@@ -347,7 +347,15 @@ describe('Enhanced Agent', () => {
         events.push({ type: 'state_change', data: `${from}->${to}` })
       );
 
+      // Send message and wait for tool execution to complete
+      const toolCompletePromise = new Promise<void>((resolve) => {
+        agent.on('tool_call_complete', () => resolve());
+      });
+
       await agent.sendMessage('Use the tool');
+      
+      // Wait for tool execution to complete
+      await toolCompletePromise;
 
       const toolEvents = events.filter((e) => e.type.startsWith('tool_'));
       expect(toolEvents).toHaveLength(2);
