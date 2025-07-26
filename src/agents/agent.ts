@@ -156,7 +156,7 @@ export class Agent extends EventEmitter {
 
     // Listen for tool approval responses
     this.on('thread_event_added', ({ event }) => {
-      if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+      if (event && event.type === 'TOOL_APPROVAL_RESPONSE') {
         this._handleToolApprovalResponse(event);
       }
     });
@@ -953,11 +953,11 @@ export class Agent extends EventEmitter {
 
       // First: Check permission
       const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
-      
+
       if (permission === 'granted') {
         // Execute immediately if allowed
         const result = await this._toolExecutor.executeTool(toolCall, toolContext);
-        
+
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {
           // Add result and update tracking
@@ -983,7 +983,6 @@ export class Agent extends EventEmitter {
         // Don't decrement pending count yet - wait for approval response
         return;
       }
-      
     } catch (error: unknown) {
       // Handle permission/execution errors
       logger.error('AGENT: Tool execution failed', {
@@ -1029,9 +1028,19 @@ export class Agent extends EventEmitter {
         workingDirectory,
       };
 
-      // Execute directly (permission already granted)
-      const result = await this._toolExecutor.executeTool(toolCall, toolContext);
-      
+      // Find the tool and execute directly (permission already granted via approval)
+      const tool = this._toolExecutor.getTool(toolCall.name);
+      if (!tool) {
+        throw new Error(`Tool '${toolCall.name}' not found`);
+      }
+
+      const result = await tool.execute(toolCall.arguments, toolContext);
+
+      // Ensure the result has the call ID if it wasn't set by the tool
+      if (!result.id && toolCall.id) {
+        result.id = toolCall.id;
+      }
+
       // Only add events if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
         // Add result and update tracking
@@ -1052,7 +1061,6 @@ export class Agent extends EventEmitter {
           this._handleBatchComplete();
         }
       }
-      
     } catch (error: unknown) {
       // Handle execution errors
       logger.error('AGENT: Approved tool execution failed', {
@@ -1098,7 +1106,10 @@ export class Agent extends EventEmitter {
       // All approved - auto-continue conversation
       this._completeTurn();
       this._setState('idle');
-      
+
+      // Emit conversation complete after successful tool batch completion
+      this.emit('conversation_complete');
+
       // Only continue conversation if agent is still running and thread exists
       if (this._isRunning && this._threadManager.getThread(this._threadId)) {
         void this._processConversation();
@@ -1626,7 +1637,7 @@ export class Agent extends EventEmitter {
    * Add a system message to the current thread
    * Used for error messages, notifications, etc.
    */
-  addSystemMessage(message: string, threadId?: string): ThreadEvent {
+  addSystemMessage(message: string, threadId?: string): ThreadEvent | null {
     const targetThreadId = threadId || this._threadId;
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
@@ -1651,9 +1662,11 @@ export class Agent extends EventEmitter {
       });
       return null;
     }
-    
+
     const event = this._threadManager.addEvent(threadId, type as EventType, data);
-    this.emit('thread_event_added', { event, threadId });
+    if (event) {
+      this.emit('thread_event_added', { event, threadId });
+    }
     return event;
   }
 

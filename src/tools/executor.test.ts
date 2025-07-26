@@ -18,7 +18,7 @@ describe('ToolExecutor with new schema-based tools', () => {
   };
 
   // Create an approval callback that requires approval for tests
-  const requireApprovalCallback: ApprovalCallback = {
+  const _requireApprovalCallback: ApprovalCallback = {
     requestApproval: () => Promise.reject(new Error('Approval required')),
   };
 
