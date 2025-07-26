@@ -54,7 +54,7 @@ const hostname = values.host || 'localhost';
 const dev = process.env.NODE_ENV !== 'production';
 
 // Validate port
-if (isNaN(port) || port < 1 || port > 65535) {
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
   console.error(`Error: Invalid port number: ${values.port}`);
   process.exit(1);
 }
@@ -77,7 +77,7 @@ app
   .prepare()
   .then(() => {
     createServer((req, res) => {
-      const parsedUrl = parse(req.url!, true);
+      const parsedUrl = parse(req.url || '/', true);
       handle(req, res, parsedUrl);
     }).listen(port, hostname, () => {
       console.log(`
