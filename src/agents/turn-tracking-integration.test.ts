@@ -11,6 +11,7 @@ import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { ApprovalDecision } from '~/tools/approval-types';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends BaseMockProvider {
@@ -150,6 +151,13 @@ describe('Turn Tracking Provider Integration Tests', () => {
   beforeEach(() => {
     setupTestPersistence();
     toolExecutor = new ToolExecutor();
+    
+    // Set up auto-approval callback so tools actually execute and emit turn_complete
+    const autoApprovalCallback = {
+      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+    };
+    toolExecutor.setApprovalCallback(autoApprovalCallback);
+    
     threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
     threadManager.createThread(threadId);

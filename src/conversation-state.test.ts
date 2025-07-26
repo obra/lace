@@ -9,6 +9,7 @@ import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { ApprovalDecision } from '~/tools/approval-types';
 
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends BaseMockProvider {
@@ -143,6 +144,12 @@ describe('Conversation State Management with Enhanced Agent', () => {
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
+    // Set up auto-approval callback so tools actually execute
+    const autoApprovalCallback = {
+      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+    };
+    toolExecutor.setApprovalCallback(autoApprovalCallback);
+
     threadId = `test_thread_${Date.now()}`;
     threadManager.createThread(threadId);
 
@@ -275,7 +282,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     await agent.sendMessage('List the files in the current directory');
 
     // Add delay to allow async tool execution and conversation completion to finish
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     if (process.env.VITEST_VERBOSE) logger.debug('Events emitted:', events);
 
