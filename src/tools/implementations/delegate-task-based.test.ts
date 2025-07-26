@@ -274,11 +274,11 @@ describe('Task-Based DelegateTool', () => {
       expect(result.content[0].text).toContain('Task task_blocked is blocked');
     });
 
-    it('should fall back to old delegation when TaskManager not available', async () => {
+    it('should require TaskManager in context', async () => {
       // Arrange
       const contextWithoutTaskManager: ToolContext = {
         threadId: asThreadId('lace_20250726_test01.1'),
-        // No taskManager - should fall back to old approach
+        // No taskManager - should error
       };
 
       // Act & Assert
@@ -293,10 +293,7 @@ describe('Task-Based DelegateTool', () => {
       );
 
       expect(result.isError).toBe(true);
-      // Should get the old delegation error since no TaskManager available
-      expect(result.content[0].text).toContain(
-        'Delegate tool not properly initialized - missing parent Agent'
-      );
+      expect(result.content[0].text).toContain('TaskManager is required for delegation');
     });
   });
 });

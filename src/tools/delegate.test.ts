@@ -22,7 +22,7 @@ vi.mock('~/providers/ollama-provider');
 
 describe('DelegateTool', () => {
   let tool: DelegateTool;
-  let realAgent: Agent;
+  let _realAgent: Agent;
   let mockProvider: {
     providerName: string;
     createResponse: ReturnType<typeof vi.fn>;
@@ -102,7 +102,7 @@ describe('DelegateTool', () => {
     );
 
     // Create a real Agent instance
-    realAgent = new Agent({
+    _realAgent = new Agent({
       provider: mockProvider as unknown as AIProvider,
       toolExecutor,
       threadManager,
@@ -112,7 +112,7 @@ describe('DelegateTool', () => {
 
     // Create tool instance and inject real dependencies
     tool = new DelegateTool();
-    tool.setDependencies(realAgent, toolExecutor);
+    // Note: Task-based delegation no longer needs setDependencies
   });
 
   afterEach(() => {
@@ -220,7 +220,7 @@ describe('DelegateTool', () => {
   it('should timeout if subagent takes too long', async () => {
     // Create a custom tool instance with short timeout
     const quickTimeoutTool = new DelegateTool();
-    quickTimeoutTool.setDependencies(realAgent, toolExecutor);
+    // Note: Task-based delegation no longer needs setDependencies
 
     // Override the default timeout for testing
     (quickTimeoutTool as unknown as { defaultTimeout: number }).defaultTimeout = 100;
