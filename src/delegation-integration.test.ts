@@ -166,14 +166,9 @@ describe('Delegation Integration Tests', () => {
       tools: toolExecutor.getAllTools(),
     });
 
-    // Initialize delegate tool with the agent now that it's created
+    // Note: Task-based delegation no longer needs setDependencies
+    // Get delegate tool for testing
     const delegateToolInstance = toolExecutor.getTool('delegate') as DelegateTool;
-    delegateToolInstance.setDependencies(agent, toolExecutor);
-
-    // Mock the DelegateTool's createProvider method to return our test provider
-    const createProviderSpy = vi
-      .spyOn(delegateToolInstance as any, 'createProvider')
-      .mockReturnValue(mockProvider);
 
     await agent.start();
 
@@ -214,14 +209,6 @@ describe('Delegation Integration Tests', () => {
     const delegateEvents = allEvents.filter((e) => e.threadId.includes('.'));
     expect(delegateEvents.length).toBeGreaterThan(0);
 
-    // Verify that our mock was called
-    expect(createProviderSpy).toHaveBeenCalledWith(
-      'anthropic',
-      'claude-3-5-haiku-latest',
-      expect.any(String)
-    );
-
-    // Cleanup
-    createProviderSpy.mockRestore();
+    // Note: Task-based delegation doesn't use createProvider anymore
   }); // Should complete quickly with mock provider
 });
