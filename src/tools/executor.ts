@@ -1,9 +1,9 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
+import { ToolResult, ToolContext, ToolCall, createErrorResult, createPendingResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
@@ -142,7 +142,14 @@ export class ToolExecutor {
 
       // ALLOW_ONCE and ALLOW_SESSION both proceed to execution
     } catch (error) {
-      // Approval system failure
+      // Check if this is a pending approval (not an error)
+      if (error instanceof ApprovalPendingError) {
+        // Tool approval is pending - don't execute yet
+        // The Agent will execute this tool when approval response arrives
+        return createPendingResult('Tool approval pending', call.id);
+      }
+
+      // Other approval system failures
       return createErrorResult(
         error instanceof Error ? error.message : 'Approval system error',
         call.id
