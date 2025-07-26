@@ -36,6 +36,97 @@ describe('Enhanced Task Manager Tools', () => {
     teardownTestPersistence();
   });
 
+  describe('TaskManager Requirements', () => {
+    it('task_add should require TaskManager', async () => {
+      const tool = new TaskCreateTool();
+      // Don't inject getTaskManager - should fail
+
+      const result = await tool.execute(
+        {
+          title: 'Test Task',
+          prompt: 'Test prompt',
+        },
+        { threadId: 'test-thread' }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('TaskManager is required');
+    });
+
+    it('task_list should require TaskManager', async () => {
+      const tool = new TaskListTool();
+
+      const result = await tool.execute(
+        {
+          filter: 'thread',
+        },
+        { threadId: 'test-thread' }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('TaskManager is required');
+    });
+
+    it('task_complete should require TaskManager', async () => {
+      const tool = new TaskCompleteTool();
+
+      const result = await tool.execute(
+        {
+          id: 'task_123',
+          message: 'Test completion',
+        },
+        { threadId: 'test-thread' }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('TaskManager is required');
+    });
+
+    it('task_update should require TaskManager', async () => {
+      const tool = new TaskUpdateTool();
+
+      const result = await tool.execute(
+        {
+          taskId: 'task_123',
+          status: 'in_progress',
+        },
+        { threadId: 'test-thread' }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('TaskManager is required');
+    });
+
+    it('task_add_note should require TaskManager', async () => {
+      const tool = new TaskAddNoteTool();
+
+      const result = await tool.execute(
+        {
+          taskId: 'task_123',
+          note: 'Test note',
+        },
+        { threadId: 'test-thread' }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('TaskManager is required');
+    });
+
+    it('task_view should require TaskManager', async () => {
+      const tool = new TaskViewTool();
+
+      const result = await tool.execute(
+        {
+          taskId: 'task_123',
+        },
+        { threadId: 'test-thread' }
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('TaskManager is required');
+    });
+  });
+
   describe('TaskCreateTool', () => {
     it('should create task with required fields', async () => {
       const tool = new TaskCreateTool();
