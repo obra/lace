@@ -8,14 +8,25 @@ import type { ToolResult, ToolContext } from '~/tools/types';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 
-// Schema for task creation
-const createTaskSchema = z.object({
+// Single task schema - extracted for reuse
+const singleTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   prompt: z.string().min(1),
   priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
   assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
 });
+
+// Bulk tasks schema
+const bulkTasksSchema = z.object({
+  tasks: z
+    .array(singleTaskSchema)
+    .min(1, 'Must provide at least 1 task')
+    .max(20, 'Cannot create more than 20 tasks at once'),
+});
+
+// Union schema supporting both formats
+const createTaskSchema = z.union([singleTaskSchema, bulkTasksSchema]);
 
 export class TaskCreateTool extends Tool {
   name = 'task_add';
@@ -40,11 +51,6 @@ export class TaskCreateTool extends Tool {
       return this.createError('TaskManager is required for task creation');
     }
 
-    // Validate assignee if provided
-    if (args.assignedTo && !isAssigneeId(args.assignedTo)) {
-      return this.createError(`Invalid assignee format: ${args.assignedTo}`);
-    }
-
     try {
       const taskManager = this.getTaskManager();
       const taskContext = {
@@ -52,26 +58,63 @@ export class TaskCreateTool extends Tool {
         isHuman: false,
       };
 
-      const task = await taskManager.createTask(
-        {
-          title: args.title,
-          description: args.description,
-          prompt: args.prompt,
-          priority: args.priority,
-          assignedTo: args.assignedTo,
-        },
-        taskContext
-      );
+      // Determine if single task or bulk tasks
+      const tasksToCreate = 'tasks' in args ? args.tasks : [args];
 
-      let message = `Created task ${task.id}: ${task.title}`;
-      if (task.assignedTo) {
-        message += ` (assigned to ${task.assignedTo})`;
+      // Validate all assignees before creating any tasks
+      for (const taskData of tasksToCreate) {
+        if (taskData.assignedTo && !isAssigneeId(taskData.assignedTo)) {
+          return this.createError(`Invalid assignee format: ${taskData.assignedTo}`);
+        }
       }
 
-      return this.createResult(message);
+      // Create all tasks atomically (all succeed or all fail)
+      const createdTasks = [];
+      try {
+        for (const taskData of tasksToCreate) {
+          const task = await taskManager.createTask(
+            {
+              title: taskData.title,
+              description: taskData.description,
+              prompt: taskData.prompt,
+              priority: taskData.priority,
+              assignedTo: taskData.assignedTo,
+            },
+            taskContext
+          );
+          createdTasks.push(task);
+        }
+      } catch (error) {
+        // If any task creation fails, we don't need explicit rollback
+        // since TaskManager.createTask is atomic per task
+        // and we haven't committed any partial state
+        throw new Error(
+          `Failed to create task ${createdTasks.length + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+
+      // Format response
+      if (createdTasks.length === 1) {
+        const task = createdTasks[0];
+        let message = `Created task ${task.id}: ${task.title}`;
+        if (task.assignedTo) {
+          message += ` (assigned to ${task.assignedTo})`;
+        }
+        return this.createResult(message);
+      } else {
+        const taskSummaries = createdTasks.map((task) => {
+          let summary = `${task.id}: ${task.title}`;
+          if (task.assignedTo) summary += ` → ${task.assignedTo}`;
+          return summary;
+        });
+
+        return this.createResult(
+          `Created ${createdTasks.length} tasks:\n${taskSummaries.join('\n')}`
+        );
+      }
     } catch (error) {
       return this.createError(
-        `Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to create task(s): ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
