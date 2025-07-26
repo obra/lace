@@ -84,6 +84,33 @@ describe('Enhanced Agent', () => {
     threadManager.createThread(threadId);
   });
 
+  // Helper function to create a provider that returns tool calls only once
+  function createOneTimeToolProvider(toolCalls: any[], content = 'I will use the tool.') {
+    let callCount = 0;
+    const provider = new MockProvider({ content, toolCalls });
+    
+    vi.spyOn(provider, 'createResponse').mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          content,
+          toolCalls,
+          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          stopReason: 'end_turn',
+        });
+      } else {
+        return Promise.resolve({
+          content: 'Task completed.',
+          toolCalls: [],
+          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          stopReason: 'end_turn',
+        });
+      }
+    });
+    
+    return provider;
+  }
+
   afterEach(() => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
@@ -594,32 +621,10 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute tool when TOOL_APPROVAL_RESPONSE event received', async () => {
-      // Create a provider that returns tool calls only once, then normal responses
-      let callCount = 0;
-      const mockProvider = new MockProvider({
-        content: 'I will execute the tool.',
-        toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
-      });
-
-      // Override createResponse to stop returning tool calls after first call
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.resolve({
-            content: 'I will execute the tool.',
-            toolCalls: [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
-            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
-            stopReason: 'end_turn',
-          });
-        } else {
-          return Promise.resolve({
-            content: 'Tool executed successfully.',
-            toolCalls: [],
-            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
-            stopReason: 'end_turn',
-          });
-        }
-      });
+      // Create a provider that returns tool calls only once
+      const mockProvider = createOneTimeToolProvider([
+        { id: 'call_1', name: 'mock_tool', input: { action: 'test' } }
+      ], 'I will execute the tool.');
 
       // Create an approval callback that requires approval (doesn't auto-approve)
       const pendingApprovalCallback: ApprovalCallback = {
