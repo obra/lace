@@ -50,11 +50,14 @@ Examples:
     openWorldHint: true,
   };
 
+  // This will be injected by the factory
+  protected getTaskManager?: () => TaskManager;
+
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.taskManager) {
+    if (!this.getTaskManager) {
       return this.createError('TaskManager is required for delegation');
     }
 
@@ -78,14 +81,10 @@ Examples:
       expected_response: string;
       model: string;
     },
-    context: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     const { title, prompt, expected_response, model } = params;
-    const taskManager = context.taskManager;
-
-    if (!taskManager) {
-      return this.createError('TaskManager context access needs implementation');
-    }
+    const taskManager = this.getTaskManager!();
 
     // Parse provider:model format
     const [providerName, modelName] = model.split(':');
@@ -95,12 +94,23 @@ Examples:
       const task = await taskManager.createTask(
         {
           title,
-          prompt: this.formatDelegatePrompt(prompt, expected_response),
+          prompt: this.formatDelegatePrompt(prompt, expected_response, 'TASK_ID_PLACEHOLDER'),
           assignedTo: `new:${providerName}/${modelName}`,
           priority: 'high',
         },
         {
-          actor: context.threadId || 'unknown',
+          actor: context?.threadId || 'unknown',
+        }
+      );
+
+      // Update the task prompt with the actual task ID
+      await taskManager.updateTask(
+        task.id,
+        {
+          prompt: this.formatDelegatePrompt(prompt, expected_response, task.id),
+        },
+        {
+          actor: context?.threadId || 'unknown',
         }
       );
 
@@ -114,7 +124,7 @@ Examples:
       const result = await this.waitForTaskCompletion(
         task.id,
         taskManager,
-        context.threadId || 'unknown'
+        context?.threadId || 'unknown'
       );
 
       logger.debug('DelegateTool: Task completed', {
@@ -133,11 +143,13 @@ Examples:
     }
   }
 
-  private formatDelegatePrompt(prompt: string, expectedResponse: string): string {
+  private formatDelegatePrompt(prompt: string, expectedResponse: string, taskId: string): string {
     return `${prompt}
 
 IMPORTANT: Your response should match this format/structure:
 ${expectedResponse}
+
+When you are done, you must complete task '${taskId}' using the task_complete tool with your result/answer as the message parameter.
 
 Please complete the task and provide your response in the expected format.`;
   }

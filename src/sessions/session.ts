@@ -98,7 +98,7 @@ export class Session {
     // Note: We'll update this with agent creation callback after session is created
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
-    // Create tool executor with TaskManager injection
+    // Create tool executor with TaskManager injection (without delegate tool initially)
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor, taskManager);
 
@@ -125,6 +125,12 @@ export class Session {
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
+
+    // Now register delegate tool with the updated TaskManager that has agent creation callback
+    const delegateTool = new DelegateTool();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    (delegateTool as any).getTaskManager = () => session._taskManager;
+    toolExecutor.registerTool('delegate', delegateTool);
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getAgent(session.getId());
@@ -267,6 +273,12 @@ export class Session {
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
+
+    // Now register delegate tool with the updated TaskManager that has agent creation callback
+    const delegateTool = new DelegateTool();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    (delegateTool as any).getTaskManager = () => session._taskManager;
+    toolExecutor.registerTool('delegate', delegateTool);
 
     logger.debug(`Session reconstruction complete for ${sessionId}`);
     return session;
@@ -579,7 +591,6 @@ export class Session {
       new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
-      new DelegateTool(),
       new UrlFetchTool(),
     ];
 
@@ -630,14 +641,8 @@ export class Session {
       return asThreadId(agent.threadId);
     };
 
-    // Update the task manager with the callback
-    // Note: We need to create a new TaskManager instance with the callback
-    // since the constructor is the only way to set it
-    this._taskManager = new TaskManager(
-      this._sessionId,
-      this._taskManager['persistence'], // Access private field
-      agentCreationCallback
-    );
+    // Set the callback on the existing TaskManager
+    this._taskManager.setAgentCreationCallback(agentCreationCallback);
   }
 
   /**

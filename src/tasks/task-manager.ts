@@ -22,6 +22,10 @@ export class TaskManager extends EventEmitter {
     super();
   }
 
+  setAgentCreationCallback(callback: AgentCreationCallback): void {
+    this.createAgent = callback;
+  }
+
   async createTask(request: CreateTaskRequest, context: TaskContext): Promise<Task> {
     // Validate request
     if (!request.title?.trim() || !request.prompt?.trim()) {
