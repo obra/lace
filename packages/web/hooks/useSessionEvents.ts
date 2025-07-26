@@ -123,7 +123,7 @@ export function useSessionEvents(
           toolCallId: approval.toolCallId,
           toolCall: approval.toolCall as { name: string; arguments: unknown },
           requestedAt: new Date(approval.requestedAt),
-          requestData: approval.requestData,
+          requestData: approval.requestData as ToolApprovalRequestData,
         }));
         setPendingApprovals(approvals);
       }

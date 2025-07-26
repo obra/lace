@@ -58,12 +58,6 @@ const mockSessionEvents: SessionEvent[] = [
     },
   },
   {
-    type: 'THINKING',
-    threadId: asThreadId('session-123.agent-1'),
-    timestamp: new Date('2025-07-21T10:31:30Z'),
-    data: { status: 'start' },
-  },
-  {
     type: 'LOCAL_SYSTEM_MESSAGE',
     threadId: asThreadId('session-123'),
     timestamp: new Date('2025-07-21T10:32:00Z'),
@@ -142,24 +136,8 @@ describe('convertSessionEventsToTimeline', () => {
     );
   });
 
-  test('converts THINKING to ai timeline entry with thinking message', () => {
-    const events: SessionEvent[] = [mockSessionEvents[4]];
-    const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toEqual(
-      expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
-        type: 'ai',
-        content: 'Claude is thinking...',
-        timestamp: new Date('2025-07-21T10:31:30Z'),
-        agent: 'Claude',
-      })
-    );
-  });
-
   test('converts LOCAL_SYSTEM_MESSAGE to admin timeline entry', () => {
-    const events: SessionEvent[] = [mockSessionEvents[5]];
+    const events: SessionEvent[] = [mockSessionEvents[4]];
     const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
@@ -182,8 +160,8 @@ describe('convertSessionEventsToTimeline', () => {
     const result = convertSessionEventsToTimeline(mockSessionEvents, contextWithSelectedAgent);
 
     // Should include: user message + agent-1 messages, exclude agent-2 messages
-    // Expecting: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, LOCAL_SYSTEM_MESSAGE
-    expect(result).toHaveLength(6);
+    // Expecting: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, LOCAL_SYSTEM_MESSAGE
+    expect(result).toHaveLength(5);
 
     // Verify agent filtering - no events from other agents
     const agentEventThreadIds = result
