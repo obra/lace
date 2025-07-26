@@ -109,6 +109,12 @@ export class Session {
       tools: toolExecutor.getAllTools(),
     });
 
+    // Initialize delegate tool dependencies
+    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+    if (delegateTool) {
+      delegateTool.setDependencies(sessionAgent, toolExecutor);
+    }
+
     // Mark the agent's thread as a session thread
     sessionAgent.updateThreadMetadata({
       isSession: true,
@@ -209,6 +215,12 @@ export class Session {
       tools: toolExecutor.getAllTools(),
     });
 
+    // Initialize delegate tool dependencies
+    const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+    if (delegateTool) {
+      delegateTool.setDependencies(sessionAgent, toolExecutor);
+    }
+
     logger.debug(`Starting session agent for ${sessionId}`);
     // Start the session agent
     await sessionAgent.start();
@@ -241,6 +253,12 @@ export class Session {
           threadId: delegateThreadId,
           tools: toolExecutor.getAllTools(),
         });
+
+        // Initialize delegate tool dependencies for delegate agent
+        const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
+        if (delegateTool) {
+          delegateTool.setDependencies(delegateAgent, toolExecutor);
+        }
 
         // Start the delegate agent
         await delegateAgent.start();
@@ -481,6 +499,12 @@ export class Session {
       this._sessionAgent.toolExecutor,
       providerInstance
     );
+
+    // Initialize delegate tool dependencies for spawned agent
+    const delegateTool = this._sessionAgent.toolExecutor.getTool('delegate') as DelegateTool;
+    if (delegateTool) {
+      delegateTool.setDependencies(agent, this._sessionAgent.toolExecutor);
+    }
 
     // Store the agent metadata
     agent.updateThreadMetadata({
