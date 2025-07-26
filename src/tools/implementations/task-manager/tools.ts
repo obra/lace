@@ -5,16 +5,8 @@ import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext } from '~/tools/types';
-import { getPersistence } from '~/persistence/database';
-import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
-
-// Helper to generate task IDs
-function generateTaskId(): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const random = Math.random().toString(36).substring(2, 8);
-  return `task_${date}_${random}`;
-}
 
 // Schema for task creation
 const createTaskSchema = z.object({
@@ -40,68 +32,43 @@ export class TaskCreateTool extends Tool {
     args: z.infer<typeof createTaskSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
+    if (!context?.threadId) {
+      return this.createError('No thread context available');
+    }
+
+    if (!this.getTaskManager) {
+      return this.createError('TaskManager is required for task creation');
+    }
+
     // Validate assignee if provided
     if (args.assignedTo && !isAssigneeId(args.assignedTo)) {
       return this.createError(`Invalid assignee format: ${args.assignedTo}`);
     }
 
-    if (!context?.threadId) {
-      return this.createError('No thread context available');
-    }
-
     try {
-      // Use TaskManager if available, otherwise fall back to direct persistence
-      if (this.getTaskManager) {
-        const taskManager = this.getTaskManager();
-        const taskContext = {
-          actor: context.threadId,
-          isHuman: false,
-        };
+      const taskManager = this.getTaskManager();
+      const taskContext = {
+        actor: context.threadId,
+        isHuman: false,
+      };
 
-        const task = await taskManager.createTask(
-          {
-            title: args.title,
-            description: args.description,
-            prompt: args.prompt,
-            priority: args.priority,
-            assignedTo: args.assignedTo,
-          },
-          taskContext
-        );
-
-        let message = `Created task ${task.id}: ${task.title}`;
-        if (task.assignedTo) {
-          message += ` (assigned to ${task.assignedTo})`;
-        }
-
-        return this.createResult(message);
-      } else {
-        // Fallback to original implementation for backward compatibility
-        const task: Task = {
-          id: generateTaskId(),
+      const task = await taskManager.createTask(
+        {
           title: args.title,
-          description: args.description || '',
+          description: args.description,
           prompt: args.prompt,
           priority: args.priority,
-          status: 'pending',
-          assignedTo: args.assignedTo as AssigneeId | undefined,
-          createdBy: context.threadId,
-          threadId: context.parentThreadId || context.threadId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          notes: [],
-        };
+          assignedTo: args.assignedTo,
+        },
+        taskContext
+      );
 
-        const persistence = getPersistence();
-        await persistence.saveTask(task);
-
-        let message = `Created task ${task.id}: ${task.title}`;
-        if (task.assignedTo) {
-          message += ` (assigned to ${task.assignedTo})`;
-        }
-
-        return this.createResult(message);
+      let message = `Created task ${task.id}: ${task.title}`;
+      if (task.assignedTo) {
+        message += ` (assigned to ${task.assignedTo})`;
       }
+
+      return this.createResult(message);
     } catch (error) {
       return this.createError(
         `Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -135,60 +102,20 @@ export class TaskListTool extends Tool {
       return this.createError('No thread context available');
     }
 
-    let tasks: Task[] = [];
+    if (!this.getTaskManager) {
+      return this.createError('TaskManager is required for task listing');
+    }
 
     try {
-      // Use TaskManager if available, otherwise fall back to direct persistence
-      if (this.getTaskManager) {
-        const taskManager = this.getTaskManager();
-        const taskContext = {
-          actor: context.threadId,
-          isHuman: false,
-        };
+      const taskManager = this.getTaskManager();
+      const taskContext = {
+        actor: context.threadId,
+        isHuman: false,
+      };
 
-        tasks = await Promise.resolve(
-          taskManager.listTasks(args.filter, args.includeCompleted, taskContext)
-        );
-      } else {
-        // Fallback to original implementation for backward compatibility
-        const parentThreadId = context.parentThreadId || context.threadId;
-        const persistence = getPersistence();
-
-        switch (args.filter) {
-          case 'mine':
-            // Tasks assigned to me
-            tasks = persistence.loadTasksByAssignee(context.threadId);
-            break;
-
-          case 'created':
-            // Tasks I created
-            tasks = persistence
-              .loadTasksByThread(parentThreadId)
-              .filter((t) => t.createdBy === context.threadId);
-            break;
-
-          case 'thread':
-            // All tasks in parent thread
-            tasks = persistence.loadTasksByThread(parentThreadId);
-            break;
-
-          case 'all': {
-            // All tasks I can see (assigned to me or in my thread)
-            const assignedToMe = persistence.loadTasksByAssignee(context.threadId);
-            const inThread = persistence.loadTasksByThread(parentThreadId);
-            const taskMap = new Map<string, Task>();
-
-            [...assignedToMe, ...inThread].forEach((t) => taskMap.set(t.id, t));
-            tasks = Array.from(taskMap.values());
-            break;
-          }
-        }
-
-        // Filter completed if needed
-        if (!args.includeCompleted) {
-          tasks = tasks.filter((t) => t.status !== 'completed');
-        }
-      }
+      const tasks = await Promise.resolve(
+        taskManager.listTasks(args.filter, args.includeCompleted, taskContext)
+      );
 
       // Sort by priority and creation date
       const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -261,43 +188,24 @@ export class TaskCompleteTool extends Tool {
       return this.createError('No thread context available');
     }
 
+    if (!this.getTaskManager) {
+      return this.createError('TaskManager is required for task completion');
+    }
+
     try {
-      // Use TaskManager if available, otherwise fall back to direct persistence
-      if (this.getTaskManager) {
-        const taskManager = this.getTaskManager();
-        const taskContext = {
-          actor: context.threadId,
-          isHuman: false,
-        };
+      const taskManager = this.getTaskManager();
+      const taskContext = {
+        actor: context.threadId,
+        isHuman: false,
+      };
 
-        // Add the completion message as a note first
-        await taskManager.addNote(args.id, args.message, taskContext);
+      // Add the completion message as a note first
+      await taskManager.addNote(args.id, args.message, taskContext);
 
-        // Then mark the task as completed
-        const task = await taskManager.updateTask(args.id, { status: 'completed' }, taskContext);
+      // Then mark the task as completed
+      const task = await taskManager.updateTask(args.id, { status: 'completed' }, taskContext);
 
-        return this.createResult(`Completed task ${args.id}: ${task.title}`);
-      } else {
-        // Fallback to original implementation for backward compatibility
-        const persistence = getPersistence();
-        const task = persistence.loadTask(args.id);
-        if (!task) {
-          return this.createError(`Task ${args.id} not found`);
-        }
-
-        // Add the completion message as a note first
-        const note: Omit<TaskNote, 'id'> = {
-          author: context.threadId,
-          content: args.message,
-          timestamp: new Date(),
-        };
-        await persistence.addNote(args.id, note);
-
-        // Then mark the task as completed
-        await persistence.updateTask(args.id, { status: 'completed' });
-
-        return this.createResult(`Completed task ${args.id}: ${task.title}`);
-      }
+      return this.createResult(`Completed task ${args.id}: ${task.title}`);
     } catch (error) {
       return this.createError(
         `Failed to complete task: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -341,67 +249,41 @@ export class TaskUpdateTool extends Tool {
       return this.createError('No thread context available');
     }
 
+    if (!this.getTaskManager) {
+      return this.createError('TaskManager is required for task updates');
+    }
+
+    // Validate assignee if provided
+    if (args.assignTo && !isAssigneeId(args.assignTo)) {
+      return this.createError(`Invalid assignee format: ${args.assignTo}`);
+    }
+
     try {
-      // Validate assignee if provided
-      if (args.assignTo && !isAssigneeId(args.assignTo)) {
-        return this.createError(`Invalid assignee format: ${args.assignTo}`);
-      }
+      const taskManager = this.getTaskManager();
+      const taskContext = {
+        actor: context.threadId,
+        isHuman: false,
+      };
 
-      // Use TaskManager if available, otherwise fall back to direct persistence
-      if (this.getTaskManager) {
-        const taskManager = this.getTaskManager();
-        const taskContext = {
-          actor: context.threadId,
-          isHuman: false,
-        };
+      const updates: Partial<Task> = {};
+      if (args.status) updates.status = args.status;
+      if (args.assignTo) updates.assignedTo = args.assignTo as AssigneeId;
+      if (args.priority) updates.priority = args.priority;
+      if (args.title) updates.title = args.title;
+      if (args.description) updates.description = args.description;
+      if (args.prompt) updates.prompt = args.prompt;
 
-        const updates: Partial<Task> = {};
-        if (args.status) updates.status = args.status;
-        if (args.assignTo) updates.assignedTo = args.assignTo as AssigneeId;
-        if (args.priority) updates.priority = args.priority;
-        if (args.title) updates.title = args.title;
-        if (args.description) updates.description = args.description;
-        if (args.prompt) updates.prompt = args.prompt;
+      await taskManager.updateTask(args.taskId, updates, taskContext);
 
-        await taskManager.updateTask(args.taskId, updates, taskContext);
+      const updateMessages = [];
+      if (args.status) updateMessages.push(`status to ${args.status}`);
+      if (args.assignTo) updateMessages.push(`assigned to ${args.assignTo}`);
+      if (args.priority) updateMessages.push(`priority to ${args.priority}`);
+      if (args.title) updateMessages.push('title');
+      if (args.description) updateMessages.push('description');
+      if (args.prompt) updateMessages.push('prompt');
 
-        const updateMessages = [];
-        if (args.status) updateMessages.push(`status to ${args.status}`);
-        if (args.assignTo) updateMessages.push(`assigned to ${args.assignTo}`);
-        if (args.priority) updateMessages.push(`priority to ${args.priority}`);
-        if (args.title) updateMessages.push('title');
-        if (args.description) updateMessages.push('description');
-        if (args.prompt) updateMessages.push('prompt');
-
-        return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`);
-      } else {
-        // Fallback to original implementation for backward compatibility
-        const persistence = getPersistence();
-        const task = persistence.loadTask(args.taskId);
-        if (!task) {
-          return this.createError(`Task ${args.taskId} not found`);
-        }
-
-        const updates: Partial<Task> = {};
-        if (args.status) updates.status = args.status;
-        if (args.assignTo) updates.assignedTo = args.assignTo as AssigneeId;
-        if (args.priority) updates.priority = args.priority;
-        if (args.title) updates.title = args.title;
-        if (args.description) updates.description = args.description;
-        if (args.prompt) updates.prompt = args.prompt;
-
-        await persistence.updateTask(args.taskId, updates);
-
-        const updateMessages = [];
-        if (args.status) updateMessages.push(`status to ${args.status}`);
-        if (args.assignTo) updateMessages.push(`assigned to ${args.assignTo}`);
-        if (args.priority) updateMessages.push(`priority to ${args.priority}`);
-        if (args.title) updateMessages.push('title');
-        if (args.description) updateMessages.push('description');
-        if (args.prompt) updateMessages.push('prompt');
-
-        return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`);
-      }
+      return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`);
     } catch (error) {
       return this.createError(
         `Failed to update task: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -435,31 +317,20 @@ export class TaskAddNoteTool extends Tool {
       return this.createError('No thread context available');
     }
 
+    if (!this.getTaskManager) {
+      return this.createError('TaskManager is required for adding notes');
+    }
+
     try {
-      // Use TaskManager if available, otherwise fall back to direct persistence
-      if (this.getTaskManager) {
-        const taskManager = this.getTaskManager();
-        const taskContext = {
-          actor: context.threadId,
-          isHuman: false,
-        };
+      const taskManager = this.getTaskManager();
+      const taskContext = {
+        actor: context.threadId,
+        isHuman: false,
+      };
 
-        await taskManager.addNote(args.taskId, args.note, taskContext);
+      await taskManager.addNote(args.taskId, args.note, taskContext);
 
-        return this.createResult(`Added note to task ${args.taskId}`);
-      } else {
-        // Fallback to original implementation for backward compatibility
-        const note: Omit<TaskNote, 'id'> = {
-          author: context.threadId,
-          content: args.note,
-          timestamp: new Date(),
-        };
-
-        const persistence = getPersistence();
-        await persistence.addNote(args.taskId, note);
-
-        return this.createResult(`Added note to task ${args.taskId}`);
-      }
+      return this.createResult(`Added note to task ${args.taskId}`);
     } catch (error) {
       return this.createError(
         `Failed to add note: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -488,22 +359,22 @@ export class TaskViewTool extends Tool {
     args: z.infer<typeof viewTaskSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
-    try {
-      let task: Task | null = null;
+    if (!context?.threadId) {
+      return this.createError('No thread context available');
+    }
 
-      // Use TaskManager if available, otherwise fall back to direct persistence
-      if (this.getTaskManager && context?.threadId) {
-        const taskManager = this.getTaskManager();
-        const taskContext = {
-          actor: context.threadId,
-          isHuman: false,
-        };
-        task = await Promise.resolve(taskManager.getTask(args.taskId, taskContext));
-      } else {
-        // Fallback to original implementation for backward compatibility
-        const persistence = getPersistence();
-        task = persistence.loadTask(args.taskId);
-      }
+    if (!this.getTaskManager) {
+      return this.createError('TaskManager is required for viewing tasks');
+    }
+
+    try {
+      const taskManager = this.getTaskManager();
+      const taskContext = {
+        actor: context.threadId,
+        isHuman: false,
+      };
+
+      const task = await Promise.resolve(taskManager.getTask(args.taskId, taskContext));
 
       if (!task) {
         return this.createError(`Task ${args.taskId} not found`);
