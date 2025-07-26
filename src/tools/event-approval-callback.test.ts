@@ -140,6 +140,9 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Wait for conversation to complete
     await conversationPromise;
 
+    // Add delay to allow async tool execution to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     // Verify tool was executed (TOOL_RESULT event exists)
     const finalEvents = threadManager.getEvents(agent.threadId);
     const toolResultEvent = finalEvents.find((e) => e.type === 'TOOL_RESULT');
@@ -238,6 +241,9 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Wait for conversation to complete
     await conversationPromise;
+
+    // Add delay to allow async tool execution to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Both tools should have executed
     const finalEvents = threadManager.getEvents(agent.threadId);

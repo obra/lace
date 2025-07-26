@@ -1,14 +1,9 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import {
-  ToolResult,
-  ToolContext,
-  ToolCall,
-  createErrorResult,
-} from '~/tools/types';
+import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
@@ -95,7 +90,10 @@ export class ToolExecutor {
     this.registerTools(tools);
   }
 
-  async requestToolPermission(call: ToolCall, context?: ToolContext): Promise<'granted' | 'pending'> {
+  async requestToolPermission(
+    call: ToolCall,
+    context?: ToolContext
+  ): Promise<'granted' | 'pending'> {
     // 1. Check if tool exists
     const tool = this.tools.get(call.name);
     if (!tool) {
@@ -132,15 +130,22 @@ export class ToolExecutor {
     }
 
     try {
-      await this.approvalCallback.requestApproval(call.name, call.arguments);
-      return 'granted'; // Approval was granted immediately
+      const decision = await this.approvalCallback.requestApproval(call.name, call.arguments);
+      
+      if (decision === 'allow_once' || decision === 'allow_session') {
+        return 'granted';
+      } else if (decision === 'deny') {
+        throw new Error('Tool execution denied by approval policy');
+      } else {
+        throw new Error(`Unknown approval decision: ${decision}`);
+      }
     } catch (error) {
       // Check if this is a pending approval (not an error)
       if (error instanceof ApprovalPendingError) {
         return 'pending'; // Approval request was created, waiting for response
       }
 
-      // Other approval system failures
+      // Other approval system failures (including denial)
       throw error;
     }
   }
@@ -152,7 +157,25 @@ export class ToolExecutor {
       return createErrorResult(`Tool '${call.name}' not found`, call.id);
     }
 
-    // 2. Execute the tool directly (permissions already checked)
+    // 2. Backward compatibility: check permissions if not called through new flow
+    // The new flow should call requestToolPermission() first, then executeTool()
+    // But old integration tests and direct calls should still work
+    try {
+      const permission = await this.requestToolPermission(call, context);
+      if (permission === 'pending') {
+        // This should not happen in the new architecture, but handle gracefully
+        return createErrorResult('Tool approval is pending', call.id);
+      }
+      // permission === 'granted', continue to execution
+    } catch (error) {
+      // Permission denied or other permission error
+      return createErrorResult(
+        error instanceof Error ? error.message : String(error),
+        call.id
+      );
+    }
+
+    // 3. Execute the tool (permissions already checked)
     return this.executeToolDirect(tool, call, context);
   }
 

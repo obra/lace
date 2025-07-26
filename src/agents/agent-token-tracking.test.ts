@@ -217,6 +217,9 @@ describe('Agent Token Tracking Integration', () => {
       // Act
       await multiCallAgent.sendMessage('Use a tool to help me');
 
+      // Add delay to allow turn completion to process
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Assert
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
@@ -309,6 +312,9 @@ describe('Agent Token Tracking Integration', () => {
 
       // Act
       await multiCallAgent.sendMessage('Multi-step response');
+
+      // Add delay to allow turn completion to process
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Assert
       expect(completeEvents).toHaveLength(1);

@@ -424,6 +424,9 @@ describe('Turn Tracking Provider Integration Tests', () => {
       // Act
       await agent.sendMessage('Use the mock tool');
 
+      // Add delay to allow turn completion to process
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Assert
       const startEvent = turnEvents.find((e) => e.type === 'start');
       const completeEvent = turnEvents.find((e) => e.type === 'complete');

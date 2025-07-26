@@ -15,7 +15,7 @@ export class EventApprovalCallback implements ApprovalCallback {
     private threadId: string
   ) {}
 
-  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+  requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
     // Find the TOOL_CALL event that triggered this approval
     const toolCallEvent = this.findRecentToolCallEvent(toolName, input);
     if (!toolCallEvent) {
@@ -27,7 +27,7 @@ export class EventApprovalCallback implements ApprovalCallback {
     // Check if approval response already exists (recovery case)
     const existingResponse = this.checkExistingApprovalResponse(toolCallId);
     if (existingResponse) {
-      return existingResponse;
+      return Promise.resolve(existingResponse);
     }
 
     // Check if approval request already exists to avoid duplicates
@@ -42,9 +42,9 @@ export class EventApprovalCallback implements ApprovalCallback {
       this.agent.emit('thread_event_added', { event, threadId: this.threadId });
     }
 
-    // Instead of blocking, throw an error that indicates approval is pending
+    // Instead of blocking, return a rejected promise with pending error
     // The Agent will handle this by NOT executing the tool yet
-    throw new ApprovalPendingError(toolCallId);
+    return Promise.reject(new ApprovalPendingError(toolCallId));
   }
 
   private findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {

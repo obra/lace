@@ -93,4 +93,3 @@ export function createErrorResult(
   }
   return createToolResult(true, input, id, metadata);
 }
-

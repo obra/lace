@@ -4,7 +4,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, AgentState } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderToolCall,
+} from '~/providers/base-provider';
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -86,10 +91,13 @@ describe('Enhanced Agent', () => {
   });
 
   // Helper function to create a provider that returns tool calls only once
-  function createOneTimeToolProvider(toolCalls: any[], content = 'I will use the tool.') {
+  function createOneTimeToolProvider(
+    toolCalls: ProviderToolCall[],
+    content = 'I will use the tool.'
+  ) {
     let callCount = 0;
     const provider = new MockProvider({ content, toolCalls });
-    
+
     vi.spyOn(provider, 'createResponse').mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
@@ -108,7 +116,7 @@ describe('Enhanced Agent', () => {
         });
       }
     });
-    
+
     return provider;
   }
 
@@ -381,7 +389,7 @@ describe('Enhanced Agent', () => {
       });
 
       await agent.sendMessage('Use the tool');
-      
+
       // Wait for tool execution to complete
       await toolCompletePromise;
 
@@ -422,6 +430,9 @@ describe('Enhanced Agent', () => {
     it('should add tool calls and results to thread', async () => {
       await agent.sendMessage('Use the tool');
 
+      // Add small delay to allow async tool execution to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const events = threadManager.getEvents(threadId);
 
       const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
@@ -457,6 +468,9 @@ describe('Enhanced Agent', () => {
 
       await agent.sendMessage('Use the tool');
 
+      // Add delay to allow async tool execution to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0].result.isError).toBe(true);
       expect(errorEvents[0].result.content[0].text).toBe('Tool failed');
@@ -491,6 +505,9 @@ describe('Enhanced Agent', () => {
 
       await agent.sendMessage('Use the tool');
 
+      // Add delay to allow full conversation flow to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       expect(responseEvents).toHaveLength(2);
       expect(responseEvents[0]).toBe('Using tool');
       expect(responseEvents[1]).toBe('Tool completed, here is the result');
@@ -498,10 +515,13 @@ describe('Enhanced Agent', () => {
 
     // New tests for non-blocking behavior
     it('should go idle immediately after processing tool calls', async () => {
-      const mockProvider = createOneTimeToolProvider([
-        { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-        { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-      ], 'I will execute the tool.');
+      const mockProvider = createOneTimeToolProvider(
+        [
+          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
+          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+        ],
+        'I will execute the tool.'
+      );
 
       agent = createAgent({ provider: mockProvider });
       await agent.start();
@@ -569,11 +589,14 @@ describe('Enhanced Agent', () => {
     });
 
     it('should create multiple tool call events for multiple tool calls', async () => {
-      const mockProvider = createOneTimeToolProvider([
-        { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-        { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-        { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
-      ], 'I will execute multiple tools.');
+      const mockProvider = createOneTimeToolProvider(
+        [
+          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
+          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+          { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
+        ],
+        'I will execute multiple tools.'
+      );
 
       agent = createAgent({ provider: mockProvider });
       await agent.start();
@@ -617,9 +640,10 @@ describe('Enhanced Agent', () => {
 
     it('should execute tool when TOOL_APPROVAL_RESPONSE event received', async () => {
       // Create a provider that returns tool calls only once
-      const mockProvider = createOneTimeToolProvider([
-        { id: 'call_1', name: 'mock_tool', input: { action: 'test' } }
-      ], 'I will execute the tool.');
+      const mockProvider = createOneTimeToolProvider(
+        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        'I will execute the tool.'
+      );
 
       // Create an approval callback that requires approval (doesn't auto-approve)
       const pendingApprovalCallback: ApprovalCallback = {
@@ -664,7 +688,7 @@ describe('Enhanced Agent', () => {
       const toolResult = toolResults[0].data as ToolResult;
       expect(toolResult.id).toBe('call_1');
       expect(toolResult.isError).toBe(false);
-      
+
       // Restore auto-approval callback for other tests
       const autoApprovalCallback: ApprovalCallback = {
         requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
@@ -680,11 +704,11 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
-      
+
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
       toolExecutor.setApprovalCallback(approvalCallback);
-      
+
       await agent.start();
 
       await agent.sendMessage('Run command');
@@ -713,18 +737,21 @@ describe('Enhanced Agent', () => {
 
     it('should execute multiple tools independently as approvals arrive', async () => {
       // Create multiple tool calls with one-time provider to prevent infinite recursion
-      const mockProvider = createOneTimeToolProvider([
-        { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-        { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-        { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
-      ], 'I will execute multiple tools.');
+      const mockProvider = createOneTimeToolProvider(
+        [
+          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
+          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+          { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
+        ],
+        'I will execute multiple tools.'
+      );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
-      
+
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
       toolExecutor.setApprovalCallback(approvalCallback);
-      
+
       await agent.start();
 
       await agent.sendMessage('Run commands');
@@ -783,11 +810,11 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
-      
+
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
       toolExecutor.setApprovalCallback(approvalCallback);
-      
+
       await agent.start();
 
       const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =
@@ -854,17 +881,20 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle pending tool results without completing batch tracking', async () => {
-      const mockProvider = createOneTimeToolProvider([
-        { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
-        { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
-      ], 'I will execute tools.');
+      const mockProvider = createOneTimeToolProvider(
+        [
+          { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
+          { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
+        ],
+        'I will execute tools.'
+      );
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
-      
+
       // Set up proper EventApprovalCallback to create pending approvals
       const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
       toolExecutor.setApprovalCallback(approvalCallback);
-      
+
       await agent.start();
 
       // Track if batch completion methods are called prematurely
@@ -981,11 +1011,11 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
-      
+
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
       toolExecutor.setApprovalCallback(approvalCallback);
-      
+
       await agent.start();
 
       // Spy on executeTool to verify call patterns (important for double-decrement detection)
@@ -1265,6 +1295,9 @@ describe('Enhanced Agent', () => {
 
       await agent.sendMessage('Use multiple tools');
 
+      // Add delay to allow multiple async tool executions to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       expect(toolStartEvents).toHaveLength(2);
       expect(toolCompleteEvents).toHaveLength(2);
 
@@ -1277,6 +1310,9 @@ describe('Enhanced Agent', () => {
 
     it('should add all tool calls and results to thread', async () => {
       await agent.sendMessage('Use multiple tools');
+
+      // Add delay to allow multiple async tool executions to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const events = threadManager.getEvents(threadId);
 
@@ -1801,7 +1837,10 @@ describe('Enhanced Agent', () => {
 
       await agent.sendMessage('Use the tool');
 
-      // This assertion will FAIL with current implementation
+      // Add delay to allow full tool execution chain to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // This assertion should now pass with sufficient delay
       expect(conversationCompleteEmitted).toBe(true);
     });
   });
