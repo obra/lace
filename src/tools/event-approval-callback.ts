@@ -63,7 +63,6 @@ export class EventApprovalCallback implements ApprovalCallback {
     return null;
   }
 
-
   private checkExistingApprovalRequest(toolCallId: string): boolean {
     const events = this.threadManager.getEvents(this.threadId);
     return events.some(

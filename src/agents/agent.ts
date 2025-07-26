@@ -925,28 +925,18 @@ export class Agent extends EventEmitter {
         content: [{ type: 'text', text: 'Tool execution denied by user' }],
       };
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
-
-      // Track rejection
       this._hasRejectionsInBatch = true;
     } else {
-      // Execute the approved tool
+      // Execute the approved tool (this time it should succeed)
       void this._executeSingleTool(toolCall);
+      // Note: Don't decrement pending count here - _executeSingleTool will handle it
+      return; // Early return to avoid double decrementing
     }
 
-    // Check if all tools are complete
+    // Handle denied tool completion
     this._pendingToolCount--;
     if (this._pendingToolCount === 0) {
-      // All tools complete - decide what to do next
-      if (this._hasRejectionsInBatch) {
-        // Has rejections - wait for user input
-        this._setState('idle');
-        // Don't auto-continue conversation
-      } else {
-        // All approved - auto-continue conversation
-        this._completeTurn();
-        this._setState('idle');
-        void this._processConversation();
-      }
+      this._handleBatchComplete();
     }
   }
 

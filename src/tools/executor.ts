@@ -1,7 +1,13 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, ToolCall, createErrorResult, createPendingResult } from '~/tools/types';
+import {
+  ToolResult,
+  ToolContext,
+  ToolCall,
+  createErrorResult,
+  createPendingResult,
+} from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
