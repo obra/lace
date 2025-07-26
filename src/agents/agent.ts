@@ -8,7 +8,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, EventType, asThreadId } from '~/threads/types';
+import { ThreadEvent, EventType, ToolApprovalResponseData, asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -138,6 +138,10 @@ export class Agent extends EventEmitter {
   private _cachedProviderInstance: AIProvider | null = null;
   private _cachedProviderKey: string | null = null;
 
+  // Simple tool batch tracking
+  private _pendingToolCount = 0;
+  private _hasRejectionsInBatch = false;
+
   constructor(config: AgentConfig) {
     super();
     this._provider = config.provider;
@@ -149,6 +153,13 @@ export class Agent extends EventEmitter {
     this._tokenBudgetManager = config.tokenBudget
       ? new TokenBudgetManager(config.tokenBudget)
       : null;
+
+    // Listen for tool approval responses
+    this.on('thread_event_added', ({ event }) => {
+      if (event && event.type === 'TOOL_APPROVAL_RESPONSE') {
+        this._handleToolApprovalResponse(event);
+      }
+    });
 
     // Events are emitted through _addEventAndEmit() helper method
   }
@@ -573,9 +584,9 @@ export class Agent extends EventEmitter {
 
       // Handle tool calls
       if (response.toolCalls && response.toolCalls.length > 0) {
-        await this._executeToolCalls(response.toolCalls);
-        // Recurse to get next response after tool execution
-        await this._processConversation();
+        this._executeToolCalls(response.toolCalls); // No await
+        // NO RECURSIVE CALL - tools will auto-continue or wait for user input
+        // DON'T complete turn yet - wait for all tools to finish
       } else {
         // No tool calls, conversation is complete for this turn
         this._completeTurn();
@@ -834,7 +845,8 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private async _executeToolCalls(toolCalls: ProviderToolCall[]): Promise<void> {
+  private _executeToolCalls(toolCalls: ProviderToolCall[]): void {
+    // No longer async - doesn't block
     this._setState('tool_execution');
 
     logger.debug('AGENT: Processing tool calls', {
@@ -843,8 +855,12 @@ export class Agent extends EventEmitter {
       toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name })),
     });
 
+    // Initialize tool batch tracking
+    this._pendingToolCount = toolCalls.length;
+    this._hasRejectionsInBatch = false;
+
     for (const providerToolCall of toolCalls) {
-      logger.debug('AGENT: Executing individual tool call', {
+      logger.debug('AGENT: Creating tool call event', {
         threadId: this._threadId,
         toolCallId: providerToolCall.id,
         toolName: providerToolCall.name,
@@ -860,81 +876,243 @@ export class Agent extends EventEmitter {
       // Add tool call to thread
       this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
 
-      // Emit tool call start event
+      // Emit tool call start event for UI
       this.emit('tool_call_start', {
         toolName: providerToolCall.name,
         input: providerToolCall.input,
         callId: providerToolCall.id,
       });
 
-      try {
-        // Get working directory for context
-        const workingDirectory = this._getWorkingDirectory();
-        const toolContext = {
-          threadId: asThreadId(this._threadId),
-          parentThreadId: asThreadId(this._getParentThreadId()),
-          workingDirectory,
-        };
+      // Attempt tool execution immediately
+      // This will trigger approval flow and create approval requests
+      void this._executeSingleTool(toolCall);
+    }
 
-        logger.debug('Agent - executing tool with context', {
-          threadId: this._threadId,
-          toolName: toolCall.name,
-          toolId: toolCall.id,
-          toolArguments: toolCall.arguments,
-          context: toolContext,
-          workingDirectoryFromMethod: workingDirectory,
-          processCwd: process.cwd(),
-        });
+    // Agent goes idle immediately - no waiting
+    this._setState('idle');
+  }
 
-        // Execute tool
+  /**
+   * Handle TOOL_APPROVAL_RESPONSE events by executing the approved tool
+   */
+  private _handleToolApprovalResponse(event: ThreadEvent): void {
+    if (event.type !== 'TOOL_APPROVAL_RESPONSE') return;
+
+    const responseData = event.data as ToolApprovalResponseData;
+    const { toolCallId, decision } = responseData;
+
+    // Find the corresponding TOOL_CALL event
+    const events = this._threadManager.getEvents(this._threadId);
+    const toolCallEvent = events.find(
+      (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId
+    );
+
+    if (!toolCallEvent) {
+      logger.error('AGENT: No TOOL_CALL event found for approval response', {
+        threadId: this._threadId,
+        toolCallId,
+      });
+      return;
+    }
+
+    const toolCall = toolCallEvent.data as ToolCall;
+
+    if (decision === ApprovalDecision.DENY) {
+      // Create error result for denied tool
+      const errorResult: ToolResult = {
+        id: toolCallId,
+        isError: true,
+        content: [{ type: 'text', text: 'Tool execution denied by user' }],
+      };
+      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+      this._hasRejectionsInBatch = true;
+    } else {
+      // Execute the approved tool directly (permission already granted)
+      void this._executeApprovedTool(toolCall);
+      return; // Early return to avoid double decrementing
+    }
+
+    // Handle denied tool completion
+    this._pendingToolCount--;
+    if (this._pendingToolCount === 0) {
+      this._handleBatchComplete();
+    }
+  }
+
+  /**
+   * Execute a single tool call without blocking
+   */
+  private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
+    try {
+      const workingDirectory = this._getWorkingDirectory();
+      const toolContext = {
+        threadId: asThreadId(this._threadId),
+        parentThreadId: asThreadId(this._getParentThreadId()),
+        workingDirectory,
+      };
+
+      // First: Check permission
+      const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
+
+      if (permission === 'granted') {
+        // Execute immediately if allowed
         const result = await this._toolExecutor.executeTool(toolCall, toolContext);
 
-        const outputText = result.content[0]?.text || '';
+        // Only add events if thread still exists
+        if (this._threadManager.getThread(this._threadId)) {
+          // Add result and update tracking
+          this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+          this.emit('tool_call_complete', {
+            toolName: toolCall.name,
+            result,
+            callId: toolCall.id,
+          });
 
-        logger.debug('AGENT: Tool execution completed', {
-          threadId: this._threadId,
-          toolCallId: providerToolCall.id,
-          toolName: providerToolCall.name,
-          success: !result.isError,
-          outputLength: outputText.length,
-          hasError: result.isError,
-        });
+          // Update batch tracking
+          this._pendingToolCount--;
+          // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+          // Only user denials should pause conversation - tool failures should continue
 
-        // Emit tool call complete event
-        this.emit('tool_call_complete', {
-          toolName: providerToolCall.name,
-          result,
-          callId: providerToolCall.id,
-        });
+          if (this._pendingToolCount === 0) {
+            this._handleBatchComplete();
+          }
+        }
+      } else {
+        // Permission pending - approval request was created
+        // Don't decrement pending count yet - wait for approval response
+        return;
+      }
+    } catch (error: unknown) {
+      // Handle permission/execution errors
+      logger.error('AGENT: Tool execution failed', {
+        threadId: this._threadId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
-        // Add tool result to thread
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
-
-        // Add tool output tokens to current turn metrics (estimated)
-        this._addTokensToCurrentTurn('in', this._estimateTokens(outputText));
-      } catch (error: unknown) {
-        logger.error('AGENT: Tool execution error', {
-          threadId: this._threadId,
-          toolCallId: providerToolCall.id,
-          toolName: providerToolCall.name,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        // Create a failed tool result
-        const failedResult: ToolResult = {
-          id: providerToolCall.id,
-          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+      // Only handle error if thread still exists
+      if (this._threadManager.getThread(this._threadId)) {
+        const errorResult: ToolResult = {
+          id: toolCall.id,
           isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
 
+        // Emit tool call complete event for failed execution
         this.emit('tool_call_complete', {
-          toolName: providerToolCall.name,
-          result: failedResult,
-          callId: providerToolCall.id,
+          toolName: toolCall.name,
+          result: errorResult,
+          callId: toolCall.id,
         });
 
-        // Add failed tool result to thread
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', failedResult);
+        // Update batch tracking for errors
+        this._pendingToolCount--;
+        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+        // Only user denials should pause conversation - tool failures should continue
+
+        if (this._pendingToolCount === 0) {
+          this._handleBatchComplete();
+        }
+      }
+    }
+  }
+
+  private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
+    try {
+      const workingDirectory = this._getWorkingDirectory();
+      const toolContext = {
+        threadId: asThreadId(this._threadId),
+        parentThreadId: asThreadId(this._getParentThreadId()),
+        workingDirectory,
+      };
+
+      // Find the tool and execute directly (permission already granted via approval)
+      const tool = this._toolExecutor.getTool(toolCall.name);
+      if (!tool) {
+        throw new Error(`Tool '${toolCall.name}' not found`);
+      }
+
+      const result = await tool.execute(toolCall.arguments, toolContext);
+
+      // Ensure the result has the call ID if it wasn't set by the tool
+      if (!result.id && toolCall.id) {
+        result.id = toolCall.id;
+      }
+
+      // Only add events if thread still exists
+      if (this._threadManager.getThread(this._threadId)) {
+        // Add result and update tracking
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+        this.emit('tool_call_complete', {
+          toolName: toolCall.name,
+          result,
+          callId: toolCall.id,
+        });
+
+        // Update batch tracking
+        this._pendingToolCount--;
+        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+        // Only user denials should pause conversation - tool failures should continue
+
+        if (this._pendingToolCount === 0) {
+          this._handleBatchComplete();
+        }
+      }
+    } catch (error: unknown) {
+      // Handle execution errors
+      logger.error('AGENT: Approved tool execution failed', {
+        threadId: this._threadId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Only handle error if thread still exists
+      if (this._threadManager.getThread(this._threadId)) {
+        const errorResult: ToolResult = {
+          id: toolCall.id,
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+        };
+        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+
+        // Emit tool call complete event for failed execution
+        this.emit('tool_call_complete', {
+          toolName: toolCall.name,
+          result: errorResult,
+          callId: toolCall.id,
+        });
+
+        // Update batch tracking for errors
+        this._pendingToolCount--;
+        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
+        // Only user denials should pause conversation - tool failures should continue
+
+        if (this._pendingToolCount === 0) {
+          this._handleBatchComplete();
+        }
+      }
+    }
+  }
+
+  private _handleBatchComplete(): void {
+    if (this._hasRejectionsInBatch) {
+      // Has rejections - wait for user input
+      this._setState('idle');
+      // Don't auto-continue conversation
+    } else {
+      // All approved - auto-continue conversation
+      this._completeTurn();
+      this._setState('idle');
+
+      // Emit conversation complete after successful tool batch completion
+      this.emit('conversation_complete');
+
+      // Only continue conversation if agent is still running and thread exists
+      if (this._isRunning && this._threadManager.getThread(this._threadId)) {
+        void this._processConversation();
       }
     }
   }
@@ -1459,7 +1637,7 @@ export class Agent extends EventEmitter {
    * Add a system message to the current thread
    * Used for error messages, notifications, etc.
    */
-  addSystemMessage(message: string, threadId?: string): ThreadEvent {
+  addSystemMessage(message: string, threadId?: string): ThreadEvent | null {
     const targetThreadId = threadId || this._threadId;
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
@@ -1475,9 +1653,20 @@ export class Agent extends EventEmitter {
     threadId: string,
     type: string,
     data: string | ToolCall | ToolResult
-  ): ThreadEvent {
+  ): ThreadEvent | null {
+    // Safety check: only add events if thread exists
+    if (!this._threadManager.getThread(threadId)) {
+      logger.warn('AGENT: Skipping event addition - thread not found', {
+        threadId,
+        type,
+      });
+      return null;
+    }
+
     const event = this._threadManager.addEvent(threadId, type as EventType, data);
-    this.emit('thread_event_added', { event, threadId });
+    if (event) {
+      this.emit('thread_event_added', { event, threadId });
+    }
     return event;
   }
 

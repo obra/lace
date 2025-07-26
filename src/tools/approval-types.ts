@@ -10,3 +10,10 @@ export enum ApprovalDecision {
 export interface ApprovalCallback {
   requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision>;
 }
+
+export class ApprovalPendingError extends Error {
+  constructor(public readonly toolCallId: string) {
+    super(`Tool approval pending for ${toolCallId}`);
+    this.name = 'ApprovalPendingError';
+  }
+}
