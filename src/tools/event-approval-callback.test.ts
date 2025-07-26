@@ -2,7 +2,7 @@
 // ABOUTME: Tests actual approval flow behavior through Agent conversations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
@@ -320,5 +320,75 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
     await conversationPromise;
+  });
+
+  describe('direct requestApproval method behavior', () => {
+    it('should throw ApprovalPendingError when approval is needed', async () => {
+      // Setup tool call event
+      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+        id: 'call_test',
+        name: 'bash',
+        arguments: { command: 'ls' },
+      });
+
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
+
+      // Should throw pending error instead of blocking
+      await expect(
+        approvalCallback.requestApproval('bash', { command: 'ls' })
+      ).rejects.toThrow(ApprovalPendingError);
+
+      // Verify approval request was created
+      const events = threadManager.getEvents(agent.threadId);
+      const approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      expect(approvalRequest).toBeDefined();
+      expect(approvalRequest?.data).toEqual({ toolCallId: 'call_test' });
+    });
+
+    it('should return existing approval decision if already present', async () => {
+      // Setup tool call and approval response events
+      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+        id: 'call_existing',
+        name: 'bash',
+        arguments: { command: 'pwd' },
+      });
+
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_existing',
+        decision: ApprovalDecision.ALLOW_SESSION,
+      });
+
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
+
+      // Should return existing decision instead of throwing
+      const decision = await approvalCallback.requestApproval('bash', { command: 'pwd' });
+      expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
+    });
+
+    it('should not create duplicate approval requests', async () => {
+      // Setup tool call event
+      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+        id: 'call_duplicate',
+        name: 'bash',
+        arguments: { command: 'echo test' },
+      });
+
+      // Add existing approval request
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_REQUEST', {
+        toolCallId: 'call_duplicate',
+      });
+
+      const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
+
+      // Should still throw ApprovalPendingError but not create duplicate request
+      await expect(
+        approvalCallback.requestApproval('bash', { command: 'echo test' })
+      ).rejects.toThrow(ApprovalPendingError);
+
+      // Should still have only one approval request
+      const events = threadManager.getEvents(agent.threadId);
+      const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      expect(approvalRequests).toHaveLength(1);
+    });
   });
 });

@@ -1,7 +1,7 @@
 // ABOUTME: Event-based approval callback that uses ThreadManager for persistence
 // ABOUTME: Replaces Promise-based approval system with durable event storage
 
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
 import { ToolCall } from '~/tools/types';
@@ -42,8 +42,9 @@ export class EventApprovalCallback implements ApprovalCallback {
       this.agent.emit('thread_event_added', { event, threadId: this.threadId });
     }
 
-    // Wait for TOOL_APPROVAL_RESPONSE event
-    return this.waitForApprovalResponse(toolCallId);
+    // Instead of blocking, throw an error that indicates approval is pending
+    // The Agent will handle this by NOT executing the tool yet
+    throw new ApprovalPendingError(toolCallId);
   }
 
   private findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
@@ -62,32 +63,6 @@ export class EventApprovalCallback implements ApprovalCallback {
     return null;
   }
 
-  private waitForApprovalResponse(toolCallId: string): Promise<ApprovalDecision> {
-    return new Promise((resolve) => {
-      // Check if response already exists (recovery case)
-      const existingResponse = this.checkExistingApprovalResponse(toolCallId);
-      if (existingResponse) {
-        resolve(existingResponse);
-        return;
-      }
-
-      // Listen for thread_event_added events on Agent
-      const eventListener = (data: { event: ThreadEvent; threadId: string }) => {
-        const { event } = data;
-        if (
-          event.type === 'TOOL_APPROVAL_RESPONSE' &&
-          (event.data as ToolApprovalResponseData).toolCallId === toolCallId
-        ) {
-          this.agent.off('thread_event_added', eventListener);
-          resolve((event.data as ToolApprovalResponseData).decision);
-        }
-      };
-
-      this.agent.on('thread_event_added', eventListener);
-
-      // No timeout - wait indefinitely for user approval
-    });
-  }
 
   private checkExistingApprovalRequest(toolCallId: string): boolean {
     const events = this.threadManager.getEvents(this.threadId);
