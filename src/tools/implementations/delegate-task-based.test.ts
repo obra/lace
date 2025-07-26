@@ -38,13 +38,15 @@ describe('Task-Based DelegateTool', () => {
       off: vi.fn(),
     } as unknown as TaskManager;
 
-    // Mock ToolContext with TaskManager
+    // Mock ToolContext
     mockContext = {
       threadId: asThreadId('lace_20250726_test01.1'),
-      taskManager: mockTaskManager,
     };
 
     delegateTool = new DelegateTool();
+    // Inject TaskManager using the factory pattern like Session does
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (delegateTool as any).getTaskManager = () => mockTaskManager;
   });
 
   describe('Task Creation and Event-Driven Completion', () => {

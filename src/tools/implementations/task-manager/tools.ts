@@ -236,14 +236,15 @@ export class TaskListTool extends Tool {
   }
 }
 
-// Schema for task completion (backwards compatibility)
+// Schema for task completion
 const completeTaskSchema = z.object({
   id: NonEmptyString,
+  message: NonEmptyString.describe('Completion message or result to add as a note'),
 });
 
 export class TaskCompleteTool extends Tool {
   name = 'task_complete';
-  description = 'Mark a task as completed';
+  description = 'Mark a task as completed with a completion message or result';
   schema = completeTaskSchema;
   annotations = {
     safeInternal: true,
@@ -269,6 +270,10 @@ export class TaskCompleteTool extends Tool {
           isHuman: false,
         };
 
+        // Add the completion message as a note first
+        await taskManager.addNote(args.id, args.message, taskContext);
+
+        // Then mark the task as completed
         const task = await taskManager.updateTask(args.id, { status: 'completed' }, taskContext);
 
         return this.createResult(`Completed task ${args.id}: ${task.title}`);
@@ -280,6 +285,15 @@ export class TaskCompleteTool extends Tool {
           return this.createError(`Task ${args.id} not found`);
         }
 
+        // Add the completion message as a note first
+        const note: Omit<TaskNote, 'id'> = {
+          author: context.threadId,
+          content: args.message,
+          timestamp: new Date(),
+        };
+        await persistence.addNote(args.id, note);
+
+        // Then mark the task as completed
         await persistence.updateTask(args.id, { status: 'completed' });
 
         return this.createResult(`Completed task ${args.id}: ${task.title}`);
