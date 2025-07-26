@@ -795,6 +795,115 @@ describe('Enhanced Agent', () => {
 
       executeToolSpy.mockRestore();
     });
+
+    it('should handle pending tool results without completing batch tracking', async () => {
+      // Mock ToolExecutor to return pending result
+      const pendingResult = {
+        id: 'call_pending',
+        isError: false,
+        isPending: true,
+        content: [{ type: 'text' as const, text: 'Tool approval pending' }],
+      };
+      vi.spyOn(toolExecutor, 'executeTool').mockResolvedValue(pendingResult);
+
+      const mockProvider = new MockProvider({
+        content: 'I will execute tools.',
+        toolCalls: [
+          { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
+          { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
+        ],
+      });
+
+      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      await agent.start();
+
+      // Track if batch completion methods are called prematurely
+      const completeTurnSpy = vi.spyOn(agent as any, '_completeTurn');
+      const processConversationSpy = vi.spyOn(agent as any, '_processConversation');
+
+      // Send message to trigger tool calls
+      await agent.sendMessage('Run commands');
+
+      // Wait for processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify no TOOL_RESULT events were created (tools are pending)
+      const events = threadManager.getEvents(agent.threadId);
+      const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(0);
+
+      // Verify Agent went idle despite pending tools
+      expect(agent.getCurrentState()).toBe('idle');
+
+      // CRITICAL: Agent should NOT complete the batch yet
+      // Batch tracking should keep pending count > 0 until approval responses arrive
+      expect(completeTurnSpy).not.toHaveBeenCalled();
+      expect(processConversationSpy).not.toHaveBeenCalledTimes(2); // Called once during initial processing
+
+      completeTurnSpy.mockRestore();
+      processConversationSpy.mockRestore();
+    });
+
+    it('should complete batch tracking when non-pending tools finish', async () => {
+      // Mock ToolExecutor to return completed result
+      const completedResult = {
+        id: 'call_complete',
+        isError: false,
+        isPending: false,
+        content: [{ type: 'text' as const, text: 'Tool completed successfully' }],
+      };
+      vi.spyOn(toolExecutor, 'executeTool').mockResolvedValue(completedResult);
+
+      // Use a provider that returns tool calls once, then regular response
+      class MockProviderOnce extends MockProvider {
+        private hasReturnedToolCalls = false;
+
+        async createResponse(...args: Parameters<MockProvider['createResponse']>): Promise<any> {
+          if (!this.hasReturnedToolCalls) {
+            this.hasReturnedToolCalls = true;
+            return super.createResponse(...args);
+          }
+          // Return regular response without tool calls for subsequent requests
+          return {
+            content: 'Task completed.',
+            toolCalls: [],
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+            stopReason: 'end_turn',
+          };
+        }
+      }
+
+      const mockProvider = new MockProviderOnce({
+        content: 'I will execute tools.',
+        toolCalls: [{ id: 'call_complete', name: 'mock_tool', input: { action: 'test' } }],
+      });
+
+      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      await agent.start();
+
+      // Track if batch completion methods are called
+      const completeTurnSpy = vi.spyOn(agent as any, '_completeTurn');
+      const processConversationSpy = vi.spyOn(agent as any, '_processConversation');
+
+      // Send message to trigger tool calls
+      await agent.sendMessage('Run commands');
+
+      // Wait for processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify TOOL_RESULT event was created
+      const events = threadManager.getEvents(agent.threadId);
+      const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+
+      // CRITICAL: Agent SHOULD complete the batch when all tools are done
+      // This should trigger conversation continuation since no rejections occurred
+      expect(completeTurnSpy).toHaveBeenCalled();
+      expect(processConversationSpy).toHaveBeenCalledTimes(2); // Initial + after tool completion
+
+      completeTurnSpy.mockRestore();
+      processConversationSpy.mockRestore();
+    });
   });
 
   describe('error handling', () => {
