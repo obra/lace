@@ -184,11 +184,22 @@ describe('SessionService Missing Methods', () => {
   });
 });
 
+interface MockAgent {
+  threadId: string;
+  on: vi.Mock;
+  emit: vi.Mock;
+  threadManager: {
+    getEvents: vi.Mock;
+  };
+  toolExecutor: {
+    getTool: vi.Mock;
+  };
+}
+
 describe('SessionService approval event forwarding', () => {
   let sessionService: SessionService;
   let mockSSEManager: { broadcast: vi.Mock };
-  let mockAgent: any;
-  let mockSession: any;
+  let mockAgent: MockAgent;
   const sessionId = asThreadId('session-123');
   const threadId = asThreadId('thread-456');
 
@@ -200,7 +211,7 @@ describe('SessionService approval event forwarding', () => {
     mockSSEManager = {
       broadcast: vi.fn()
     };
-    (SSEManager.getInstance as any).mockReturnValue(mockSSEManager);
+    (SSEManager.getInstance as vi.Mock).mockReturnValue(mockSSEManager);
 
     // Create mock agent with event emitter capabilities
     mockAgent = {
@@ -215,29 +226,18 @@ describe('SessionService approval event forwarding', () => {
       }
     };
 
-    // Create mock session
-    mockSession = {
-      getId: () => sessionId,
-      getAgent: vi.fn(() => mockAgent),
-      getAgents: vi.fn(() => [{ threadId, name: 'test-agent' }]),
-      getInfo: vi.fn(() => ({
-        name: 'Test Session',
-        createdAt: new Date()
-      }))
-    };
-
     sessionService = new SessionService();
   });
 
   it('should forward TOOL_APPROVAL_RESPONSE events to SSE', async () => {
     // Set up the agent event handlers
-    const setupHandlers = (sessionService as any).setupAgentEventHandlers;
+    const setupHandlers = (sessionService as { setupAgentEventHandlers: (agent: MockAgent, sessionId: string) => void }).setupAgentEventHandlers;
     setupHandlers.call(sessionService, mockAgent, sessionId);
 
     // Verify thread_event_added handler was registered
     expect(mockAgent.on).toHaveBeenCalledWith('thread_event_added', expect.any(Function));
     const threadEventHandler = mockAgent.on.mock.calls.find(
-      (call: any) => call[0] === 'thread_event_added'
+      (call: [string, Function]) => call[0] === 'thread_event_added'
     )?.[1];
 
     expect(threadEventHandler).toBeDefined();
@@ -276,11 +276,11 @@ describe('SessionService approval event forwarding', () => {
 
   it('should handle TOOL_APPROVAL_REQUEST events (existing behavior)', async () => {
     // Set up the agent event handlers
-    const setupHandlers = (sessionService as any).setupAgentEventHandlers;
+    const setupHandlers = (sessionService as { setupAgentEventHandlers: (agent: MockAgent, sessionId: string) => void }).setupAgentEventHandlers;
     setupHandlers.call(sessionService, mockAgent, sessionId);
 
     const threadEventHandler = mockAgent.on.mock.calls.find(
-      (call: any) => call[0] === 'thread_event_added'
+      (call: [string, Function]) => call[0] === 'thread_event_added'
     )?.[1];
 
     // Mock the tool call event lookup
