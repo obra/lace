@@ -10,16 +10,12 @@ import { getSessionService } from '@/lib/server/session-service';
 vi.mock('@/lib/server/session-service');
 const mockGetSessionService = vi.mocked(getSessionService);
 
-interface MockThreadManager {
-  getPendingApprovals: ReturnType<typeof vi.fn>;
-}
-
 interface MockToolExecutor {
   getTool?: ReturnType<typeof vi.fn>;
 }
 
 interface MockAgent {
-  threadManager: MockThreadManager;
+  getPendingApprovals: ReturnType<typeof vi.fn>;
   toolExecutor: MockToolExecutor;
 }
 
@@ -33,19 +29,13 @@ interface MockSessionService {
 
 describe('GET /api/threads/[threadId]/approvals/pending', () => {
   let mockAgent: MockAgent;
-  let mockThreadManager: MockThreadManager;
   let mockSession: MockSession;
   let mockSessionService: MockSessionService;
 
   beforeEach(() => {
-    // Create mock ThreadManager
-    mockThreadManager = {
-      getPendingApprovals: vi.fn(),
-    };
-
     // Create mock Agent
     mockAgent = {
-      threadManager: mockThreadManager,
+      getPendingApprovals: vi.fn(),
       toolExecutor: {
         getTool: vi.fn().mockReturnValue({
           description: 'Mock tool description',
@@ -118,15 +108,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
     ];
 
-    mockThreadManager.getPendingApprovals.mockReturnValue(mockPendingApprovals);
+    mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
     const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = { threadId };
 
     const response = await GET(request, { params });
 
-    // Verify ThreadManager.getPendingApprovals was called
-    expect(mockThreadManager.getPendingApprovals).toHaveBeenCalledWith(threadId);
+    // Verify Agent.getPendingApprovals was called
+    expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
 
     // Verify response
     expect(response.status).toBe(200);
@@ -137,14 +127,14 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   it('should return empty array when no pending approvals', async () => {
     const threadId = 'thread_empty';
     
-    mockThreadManager.getPendingApprovals.mockReturnValue([]);
+    mockAgent.getPendingApprovals.mockReturnValue([]);
 
     const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = { threadId };
 
     const response = await GET(request, { params });
 
-    expect(mockThreadManager.getPendingApprovals).toHaveBeenCalledWith(threadId);
+    expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
     expect(response.status).toBe(200);
     
     const data = (await response.json()) as { pendingApprovals: unknown[] };
@@ -163,7 +153,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const response = await GET(request, { params });
 
     // Should not call getPendingApprovals if agent not found
-    expect(mockThreadManager.getPendingApprovals).not.toHaveBeenCalled();
+    expect(mockAgent.getPendingApprovals).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
     const data = (await response.json()) as { error: string };
@@ -254,7 +244,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
     ];
 
-    mockThreadManager.getPendingApprovals.mockReturnValue(mockPendingApprovals);
+    mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
     const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = { threadId };
@@ -267,10 +257,10 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     expect(data.pendingApprovals).toEqual(expectedJsonResponse);
   });
 
-  it('should handle ThreadManager errors gracefully', async () => {
+  it('should handle Agent errors gracefully', async () => {
     const threadId = 'thread_error';
     
-    mockThreadManager.getPendingApprovals.mockImplementation(() => {
+    mockAgent.getPendingApprovals.mockImplementation(() => {
       throw new Error('Database connection failed');
     });
 

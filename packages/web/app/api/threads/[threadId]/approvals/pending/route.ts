@@ -30,8 +30,8 @@ export async function GET(
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
     
-    // Use core method to get pending approvals
-    const rawPendingApprovals = agent.threadManager.getPendingApprovals(asThreadId(threadId));
+    // Use Agent interface to get pending approvals
+    const rawPendingApprovals = agent.getPendingApprovals();
     
     // Reconstruct ToolApprovalRequestData for each pending approval
     const pendingApprovals = rawPendingApprovals.map((approval) => {

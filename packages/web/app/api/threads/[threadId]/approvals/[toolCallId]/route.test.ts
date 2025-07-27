@@ -10,13 +10,8 @@ import { getSessionService } from '@/lib/server/session-service';
 vi.mock('@/lib/server/session-service');
 const mockGetSessionService = vi.mocked(getSessionService);
 
-interface MockThreadManager {
-  addEvent: ReturnType<typeof vi.fn>;
-}
-
 interface MockAgent {
-  threadManager: MockThreadManager;
-  emit: ReturnType<typeof vi.fn>;
+  handleApprovalResponse: ReturnType<typeof vi.fn>;
 }
 
 interface MockSession {
@@ -29,20 +24,13 @@ interface MockSessionService {
 
 describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   let mockAgent: MockAgent;
-  let mockThreadManager: MockThreadManager;
   let mockSession: MockSession;
   let mockSessionService: MockSessionService;
 
   beforeEach(() => {
-    // Create mock ThreadManager
-    mockThreadManager = {
-      addEvent: vi.fn(),
-    };
-
     // Create mock Agent
     mockAgent = {
-      threadManager: mockThreadManager,
-      emit: vi.fn(),
+      handleApprovalResponse: vi.fn(),
     };
 
     // Create mock Session
@@ -80,15 +68,8 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     // Call the API route
     const response = await POST(request, { params });
 
-    // Verify ThreadManager.addEvent was called correctly
-    expect(mockThreadManager.addEvent).toHaveBeenCalledWith(
-      threadId,
-      'TOOL_APPROVAL_RESPONSE',
-      {
-        toolCallId,
-        decision,
-      }
-    );
+    // Verify Agent.handleApprovalResponse was called correctly
+    expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
 
     // Verify response
     expect(response.status).toBe(200);
@@ -111,14 +92,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       const params = { threadId, toolCallId };
       const response = await POST(request, { params });
 
-      expect(mockThreadManager.addEvent).toHaveBeenCalledWith(
-        threadId,
-        'TOOL_APPROVAL_RESPONSE',
-        {
-          toolCallId,
-          decision,
-        }
-      );
+      expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
 
       expect(response.status).toBe(200);
       const data = (await response.json()) as { success: boolean };
@@ -149,8 +123,8 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
 
-    // Should not call addEvent if agent not found
-    expect(mockThreadManager.addEvent).not.toHaveBeenCalled();
+    // Should not call handleApprovalResponse if agent not found
+    expect(mockAgent.handleApprovalResponse).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
     const data = (await response.json()) as { error: string };
@@ -191,5 +165,69 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error: string };
     expect(data).toEqual({ error: 'Missing decision in request body' });
+  });
+
+  it('should handle duplicate approval requests gracefully', async () => {
+    const threadId = 'thread_123';
+    const toolCallId = 'call_456';
+    const decision = 'allow_once';
+
+    // Mock the first call to succeed (agent handles it gracefully)
+    mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
+
+    // Mock the second call to also succeed (agent handles duplicates)
+    mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
+
+    // First request should succeed
+    const request1 = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const params = { threadId, toolCallId };
+    const response1 = await POST(request1, { params });
+
+    expect(response1.status).toBe(200);
+    const data1 = (await response1.json()) as { success: boolean };
+    expect(data1).toEqual({ success: true });
+
+    // Second request (duplicate) should also succeed
+    const request2 = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response2 = await POST(request2, { params });
+
+    expect(response2.status).toBe(200);
+    const data2 = (await response2.json()) as { success: boolean };
+    expect(data2).toEqual({ success: true });
+
+    // Verify handleApprovalResponse was called twice
+    expect(mockAgent.handleApprovalResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it('should throw non-constraint errors normally', async () => {
+    const threadId = 'thread_123';
+    const toolCallId = 'call_456';
+    const decision = 'allow_once';
+
+    // Mock handleApprovalResponse to throw a non-constraint error
+    mockAgent.handleApprovalResponse.mockRejectedValueOnce(new Error('Some other agent error'));
+
+    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const params = { threadId, toolCallId };
+    const response = await POST(request, { params });
+
+    expect(response.status).toBe(500);
+    const data = (await response.json()) as { error: string };
+    expect(data).toEqual({ error: 'Internal server error' });
   });
 });

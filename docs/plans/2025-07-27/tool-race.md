@@ -240,56 +240,81 @@ describe('addEvent atomicity', () => {
 - `packages/web/app/api/threads/[threadId]/approvals/[toolCallId]/route.ts`
 
 **Background:**
-This API endpoint receives POST requests when users approve/deny tools. Currently it calls `ThreadManager.addEvent()` directly without handling constraint violations.
+This API endpoint receives POST requests when users approve/deny tools. Currently it bypasses the Agent and calls `ThreadManager.addEvent()` directly, which violates our architecture. The web layer should only communicate with the Agent interface.
+
+**ARCHITECTURAL FIX REQUIRED:** The web API must go through the Agent, not directly access ThreadManager.
 
 **Implementation Steps:**
 
-1. **Locate the POST handler** in the approval route file.
-
-2. **Add try-catch around the addEvent call:**
+1. **Add handleApprovalResponse method to Agent class** to encapsulate approval logic:
 ```typescript
-export async function POST(
-  request: Request,
-  { params }: { params: { threadId: string; toolCallId: string } }
-) {
+// In src/agents/agent.ts
+async handleApprovalResponse(toolCallId: string, decision: string): Promise<void> {
   try {
-    const { decision } = await request.json() as { decision: string };
-    const { threadId, toolCallId } = params;
+    // Create approval response event with atomic database transaction
+    const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId,
+      decision,
+    });
     
-    const threadManager = new ThreadManager();
-    
-    try {
-      // Attempt to create approval response event
-      const event = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId,
-        decision,
-      });
-      
-      return Response.json({ success: true, eventId: event.id });
-      
-    } catch (error: unknown) {
-      // Check if this is a constraint violation (duplicate approval)
-      if (error instanceof Error && 
-          (error.message.includes('UNIQUE constraint failed') ||
-           error.message.includes('SQLITE_CONSTRAINT_UNIQUE'))) {
-        
-        // Duplicate approval - return success (idempotent behavior)
-        return Response.json({ 
-          success: true, 
-          message: 'Approval already processed' 
-        });
-      }
-      
-      // Re-throw other errors
-      throw error;
-    }
+    // Emit event for UI synchronization
+    this.emit('thread_event_added', { event, threadId: this._threadId });
     
   } catch (error: unknown) {
-    console.error('Approval API error:', error);
-    return Response.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Handle constraint violations gracefully
+    if (error instanceof Error && 
+        (error.message.includes('UNIQUE constraint failed') ||
+         error.message.includes('SQLITE_CONSTRAINT_UNIQUE'))) {
+      
+      // Duplicate approval - log but don't throw (idempotent behavior)
+      logger.warn('AGENT: Duplicate approval response ignored', {
+        threadId: this._threadId,
+        toolCallId,
+        reason: 'Database constraint violation'
+      });
+      return;
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
+}
+```
+
+2. **Update the API route to use Agent interface:**
+```typescript
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ threadId: string; toolCallId: string }> }
+): Promise<NextResponse> {
+  try {
+    const { threadId, toolCallId } = await params;
+    const { decision } = await request.json() as { decision: string };
+    
+    // Get agent through proper service layer
+    const sessionService = getSessionService();
+    const sessionIdStr = threadId.includes('.') 
+      ? threadId.split('.')[0] ?? threadId 
+      : threadId;
+    
+    const session = await sessionService.getSession(asThreadId(sessionIdStr));
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+    
+    const agent = session.getAgent(asThreadId(threadId));
+    if (!agent) {
+      return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
+    }
+    
+    // Use Agent interface - no direct ThreadManager access
+    await agent.handleApprovalResponse(toolCallId, decision);
+    
+    return NextResponse.json({ success: true });
+    
+  } catch (error: unknown) {
+    logger.error('Approval API error', { error });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 ```
@@ -334,7 +359,28 @@ describe('approval API concurrency', () => {
 });
 ```
 
-**Commit Message:** `fix: make approval API idempotent by handling constraint violations`
+**Commit Message:** `fix: make approval API use proper Agent interface instead of direct ThreadManager access`
+
+**REFACTORING NOTE:** The current implementation has SQLite constraint error handling in the Agent layer, but this violates separation of concerns. The persistence layer should handle database-specific errors and make operations idempotent at the database level. This should be refactored in a future task:
+
+```typescript
+// FUTURE: Move constraint error handling to DatabasePersistence.saveEvent()
+saveEvent(event: ThreadEvent): void {
+  try {
+    // Attempt to save event
+    this.db.prepare(insertQuery).run(...);
+  } catch (error: unknown) {
+    if (isConstraintViolation(error) && event.type === 'TOOL_APPROVAL_RESPONSE') {
+      // Silently ignore duplicate approval responses - idempotent behavior
+      logger.debug('Duplicate approval response ignored', { eventId: event.id });
+      return;
+    }
+    throw error; // Re-throw other errors
+  }
+}
+```
+
+This would allow the Agent.handleApprovalResponse() method to be simplified to just business logic without database implementation details.
 
 ### Task 4: Add Agent-Level Duplicate Execution Guards
 

@@ -1757,6 +1757,58 @@ export class Agent extends EventEmitter {
     }
   }
 
+  /**
+   * Handle approval response from web API, maintaining architectural boundaries.
+   * 
+   * The web layer should only communicate with the Agent interface, not directly
+   * access ThreadManager. This method encapsulates approval response logic with
+   * proper error handling for race conditions.
+   */
+  async handleApprovalResponse(toolCallId: string, decision: string): Promise<void> {
+    try {
+      // Create approval response event with atomic database transaction
+      const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId,
+        decision,
+      });
+      
+      // Emit event for UI synchronization (matches existing pattern)
+      this.emit('thread_event_added', { event, threadId: this._threadId });
+      
+    } catch (error: unknown) {
+      // Handle constraint violations gracefully
+      if (error instanceof Error && 
+          (error.message.includes('UNIQUE constraint failed') ||
+           error.message.includes('SQLITE_CONSTRAINT_UNIQUE'))) {
+        
+        // Duplicate approval - log but don't throw (idempotent behavior)
+        logger.warn('AGENT: Duplicate approval response ignored', {
+          threadId: this._threadId,
+          toolCallId,
+          reason: 'Database constraint violation'
+        });
+        return;
+      }
+      
+      // Re-throw other errors
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending tool approvals for this agent's thread.
+   * 
+   * Returns tool calls that have approval requests but no responses yet.
+   * The web layer should use this instead of directly accessing ThreadManager.
+   */
+  getPendingApprovals(): Array<{
+    toolCallId: string;
+    toolCall: unknown;
+    requestedAt: Date;
+  }> {
+    return this._threadManager.getPendingApprovals(this._threadId);
+  }
+
   private _getWorkingDirectory(): string | undefined {
     logger.debug('Agent._getWorkingDirectory() called', {
       threadId: this._threadId,

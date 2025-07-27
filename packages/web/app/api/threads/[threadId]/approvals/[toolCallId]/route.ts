@@ -44,14 +44,8 @@ export async function POST(
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
     
-    // Create approval response event and emit it so EventApprovalCallback receives it
-    const event = agent.threadManager.addEvent(asThreadId(threadId), 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId,
-      decision
-    });
-    
-    // Emit the event so the EventApprovalCallback can receive it and continue tool execution
-    agent.emit('thread_event_added', { event, threadId: asThreadId(threadId) });
+    // Use Agent interface - no direct ThreadManager access
+    await agent.handleApprovalResponse(toolCallId, decision);
     
     return NextResponse.json({ success: true });
   } catch (_error) {
