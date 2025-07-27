@@ -66,7 +66,7 @@ export function useSessionEvents(
 
   // Filter events for the selected agent
   const filteredEvents = selectedAgent
-    ? allEvents.filter((event) => event.threadId === selectedAgent)
+    ? (allEvents?.filter((event) => event.threadId === selectedAgent) ?? [])
     : [];
 
   // Load conversation history for entire session

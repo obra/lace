@@ -93,11 +93,15 @@ export function LaceApp() {
     if (events?.length > 0) {
       const lastEvent = events[events.length - 1];
       if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
-          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && lastEvent.data?.content?.includes('error')))) {
+          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
+           lastEvent.data?.content && 
+           (lastEvent.data.content.toLowerCase().includes('error') || 
+            lastEvent.data.content.toLowerCase().includes('failed') ||
+            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
         setSendingMessage(false);
       }
     }
-  }, [events, sendingMessage]);
+  }, [events]);
 
   // Add task manager hook when project and session are selected
   const taskManager = useTaskManager(selectedProject || '', selectedSession || '');

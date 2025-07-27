@@ -9,13 +9,18 @@ import { useState, useEffect } from 'react';
 function useThinkingIndicatorLogic(events: any[], sendingMessage: boolean, setSendingMessage: (value: boolean) => void) {
   // This mirrors the logic from LaceApp
   useEffect(() => {
-    if (events.length > 0) {
+    if (events?.length > 0) {
       const lastEvent = events[events.length - 1];
-      if (lastEvent.type === 'AGENT_MESSAGE' && sendingMessage) {
+      if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
+          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
+           lastEvent.data?.content && 
+           (lastEvent.data.content.toLowerCase().includes('error') || 
+            lastEvent.data.content.toLowerCase().includes('failed') ||
+            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
         setSendingMessage(false);
       }
     }
-  }, [events, sendingMessage, setSendingMessage]);
+  }, [events]);
 }
 
 describe('LaceApp thinking indicator logic', () => {
@@ -27,7 +32,7 @@ describe('LaceApp thinking indicator logic', () => {
       { type: 'AGENT_MESSAGE', timestamp: new Date() }
     ];
 
-    const { rerender } = renderHook(() => 
+    renderHook(() => 
       useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
     );
 
@@ -63,6 +68,51 @@ describe('LaceApp thinking indicator logic', () => {
     );
 
     // Should not call setSendingMessage when sendingMessage is already false
+    expect(setSendingMessage).not.toHaveBeenCalled();
+  });
+
+  it('should reset sendingMessage for error messages', () => {
+    let sendingMessage = true;
+    const setSendingMessage = vi.fn();
+    const events = [
+      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connection failed' }, timestamp: new Date() }
+    ];
+
+    renderHook(() => 
+      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
+    );
+
+    // Should call setSendingMessage(false) for error messages
+    expect(setSendingMessage).toHaveBeenCalledWith(false);
+  });
+
+  it('should reset sendingMessage for connection lost messages', () => {
+    let sendingMessage = true;
+    const setSendingMessage = vi.fn();
+    const events = [
+      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connection lost' }, timestamp: new Date() }
+    ];
+
+    renderHook(() => 
+      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
+    );
+
+    // Should call setSendingMessage(false) for connection lost messages
+    expect(setSendingMessage).toHaveBeenCalledWith(false);
+  });
+
+  it('should not reset sendingMessage for non-error system messages', () => {
+    let sendingMessage = true;
+    const setSendingMessage = vi.fn();
+    const events = [
+      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connected to session stream' }, timestamp: new Date() }
+    ];
+
+    renderHook(() => 
+      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
+    );
+
+    // Should not call setSendingMessage for non-error system messages
     expect(setSendingMessage).not.toHaveBeenCalled();
   });
 
