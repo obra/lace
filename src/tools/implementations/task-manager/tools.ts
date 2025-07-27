@@ -402,11 +402,11 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
       if (args.description) updates.description = args.description;
       if (args.prompt) updates.prompt = args.prompt;
 
-      await taskManager.updateTask(args.taskId, updates, taskContext);
+      const updatedTask = await taskManager.updateTask(args.taskId, updates, taskContext);
 
       const updateMessages = [];
       if (args.status) updateMessages.push(`status to ${args.status}`);
-      if (args.assignTo) updateMessages.push(`assigned to ${args.assignTo}`);
+      if (args.assignTo) updateMessages.push(`assigned to ${updatedTask.assignedTo}`);
       if (args.priority) updateMessages.push(`priority to ${args.priority}`);
       if (args.title) updateMessages.push('title');
       if (args.description) updateMessages.push('description');

@@ -125,8 +125,21 @@ export class TaskManager extends EventEmitter {
       notes: existingTask.notes, // Preserve notes
     };
 
-    // Save to database
-    await this.persistence.updateTask(taskId, updates);
+    // Handle agent spawning if assignedTo is being updated to "new:provider/model"
+    if (updates.assignedTo && isNewAgentSpec(updates.assignedTo)) {
+      await this.handleAgentSpawning(updatedTask);
+      // handleAgentSpawning modifies updatedTask.assignedTo to the spawned agent thread ID
+      // Update our database with the final task state including the spawned agent assignment
+      await this.persistence.updateTask(taskId, {
+        ...updates,
+        assignedTo: updatedTask.assignedTo,
+        status: updatedTask.status,
+        updatedAt: updatedTask.updatedAt,
+      });
+    } else {
+      // Save to database with original updates
+      await this.persistence.updateTask(taskId, updates);
+    }
 
     // Emit event for real-time updates
     this.emit('task:updated', {
