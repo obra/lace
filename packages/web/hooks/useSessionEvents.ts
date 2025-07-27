@@ -66,7 +66,7 @@ export function useSessionEvents(
 
   // Filter events for the selected agent
   const filteredEvents = selectedAgent
-    ? allEvents.filter((event) => event.threadId === selectedAgent)
+    ? (allEvents?.filter((event) => event.threadId === selectedAgent) ?? [])
     : [];
 
   // Load conversation history for entire session
@@ -123,7 +123,7 @@ export function useSessionEvents(
           toolCallId: approval.toolCallId,
           toolCall: approval.toolCall as { name: string; arguments: unknown },
           requestedAt: new Date(approval.requestedAt),
-          requestData: approval.requestData,
+          requestData: approval.requestData as ToolApprovalRequestData,
         }));
         setPendingApprovals(approvals);
       }

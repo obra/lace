@@ -88,6 +88,21 @@ export function LaceApp() {
     clearApprovalRequest,
   } = useSessionEvents(selectedSession, selectedAgent);
 
+  // Reset thinking indicator when agent completes response or encounters error
+  useEffect(() => {
+    if (events?.length > 0) {
+      const lastEvent = events[events.length - 1];
+      if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
+          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
+           lastEvent.data?.content && 
+           (lastEvent.data.content.toLowerCase().includes('error') || 
+            lastEvent.data.content.toLowerCase().includes('failed') ||
+            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
+        setSendingMessage(false);
+      }
+    }
+  }, [events]);
+
   // Add task manager hook when project and session are selected
   const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 
@@ -237,11 +252,15 @@ export function LaceApp() {
 
       if (res.ok) {
         setMessage('');
+        // Keep sendingMessage true - it will be reset when agent response completes
+      } else {
+        // Only reset on error
+        setSendingMessage(false);
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      setSendingMessage(false);
     }
-    setSendingMessage(false);
   }
 
   // Handle tool approval decision

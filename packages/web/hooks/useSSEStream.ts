@@ -55,7 +55,6 @@ export function useSSEStream(sessionId: ThreadId | null) {
         'AGENT_MESSAGE',
         'TOOL_CALL',
         'TOOL_RESULT',
-        'THINKING',
         'SYSTEM_MESSAGE',
         'LOCAL_SYSTEM_MESSAGE',
         'TOOL_APPROVAL_REQUEST',

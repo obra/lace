@@ -9,7 +9,6 @@ export { EVENT_TYPES, type EventType };
 
 // UI-only event types that are NOT persisted to the database
 export const UI_EVENT_TYPES = [
-  'THINKING', // Agent state change, not persisted
   'TOOL_APPROVAL_REQUEST', // Approval flow, not persisted
   'AGENT_TOKEN', // Streaming token, not persisted
   'AGENT_STREAMING', // Accumulated streaming content, not persisted

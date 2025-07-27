@@ -274,7 +274,6 @@ describe('useSSEStream', () => {
       'AGENT_MESSAGE',
       'TOOL_CALL',
       'TOOL_RESULT',
-      'THINKING',
       'SYSTEM_MESSAGE',
       'LOCAL_SYSTEM_MESSAGE',
     ];
