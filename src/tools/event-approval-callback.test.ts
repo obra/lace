@@ -87,7 +87,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     });
 
     // Set up the EventApprovalCallback
-    const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+    const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
@@ -337,7 +337,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         arguments: { command: 'ls' },
       });
 
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
 
       // Should throw pending error instead of blocking
       await expect(approvalCallback.requestApproval('bash', { command: 'ls' })).rejects.toThrow(
@@ -364,7 +364,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         decision: ApprovalDecision.ALLOW_SESSION,
       });
 
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
 
       // Should return existing decision instead of throwing
       const decision = await approvalCallback.requestApproval('bash', { command: 'pwd' });
@@ -384,7 +384,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         toolCallId: 'call_duplicate',
       });
 
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, agent.threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
 
       // Should still throw ApprovalPendingError but not create duplicate request
       await expect(

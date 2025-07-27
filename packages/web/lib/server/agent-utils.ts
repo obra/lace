@@ -6,11 +6,7 @@ import type { ThreadId } from '@/lib/server/core-types';
 
 export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
   // Use core event-based approval callback
-  const approvalCallback = new EventApprovalCallback(
-    agent,
-    agent.threadManager,
-    agent.threadId
-  );
+  const approvalCallback = new EventApprovalCallback(agent);
   
   // Set the approval callback on the agent's ToolExecutor
   agent.toolExecutor.setApprovalCallback(approvalCallback);

@@ -2,17 +2,13 @@
 // ABOUTME: Replaces Promise-based approval system with durable event storage
 
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
-import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
 import { ToolCall } from '~/tools/types';
-import { ThreadEvent, ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
-import { isDeepStrictEqual } from 'util';
+import { ThreadEvent } from '~/threads/types';
 
 export class EventApprovalCallback implements ApprovalCallback {
   constructor(
-    private agent: Agent,
-    private threadManager: ThreadManager,
-    private threadId: string
+    private agent: Agent
   ) {}
 
   requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
@@ -34,12 +30,7 @@ export class EventApprovalCallback implements ApprovalCallback {
     const existingRequest = this.checkExistingApprovalRequest(toolCallId);
     if (!existingRequest) {
       // Create TOOL_APPROVAL_REQUEST event and emit it so SSE stream can deliver it
-      const event = this.threadManager.addEvent(this.threadId, 'TOOL_APPROVAL_REQUEST', {
-        toolCallId: toolCallId,
-      });
-
-      // Emit the event so the SSE stream delivers it to the frontend immediately
-      this.agent.emit('thread_event_added', { event, threadId: this.threadId });
+      this.agent.addApprovalRequestEvent(toolCallId);
     }
 
     // Instead of blocking, return a rejected promise with pending error
@@ -48,37 +39,14 @@ export class EventApprovalCallback implements ApprovalCallback {
   }
 
   private findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
-    const events = this.threadManager.getEvents(this.threadId);
-
-    // Find most recent TOOL_CALL for this tool with matching input
-    for (let i = events.length - 1; i >= 0; i--) {
-      const event = events[i];
-      if (event.type === 'TOOL_CALL') {
-        const toolCall = event.data as ToolCall;
-        if (toolCall.name === toolName && isDeepStrictEqual(toolCall.arguments, input)) {
-          return event;
-        }
-      }
-    }
-    return null;
+    return this.agent.findRecentToolCallEvent(toolName, input);
   }
 
   private checkExistingApprovalRequest(toolCallId: string): boolean {
-    const events = this.threadManager.getEvents(this.threadId);
-    return events.some(
-      (e) =>
-        e.type === 'TOOL_APPROVAL_REQUEST' &&
-        (e.data as ToolApprovalRequestData).toolCallId === toolCallId
-    );
+    return this.agent.checkExistingApprovalRequest(toolCallId);
   }
 
   private checkExistingApprovalResponse(toolCallId: string): ApprovalDecision | null {
-    const events = this.threadManager.getEvents(this.threadId);
-    const responseEvent = events.find(
-      (e) =>
-        e.type === 'TOOL_APPROVAL_RESPONSE' &&
-        (e.data as ToolApprovalResponseData).toolCallId === toolCallId
-    );
-    return responseEvent ? (responseEvent.data as ToolApprovalResponseData).decision : null;
+    return this.agent.checkExistingApprovalResponse(toolCallId);
   }
 }

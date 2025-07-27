@@ -8,7 +8,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, EventType, ToolApprovalResponseData, asThreadId } from '~/threads/types';
+import { ThreadEvent, EventType, ToolApprovalResponseData, ToolApprovalRequestData, asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -1807,6 +1807,94 @@ export class Agent extends EventEmitter {
     requestedAt: Date;
   }> {
     return this._threadManager.getPendingApprovals(this._threadId);
+  }
+
+  /**
+   * Get a tool call event by its ID.
+   * 
+   * This provides controlled access to thread events for the web layer
+   * without exposing ThreadManager directly.
+   */
+  getToolCallEventById(toolCallId: string): ThreadEvent | undefined {
+    const events = this._threadManager.getEvents(this._threadId);
+    return events.find(e => 
+      e.type === 'TOOL_CALL' && 
+      (e.data as ToolCall).id === toolCallId
+    );
+  }
+
+  /**
+   * Get a tool call event by tool call ID for a specific thread.
+   * 
+   * Used by web layer components that need to look up tool calls
+   * without direct ThreadManager access.
+   */
+  getToolCallEventByIdForThread(toolCallId: string, threadId: string): ThreadEvent | undefined {
+    const events = this._threadManager.getEvents(threadId);
+    return events.find(e => 
+      e.type === 'TOOL_CALL' && 
+      (e.data as ToolCall).id === toolCallId
+    );
+  }
+
+  /**
+   * Find the most recent tool call event matching the given criteria.
+   * Used by EventApprovalCallback to locate the tool call that needs approval.
+   */
+  findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
+    const events = this._threadManager.getEvents(this._threadId);
+    
+    // Find most recent TOOL_CALL for this tool with matching input
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (event.type === 'TOOL_CALL') {
+        const toolCall = event.data as ToolCall;
+        if (toolCall.name === toolName && require('util').isDeepStrictEqual(toolCall.arguments, input)) {
+          return event;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Check if an approval request already exists for the given tool call ID.
+   */
+  checkExistingApprovalRequest(toolCallId: string): boolean {
+    const events = this._threadManager.getEvents(this._threadId);
+    return events.some(
+      (e) =>
+        e.type === 'TOOL_APPROVAL_REQUEST' &&
+        (e.data as ToolApprovalRequestData).toolCallId === toolCallId
+    );
+  }
+
+  /**
+   * Check for existing approval response for the given tool call ID.
+   */
+  checkExistingApprovalResponse(toolCallId: string): ApprovalDecision | null {
+    const events = this._threadManager.getEvents(this._threadId);
+    const responseEvent = events.find(
+      (e) =>
+        e.type === 'TOOL_APPROVAL_RESPONSE' &&
+        (e.data as ToolApprovalResponseData).toolCallId === toolCallId
+    );
+    return responseEvent ? (responseEvent.data as ToolApprovalResponseData).decision : null;
+  }
+
+  /**
+   * Add an approval request event for the given tool call ID.
+   * Used by EventApprovalCallback to create approval requests.
+   */
+  addApprovalRequestEvent(toolCallId: string): ThreadEvent {
+    const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_REQUEST', {
+      toolCallId: toolCallId,
+    });
+
+    // Emit the event so the SSE stream delivers it to the frontend immediately
+    this.emit('thread_event_added', { event, threadId: this._threadId });
+    
+    return event;
   }
 
   private _getWorkingDirectory(): string | undefined {

@@ -107,7 +107,7 @@ describe('Tool Batch Completion Behavior', () => {
       tools: [configurableTool],
     });
 
-    const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+    const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 

@@ -706,7 +706,7 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
 
       // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
       toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
@@ -749,7 +749,7 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
 
       // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
       toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
@@ -812,7 +812,7 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
 
       // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
       toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
@@ -892,7 +892,7 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
 
       // Set up proper EventApprovalCallback to create pending approvals
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
       toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
@@ -1013,7 +1013,7 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ provider: mockProvider, tools: [mockTool] });
 
       // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+      const approvalCallback = new EventApprovalCallback(agent);
       toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();

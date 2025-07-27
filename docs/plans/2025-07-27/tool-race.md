@@ -361,7 +361,9 @@ describe('approval API concurrency', () => {
 
 **Commit Message:** `fix: make approval API use proper Agent interface instead of direct ThreadManager access`
 
-**REFACTORING NOTE:** The current implementation has SQLite constraint error handling in the Agent layer, but this violates separation of concerns. The persistence layer should handle database-specific errors and make operations idempotent at the database level. This should be refactored in a future task:
+**REFACTORING NOTES:** 
+
+1. **Database Error Handling:** The current implementation has SQLite constraint error handling in the Agent layer, but this violates separation of concerns. The persistence layer should handle database-specific errors and make operations idempotent at the database level. This should be refactored in a future task:
 
 ```typescript
 // FUTURE: Move constraint error handling to DatabasePersistence.saveEvent()
@@ -380,7 +382,120 @@ saveEvent(event: ThreadEvent): void {
 }
 ```
 
-This would allow the Agent.handleApprovalResponse() method to be simplified to just business logic without database implementation details.
+2. **Approval System Architecture Fix:** The current EventApprovalCallback has a fundamental design flaw - it requests approval by `toolName + input` and then tries to "find" which ToolCall this refers to by matching. This is backwards! We already have the ToolCall with a unique ID from the LLM. The approval system should work directly with ToolCall IDs:
+
+**Current (Broken):**
+```typescript
+interface ApprovalCallback {
+  requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision>;
+}
+// Then complex logic to find which ToolCall this refers to
+```
+
+**Fixed:**
+```typescript
+interface ApprovalCallback {
+  requestApproval(toolCallId: string): Promise<ApprovalDecision>;
+}
+// Direct reference to the specific ToolCall ID
+```
+
+This eliminates all the complex `findRecentToolCallEvent` logic and race conditions around matching tool names and inputs. The ToolExecutor should pass the ToolCall ID directly to the approval system.
+
+### Task 3.5: Fix Approval System Architecture (CRITICAL)
+
+**Objective:** Fix the fundamental design flaw where approvals are requested by toolName+input instead of toolCallId.
+
+**Files to Modify:**
+- `src/tools/approval-types.ts`
+- `src/tools/event-approval-callback.ts`  
+- `src/tools/executor.ts`
+- `packages/web/lib/server/agent-utils.ts`
+
+**Background:**
+The current approval system is backwards. When the Agent gets a ToolCall from the LLM, it has a unique ID. But the approval system throws away this ID and tries to "find" the right ToolCall by matching name and input. This is error-prone and creates unnecessary complexity.
+
+**Implementation Steps:**
+
+1. **Update ApprovalCallback interface:**
+```typescript
+// In src/tools/approval-types.ts
+export interface ApprovalCallback {
+  requestApproval(toolCallId: string): Promise<ApprovalDecision>;
+}
+```
+
+2. **Simplify EventApprovalCallback:**
+```typescript
+// In src/tools/event-approval-callback.ts
+export class EventApprovalCallback implements ApprovalCallback {
+  constructor(private agent: Agent) {}
+  
+  requestApproval(toolCallId: string): Promise<ApprovalDecision> {
+    // Check if approval response already exists (recovery case)
+    const existingResponse = this.agent.checkExistingApprovalResponse(toolCallId);
+    if (existingResponse) {
+      return Promise.resolve(existingResponse);
+    }
+
+    // Check if approval request already exists to avoid duplicates
+    const existingRequest = this.agent.checkExistingApprovalRequest(toolCallId);
+    if (!existingRequest) {
+      // Create TOOL_APPROVAL_REQUEST event
+      this.agent.addApprovalRequestEvent(toolCallId);
+    }
+
+    // Return pending error - Agent will handle by not executing tool yet
+    return Promise.reject(new ApprovalPendingError(toolCallId));
+  }
+}
+```
+
+3. **Update ToolExecutor to pass toolCallId:**
+```typescript
+// In src/tools/executor.ts - update executeTool method
+async executeTool(toolCall: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  // ... existing validation logic ...
+  
+  if (this._approvalCallback) {
+    try {
+      // Pass the toolCall ID directly instead of name+input
+      const decision = await this._approvalCallback.requestApproval(toolCall.id);
+      if (decision === ApprovalDecision.DENY) {
+        return this.createDeniedResult(toolCall.id);
+      }
+    } catch (error) {
+      if (error instanceof ApprovalPendingError) {
+        throw error; // Let Agent handle pending approvals
+      }
+      throw error;
+    }
+  }
+  
+  // ... rest of execution logic ...
+}
+```
+
+4. **Remove complex event matching logic:**
+All the `findRecentToolCallEvent`, `isDeepStrictEqual` matching logic can be deleted. The system works directly with known ToolCall IDs.
+
+5. **Update agent-utils.ts:**
+```typescript
+// In packages/web/lib/server/agent-utils.ts
+export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
+  const approvalCallback = new EventApprovalCallback(agent);
+  agent.toolExecutor.setApprovalCallback(approvalCallback);
+}
+```
+
+**Benefits:**
+- Eliminates race conditions from tool name/input matching
+- Removes complex event searching logic
+- Makes approval system more reliable and easier to understand
+- Reduces coupling between approval system and ThreadManager
+- Preparation for proper architectural boundaries
+
+**Commit Message:** `refactor: fix approval system to use toolCallId instead of toolName+input matching`
 
 ### Task 4: Add Agent-Level Duplicate Execution Guards
 
