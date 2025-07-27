@@ -88,6 +88,9 @@ export class DatabasePersistence {
     if (currentVersion < 10) {
       this.migrateToV10();
     }
+    if (currentVersion < 11) {
+      this.migrateToV11();
+    }
   }
 
   private getSchemaVersion(): number {
@@ -203,6 +206,27 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(10);
+  }
+
+  private migrateToV11(): void {
+    if (!this.db) return;
+
+    // Add unique constraint for tool approval responses to prevent race conditions
+    this.db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_tool_approval
+      ON events(thread_id, type, json_extract(data, '$.toolCallId'))  
+      WHERE type = 'TOOL_APPROVAL_RESPONSE';
+    `);
+
+    this.setSchemaVersion(11);
+  }
+
+  transaction<T>(fn: () => T): T {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    return this.db.transaction(fn)();
   }
 
   // ===============================
