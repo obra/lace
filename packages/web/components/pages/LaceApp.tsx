@@ -210,17 +210,28 @@ export function LaceApp() {
     void loadSessionDetails(selectedSession);
   }, [selectedSession, loadSessionDetails]);
 
-  // Auto-select agent if session has only one agent
+  // Auto-select agent only when user selects a project (not on every render)
+  const [shouldAutoSelectAgent, setShouldAutoSelectAgent] = useState(false);
+
+  // Auto-select agent if session has only one agent and auto-selection is enabled
   useEffect(() => {
-    if (selectedSessionDetails && selectedSessionDetails.agents && selectedSessionDetails.agents.length === 1 && !selectedAgent) {
+    if (shouldAutoSelectAgent && selectedSessionDetails && selectedSessionDetails.agents && selectedSessionDetails.agents.length === 1 && !selectedAgent) {
       setSelectedAgent(selectedSessionDetails.agents[0].threadId as ThreadId);
+      setShouldAutoSelectAgent(false); // Reset flag after auto-selection
     }
-  }, [selectedSessionDetails, selectedAgent, setSelectedAgent]);
+  }, [shouldAutoSelectAgent, selectedSessionDetails, selectedAgent, setSelectedAgent]);
+
+  // Reset auto-selection flag when session changes
+  useEffect(() => {
+    setShouldAutoSelectAgent(false);
+  }, [selectedSession]);
 
   // Handle project selection
   const handleProjectSelect = (project: { id: string }) => {
     // Hash router automatically clears session/agent when project changes
     setSelectedProject(project.id);
+    // Enable auto-selection for this project selection
+    setShouldAutoSelectAgent(true);
   };
 
 
@@ -336,6 +347,7 @@ export function LaceApp() {
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
+    setShouldAutoSelectAgent(false); // Clear auto-selection flag when user manually selects an agent
     setSelectedAgent(agentThreadId as ThreadId);
   };
 
@@ -380,6 +392,9 @@ export function LaceApp() {
     
     // Clear auto-open state
     setAutoOpenCreateProject(false);
+    
+    // Enable auto-selection for future navigation within this project
+    setShouldAutoSelectAgent(true);
   };
 
   // Handle task updates
