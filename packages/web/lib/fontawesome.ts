@@ -72,4 +72,6 @@ export {
   faClipboard,
   faClock,
   faSave,
+  faGlobe,
+  faExclamationTriangle,
 } from '@fortawesome/free-solid-svg-icons';
