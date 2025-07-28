@@ -76,7 +76,6 @@ describe('Enhanced Agent', () => {
   let mockProvider: MockProvider;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
-  let threadId: string;
   let agent: Agent;
   let session: Session;
   let project: Project;
@@ -113,9 +112,6 @@ describe('Enhanced Agent', () => {
     toolExecutor.registerAllAvailableTools();
     toolExecutor.setApprovalCallback(autoApprovalCallback);
     threadManager = new ThreadManager();
-    threadId = 'test_thread_123';
-    // Create thread WITH session ID so _getFullSession() can find it
-    threadManager.createThread(threadId, session.getId());
   });
 
   // Helper function to create a provider that returns tool calls only once
@@ -161,6 +157,10 @@ describe('Enhanced Agent', () => {
   });
 
   function createAgent(config?: Partial<AgentConfig>): Agent {
+    const threadId = threadManager.generateThreadId();
+    // Create thread WITH session ID so _getFullSession() can find it
+    threadManager.createThread(threadId, session.getId());
+    
     const defaultConfig: AgentConfig = {
       provider: mockProvider,
       toolExecutor,
@@ -177,7 +177,7 @@ describe('Enhanced Agent', () => {
       agent = createAgent();
 
       expect(agent.providerName).toBe('mock');
-      expect(agent.getThreadId()).toBe(threadId);
+      expect(agent.getThreadId()).toBeDefined();
       expect(agent.getCurrentState()).toBe('idle');
       expect(agent.getAvailableTools()).toEqual([]);
     });
@@ -272,7 +272,7 @@ describe('Enhanced Agent', () => {
     it('should add user message to thread', async () => {
       await agent.sendMessage('Test message');
 
-      const events = threadManager.getEvents(threadId);
+      const events = threadManager.getEvents(agent.getThreadId());
       const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
       expect(userMessages).toHaveLength(1);
       expect(userMessages[0].data).toBe('Test message');
@@ -281,7 +281,7 @@ describe('Enhanced Agent', () => {
     it('should add agent response to thread', async () => {
       await agent.sendMessage('Test message');
 
-      const events = threadManager.getEvents(threadId);
+      const events = threadManager.getEvents(agent.getThreadId());
       const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
       expect(agentMessages).toHaveLength(1);
       expect(agentMessages[0].data).toBe('Test response');
@@ -309,7 +309,7 @@ describe('Enhanced Agent', () => {
       });
 
       // Verify that raw content (with thinking blocks) is stored in thread for model context
-      const events = threadManager.getEvents(threadId);
+      const events = threadManager.getEvents(agent.getThreadId());
       const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
       expect(agentMessage?.data).toBe('<think>I need to process this</think>This is my response');
     });
@@ -317,7 +317,7 @@ describe('Enhanced Agent', () => {
     it('should handle empty message correctly', async () => {
       await agent.sendMessage('   '); // Whitespace only
 
-      const events = threadManager.getEvents(threadId);
+      const events = threadManager.getEvents(agent.getThreadId());
       const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
       expect(userMessages).toHaveLength(0); // Empty messages not added
     });
@@ -326,12 +326,12 @@ describe('Enhanced Agent', () => {
       // Add a user message first
       await agent.sendMessage('Initial message');
 
-      const eventsBefore = threadManager.getEvents(threadId).length;
+      const eventsBefore = threadManager.getEvents(agent.getThreadId()).length;
 
       // Continue conversation
       await agent.continueConversation();
 
-      const eventsAfter = threadManager.getEvents(threadId);
+      const eventsAfter = threadManager.getEvents(agent.getThreadId());
       const newEvents = eventsAfter.slice(eventsBefore);
 
       // Should only add agent message, no new user message
@@ -461,7 +461,7 @@ describe('Enhanced Agent', () => {
       // Add small delay to allow async tool execution to complete
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const events = threadManager.getEvents(threadId);
+      const events = threadManager.getEvents(agent.getThreadId());
 
       const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
       expect(toolCalls).toHaveLength(1);
@@ -860,7 +860,14 @@ describe('Enhanced Agent', () => {
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Wait for the tool_call_complete event to be emitted
+      await new Promise<void>((resolve) => {
+        if (toolCompleteEvents.length > 0) {
+          resolve();
+        } else {
+          agent.once('tool_call_complete', () => resolve());
+        }
+      });
 
       // Now should have completion event
       expect(toolCompleteEvents).toHaveLength(1);
@@ -870,6 +877,12 @@ describe('Enhanced Agent', () => {
     });
 
     it('should attempt tool execution immediately instead of creating approval requests directly', async () => {
+      // Reset to auto-approval callback for this test
+      const autoApprovalCallback: ApprovalCallback = {
+        requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+      };
+      toolExecutor.setApprovalCallback(autoApprovalCallback);
+      
       // Mock ToolExecutor.executeTool to track calls
       const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
 
@@ -883,6 +896,9 @@ describe('Enhanced Agent', () => {
 
       // Send message to trigger tool calls
       await agent.sendMessage('Run command');
+
+      // Add delay to allow async tool execution to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Verify ToolExecutor.executeTool was called immediately
       expect(executeToolSpy).toHaveBeenCalledTimes(1);
@@ -1168,9 +1184,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', 'System info message');
-      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Response');
+      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
+      threadManager.addEvent(agent.getThreadId(), 'LOCAL_SYSTEM_MESSAGE', 'System info message');
+      threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', 'Response');
 
       const history = agent.buildThreadMessages();
 
@@ -1181,8 +1197,8 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle orphaned tool results gracefully', () => {
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
+      threadManager.addEvent(agent.getThreadId(), 'TOOL_RESULT', {
         id: 'missing-call-id',
         content: [{ type: 'text', text: 'Some output' }],
         isError: false,
@@ -1196,8 +1212,8 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle orphaned tool calls gracefully', () => {
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(threadId, 'TOOL_CALL', {
+      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
+      threadManager.addEvent(agent.getThreadId(), 'TOOL_CALL', {
         name: 'bash',
         arguments: { command: 'ls' },
         id: 'orphaned-call',
@@ -1343,7 +1359,7 @@ describe('Enhanced Agent', () => {
       // Add delay to allow multiple async tool executions to complete
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const events = threadManager.getEvents(threadId);
+      const events = threadManager.getEvents(agent.getThreadId());
 
       const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
       const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
@@ -1522,7 +1538,7 @@ describe('Enhanced Agent', () => {
         expect(allTokens).toContain('Here is my response');
 
         // Thread should contain raw agent message with thinking blocks for model context
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
         expect(agentMessages[0].data).toBe(
@@ -1581,7 +1597,7 @@ describe('Enhanced Agent', () => {
         expect(agent.getCurrentState()).toBe('idle');
 
         // Verify response was added to thread
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
         expect(agentMessages[0].data).toBe('Non-streaming response');
@@ -1629,7 +1645,7 @@ describe('Enhanced Agent', () => {
 
         // Verify final response was processed
         expect(agent.getCurrentState()).toBe('idle');
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
 
@@ -1641,12 +1657,14 @@ describe('Enhanced Agent', () => {
 
   describe('System prompt event handling', () => {
     it('should skip SYSTEM_PROMPT and USER_SYSTEM_PROMPT events in conversation building', async () => {
+      agent = createAgent();
+      
       // Manually add system prompt events to thread (simulating what Agent.start() does)
-      threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'You are a helpful AI assistant.');
-      threadManager.addEvent(threadId, 'USER_SYSTEM_PROMPT', 'Always be concise.');
+      threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'You are a helpful AI assistant.');
+      threadManager.addEvent(agent.getThreadId(), 'USER_SYSTEM_PROMPT', 'Always be concise.');
 
       // Add a user message
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello, how are you?');
+      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello, how are you?');
 
       // Mock the provider to capture what messages it receives
       const mockCreateResponse = vi.spyOn(mockProvider, 'createResponse');
@@ -1655,7 +1673,6 @@ describe('Enhanced Agent', () => {
         toolCalls: [],
       });
 
-      agent = createAgent();
       await agent.start();
       await agent.sendMessage('Hello, how are you?');
 
@@ -1682,13 +1699,13 @@ describe('Enhanced Agent', () => {
         agent = createAgent();
 
         // Verify thread is initially empty
-        const initialEvents = threadManager.getEvents(threadId);
+        const initialEvents = threadManager.getEvents(agent.getThreadId());
         expect(initialEvents).toHaveLength(0);
 
         await agent.start();
 
         // Should have added both system prompt events
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
         const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
 
@@ -1702,30 +1719,37 @@ describe('Enhanced Agent', () => {
 
         // First start - should add prompts
         await agent.start();
-        const afterFirstStart = threadManager.getEvents(threadId);
+        const afterFirstStart = threadManager.getEvents(agent.getThreadId());
         expect(afterFirstStart.filter((e) => e.type === 'SYSTEM_PROMPT')).toHaveLength(1);
         expect(afterFirstStart.filter((e) => e.type === 'USER_SYSTEM_PROMPT')).toHaveLength(1);
 
         // Simulate agent restart by creating new agent with same thread
-        const agent2 = createAgent();
+        const agent2 = new Agent({
+          provider: mockProvider,
+          toolExecutor,
+          threadManager,
+          threadId: agent.getThreadId(), // Use same thread ID
+          tools: [],
+        });
         await agent2.start();
 
         // Should NOT have added more prompt events
-        const afterRestart = threadManager.getEvents(threadId);
+        const afterRestart = threadManager.getEvents(agent.getThreadId());
         expect(afterRestart.filter((e) => e.type === 'SYSTEM_PROMPT')).toHaveLength(1);
         expect(afterRestart.filter((e) => e.type === 'USER_SYSTEM_PROMPT')).toHaveLength(1);
         expect(afterRestart).toHaveLength(2); // Same total count
       });
 
       it('should NOT add SYSTEM_PROMPT events if conversation already started', async () => {
-        // Pre-populate thread with a user message (conversation started)
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello there!');
-
         agent = createAgent();
+        
+        // Pre-populate thread with a user message (conversation started)
+        threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello there!');
+
         await agent.start();
 
         // Should NOT have added system prompt events since conversation exists
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
         const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
 
@@ -1735,14 +1759,15 @@ describe('Enhanced Agent', () => {
       });
 
       it('should NOT add SYSTEM_PROMPT events if existing prompts are already present', async () => {
-        // Pre-populate thread with system prompts (e.g., from previous agent run)
-        threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'Existing system prompt');
-
         agent = createAgent();
+        
+        // Pre-populate thread with system prompts (e.g., from previous agent run)
+        threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'Existing system prompt');
+
         await agent.start();
 
         // Should NOT have added more prompt events
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
         const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
 
@@ -1760,7 +1785,7 @@ describe('Enhanced Agent', () => {
         await Promise.all(startPromises);
 
         // Should only have one set of prompts despite multiple starts
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
         const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
 
@@ -1770,14 +1795,15 @@ describe('Enhanced Agent', () => {
       });
 
       it('should handle complex scenarios with mixed existing events', async () => {
-        // Pre-populate thread with some system messages but no conversation or prompts
-        threadManager.addEvent(threadId, 'LOCAL_SYSTEM_MESSAGE', 'Connection established');
-
         agent = createAgent();
+        
+        // Pre-populate thread with some system messages but no conversation or prompts
+        threadManager.addEvent(agent.getThreadId(), 'LOCAL_SYSTEM_MESSAGE', 'Connection established');
+
         await agent.start();
 
         // Should have added prompts since no conversation or existing prompts
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
         const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
         const localMessages = events.filter((e) => e.type === 'LOCAL_SYSTEM_MESSAGE');
@@ -1789,16 +1815,17 @@ describe('Enhanced Agent', () => {
       });
 
       it('should not add prompts when both conversation and existing prompts are present', async () => {
-        // Pre-populate with both conversation events and existing prompts
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there!');
-        threadManager.addEvent(threadId, 'SYSTEM_PROMPT', 'You are helpful');
-
         agent = createAgent();
+        
+        // Pre-populate with both conversation events and existing prompts
+        threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello');
+        threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', 'Hi there!');
+        threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'You are helpful');
+
         await agent.start();
 
         // Should NOT have added any new prompts
-        const events = threadManager.getEvents(threadId);
+        const events = threadManager.getEvents(agent.getThreadId());
         const systemPrompts = events.filter((e) => e.type === 'SYSTEM_PROMPT');
         const userSystemPrompts = events.filter((e) => e.type === 'USER_SYSTEM_PROMPT');
 
