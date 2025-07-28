@@ -491,7 +491,7 @@ export class Session {
       model: targetModel,
     });
 
-    this._agents.set(asThreadId(agent.threadId), agent);
+    this._agents.set(agent.threadId, agent);
     return agent;
   }
 
@@ -518,7 +518,7 @@ export class Session {
     Array.from(this._agents.values()).forEach((agent) => {
       const metadata = agent.getThreadMetadata();
       agents.push({
-        threadId: asThreadId(agent.threadId),
+        threadId: agent.threadId,
         name: (metadata?.name as string) || 'Agent ' + agent.threadId,
         provider: (metadata?.provider as string) || agent.providerName,
         model: (metadata?.model as string) || agent.providerInstance.modelName,

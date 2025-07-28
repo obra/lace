@@ -132,7 +132,7 @@ export class SessionService {
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     const sseManager = SSEManager.getInstance();
-    const threadId = asThreadId(agent.threadId);
+    const threadId = agent.threadId;
 
     agent.on('agent_thinking_start', () => {
       const event: SessionEvent = {

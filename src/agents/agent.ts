@@ -13,6 +13,7 @@ import {
   EventType,
   ToolApprovalResponseData,
   ToolApprovalRequestData,
+  ThreadId,
   asThreadId,
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
@@ -118,8 +119,8 @@ export class Agent extends EventEmitter {
   }
 
   // Public access to thread ID for delegation
-  get threadId(): string {
-    return this._threadId;
+  get threadId(): ThreadId {
+    return asThreadId(this._threadId);
   }
 
   // Public access to thread manager for approval system
@@ -964,13 +965,15 @@ export class Agent extends EventEmitter {
   private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
     try {
       const workingDirectory = this._getWorkingDirectory();
-      
+
       // Get session for security policy enforcement
       const session = await this._getFullSession();
       if (!session) {
-        throw new Error(`Tool execution denied: no session context available for thread ${this._threadId}`);
+        throw new Error(
+          `Tool execution denied: no session context available for thread ${this._threadId}`
+        );
       }
-      
+
       const toolContext = {
         threadId: asThreadId(this._threadId),
         parentThreadId: asThreadId(this._getParentThreadId()),
@@ -1049,13 +1052,15 @@ export class Agent extends EventEmitter {
   private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
     try {
       const workingDirectory = this._getWorkingDirectory();
-      
+
       // Get session for security policy enforcement
       const session = await this._getFullSession();
       if (!session) {
-        throw new Error(`Tool execution denied: no session context available for thread ${this._threadId}`);
+        throw new Error(
+          `Tool execution denied: no session context available for thread ${this._threadId}`
+        );
       }
-      
+
       const toolContext = {
         threadId: asThreadId(this._threadId),
         parentThreadId: asThreadId(this._getParentThreadId()),
@@ -1589,8 +1594,8 @@ export class Agent extends EventEmitter {
     return this._threadManager.getEvents(targetThreadId);
   }
 
-  generateThreadId(): string {
-    return this._threadManager.generateThreadId();
+  generateThreadId(): ThreadId {
+    return asThreadId(this._threadManager.generateThreadId());
   }
 
   createThread(threadId: string): void {
@@ -2003,7 +2008,7 @@ export class Agent extends EventEmitter {
         return undefined;
       }
 
-      return await Session.getById(asThreadId(thread.sessionId)) || undefined;
+      return (await Session.getById(asThreadId(thread.sessionId))) || undefined;
     } catch (error) {
       logger.error('Agent._getFullSession() - error getting session', {
         threadId: this._threadId,
