@@ -17,6 +17,7 @@ import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tool
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { expectEventAdded } from '~/test-utils/event-helpers';
 import { BashTool } from '~/tools/implementations/bash';
 
 // Mock provider for testing
@@ -670,10 +671,12 @@ describe('Enhanced Agent', () => {
       expect(toolResults).toHaveLength(0);
 
       // Simulate approval response
-      const approvalEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_1',
-        decision: 'allow_once',
-      });
+      const approvalEvent = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_1',
+          decision: 'allow_once',
+        })
+      );
 
       // Emit the event to trigger execution
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -715,10 +718,12 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Run command');
 
       // Deny the tool
-      const approvalEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_1',
-        decision: 'deny',
-      });
+      const approvalEvent = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_1',
+          decision: 'deny',
+        })
+      );
 
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
 
@@ -758,10 +763,12 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Run commands');
 
       // Approve second tool first (out of order)
-      const approval2 = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_2',
-        decision: 'allow_once',
-      });
+      const approval2 = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_2',
+          decision: 'allow_once',
+        })
+      );
       agent.emit('thread_event_added', { event: approval2, threadId: agent.threadId });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -773,10 +780,12 @@ describe('Enhanced Agent', () => {
       expect((toolResults[0].data as ToolResult).id).toBe('call_2');
 
       // Approve first tool
-      const approval1 = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_1',
-        decision: 'allow_once',
-      });
+      const approval1 = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_1',
+          decision: 'allow_once',
+        })
+      );
       agent.emit('thread_event_added', { event: approval1, threadId: agent.threadId });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -787,10 +796,12 @@ describe('Enhanced Agent', () => {
       expect(toolResults).toHaveLength(2);
 
       // Deny third tool
-      const approval3 = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_3',
-        decision: 'deny',
-      });
+      const approval3 = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_3',
+          decision: 'deny',
+        })
+      );
       agent.emit('thread_event_added', { event: approval3, threadId: agent.threadId });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -828,10 +839,12 @@ describe('Enhanced Agent', () => {
       expect(toolCompleteEvents).toHaveLength(0);
 
       // Approve the tool
-      const approvalEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_1',
-        decision: 'allow_once',
-      });
+      const approvalEvent = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_1',
+          decision: 'allow_once',
+        })
+      );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -1039,10 +1052,12 @@ describe('Enhanced Agent', () => {
       expect(approvalRequests).toHaveLength(1);
 
       // Now approve the tool
-      const approvalEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_approval',
-        decision: 'allow_once',
-      });
+      const approvalEvent = expectEventAdded(
+        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'call_approval',
+          decision: 'allow_once',
+        })
+      );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
 
       // Wait for approval processing
@@ -1880,10 +1895,12 @@ describe('Enhanced Agent', () => {
       const executeSpy = vi.spyOn(bashTool, 'execute');
 
       // Send approval response (this should be ignored due to duplicate guard)
-      const approvalEvent = agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'tool-123',
-        decision: 'allow_once',
-      });
+      const approvalEvent = expectEventAdded(
+        agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'tool-123',
+          decision: 'allow_once',
+        })
+      );
 
       // Simulate event processing (this triggers _handleToolApprovalResponse)
       agent['_handleToolApprovalResponse'](approvalEvent);
@@ -1930,10 +1947,12 @@ describe('Enhanced Agent', () => {
       });
 
       // Send approval response (this should execute normally)
-      const approvalEvent = agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'tool-456',
-        decision: 'allow_once',
-      });
+      const approvalEvent = expectEventAdded(
+        agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'tool-456',
+          decision: 'allow_once',
+        })
+      );
 
       // Simulate event processing
       agent['_handleToolApprovalResponse'](approvalEvent);

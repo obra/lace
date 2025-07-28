@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { expectEventAdded } from '~/test-utils/event-helpers';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -130,10 +131,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(approvalRequestEvent?.data).toEqual({ toolCallId: 'call_test' });
 
     // Simulate user approval
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_test',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_test',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
@@ -171,10 +174,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(approvalRequestEvent).toBeDefined();
 
     // Simulate user denial
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_deny',
-      decision: ApprovalDecision.DENY,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_deny',
+        decision: ApprovalDecision.DENY,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
@@ -217,10 +222,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(firstApprovalRequest).toBeDefined();
 
     // Approve first tool call to allow second one to be processed
-    const response1Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_multi_1',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const response1Event = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_multi_1',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
 
@@ -232,10 +239,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(approvalRequests).toHaveLength(2);
 
     // Approve second tool call
-    const response2Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_multi_2',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const response2Event = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_multi_2',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: response2Event, threadId: agent.threadId });
 
@@ -319,10 +328,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     });
 
     // Complete the test
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_emit_test',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_emit_test',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
     await conversationPromise;

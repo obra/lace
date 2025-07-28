@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { expectEventAdded } from '~/test-utils/event-helpers';
 
 describe('ThreadManager', () => {
   let threadManager: ThreadManager;
@@ -25,14 +26,14 @@ describe('ThreadManager', () => {
       threadManager.createThread(threadId);
 
       // Act
-      const event = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
+      const event = expectEventAdded(
+        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message')
+      );
 
       // Assert
-      expect(event).toBeDefined();
-      expect(event).not.toBeNull();
-      expect(event!.type).toBe('USER_MESSAGE');
-      expect(event!.data).toBe('Test message');
-      expect(event!.threadId).toBe(threadId);
+      expect(event.type).toBe('USER_MESSAGE');
+      expect(event.data).toBe('Test message');
+      expect(event.threadId).toBe(threadId);
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(1);
@@ -45,14 +46,14 @@ describe('ThreadManager', () => {
       threadManager.createThread(threadId);
 
       // Act - ThreadManager now operates as pure data layer
-      const event1 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-      const event2 = threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
+      const event1 = expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+      const event2 = expectEventAdded(
+        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there')
+      );
 
       // Assert - Data operations work correctly
-      expect(event1).not.toBeNull();
-      expect(event2).not.toBeNull();
-      expect(event1!.type).toBe('USER_MESSAGE');
-      expect(event2!.type).toBe('AGENT_MESSAGE');
+      expect(event1.type).toBe('USER_MESSAGE');
+      expect(event2.type).toBe('AGENT_MESSAGE');
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(2);
@@ -66,11 +67,12 @@ describe('ThreadManager', () => {
       threadManager.createThread(threadId);
 
       // Act - First approval should succeed
-      const firstEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'tool-123',
-        decision: 'approve',
-      });
-      expect(firstEvent).not.toBeNull();
+      expectEventAdded(
+        threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'tool-123',
+          decision: 'approve',
+        })
+      );
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
 
       // Second approval should be ignored due to database constraint

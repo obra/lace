@@ -7,6 +7,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { expectEventAdded } from '~/test-utils/event-helpers';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
@@ -137,10 +138,12 @@ describe('Tool Batch Completion Behavior', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Approve the tool
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_fail',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_fail',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
@@ -183,10 +186,12 @@ describe('Tool Batch Completion Behavior', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Deny the tool
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_deny',
-      decision: ApprovalDecision.DENY,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_deny',
+        decision: ApprovalDecision.DENY,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
@@ -236,10 +241,12 @@ describe('Tool Batch Completion Behavior', () => {
 
     // Approve first tool (will succeed)
     configurableTool.setShouldFail(false);
-    const response1Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_success',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const response1Event = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_success',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
 
     // Wait for second approval request
@@ -247,10 +254,12 @@ describe('Tool Batch Completion Behavior', () => {
 
     // Approve second tool (will fail)
     configurableTool.setShouldFail(true);
-    const response2Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_fail',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const response2Event = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_fail',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
     agent.emit('thread_event_added', { event: response2Event, threadId: agent.threadId });
 
     // Wait for conversation to complete
