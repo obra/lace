@@ -203,13 +203,18 @@ function convertEvent(
       };
 
     case 'TOOL_CALL':
+      const toolCallData = event.data as { toolName?: string; input?: unknown; [key: string]: unknown };
       return {
         id,
         type: 'tool',
-        content: `Tool: ${event.data.toolName}`,
-        tool: event.data.toolName,
+        content: `Tool: ${toolCallData.toolName}`,
+        tool: toolCallData.toolName,
         timestamp,
         agent: agent,
+        metadata: {
+          arguments: toolCallData.input,
+          isToolCall: true,
+        },
       };
 
     case 'TOOL_RESULT':

@@ -45,8 +45,8 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
 
   // Tool Messages - use enhanced display for aggregated tools, fallback for legacy
   if (entry.type === 'tool') {
-    // Check if this is an aggregated tool call with metadata
-    if (entry.metadata && entry.metadata.toolId) {
+    // Check if this is an aggregated tool call with metadata, or a regular tool call with arguments
+    if ((entry.metadata && entry.metadata.toolId) || (entry.metadata && entry.metadata.arguments)) {
       return (
         <ToolCallDisplay
           tool={entry.tool || 'Unknown Tool'}
