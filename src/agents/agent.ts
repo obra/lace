@@ -1837,25 +1837,6 @@ export class Agent extends EventEmitter {
     );
   }
 
-  /**
-   * Find the most recent tool call event matching the given criteria.
-   * Used by EventApprovalCallback to locate the tool call that needs approval.
-   */
-  findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
-    const events = this._threadManager.getEvents(this._threadId);
-    
-    // Find most recent TOOL_CALL for this tool with matching input
-    for (let i = events.length - 1; i >= 0; i--) {
-      const event = events[i];
-      if (event.type === 'TOOL_CALL') {
-        const toolCall = event.data as ToolCall;
-        if (toolCall.name === toolName && require('util').isDeepStrictEqual(toolCall.arguments, input)) {
-          return event;
-        }
-      }
-    }
-    return null;
-  }
 
   /**
    * Check if an approval request already exists for the given tool call ID.

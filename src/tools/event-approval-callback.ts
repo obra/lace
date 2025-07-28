@@ -1,45 +1,32 @@
-// ABOUTME: Event-based approval callback that uses ThreadManager for persistence
+// ABOUTME: Event-based approval callback that works directly with ToolCall IDs
 // ABOUTME: Replaces Promise-based approval system with durable event storage
 
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
-import { Agent } from '~/agents/agent';
 import { ToolCall } from '~/tools/types';
-import { ThreadEvent } from '~/threads/types';
+import { Agent } from '~/agents/agent';
 
 export class EventApprovalCallback implements ApprovalCallback {
   constructor(
     private agent: Agent
   ) {}
 
-  requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
-    // Find the TOOL_CALL event that triggered this approval
-    const toolCallEvent = this.findRecentToolCallEvent(toolName, input);
-    if (!toolCallEvent) {
-      throw new Error(`Could not find TOOL_CALL event for ${toolName}`);
-    }
-
-    const toolCallId = (toolCallEvent.data as ToolCall).id;
-
+  requestApproval(toolCall: ToolCall): Promise<ApprovalDecision> {
     // Check if approval response already exists (recovery case)
-    const existingResponse = this.checkExistingApprovalResponse(toolCallId);
+    const existingResponse = this.checkExistingApprovalResponse(toolCall.id);
     if (existingResponse) {
       return Promise.resolve(existingResponse);
     }
 
     // Check if approval request already exists to avoid duplicates
-    const existingRequest = this.checkExistingApprovalRequest(toolCallId);
+    const existingRequest = this.checkExistingApprovalRequest(toolCall.id);
     if (!existingRequest) {
       // Create TOOL_APPROVAL_REQUEST event and emit it so SSE stream can deliver it
-      this.agent.addApprovalRequestEvent(toolCallId);
+      this.agent.addApprovalRequestEvent(toolCall.id);
     }
 
     // Instead of blocking, return a rejected promise with pending error
     // The Agent will handle this by NOT executing the tool yet
-    return Promise.reject(new ApprovalPendingError(toolCallId));
-  }
-
-  private findRecentToolCallEvent(toolName: string, input: unknown): ThreadEvent | null {
-    return this.agent.findRecentToolCallEvent(toolName, input);
+    return Promise.reject(new ApprovalPendingError(toolCall.id));
   }
 
   private checkExistingApprovalRequest(toolCallId: string): boolean {

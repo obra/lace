@@ -130,7 +130,7 @@ export class ToolExecutor {
     }
 
     try {
-      const decision = await this.approvalCallback.requestApproval(call.name, call.arguments);
+      const decision = await this.approvalCallback.requestApproval(call);
 
       if (decision === ApprovalDecision.ALLOW_ONCE || decision === ApprovalDecision.ALLOW_SESSION) {
         return 'granted';

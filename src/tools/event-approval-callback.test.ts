@@ -340,7 +340,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       const approvalCallback = new EventApprovalCallback(agent);
 
       // Should throw pending error instead of blocking
-      await expect(approvalCallback.requestApproval('bash', { command: 'ls' })).rejects.toThrow(
+      await expect(approvalCallback.requestApproval({ id: 'call_test', name: 'bash', arguments: { command: 'ls' } })).rejects.toThrow(
         ApprovalPendingError
       );
 
@@ -367,7 +367,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       const approvalCallback = new EventApprovalCallback(agent);
 
       // Should return existing decision instead of throwing
-      const decision = await approvalCallback.requestApproval('bash', { command: 'pwd' });
+      const decision = await approvalCallback.requestApproval({ id: 'call_existing', name: 'bash', arguments: { command: 'pwd' } });
       expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
     });
 
@@ -388,7 +388,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
       // Should still throw ApprovalPendingError but not create duplicate request
       await expect(
-        approvalCallback.requestApproval('bash', { command: 'echo test' })
+        approvalCallback.requestApproval({ id: 'call_duplicate', name: 'bash', arguments: { command: 'echo test' } })
       ).rejects.toThrow(ApprovalPendingError);
 
       // Should still have only one approval request
