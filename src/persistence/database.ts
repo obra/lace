@@ -298,24 +298,46 @@ export class DatabasePersistence {
   saveEvent(event: ThreadEvent): void {
     if (this._closed || this._disabled || !this.db) return;
 
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO events (id, thread_id, type, timestamp, data)
-      VALUES (?, ?, ?, ?, ?)
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO events (id, thread_id, type, timestamp, data)
+        VALUES (?, ?, ?, ?, ?)
+      `);
 
-    stmt.run(
-      event.id,
-      event.threadId,
-      event.type,
-      event.timestamp.toISOString(),
-      JSON.stringify(event.data)
-    );
+      stmt.run(
+        event.id,
+        event.threadId,
+        event.type,
+        event.timestamp.toISOString(),
+        JSON.stringify(event.data)
+      );
 
-    // Update thread's updated_at timestamp
-    const updateThreadStmt = this.db.prepare(`
-      UPDATE threads SET updated_at = ? WHERE id = ?
-    `);
-    updateThreadStmt.run(new Date().toISOString(), event.threadId);
+      // Update thread's updated_at timestamp
+      const updateThreadStmt = this.db.prepare(`
+        UPDATE threads SET updated_at = ? WHERE id = ?
+      `);
+      updateThreadStmt.run(new Date().toISOString(), event.threadId);
+      
+    } catch (error: unknown) {
+      // Handle constraint violations for duplicate approval responses idempotently
+      if (this.isConstraintViolation(error) && event.type === 'TOOL_APPROVAL_RESPONSE') {
+        // Silently ignore duplicate approval responses - this is the desired idempotent behavior
+        logger.debug('DATABASE: Duplicate approval response ignored', { 
+          eventId: event.id, 
+          toolCallId: (event.data as { toolCallId?: string }).toolCallId 
+        });
+        return;
+      }
+      
+      // Re-throw other errors (including constraint violations for non-approval events)
+      throw error;
+    }
+  }
+
+  private isConstraintViolation(error: unknown): boolean {
+    return error instanceof Error && 
+           (error.message.includes('UNIQUE constraint failed') ||
+            error.message.includes('SQLITE_CONSTRAINT_UNIQUE'));
   }
 
   loadEvents(threadId: string): ThreadEvent[] {

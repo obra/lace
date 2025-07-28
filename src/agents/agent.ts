@@ -1765,34 +1765,15 @@ export class Agent extends EventEmitter {
    * proper error handling for race conditions.
    */
   async handleApprovalResponse(toolCallId: string, decision: string): Promise<void> {
-    try {
-      // Create approval response event with atomic database transaction
-      const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId,
-        decision,
-      });
-      
-      // Emit event for UI synchronization (matches existing pattern)
-      this.emit('thread_event_added', { event, threadId: this._threadId });
-      
-    } catch (error: unknown) {
-      // Handle constraint violations gracefully
-      if (error instanceof Error && 
-          (error.message.includes('UNIQUE constraint failed') ||
-           error.message.includes('SQLITE_CONSTRAINT_UNIQUE'))) {
-        
-        // Duplicate approval - log but don't throw (idempotent behavior)
-        logger.warn('AGENT: Duplicate approval response ignored', {
-          threadId: this._threadId,
-          toolCallId,
-          reason: 'Database constraint violation'
-        });
-        return;
-      }
-      
-      // Re-throw other errors
-      throw error;
-    }
+    // Create approval response event with atomic database transaction
+    // The persistence layer handles duplicate detection idempotently
+    const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId,
+      decision,
+    });
+    
+    // Emit event for UI synchronization (matches existing pattern)
+    this.emit('thread_event_added', { event, threadId: this._threadId });
   }
 
   /**

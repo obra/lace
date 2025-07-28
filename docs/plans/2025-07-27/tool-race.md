@@ -128,6 +128,12 @@ describe('unique constraint for tool approvals', () => {
 
 **Commit Message:** `feat: add database unique constraint for tool approval responses`
 
+**✅ STATUS: COMPLETED** - Successfully implemented unique constraint in database schema:
+- Added migration to version 11 with unique index: `idx_unique_tool_approval ON events(thread_id, type, json_extract(data, '$.toolCallId')) WHERE type = 'TOOL_APPROVAL_RESPONSE'`
+- Added `DatabasePersistence.transaction<T>(fn: () => T): T` method for atomic operations
+- Created comprehensive tests verifying constraint prevents duplicates
+- Committed: `feat: add database unique constraint to prevent duplicate tool approval responses`
+
 ### Task 2: Make ThreadManager.addEvent() Atomic
 
 **Objective:** Ensure event creation is atomic - either the database write succeeds and memory is updated, or both fail together.
@@ -231,6 +237,13 @@ describe('addEvent atomicity', () => {
 ```
 
 **Commit Message:** `feat: make ThreadManager.addEvent() atomic with database transactions`
+
+**✅ STATUS: COMPLETED** - Successfully made ThreadManager.addEvent() atomic:
+- Wrapped entire operation in `this._persistence.transaction()` 
+- Database write happens first, memory update only if successful
+- Ensures consistency between persistent and in-memory representations
+- Added tests verifying atomic behavior on database failures
+- Committed: `feat: make ThreadManager.addEvent() atomic with database transactions`
 
 ### Task 3: Update Approval API Error Handling
 
@@ -360,6 +373,16 @@ describe('approval API concurrency', () => {
 ```
 
 **Commit Message:** `fix: make approval API use proper Agent interface instead of direct ThreadManager access`
+
+**✅ STATUS: COMPLETED** - Successfully implemented proper architectural boundaries:
+- Added `Agent.handleApprovalResponse(toolCallId: string, decision: string)` method with constraint error handling
+- Added `Agent.getPendingApprovals()` method for web layer access
+- Updated approval API routes to use Agent interface instead of direct ThreadManager access
+- Fixed all ThreadManager references in web layer (session-service.ts, agent-utils.ts)
+- Updated all test files to use new interfaces
+- Committed multiple times:
+  - `feat: add Agent.handleApprovalResponse() and getPendingApprovals() methods for web API layer`
+  - `fix: eliminate ThreadManager references from web layer`
 
 **REFACTORING NOTES:** 
 
@@ -496,6 +519,16 @@ export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
 - Preparation for proper architectural boundaries
 
 **Commit Message:** `refactor: fix approval system to use toolCallId instead of toolName+input matching`
+
+**✅ STATUS: COMPLETED** - Successfully fixed fundamental approval system architecture:
+- **BREAKING CHANGE**: Updated `ApprovalCallback.requestApproval(toolCall: ToolCall)` interface 
+- Eliminated complex `findRecentToolCallEvent` and `isDeepStrictEqual` matching logic (-75 lines)
+- Simplified EventApprovalCallback to work directly with ToolCall IDs
+- Updated ToolExecutor to pass full ToolCall objects to approval system
+- Cleaned policy wrapper to work directly with `toolCall.name` for decisions
+- Fixed all test mocks and expectations to use new ToolCall object interface
+- **Benefits**: Eliminated race conditions, removed complex event searching, made system more reliable
+- Committed: `refactor: fix approval system to use ToolCall objects instead of toolName+input matching`
 
 ### Task 4: Add Agent-Level Duplicate Execution Guards
 
