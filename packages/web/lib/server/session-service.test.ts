@@ -77,6 +77,7 @@ vi.mock('~/persistence/database', () => {
       saveSession: vi.fn((session: Record<string, unknown> & { id: string }) => {
         sessionStore.set(session.id, session);
       }),
+      close: vi.fn(),
     })),
   };
 });
@@ -191,7 +192,36 @@ describe('SessionService approval event forwarding', () => {
   let mockSSEManager: { broadcast: vi.Mock };
   let session: Session;
   let agent: Agent;
-  let testProvider: TestProvider;
+
+  // Mock provider that returns a tool call requiring approval
+  class MockApprovalProvider extends TestProvider {
+    private callCount = 0;
+
+    createResponse(): Promise<import('@/lib/server/core-types').ProviderResponse> {
+      this.callCount++;
+      if (this.callCount === 1) {
+        // First call: return a tool call that will require approval
+        return Promise.resolve({
+          content: "I'll use the file-read tool to check the file.",
+          toolCalls: [
+            {
+              id: 'tool-call-approval-test',
+              name: 'file-read',
+              input: { file_path: '/test/file.txt' },
+            },
+          ],
+          stopReason: 'tool_use',
+        });
+      } else {
+        // Subsequent calls: return regular response
+        return Promise.resolve({
+          content: 'Task completed.',
+          toolCalls: [],
+          stopReason: 'stop',
+        });
+      }
+    }
+  }
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -211,15 +241,15 @@ describe('SessionService approval event forwarding', () => {
       getPath: () => '/test/path'
     } as any);
 
-    // Create test provider
-    testProvider = new TestProvider();
+    // Create mock provider that returns tool calls
+    const mockProvider = new MockApprovalProvider();
     
-    // Mock ProviderRegistry to return our test provider
+    // Mock ProviderRegistry to return our mock provider
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.mocked(ProviderRegistry.getProvider).mockReturnValue(testProvider);
-    vi.mocked(ProviderRegistry.createProvider).mockReturnValue(testProvider);
+    vi.mocked(ProviderRegistry.getProvider).mockReturnValue(mockProvider);
+    vi.mocked(ProviderRegistry.createProvider).mockReturnValue(mockProvider);
     vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue({
-      createProvider: vi.fn().mockReturnValue(testProvider)
+      createProvider: vi.fn().mockReturnValue(mockProvider)
     } as any);
 
     sessionService = new SessionService();
@@ -232,7 +262,7 @@ describe('SessionService approval event forwarding', () => {
       'test-project'
     );
 
-    session = (await Session.getById(asThreadId(sessionData.id)))!;
+    session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
   });
 
@@ -245,63 +275,12 @@ describe('SessionService approval event forwarding', () => {
     vi.restoreAllMocks();
   });
 
-  it('should forward TOOL_APPROVAL_RESPONSE events to SSE', async () => {
-    // Create a real TOOL_APPROVAL_RESPONSE event
-    const { ThreadManager } = await import('@/lib/server/lace-imports');
-    const threadManager = new ThreadManager();
-    
-    const approvalResponseEvent = threadManager.addEvent(asThreadId(session.getId()), 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'tool-call-123',
-      decision: 'approve'
-    });
+  it('should forward TOOL_APPROVAL_REQUEST events to SSE when tool requires approval', async () => {
+    // Send a message that will trigger a tool call requiring approval
+    await agent.sendMessage('Read the test file');
 
-    // Emit the event through the real agent (this triggers the SessionService event handlers)
-    agent.emit('thread_event_added', { 
-      event: approvalResponseEvent, 
-      threadId: session.getId()
-    });
-
-    // Wait a moment for async processing
-    await new Promise(resolve => setTimeout(resolve, 10));
-
-    // Verify SSE broadcast was called for the approval response
-    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
-      session.getId(),
-      expect.objectContaining({
-        type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: session.getId(),
-        data: expect.objectContaining({
-          toolCallId: 'tool-call-123',
-          decision: 'approve'
-        })
-      })
-    );
-  });
-
-  it('should handle TOOL_APPROVAL_REQUEST events (existing behavior)', async () => {
-    // First, create a TOOL_CALL event so there's something to reference
-    const { ThreadManager } = await import('@/lib/server/lace-imports');
-    const threadManager = new ThreadManager();
-    
-    const toolCallEvent = threadManager.addEvent(asThreadId(session.getId()), 'TOOL_CALL', {
-      id: 'tool-call-123',
-      name: 'test-tool',
-      arguments: { test: 'args' }
-    });
-
-    // Now create the TOOL_APPROVAL_REQUEST event
-    const approvalRequestEvent = threadManager.addEvent(asThreadId(session.getId()), 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: 'tool-call-123'
-    });
-
-    // Emit the event through the real agent (this triggers the SessionService event handlers)
-    agent.emit('thread_event_added', { 
-      event: approvalRequestEvent, 
-      threadId: session.getId()
-    });
-
-    // Wait a moment for async processing
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Wait for the approval request to be processed
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     // Verify SSE broadcast was called for the approval request
     expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
@@ -310,8 +289,41 @@ describe('SessionService approval event forwarding', () => {
         type: 'TOOL_APPROVAL_REQUEST',
         threadId: session.getId(),
         data: expect.objectContaining({
-          requestId: 'tool-call-123',
-          toolName: 'test-tool'
+          requestId: 'tool-call-approval-test',
+          toolName: 'file-read'
+        })
+      })
+    );
+  });
+
+  it('should forward TOOL_APPROVAL_RESPONSE events to SSE when approval is given', async () => {
+    // First, trigger a tool call that requires approval
+    await agent.sendMessage('Read the test file');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Clear previous SSE calls
+    mockSSEManager.broadcast.mockClear();
+
+    // Now simulate providing approval by adding a TOOL_APPROVAL_RESPONSE event
+    // (In real usage, this would come from the approval manager/UI)
+    const { EventApprovalCallback } = await import('@/lib/server/lace-imports');
+    const approvalCallback = (agent as any).toolExecutor.approvalCallback as EventApprovalCallback;
+    
+    // Directly add the approval response event to test the forwarding
+    await approvalCallback.respondToApproval('tool-call-approval-test', 'approve');
+
+    // Wait for the approval response to be processed
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Verify SSE broadcast was called for the approval response
+    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
+      session.getId(),
+      expect.objectContaining({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: session.getId(),
+        data: expect.objectContaining({
+          toolCallId: 'tool-call-approval-test',
+          decision: 'approve'
         })
       })
     );
