@@ -274,15 +274,15 @@ export class ThreadManager {
 
   /**
    * Add an event to a thread with atomic database persistence.
-   * 
+   *
    * This method is designed to prevent race conditions in tool approval
    * scenarios where multiple requests might try to create the same event
    * simultaneously (e.g., rapid button clicking).
-   * 
+   *
    * The operation is atomic: either both the database write and memory
    * update succeed, or both fail. This ensures consistency between the
    * persistent and in-memory representations.
-   * 
+   *
    * For TOOL_APPROVAL_RESPONSE events, a database unique constraint
    * prevents duplicate approvals for the same toolCallId, causing
    * this method to throw if a duplicate is attempted.
@@ -309,14 +309,14 @@ export class ThreadManager {
     return this._persistence.transaction(() => {
       // Save to database first
       this._persistence.saveEvent(event);
-      
+
       // Only update memory if database save succeeded
       thread.events.push(event);
       thread.updatedAt = new Date();
-      
+
       // Update process-local cache
       processLocalThreadCache.set(threadId, thread);
-      
+
       return event;
     });
   }

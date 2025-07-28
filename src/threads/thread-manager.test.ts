@@ -97,18 +97,26 @@ describe('ThreadManager', () => {
       const mockPersistence = vi.spyOn(threadManager['_persistence'], 'saveEvent');
       mockPersistence.mockImplementationOnce(() => {}); // First call succeeds
       mockPersistence.mockImplementationOnce(() => {
-        const error = new Error('UNIQUE constraint failed: events.thread_id, events.type, json_extract(events.data, \'$.toolCallId\')');
-        (error as any).code = 'SQLITE_CONSTRAINT_UNIQUE';
+        const error = new Error(
+          "UNIQUE constraint failed: events.thread_id, events.type, json_extract(events.data, '$.toolCallId')"
+        );
+        (error as unknown as { code: string }).code = 'SQLITE_CONSTRAINT_UNIQUE';
         throw error;
       });
 
       // Act - First approval should succeed
-      threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', { toolCallId: 'tool-123', decision: 'approve' });
+      threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'tool-123',
+        decision: 'approve',
+      });
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
 
       // Second approval should fail and not affect memory
       expect(() => {
-        threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', { toolCallId: 'tool-123', decision: 'approve' });
+        threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+          toolCallId: 'tool-123',
+          decision: 'approve',
+        });
       }).toThrow(/UNIQUE constraint failed/);
 
       // Assert - Memory should still have only first event

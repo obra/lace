@@ -8,7 +8,13 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, EventType, ToolApprovalResponseData, ToolApprovalRequestData, asThreadId } from '~/threads/types';
+import {
+  ThreadEvent,
+  EventType,
+  ToolApprovalResponseData,
+  ToolApprovalRequestData,
+  asThreadId,
+} from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -903,16 +909,15 @@ export class Agent extends EventEmitter {
 
     // Defense-in-depth: Check if tool has already been executed (duplicate prevention)
     const events = this._threadManager.getEvents(this._threadId);
-    const existingResult = events.find(e => 
-      e.type === 'TOOL_RESULT' && 
-      (e.data as ToolResult).id === toolCallId
+    const existingResult = events.find(
+      (e) => e.type === 'TOOL_RESULT' && (e.data as ToolResult).id === toolCallId
     );
-    
+
     if (existingResult) {
       logger.warn('AGENT: Prevented duplicate tool execution', {
         threadId: this._threadId,
         toolCallId,
-        reason: 'TOOL_RESULT already exists'
+        reason: 'TOOL_RESULT already exists',
       });
       return; // Early exit - don't execute again
     }
@@ -1774,26 +1779,26 @@ export class Agent extends EventEmitter {
 
   /**
    * Handle approval response from web API, maintaining architectural boundaries.
-   * 
+   *
    * The web layer should only communicate with the Agent interface, not directly
    * access ThreadManager. This method encapsulates approval response logic with
    * proper error handling for race conditions.
    */
-  async handleApprovalResponse(toolCallId: string, decision: string): Promise<void> {
+  handleApprovalResponse(toolCallId: string, decision: string): void {
     // Create approval response event with atomic database transaction
     // The persistence layer handles duplicate detection idempotently
     const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId,
       decision,
     });
-    
+
     // Emit event for UI synchronization (matches existing pattern)
     this.emit('thread_event_added', { event, threadId: this._threadId });
   }
 
   /**
    * Get pending tool approvals for this agent's thread.
-   * 
+   *
    * Returns tool calls that have approval requests but no responses yet.
    * The web layer should use this instead of directly accessing ThreadManager.
    */
@@ -1807,32 +1812,25 @@ export class Agent extends EventEmitter {
 
   /**
    * Get a tool call event by its ID.
-   * 
+   *
    * This provides controlled access to thread events for the web layer
    * without exposing ThreadManager directly.
    */
   getToolCallEventById(toolCallId: string): ThreadEvent | undefined {
     const events = this._threadManager.getEvents(this._threadId);
-    return events.find(e => 
-      e.type === 'TOOL_CALL' && 
-      (e.data as ToolCall).id === toolCallId
-    );
+    return events.find((e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId);
   }
 
   /**
    * Get a tool call event by tool call ID for a specific thread.
-   * 
+   *
    * Used by web layer components that need to look up tool calls
    * without direct ThreadManager access.
    */
   getToolCallEventByIdForThread(toolCallId: string, threadId: string): ThreadEvent | undefined {
     const events = this._threadManager.getEvents(threadId);
-    return events.find(e => 
-      e.type === 'TOOL_CALL' && 
-      (e.data as ToolCall).id === toolCallId
-    );
+    return events.find((e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId);
   }
-
 
   /**
    * Check if an approval request already exists for the given tool call ID.
@@ -1870,7 +1868,7 @@ export class Agent extends EventEmitter {
 
     // Emit the event so the SSE stream delivers it to the frontend immediately
     this.emit('thread_event_added', { event, threadId: this._threadId });
-    
+
     return event;
   }
 

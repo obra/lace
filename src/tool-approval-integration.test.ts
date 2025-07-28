@@ -20,7 +20,11 @@ class MockApprovalInterface implements ApprovalCallback {
     this.responses.set(toolName, decision);
   }
 
-  requestApproval(toolCall: { id: string; name: string; arguments: unknown }): Promise<ApprovalDecision> {
+  requestApproval(toolCall: {
+    id: string;
+    name: string;
+    arguments: unknown;
+  }): Promise<ApprovalDecision> {
     this.callLog.push({ toolName: toolCall.name, input: toolCall.arguments });
     const response = this.responses.get(toolCall.name);
     if (!response) {

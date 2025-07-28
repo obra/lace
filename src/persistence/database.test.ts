@@ -251,10 +251,12 @@ describe('tool approval unique constraint', () => {
     const threadId = 'test-thread';
 
     // Create thread first
-    db.database!.prepare(`
+    db.database!.prepare(
+      `
       INSERT INTO threads (id, created_at, updated_at)
       VALUES (?, ?, ?)
-    `).run(threadId, new Date().toISOString(), new Date().toISOString());
+    `
+    ).run(threadId, new Date().toISOString(), new Date().toISOString());
 
     // Create first approval event
     const event1 = {
@@ -262,15 +264,17 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
     };
 
     // Should succeed
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(event1.id, event1.threadId, event1.type, event1.timestamp, event1.data);
+      `
+      ).run(event1.id, event1.threadId, event1.type, event1.timestamp, event1.data);
     }).not.toThrow();
 
     // Create duplicate approval event
@@ -279,15 +283,17 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
     };
 
     // Should throw constraint violation
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(event2.id, event2.threadId, event2.type, event2.timestamp, event2.data);
+      `
+      ).run(event2.id, event2.threadId, event2.type, event2.timestamp, event2.data);
     }).toThrow(/UNIQUE constraint failed/);
   });
 
@@ -295,10 +301,12 @@ describe('tool approval unique constraint', () => {
     const threadId = 'test-thread';
 
     // Create thread first
-    db.database!.prepare(`
+    db.database!.prepare(
+      `
       INSERT INTO threads (id, created_at, updated_at)
       VALUES (?, ?, ?)
-    `).run(threadId, new Date().toISOString(), new Date().toISOString());
+    `
+    ).run(threadId, new Date().toISOString(), new Date().toISOString());
 
     // Create first approval event
     const event1 = {
@@ -306,7 +314,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
     };
 
     // Create second approval event with different toolCallId
@@ -315,22 +323,26 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-456', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-456', decision: 'approve' }),
     };
 
     // Both should succeed
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(event1.id, event1.threadId, event1.type, event1.timestamp, event1.data);
+      `
+      ).run(event1.id, event1.threadId, event1.type, event1.timestamp, event1.data);
     }).not.toThrow();
 
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(event2.id, event2.threadId, event2.type, event2.timestamp, event2.data);
+      `
+      ).run(event2.id, event2.threadId, event2.type, event2.timestamp, event2.data);
     }).not.toThrow();
   });
 
@@ -339,15 +351,19 @@ describe('tool approval unique constraint', () => {
     const threadId2 = 'test-thread-2';
 
     // Create threads first
-    db.database!.prepare(`
+    db.database!.prepare(
+      `
       INSERT INTO threads (id, created_at, updated_at)
       VALUES (?, ?, ?)
-    `).run(threadId1, new Date().toISOString(), new Date().toISOString());
+    `
+    ).run(threadId1, new Date().toISOString(), new Date().toISOString());
 
-    db.database!.prepare(`
+    db.database!.prepare(
+      `
       INSERT INTO threads (id, created_at, updated_at)
       VALUES (?, ?, ?)
-    `).run(threadId2, new Date().toISOString(), new Date().toISOString());
+    `
+    ).run(threadId2, new Date().toISOString(), new Date().toISOString());
 
     // Create approval events with same toolCallId in different threads
     const event1 = {
@@ -355,7 +371,7 @@ describe('tool approval unique constraint', () => {
       threadId: threadId1,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
     };
 
     const event2 = {
@@ -363,22 +379,26 @@ describe('tool approval unique constraint', () => {
       threadId: threadId2,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
     };
 
     // Both should succeed
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(event1.id, event1.threadId, event1.type, event1.timestamp, event1.data);
+      `
+      ).run(event1.id, event1.threadId, event1.type, event1.timestamp, event1.data);
     }).not.toThrow();
 
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(event2.id, event2.threadId, event2.type, event2.timestamp, event2.data);
+      `
+      ).run(event2.id, event2.threadId, event2.type, event2.timestamp, event2.data);
     }).not.toThrow();
   });
 
@@ -386,10 +406,12 @@ describe('tool approval unique constraint', () => {
     const threadId = 'test-thread';
 
     // Create thread first
-    db.database!.prepare(`
+    db.database!.prepare(
+      `
       INSERT INTO threads (id, created_at, updated_at)
       VALUES (?, ?, ?)
-    `).run(threadId, new Date().toISOString(), new Date().toISOString());
+    `
+    ).run(threadId, new Date().toISOString(), new Date().toISOString());
 
     // Create TOOL_APPROVAL_REQUEST event
     const requestEvent = {
@@ -397,7 +419,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_REQUEST',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123' })
+      data: JSON.stringify({ toolCallId: 'tool-123' }),
     };
 
     // Create TOOL_APPROVAL_RESPONSE event with same toolCallId
@@ -406,22 +428,38 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' })
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
     };
 
     // Both should succeed (constraint only applies to RESPONSE events)
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(requestEvent.id, requestEvent.threadId, requestEvent.type, requestEvent.timestamp, requestEvent.data);
+      `
+      ).run(
+        requestEvent.id,
+        requestEvent.threadId,
+        requestEvent.type,
+        requestEvent.timestamp,
+        requestEvent.data
+      );
     }).not.toThrow();
 
     expect(() => {
-      db.database!.prepare(`
+      db.database!.prepare(
+        `
         INSERT INTO events (id, thread_id, type, timestamp, data)
         VALUES (?, ?, ?, ?, ?)
-      `).run(responseEvent.id, responseEvent.threadId, responseEvent.type, responseEvent.timestamp, responseEvent.data);
+      `
+      ).run(
+        responseEvent.id,
+        responseEvent.threadId,
+        responseEvent.type,
+        responseEvent.timestamp,
+        responseEvent.data
+      );
     }).not.toThrow();
   });
 });

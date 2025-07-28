@@ -225,7 +225,7 @@ export class DatabasePersistence {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
-    
+
     return this.db.transaction(fn)();
   }
 
@@ -317,27 +317,28 @@ export class DatabasePersistence {
         UPDATE threads SET updated_at = ? WHERE id = ?
       `);
       updateThreadStmt.run(new Date().toISOString(), event.threadId);
-      
     } catch (error: unknown) {
       // Handle constraint violations for duplicate approval responses idempotently
       if (this.isConstraintViolation(error) && event.type === 'TOOL_APPROVAL_RESPONSE') {
         // Silently ignore duplicate approval responses - this is the desired idempotent behavior
-        logger.debug('DATABASE: Duplicate approval response ignored', { 
-          eventId: event.id, 
-          toolCallId: (event.data as { toolCallId?: string }).toolCallId 
+        logger.debug('DATABASE: Duplicate approval response ignored', {
+          eventId: event.id,
+          toolCallId: (event.data as { toolCallId?: string }).toolCallId,
         });
         return;
       }
-      
+
       // Re-throw other errors (including constraint violations for non-approval events)
       throw error;
     }
   }
 
   private isConstraintViolation(error: unknown): boolean {
-    return error instanceof Error && 
-           (error.message.includes('UNIQUE constraint failed') ||
-            error.message.includes('SQLITE_CONSTRAINT_UNIQUE'));
+    return (
+      error instanceof Error &&
+      (error.message.includes('UNIQUE constraint failed') ||
+        error.message.includes('SQLITE_CONSTRAINT_UNIQUE'))
+    );
   }
 
   loadEvents(threadId: string): ThreadEvent[] {

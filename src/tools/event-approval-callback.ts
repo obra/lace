@@ -6,9 +6,7 @@ import { ToolCall } from '~/tools/types';
 import { Agent } from '~/agents/agent';
 
 export class EventApprovalCallback implements ApprovalCallback {
-  constructor(
-    private agent: Agent
-  ) {}
+  constructor(private agent: Agent) {}
 
   requestApproval(toolCall: ToolCall): Promise<ApprovalDecision> {
     // Check if approval response already exists (recovery case)
