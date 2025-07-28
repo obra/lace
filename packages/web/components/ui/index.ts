@@ -25,7 +25,7 @@ export { default as MessageBubble } from './MessageBubble';
 export { default as NavigationItem } from './NavigationItem';
 export { default as MessageHeader } from './MessageHeader';
 export { default as ChatInputComposer } from './ChatInputComposer';
-export { default as MessageDisplay } from './MessageDisplay';
+export { ToolCallDisplay } from './ToolCallDisplay';
 export { default as SidebarSection } from './SidebarSection';
 
 // Re-export components that might use named exports

@@ -1,7 +1,8 @@
 'use client';
 
 import { TimelineEntry } from '@/types';
-import { MessageDisplay } from '@/components/ui';
+import { MessageHeader, MessageText, AgentBadge, TimestampDisplay } from '@/components/ui';
+import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
 import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
 import { UnknownEventEntry } from '@/components/timeline/UnknownEventEntry';
 import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
@@ -28,17 +29,90 @@ interface TimelineMessageProps {
  * ```
  */
 export function TimelineMessage({ entry }: TimelineMessageProps) {
-  // Handle basic message types with MessageDisplay molecule
-  if (entry.type === 'admin' || entry.type === 'human' || entry.type === 'ai' || entry.type === 'tool') {
+  // Admin Messages
+  if (entry.type === 'admin') {
     return (
-      <MessageDisplay
-        type={entry.type}
-        content={entry.content || ''}
-        timestamp={entry.timestamp}
-        agent={entry.agent}
-        tool={entry.tool}
-        result={entry.result}
-      />
+      <div className="flex justify-center">
+        <div className="bg-base-200 border border-base-300 rounded-full px-4 py-2 text-sm text-base-content/70">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-info rounded-full"></div>
+            <span>{entry.content}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Tool Messages - use enhanced display for aggregated tools, fallback for legacy
+  if (entry.type === 'tool') {
+    // Check if this is an aggregated tool call with metadata
+    if (entry.metadata && entry.metadata.toolId) {
+      return (
+        <ToolCallDisplay
+          tool={entry.tool || 'Unknown Tool'}
+          content={entry.content || ''}
+          result={entry.result}
+          timestamp={entry.timestamp}
+          metadata={entry.metadata}
+        />
+      );
+    }
+    
+    // Legacy tool display for backwards compatibility
+    return (
+      <div className="flex gap-3">
+        <div className="flex-shrink-0">
+          <div className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
+            <div className="w-3 h-3 bg-teal-600 rounded"></div>
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <MessageHeader
+            name="Tool"
+            timestamp={entry.timestamp}
+            badge={entry.tool ? { text: entry.tool, variant: 'info' } : undefined}
+          />
+          <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
+            <div className="text-base-content/80 mb-2 font-mono">$ {entry.content}</div>
+            {entry.result && (
+              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">{entry.result}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Human Messages
+  if (entry.type === 'human') {
+    return (
+      <div className="flex gap-3">
+        <div className="flex-1 min-w-0">
+          <MessageHeader
+            name="You"
+            timestamp={entry.timestamp}
+            role="user"
+          />
+          <MessageText content={entry.content || ''} />
+        </div>
+      </div>
+    );
+  }
+
+  // AI Messages
+  if (entry.type === 'ai') {
+    return (
+      <div className="flex gap-3">
+        <div className="flex-1 min-w-0">
+          <MessageHeader
+            name={entry.agent || 'Assistant'}
+            timestamp={entry.timestamp}
+            role="assistant"
+            badge={entry.agent ? { text: entry.agent, variant: 'primary' } : undefined}
+          />
+          <MessageText content={entry.content || ''} />
+        </div>
+      </div>
     );
   }
 

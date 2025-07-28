@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@/lib/fontawesome';
@@ -40,7 +40,7 @@ import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
-export function LaceApp() {
+export const LaceApp = memo(function LaceApp() {
   // Theme state
   const { theme, setTheme } = useTheme();
 
@@ -75,7 +75,6 @@ export function LaceApp() {
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
 
@@ -235,7 +234,7 @@ export function LaceApp() {
   };
 
 
-  async function sendMessage() {
+  const sendMessage = useCallback(async (message: string) => {
     if (!selectedAgent || !message.trim()) return;
 
     setSendingMessage(true);
@@ -247,13 +246,14 @@ export function LaceApp() {
       });
 
       if (res.ok) {
-        setMessage('');
+        return true; // Indicate success so the input can clear itself
       }
     } catch (error) {
       console.error('Failed to send message:', error);
     }
     setSendingMessage(false);
-  }
+    return false;
+  }, [selectedAgent]);
 
   // Handle tool approval decision
   const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
@@ -485,7 +485,7 @@ export function LaceApp() {
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
   const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
-  const currentProject = foundProject || { 
+  const currentProject = useMemo(() => foundProject || { 
     id: '', 
     name: 'No project selected', 
     description: 'Select a project to get started',
@@ -493,7 +493,7 @@ export function LaceApp() {
     isArchived: false,
     createdAt: new Date(),
     lastUsedAt: new Date()
-  };
+  }, [foundProject]);
   
   
   // Clear invalid project selection from URL  
@@ -509,7 +509,7 @@ export function LaceApp() {
   //   }
   // }, [selectedProject, projects, foundProject, setSelectedProject, loadingProjects]);
 
-  const projectsForSidebar = projects.map(p => ({
+  const projectsForSidebar = useMemo(() => projects.map(p => ({
     id: p.id,
     name: p.name,
     workingDirectory: p.workingDirectory,
@@ -518,7 +518,7 @@ export function LaceApp() {
     createdAt: new Date(p.createdAt),
     lastUsedAt: new Date(p.lastUsedAt),
     sessionCount: p.sessionCount || 0,
-  }));
+  })), [projects]);
 
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
@@ -860,22 +860,11 @@ export function LaceApp() {
                 </div>
 
                 {/* Chat Input */}
-                <motion.div
-                  initial={{ y: 100, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className="flex-shrink-0 bg-base-200 border-t border-base-300 p-4"
-                >
-                  <EnhancedChatInput
-                    value={message}
-                    onChange={setMessage}
-                    onSubmit={sendMessage}
-                    disabled={sendingMessage}
-                    isListening={false}
-                    onStartVoice={() => {}}
-                    onStopVoice={() => {}}
-                    placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
-                  />
-                </motion.div>
+                <MemoizedChatInput
+                  onSubmit={sendMessage}
+                  disabled={sendingMessage}
+                  placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
+                />
               </div>
             ) : (
               /* Session Configuration Panel - Main UI for session/agent management */
@@ -962,4 +951,43 @@ export function LaceApp() {
       )}
     </motion.div>
   );
-}
+});
+
+// Memoized chat input component to prevent parent re-renders
+const MemoizedChatInput = memo(function MemoizedChatInput({ 
+  onSubmit, 
+  disabled, 
+  placeholder 
+}: { 
+  onSubmit: (message: string) => Promise<boolean | void>;
+  disabled: boolean;
+  placeholder: string;
+}) {
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = useCallback(async () => {
+    const success = await onSubmit(message);
+    if (success) {
+      setMessage('');
+    }
+  }, [message, onSubmit]);
+
+  return (
+    <motion.div
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="flex-shrink-0 bg-base-200 border-t border-base-300 p-4"
+    >
+      <EnhancedChatInput
+        value={message}
+        onChange={setMessage}
+        onSubmit={handleSubmit}
+        disabled={disabled}
+        isListening={false}
+        onStartVoice={() => {}}
+        onStopVoice={() => {}}
+        placeholder={placeholder}
+      />
+    </motion.div>
+  );
+});

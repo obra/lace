@@ -1,7 +1,7 @@
 // ABOUTME: Custom hook for managing session events and SSE connections
 // ABOUTME: Handles event loading, filtering, and real-time updates for agent conversations
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import { isApiError } from '@/types/api';
 import { getAllEventTypes } from '@/types/events';
@@ -59,6 +59,8 @@ export function useSessionEvents(
   sessionId: ThreadId | null,
   selectedAgent: ThreadId | null
 ): UseSessionEventsReturn {
+  // Add unique ID to track hook instances (for debugging)
+  const hookId = React.useRef(Math.random().toString(36).substr(2, 9));
   const [allEvents, setAllEvents] = useState<SessionEvent[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -83,11 +85,16 @@ export function useSessionEvents(
 
       const historyData = data as { events: Array<SessionEvent & { timestamp: string }> };
 
-      // Convert string timestamps to Date objects - keep ALL events
-      const eventsWithDateTimestamps: SessionEvent[] = (historyData.events || []).map((event) => ({
-        ...event,
-        timestamp: new Date(event.timestamp),
-      }));
+      // Convert string timestamps to Date objects and filter out approval events
+      const eventsWithDateTimestamps: SessionEvent[] = (historyData.events || [])
+        .filter((event) => {
+          // Filter out approval events from history - they should not appear in timeline
+          return event.type !== 'TOOL_APPROVAL_REQUEST' && event.type !== 'TOOL_APPROVAL_RESPONSE';
+        })
+        .map((event) => ({
+          ...event,
+          timestamp: new Date(event.timestamp),
+        }));
 
       setAllEvents(eventsWithDateTimestamps);
     } catch (error) {
@@ -144,6 +151,8 @@ export function useSessionEvents(
 
   // SSE connection effect
   useEffect(() => {
+    // SSE effect running for session
+    
     if (!sessionId) {
       setAllEvents([]);
       setConnected(false);
@@ -154,6 +163,7 @@ export function useSessionEvents(
     void loadConversationHistory(sessionId);
 
     // Set up SSE connection
+    // Creating new EventSource for session
     const eventSource = new EventSource(`/api/sessions/${sessionId}/events/stream`);
 
     // Store event listeners for cleanup
@@ -162,6 +172,8 @@ export function useSessionEvents(
     // Listen to all event types
     const eventTypes = getAllEventTypes();
 
+    // Registering event listeners for all event types
+    
     eventTypes.forEach((eventType) => {
       const listener = (event: MessageEvent) => {
         try {
@@ -206,6 +218,9 @@ export function useSessionEvents(
                 const updated = [...prev, pendingApproval];
                 return updated;
               });
+              
+              // Don't add approval request events to timeline
+              return;
             } else if (eventData.type === 'TOOL_APPROVAL_RESPONSE') {
               // Remove approved item from pending list (spec Phase 3.2)
               const responseData = eventData.data as { toolCallId: string; decision: string };
@@ -221,6 +236,9 @@ export function useSessionEvents(
                 const updated = prev.filter((approval) => approval.toolCallId !== responseData.toolCallId);
                 return updated;
               });
+              
+              // Don't add approval response events to timeline
+              return;
             } else if (eventData.threadId) {
               // Convert timestamp from string to Date if needed
               const timestamp = eventData.timestamp
@@ -308,6 +326,7 @@ export function useSessionEvents(
 
     // Cleanup function
     return () => {
+      // Cleaning up SSE connection
       // Remove all event listeners before closing
       eventListeners.forEach((listener, eventType) => {
         eventSource.removeEventListener(eventType, listener);
