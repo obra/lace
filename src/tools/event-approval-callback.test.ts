@@ -107,8 +107,8 @@ describe('EventApprovalCallback Integration Tests', () => {
     const threadId = threadManager.generateThreadId();
     
     // Create thread WITH session ID so _getFullSession() can find it
-    threadManager.createThread(threadId, { sessionId: session.getId() });
-
+    threadManager.createThread(threadId, session.getId());
+    
     agent = new Agent({
       provider: mockProvider,
       toolExecutor,
@@ -116,6 +116,9 @@ describe('EventApprovalCallback Integration Tests', () => {
       threadId,
       tools: [new BashTool()], // Enable bash tool
     });
+
+    // Use the SAME threadManager instance everywhere
+    threadManager = agent.threadManager;
 
     // Set up the EventApprovalCallback
     const approvalCallback = new EventApprovalCallback(agent);
@@ -147,9 +150,9 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Start agent conversation - this creates TOOL_CALL events and triggers approval
     const conversationPromise = agent.sendMessage('Please run ls command');
-
-    // Wait for tool call and approval request to be created
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    
+    // Wait for tool calls to be processed (but not for full conversation completion)
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check that both TOOL_CALL and TOOL_APPROVAL_REQUEST events were created
     const events = threadManager.getEvents(agent.threadId);
