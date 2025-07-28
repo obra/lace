@@ -108,8 +108,12 @@ describe('Event-Based Tool Approval Integration', () => {
 
     // Start approval request (this should create TOOL_APPROVAL_REQUEST event and throw ApprovalPendingError)
     try {
-      await toolExecutor.approvalCallback.requestApproval('file-read', {
-        path: testFilePath,
+      await toolExecutor.approvalCallback.requestApproval({
+        id: 'test-call-123',
+        name: 'file-read',
+        arguments: {
+          file_path: testFilePath,
+        },
       });
       throw new Error('Expected ApprovalPendingError to be thrown');
     } catch (error: unknown) {
@@ -154,8 +158,12 @@ describe('Event-Based Tool Approval Integration', () => {
     }
 
     // Request approval - should return existing decision immediately
-    const decision = await toolExecutor.approvalCallback.requestApproval('file-read', {
-      path: testFilePath,
+    const decision = await toolExecutor.approvalCallback.requestApproval({
+      id: 'existing-call-456',
+      name: 'file-read',
+      arguments: {
+        file_path: testFilePath,
+      },
     });
 
     expect(decision).toBe('allow_session');
