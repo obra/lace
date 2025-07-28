@@ -24,6 +24,9 @@ interface MockAgent {
   emit: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
   off: ReturnType<typeof vi.fn>;
+  checkExistingApprovalRequest: ReturnType<typeof vi.fn>;
+  checkExistingApprovalResponse: ReturnType<typeof vi.fn>;
+  addApprovalRequestEvent: ReturnType<typeof vi.fn>;
 }
 
 interface ApprovalCallback {
@@ -36,6 +39,14 @@ describe('Event-Based Approval Callback', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    const threadManager = {
+      addEvent: vi.fn(),
+      on: vi.fn(),
+      getEvents: vi.fn(() => [])
+    };
+
+    const emit = vi.fn();
     
     mockAgent = {
       threadId: 'test_thread_123',
@@ -43,14 +54,23 @@ describe('Event-Based Approval Callback', () => {
         setApprovalCallback: vi.fn(),
         getTool: vi.fn(() => ({ annotations: { readOnlyHint: false } }))
       },
-      threadManager: {
-        addEvent: vi.fn(),
-        on: vi.fn(),
-        getEvents: vi.fn(() => [])
-      },
-      emit: vi.fn(),
+      threadManager,
+      emit,
       on: vi.fn(),
-      off: vi.fn()
+      off: vi.fn(),
+      checkExistingApprovalRequest: vi.fn(() => false),
+      checkExistingApprovalResponse: vi.fn(() => null),
+      addApprovalRequestEvent: vi.fn((toolCallId: string) => {
+        const event = {
+          id: 'event_request',
+          type: 'TOOL_APPROVAL_REQUEST',
+          timestamp: new Date(),
+          data: { toolCallId }
+        };
+        threadManager.addEvent('test_thread_123', 'TOOL_APPROVAL_REQUEST', { toolCallId });
+        emit('thread_event_added', { event, threadId: 'test_thread_123' });
+        return event;
+      })
     };
     
     sessionId = asThreadId('lace_20240101_test01');
@@ -82,7 +102,7 @@ describe('Event-Based Approval Callback', () => {
 
     // Start the approval request - should throw ApprovalPendingError
     try {
-      await approvalCallback.requestApproval('bash', { command: 'ls' });
+      await approvalCallback.requestApproval({ id: 'call_123', name: 'bash', arguments: { command: 'ls' } });
       throw new Error('Expected ApprovalPendingError to be thrown');
     } catch (error: unknown) {
       // Verify that ApprovalPendingError was thrown with correct toolCallId
@@ -113,27 +133,14 @@ describe('Event-Based Approval Callback', () => {
 
     const approvalCallback = mockAgent.toolExecutor.setApprovalCallback.mock.calls[0]?.[0] as ApprovalCallback;
 
-    // Mock finding recent TOOL_CALL and existing response
-    mockAgent.threadManager.getEvents.mockReturnValue([
-      {
-        id: 'event_1',
-        type: 'TOOL_CALL',
-        timestamp: new Date(),
-        data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } }
-      },
-      {
-        id: 'event_3',
-        type: 'TOOL_APPROVAL_RESPONSE',
-        timestamp: new Date(),
-        data: { toolCallId: 'call_123', decision: 'allow_session' }
-      }
-    ]);
+    // Mock that existing approval response is found
+    mockAgent.checkExistingApprovalResponse.mockReturnValue('allow_session');
 
-    const decision = await approvalCallback.requestApproval('bash', { command: 'ls' });
+    const decision = await approvalCallback.requestApproval({ id: 'call_123', name: 'bash', arguments: { command: 'ls' } });
     expect(decision).toBe('allow_session');
 
     // Should not create new approval request since response exists
-    expect(mockAgent.threadManager.addEvent).not.toHaveBeenCalled();
+    expect(mockAgent.addApprovalRequestEvent).not.toHaveBeenCalled();
   });
 
   it('should clean up event listeners when approval resolves', async () => {
@@ -164,7 +171,7 @@ describe('Event-Based Approval Callback', () => {
 
     // Start approval request - should throw ApprovalPendingError
     try {
-      await approvalCallback.requestApproval('bash', { command: 'pwd' });
+      await approvalCallback.requestApproval({ id: 'call_789', name: 'bash', arguments: { command: 'pwd' } });
       throw new Error('Expected ApprovalPendingError to be thrown');
     } catch (error: unknown) {
       // Verify that ApprovalPendingError was thrown with correct toolCallId
