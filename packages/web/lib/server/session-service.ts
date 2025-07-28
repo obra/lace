@@ -289,6 +289,28 @@ export class SessionService {
     Session.updateSession(sessionId, updates);
   }
 
+  // Test helper method to stop all agents and clear active sessions
+  async stopAllAgents(): Promise<void> {
+    for (const session of activeSessions.values()) {
+      // Stop the coordinator agent
+      const coordinatorAgent = session.getAgent(session.getId());
+      if (coordinatorAgent) {
+        coordinatorAgent.stop();
+      }
+      
+      // Stop all delegate agents
+      const agentMetadata = session.getAgents();
+      for (const agentMeta of agentMetadata) {
+        if (agentMeta.threadId !== session.getId()) { // Skip coordinator (already stopped)
+          const agent = session.getAgent(agentMeta.threadId);
+          if (agent) {
+            agent.stop();
+          }
+        }
+      }
+    }
+  }
+
   // Test helper method to clear active sessions
   clearActiveSessions(): void {
     activeSessions.clear();
