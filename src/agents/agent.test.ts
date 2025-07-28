@@ -762,14 +762,8 @@ describe('Enhanced Agent', () => {
 
       await agent.sendMessage('Run commands');
 
-      // Approve second tool first (out of order)
-      const approval2 = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_2',
-          decision: 'allow_once',
-        })
-      );
-      agent.emit('thread_event_added', { event: approval2, threadId: agent.threadId });
+      // Approve second tool first (out of order) - use agent's proper API
+      agent.handleApprovalResponse('call_2', 'allow_once');
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -779,14 +773,8 @@ describe('Enhanced Agent', () => {
       expect(toolResults).toHaveLength(1);
       expect((toolResults[0].data as ToolResult).id).toBe('call_2');
 
-      // Approve first tool
-      const approval1 = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: 'allow_once',
-        })
-      );
-      agent.emit('thread_event_added', { event: approval1, threadId: agent.threadId });
+      // Approve first tool - use agent's proper API
+      agent.handleApprovalResponse('call_1', 'allow_once');
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -795,14 +783,8 @@ describe('Enhanced Agent', () => {
       toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(2);
 
-      // Deny third tool
-      const approval3 = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_3',
-          decision: 'deny',
-        })
-      );
-      agent.emit('thread_event_added', { event: approval3, threadId: agent.threadId });
+      // Deny third tool - use agent's proper API
+      agent.handleApprovalResponse('call_3', 'deny');
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -810,6 +792,9 @@ describe('Enhanced Agent', () => {
       events = threadManager.getEvents(agent.threadId);
       toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(3);
+
+      const successResults = toolResults.filter((r) => !(r.data as ToolResult).isError);
+      expect(successResults).toHaveLength(2);
 
       const errorResult = toolResults.find((r) => (r.data as ToolResult).id === 'call_3');
       expect((errorResult?.data as ToolResult).isError).toBe(true);
