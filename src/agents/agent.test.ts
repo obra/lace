@@ -60,7 +60,11 @@ class MockTool extends Tool {
     _args: z.infer<typeof this.schema>,
     _context?: ToolContext
   ): Promise<ToolResult> {
-    return Promise.resolve(this.result);
+    // Return a fresh copy to avoid ID mutation issues
+    return Promise.resolve({
+      ...this.result,
+      content: this.result.content.map(c => ({ ...c }))
+    });
   }
 }
 
