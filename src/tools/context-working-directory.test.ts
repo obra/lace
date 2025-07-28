@@ -7,6 +7,7 @@ import { ToolContext } from '~/tools/types';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { asThreadId } from '~/threads/types';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { createMockSession, createMockToolContext } from '~/tools/test-utils';
 
 describe('ToolContext working directory', () => {
   let executor: ToolExecutor;
@@ -17,18 +18,19 @@ describe('ToolContext working directory', () => {
   });
 
   it('should pass working directory in ToolContext', () => {
-    const context: ToolContext = {
-      threadId: asThreadId('lace_20240101_test01'),
+    const context = createMockToolContext({
+      threadId: 'lace_20240101_test01',
       workingDirectory: '/test/project/path',
-    };
+    });
 
     expect(context.workingDirectory).toBe('/test/project/path');
   });
 
   it('should handle undefined working directory', () => {
-    const context: ToolContext = {
-      threadId: asThreadId('lace_20240101_test01'),
-    };
+    const context = createMockToolContext({
+      threadId: 'lace_20240101_test01',
+      workingDirectory: undefined,
+    });
 
     expect(context.workingDirectory).toBeUndefined();
   });
@@ -41,10 +43,10 @@ describe('ToolContext working directory', () => {
       },
     });
 
-    const context: ToolContext = {
-      threadId: asThreadId('lace_20240101_test01'),
+    const context = createMockToolContext({
+      threadId: 'lace_20240101_test01',
       workingDirectory: '/test/project/path',
-    };
+    });
 
     // We can't actually test file reading without creating files,
     // but we can verify the context structure is preserved

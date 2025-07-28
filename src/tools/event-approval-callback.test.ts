@@ -14,6 +14,9 @@ import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { type ToolResult } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Enhanced test provider that can return tool calls once, then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -61,14 +64,39 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('EventApprovalCallback Integration Tests', () => {
+  const tempDirContext = useTempLaceDir();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
+  let session: Session;
+  let project: Project;
 
   beforeEach(() => {
     setupTestPersistence();
 
-    // Create real components for integration testing
+    // Create real project
+    project = Project.create(
+      'Approval Test Project',
+      'Project for approval testing',
+      tempDirContext.path,
+      {
+        tools: ['bash'], // Enable bash tool
+        toolPolicies: {
+          'bash': 'require-approval',
+        },
+      }
+    );
+
+    // Create real session with anthropic provider
+    session = Session.create({
+      name: 'Approval Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
+      tools: ['bash'], // Enable bash tool
+    });
+
+    // Create manual components for controlled testing
     threadManager = new ThreadManager();
     mockProvider = new MockProviderWithToolCalls();
     const toolExecutor = new ToolExecutor();
@@ -77,12 +105,14 @@ describe('EventApprovalCallback Integration Tests', () => {
     toolExecutor.registerTool('bash', new BashTool());
 
     const threadId = threadManager.generateThreadId();
-    threadManager.createThread(threadId);
+    
+    // Create thread WITH session ID so _getFullSession() can find it
+    threadManager.createThread(threadId, { sessionId: session.getId() });
 
     agent = new Agent({
       provider: mockProvider,
       toolExecutor,
-      threadManager,
+      threadManager, 
       threadId,
       tools: [new BashTool()], // Enable bash tool
     });

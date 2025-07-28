@@ -12,7 +12,7 @@ export interface ToolContext {
   // Session information for policy enforcement - REQUIRED for security
   sessionId?: string;
   projectId?: string;
-  session: import('~/sessions/session').Session; // MANDATORY - tools must have session context for policy enforcement
+  session?: import('~/sessions/session').Session; // Optional for tests, required for security in ToolExecutor
 }
 
 export interface ToolAnnotations {

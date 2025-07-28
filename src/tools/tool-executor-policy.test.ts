@@ -121,22 +121,16 @@ describe('ToolExecutor policy enforcement', () => {
     expect(result.content[0].text).toContain('not allowed in current configuration');
   });
 
-  it('should use default policy when session not available', async () => {
+  it('should require session context for security policy enforcement', async () => {
     const contextWithoutSession = {
       threadId: asThreadId('thread1'),
     };
 
-    // Should fall back to default require-approval policy
-    const mockApprovalCallback = {
-      requestApproval: vi.fn().mockResolvedValue(ApprovalDecision.DENY),
-    };
-    executor.setApprovalCallback(mockApprovalCallback);
-
     const toolCall = { id: 'test-id', name: 'file-read', arguments: { file_path: '/test.txt' } };
     const result = await executor.executeTool(toolCall, contextWithoutSession);
 
-    expect(mockApprovalCallback.requestApproval).toHaveBeenCalled();
     expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('session context required for security policy enforcement');
   });
 
   it('should deny approval when user rejects', async () => {
