@@ -74,4 +74,27 @@ describe('Agent Session Context', () => {
       expect(retrievedSession).toBeUndefined();
     });
   });
+
+  describe('Session roundtrip persistence', () => {
+    it('should persist sessions properly via Session.create() → Session.getById()', async () => {
+      // Create session via Session.create()
+      const createdSession = Session.create({
+        name: 'Roundtrip Test Session',
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307',
+        projectId: project.getId(),
+      });
+
+      // Retrieve same session via Session.getById()
+      const retrievedSession = await Session.getById(createdSession.getId());
+
+      expect(retrievedSession).toBeDefined();
+      expect(retrievedSession!.getId()).toBe(createdSession.getId());
+    });
+
+    it('should return null for non-existent session IDs', async () => {
+      const nonExistentSession = await Session.getById(asThreadId('non-existent-session-123'));
+      expect(nonExistentSession).toBeNull();
+    });
+  });
 });
