@@ -78,11 +78,11 @@ describe('EventApprovalCallback Integration Tests', () => {
     project = Project.create(
       'Approval Test Project',
       'Project for approval testing',
-      tempDirContext.path,
+      tempDirContext.tempDir,
       {
         tools: ['bash'], // Enable bash tool
         toolPolicies: {
-          'bash': 'require-approval',
+          bash: 'require-approval',
         },
       }
     );
@@ -93,7 +93,6 @@ describe('EventApprovalCallback Integration Tests', () => {
       provider: 'anthropic',
       model: 'claude-3-haiku-20240307',
       projectId: project.getId(),
-      tools: ['bash'], // Enable bash tool
     });
 
     // Create manual components for controlled testing
@@ -105,14 +104,14 @@ describe('EventApprovalCallback Integration Tests', () => {
     toolExecutor.registerTool('bash', new BashTool());
 
     const threadId = threadManager.generateThreadId();
-    
+
     // Create thread WITH session ID so _getFullSession() can find it
     threadManager.createThread(threadId, session.getId());
-    
+
     agent = new Agent({
       provider: mockProvider,
       toolExecutor,
-      threadManager, 
+      threadManager,
       threadId,
       tools: [new BashTool()], // Enable bash tool
     });
@@ -150,7 +149,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Start agent conversation - this creates TOOL_CALL events and triggers approval
     const conversationPromise = agent.sendMessage('Please run ls command');
-    
+
     // Wait for tool calls to be processed (but not for full conversation completion)
     await new Promise((resolve) => setTimeout(resolve, 100));
 
