@@ -1672,7 +1672,7 @@ export class Agent extends EventEmitter {
   private _addEventAndEmit(
     threadId: string,
     type: string,
-    data: string | ToolCall | ToolResult
+    data: string | ToolCall | ToolResult | Record<string, unknown>
   ): ThreadEvent | null {
     // Safety check: only add events if thread exists
     if (!this._threadManager.getThread(threadId)) {
@@ -1859,12 +1859,13 @@ export class Agent extends EventEmitter {
    * Used by EventApprovalCallback to create approval requests.
    */
   addApprovalRequestEvent(toolCallId: string): ThreadEvent {
-    const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_REQUEST', {
+    const event = this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_REQUEST', {
       toolCallId: toolCallId,
     });
 
-    // Emit the event so the SSE stream delivers it to the frontend immediately
-    this.emit('thread_event_added', { event, threadId: this._threadId });
+    if (!event) {
+      throw new Error(`Failed to create TOOL_APPROVAL_REQUEST event for toolCallId: ${toolCallId}`);
+    }
 
     return event;
   }
