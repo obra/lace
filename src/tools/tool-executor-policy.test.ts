@@ -130,7 +130,9 @@ describe('ToolExecutor policy enforcement', () => {
     const result = await executor.executeTool(toolCall, contextWithoutSession);
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('session context required for security policy enforcement');
+    expect(result.content[0].text).toContain(
+      'session context required for security policy enforcement'
+    );
   });
 
   it('should deny approval when user rejects', async () => {

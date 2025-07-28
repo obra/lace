@@ -7,11 +7,9 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { Agent } from '~/agents/agent';
-import { TestProvider } from '~/test-utils/test-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ToolCall, ToolContext } from '~/tools/types';
-import { ApprovalPendingError } from '~/tools/approval-types';
 
 describe('ToolExecutor Security with Real Session Context', () => {
   const tempDirContext = useTempLaceDir();
@@ -22,12 +20,12 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Create real project
     project = Project.create(
       'Security Test Project',
       'Project for security testing',
-      tempDirContext.path,
+      tempDirContext.tempDir,
       {}
     );
 
@@ -72,9 +70,9 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       // Test with no session context (undefined)
-      await expect(
-        toolExecutor.requestToolPermission(toolCall, undefined)
-      ).rejects.toThrow('Tool execution denied: session context required for security policy enforcement');
+      await expect(toolExecutor.requestToolPermission(toolCall, undefined)).rejects.toThrow(
+        'Tool execution denied: session context required for security policy enforcement'
+      );
 
       // Test with empty context (no session property)
       const emptyContext = {
@@ -82,9 +80,9 @@ describe('ToolExecutor Security with Real Session Context', () => {
         workingDirectory: '/tmp',
       } as any; // Cast to bypass TypeScript - simulating old code
 
-      await expect(
-        toolExecutor.requestToolPermission(toolCall, emptyContext)
-      ).rejects.toThrow('Tool execution denied: session context required for security policy enforcement');
+      await expect(toolExecutor.requestToolPermission(toolCall, emptyContext)).rejects.toThrow(
+        'Tool execution denied: session context required for security policy enforcement'
+      );
     });
 
     it('should require approval by default when session context is provided', async () => {
@@ -96,7 +94,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.path,
+        workingDirectory: tempDirContext.tempDir,
         session,
       };
 
@@ -118,7 +116,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.path,
+        workingDirectory: tempDirContext.tempDir,
         session,
       };
 
@@ -136,7 +134,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
         projectId: project.getId(),
         configuration: {
           toolPolicies: {
-            'file_read': 'allow' as const,
+            file_read: 'allow' as const,
           },
         },
       });
@@ -149,7 +147,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.path,
+        workingDirectory: tempDirContext.tempDir,
         session: permissiveSession,
       };
 
@@ -167,7 +165,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
         projectId: project.getId(),
         configuration: {
           toolPolicies: {
-            'bash': 'deny' as const,
+            bash: 'deny' as const,
           },
         },
       });
@@ -180,14 +178,14 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.path,
+        workingDirectory: tempDirContext.tempDir,
         session: restrictiveSession,
       };
 
       // Should be denied outright
-      await expect(
-        toolExecutor.requestToolPermission(toolCall, toolContext)
-      ).rejects.toThrow("Tool 'bash' execution denied by policy");
+      await expect(toolExecutor.requestToolPermission(toolCall, toolContext)).rejects.toThrow(
+        "Tool 'bash' execution denied by policy"
+      );
     });
   });
 
@@ -206,14 +204,14 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.path,
+        workingDirectory: tempDirContext.tempDir,
         session,
       };
 
       // Should fail because no approval callback is configured
-      await expect(
-        unsafeExecutor.requestToolPermission(toolCall, toolContext)
-      ).rejects.toThrow('Tool execution requires approval but no approval callback is configured');
+      await expect(unsafeExecutor.requestToolPermission(toolCall, toolContext)).rejects.toThrow(
+        'Tool execution requires approval but no approval callback is configured'
+      );
     });
   });
 });
