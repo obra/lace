@@ -255,9 +255,7 @@ export function LaceApp() {
         body: JSON.stringify({ decision }),
       });
 
-      if (res.ok) {
-        clearApprovalRequest();
-      } else {
+      if (!res.ok) {
         console.error('Failed to submit approval decision');
       }
     } catch (error) {
@@ -596,7 +594,7 @@ export function LaceApp() {
                   {/* Back to Session Config */}
                   <SidebarButton
                     onClick={() => {
-                      setSelectedAgent(undefined);
+                      setSelectedAgent(null);
                       setShowMobileNav(false);
                     }}
                     variant="ghost"
@@ -737,7 +735,7 @@ export function LaceApp() {
               {/* Back to Session Config */}
               <SidebarButton
                 onClick={() => {
-                  setSelectedAgent(undefined);
+                  setSelectedAgent(null);
                 }}
                 variant="ghost"
               >
