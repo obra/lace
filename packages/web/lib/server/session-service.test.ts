@@ -58,58 +58,35 @@ vi.mock('@/lib/sse-manager', () => ({
   }
 }));
 
-// Mock external dependencies (filesystem, database) but not business logic
-vi.mock('~/persistence/database', () => {
-  // Keep a simple in-memory store to test real behavior
-  const sessionStore = new Map<string, Record<string, unknown>>();
+// Use real persistence with temporary directory instead of complex mocking
 
-  return {
-    getPersistence: vi.fn(() => ({
-      // Mock the persistence layer to use in-memory storage for testing
-      updateSession: vi.fn((sessionId: string, updates: Record<string, unknown>) => {
-        const existing = sessionStore.get(sessionId) || {};
-        const updated = { ...existing, ...updates, updatedAt: new Date() };
-        sessionStore.set(sessionId, updated);
-      }),
-      loadSession: vi.fn((sessionId: string) => {
-        return sessionStore.get(sessionId) || null;
-      }),
-      saveSession: vi.fn((session: Record<string, unknown> & { id: string }) => {
-        sessionStore.set(session.id, session);
-      }),
-      close: vi.fn(),
-    })),
-  };
-});
+// Don't mock agent-utils - we want real approval callback setup
 
-// Mock agent-utils
-vi.mock('./agent-utils', () => ({
-  setupAgentApprovals: vi.fn()
-}));
+// Don't mock ProviderRegistry globally - mock it per test as needed
 
-// Mock Project.getById - external dependency for project validation
-vi.mock('@/lib/server/lace-imports', async () => {
-  const actual = await vi.importActual('@/lib/server/lace-imports');
-  return {
-    ...actual,
-    Project: {
-      getById: vi.fn((projectId: string) => ({ id: projectId, name: 'Test Project' })),
-    },
-    Session: actual.Session,
-    ProviderRegistry: {
-      getProvider: vi.fn(),
-      createProvider: vi.fn(),
-      createWithAutoDiscovery: vi.fn(),
-    },
-  };
-});
+// Don't mock lace-imports - use real implementations with temp directory
 
 describe('SessionService Missing Methods', () => {
+  const tempDirContext = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
   let Session: typeof import('@/lib/server/lace-imports').Session;
+  let testProject: import('@/lib/server/lace-imports').Project;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    
+    // Set up test environment
+    process.env.ANTHROPIC_KEY = 'test-key';
+    
+    // Create a real test project 
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create(
+      'Test Project',
+      'Test project for session service tests',
+      tempDirContext.path,
+      {}
+    );
+    
     sessionService = getSessionService();
     sessionService.clearActiveSessions();
 
@@ -125,30 +102,23 @@ describe('SessionService Missing Methods', () => {
   describe('updateSession', () => {
     it('should update session metadata and persist changes', async () => {
       // Arrange: Create a session first
-      const sessionId = asThreadId('test-session-id');
+      const _sessionId = asThreadId('test-session-id');
 
-      // Create a session record in our mocked persistence
-      const initialSessionData = {
-        id: sessionId,
-        name: 'Original Session',
-        description: 'Original description',
-        projectId: 'test-project',
-        configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
-        status: 'active' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      // Save directly to mocked persistence
-      const { getPersistence } = await import('~/persistence/database');
-      getPersistence().saveSession(initialSessionData);
+      // Create a real session using SessionService
+      const initialSession = await sessionService.createSession(
+        'Original Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
 
       const updates = { name: 'Updated Session', description: 'New description' };
 
-      // Act: Update the session through the service
-      sessionService.updateSession(sessionId, updates);
+      // Act: Update the session through the service  
+      sessionService.updateSession(asThreadId(initialSession.id), updates);
 
       // Assert: Verify the session was actually updated in persistence
-      const updatedSession = Session.getSession(sessionId);
+      const updatedSession = Session.getSession(asThreadId(initialSession.id));
       expect(updatedSession).not.toBeNull();
       expect(updatedSession?.name).toBe('Updated Session');
       expect(updatedSession?.description).toBe('New description');
@@ -157,31 +127,22 @@ describe('SessionService Missing Methods', () => {
 
     it('should handle partial updates correctly', async () => {
       // Arrange: Create a session with multiple properties
-      const sessionId = asThreadId('test-session-partial');
-
-      const initialSessionData = {
-        id: sessionId,
-        name: 'Original Session',
-        description: 'Original description',
-        projectId: 'test-project',
-        configuration: { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
-        status: 'active' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      // Save directly to mocked persistence
-      const { getPersistence } = await import('~/persistence/database');
-      getPersistence().saveSession(initialSessionData);
+      const initialSession = await sessionService.createSession(
+        'Original Session',
+        'anthropic',
+        'claude-3-haiku-20240307',
+        testProject.getId()
+      );
 
       // Act: Update only one property
       const partialUpdates = { description: 'Partially updated description' };
-      sessionService.updateSession(sessionId, partialUpdates);
+      sessionService.updateSession(asThreadId(initialSession.id), partialUpdates);
 
       // Assert: Verify only the specified field was updated
-      const updatedSession = Session.getSession(sessionId);
+      const updatedSession = Session.getSession(asThreadId(initialSession.id));
       expect(updatedSession?.name).toBe('Original Session'); // unchanged
       expect(updatedSession?.description).toBe('Partially updated description'); // changed
-      expect(updatedSession?.projectId).toBe('test-project'); // unchanged
+      expect(updatedSession?.projectId).toBe(testProject.getId()); // unchanged
     });
   });
 });
@@ -189,81 +150,46 @@ describe('SessionService Missing Methods', () => {
 describe('SessionService approval event forwarding', () => {
   const tempDirContext = useTempLaceDir();
   let sessionService: SessionService;
-  let mockSSEManager: { broadcast: vi.Mock };
   let session: Session;
   let agent: Agent;
+  let testProject: import('@/lib/server/lace-imports').Project;
 
-  // Mock provider that returns a tool call requiring approval
+  // Mock provider that returns tool calls to trigger approval flow
   class MockApprovalProvider extends TestProvider {
     private callCount = 0;
-
+    
     createResponse(): Promise<import('@/lib/server/core-types').ProviderResponse> {
       this.callCount++;
+      
+      // Only return tool calls on first call to avoid loops
       if (this.callCount === 1) {
-        // First call: return a tool call that will require approval
         return Promise.resolve({
-          content: "I'll use the file-read tool to check the file.",
+          content: "I'll write to the file.",
           toolCalls: [
             {
-              id: 'tool-call-approval-test',
-              name: 'file-read',
-              input: { file_path: '/test/file.txt' },
+              id: 'test-call-123',
+              name: 'file-write',
+              input: { file_path: '/test/file.txt', content: 'test content' },
             },
           ],
           stopReason: 'tool_use',
         });
-      } else {
-        // Subsequent calls: return regular response
-        return Promise.resolve({
-          content: 'Task completed.',
-          toolCalls: [],
-          stopReason: 'stop',
-        });
       }
+      
+      // Subsequent calls return normal response
+      return Promise.resolve({
+        content: 'Task completed.',
+        toolCalls: [],
+        stopReason: 'stop',
+      });
     }
   }
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
     
-    // Mock SSEManager
-    const { SSEManager } = await import('@/lib/sse-manager');
-    mockSSEManager = {
-      broadcast: vi.fn()
-    };
-    (SSEManager.getInstance as vi.Mock).mockReturnValue(mockSSEManager);
-
-    // Mock Project.getById
-    const { Project } = await import('@/lib/server/lace-imports');
-    vi.spyOn(Project, 'getById').mockReturnValue({
-      getId: () => 'test-project',
-      getName: () => 'Test Project',
-      getPath: () => '/test/path'
-    } as any);
-
-    // Create mock provider that returns tool calls
-    const mockProvider = new MockApprovalProvider();
-    
-    // Mock ProviderRegistry to return our mock provider
-    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.mocked(ProviderRegistry.getProvider).mockReturnValue(mockProvider);
-    vi.mocked(ProviderRegistry.createProvider).mockReturnValue(mockProvider);
-    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue({
-      createProvider: vi.fn().mockReturnValue(mockProvider)
-    } as any);
-
-    sessionService = new SessionService();
-
-    // Create a real session with real agent
-    const sessionData = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-haiku-20240307',
-      'test-project'
-    );
-
-    session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
-    agent = session.getAgent(asThreadId(sessionData.id))!;
+    // Set up test environment
+    process.env.ANTHROPIC_KEY = 'test-key';
   });
 
   afterEach(async () => {
@@ -276,21 +202,78 @@ describe('SessionService approval event forwarding', () => {
   });
 
   it('should forward TOOL_APPROVAL_REQUEST events to SSE when tool requires approval', async () => {
-    // Send a message that will trigger a tool call requiring approval
-    await agent.sendMessage('Read the test file');
+    // Instrument real SSEManager to capture broadcasts
+    const { SSEManager } = await import('@/lib/sse-manager');
+    const realSSEManager = SSEManager.getInstance();
+    const broadcastSpy = vi.spyOn(realSSEManager, 'broadcast');
+
+    // Create a real test project using temp directory
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create(
+      'Test Project',
+      'Test project for approval flow testing',
+      tempDirContext.path,
+      {}
+    );
+    
+    // Ensure project is saved (Project.create should handle this, but let's be explicit)
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Create mock provider that returns tool calls
+    const mockProvider = new MockApprovalProvider();
+    
+    // Mock ProviderRegistry to return our mock provider
+    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockReturnValue({
+      createProvider: vi.fn().mockReturnValue(mockProvider),
+      getProvider: vi.fn().mockReturnValue(mockProvider),
+    } as unknown as ReturnType<typeof ProviderRegistry.createWithAutoDiscovery>);
+
+    sessionService = new SessionService();
+
+    // Create a real session with real agent using the real project
+    const sessionData = await sessionService.createSession(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307',
+      testProject.getId()
+    );
+
+    session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
+    agent = session.getAgent(asThreadId(sessionData.id))!;
+    
+    // Debug: Check if approval callback is set up
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
+    expect(approvalCallback).toBeDefined();
+
+    // Send a message - mock provider will return tool calls which should trigger approval
+    await agent.sendMessage('Write to the test file');
 
     // Wait for the approval request to be processed
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 200));
 
-    // Verify SSE broadcast was called for the approval request
-    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
+    // Debug: Check what events were actually created
+    const events = agent.threadManager.getEvents(agent.threadId);
+    // console.log('All events created:', events.map(e => ({ type: e.type, data: e.data })));
+    
+    // Check if any tool calls were made
+    const toolCallEvents = events.filter(e => e.type === 'TOOL_CALL');
+    // console.log('Tool call events:', toolCallEvents);
+    
+    // Verify that TOOL_APPROVAL_REQUEST event was created in the thread
+    const approvalRequestEvent = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(approvalRequestEvent).toBeDefined();
+    expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
+
+    // Verify that SessionService forwarded the event to real SSEManager
+    expect(broadcastSpy).toHaveBeenCalledWith(
       session.getId(),
       expect.objectContaining({
         type: 'TOOL_APPROVAL_REQUEST',
         threadId: session.getId(),
         data: expect.objectContaining({
-          requestId: 'tool-call-approval-test',
-          toolName: 'file-read'
+          requestId: 'test-call-123',
+          toolName: 'file-write'
         })
       })
     );
