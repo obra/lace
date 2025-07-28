@@ -317,7 +317,7 @@ export class DatabasePersistence {
         UPDATE threads SET updated_at = ? WHERE id = ?
       `);
       updateThreadStmt.run(new Date().toISOString(), event.threadId);
-      
+
       return true; // Event was successfully saved
     } catch (error: unknown) {
       // Handle constraint violations for duplicate approval responses idempotently
