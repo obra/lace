@@ -1787,15 +1787,10 @@ export class Agent extends EventEmitter {
   handleApprovalResponse(toolCallId: string, decision: string): void {
     // Create approval response event with atomic database transaction
     // The persistence layer handles duplicate detection idempotently
-    const event = this._threadManager.addEvent(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
+    this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId,
       decision,
     });
-
-    // Only emit event for UI synchronization if the event was actually added
-    if (event) {
-      this.emit('thread_event_added', { event, threadId: this._threadId });
-    }
   }
 
   /**

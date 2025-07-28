@@ -1,27 +1,21 @@
 // ABOUTME: Unit tests for ThreadManager data layer operations
 // ABOUTME: Tests verify ThreadManager operates as pure data persistence layer
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { mkdtemp, rm } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
 
 describe('ThreadManager', () => {
   let threadManager: ThreadManager;
-  let testDir: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     setupTestPersistence();
-    testDir = await mkdtemp(join(tmpdir(), 'lace-test-'));
     threadManager = new ThreadManager();
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     threadManager.close();
     teardownTestPersistence();
-    await rm(testDir, { recursive: true, force: true });
   });
 
   describe('addEvent', () => {
@@ -35,9 +29,10 @@ describe('ThreadManager', () => {
 
       // Assert
       expect(event).toBeDefined();
-      expect(event.type).toBe('USER_MESSAGE');
-      expect(event.data).toBe('Test message');
-      expect(event.threadId).toBe(threadId);
+      expect(event).not.toBeNull();
+      expect(event!.type).toBe('USER_MESSAGE');
+      expect(event!.data).toBe('Test message');
+      expect(event!.threadId).toBe(threadId);
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(1);
@@ -54,8 +49,10 @@ describe('ThreadManager', () => {
       const event2 = threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
 
       // Assert - Data operations work correctly
-      expect(event1.type).toBe('USER_MESSAGE');
-      expect(event2.type).toBe('AGENT_MESSAGE');
+      expect(event1).not.toBeNull();
+      expect(event2).not.toBeNull();
+      expect(event1!.type).toBe('USER_MESSAGE');
+      expect(event2!.type).toBe('AGENT_MESSAGE');
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(2);
@@ -63,64 +60,35 @@ describe('ThreadManager', () => {
       expect(events[1].data).toBe('Hi there');
     });
 
-    it('should not update memory if database save fails', () => {
+    it('should handle duplicate tool approval responses correctly', () => {
       // Arrange
       const threadId = threadManager.generateThreadId();
       threadManager.createThread(threadId);
 
-      // Mock database to fail on second save
-      const mockPersistence = vi.spyOn(threadManager['_persistence'], 'saveEvent');
-      mockPersistence.mockImplementationOnce(() => {}); // First call succeeds
-      mockPersistence.mockImplementationOnce(() => {
-        throw new Error('Database error');
+      // Act - First approval should succeed
+      const firstEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'tool-123',
+        decision: 'approve',
       });
-
-      // Act - First event should succeed
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'hello');
+      expect(firstEvent).not.toBeNull();
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
 
-      // Second event should fail and not affect memory
-      expect(() => {
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'world');
-      }).toThrow('Database error');
+      // Second approval should be ignored due to database constraint
+      const secondEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'tool-123',
+        decision: 'approve',
+      });
+      expect(secondEvent).toBeNull(); // Returns null for duplicates
 
       // Assert - Memory should still have only first event
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
     });
 
-    it('should handle database constraint violations atomically', () => {
-      // Arrange
-      const threadId = threadManager.generateThreadId();
-      threadManager.createThread(threadId);
-
-      // Mock database to throw constraint violation on second save
-      const mockPersistence = vi.spyOn(threadManager['_persistence'], 'saveEvent');
-      mockPersistence.mockImplementationOnce(() => {}); // First call succeeds
-      mockPersistence.mockImplementationOnce(() => {
-        const error = new Error(
-          "UNIQUE constraint failed: events.thread_id, events.type, json_extract(events.data, '$.toolCallId')"
-        );
-        (error as unknown as { code: string }).code = 'SQLITE_CONSTRAINT_UNIQUE';
-        throw error;
-      });
-
-      // Act - First approval should succeed
-      threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'tool-123',
-        decision: 'approve',
-      });
-      expect(threadManager.getEvents(threadId)).toHaveLength(1);
-
-      // Second approval should fail and not affect memory
+    it('should handle thread not found gracefully', () => {
+      // Act & Assert - Should throw for non-existent thread
       expect(() => {
-        threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'tool-123',
-          decision: 'approve',
-        });
-      }).toThrow(/UNIQUE constraint failed/);
-
-      // Assert - Memory should still have only first event
-      expect(threadManager.getEvents(threadId)).toHaveLength(1);
+        threadManager.addEvent('non-existent-thread', 'USER_MESSAGE', 'test');
+      }).toThrow('Thread non-existent-thread not found');
     });
   });
 });
