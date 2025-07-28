@@ -9,10 +9,10 @@ export interface ToolContext {
   parentThreadId?: ThreadId; // Parent thread (session)
   // Working directory for file operations
   workingDirectory?: string;
-  // Session information for policy enforcement
+  // Session information for policy enforcement - REQUIRED for security
   sessionId?: string;
   projectId?: string;
-  session?: import('~/sessions/session').Session;
+  session: import('~/sessions/session').Session; // MANDATORY - tools must have session context for policy enforcement
 }
 
 export interface ToolAnnotations {

@@ -100,31 +100,36 @@ export class ToolExecutor {
       throw new Error(`Tool '${call.name}' not found`);
     }
 
-    // 2. Check tool policy if session is available
-    if (context?.session) {
-      // Check if tool is allowed in configuration
-      const config = context.session.getEffectiveConfiguration();
-      if (config.tools && !config.tools.includes(call.name)) {
-        throw new Error(`Tool '${call.name}' not allowed in current configuration`);
-      }
-
-      // Check tool policy
-      const policy = context.session.getToolPolicy(call.name);
-
-      switch (policy) {
-        case 'deny':
-          throw new Error(`Tool '${call.name}' execution denied by policy`);
-
-        case 'allow':
-          return 'granted'; // Skip approval system
-
-        case 'require-approval':
-          // Fall through to approval system
-          break;
-      }
+    // 2. SECURITY: Fail-safe - require session context for policy enforcement
+    if (!context?.session) {
+      throw new Error('Tool execution denied: session context required for security policy enforcement');
     }
 
-    // 3. Check approval - fail safe if no callback is configured
+    // 3. Check tool policy with session context
+    const session = context.session;
+    
+    // Check if tool is allowed in configuration
+    const config = session.getEffectiveConfiguration();
+    if (config.tools && !config.tools.includes(call.name)) {
+      throw new Error(`Tool '${call.name}' not allowed in current configuration`);
+    }
+
+    // Check tool policy
+    const policy = session.getToolPolicy(call.name);
+
+    switch (policy) {
+      case 'deny':
+        throw new Error(`Tool '${call.name}' execution denied by policy`);
+
+      case 'allow':
+        return 'granted'; // Skip approval system
+
+      case 'require-approval':
+        // Fall through to approval system
+        break;
+    }
+
+    // 4. Check approval - fail safe if no callback is configured
     if (!this.approvalCallback) {
       throw new Error('Tool execution requires approval but no approval callback is configured');
     }

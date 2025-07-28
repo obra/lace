@@ -964,10 +964,18 @@ export class Agent extends EventEmitter {
   private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
     try {
       const workingDirectory = this._getWorkingDirectory();
+      
+      // Get session for security policy enforcement
+      const session = await this._getFullSession();
+      if (!session) {
+        throw new Error(`Tool execution denied: no session context available for thread ${this._threadId}`);
+      }
+      
       const toolContext = {
         threadId: asThreadId(this._threadId),
         parentThreadId: asThreadId(this._getParentThreadId()),
         workingDirectory,
+        session, // REQUIRED for security policy enforcement
       };
 
       // First: Check permission
@@ -1041,10 +1049,18 @@ export class Agent extends EventEmitter {
   private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
     try {
       const workingDirectory = this._getWorkingDirectory();
+      
+      // Get session for security policy enforcement
+      const session = await this._getFullSession();
+      if (!session) {
+        throw new Error(`Tool execution denied: no session context available for thread ${this._threadId}`);
+      }
+      
       const toolContext = {
         threadId: asThreadId(this._threadId),
         parentThreadId: asThreadId(this._getParentThreadId()),
         workingDirectory,
+        session, // REQUIRED for security policy enforcement
       };
 
       // Find the tool and execute directly (permission already granted via approval)
@@ -1977,6 +1993,23 @@ export class Agent extends EventEmitter {
         processCwd: process.cwd(),
       });
       return process.cwd();
+    }
+  }
+
+  private async _getFullSession(): Promise<Session | undefined> {
+    try {
+      const thread = this._threadManager.getThread(this._threadId);
+      if (!thread?.sessionId) {
+        return undefined;
+      }
+
+      return await Session.getById(thread.sessionId) || undefined;
+    } catch (error) {
+      logger.error('Agent._getFullSession() - error getting session', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
     }
   }
 
