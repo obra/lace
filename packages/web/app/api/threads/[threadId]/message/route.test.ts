@@ -69,9 +69,13 @@ describe('Thread Messaging API', () => {
     realThreadId = session.id; // Session ID equals coordinator thread ID
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     console.error = originalConsoleError;
+    // Stop all agents first to prevent async operations after database closure
+    await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
+    // Wait a moment for any pending operations to abort
+    await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
   });
 
