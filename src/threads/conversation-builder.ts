@@ -41,27 +41,40 @@ function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
 
   for (const event of events) {
     if (event.type === 'TOOL_RESULT') {
-      const toolResult = event.data as ToolResult;
-      const toolCallId = toolResult.id;
-
-      if (!toolCallId) {
-        logger.warn('CONVERSATION_BUILDER: TOOL_RESULT missing id', {
-          eventId: event.id,
-          threadId: event.threadId,
-        });
-        continue; // Skip results without IDs
+      // Handle different TOOL_RESULT data formats:
+      
+      if (typeof event.data === 'string') {
+        // Raw string data (e.g., from compaction) - pass through unchanged
+        deduplicatedEvents.push(event);
+        continue;
       }
+      
+      if (typeof event.data === 'object' && event.data && 'content' in event.data) {
+        // ToolResult object - check for ID and deduplicate if present
+        const toolResult = event.data as ToolResult;
+        const toolCallId = toolResult.id;
 
-      if (seenToolResults.has(toolCallId)) {
-        logger.warn('CONVERSATION_BUILDER: Duplicate TOOL_RESULT filtered', {
-          toolCallId,
-          eventId: event.id,
-          threadId: event.threadId,
-        });
-        continue; // Skip duplicate
+        if (!toolCallId) {
+          // ToolResult objects without IDs are considered invalid and filtered out
+          logger.warn('CONVERSATION_BUILDER: TOOL_RESULT missing id', {
+            eventId: event.id,
+            threadId: event.threadId,
+          });
+          continue; // Skip results without IDs
+        }
+
+        if (seenToolResults.has(toolCallId)) {
+          logger.warn('CONVERSATION_BUILDER: Duplicate TOOL_RESULT filtered', {
+            toolCallId,
+            eventId: event.id,
+            threadId: event.threadId,
+          });
+          continue; // Skip duplicate
+        }
+
+        seenToolResults.add(toolCallId);
       }
-
-      seenToolResults.add(toolCallId);
+      // Other object formats pass through unchanged
     }
 
     deduplicatedEvents.push(event);
