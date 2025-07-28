@@ -19,12 +19,12 @@ describe('Agent Session Context', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Create real project
     project = Project.create(
       'Test Project',
       'Project for session context testing',
-      tempDirContext.path,
+      tempDirContext.tempDir,
       {}
     );
 
@@ -52,7 +52,7 @@ describe('Agent Session Context', () => {
     it('should retrieve the session that created the agent', async () => {
       // Test that agent can get its session
       const retrievedSession = await (agent as any)._getFullSession();
-      
+
       expect(retrievedSession).toBeDefined();
       expect(retrievedSession.getId()).toBe(session.getId());
     });
@@ -61,7 +61,7 @@ describe('Agent Session Context', () => {
       // Create agent with thread that has no session
       const toolExecutor = new ToolExecutor();
       const provider = new TestProvider({});
-      
+
       const orphanAgent = new Agent({
         provider,
         toolExecutor,
