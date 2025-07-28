@@ -763,6 +763,26 @@ describe('tool result deduplication', () => {
 - `src/agents/tool-approval-race-conditions.test.ts`
 - `packages/web/app/api/threads/approval-concurrency.test.ts`
 
+**✅ STATUS: COMPLETED** - All integration tests passing! 🎉
+
+**MAJOR BREAKTHROUGH**: The defense-in-depth system is working perfectly:
+
+**Root Cause Fixed**: DatabasePersistence.saveEvent() was silently ignoring constraint violations but not communicating this to ThreadManager, causing duplicate events in memory and multiple agent executions.
+
+**Final Architecture**:
+1. **Database Layer**: Unique constraint prevents duplicate TOOL_APPROVAL_RESPONSE events  
+2. **Persistence Layer**: Returns boolean to indicate if event was actually saved (`saveEvent(): boolean`)
+3. **ThreadManager Layer**: Only updates memory if database save succeeded (`addEvent()` returns `null` for duplicates)
+4. **Agent Layer**: Uses `_addEventAndEmit()` helper which only emits events if event was actually added
+
+**Integration Test Results**: 4/4 PASSING ✅
+- ✅ Tool executes exactly once despite multiple concurrent approvals
+- ✅ Database constraint violations handled gracefully  
+- ✅ Conversation integrity maintained with deduplication
+- ✅ Rapid approval responses handled without data corruption
+
+**Critical Fix**: ThreadManager tests now use real DatabasePersistence instead of brittle mocks, providing better integration confidence.
+
 **Testing Principles:**
 - **Use real components** - No mocking of the functionality under test
 - **Test actual concurrency** - Use `Promise.all()` to create real race conditions
