@@ -3,7 +3,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId, Agent, Session } from '@/lib/server/lace-imports';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { TestProvider } from '~/test-utils/test-provider';
 
 describe('SessionService after getProjectForSession removal', () => {
   it('should not have getProjectForSession method', () => {
@@ -92,12 +94,11 @@ vi.mock('@/lib/server/lace-imports', async () => {
     Project: {
       getById: vi.fn((projectId: string) => ({ id: projectId, name: 'Test Project' })),
     },
-    Session: {
-      create: vi.fn(),
-      getAll: vi.fn(),
-      getById: vi.fn(),
-      updateSession: vi.fn(),
-      getSession: vi.fn()
+    Session: actual.Session,
+    ProviderRegistry: {
+      getProvider: vi.fn(),
+      createProvider: vi.fn(),
+      createWithAutoDiscovery: vi.fn(),
     },
   };
 });
@@ -184,88 +185,91 @@ describe('SessionService Missing Methods', () => {
   });
 });
 
-interface MockAgent {
-  threadId: string;
-  on: vi.Mock;
-  emit: vi.Mock;
-  threadManager: {
-    getEvents: vi.Mock;
-  };
-  toolExecutor: {
-    getTool: vi.Mock;
-  };
-}
-
 describe('SessionService approval event forwarding', () => {
+  const tempDirContext = useTempLaceDir();
   let sessionService: SessionService;
   let mockSSEManager: { broadcast: vi.Mock };
-  let mockAgent: MockAgent;
-  const sessionId = asThreadId('session-123');
-  const threadId = asThreadId('thread-456');
+  let session: Session;
+  let agent: Agent;
+  let testProvider: TestProvider;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     
-    // Import SSEManager properly
+    // Mock SSEManager
     const { SSEManager } = await import('@/lib/sse-manager');
     mockSSEManager = {
       broadcast: vi.fn()
     };
     (SSEManager.getInstance as vi.Mock).mockReturnValue(mockSSEManager);
 
-    // Create mock agent with event emitter capabilities
-    mockAgent = {
-      threadId: threadId,
-      on: vi.fn(),
-      emit: vi.fn(),
-      threadManager: {
-        getEvents: vi.fn()
-      },
-      toolExecutor: {
-        getTool: vi.fn()
-      }
-    };
+    // Mock Project.getById
+    const { Project } = await import('@/lib/server/lace-imports');
+    vi.spyOn(Project, 'getById').mockReturnValue({
+      getId: () => 'test-project',
+      getName: () => 'Test Project',
+      getPath: () => '/test/path'
+    } as any);
+
+    // Create test provider
+    testProvider = new TestProvider();
+    
+    // Mock ProviderRegistry to return our test provider
+    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    vi.mocked(ProviderRegistry.getProvider).mockReturnValue(testProvider);
+    vi.mocked(ProviderRegistry.createProvider).mockReturnValue(testProvider);
+    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue({
+      createProvider: vi.fn().mockReturnValue(testProvider)
+    } as any);
 
     sessionService = new SessionService();
+
+    // Create a real session with real agent
+    const sessionData = await sessionService.createSession(
+      'Test Session',
+      'anthropic',
+      'claude-3-haiku-20240307',
+      'test-project'
+    );
+
+    session = (await Session.getById(asThreadId(sessionData.id)))!;
+    agent = session.getAgent(asThreadId(sessionData.id))!;
+  });
+
+  afterEach(async () => {
+    if (agent) {
+      agent.stop();
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    sessionService.clearActiveSessions();
+    vi.restoreAllMocks();
   });
 
   it('should forward TOOL_APPROVAL_RESPONSE events to SSE', async () => {
-    // Set up the agent event handlers
-    const setupHandlers = (sessionService as { setupAgentEventHandlers: (agent: MockAgent, sessionId: string) => void }).setupAgentEventHandlers;
-    setupHandlers.call(sessionService, mockAgent, sessionId);
-
-    // Verify thread_event_added handler was registered
-    expect(mockAgent.on).toHaveBeenCalledWith('thread_event_added', expect.any(Function));
-    const threadEventHandler = mockAgent.on.mock.calls.find(
-      (call: [string, Function]) => call[0] === 'thread_event_added'
-    )?.[1];
-
-    expect(threadEventHandler).toBeDefined();
-
-    // Simulate TOOL_APPROVAL_RESPONSE event
-    const approvalResponseEvent = {
-      id: 'evt-response-123',
-      threadId: threadId,
-      type: 'TOOL_APPROVAL_RESPONSE',
-      timestamp: new Date(),
-      data: {
-        toolCallId: 'tool-call-123',
-        decision: 'approve'
-      }
-    };
-
-    // Call the handler
-    await threadEventHandler({ 
-      event: approvalResponseEvent, 
-      threadId: threadId 
+    // Create a real TOOL_APPROVAL_RESPONSE event
+    const { ThreadManager } = await import('@/lib/server/lace-imports');
+    const threadManager = new ThreadManager();
+    
+    const approvalResponseEvent = threadManager.addEvent(asThreadId(session.getId()), 'TOOL_APPROVAL_RESPONSE', {
+      toolCallId: 'tool-call-123',
+      decision: 'approve'
     });
+
+    // Emit the event through the real agent (this triggers the SessionService event handlers)
+    agent.emit('thread_event_added', { 
+      event: approvalResponseEvent, 
+      threadId: session.getId()
+    });
+
+    // Wait a moment for async processing
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Verify SSE broadcast was called for the approval response
     expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
-      sessionId,
+      session.getId(),
       expect.objectContaining({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: threadId,
+        threadId: session.getId(),
         data: expect.objectContaining({
           toolCallId: 'tool-call-123',
           decision: 'approve'
@@ -275,57 +279,36 @@ describe('SessionService approval event forwarding', () => {
   });
 
   it('should handle TOOL_APPROVAL_REQUEST events (existing behavior)', async () => {
-    // Set up the agent event handlers
-    const setupHandlers = (sessionService as { setupAgentEventHandlers: (agent: MockAgent, sessionId: string) => void }).setupAgentEventHandlers;
-    setupHandlers.call(sessionService, mockAgent, sessionId);
-
-    const threadEventHandler = mockAgent.on.mock.calls.find(
-      (call: [string, Function]) => call[0] === 'thread_event_added'
-    )?.[1];
-
-    // Mock the tool call event lookup
-    const mockToolCall = {
+    // First, create a TOOL_CALL event so there's something to reference
+    const { ThreadManager } = await import('@/lib/server/lace-imports');
+    const threadManager = new ThreadManager();
+    
+    const toolCallEvent = threadManager.addEvent(asThreadId(session.getId()), 'TOOL_CALL', {
       id: 'tool-call-123',
       name: 'test-tool',
       arguments: { test: 'args' }
-    };
-    
-    mockAgent.threadManager.getEvents.mockReturnValue([
-      {
-        type: 'TOOL_CALL',
-        data: mockToolCall
-      }
-    ]);
-
-    // Mock tool metadata
-    mockAgent.toolExecutor.getTool.mockReturnValue({
-      description: 'Test tool',
-      annotations: { readOnlyHint: false }
     });
 
-    // Simulate TOOL_APPROVAL_REQUEST event
-    const approvalRequestEvent = {
-      id: 'evt-request-123',
-      threadId: threadId,
-      type: 'TOOL_APPROVAL_REQUEST',
-      timestamp: new Date(),
-      data: {
-        toolCallId: 'tool-call-123'
-      }
-    };
+    // Now create the TOOL_APPROVAL_REQUEST event
+    const approvalRequestEvent = threadManager.addEvent(asThreadId(session.getId()), 'TOOL_APPROVAL_REQUEST', {
+      toolCallId: 'tool-call-123'
+    });
 
-    // Call the handler
-    await threadEventHandler({ 
+    // Emit the event through the real agent (this triggers the SessionService event handlers)
+    agent.emit('thread_event_added', { 
       event: approvalRequestEvent, 
-      threadId: threadId 
+      threadId: session.getId()
     });
+
+    // Wait a moment for async processing
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Verify SSE broadcast was called for the approval request
     expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
-      sessionId,
+      session.getId(),
       expect.objectContaining({
         type: 'TOOL_APPROVAL_REQUEST',
-        threadId: threadId,
+        threadId: session.getId(),
         data: expect.objectContaining({
           requestId: 'tool-call-123',
           toolName: 'test-tool'
