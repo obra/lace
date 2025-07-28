@@ -590,14 +590,15 @@ export class Agent extends EventEmitter {
 
       // Handle tool calls
       if (response.toolCalls && response.toolCalls.length > 0) {
-        this._executeToolCalls(response.toolCalls); // No await
-        // NO RECURSIVE CALL - tools will auto-continue or wait for user input
-        // DON'T complete turn yet - wait for all tools to finish
+        this._executeToolCalls(response.toolCalls);
+        // Tools will execute asynchronously and auto-continue or wait for user input
+        // Turn tracking and state management handled by tool batch completion
       } else {
         // No tool calls, conversation is complete for this turn
         this._completeTurn();
         this._setState('idle');
         this.emit('conversation_complete');
+        
       }
     } catch (error: unknown) {
       this._setState('idle');
@@ -852,7 +853,6 @@ export class Agent extends EventEmitter {
   }
 
   private _executeToolCalls(toolCalls: ProviderToolCall[]): void {
-    // No longer async - doesn't block
     this._setState('tool_execution');
 
     logger.debug('AGENT: Processing tool calls', {
@@ -894,8 +894,8 @@ export class Agent extends EventEmitter {
       void this._executeSingleTool(toolCall);
     }
 
-    // Agent goes idle immediately - no waiting
-    this._setState('idle');
+    // Agent stays in tool_execution state until all tools complete
+    // _handleBatchComplete() will set state to idle when _pendingToolCount reaches 0
   }
 
   /**
@@ -1135,6 +1135,8 @@ export class Agent extends EventEmitter {
         void this._processConversation();
       }
     }
+
+    // Conversation completion handled by event emission, not promises
   }
 
   private _setState(newState: AgentState): void {

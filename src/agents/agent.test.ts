@@ -63,7 +63,7 @@ class MockTool extends Tool {
     // Return a fresh copy to avoid ID mutation issues
     return Promise.resolve({
       ...this.result,
-      content: this.result.content.map(c => ({ ...c }))
+      content: this.result.content.map((c) => ({ ...c })),
     });
   }
 }
@@ -430,7 +430,7 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Use the tool');
 
       expect(stateChanges).toContain('thinking->tool_execution');
-      expect(stateChanges).toContain('tool_execution->idle'); // New non-blocking behavior: goes idle immediately
+      expect(stateChanges).not.toContain('tool_execution->idle'); // Agent stays in tool_execution until tools complete
     });
 
     it('should add tool calls and results to thread', async () => {
@@ -520,7 +520,7 @@ describe('Enhanced Agent', () => {
     });
 
     // New tests for non-blocking behavior
-    it('should go idle immediately after processing tool calls', async () => {
+    it('should stay in tool_execution state until tools complete', async () => {
       const mockProvider = createOneTimeToolProvider(
         [
           { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
@@ -537,21 +537,23 @@ describe('Enhanced Agent', () => {
 
       const conversationPromise = agent.sendMessage('Run commands');
 
-      // Agent should complete conversation immediately
+      // sendMessage should complete quickly (event-driven)
       await conversationPromise;
-      expect(agent.getCurrentState()).toBe('idle');
 
-      // Should have transitioned to tool_execution then back to idle
+      // Agent should stay in tool_execution state until tools complete
+      expect(agent.getCurrentState()).toBe('tool_execution');
+
+      // Should have transitioned to tool_execution but not back to idle yet
       expect(stateChanges).toContain('thinking->tool_execution');
-      expect(stateChanges).toContain('tool_execution->idle');
+      expect(stateChanges).not.toContain('tool_execution->idle');
 
-      // Tool calls should be created but no results yet
+      // Tool calls should be created but no results yet (pending approval)
       const events = threadManager.getEvents(agent.threadId);
       const toolCalls = events.filter((e) => e.type === 'TOOL_CALL');
       const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
 
       expect(toolCalls).toHaveLength(2);
-      expect(toolResults).toHaveLength(0);
+      expect(toolResults).toHaveLength(0); // No results yet since they weren't approved
     });
 
     it('should create tool call events without executing tools', async () => {
@@ -626,8 +628,8 @@ describe('Enhanced Agent', () => {
       expect(toolCalls).toHaveLength(3);
       expect(toolResults).toHaveLength(0); // No execution yet
 
-      // Verify agent went idle after creating all tool calls
-      expect(agent.getCurrentState()).toBe('idle');
+      // Verify agent stays in tool_execution state after creating tool calls
+      expect(agent.getCurrentState()).toBe('tool_execution');
     });
   });
 
@@ -915,8 +917,8 @@ describe('Enhanced Agent', () => {
       const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(0);
 
-      // Verify Agent went idle despite pending tools
-      expect(agent.getCurrentState()).toBe('idle');
+      // Verify Agent stays in tool_execution state with pending tools
+      expect(agent.getCurrentState()).toBe('tool_execution');
 
       // CRITICAL: Agent should NOT complete the batch yet
       // Batch tracking should keep pending count > 0 until approval responses arrive

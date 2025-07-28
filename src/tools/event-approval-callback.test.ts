@@ -92,7 +92,13 @@ describe('EventApprovalCallback Integration Tests', () => {
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Stop the agent first to prevent any ongoing operations
+    if (agent) {
+      agent.stop();
+      // Wait a moment for any pending operations to abort
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     teardownTestPersistence();
   });
 
@@ -337,6 +343,19 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
     await conversationPromise;
+    
+    // Wait for agent to return to idle state (all async operations complete)
+    await new Promise<void>((resolve) => {
+      const checkForIdle = () => {
+        if (agent.getCurrentState() === 'idle') {
+          resolve();
+        } else {
+          setTimeout(checkForIdle, 10);
+        }
+      };
+      checkForIdle();
+    });
+    
   });
 
   describe('direct requestApproval method behavior', () => {

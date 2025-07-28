@@ -63,13 +63,6 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
   }
 
   private trimToolResult(event: ThreadEvent): ThreadEvent {
-    if (typeof event.data === 'string') {
-      return {
-        ...event,
-        data: this.truncateString(event.data),
-      };
-    }
-
     // Handle ToolResult objects (they have a 'content' field)
     if (event.data && typeof event.data === 'object' && 'content' in event.data) {
       const toolResult = event.data as {
@@ -96,8 +89,8 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
       };
     }
 
-    // If we don't recognize the format, return unchanged
-    return event;
+    // If we don't recognize the format, this is an error
+    throw new Error(`TOOL_RESULT event must contain ToolResult object with content field, got: ${typeof event.data}`);
   }
 
   private truncateString(text: string): string {

@@ -11,6 +11,29 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { ApprovalDecision } from '~/tools/approval-types';
 
+// Helper function to wait for agent to return to idle state
+async function waitForAgentIdle(agent: Agent, timeout = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    
+    const checkState = () => {
+      if (agent.getCurrentState() === 'idle') {
+        resolve();
+        return;
+      }
+      
+      if (Date.now() - startTime > timeout) {
+        reject(new Error(`Agent did not return to idle state within ${timeout}ms. Current state: ${agent.getCurrentState()}`));
+        return;
+      }
+      
+      setTimeout(checkState, 50); // Check every 50ms
+    };
+    
+    checkState();
+  });
+}
+
 // Mock provider that returns predictable responses for stable testing
 class MockConversationProvider extends BaseMockProvider {
   private responseMap = new Map<string, ProviderResponse>();
@@ -196,6 +219,9 @@ describe('Conversation State Management with Enhanced Agent', () => {
       if (process.env.VITEST_VERBOSE) logger.debug(`Turn ${i + 1}: "${turns[i]}"`);
 
       await agent.sendMessage(turns[i]);
+      
+      // Wait for agent to return to idle state before sending next message
+      await waitForAgentIdle(agent);
 
       const events = threadManager.getEvents(threadId);
       const conversation = agent.buildThreadMessages();
