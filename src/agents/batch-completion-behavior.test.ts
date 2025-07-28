@@ -13,6 +13,9 @@ import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { z } from 'zod';
 
 // Test tool that can be configured to fail or succeed
@@ -82,13 +85,31 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('Tool Batch Completion Behavior', () => {
+  const tempDirContext = useTempLaceDir();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
   let configurableTool: ConfigurableTool;
+  let session: Session;
+  let project: Project;
 
   beforeEach(() => {
     setupTestPersistence();
+
+    // Create real project and session for proper context
+    project = Project.create(
+      'Batch Completion Test Project',
+      'Project for batch completion testing',
+      tempDirContext.tempDir,
+      {}
+    );
+
+    session = Session.create({
+      name: 'Batch Completion Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
+    });
 
     threadManager = new ThreadManager();
     mockProvider = new MockProviderWithToolCalls();
@@ -98,7 +119,8 @@ describe('Tool Batch Completion Behavior', () => {
     toolExecutor.registerTool('test_tool', configurableTool);
 
     const threadId = threadManager.generateThreadId();
-    threadManager.createThread(threadId);
+    // Create thread WITH session ID so _getFullSession() can find it
+    threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
       provider: mockProvider,

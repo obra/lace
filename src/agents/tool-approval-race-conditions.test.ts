@@ -10,6 +10,9 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import { BashTool } from '~/tools/implementations/bash';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { ProviderResponse } from '~/providers/base-provider';
 
 // Mock provider that can return tool calls once then regular responses
@@ -53,14 +56,32 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('Tool Approval Race Condition Integration Tests', () => {
+  const tempDirContext = useTempLaceDir();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
   let toolExecutor: ToolExecutor;
   let bashTool: BashTool;
+  let session: Session;
+  let project: Project;
 
   beforeEach(() => {
     setupTestPersistence();
+
+    // Create real project and session for proper context
+    project = Project.create(
+      'Race Condition Test Project',
+      'Project for race condition testing',
+      tempDirContext.tempDir,
+      {}
+    );
+
+    session = Session.create({
+      name: 'Race Condition Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
+    });
 
     threadManager = new ThreadManager();
     mockProvider = new MockProviderWithToolCalls();
@@ -71,7 +92,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     toolExecutor.registerTool('bash', bashTool);
 
     const threadId = threadManager.generateThreadId();
-    threadManager.createThread(threadId);
+    // Create thread WITH session ID so _getFullSession() can find it
+    threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
       provider: mockProvider,
