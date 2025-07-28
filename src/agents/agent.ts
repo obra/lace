@@ -2003,7 +2003,7 @@ export class Agent extends EventEmitter {
         return undefined;
       }
 
-      return await Session.getById(thread.sessionId) || undefined;
+      return await Session.getById(asThreadId(thread.sessionId)) || undefined;
     } catch (error) {
       logger.error('Agent._getFullSession() - error getting session', {
         threadId: this._threadId,
