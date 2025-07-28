@@ -248,11 +248,13 @@ export const LaceApp = memo(function LaceApp() {
       if (res.ok) {
         return true; // Indicate success so the input can clear itself
       }
+      return false;
     } catch (error) {
       console.error('Failed to send message:', error);
+      return false;
+    } finally {
+      setSendingMessage(false);
     }
-    setSendingMessage(false);
-    return false;
   }, [selectedAgent]);
 
   // Handle tool approval decision

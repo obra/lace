@@ -109,12 +109,13 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
 function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
   const processed: SessionEvent[] = [];
   const pendingToolCalls = new Map<string, { call: SessionEvent; result?: SessionEvent }>();
+  let toolCallCounter = 0; // Counter to ensure unique IDs for simultaneous calls
 
   for (const event of events) {
     if (event.type === 'TOOL_CALL') {
       // Extract tool call ID from the event data
       const eventData = event.data as { id?: string; [key: string]: unknown };
-      const toolCallId = eventData?.id || `${event.threadId}-${event.timestamp}`;
+      const toolCallId = eventData?.id || `${event.threadId}-${event.timestamp}-${toolCallCounter++}`;
       pendingToolCalls.set(toolCallId, { call: event });
     } else if (event.type === 'TOOL_RESULT') {
       // Find matching tool call by ID or by proximity (most recent call on same thread)  
@@ -123,14 +124,14 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
       
       let matchingCall = toolCallId ? pendingToolCalls.get(toolCallId) : null;
       
-      // If no exact match, find the most recent tool call on the same thread
+      // If no exact match, find the oldest tool call without a result on the same thread
       if (!matchingCall) {
         const threadCalls = Array.from(pendingToolCalls.entries())
-          .filter(([_, data]) => data.call.threadId === event.threadId)
+          .filter(([_, data]) => data.call.threadId === event.threadId && !data.result)
           .sort(([_, a], [__, b]) => {
             const aTime = a.call.timestamp instanceof Date ? a.call.timestamp.getTime() : new Date(a.call.timestamp).getTime();
             const bTime = b.call.timestamp instanceof Date ? b.call.timestamp.getTime() : new Date(b.call.timestamp).getTime();
-            return bTime - aTime; // Most recent first
+            return aTime - bTime; // Oldest first (FIFO matching)
           });
         
         if (threadCalls.length > 0) {
@@ -218,11 +219,13 @@ function convertEvent(
       };
 
     case 'TOOL_RESULT':
+      const resultData = event.data.result;
+      const resultString = typeof resultData === 'string' ? resultData : JSON.stringify(resultData);
       return {
         id,
         type: 'tool',
-        content: formatToolResult(event.data.result),
-        result: formatToolResult(event.data.result),
+        content: resultString,
+        result: resultString,
         timestamp,
         agent: agent,
       };
@@ -240,10 +243,12 @@ function convertEvent(
         type: 'tool',
         content: `${toolData.toolName || 'Unknown Tool'}`,
         tool: toolData.toolName,
-        result: toolData.result ? formatToolResult(
+        result: toolData.result ? (
           typeof toolData.result === 'object' && toolData.result !== null && 'content' in toolData.result 
             ? toolData.result.content 
-            : toolData.result
+            : typeof toolData.result === 'string' 
+              ? toolData.result
+              : JSON.stringify(toolData.result)
         ) : undefined,
         timestamp,
         agent: agent,
@@ -320,14 +325,3 @@ function getAgentName(threadId: ThreadId, agents: Agent[]): string {
   return 'Agent';
 }
 
-function formatToolResult(result: unknown): string {
-  if (typeof result === 'string') {
-    return result;
-  }
-
-  if (result && typeof result === 'object') {
-    return JSON.stringify(result, null, 2);
-  }
-
-  return String(result);
-}
