@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { ApprovalDecision } from '~/tools/approval-types';
-import { createMockSession, createMockToolContext } from '~/tools/test-utils';
+import { createMockToolContext } from '~/tools/test-utils';
 
 describe('ToolContext working directory', () => {
   let executor: ToolExecutor;

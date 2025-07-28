@@ -17,7 +17,7 @@ describe('Agent Session Context', () => {
   let agent: Agent;
   let project: Project;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     setupTestPersistence();
 
     // Create real project
