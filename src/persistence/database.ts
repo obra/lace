@@ -295,8 +295,8 @@ export class DatabasePersistence {
     };
   }
 
-  saveEvent(event: ThreadEvent): void {
-    if (this._closed || this._disabled || !this.db) return;
+  saveEvent(event: ThreadEvent): boolean {
+    if (this._closed || this._disabled || !this.db) return false;
 
     try {
       const stmt = this.db.prepare(`
@@ -317,6 +317,8 @@ export class DatabasePersistence {
         UPDATE threads SET updated_at = ? WHERE id = ?
       `);
       updateThreadStmt.run(new Date().toISOString(), event.threadId);
+      
+      return true; // Event was successfully saved
     } catch (error: unknown) {
       // Handle constraint violations for duplicate approval responses idempotently
       if (this.isConstraintViolation(error) && event.type === 'TOOL_APPROVAL_RESPONSE') {
@@ -325,7 +327,7 @@ export class DatabasePersistence {
           eventId: event.id,
           toolCallId: (event.data as { toolCallId?: string }).toolCallId,
         });
-        return;
+        return false; // Event was ignored due to duplicate
       }
 
       // Re-throw other errors (including constraint violations for non-approval events)

@@ -1792,8 +1792,10 @@ export class Agent extends EventEmitter {
       decision,
     });
 
-    // Emit event for UI synchronization (matches existing pattern)
-    this.emit('thread_event_added', { event, threadId: this._threadId });
+    // Only emit event for UI synchronization if the event was actually added
+    if (event) {
+      this.emit('thread_event_added', { event, threadId: this._threadId });
+    }
   }
 
   /**

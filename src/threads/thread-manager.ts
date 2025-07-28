@@ -291,7 +291,7 @@ export class ThreadManager {
     threadId: string,
     type: EventType,
     eventData: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>
-  ): ThreadEvent {
+  ): ThreadEvent | null {
     const thread = this.getThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found`);
@@ -307,17 +307,22 @@ export class ThreadManager {
 
     // Use database transaction for atomicity
     return this._persistence.transaction(() => {
-      // Save to database first
-      this._persistence.saveEvent(event);
+      // Save to database first and check if it was actually saved
+      const wasSaved = this._persistence.saveEvent(event);
 
-      // Only update memory if database save succeeded
-      thread.events.push(event);
-      thread.updatedAt = new Date();
+      if (wasSaved) {
+        // Only update memory if database save succeeded
+        thread.events.push(event);
+        thread.updatedAt = new Date();
 
-      // Update process-local cache
-      processLocalThreadCache.set(threadId, thread);
+        // Update process-local cache
+        processLocalThreadCache.set(threadId, thread);
 
-      return event;
+        return event;
+      } else {
+        // Event was ignored (duplicate approval) - return null to indicate no-op
+        return null;
+      }
     });
   }
 
