@@ -42,13 +42,13 @@ function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
   for (const event of events) {
     if (event.type === 'TOOL_RESULT') {
       // Handle different TOOL_RESULT data formats:
-      
+
       if (typeof event.data === 'string') {
         // Raw string data (e.g., from compaction) - pass through unchanged
         deduplicatedEvents.push(event);
         continue;
       }
-      
+
       if (typeof event.data === 'object' && event.data && 'content' in event.data) {
         // ToolResult object - check for ID and deduplicate if present
         const toolResult = event.data as ToolResult;
