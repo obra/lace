@@ -19,6 +19,9 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { BashTool } from '~/tools/implementations/bash';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -69,14 +72,32 @@ class MockTool extends Tool {
 }
 
 describe('Enhanced Agent', () => {
+  const tempDirContext = useTempLaceDir();
   let mockProvider: MockProvider;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
   let agent: Agent;
+  let session: Session;
+  let project: Project;
 
   beforeEach(() => {
     setupTestPersistence();
+
+    // Create real project and session for proper context
+    project = Project.create(
+      'Agent Test Project',
+      'Project for agent testing',
+      tempDirContext.tempDir,
+      {}
+    );
+
+    session = Session.create({
+      name: 'Agent Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
+    });
 
     mockProvider = new MockProvider({
       content: 'Test response',
@@ -93,7 +114,8 @@ describe('Enhanced Agent', () => {
     toolExecutor.setApprovalCallback(autoApprovalCallback);
     threadManager = new ThreadManager();
     threadId = 'test_thread_123';
-    threadManager.createThread(threadId);
+    // Create thread WITH session ID so _getFullSession() can find it
+    threadManager.createThread(threadId, session.getId());
   });
 
   // Helper function to create a provider that returns tool calls only once
