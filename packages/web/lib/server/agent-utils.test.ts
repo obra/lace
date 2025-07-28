@@ -30,7 +30,7 @@ interface MockAgent {
 }
 
 interface ApprovalCallback {
-  requestApproval: (toolName: string, args: unknown) => Promise<string>;
+  requestApproval: (toolCall: { id: string; name: string; arguments: unknown }) => Promise<string>;
 }
 
 describe('Event-Based Approval Callback', () => {
