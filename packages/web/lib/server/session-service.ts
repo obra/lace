@@ -233,7 +233,11 @@ export class SessionService {
         const toolCallData = event.data as { toolCallId: string };
         
         // Get the related TOOL_CALL event to reconstruct approval request data
-        const toolCallEvent = agent.getToolCallEventByIdForThread(toolCallData.toolCallId, eventThreadId);
+        const events = agent.threadManager.getEvents(eventThreadId);
+        const toolCallEvent = events.find(e => 
+          e.type === 'TOOL_CALL' && 
+          (e.data as any)?.id === toolCallData.toolCallId
+        );
         
         if (toolCallEvent) {
           const toolCall = toolCallEvent.data as ToolCall;

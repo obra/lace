@@ -49,14 +49,7 @@ describe('SessionService after getSessionData removal', () => {
   });
 });
 
-// Mock SSEManager
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: vi.fn(() => ({
-      broadcast: vi.fn()
-    }))
-  }
-}));
+// Don't mock SSEManager - we want to spy on the real one
 
 // Use real persistence with temporary directory instead of complex mocking
 
@@ -168,7 +161,7 @@ describe('SessionService approval event forwarding', () => {
           toolCalls: [
             {
               id: 'test-call-123',
-              name: 'file-write',
+              name: 'file_write',
               input: { file_path: '/test/file.txt', content: 'test content' },
             },
           ],
@@ -229,7 +222,7 @@ describe('SessionService approval event forwarding', () => {
       getProvider: vi.fn().mockReturnValue(mockProvider),
     } as unknown as ReturnType<typeof ProviderRegistry.createWithAutoDiscovery>);
 
-    sessionService = new SessionService();
+    sessionService = getSessionService();
 
     // Create a real session with real agent using the real project
     const sessionData = await sessionService.createSession(
@@ -245,6 +238,7 @@ describe('SessionService approval event forwarding', () => {
     // Debug: Check if approval callback is set up
     const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
+    
 
     // Send a message - mock provider will return tool calls which should trigger approval
     await agent.sendMessage('Write to the test file');
@@ -252,13 +246,8 @@ describe('SessionService approval event forwarding', () => {
     // Wait for the approval request to be processed
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    // Debug: Check what events were actually created
+    // Check that the expected events were created
     const events = agent.threadManager.getEvents(agent.threadId);
-    // console.log('All events created:', events.map(e => ({ type: e.type, data: e.data })));
-    
-    // Check if any tool calls were made
-    const toolCallEvents = events.filter(e => e.type === 'TOOL_CALL');
-    // console.log('Tool call events:', toolCallEvents);
     
     // Verify that TOOL_APPROVAL_REQUEST event was created in the thread
     const approvalRequestEvent = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
@@ -273,19 +262,24 @@ describe('SessionService approval event forwarding', () => {
         threadId: session.getId(),
         data: expect.objectContaining({
           requestId: 'test-call-123',
-          toolName: 'file-write'
+          toolName: 'file_write'
         })
       })
     );
   });
 
   it('should forward TOOL_APPROVAL_RESPONSE events to SSE when approval is given', async () => {
+    // Instrument real SSEManager to capture broadcasts
+    const { SSEManager } = await import('@/lib/sse-manager');
+    const realSSEManager = SSEManager.getInstance();
+    const broadcastSpy = vi.spyOn(realSSEManager, 'broadcast');
+
     // First, trigger a tool call that requires approval
     await agent.sendMessage('Read the test file');
     await new Promise(resolve => setTimeout(resolve, 50));
 
     // Clear previous SSE calls
-    mockSSEManager.broadcast.mockClear();
+    broadcastSpy.mockClear();
 
     // Now simulate providing approval by adding a TOOL_APPROVAL_RESPONSE event
     // (In real usage, this would come from the approval manager/UI)
@@ -299,7 +293,7 @@ describe('SessionService approval event forwarding', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     // Verify SSE broadcast was called for the approval response
-    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
+    expect(broadcastSpy).toHaveBeenCalledWith(
       session.getId(),
       expect.objectContaining({
         type: 'TOOL_APPROVAL_RESPONSE',
