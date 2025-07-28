@@ -17,6 +17,7 @@ import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tool
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { BashTool } from '~/tools/implementations/bash';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -1842,6 +1843,108 @@ describe('Enhanced Agent', () => {
 
       // This assertion should now pass with sufficient delay
       expect(conversationCompleteEmitted).toBe(true);
+    });
+  });
+
+  describe('duplicate execution prevention', () => {
+    it('should not execute tool if TOOL_RESULT already exists', async () => {
+      const bashTool = new BashTool();
+      const toolExecutor = new ToolExecutor();
+      toolExecutor.registerTool('bash', bashTool);
+
+      const agent = createAgent({ 
+        provider: mockProvider, 
+        toolExecutor,
+        tools: [bashTool] 
+      });
+
+      // Create tool call event
+      const toolCall: ToolCall = {
+        id: 'tool-123',
+        name: 'bash', 
+        arguments: { command: 'echo "test"' }
+      };
+      
+      agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
+      
+      // Create existing tool result (simulates tool already executed)
+      const existingResult: ToolResult = {
+        id: 'tool-123',
+        content: [{ type: 'text', text: 'Already executed - preventing duplicate' }],
+        isError: false
+      };
+      
+      agent.threadManager.addEvent(agent.threadId, 'TOOL_RESULT', existingResult);
+      
+      // Mock tool executor to track calls
+      const executeSpy = vi.spyOn(bashTool, 'executeValidated');
+      
+      // Send approval response (this should be ignored due to duplicate guard)
+      const approvalEvent = agent.threadManager.addEvent(
+        agent.threadId, 
+        'TOOL_APPROVAL_RESPONSE',
+        { toolCallId: 'tool-123', decision: 'allow_once' }
+      );
+      
+      // Simulate event processing (this triggers _handleToolApprovalResponse)
+      agent['_handleToolApprovalResponse'](approvalEvent);
+      
+      // Wait for potential async processing
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Tool executor should not have been called due to duplicate guard
+      expect(executeSpy).not.toHaveBeenCalled();
+      
+      // Should still have only one TOOL_RESULT event (the original one)
+      const events = agent.threadManager.getEvents(agent.threadId);
+      const toolResults = events.filter(e => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect(toolResults[0]?.data).toEqual(existingResult);
+    });
+
+    it('should execute tool normally when no TOOL_RESULT exists', async () => {
+      const bashTool = new BashTool();
+      const toolExecutor = new ToolExecutor();
+      toolExecutor.registerTool('bash', bashTool);
+
+      const agent = createAgent({ 
+        provider: mockProvider, 
+        toolExecutor,
+        tools: [bashTool] 
+      });
+
+      // Create tool call event
+      const toolCall: ToolCall = {
+        id: 'tool-456',
+        name: 'bash', 
+        arguments: { command: 'echo "success"' }
+      };
+      
+      agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
+      
+      // Mock tool executor to track calls
+      const executeSpy = vi.spyOn(bashTool, 'executeValidated');
+      executeSpy.mockResolvedValue({
+        id: 'tool-456',
+        content: [{ type: 'text', text: 'Tool executed successfully' }],
+        isError: false
+      });
+      
+      // Send approval response (this should execute normally)
+      const approvalEvent = agent.threadManager.addEvent(
+        agent.threadId, 
+        'TOOL_APPROVAL_RESPONSE',
+        { toolCallId: 'tool-456', decision: 'allow_once' }
+      );
+      
+      // Simulate event processing
+      agent['_handleToolApprovalResponse'](approvalEvent);
+      
+      // Wait for async tool execution
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Tool should have been executed
+      expect(executeSpy).toHaveBeenCalledWith(toolCall.arguments, expect.any(Object));
     });
   });
 });

@@ -901,8 +901,23 @@ export class Agent extends EventEmitter {
     const responseData = event.data as ToolApprovalResponseData;
     const { toolCallId, decision } = responseData;
 
-    // Find the corresponding TOOL_CALL event
+    // Defense-in-depth: Check if tool has already been executed (duplicate prevention)
     const events = this._threadManager.getEvents(this._threadId);
+    const existingResult = events.find(e => 
+      e.type === 'TOOL_RESULT' && 
+      (e.data as ToolResult).id === toolCallId
+    );
+    
+    if (existingResult) {
+      logger.warn('AGENT: Prevented duplicate tool execution', {
+        threadId: this._threadId,
+        toolCallId,
+        reason: 'TOOL_RESULT already exists'
+      });
+      return; // Early exit - don't execute again
+    }
+
+    // Find the corresponding TOOL_CALL event
     const toolCallEvent = events.find(
       (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId
     );
