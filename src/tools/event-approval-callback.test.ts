@@ -343,7 +343,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
     await conversationPromise;
-    
+
     // Wait for agent to return to idle state (all async operations complete)
     await new Promise<void>((resolve) => {
       const checkForIdle = () => {
@@ -355,7 +355,6 @@ describe('EventApprovalCallback Integration Tests', () => {
       };
       checkForIdle();
     });
-    
   });
 
   describe('direct requestApproval method behavior', () => {

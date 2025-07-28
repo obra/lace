@@ -598,7 +598,6 @@ export class Agent extends EventEmitter {
         this._completeTurn();
         this._setState('idle');
         this.emit('conversation_complete');
-        
       }
     } catch (error: unknown) {
       this._setState('idle');
