@@ -39,12 +39,14 @@ export { createTempDir, createTestTempDir, withTempDir } from './temp-utils';
  * @param overrides - Optional overrides for specific methods
  * @returns A mock Session object with default test behavior
  */
-export function createMockSession(overrides: {
-  getToolPolicy?: (toolName: string) => 'allow' | 'require-approval' | 'deny';
-  getEffectiveConfiguration?: () => Record<string, unknown>;
-  getId?: () => string;
-  [key: string]: unknown;
-} = {}): any {
+export function createMockSession(
+  overrides: {
+    getToolPolicy?: (toolName: string) => 'allow' | 'require-approval' | 'deny';
+    getEffectiveConfiguration?: () => Record<string, unknown>;
+    getId?: () => string;
+    [key: string]: unknown;
+  } = {}
+): any {
   return {
     getToolPolicy: overrides.getToolPolicy || (() => 'require-approval'),
     getEffectiveConfiguration: overrides.getEffectiveConfiguration || (() => ({})),
@@ -58,13 +60,15 @@ export function createMockSession(overrides: {
  * @param overrides - Optional overrides for context properties
  * @returns A ToolContext with all required properties including mock session
  */
-export function createMockToolContext(overrides: {
-  threadId?: string;
-  workingDirectory?: string;
-  projectId?: string;
-  parentThreadId?: string;
-  session?: any;
-} = {}): ToolContext {
+export function createMockToolContext(
+  overrides: {
+    threadId?: string;
+    workingDirectory?: string;
+    projectId?: string;
+    parentThreadId?: string;
+    session?: any;
+  } = {}
+): ToolContext {
   return {
     threadId: asThreadId(overrides.threadId || 'test-thread-id'),
     workingDirectory: overrides.workingDirectory, // Allow explicitly undefined

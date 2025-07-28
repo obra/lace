@@ -3,9 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
-import { ToolContext } from '~/tools/types';
 import { FileReadTool } from '~/tools/implementations/file-read';
-import { asThreadId } from '~/threads/types';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { createMockSession, createMockToolContext } from '~/tools/test-utils';
 
