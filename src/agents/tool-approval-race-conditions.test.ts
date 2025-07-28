@@ -27,7 +27,9 @@ class MockProviderWithToolCalls extends TestProvider {
     this.hasReturnedToolCalls = false;
   }
 
-  async createResponse(...args: Parameters<TestProvider['createResponse']>): Promise<ProviderResponse> {
+  async createResponse(
+    ...args: Parameters<TestProvider['createResponse']>
+  ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
       // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -96,7 +98,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       executeSpy.mockImplementation(async () => {
         executionCount++;
         // Simulate some execution time
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
         return {
           id: 'tool-counter',
           content: [{ type: 'text', text: `Executed ${executionCount} times` }],
@@ -120,20 +122,22 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       const conversationPromise = agent.sendMessage('Run echo test');
 
       // Wait for approval request to be created
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Verify approval request was created
       let events = threadManager.getEvents(agent.threadId);
-      const approvalRequest = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
+      const approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
       expect(approvalRequest).toBeDefined();
 
       // Send multiple concurrent approval responses (simulating rapid clicking)
-      const approvalPromises = Array(10).fill(null).map(async (_, index) => {
-        // Slight delay to create more realistic race conditions
-        await new Promise(resolve => setTimeout(resolve, index * 2));
-        
-        return agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
-      });
+      const approvalPromises = Array(10)
+        .fill(null)
+        .map(async (_, index) => {
+          // Slight delay to create more realistic race conditions
+          await new Promise((resolve) => setTimeout(resolve, index * 2));
+
+          return agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
+        });
 
       // Execute all approvals concurrently
       await Promise.all(approvalPromises);
@@ -142,26 +146,27 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       await conversationPromise;
 
       // Add delay to allow all async processing to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // ASSERTIONS: Defense-in-depth should work
-      
+
       // Tool should have been executed exactly once
       expect(executionCount).toBe(1);
       expect(executeSpy).toHaveBeenCalledTimes(1);
 
       // Verify end state in database/memory
       events = threadManager.getEvents(agent.threadId);
-      
+
       // Should have exactly one TOOL_APPROVAL_RESPONSE event (database layer defense)
-      const approvalResponses = events.filter(e => 
-        e.type === 'TOOL_APPROVAL_RESPONSE' &&
-        (e.data as { toolCallId: string }).toolCallId === 'tool-counter'
+      const approvalResponses = events.filter(
+        (e) =>
+          e.type === 'TOOL_APPROVAL_RESPONSE' &&
+          (e.data as { toolCallId: string }).toolCallId === 'tool-counter'
       );
       expect(approvalResponses).toHaveLength(1);
 
       // Should have exactly one TOOL_RESULT event (agent layer defense)
-      const toolResults = events.filter(e => e.type === 'TOOL_RESULT');
+      const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
       expect((toolResults[0].data as { id: string }).id).toBe('tool-counter');
 
@@ -190,23 +195,24 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       }).not.toThrow();
 
       // Wait for any async processing
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Verify only one approval response exists
       const events = threadManager.getEvents(agent.threadId);
-      const approvalResponses = events.filter(e => 
-        e.type === 'TOOL_APPROVAL_RESPONSE' &&
-        (e.data as { toolCallId: string }).toolCallId === 'constraint-test'
+      const approvalResponses = events.filter(
+        (e) =>
+          e.type === 'TOOL_APPROVAL_RESPONSE' &&
+          (e.data as { toolCallId: string }).toolCallId === 'constraint-test'
       );
       expect(approvalResponses).toHaveLength(1);
     });
 
-    it('should maintain conversation integrity with deduplication', async () => {
+    it('should maintain conversation integrity with deduplication', () => {
       // This test verifies the conversation builder deduplication layer
-      
+
       // Manually create scenario with duplicate tool results (bypassing other defenses)
       const toolCallId = 'dedup-test';
-      
+
       threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
         id: toolCallId,
         name: 'bash',
@@ -230,9 +236,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       const messages = agent.buildThreadMessages();
 
       // Count tool results in conversation
-      const toolResultMessages = messages.filter(msg => 
-        msg.role === 'user' && 
-        msg.toolResults && msg.toolResults.length > 0
+      const toolResultMessages = messages.filter(
+        (msg) => msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0
       );
 
       // Should have only one tool result despite duplicates in event stream
@@ -250,33 +255,37 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       });
 
       // Simulate extremely rapid concurrent approvals (like button mashing)
-      const rapidApprovals = Array(50).fill(null).map((_, index) => 
-        new Promise<void>((resolve) => {
-          setTimeout(() => {
-            agent.handleApprovalResponse('rapid-test', ApprovalDecision.ALLOW_ONCE);
-            resolve();
-          }, Math.random() * 10); // Random timing to create race conditions
-        })
-      );
+      const rapidApprovals = Array(50)
+        .fill(null)
+        .map(
+          (_, _index) =>
+            new Promise<void>((resolve) => {
+              setTimeout(() => {
+                agent.handleApprovalResponse('rapid-test', ApprovalDecision.ALLOW_ONCE);
+                resolve();
+              }, Math.random() * 10); // Random timing to create race conditions
+            })
+        );
 
       // Execute all concurrent approvals
       await Promise.all(rapidApprovals);
 
       // Wait for processing to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify data integrity
       const events = threadManager.getEvents(agent.threadId);
-      
+
       // Should have exactly one approval response
-      const approvalResponses = events.filter(e => 
-        e.type === 'TOOL_APPROVAL_RESPONSE' &&
-        (e.data as { toolCallId: string }).toolCallId === 'rapid-test'
+      const approvalResponses = events.filter(
+        (e) =>
+          e.type === 'TOOL_APPROVAL_RESPONSE' &&
+          (e.data as { toolCallId: string }).toolCallId === 'rapid-test'
       );
       expect(approvalResponses).toHaveLength(1);
 
       // Events should be properly ordered and uncorrupted
-      expect(events.every(e => e.id && e.threadId && e.type && e.timestamp)).toBe(true);
+      expect(events.every((e) => e.id && e.threadId && e.type && e.timestamp)).toBe(true);
     });
   });
 });
