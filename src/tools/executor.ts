@@ -102,12 +102,14 @@ export class ToolExecutor {
 
     // 2. SECURITY: Fail-safe - require session context for policy enforcement
     if (!context?.session) {
-      throw new Error('Tool execution denied: session context required for security policy enforcement');
+      throw new Error(
+        'Tool execution denied: session context required for security policy enforcement'
+      );
     }
 
     // 3. Check tool policy with session context
     const session = context.session;
-    
+
     // Check if tool is allowed in configuration
     const config = session.getEffectiveConfiguration();
     if (config.tools && !config.tools.includes(call.name)) {
