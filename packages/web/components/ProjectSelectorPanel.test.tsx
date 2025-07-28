@@ -16,8 +16,8 @@ const mockProjects: ProjectInfo[] = [
     description: 'First test project',
     workingDirectory: '/path/to/project1',
     isArchived: false,
-    createdAt: '2025-07-01T00:00:00Z',
-    lastUsedAt: '2025-07-28T00:00:00Z', // Today's date to pass the "week" filter
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+    lastUsedAt: new Date().toISOString(), // Today - always passes week filter
     sessionCount: 5,
   },
   {
@@ -26,8 +26,8 @@ const mockProjects: ProjectInfo[] = [
     description: 'Second test project',
     workingDirectory: '/path/to/project2',
     isArchived: false,
-    createdAt: '2025-07-02T00:00:00Z',
-    lastUsedAt: '2025-07-27T00:00:00Z', // Recent date to pass the "week" filter
+    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
+    lastUsedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago - always passes week filter
     sessionCount: 3,
   }
 ];
