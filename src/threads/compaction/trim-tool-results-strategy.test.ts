@@ -61,7 +61,9 @@ describe('TrimToolResultsStrategy', () => {
       const result = await strategy.compact(events, mockContext);
 
       const compactionData = result.data as unknown as CompactionData;
-      const compactedResult = compactionData.compactedEvents[0].data as { content: Array<{ type: string; text: string }> };
+      const compactedResult = compactionData.compactedEvents[0].data as {
+        content: Array<{ type: string; text: string }>;
+      };
       expect(compactedResult.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
@@ -86,7 +88,9 @@ describe('TrimToolResultsStrategy', () => {
       const result = await strategy.compact(events, mockContext);
 
       const compactionData = result.data as unknown as CompactionData;
-      const compactedResult = compactionData.compactedEvents[0].data as { content: Array<{ type: string; text: string }> };
+      const compactedResult = compactionData.compactedEvents[0].data as {
+        content: Array<{ type: string; text: string }>;
+      };
       expect(compactedResult.content[0].text).toBe(shortResult);
     });
 

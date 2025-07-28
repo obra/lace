@@ -43,7 +43,9 @@ function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
     if (event.type === 'TOOL_RESULT') {
       // All TOOL_RESULT events must be ToolResult objects with content field
       if (typeof event.data !== 'object' || !event.data || !('content' in event.data)) {
-        throw new Error(`TOOL_RESULT event must contain ToolResult object with content field, got: ${typeof event.data}`);
+        throw new Error(
+          `TOOL_RESULT event must contain ToolResult object with content field, got: ${typeof event.data}`
+        );
       }
 
       const toolResult = event.data as ToolResult;

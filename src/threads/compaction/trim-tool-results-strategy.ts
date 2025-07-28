@@ -90,7 +90,9 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     }
 
     // If we don't recognize the format, this is an error
-    throw new Error(`TOOL_RESULT event must contain ToolResult object with content field, got: ${typeof event.data}`);
+    throw new Error(
+      `TOOL_RESULT event must contain ToolResult object with content field, got: ${typeof event.data}`
+    );
   }
 
   private truncateString(text: string): string {

@@ -71,7 +71,12 @@ describe('Compaction Integration', () => {
         type: 'TOOL_RESULT',
         data: expect.objectContaining({
           id: 'call1',
-          content: [{ type: 'text', text: 'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]' }],
+          content: [
+            {
+              type: 'text',
+              text: 'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]',
+            },
+          ],
           isError: false,
         }),
       })
@@ -117,7 +122,9 @@ describe('Compaction Integration', () => {
         type: 'TOOL_RESULT',
         data: expect.objectContaining({
           id: 'call-hello',
-          content: [{ type: 'text', text: 'line1\nline2\nline3\n[results truncated to save space.]' }],
+          content: [
+            { type: 'text', text: 'line1\nline2\nline3\n[results truncated to save space.]' },
+          ],
           isError: false,
         }),
       })
@@ -206,7 +213,9 @@ describe('Compaction Integration', () => {
         type: 'TOOL_RESULT',
         data: expect.objectContaining({
           id: 'call-first',
-          content: [{ type: 'text', text: 'long\nresult\nhere\n[results truncated to save space.]' }],
+          content: [
+            { type: 'text', text: 'long\nresult\nhere\n[results truncated to save space.]' },
+          ],
           isError: false,
         }),
       })
@@ -219,7 +228,9 @@ describe('Compaction Integration', () => {
         type: 'TOOL_RESULT',
         data: expect.objectContaining({
           id: 'call-second',
-          content: [{ type: 'text', text: 'another\nlong\nresult\n[results truncated to save space.]' }],
+          content: [
+            { type: 'text', text: 'another\nlong\nresult\n[results truncated to save space.]' },
+          ],
           isError: false,
         }),
       })
@@ -289,7 +300,9 @@ describe('Compaction Integration', () => {
     expect(workingEvents[1].type).toBe('AGENT_MESSAGE');
     expect(workingEvents[1].data).toBe('First response');
     expect(workingEvents[2].type).toBe('TOOL_RESULT');
-    expect((workingEvents[2].data as any).content[0].text).toBe('long\ntool\nresult\n[results truncated to save space.]');
+    expect((workingEvents[2].data as any).content[0].text).toBe(
+      'long\ntool\nresult\n[results truncated to save space.]'
+    );
     expect(workingEvents[3].type).toBe('USER_MESSAGE');
     expect(workingEvents[3].data).toBe('Second message');
   });
