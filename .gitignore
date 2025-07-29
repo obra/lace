@@ -64,3 +64,9 @@ lace-memory.db
 anthropic-*.txt
 anthropic-*.json
 packages/web/.next/
+
+# Next.js cache
+.next/
+
+# Storybook
+storybook-static/
