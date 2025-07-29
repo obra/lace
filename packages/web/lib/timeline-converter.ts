@@ -96,12 +96,17 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
     processed.push(streamingEvent);
   }
 
-  // Sort by timestamp to maintain chronological order
+  // Sort by timestamp to maintain chronological order (optimized)
+  if (processed.length <= 1) return processed;
+  
   return processed.sort((a, b) => {
-    const aTime =
-      a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-    const bTime =
-      b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+    // Optimize timestamp comparison - avoid repeated Date creation
+    const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : 
+      (a.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
+      new Date(a.timestamp).getTime();
+    const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : 
+      (b.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
+      new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }
@@ -167,10 +172,17 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
     processed.push(aggregatedEvent);
   }
 
-  // Sort by timestamp to maintain chronological order
+  // Sort by timestamp to maintain chronological order (optimized)
+  if (processed.length <= 1) return processed;
+  
   return processed.sort((a, b) => {
-    const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-    const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+    // Optimize timestamp comparison - avoid repeated Date creation
+    const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : 
+      (a.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
+      new Date(a.timestamp).getTime();
+    const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : 
+      (b.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
+      new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }

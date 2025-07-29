@@ -62,7 +62,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return pending approvals from ThreadManager', async () => {
-    const threadId = 'thread_123';
+    const threadId = 'lace_20250101_test123';
     const mockPendingApprovals = [
       {
         toolCallId: 'call_456',
@@ -125,7 +125,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return empty array when no pending approvals', async () => {
-    const threadId = 'thread_empty';
+    const threadId = 'lace_20250101_test456';
     
     mockAgent.getPendingApprovals.mockReturnValue([]);
 
@@ -142,7 +142,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return error if agent not found', async () => {
-    const threadId = 'nonexistent_thread';
+    const threadId = 'lace_20250101_nonexist';
 
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
@@ -161,7 +161,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should handle multiple pending approvals with different tool types', async () => {
-    const threadId = 'thread_multi';
+    const threadId = 'lace_20250101_test789';
     const mockPendingApprovals = [
       {
         toolCallId: 'call_bash',
@@ -258,7 +258,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should handle Agent errors gracefully', async () => {
-    const threadId = 'thread_error';
+    const threadId = 'lace_20250101_test999';
     
     mockAgent.getPendingApprovals.mockImplementation(() => {
       throw new Error('Database connection failed');

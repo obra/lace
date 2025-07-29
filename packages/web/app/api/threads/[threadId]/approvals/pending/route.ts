@@ -2,15 +2,31 @@
 // ABOUTME: Thin web layer over core approval system
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/lib/server/lace-imports';
+import { ThreadIdSchema } from '@/lib/validation/schemas';
+
+// Validation schema
+const ParamsSchema = z.object({
+  threadId: ThreadIdSchema,
+});
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ threadId: string }> }
 ): Promise<NextResponse> {
   try {
-    const { threadId } = await params;
+    // Validate parameters
+    const paramsResult = ParamsSchema.safeParse(await params);
+    if (!paramsResult.success) {
+      return NextResponse.json({ 
+        error: 'Invalid parameters',
+        details: paramsResult.error.format()
+      }, { status: 400 });
+    }
+    
+    const { threadId } = paramsResult.data;
     
     // Get session first, then agent (following existing pattern)
     const sessionService = getSessionService();

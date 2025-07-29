@@ -11,7 +11,7 @@ export function isValidThreadId(value: string): boolean {
   }
 
   // Pattern for lace_YYYYMMDD_randomId format with optional .N suffix
-  const lacePattern = /^lace_\d{8}_[a-z0-9]+(\.\d+)?$/;
+  const lacePattern = /^lace_\d{8}_[a-zA-Z0-9]+(\.\d+)?$/;
 
   // Pattern for UUID format with optional .N suffix
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.\d+)?$/;
