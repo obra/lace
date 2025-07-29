@@ -17,6 +17,7 @@ import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import type { TaskManager } from '~/tasks/task-manager';
 
 describe('Enhanced Task Manager Tools', () => {
   const _tempDirContext = useTempLaceDir();
@@ -76,7 +77,7 @@ describe('Enhanced Task Manager Tools', () => {
 
       // Check if getTaskManager is actually set
       const taskTool = taskCreateTool as unknown as {
-        getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+        getTaskManager?: () => TaskManager;
       };
       console.log('getTaskManager function exists:', !!taskTool.getTaskManager);
 
