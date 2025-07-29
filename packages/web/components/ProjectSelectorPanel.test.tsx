@@ -16,8 +16,8 @@ const mockProjects: ProjectInfo[] = [
     description: 'First test project',
     workingDirectory: '/path/to/project1',
     isArchived: false,
-    createdAt: '2025-07-01T00:00:00Z',
-    lastUsedAt: '2025-07-20T00:00:00Z',
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+    lastUsedAt: new Date().toISOString(), // Today - always passes week filter
     sessionCount: 5,
   },
   {
@@ -26,8 +26,8 @@ const mockProjects: ProjectInfo[] = [
     description: 'Second test project',
     workingDirectory: '/path/to/project2',
     isArchived: false,
-    createdAt: '2025-07-02T00:00:00Z',
-    lastUsedAt: '2025-07-19T00:00:00Z',
+    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
+    lastUsedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago - always passes week filter
     sessionCount: 3,
   }
 ];
@@ -115,8 +115,8 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /new project/i }));
-    // Modal should open with form
-    expect(screen.getByPlaceholderText('Enter project name')).toBeInTheDocument();
+    // Modal should open with form in simplified mode by default
+    expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
     // Should have both the card heading and modal heading - just check for the input instead
     expect(screen.getAllByText('Create New Project')).toHaveLength(2);
   });
@@ -131,7 +131,7 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    expect(screen.getByText(/no projects yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/No Projects Yet/i)).toBeInTheDocument();
   });
 
   it('should show loading state', () => {

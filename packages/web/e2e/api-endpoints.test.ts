@@ -56,18 +56,20 @@ describe('API Endpoints E2E Tests', () => {
     sessionService = getSessionService();
   });
 
-  afterEach(() => {
-    // Clear active sessions to prevent test pollution
+  afterEach(async () => {
+    // Stop all agents first to prevent async operations continuing after database teardown
     if (sessionService) {
+      await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
     // Clear persistence to reset database state
     teardownTestPersistence();
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Clear everything after all tests are done
     if (sessionService) {
+      await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
     global.sessionService = undefined;

@@ -6,11 +6,11 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useState, useEffect } from 'react';
 
 // Test the core thinking indicator logic in isolation
-function useThinkingIndicatorLogic(events: any[], sendingMessage: boolean, setSendingMessage: (value: boolean) => void) {
+function useThinkingIndicatorLogic(events: unknown[], sendingMessage: boolean, setSendingMessage: (value: boolean) => void) {
   // This mirrors the logic from LaceApp
   useEffect(() => {
     if (events?.length > 0) {
-      const lastEvent = events[events.length - 1];
+      const lastEvent = events[events.length - 1] as { type: string; data?: { content?: string } };
       if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
           (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
            lastEvent.data?.content && 
@@ -20,7 +20,7 @@ function useThinkingIndicatorLogic(events: any[], sendingMessage: boolean, setSe
         setSendingMessage(false);
       }
     }
-  }, [events]);
+  }, [events, sendingMessage, setSendingMessage]);
 }
 
 describe('LaceApp thinking indicator logic', () => {
@@ -119,7 +119,7 @@ describe('LaceApp thinking indicator logic', () => {
   it('should handle empty events array', () => {
     let sendingMessage = true;
     const setSendingMessage = vi.fn();
-    const events: any[] = [];
+    const events: unknown[] = [];
 
     renderHook(() => 
       useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)

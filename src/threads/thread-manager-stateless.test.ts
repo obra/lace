@@ -1,13 +1,20 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
+import { expectEventAdded } from '~/test-utils/event-helpers';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('ThreadManager - Core Behavior', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
+    setupTestPersistence();
     threadManager = new ThreadManager();
     threadId = threadManager.createThread();
+  });
+
+  afterEach(() => {
+    teardownTestPersistence();
   });
 
   describe('Core thread operations', () => {
@@ -17,8 +24,8 @@ describe('ThreadManager - Core Behavior', () => {
     });
 
     it('adds events to specific thread', () => {
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
+      expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+      expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there'));
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(2);
@@ -30,8 +37,8 @@ describe('ThreadManager - Core Behavior', () => {
       const thread1 = threadManager.createThread();
       const thread2 = threadManager.createThread();
 
-      threadManager.addEvent(thread1, 'USER_MESSAGE', 'Thread 1 message');
-      threadManager.addEvent(thread2, 'USER_MESSAGE', 'Thread 2 message');
+      expectEventAdded(threadManager.addEvent(thread1, 'USER_MESSAGE', 'Thread 1 message'));
+      expectEventAdded(threadManager.addEvent(thread2, 'USER_MESSAGE', 'Thread 2 message'));
 
       const events1 = threadManager.getEvents(thread1);
       const events2 = threadManager.getEvents(thread2);
@@ -50,7 +57,7 @@ describe('ThreadManager - Core Behavior', () => {
 
   describe('Thread persistence', () => {
     it('persists thread data across ThreadManager instances', () => {
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Persistent message');
+      expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Persistent message'));
 
       // Create new ThreadManager instance
       const newManager = new ThreadManager();
@@ -75,8 +82,8 @@ describe('ThreadManager - Core Behavior', () => {
       const delegateId = threadManager.generateDelegateThreadId(threadId);
       threadManager.createThread(delegateId);
 
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Parent message');
-      threadManager.addEvent(delegateId, 'USER_MESSAGE', 'Delegate message');
+      expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Parent message'));
+      expectEventAdded(threadManager.addEvent(delegateId, 'USER_MESSAGE', 'Delegate message'));
 
       const parentEvents = threadManager.getEvents(threadId);
       const delegateEvents = threadManager.getEvents(delegateId);

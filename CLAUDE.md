@@ -36,6 +36,11 @@ npm run test:run    # Run tests once
 npm run test:unit   # Unit tests only
 npm run test:integration # Integration tests
 npm run test:coverage # Run tests with coverage report
+
+# Direct vitest commands (alternative)
+npx vitest          # Run tests in watch mode
+npx vitest --run    # Run tests once
+npx vitest --run src/path/to/test.ts  # Run specific test file
 ```
 
 

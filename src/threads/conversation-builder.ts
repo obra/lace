@@ -3,6 +3,8 @@
 
 import type { ThreadEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
+import type { ToolResult } from '~/tools/types';
+import { logger } from '~/utils/logger';
 
 /**
  * Type guard to ensure data from COMPACTION events is valid CompactionData
@@ -26,25 +28,80 @@ function isCompactionData(data: unknown): data is CompactionData {
   );
 }
 
+/**
+ * Deduplicates TOOL_RESULT events to prevent duplicate tool results in conversations.
+ *
+ * This is part of the defense-in-depth strategy against tool approval race conditions.
+ * Even if duplicate tool results make it into the event stream, we filter them out
+ * at the conversation building level to ensure clean provider API calls.
+ */
+function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
+  const seenToolResults = new Set<string>();
+  const deduplicatedEvents: ThreadEvent[] = [];
+
+  for (const event of events) {
+    if (event.type === 'TOOL_RESULT') {
+      // All TOOL_RESULT events must be ToolResult objects with content field
+      if (typeof event.data !== 'object' || !event.data || !('content' in event.data)) {
+        throw new Error(
+          `TOOL_RESULT event must contain ToolResult object with content field, got: ${typeof event.data}`
+        );
+      }
+
+      const toolResult = event.data as ToolResult;
+      const toolCallId = toolResult.id;
+
+      if (!toolCallId) {
+        // ToolResult objects without IDs are considered invalid and filtered out
+        logger.warn('CONVERSATION_BUILDER: TOOL_RESULT missing id', {
+          eventId: event.id,
+          threadId: event.threadId,
+        });
+        continue; // Skip results without IDs
+      }
+
+      if (seenToolResults.has(toolCallId)) {
+        logger.warn('CONVERSATION_BUILDER: Duplicate TOOL_RESULT filtered', {
+          toolCallId,
+          eventId: event.id,
+          threadId: event.threadId,
+        });
+        continue; // Skip duplicate
+      }
+
+      seenToolResults.add(toolCallId);
+    }
+
+    deduplicatedEvents.push(event);
+  }
+
+  return deduplicatedEvents;
+}
+
 export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
   const { lastCompaction, lastCompactionIndex } = findLastCompactionEventWithIndex(events);
 
+  let workingEvents: ThreadEvent[];
+
   if (!lastCompaction) {
-    return events; // No compaction yet, use all events
+    workingEvents = events; // No compaction yet, use all events
+  } else {
+    // Use compacted events + compaction event + everything after compaction
+    const eventsAfterCompaction = events.slice(lastCompactionIndex + 1);
+
+    // Type-safe extraction of compaction data with runtime validation
+    if (!isCompactionData(lastCompaction.data)) {
+      // Defensive fallback: if compaction data is malformed, return all events
+      // This preserves conversation integrity even if compaction data is corrupted
+      workingEvents = events;
+    } else {
+      const compactionData = lastCompaction.data;
+      workingEvents = [...compactionData.compactedEvents, lastCompaction, ...eventsAfterCompaction];
+    }
   }
 
-  // Use compacted events + compaction event + everything after compaction
-  const eventsAfterCompaction = events.slice(lastCompactionIndex + 1);
-
-  // Type-safe extraction of compaction data with runtime validation
-  if (!isCompactionData(lastCompaction.data)) {
-    // Defensive fallback: if compaction data is malformed, return all events
-    // This preserves conversation integrity even if compaction data is corrupted
-    return events;
-  }
-
-  const compactionData = lastCompaction.data;
-  return [...compactionData.compactedEvents, lastCompaction, ...eventsAfterCompaction];
+  // Apply tool result deduplication as final step
+  return deduplicateToolResults(workingEvents);
 }
 
 export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {

@@ -145,6 +145,146 @@ describe('conversation-builder', () => {
     });
   });
 
+  describe('tool result deduplication', () => {
+    it('should remove duplicate TOOL_RESULT events with same toolCallId', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_CALL',
+          timestamp: new Date('2024-01-01T10:00:00Z'),
+          data: { id: 'tool-123', name: 'test', arguments: {} },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result 1' }], isError: false },
+        },
+        {
+          id: 'evt3',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result 2' }], isError: false },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should have tool call + only one tool result (the first one)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Result 1'
+      );
+    });
+
+    it('should keep TOOL_RESULT events with different toolCallIds', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result A' }], isError: false },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: { id: 'tool-456', content: [{ type: 'text', text: 'Result B' }], isError: false },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep both tool results (different IDs)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(2);
+    });
+
+    it('should skip TOOL_RESULT events missing toolCallId', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: { content: [{ type: 'text', text: 'Result without ID' }], isError: false }, // Missing id field
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Valid result' }],
+            isError: false,
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should skip the one without ID, keep the valid one
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { id: string }).id).toBe('tool-123');
+    });
+
+    it('should work correctly with compacted events containing duplicates', () => {
+      const compactionEvent: ThreadEvent = {
+        id: 'comp1',
+        threadId: 'test-thread',
+        type: 'COMPACTION',
+        timestamp: new Date('2024-01-01T10:03:00Z'),
+        data: {
+          strategyId: 'test-strategy',
+          originalEventCount: 2,
+          compactedEvents: [
+            {
+              id: 'c1',
+              threadId: 'test-thread',
+              type: 'TOOL_RESULT',
+              timestamp: new Date('2024-01-01T10:01:00Z'),
+              data: {
+                id: 'tool-999',
+                content: [{ type: 'text', text: 'Compacted result' }],
+                isError: false,
+              },
+            },
+          ],
+        },
+      };
+
+      const duplicateAfterCompaction: ThreadEvent = {
+        id: 'e4',
+        threadId: 'test-thread',
+        type: 'TOOL_RESULT',
+        timestamp: new Date('2024-01-01T10:04:00Z'),
+        data: {
+          id: 'tool-999',
+          content: [{ type: 'text', text: 'Duplicate result' }],
+          isError: false,
+        },
+      };
+
+      const events = [compactionEvent, duplicateAfterCompaction];
+      const result = buildWorkingConversation(events);
+
+      // Should keep only the compacted result, filter the duplicate
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Compacted result'
+      );
+    });
+  });
+
   describe('malformed compaction data handling', () => {
     it('gracefully handles malformed compaction data by falling back to all events', () => {
       const malformedCompactionEvent: ThreadEvent = {

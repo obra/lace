@@ -10,8 +10,13 @@ export const ThreadIdSchema = z
   .refine(
     (value) => isValidThreadId(value),
     'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId, UUID, or either with .number suffix'
-  )
-  .transform((value) => asValidThreadId(value));
+  );
+
+// Tool Call ID schema for API validation
+export const ToolCallIdSchema = z
+  .string()
+  .min(1, 'toolCallId cannot be empty')
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid toolCallId format. Expected alphanumeric characters, underscores, and hyphens only');
 
 // Message request schema with size limits
 export const MessageRequestSchema = z.object({
@@ -77,6 +82,7 @@ export const SpawnAgentRequestSchema = z.object({
 
 // Type exports for use in code
 export type ThreadId = z.infer<typeof ThreadIdSchema>;
+export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
 export type MessageRequest = z.infer<typeof MessageRequestSchema>;
 export type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
 export type UpdateTaskRequest = z.infer<typeof UpdateTaskRequestSchema>;

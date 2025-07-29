@@ -1,19 +1,26 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
+import { expectEventAdded } from '~/test-utils/event-helpers';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Compaction Integration', () => {
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
+    setupTestPersistence();
     threadManager = new ThreadManager();
     threadId = threadManager.createThread();
   });
 
+  afterEach(() => {
+    teardownTestPersistence();
+  });
+
   it('creates working conversation without compaction', () => {
     // Add some events
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there'));
 
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
@@ -25,18 +32,22 @@ describe('Compaction Integration', () => {
 
   it('compacts conversation using trim-tool-results strategy', async () => {
     // Add events including a long tool result
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files');
-    threadManager.addEvent(threadId, 'TOOL_CALL', {
-      id: 'call1',
-      name: 'list_files',
-      arguments: {},
-    });
-    threadManager.addEvent(
-      threadId,
-      'TOOL_RESULT',
-      'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt'
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files'));
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'TOOL_CALL', {
+        id: 'call1',
+        name: 'list_files',
+        arguments: {},
+      })
     );
-    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Found 5 files');
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+        id: 'call1',
+        content: [{ type: 'text', text: 'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt' }],
+        isError: false,
+      })
+    );
+    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Found 5 files'));
 
     expect(threadManager.getAllEvents(threadId)).toHaveLength(4);
 
@@ -58,7 +69,16 @@ describe('Compaction Integration', () => {
     expect(workingEvents[2]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
-        data: 'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]',
+        data: expect.objectContaining({
+          id: 'call1',
+          content: [
+            {
+              type: 'text',
+              text: 'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]',
+            },
+          ],
+          isError: false,
+        }) as unknown,
       })
     );
     expect(workingEvents[3]).toEqual(
@@ -69,14 +89,20 @@ describe('Compaction Integration', () => {
 
   it('continues conversation after compaction', async () => {
     // Set up conversation and compact it
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'line1\nline2\nline3\nline4\nline5');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+        id: 'call-hello',
+        content: [{ type: 'text', text: 'line1\nline2\nline3\nline4\nline5' }],
+        isError: false,
+      })
+    );
 
     await threadManager.compact(threadId, 'trim-tool-results');
 
     // Add more events after compaction
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'What next?');
-    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Let me help');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'What next?'));
+    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Let me help'));
 
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
@@ -94,7 +120,13 @@ describe('Compaction Integration', () => {
     expect(workingEvents[1]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
-        data: 'line1\nline2\nline3\n[results truncated to save space.]',
+        data: expect.objectContaining({
+          id: 'call-hello',
+          content: [
+            { type: 'text', text: 'line1\nline2\nline3\n[results truncated to save space.]' },
+          ],
+          isError: false,
+        }) as unknown,
       })
     );
     expect(workingEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
@@ -108,15 +140,27 @@ describe('Compaction Integration', () => {
 
   it('handles multiple compactions', async () => {
     // Create initial conversation
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'long\nresult\nhere\nextra\nlines');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+        id: 'call-first',
+        content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
+        isError: false,
+      })
+    );
 
     // First compaction
     await threadManager.compact(threadId, 'trim-tool-results');
 
     // Add more events
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Continue');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'another\nlong\nresult\nwith\nextra\nlines');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Continue'));
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+        id: 'call-second',
+        content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
+        isError: false,
+      })
+    );
 
     // Second compaction
     await threadManager.compact(threadId, 'trim-tool-results');
@@ -134,7 +178,11 @@ describe('Compaction Integration', () => {
     expect(allEvents[1]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
-        data: expect.stringContaining('long\nresult\nhere') as string,
+        data: expect.objectContaining({
+          id: 'call-first',
+          content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
+          isError: false,
+        }) as unknown,
       })
     );
     expect(allEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
@@ -144,7 +192,11 @@ describe('Compaction Integration', () => {
     expect(allEvents[4]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
-        data: expect.stringContaining('another\nlong\nresult') as string,
+        data: expect.objectContaining({
+          id: 'call-second',
+          content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
+          isError: false,
+        }) as unknown,
       })
     );
     expect(allEvents[5]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
@@ -159,7 +211,13 @@ describe('Compaction Integration', () => {
     expect(workingEvents[1]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
-        data: 'long\nresult\nhere\n[results truncated to save space.]',
+        data: expect.objectContaining({
+          id: 'call-first',
+          content: [
+            { type: 'text', text: 'long\nresult\nhere\n[results truncated to save space.]' },
+          ],
+          isError: false,
+        }) as unknown,
       })
     );
     expect(workingEvents[2]).toEqual(
@@ -168,7 +226,13 @@ describe('Compaction Integration', () => {
     expect(workingEvents[3]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
-        data: 'another\nlong\nresult\n[results truncated to save space.]',
+        data: expect.objectContaining({
+          id: 'call-second',
+          content: [
+            { type: 'text', text: 'another\nlong\nresult\n[results truncated to save space.]' },
+          ],
+          isError: false,
+        }) as unknown,
       })
     );
 
@@ -182,7 +246,7 @@ describe('Compaction Integration', () => {
   });
 
   it('throws error for unknown strategy', async () => {
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
 
     await expect(threadManager.compact(threadId, 'unknown-strategy')).rejects.toThrow(
       'Unknown compaction strategy: unknown-strategy'
@@ -200,7 +264,13 @@ describe('Compaction Integration', () => {
     const newThreadId = newThreadManager.createThread();
 
     // Should be able to use the trim-tool-results strategy without manual registration
-    newThreadManager.addEvent(newThreadId, 'TOOL_RESULT', 'line1\nline2\nline3\nline4');
+    expectEventAdded(
+      newThreadManager.addEvent(newThreadId, 'TOOL_RESULT', {
+        id: 'call-auto',
+        content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
+        isError: false,
+      })
+    );
 
     expect(async () => {
       await newThreadManager.compact(newThreadId, 'trim-tool-results');
@@ -209,10 +279,16 @@ describe('Compaction Integration', () => {
 
   it('preserves event order in compacted conversation', async () => {
     // Add events in specific order
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message');
-    threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'First response');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'long\ntool\nresult\nwith\nmany\nlines');
-    threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message');
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message'));
+    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'First response'));
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'TOOL_RESULT', {
+        id: 'call-order',
+        content: [{ type: 'text', text: 'long\ntool\nresult\nwith\nmany\nlines' }],
+        isError: false,
+      })
+    );
+    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message'));
 
     await threadManager.compact(threadId, 'trim-tool-results');
 
@@ -224,7 +300,9 @@ describe('Compaction Integration', () => {
     expect(workingEvents[1].type).toBe('AGENT_MESSAGE');
     expect(workingEvents[1].data).toBe('First response');
     expect(workingEvents[2].type).toBe('TOOL_RESULT');
-    expect(workingEvents[2].data).toBe('long\ntool\nresult\n[results truncated to save space.]');
+    expect((workingEvents[2].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+      'long\ntool\nresult\n[results truncated to save space.]'
+    );
     expect(workingEvents[3].type).toBe('USER_MESSAGE');
     expect(workingEvents[3].data).toBe('Second message');
   });

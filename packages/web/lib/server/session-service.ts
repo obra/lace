@@ -128,7 +128,7 @@ export class SessionService {
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     const sseManager = SSEManager.getInstance();
-    const threadId = asThreadId(agent.threadId);
+    const threadId = agent.threadId;
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
       const event: SessionEvent = {
@@ -203,60 +203,93 @@ export class SessionService {
     // Note: Tool approval is now handled by core EventApprovalCallback via ThreadManager events
 
     // Handle thread events (including approval events)
-    agent.on(
-      'thread_event_added',
-      ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
-        // Convert thread events to session events and broadcast them
-        if (event.type === 'TOOL_APPROVAL_REQUEST') {
-          const toolCallData = event.data as { toolCallId: string };
-
-          // Get the related TOOL_CALL event to reconstruct approval request data
-          const events = agent.threadManager.getEvents(eventThreadId);
-          const toolCallEvent = events.find(
-            (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallData.toolCallId
-          );
-
-          if (toolCallEvent) {
-            const toolCall = toolCallEvent.data as ToolCall;
-
-            // Try to get tool metadata
-            let tool;
-            try {
-              tool = agent.toolExecutor?.getTool(toolCall.name);
-            } catch {
-              tool = null;
-            }
-
-            const sessionEvent: SessionEvent = {
-              type: 'TOOL_APPROVAL_REQUEST',
-              threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp),
-              data: {
-                requestId: toolCallData.toolCallId,
-                toolName: toolCall.name,
-                input: toolCall.arguments,
-                isReadOnly: tool?.annotations?.readOnlyHint ?? false,
-                toolDescription: tool?.description,
-                toolAnnotations: tool?.annotations,
-                riskLevel: tool?.annotations?.readOnlyHint
-                  ? 'safe'
-                  : tool?.annotations?.destructiveHint
-                    ? 'destructive'
-                    : 'moderate',
-              },
-            };
-
-            sseManager.broadcast(sessionId, sessionEvent);
+    agent.on('thread_event_added', ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
+      // Convert thread events to session events and broadcast them
+      if (event.type === 'TOOL_APPROVAL_REQUEST') {
+        const toolCallData = event.data as { toolCallId: string };
+        
+        // Get the related TOOL_CALL event to reconstruct approval request data
+        const events = agent.threadManager.getEvents(eventThreadId);
+        const toolCallEvent = events.find(e => 
+          e.type === 'TOOL_CALL' && 
+          e.data && typeof e.data === 'object' && 'id' in e.data &&
+          (e.data as { id: string }).id === toolCallData.toolCallId
+        );
+        
+        if (toolCallEvent) {
+          const toolCall = toolCallEvent.data as ToolCall;
+          
+          // Try to get tool metadata
+          let tool;
+          try {
+            tool = agent.toolExecutor?.getTool(toolCall.name);
+          } catch {
+            tool = null;
           }
+          
+          const sessionEvent: SessionEvent = {
+            type: 'TOOL_APPROVAL_REQUEST',
+            threadId: asThreadId(eventThreadId),
+            timestamp: new Date(event.timestamp),
+            data: {
+              requestId: toolCallData.toolCallId,
+              toolName: toolCall.name,
+              input: toolCall.arguments,
+              isReadOnly: tool?.annotations?.readOnlyHint ?? false,
+              toolDescription: tool?.description,
+              toolAnnotations: tool?.annotations,
+              riskLevel: tool?.annotations?.readOnlyHint ? 'safe' : 
+                        tool?.annotations?.destructiveHint ? 'destructive' : 'moderate',
+            },
+          };
+          
+          sseManager.broadcast(sessionId, sessionEvent);
         }
+      } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+        // Forward approval response events to UI so modal can refresh
+        const responseData = event.data as { toolCallId: string; decision: string };
+        
+        const sessionEvent: SessionEvent = {
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: asThreadId(eventThreadId),
+          timestamp: new Date(event.timestamp),
+          data: {
+            toolCallId: responseData.toolCallId,
+            decision: responseData.decision,
+          },
+        };
+        
+        sseManager.broadcast(sessionId, sessionEvent);
       }
-    );
+    });
   }
 
   // Service layer methods to eliminate direct business logic calls from API routes
 
   updateSession(sessionId: ThreadId, updates: Record<string, unknown>): void {
     Session.updateSession(sessionId, updates);
+  }
+
+  // Test helper method to stop all agents and clear active sessions
+  async stopAllAgents(): Promise<void> {
+    for (const session of activeSessions.values()) {
+      // Stop the coordinator agent
+      const coordinatorAgent = session.getAgent(session.getId());
+      if (coordinatorAgent) {
+        coordinatorAgent.stop();
+      }
+      
+      // Stop all delegate agents
+      const agentMetadata = session.getAgents();
+      for (const agentMeta of agentMetadata) {
+        if (agentMeta.threadId !== session.getId()) { // Skip coordinator (already stopped)
+          const agent = session.getAgent(agentMeta.threadId);
+          if (agent) {
+            agent.stop();
+          }
+        }
+      }
+    }
   }
 
   // Test helper method to clear active sessions

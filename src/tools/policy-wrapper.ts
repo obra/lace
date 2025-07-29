@@ -2,6 +2,7 @@
 // ABOUTME: Ensures CLI tool policies work regardless of which interface is running (CLI, web, React/Ink)
 
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ToolCall } from '~/tools/types';
 import { CLIOptions } from '~/cli/args';
 import { ToolExecutor } from '~/tools/executor';
 
@@ -14,7 +15,8 @@ export function createGlobalPolicyCallback(
   const sessionCache = new Map<string, boolean>();
 
   return {
-    async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+    async requestApproval(toolCall: ToolCall): Promise<ApprovalDecision> {
+      const toolName = toolCall.name;
       // 1. Check session cache first
       if (sessionCache.has(toolName)) {
         return ApprovalDecision.ALLOW_SESSION;
@@ -55,7 +57,7 @@ export function createGlobalPolicyCallback(
       }
 
       // 7. Fall back to interface-specific approval (CLI, web, React/Ink, etc.)
-      const decision = await interfaceCallback.requestApproval(toolName, input);
+      const decision = await interfaceCallback.requestApproval(toolCall);
 
       // 8. Cache session approvals
       if (decision === ApprovalDecision.ALLOW_SESSION) {

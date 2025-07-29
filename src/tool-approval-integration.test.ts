@@ -9,7 +9,12 @@ import { CLIOptions } from '~/cli/args';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
-import { ToolCall } from '~/tools/types';
+import { ToolCall, ToolContext } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { ThreadId } from '~/threads/types';
 
 // Mock approval interface for testing
 class MockApprovalInterface implements ApprovalCallback {
@@ -20,9 +25,13 @@ class MockApprovalInterface implements ApprovalCallback {
     this.responses.set(toolName, decision);
   }
 
-  requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
-    this.callLog.push({ toolName, input });
-    const response = this.responses.get(toolName);
+  requestApproval(toolCall: {
+    id: string;
+    name: string;
+    arguments: unknown;
+  }): Promise<ApprovalDecision> {
+    this.callLog.push({ toolName: toolCall.name, input: toolCall.arguments });
+    const response = this.responses.get(toolCall.name);
     if (!response) {
       return Promise.resolve(ApprovalDecision.DENY); // Default to deny if no response set
     }
@@ -49,10 +58,47 @@ function createToolCall(
 }
 
 describe('Tool Approval System Integration', () => {
+  const tempDirContext = useTempLaceDir();
   let toolExecutor: ToolExecutor;
   let mockInterface: MockApprovalInterface;
+  let session: Session;
+  let project: Project;
+  let toolContext: ToolContext;
 
   beforeEach(() => {
+    setupTestPersistence();
+
+    // Create real project and session for proper tool execution context
+    project = Project.create(
+      'Tool Approval Test Project',
+      'Project for tool approval integration testing',
+      tempDirContext.tempDir,
+      {
+        tools: ['bash', 'file_read', 'file_write'], // Enable tools for testing
+        toolPolicies: {
+          // All tools require approval by default
+          bash: 'require-approval',
+          file_read: 'require-approval',
+          file_write: 'require-approval',
+        },
+      }
+    );
+
+    session = Session.create({
+      name: 'Tool Approval Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
+    });
+
+    // Create tool context with session for security policy enforcement
+    toolContext = {
+      threadId: 'test-thread-id' as ThreadId,
+      parentThreadId: 'test-parent-thread-id' as ThreadId,
+      workingDirectory: tempDirContext.tempDir,
+      session, // REQUIRED for security policy enforcement
+    };
+
     toolExecutor = new ToolExecutor();
     toolExecutor.registerTool('bash', new BashTool());
     toolExecutor.registerTool('file_read', new FileReadTool());
@@ -63,6 +109,7 @@ describe('Tool Approval System Integration', () => {
 
   afterEach(() => {
     mockInterface.reset();
+    teardownTestPersistence();
   });
 
   describe('complete approval flow without policies', () => {
@@ -71,7 +118,8 @@ describe('Tool Approval System Integration', () => {
       mockInterface.setResponse('bash', ApprovalDecision.ALLOW_ONCE);
 
       const result = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "test"' })
+        createToolCall('bash', { command: 'echo "test"' }),
+        toolContext
       );
 
       expect(result.isError).toBe(false);
@@ -88,7 +136,8 @@ describe('Tool Approval System Integration', () => {
       mockInterface.setResponse('bash', ApprovalDecision.DENY);
 
       const result = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "test"' })
+        createToolCall('bash', { command: 'echo "test"' }),
+        toolContext
       );
 
       expect(result.isError).toBe(true);
@@ -99,7 +148,8 @@ describe('Tool Approval System Integration', () => {
     it('should fail safely when no approval callback is set', async () => {
       // No approval callback set - should fail safely
       const result = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "no approval"' })
+        createToolCall('bash', { command: 'echo "no approval"' }),
+        toolContext
       );
 
       expect(result.isError).toBe(true);
@@ -132,7 +182,8 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(policyCallback);
 
       const result = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "auto-approved"' })
+        createToolCall('bash', { command: 'echo "auto-approved"' }),
+        toolContext
       );
 
       expect(result.isError).toBe(false);
@@ -161,7 +212,8 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(policyCallback);
 
       const result = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "blocked"' })
+        createToolCall('bash', { command: 'echo "blocked"' }),
+        toolContext
       );
 
       expect(result.isError).toBe(true);
@@ -196,7 +248,8 @@ describe('Tool Approval System Integration', () => {
       const result = await toolExecutor.executeTool(
         createToolCall('file_read', {
           path: '/tmp/safe-read-test.txt',
-        })
+        }),
+        toolContext
       );
 
       expect(result.isError).toBe(false);
@@ -231,7 +284,8 @@ describe('Tool Approval System Integration', () => {
       const result = await toolExecutor.executeTool(
         createToolCall('bash', {
           command: 'echo "interface decision"',
-        })
+        }),
+        toolContext
       );
 
       expect(result.isError).toBe(false);
@@ -265,7 +319,8 @@ describe('Tool Approval System Integration', () => {
 
       // First execution should call interface
       const firstResult = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "first"' })
+        createToolCall('bash', { command: 'echo "first"' }),
+        toolContext
       );
       expect(firstResult.isError).toBe(false);
       expect(firstResult.content[0].text).toContain('first');
@@ -273,7 +328,8 @@ describe('Tool Approval System Integration', () => {
 
       // Second execution should use cached approval
       const secondResult = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "second"' })
+        createToolCall('bash', { command: 'echo "second"' }),
+        toolContext
       );
       expect(secondResult.isError).toBe(false);
       expect(secondResult.content[0].text).toContain('second');
@@ -305,7 +361,8 @@ describe('Tool Approval System Integration', () => {
       const result = await toolExecutor.executeTool(
         createToolCall('bash', {
           command: 'echo "should be blocked"',
-        })
+        }),
+        toolContext
       );
 
       expect(result.isError).toBe(true);
@@ -335,13 +392,15 @@ describe('Tool Approval System Integration', () => {
 
       // Test bash (should be blocked despite auto-approve)
       const bashResult = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "blocked"' })
+        createToolCall('bash', { command: 'echo "blocked"' }),
+        toolContext
       );
       expect(bashResult.isError).toBe(true);
 
       // Test file_read (should be blocked despite read-only)
       const fileReadResult = await toolExecutor.executeTool(
-        createToolCall('file_read', { path: 'test.txt' })
+        createToolCall('file_read', { path: 'test.txt' }),
+        toolContext
       );
       expect(fileReadResult.isError).toBe(true);
 
@@ -360,7 +419,8 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(errorCallback);
 
       const result = await toolExecutor.executeTool(
-        createToolCall('bash', { command: 'echo "error test"' })
+        createToolCall('bash', { command: 'echo "error test"' }),
+        toolContext
       );
 
       expect(result.isError).toBe(true);
@@ -371,7 +431,8 @@ describe('Tool Approval System Integration', () => {
       toolExecutor.setApprovalCallback(mockInterface);
 
       const result = await toolExecutor.executeTool(
-        createToolCall('unknown_tool', { param: 'value' })
+        createToolCall('unknown_tool', { param: 'value' }),
+        toolContext
       );
 
       expect(result.isError).toBe(true);

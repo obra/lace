@@ -272,11 +272,26 @@ export class ThreadManager {
     }
   }
 
+  /**
+   * Add an event to a thread with atomic database persistence.
+   *
+   * This method is designed to prevent race conditions in tool approval
+   * scenarios where multiple requests might try to create the same event
+   * simultaneously (e.g., rapid button clicking).
+   *
+   * The operation is atomic: either both the database write and memory
+   * update succeed, or both fail. This ensures consistency between the
+   * persistent and in-memory representations.
+   *
+   * For TOOL_APPROVAL_RESPONSE events, a database unique constraint
+   * prevents duplicate approvals for the same toolCallId, causing
+   * this method to throw if a duplicate is attempted.
+   */
   addEvent(
     threadId: string,
     type: EventType,
     eventData: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>
-  ): ThreadEvent {
+  ): ThreadEvent | null {
     const thread = this.getThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found`);
@@ -290,21 +305,25 @@ export class ThreadManager {
       data: eventData,
     };
 
-    thread.events.push(event);
-    thread.updatedAt = new Date();
+    // Use database transaction for atomicity
+    return this._persistence.transaction(() => {
+      // Save to database first and check if it was actually saved
+      const wasSaved = this._persistence.saveEvent(event);
 
-    // Save event to persistence immediately
-    try {
-      this._persistence.saveEvent(event);
-      // Update process-local cache with modified thread
-      processLocalThreadCache.set(threadId, thread);
-    } catch (error) {
-      logger.error('Failed to save event', { error });
-    }
+      if (wasSaved) {
+        // Only update memory if database save succeeded
+        thread.events.push(event);
+        thread.updatedAt = new Date();
 
-    // Event emission removed - Agent will handle event emission for UI synchronization
+        // Update process-local cache
+        processLocalThreadCache.set(threadId, thread);
 
-    return event;
+        return event;
+      } else {
+        // Event was ignored (duplicate approval) - return null to indicate no-op
+        return null;
+      }
+    });
   }
 
   /**

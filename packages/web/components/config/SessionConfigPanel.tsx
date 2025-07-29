@@ -41,19 +41,20 @@ interface SessionConfigPanelProps {
   loading?: boolean;
 }
 
+const AVAILABLE_TOOLS = [
+  'bash', 'file_read', 'file_write', 'file_edit', 'file_list', 
+  'file_find', 'url_fetch', 'ripgrep_search', 'file_insert', 'delegate',
+  'task_add', 'task_list', 'task_complete', 'task_update', 'task_add_note', 'task_view'
+];
+
 const DEFAULT_CONFIG: SessionConfiguration = {
   provider: 'anthropic',
   model: 'claude-3-5-sonnet-20241022',
   maxTokens: 4096,
-  tools: [],
+  tools: AVAILABLE_TOOLS,
   toolPolicies: {},
   environmentVariables: {},
 };
-
-const AVAILABLE_TOOLS = [
-  'bash', 'file-read', 'file-write', 'file-edit', 'file-list', 
-  'file-find', 'url-fetch', 'task-manager', 'delegate'
-];
 
 export function SessionConfigPanel({
   selectedProject,

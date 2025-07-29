@@ -88,6 +88,9 @@ export class DatabasePersistence {
     if (currentVersion < 10) {
       this.migrateToV10();
     }
+    if (currentVersion < 11) {
+      this.migrateToV11();
+    }
   }
 
   private getSchemaVersion(): number {
@@ -205,6 +208,27 @@ export class DatabasePersistence {
     this.setSchemaVersion(10);
   }
 
+  private migrateToV11(): void {
+    if (!this.db) return;
+
+    // Add unique constraint for tool approval responses to prevent race conditions
+    this.db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_tool_approval
+      ON events(thread_id, type, json_extract(data, '$.toolCallId'))  
+      WHERE type = 'TOOL_APPROVAL_RESPONSE';
+    `);
+
+    this.setSchemaVersion(11);
+  }
+
+  transaction<T>(fn: () => T): T {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    return this.db.transaction(fn)();
+  }
+
   // ===============================
   // Thread-related methods
   // ===============================
@@ -271,27 +295,52 @@ export class DatabasePersistence {
     };
   }
 
-  saveEvent(event: ThreadEvent): void {
-    if (this._closed || this._disabled || !this.db) return;
+  saveEvent(event: ThreadEvent): boolean {
+    if (this._closed || this._disabled || !this.db) return false;
 
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO events (id, thread_id, type, timestamp, data)
-      VALUES (?, ?, ?, ?, ?)
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO events (id, thread_id, type, timestamp, data)
+        VALUES (?, ?, ?, ?, ?)
+      `);
 
-    stmt.run(
-      event.id,
-      event.threadId,
-      event.type,
-      event.timestamp.toISOString(),
-      JSON.stringify(event.data)
+      stmt.run(
+        event.id,
+        event.threadId,
+        event.type,
+        event.timestamp.toISOString(),
+        JSON.stringify(event.data)
+      );
+
+      // Update thread's updated_at timestamp
+      const updateThreadStmt = this.db.prepare(`
+        UPDATE threads SET updated_at = ? WHERE id = ?
+      `);
+      updateThreadStmt.run(new Date().toISOString(), event.threadId);
+
+      return true; // Event was successfully saved
+    } catch (error: unknown) {
+      // Handle constraint violations for duplicate approval responses idempotently
+      if (this.isConstraintViolation(error) && event.type === 'TOOL_APPROVAL_RESPONSE') {
+        // Silently ignore duplicate approval responses - this is the desired idempotent behavior
+        logger.debug('DATABASE: Duplicate approval response ignored', {
+          eventId: event.id,
+          toolCallId: (event.data as { toolCallId?: string }).toolCallId,
+        });
+        return false; // Event was ignored due to duplicate
+      }
+
+      // Re-throw other errors (including constraint violations for non-approval events)
+      throw error;
+    }
+  }
+
+  private isConstraintViolation(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      (error.message.includes('UNIQUE constraint failed') ||
+        error.message.includes('SQLITE_CONSTRAINT_UNIQUE'))
     );
-
-    // Update thread's updated_at timestamp
-    const updateThreadStmt = this.db.prepare(`
-      UPDATE threads SET updated_at = ? WHERE id = ?
-    `);
-    updateThreadStmt.run(new Date().toISOString(), event.threadId);
   }
 
   loadEvents(threadId: string): ThreadEvent[] {

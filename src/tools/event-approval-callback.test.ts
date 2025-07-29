@@ -2,8 +2,9 @@
 // ABOUTME: Tests actual approval flow behavior through Agent conversations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { expectEventAdded } from '~/test-utils/event-helpers';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -13,6 +14,9 @@ import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { type ToolResult } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Enhanced test provider that can return tool calls once, then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -60,14 +64,38 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('EventApprovalCallback Integration Tests', () => {
+  const tempDirContext = useTempLaceDir();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
+  let session: Session;
+  let project: Project;
 
   beforeEach(() => {
     setupTestPersistence();
 
-    // Create real components for integration testing
+    // Create real project
+    project = Project.create(
+      'Approval Test Project',
+      'Project for approval testing',
+      tempDirContext.tempDir,
+      {
+        tools: ['bash'], // Enable bash tool
+        toolPolicies: {
+          bash: 'require-approval',
+        },
+      }
+    );
+
+    // Create real session with anthropic provider
+    session = Session.create({
+      name: 'Approval Test Session',
+      provider: 'anthropic',
+      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
+    });
+
+    // Create manual components for controlled testing
     threadManager = new ThreadManager();
     mockProvider = new MockProviderWithToolCalls();
     const toolExecutor = new ToolExecutor();
@@ -76,7 +104,9 @@ describe('EventApprovalCallback Integration Tests', () => {
     toolExecutor.registerTool('bash', new BashTool());
 
     const threadId = threadManager.generateThreadId();
-    threadManager.createThread(threadId);
+
+    // Create thread WITH session ID so _getFullSession() can find it
+    threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
       provider: mockProvider,
@@ -86,12 +116,21 @@ describe('EventApprovalCallback Integration Tests', () => {
       tools: [new BashTool()], // Enable bash tool
     });
 
+    // Use the SAME threadManager instance everywhere
+    threadManager = agent.threadManager;
+
     // Set up the EventApprovalCallback
-    const approvalCallback = new EventApprovalCallback(agent, threadManager, threadId);
+    const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Stop the agent first to prevent any ongoing operations
+    if (agent) {
+      agent.stop();
+      // Wait a moment for any pending operations to abort
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     teardownTestPersistence();
   });
 
@@ -111,8 +150,8 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Start agent conversation - this creates TOOL_CALL events and triggers approval
     const conversationPromise = agent.sendMessage('Please run ls command');
 
-    // Wait for tool call and approval request to be created
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for tool calls to be processed (but not for full conversation completion)
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check that both TOOL_CALL and TOOL_APPROVAL_REQUEST events were created
     const events = threadManager.getEvents(agent.threadId);
@@ -130,15 +169,20 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(approvalRequestEvent?.data).toEqual({ toolCallId: 'call_test' });
 
     // Simulate user approval
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_test',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_test',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
     // Wait for conversation to complete
     await conversationPromise;
+
+    // Add delay to allow async tool execution to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Verify tool was executed (TOOL_RESULT event exists)
     const finalEvents = threadManager.getEvents(agent.threadId);
@@ -168,10 +212,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(approvalRequestEvent).toBeDefined();
 
     // Simulate user denial
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_deny',
-      decision: ApprovalDecision.DENY,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_deny',
+        decision: ApprovalDecision.DENY,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
@@ -214,10 +260,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(firstApprovalRequest).toBeDefined();
 
     // Approve first tool call to allow second one to be processed
-    const response1Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_multi_1',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const response1Event = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_multi_1',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
 
@@ -229,15 +277,20 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(approvalRequests).toHaveLength(2);
 
     // Approve second tool call
-    const response2Event = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_multi_2',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const response2Event = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_multi_2',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: response2Event, threadId: agent.threadId });
 
     // Wait for conversation to complete
     await conversationPromise;
+
+    // Add delay to allow async tool execution to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Both tools should have executed
     const finalEvents = threadManager.getEvents(agent.threadId);
@@ -313,12 +366,108 @@ describe('EventApprovalCallback Integration Tests', () => {
     });
 
     // Complete the test
-    const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_emit_test',
-      decision: ApprovalDecision.ALLOW_ONCE,
-    });
+    const responseEvent = expectEventAdded(
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_emit_test',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      })
+    );
 
     agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
     await conversationPromise;
+
+    // Wait for agent to return to idle state (all async operations complete)
+    await new Promise<void>((resolve) => {
+      const checkForIdle = () => {
+        if (agent.getCurrentState() === 'idle') {
+          resolve();
+        } else {
+          setTimeout(checkForIdle, 10);
+        }
+      };
+      checkForIdle();
+    });
+  });
+
+  describe('direct requestApproval method behavior', () => {
+    it('should throw ApprovalPendingError when approval is needed', async () => {
+      // Setup tool call event
+      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+        id: 'call_test',
+        name: 'bash',
+        arguments: { command: 'ls' },
+      });
+
+      const approvalCallback = new EventApprovalCallback(agent);
+
+      // Should throw pending error instead of blocking
+      await expect(
+        approvalCallback.requestApproval({
+          id: 'call_test',
+          name: 'bash',
+          arguments: { command: 'ls' },
+        })
+      ).rejects.toThrow(ApprovalPendingError);
+
+      // Verify approval request was created
+      const events = threadManager.getEvents(agent.threadId);
+      const approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      expect(approvalRequest).toBeDefined();
+      expect(approvalRequest?.data).toEqual({ toolCallId: 'call_test' });
+    });
+
+    it('should return existing approval decision if already present', async () => {
+      // Setup tool call and approval response events
+      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+        id: 'call_existing',
+        name: 'bash',
+        arguments: { command: 'pwd' },
+      });
+
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
+        toolCallId: 'call_existing',
+        decision: ApprovalDecision.ALLOW_SESSION,
+      });
+
+      const approvalCallback = new EventApprovalCallback(agent);
+
+      // Should return existing decision instead of throwing
+      const decision = await approvalCallback.requestApproval({
+        id: 'call_existing',
+        name: 'bash',
+        arguments: { command: 'pwd' },
+      });
+      expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
+    });
+
+    it('should not create duplicate approval requests', async () => {
+      // Setup tool call event
+      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
+        id: 'call_duplicate',
+        name: 'bash',
+        arguments: { command: 'echo test' },
+      });
+
+      // Add existing approval request
+      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_REQUEST', {
+        toolCallId: 'call_duplicate',
+      });
+
+      const approvalCallback = new EventApprovalCallback(agent);
+
+      // Should still throw ApprovalPendingError but not create duplicate request
+      await expect(
+        approvalCallback.requestApproval({
+          id: 'call_duplicate',
+          name: 'bash',
+          arguments: { command: 'echo test' },
+        })
+      ).rejects.toThrow(ApprovalPendingError);
+
+      // Should still have only one approval request
+      const events = threadManager.getEvents(agent.threadId);
+      const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      expect(approvalRequests).toHaveLength(1);
+    });
   });
 });

@@ -8,6 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { ThreadEvent } from '~/threads/types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { expectEventAdded } from '~/test-utils/event-helpers';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -154,9 +155,15 @@ describe('Agent Thread Events', () => {
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
 
-      const event1 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 1');
-      const event2 = threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Response 1');
-      const event3 = threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 2');
+      const event1 = expectEventAdded(
+        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 1')
+      );
+      const event2 = expectEventAdded(
+        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Response 1')
+      );
+      const event3 = expectEventAdded(
+        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 2')
+      );
 
       const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);

@@ -106,37 +106,28 @@ describe('Event-Based Tool Approval Integration', () => {
       throw new Error('Approval callback not found');
     }
 
-    // Start approval request (this should create TOOL_APPROVAL_REQUEST event)
-    const approvalPromise = toolExecutor.approvalCallback.requestApproval('file-read', {
-      path: testFilePath,
-    });
+    // Start approval request (this should create TOOL_APPROVAL_REQUEST event and throw ApprovalPendingError)
+    try {
+      await toolExecutor.approvalCallback.requestApproval({
+        id: 'test-call-123',
+        name: 'file-read',
+        arguments: {
+          file_path: testFilePath,
+        },
+      });
+      throw new Error('Expected ApprovalPendingError to be thrown');
+    } catch (error: unknown) {
+      // Verify that ApprovalPendingError was thrown with correct toolCallId
+      expect(error).toBeInstanceOf(Error);
+      const approvalError = error as { toolCallId?: string };
+      expect(approvalError.toolCallId).toBe('test-call-123');
+    }
 
     // Verify TOOL_APPROVAL_REQUEST event was created
     const events = agent.threadManager.getEvents(agent.threadId);
     const approvalRequestEvent = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequestEvent).toBeDefined();
     expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
-
-    // Simulate approval response by adding TOOL_APPROVAL_RESPONSE event and triggering agent emission
-    const approvalResponseEvent = agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'test-call-123',
-      decision: 'allow_once',
-    });
-    
-    // Manually trigger the agent's event emission (since we're bypassing the private _addEventAndEmit)
-    agent.emit('thread_event_added', { event: approvalResponseEvent, threadId: agent.threadId });
-
-    // Now the promise should resolve
-    const decision = await approvalPromise;
-    expect(decision).toBe('allow_once');
-
-    // Verify both events exist in thread
-    const finalEvents = agent.threadManager.getEvents(agent.threadId);
-    const requestEvent = finalEvents.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
-    const responseEvent = finalEvents.find(e => e.type === 'TOOL_APPROVAL_RESPONSE');
-    
-    expect(requestEvent).toBeDefined();
-    expect(responseEvent).toBeDefined();
   });
 
   it('should return existing approval if response already exists', async () => {
@@ -167,8 +158,12 @@ describe('Event-Based Tool Approval Integration', () => {
     }
 
     // Request approval - should return existing decision immediately
-    const decision = await toolExecutor.approvalCallback.requestApproval('file-read', {
-      path: testFilePath,
+    const decision = await toolExecutor.approvalCallback.requestApproval({
+      id: 'existing-call-456',
+      name: 'file-read',
+      arguments: {
+        file_path: testFilePath,
+      },
     });
 
     expect(decision).toBe('allow_session');

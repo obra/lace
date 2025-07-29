@@ -50,14 +50,21 @@ describe('TrimToolResultsStrategy', () => {
           threadId: 'test-thread',
           type: 'TOOL_RESULT',
           timestamp: new Date(),
-          data: longResult,
+          data: {
+            id: 'tool-call-1',
+            content: [{ type: 'text', text: longResult }],
+            isError: false,
+          },
         },
       ];
 
       const result = await strategy.compact(events, mockContext);
 
       const compactionData = result.data as unknown as CompactionData;
-      expect(compactionData.compactedEvents[0].data).toBe(
+      const compactedResult = compactionData.compactedEvents[0].data as {
+        content: Array<{ type: string; text: string }>;
+      };
+      expect(compactedResult.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
     });
@@ -70,14 +77,21 @@ describe('TrimToolResultsStrategy', () => {
           threadId: 'test-thread',
           type: 'TOOL_RESULT',
           timestamp: new Date(),
-          data: shortResult,
+          data: {
+            id: 'tool-call-2',
+            content: [{ type: 'text', text: shortResult }],
+            isError: false,
+          },
         },
       ];
 
       const result = await strategy.compact(events, mockContext);
 
       const compactionData = result.data as unknown as CompactionData;
-      expect(compactionData.compactedEvents[0].data).toBe(shortResult);
+      const compactedResult = compactionData.compactedEvents[0].data as {
+        content: Array<{ type: string; text: string }>;
+      };
+      expect(compactedResult.content[0].text).toBe(shortResult);
     });
 
     it('handles ToolResult objects with content array', async () => {
@@ -120,7 +134,11 @@ describe('TrimToolResultsStrategy', () => {
           threadId: 'test-thread',
           type: 'TOOL_RESULT',
           timestamp: new Date(),
-          data: 'line1\nline2\nline3\nline4',
+          data: {
+            id: 'tool-call-3',
+            content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
+            isError: false,
+          },
         },
         {
           id: 'e2',

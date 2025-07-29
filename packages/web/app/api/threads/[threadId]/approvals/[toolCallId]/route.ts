@@ -2,29 +2,56 @@
 // ABOUTME: Web-specific route that delegates to core event system
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/lib/server/lace-imports';
+import { ThreadIdSchema, ToolCallIdSchema } from '@/lib/validation/schemas';
+
+// Validation schemas
+const ParamsSchema = z.object({
+  threadId: ThreadIdSchema,
+  toolCallId: ToolCallIdSchema,
+});
+
+const BodySchema = z.object({
+  decision: z.enum(['allow_once', 'allow_session', 'deny'], {
+    errorMap: () => ({ message: 'Decision must be "allow_once", "allow_session", or "deny"' }),
+  }),
+});
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ threadId: string; toolCallId: string }> }
 ): Promise<NextResponse> {
   try {
-    const { threadId, toolCallId } = await params;
+    // Validate parameters
+    const paramsResult = ParamsSchema.safeParse(await params);
+    if (!paramsResult.success) {
+      return NextResponse.json({ 
+        error: 'Invalid parameters',
+        details: paramsResult.error.format()
+      }, { status: 400 });
+    }
     
-    // Parse request body
-    let body: { decision?: string };
+    const { threadId, toolCallId } = paramsResult.data;
+    
+    // Parse and validate request body
+    let requestBody: unknown;
     try {
-      body = await request.json() as { decision?: string };
+      requestBody = await request.json();
     } catch (_error) {
       return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
     
-    const { decision } = body;
-    
-    if (!decision) {
-      return NextResponse.json({ error: 'Missing decision in request body' }, { status: 400 });
+    const bodyResult = BodySchema.safeParse(requestBody);
+    if (!bodyResult.success) {
+      return NextResponse.json({ 
+        error: 'Invalid request body',
+        details: bodyResult.error.format()
+      }, { status: 400 });
     }
+    
+    const { decision } = bodyResult.data;
     
     // Get session first, then agent (following existing pattern)
     const sessionService = getSessionService();
@@ -44,14 +71,8 @@ export async function POST(
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
     
-    // Create approval response event and emit it so EventApprovalCallback receives it
-    const event = agent.threadManager.addEvent(asThreadId(threadId), 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId,
-      decision
-    });
-    
-    // Emit the event so the EventApprovalCallback can receive it and continue tool execution
-    agent.emit('thread_event_added', { event, threadId: asThreadId(threadId) });
+    // Use Agent interface - no direct ThreadManager access
+    await agent.handleApprovalResponse(toolCallId, decision);
     
     return NextResponse.json({ success: true });
   } catch (_error) {

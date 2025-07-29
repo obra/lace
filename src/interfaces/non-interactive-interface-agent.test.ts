@@ -8,6 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { asThreadId } from '~/threads/types';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -75,7 +76,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
       const testThreadId = 'test-thread-123';
       const agentGenerateThreadIdSpy = vi
         .spyOn(agent, 'generateThreadId')
-        .mockReturnValue(testThreadId);
+        .mockReturnValue(asThreadId(testThreadId));
       const agentCreateThreadSpy = vi.spyOn(agent, 'createThread');
 
       // Execute clearSession

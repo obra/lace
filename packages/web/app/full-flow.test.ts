@@ -47,8 +47,12 @@ describe('Full Conversation Flow', () => {
     sessionService = getSessionService();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Stop all agents first to prevent async operations after database closure
+    await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
+    // Wait a moment for any pending operations to abort
+    await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
   });
 
