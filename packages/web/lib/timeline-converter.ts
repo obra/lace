@@ -261,15 +261,6 @@ function convertEvent(
         },
       };
 
-    case 'THINKING':
-      return {
-        id,
-        type: 'ai',
-        content: `${agent} is thinking...`,
-        timestamp,
-        agent: agent,
-      };
-
     case 'LOCAL_SYSTEM_MESSAGE':
       return {
         id,

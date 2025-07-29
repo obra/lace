@@ -87,6 +87,21 @@ export const LaceApp = memo(function LaceApp() {
     clearApprovalRequest,
   } = useSessionEvents(selectedSession, selectedAgent);
 
+  // Reset thinking indicator when agent completes response or encounters error
+  useEffect(() => {
+    if (events?.length > 0) {
+      const lastEvent = events[events.length - 1];
+      if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
+          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
+           lastEvent.data?.content && 
+           (lastEvent.data.content.toLowerCase().includes('error') || 
+            lastEvent.data.content.toLowerCase().includes('failed') ||
+            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
+        setSendingMessage(false);
+      }
+    }
+  }, [events]);
+
   // Add task manager hook when project and session are selected
   const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 

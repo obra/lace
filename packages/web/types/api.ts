@@ -69,7 +69,6 @@ type _SessionEventType =
   | 'AGENT_MESSAGE'
   | 'TOOL_CALL'
   | 'TOOL_RESULT'
-  | 'THINKING'
   | 'LOCAL_SYSTEM_MESSAGE'
   | 'SYSTEM_PROMPT'
   | 'USER_SYSTEM_PROMPT';
@@ -91,10 +90,6 @@ export interface ToolCallEventData {
 export interface ToolResultEventData {
   toolName: string;
   result: unknown;
-}
-
-export interface ThinkingEventData {
-  status: 'start' | 'complete';
 }
 
 export interface LocalSystemMessageEventData {
@@ -141,12 +136,6 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: Date;
       data: ToolResultEventData;
-    }
-  | {
-      type: 'THINKING';
-      threadId: ThreadId;
-      timestamp: Date;
-      data: ThinkingEventData;
     }
   | {
       type: 'LOCAL_SYSTEM_MESSAGE';

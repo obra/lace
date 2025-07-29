@@ -5,11 +5,7 @@ import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
-import {
-  Session as SessionType,
-  Agent as AgentType,
-  SessionEvent,
-} from '@/types/api';
+import { Session as SessionType, Agent as AgentType, SessionEvent } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
 
 // Active session instances
@@ -133,26 +129,6 @@ export class SessionService {
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     const sseManager = SSEManager.getInstance();
     const threadId = agent.threadId;
-
-    agent.on('agent_thinking_start', () => {
-      const event: SessionEvent = {
-        type: 'THINKING',
-        threadId,
-        timestamp: new Date(),
-        data: { status: 'start' },
-      };
-      sseManager.broadcast(sessionId, event);
-    });
-
-    agent.on('agent_thinking_complete', () => {
-      const event: SessionEvent = {
-        type: 'THINKING',
-        threadId,
-        timestamp: new Date(),
-        data: { status: 'complete' },
-      };
-      sseManager.broadcast(sessionId, event);
-    });
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
       const event: SessionEvent = {
@@ -285,7 +261,7 @@ export class SessionService {
         
         sseManager.broadcast(sessionId, sessionEvent);
       }
-    });
+    );
   }
 
   // Service layer methods to eliminate direct business logic calls from API routes
