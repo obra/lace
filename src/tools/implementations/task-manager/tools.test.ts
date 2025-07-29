@@ -17,7 +17,34 @@ import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ProviderRegistry } from '~/providers/registry';
 import type { TaskManager } from '~/tasks/task-manager';
+
+// Mock provider for testing agent spawning
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'mock response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Enhanced Task Manager Tools', () => {
   const _tempDirContext = useTempLaceDir();
@@ -31,6 +58,7 @@ describe('Enhanced Task Manager Tools', () => {
   let taskUpdateTool: TaskUpdateTool;
   let taskAddNoteTool: TaskAddNoteTool;
   let taskViewTool: TaskViewTool;
+  let mockProvider: MockProvider;
 
   const parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
@@ -38,9 +66,29 @@ describe('Enhanced Task Manager Tools', () => {
 
   beforeEach(() => {
     setupTestPersistence();
+    mockProvider = new MockProvider();
 
-    // Create session with real TaskManager integration
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+      (_name: string, _config?: unknown) => {
+        return mockProvider;
+      }
+    );
+
+    // Also mock the static createWithAutoDiscovery method
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
+      const mockRegistry = {
+        createProvider: () => mockProvider,
+        getProvider: () => mockProvider,
+        getProviderNames: () => ['anthropic', 'openai'],
+      } as ProviderRegistry;
+      return mockRegistry;
+    });
+
+    // Create project first
     project = Project.create('Test Project', '/tmp/test-tools');
+
+    // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Tool Test Session',
       provider: 'anthropic',
@@ -151,8 +199,16 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
+      if (result.isError) {
+        console.log('ERROR:', result.content?.[0]?.text);
+      }
+
       expect(result.isError).toBe(false);
-      expect(result.content?.[0]?.text).toContain('new:anthropic/claude-3-haiku');
+      // After agent spawning, the task should be assigned to the spawned agent thread ID
+      expect(result.content?.[0]?.text).toContain('Research task');
+      expect(result.content?.[0]?.text).toContain('assigned to');
+      // The assignment should be to a delegate thread ID, not the original spec
+      expect(result.content?.[0]?.text).toMatch(/assigned to \w+\.\d+/);
     });
 
     it('should validate required fields', async () => {
@@ -218,11 +274,11 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should list my tasks', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskListTool.execute(
         {
           filter: 'mine',
         },
-        context
+        { ...context, threadId: agent1ThreadId }
       );
 
       expect(result.isError).toBe(false);
@@ -232,7 +288,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should list all thread tasks', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskListTool.execute(
         {
           filter: 'thread',
         },
@@ -247,7 +303,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should list tasks I created', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskListTool.execute(
         {
           filter: 'created',
         },
@@ -316,7 +372,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should update task status', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           status: 'in_progress',
@@ -334,7 +390,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should validate status values', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           status: 'invalid' as 'pending' | 'in_progress' | 'completed',
@@ -347,7 +403,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should handle non-existent task', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId: 'task_99999999_nonexist',
           status: 'completed',
@@ -360,7 +416,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should reassign task to another agent', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           assignTo: agent2ThreadId,
@@ -380,7 +436,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should assign to new agent spec', async () => {
       const newAgentSpec = createNewAgentSpec('openai', 'gpt-4');
 
-      const result = await taskCreateTool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           assignTo: newAgentSpec,
@@ -389,11 +445,13 @@ describe('Enhanced Task Manager Tools', () => {
       );
 
       expect(result.isError).toBe(false);
-      expect(result.content?.[0]?.text).toContain('new:openai/gpt-4');
+      // After agent spawning, assignment should be to delegate thread ID
+      expect(result.content?.[0]?.text).toContain('assigned to');
+      expect(result.content?.[0]?.text).toMatch(/assigned to \w+\.\d+/);
     });
 
     it('should validate assignee format', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           assignTo: 'invalid',
@@ -422,7 +480,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should add note to task', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskAddNoteTool.execute(
         {
           taskId,
           note: 'Started working on this task',
@@ -438,7 +496,7 @@ describe('Enhanced Task Manager Tools', () => {
       expect(viewResult.isError).toBe(false);
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('Started working on this task');
-      expect(taskDetails).toContain(agent1ThreadId);
+      expect(taskDetails).toContain(session.getId()); // Note author should be session ID
       // Should have 1 note in the output
       const noteMatches = taskDetails.match(/\d+\. \[/g);
       expect(noteMatches).toHaveLength(1);
@@ -510,7 +568,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should view task details', async () => {
-      const result = await taskCreateTool.execute({ taskId }, context);
+      const result = await taskViewTool.execute({ taskId }, context);
 
       expect(result.isError).toBe(false);
       const text = result.content?.[0]?.text || '';
@@ -524,7 +582,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should handle non-existent task', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await taskViewTool.execute(
         {
           taskId: 'task_99999999_nonexist',
         },
@@ -552,7 +610,13 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should complete a task', async () => {
-      const result = await taskCreateTool.execute({ id: taskId }, context);
+      const result = await _taskCompleteTool.execute(
+        {
+          id: taskId,
+          message: 'Task completed successfully',
+        },
+        context
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content?.[0]?.text).toContain('Completed task');
@@ -564,9 +628,10 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should handle non-existent task', async () => {
-      const result = await taskCreateTool.execute(
+      const result = await _taskCompleteTool.execute(
         {
           id: 'task_99999999_nonexist',
+          message: 'This should fail',
         },
         context
       );

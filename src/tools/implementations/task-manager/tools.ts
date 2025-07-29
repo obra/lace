@@ -8,25 +8,45 @@ import type { ToolResult, ToolContext } from '~/tools/types';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 
-// Single task schema - extracted for reuse
-const singleTaskSchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().max(1000).optional(),
-  prompt: z.string().min(1),
-  priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
-  assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
-});
+// Single schema that supports both single and bulk task creation
+const createTaskSchema = z
+  .object({
+    // Single task fields (mutually exclusive with tasks array)
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().max(1000).optional(),
+    prompt: z.string().min(1).optional(),
+    priority: z
+      .enum(['high', 'medium', 'low'] as const)
+      .default('medium')
+      .optional(),
+    assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
 
-// Bulk tasks schema
-const bulkTasksSchema = z.object({
-  tasks: z
-    .array(singleTaskSchema)
-    .min(1, 'Must provide at least 1 task')
-    .max(20, 'Cannot create more than 20 tasks at once'),
-});
-
-// Union schema supporting both formats
-const createTaskSchema = z.union([singleTaskSchema, bulkTasksSchema]);
+    // Bulk tasks array (mutually exclusive with single task fields)
+    tasks: z
+      .array(
+        z.object({
+          title: z.string().min(1).max(200),
+          description: z.string().max(1000).optional(),
+          prompt: z.string().min(1),
+          priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
+          assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
+        })
+      )
+      .min(1, 'Must provide at least 1 task')
+      .max(20, 'Cannot create more than 20 tasks at once')
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      // Either single task fields OR tasks array must be provided, not both
+      const hasSingleTask = data.title && data.prompt;
+      const hasBulkTasks = data.tasks && data.tasks.length > 0;
+      return hasSingleTask !== hasBulkTasks; // XOR logic
+    },
+    {
+      message: 'Must provide either single task fields (title, prompt) OR tasks array, not both',
+    }
+  );
 
 export class TaskCreateTool extends Tool {
   name = 'task_add';
@@ -104,7 +124,17 @@ Bulk planning: task_add({ tasks: [
       };
 
       // Determine if single task or bulk tasks
-      const tasksToCreate = 'tasks' in args ? args.tasks : [args];
+      const tasksToCreate = args.tasks
+        ? args.tasks
+        : [
+            {
+              title: args.title!,
+              description: args.description,
+              prompt: args.prompt!,
+              priority: args.priority || 'medium',
+              assignedTo: args.assignedTo,
+            },
+          ];
 
       // Validate all assignees before creating any tasks
       for (const taskData of tasksToCreate) {
