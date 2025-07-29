@@ -108,7 +108,7 @@ describe('convertSessionEventsToTimeline', () => {
     );
   });
 
-  test('converts TOOL_CALL to tool timeline entry', () => {
+  test('converts TOOL_CALL to aggregated tool timeline entry', () => {
     const events: SessionEvent[] = [mockSessionEvents[2]];
     const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
@@ -117,16 +117,19 @@ describe('convertSessionEventsToTimeline', () => {
       expect.objectContaining({
         id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'tool',
-        content: 'Tool: file_read',
+        content: 'file_read',
         tool: 'file_read',
         timestamp: new Date('2025-07-21T10:31:00Z'),
         agent: 'Claude',
+        metadata: expect.objectContaining({
+          arguments: { path: '/src/types.ts', limit: 100 },
+        }),
       })
     );
   });
 
-  test('converts TOOL_RESULT to tool timeline entry with result', () => {
-    const events: SessionEvent[] = [mockSessionEvents[3]];
+  test('converts TOOL_CALL and TOOL_RESULT pair to aggregated tool timeline entry', () => {
+    const events: SessionEvent[] = [mockSessionEvents[2], mockSessionEvents[3]]; // TOOL_CALL + TOOL_RESULT
     const result: TimelineEntry[] = convertSessionEventsToTimeline(events, defaultContext);
 
     expect(result).toHaveLength(1);
@@ -134,10 +137,14 @@ describe('convertSessionEventsToTimeline', () => {
       expect.objectContaining({
         id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
         type: 'tool',
-        content: expect.stringContaining('interface User') as string,
+        content: 'file_read',
+        tool: 'file_read',
         result: expect.stringContaining('interface User') as string,
-        timestamp: new Date('2025-07-21T10:31:15Z'),
+        timestamp: new Date('2025-07-21T10:31:00Z'), // Uses TOOL_CALL timestamp
         agent: 'Claude',
+        metadata: expect.objectContaining({
+          arguments: { path: '/src/types.ts', limit: 100 },
+        }),
       })
     );
   });
@@ -182,8 +189,8 @@ describe('convertSessionEventsToTimeline', () => {
     const result = convertSessionEventsToTimeline(mockSessionEvents, contextWithSelectedAgent);
 
     // Should include: user message + agent-1 messages, exclude agent-2 messages
-    // Expecting: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, LOCAL_SYSTEM_MESSAGE
-    expect(result).toHaveLength(6);
+    // Expecting: USER_MESSAGE, AGENT_MESSAGE, TOOL_AGGREGATED (call+result), THINKING, LOCAL_SYSTEM_MESSAGE
+    expect(result).toHaveLength(5);
 
     // Verify agent filtering - no events from other agents
     const agentEventThreadIds = result
