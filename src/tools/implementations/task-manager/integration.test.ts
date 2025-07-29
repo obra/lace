@@ -13,9 +13,46 @@ import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ProviderRegistry } from '~/providers/registry';
+
+// Mock provider for testing integration
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'Mock integration response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Multi-Agent Task Manager Integration', () => {
   const _tempDirContext = useTempLaceDir();
+  let session: Session;
+  let project: Project;
+  let mockProvider: MockProvider;
+  let createTool: TaskCreateTool;
+  let listTool: TaskListTool;
+  let updateTool: TaskUpdateTool;
+  let noteTool: TaskAddNoteTool;
+  let viewTool: TaskViewTool;
 
   // Simulate three agents in a parent thread
   const parentThreadId = asThreadId('lace_20250703_parent');
@@ -34,21 +71,54 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   beforeEach(() => {
     setupTestPersistence();
-    // No special setup needed - tools and tests use same database via LACE_DIR
+    mockProvider = new MockProvider();
+
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+      (_name: string, _config?: unknown) => {
+        return mockProvider;
+      }
+    );
+
+    // Also mock the static createWithAutoDiscovery method
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
+      const mockRegistry = {
+        createProvider: () => mockProvider,
+        getProvider: () => mockProvider,
+        getProviderNames: () => ['anthropic', 'openai'],
+      } as ProviderRegistry;
+      return mockRegistry;
+    });
+
+    // Create project first
+    project = Project.create('Integration Test Project', '/tmp/test-integration');
+
+    // Create session with anthropic - the provider will be mocked
+    session = Session.create({
+      name: 'Integration Test Session',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      projectId: project.getId(),
+    });
+
+    // Get tools from session agent's toolExecutor
+    const agent = session.getAgent(session.getId());
+    const toolExecutor = agent!.toolExecutor;
+    createTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    listTool = toolExecutor.getTool('task_list') as TaskListTool;
+    updateTool = toolExecutor.getTool('task_update') as TaskUpdateTool;
+    noteTool = toolExecutor.getTool('task_add_note') as TaskAddNoteTool;
+    viewTool = toolExecutor.getTool('task_view') as TaskViewTool;
   });
 
   afterEach(() => {
-    teardownTestPersistence();
     vi.clearAllMocks();
+    session?.destroy();
+    teardownTestPersistence();
   });
 
   describe('Multi-agent task workflow', () => {
     it('should support full lifecycle of multi-agent task collaboration', async () => {
-      const createTool = new TaskCreateTool();
-      const listTool = new TaskListTool();
-      const updateTool = new TaskUpdateTool();
-      const noteTool = new TaskAddNoteTool();
-
       // Step 1: Main agent creates a task
       const createResult = await createTool.execute(
         {
@@ -143,7 +213,6 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(listResult3.content?.[0]?.text).toContain('Implement user authentication');
 
       // Step 9: Verify task has all notes using TaskViewTool
-      const viewTool = new TaskViewTool();
       const finalViewResult = await viewTool.execute({ taskId }, mainAgentContext);
       expect(finalViewResult.isError).toBe(false);
 
@@ -160,10 +229,6 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   describe('New agent assignment workflow', () => {
     it('should handle task assignment to new agent specification', async () => {
-      const createTool = new TaskCreateTool();
-      const _listTool = new TaskListTool();
-      const updateTool = new TaskUpdateTool();
-
       // Create task assigned to a new agent spec
       const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
       const createResult = await createTool.execute(
@@ -180,11 +245,12 @@ describe('Multi-Agent Task Manager Integration', () => {
       const taskId = createResult.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
 
       // Verify task shows new agent assignment using TaskViewTool
-      const viewTool = new TaskViewTool();
       const viewResult = await viewTool.execute({ taskId }, mainAgentContext);
       expect(viewResult.isError).toBe(false);
-      expect(viewResult.content?.[0]?.text).toContain('new:anthropic/claude-3-haiku');
-      expect(viewResult.content?.[0]?.text).toContain('pending');
+      // After agent spawning, the task should be assigned to the spawned agent thread ID
+      const taskDetails = viewResult.content?.[0]?.text || '';
+      expect(taskDetails).toMatch(/Assigned to: \w+\.\d+/); // Should show delegate thread ID
+      expect(taskDetails).toContain('in_progress'); // Should be in progress after spawning
 
       // Later, reassign to actual agent
       const actualAgentResult = await updateTool.execute(
@@ -198,24 +264,20 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(actualAgentResult.isError).toBe(false);
 
       // Verify reassignment using TaskViewTool
-      const viewTool2 = new TaskViewTool();
-      const viewResult2 = await viewTool2.execute({ taskId }, mainAgentContext);
+      const viewResult2 = await viewTool.execute({ taskId }, mainAgentContext);
       expect(viewResult2.isError).toBe(false);
       expect(viewResult2.content?.[0]?.text).toContain(agent3Context.threadId!);
     });
   });
 
-  describe('Thread isolation', () => {
-    it('should isolate tasks between different parent threads', async () => {
+  describe('Thread task visibility', () => {
+    it('should share tasks between threads in the same session', async () => {
       // Create a different parent thread context
       const otherParentThreadId = asThreadId('lace_20250703_other1');
       const otherAgentContext: ToolContext = {
         threadId: asThreadId('lace_20250703_other1.1'),
         parentThreadId: otherParentThreadId,
       };
-
-      const createTool = new TaskCreateTool();
-      const listTool = new TaskListTool();
 
       // Create task in main thread
       await createTool.execute(
@@ -237,7 +299,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         otherAgentContext
       );
 
-      // Main agent should only see main thread task
+      // Both agents should see all tasks in the session (collaborative context)
       const mainListResult = await listTool.execute(
         {
           filter: 'thread',
@@ -246,9 +308,9 @@ describe('Multi-Agent Task Manager Integration', () => {
       );
 
       expect(mainListResult.content?.[0]?.text).toContain('Main thread task');
-      expect(mainListResult.content?.[0]?.text).not.toContain('Other thread task');
+      expect(mainListResult.content?.[0]?.text).toContain('Other thread task');
 
-      // Other agent should only see other thread task
+      // Other agent should also see both tasks
       const otherListResult = await listTool.execute(
         {
           filter: 'thread',
@@ -257,15 +319,73 @@ describe('Multi-Agent Task Manager Integration', () => {
       );
 
       expect(otherListResult.content?.[0]?.text).toContain('Other thread task');
-      expect(otherListResult.content?.[0]?.text).not.toContain('Main thread task');
+      expect(otherListResult.content?.[0]?.text).toContain('Main thread task');
+    });
+  });
+
+  describe('Session isolation', () => {
+    it('should isolate tasks between different sessions', async () => {
+      // Create a second session with different project
+      const project2 = Project.create('Session 2 Project', '/tmp/test-session2');
+      const session2 = Session.create({
+        name: 'Session 2 Test',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-20250514',
+        projectId: project2.getId(),
+      });
+
+      // Get tools from second session
+      const agent2 = session2.getAgent(session2.getId());
+      const toolExecutor2 = agent2!.toolExecutor;
+      const createTool2 = toolExecutor2.getTool('task_add') as TaskCreateTool;
+      const listTool2 = toolExecutor2.getTool('task_list') as TaskListTool;
+
+      const session2Context = {
+        threadId: session2.getId(),
+        parentThreadId: session2.getId(),
+      };
+
+      try {
+        // Create task in first session
+        await createTool.execute(
+          {
+            title: 'Session 1 task',
+            prompt: 'Task in session 1',
+            priority: 'high',
+          },
+          mainAgentContext
+        );
+
+        // Create task in second session
+        await createTool2.execute(
+          {
+            title: 'Session 2 task',
+            prompt: 'Task in session 2',
+            priority: 'medium',
+          },
+          session2Context
+        );
+
+        // Session 1 should only see its own task
+        const session1ListResult = await listTool.execute({ filter: 'thread' }, mainAgentContext);
+
+        expect(session1ListResult.content?.[0]?.text).toContain('Session 1 task');
+        expect(session1ListResult.content?.[0]?.text).not.toContain('Session 2 task');
+
+        // Session 2 should only see its own task
+        const session2ListResult = await listTool2.execute({ filter: 'thread' }, session2Context);
+
+        expect(session2ListResult.content?.[0]?.text).toContain('Session 2 task');
+        expect(session2ListResult.content?.[0]?.text).not.toContain('Session 1 task');
+      } finally {
+        // Clean up second session
+        session2.destroy();
+      }
     });
   });
 
   describe('Concurrent access', () => {
     it('should handle concurrent task updates', async () => {
-      const createTool = new TaskCreateTool();
-      const noteTool = new TaskAddNoteTool();
-
       // Create a task
       const createResult = await createTool.execute(
         {
@@ -293,7 +413,6 @@ describe('Multi-Agent Task Manager Integration', () => {
       });
 
       // Verify all notes were added using TaskViewTool
-      const viewTool = new TaskViewTool();
       const viewResult = await viewTool.execute({ taskId }, mainAgentContext);
       expect(viewResult.isError).toBe(false);
 
@@ -310,9 +429,6 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   describe('Task filtering and visibility', () => {
     it('should correctly filter tasks by different criteria', async () => {
-      const createTool = new TaskCreateTool();
-      const listTool = new TaskListTool();
-
       // Create various tasks
       await createTool.execute(
         {
