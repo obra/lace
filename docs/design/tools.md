@@ -361,7 +361,257 @@ const delegateSchema = z.object({
 });
 ```
 
+## Tool Executor Architecture
+
+### Overview
+
+The ToolExecutor is the central hub for tool management and execution in Lace. Each Agent has its own ToolExecutor instance that manages tool registration, execution, and approval workflows.
+
+### Architecture Pattern
+
+```
+Session
+  └── Agent(s)
+      └── ToolExecutor
+          ├── Registered Tools
+          ├── Approval System
+          └── Execution Context
+```
+
+### Tool Registration and Dependency Injection
+
+#### Session-Level Tool Initialization
+
+Tools are registered at the session level with proper dependency injection:
+
+```typescript
+// src/sessions/session.ts
+private static initializeTools(toolExecutor: ToolExecutor, taskManager: TaskManager): void {
+  // Register non-task tools
+  const nonTaskTools = [
+    new BashTool(),
+    new FileReadTool(),
+    new FileWriteTool(),
+    // ... other tools
+  ];
+  toolExecutor.registerTools(nonTaskTools);
+  
+  // Register task tools with TaskManager injection
+  const taskTools = createTaskManagerTools(() => taskManager);
+  toolExecutor.registerTools(taskTools);
+}
+```
+
+#### Task Manager Tools Factory
+
+Task-related tools require access to the session's TaskManager for proper integration:
+
+```typescript
+// src/tools/implementations/task-manager/index.ts
+export function createTaskManagerTools(getTaskManager: () => TaskManager): Tool[] {
+  const tools = [
+    new TaskCreateTool(),
+    new TaskListTool(),
+    new TaskUpdateTool(),
+    new TaskAddNoteTool(),
+    new TaskViewTool(),
+    new TaskCompleteTool(),
+  ];
+  
+  // Inject TaskManager getter into each tool
+  tools.forEach(tool => {
+    (tool as any).getTaskManager = getTaskManager;
+  });
+  
+  return tools;
+}
+```
+
+#### Accessing Tools in Production Code
+
+**Correct Pattern**: Access tools through the Agent's ToolExecutor:
+
+```typescript
+// Get the session agent
+const agent = session.getAgent(session.getId());
+const toolExecutor = agent.toolExecutor;
+
+// Get specific tools
+const bashTool = toolExecutor.getTool('bash') as BashTool;
+const taskCreateTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+
+// Execute tools with proper context
+const result = await bashTool.execute({ command: 'ls -la' }, context);
+```
+
+**Incorrect Pattern**: Direct tool instantiation:
+
+```typescript
+// ❌ Don't do this - no dependency injection
+const bashTool = new BashTool();
+const taskCreateTool = new TaskCreateTool(); // Missing TaskManager!
+```
+
+### Tool Context and Thread Management
+
+Tools receive context about the execution environment:
+
+```typescript
+interface ToolContext {
+  threadId?: ThreadId;          // Current thread
+  parentThreadId?: ThreadId;    // Parent thread for delegation
+  workingDirectory?: string;    // File operation context
+}
+```
+
+This context enables:
+- Thread-scoped task management
+- Proper file operation contexts
+- Multi-agent coordination
+- Session isolation
+
+### Session vs Thread Isolation
+
+#### Session-Level Sharing (Collaborative)
+Within a single session, threads share:
+- TaskManager instance
+- Tool execution context
+- Session-scoped data
+
+```typescript
+// Two threads in same session see each other's tasks
+const thread1Context = { threadId: 'session1.thread1', parentThreadId: 'session1' };
+const thread2Context = { threadId: 'session1.thread2', parentThreadId: 'session1' };
+
+// Both can see tasks created by either thread
+await taskListTool.execute({ filter: 'thread' }, thread1Context); // Shows all session tasks
+await taskListTool.execute({ filter: 'thread' }, thread2Context); // Shows all session tasks
+```
+
+#### Session-Level Isolation (Boundaries)
+Different sessions are completely isolated:
+- Separate TaskManager instances
+- Separate tool executors
+- No cross-session data access
+
+```typescript
+// Tasks from session1 never appear in session2
+const session1Tasks = await session1TaskList.execute({ filter: 'thread' }, session1Context);
+const session2Tasks = await session2TaskList.execute({ filter: 'thread' }, session2Context);
+// These lists will never intersect
+```
+
 ## Testing Tools
+
+### Testing Architecture Patterns
+
+#### Unit Tests vs Integration Tests
+
+**Unit Tests**: Test individual tool behavior in isolation
+- Direct tool instantiation is acceptable
+- Mock external dependencies
+- Focus on schema validation and business logic
+
+**Integration Tests**: Test tools within the full system context
+- Use Session/Agent/ToolExecutor pattern
+- Real dependency injection
+- Test actual system behavior
+
+#### Unit Test Pattern
+
+```typescript
+// Unit test - tests tool logic in isolation
+describe('BashTool Unit Tests', () => {
+  let tool: BashTool;
+  
+  beforeEach(() => {
+    tool = new BashTool(); // Direct instantiation OK for unit tests
+  });
+  
+  it('should validate command parameter', async () => {
+    const result = await tool.execute({ command: '' });
+    expect(result.isError).toBe(true);
+  });
+});
+```
+
+#### Integration Test Pattern
+
+```typescript
+// Integration test - tests tool within full system
+describe('Task Manager Integration Tests', () => {
+  let session: Session;
+  let project: Project;
+  let createTool: TaskCreateTool;
+  let listTool: TaskListTool;
+  
+  beforeEach(() => {
+    // Create real session with proper dependencies
+    project = Project.create('Test Project', '/tmp/test');
+    session = Session.create({
+      name: 'Test Session',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      projectId: project.getId(),
+    });
+    
+    // Get tools from session's toolExecutor (proper dependency injection)
+    const agent = session.getAgent(session.getId());
+    const toolExecutor = agent!.toolExecutor;
+    createTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    listTool = toolExecutor.getTool('task_list') as TaskListTool;
+  });
+  
+  afterEach(() => {
+    session?.destroy(); // Cleanup
+  });
+  
+  it('should create and list tasks with proper context', async () => {
+    const context = { threadId: session.getId() };
+    
+    // Create task using properly injected tool
+    await createTool.execute({
+      title: 'Test Task',
+      prompt: 'Do something',
+      priority: 'high'
+    }, context);
+    
+    // List tasks - should see the created task
+    const result = await listTool.execute({ filter: 'thread' }, context);
+    expect(result.content[0].text).toContain('Test Task');
+  });
+});
+```
+
+#### Mock Provider Pattern for Integration Tests
+
+```typescript
+// Create mock provider to avoid real API calls
+class MockProvider extends BaseMockProvider {
+  get providerName(): string { return 'mock'; }
+  get defaultModel(): string { return 'mock-model'; }
+  
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'Mock response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
+
+beforeEach(() => {
+  mockProvider = new MockProvider();
+  
+  // Mock the ProviderRegistry
+  vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+    () => mockProvider
+  );
+  
+  // Session creation will use mocked provider
+  session = Session.create({ /* ... */ });
+});
+```
 
 ### Test Structure
 

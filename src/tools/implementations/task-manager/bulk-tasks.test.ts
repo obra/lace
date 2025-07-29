@@ -1,23 +1,70 @@
 // ABOUTME: Tests for bulk task creation functionality in TaskCreateTool
 // ABOUTME: Validates both single task and bulk task creation scenarios with proper validation
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ProviderRegistry } from '~/providers/registry';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+
+// Mock provider for testing
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'Mock response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Bulk Task Creation', () => {
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
+  let mockProvider: MockProvider;
 
   beforeEach(() => {
     setupTestPersistence();
+    mockProvider = new MockProvider();
 
-    // Create session with TaskManager like real usage
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+      (_name: string, _config?: unknown) => {
+        return mockProvider;
+      }
+    );
+
+    // Also mock the static createWithAutoDiscovery method
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
+      const mockRegistry = {
+        createProvider: () => mockProvider,
+        getProvider: () => mockProvider,
+        getProviderNames: () => ['anthropic', 'openai'],
+      } as ProviderRegistry;
+      return mockRegistry;
+    });
+
+    // Create project first
     project = Project.create('Test Project', '/tmp/test-bulk-tasks');
 
+    // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Bulk Test Session',
       provider: 'anthropic',
@@ -25,16 +72,15 @@ describe('Bulk Task Creation', () => {
       projectId: project.getId(),
     });
 
-    // Get tool with proper TaskManager injection
-    tool = new TaskCreateTool();
-    const taskManager = session.getTaskManager();
-    const taskTool = tool as unknown as {
-      getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
-    };
-    taskTool.getTaskManager = () => taskManager;
+    // Get tool from session agent's toolExecutor
+    const agent = session.getAgent(session.getId());
+    const toolExecutor = agent!.toolExecutor;
+    tool = toolExecutor.getTool('task_add') as TaskCreateTool;
   });
 
   afterEach(() => {
+    vi.clearAllMocks();
+    session?.destroy();
     teardownTestPersistence();
   });
 
@@ -96,7 +142,7 @@ describe('Bulk Task Creation', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('maximum');
+    expect(result.content[0].text).toContain('Cannot create more than 20 tasks');
   });
 
   it('should handle single task object (backward compatibility)', async () => {
