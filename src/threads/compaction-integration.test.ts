@@ -78,7 +78,7 @@ describe('Compaction Integration', () => {
             },
           ],
           isError: false,
-        }),
+        }) as unknown,
       })
     );
     expect(workingEvents[3]).toEqual(
@@ -126,7 +126,7 @@ describe('Compaction Integration', () => {
             { type: 'text', text: 'line1\nline2\nline3\n[results truncated to save space.]' },
           ],
           isError: false,
-        }),
+        }) as unknown,
       })
     );
     expect(workingEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
@@ -182,7 +182,7 @@ describe('Compaction Integration', () => {
           id: 'call-first',
           content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
           isError: false,
-        }),
+        }) as unknown,
       })
     );
     expect(allEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
@@ -196,7 +196,7 @@ describe('Compaction Integration', () => {
           id: 'call-second',
           content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
           isError: false,
-        }),
+        }) as unknown,
       })
     );
     expect(allEvents[5]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
@@ -217,7 +217,7 @@ describe('Compaction Integration', () => {
             { type: 'text', text: 'long\nresult\nhere\n[results truncated to save space.]' },
           ],
           isError: false,
-        }),
+        }) as unknown,
       })
     );
     expect(workingEvents[2]).toEqual(
@@ -232,7 +232,7 @@ describe('Compaction Integration', () => {
             { type: 'text', text: 'another\nlong\nresult\n[results truncated to save space.]' },
           ],
           isError: false,
-        }),
+        }) as unknown,
       })
     );
 
@@ -300,7 +300,7 @@ describe('Compaction Integration', () => {
     expect(workingEvents[1].type).toBe('AGENT_MESSAGE');
     expect(workingEvents[1].data).toBe('First response');
     expect(workingEvents[2].type).toBe('TOOL_RESULT');
-    expect((workingEvents[2].data as any).content[0].text).toBe(
+    expect((workingEvents[2].data as { content: Array<{ text: string }> }).content[0].text).toBe(
       'long\ntool\nresult\n[results truncated to save space.]'
     );
     expect(workingEvents[3].type).toBe('USER_MESSAGE');
