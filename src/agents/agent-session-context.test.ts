@@ -51,10 +51,12 @@ describe('Agent Session Context', () => {
   describe('_getFullSession', () => {
     it('should retrieve the session that created the agent', async () => {
       // Test that agent can get its session
-      const retrievedSession = await (agent as any)._getFullSession();
+      const retrievedSession = await (
+        agent as unknown as { _getFullSession(): Promise<Session | undefined> }
+      )._getFullSession();
 
       expect(retrievedSession).toBeDefined();
-      expect(retrievedSession.getId()).toBe(session.getId());
+      expect(retrievedSession!.getId()).toBe(session.getId());
     });
 
     it('should return undefined if thread has no sessionId', async () => {
@@ -70,7 +72,9 @@ describe('Agent Session Context', () => {
         tools: [],
       });
 
-      const retrievedSession = await (orphanAgent as any)._getFullSession();
+      const retrievedSession = await (
+        orphanAgent as unknown as { _getFullSession(): Promise<Session | undefined> }
+      )._getFullSession();
       expect(retrievedSession).toBeUndefined();
     });
   });

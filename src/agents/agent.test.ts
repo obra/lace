@@ -160,7 +160,7 @@ describe('Enhanced Agent', () => {
     const threadId = threadManager.generateThreadId();
     // Create thread WITH session ID so _getFullSession() can find it
     threadManager.createThread(threadId, session.getId());
-    
+
     const defaultConfig: AgentConfig = {
       provider: mockProvider,
       toolExecutor,
@@ -882,7 +882,7 @@ describe('Enhanced Agent', () => {
         requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
       };
       toolExecutor.setApprovalCallback(autoApprovalCallback);
-      
+
       // Mock ToolExecutor.executeTool to track calls
       const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
 
@@ -1658,9 +1658,13 @@ describe('Enhanced Agent', () => {
   describe('System prompt event handling', () => {
     it('should skip SYSTEM_PROMPT and USER_SYSTEM_PROMPT events in conversation building', async () => {
       agent = createAgent();
-      
+
       // Manually add system prompt events to thread (simulating what Agent.start() does)
-      threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'You are a helpful AI assistant.');
+      threadManager.addEvent(
+        agent.getThreadId(),
+        'SYSTEM_PROMPT',
+        'You are a helpful AI assistant.'
+      );
       threadManager.addEvent(agent.getThreadId(), 'USER_SYSTEM_PROMPT', 'Always be concise.');
 
       // Add a user message
@@ -1742,7 +1746,7 @@ describe('Enhanced Agent', () => {
 
       it('should NOT add SYSTEM_PROMPT events if conversation already started', async () => {
         agent = createAgent();
-        
+
         // Pre-populate thread with a user message (conversation started)
         threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello there!');
 
@@ -1760,7 +1764,7 @@ describe('Enhanced Agent', () => {
 
       it('should NOT add SYSTEM_PROMPT events if existing prompts are already present', async () => {
         agent = createAgent();
-        
+
         // Pre-populate thread with system prompts (e.g., from previous agent run)
         threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'Existing system prompt');
 
@@ -1796,9 +1800,13 @@ describe('Enhanced Agent', () => {
 
       it('should handle complex scenarios with mixed existing events', async () => {
         agent = createAgent();
-        
+
         // Pre-populate thread with some system messages but no conversation or prompts
-        threadManager.addEvent(agent.getThreadId(), 'LOCAL_SYSTEM_MESSAGE', 'Connection established');
+        threadManager.addEvent(
+          agent.getThreadId(),
+          'LOCAL_SYSTEM_MESSAGE',
+          'Connection established'
+        );
 
         await agent.start();
 
@@ -1816,7 +1824,7 @@ describe('Enhanced Agent', () => {
 
       it('should not add prompts when both conversation and existing prompts are present', async () => {
         agent = createAgent();
-        
+
         // Pre-populate with both conversation events and existing prompts
         threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello');
         threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', 'Hi there!');
