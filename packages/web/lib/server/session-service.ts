@@ -236,7 +236,8 @@ export class SessionService {
         const events = agent.threadManager.getEvents(eventThreadId);
         const toolCallEvent = events.find(e => 
           e.type === 'TOOL_CALL' && 
-          (e.data as any)?.id === toolCallData.toolCallId
+          e.data && typeof e.data === 'object' && 'id' in e.data &&
+          (e.data as { id: string }).id === toolCallData.toolCallId
         );
         
         if (toolCallEvent) {
