@@ -100,7 +100,7 @@ export const LaceApp = memo(function LaceApp() {
         setSendingMessage(false);
       }
     }
-  }, [events]);
+  }, [events, sendingMessage]);
 
   // Add task manager hook when project and session are selected
   const taskManager = useTaskManager(selectedProject || '', selectedSession || '');

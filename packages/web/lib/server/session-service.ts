@@ -261,7 +261,7 @@ export class SessionService {
         
         sseManager.broadcast(sessionId, sessionEvent);
       }
-    );
+    });
   }
 
   // Service layer methods to eliminate direct business logic calls from API routes
