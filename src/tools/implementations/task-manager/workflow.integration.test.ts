@@ -42,18 +42,18 @@ describe('Task Management Workflow Integration', () => {
 
     // Initialize core services
     threadManager = new ThreadManager();
-    mainThreadId = asThreadId('lace_20250726_test123');
+    mainThreadId = 'lace_20250726_test123';
 
     // Mock agent creation callback
     const mockAgentCreator = vi.fn().mockImplementation((_provider: string, _model: string) => {
       return Promise.resolve(asThreadId(`${mainThreadId}.delegate_${Date.now()}`));
     });
 
-    taskManager = new TaskManager(mainThreadId, persistence, mockAgentCreator);
+    taskManager = new TaskManager(asThreadId(mainThreadId), persistence, mockAgentCreator);
     toolExecutor = new ToolExecutor();
 
     // Create main thread
-    threadManager.createThread(mainThreadId);
+    threadManager.createThread(asThreadId(mainThreadId));
 
     // Initialize task tools with TaskManager injection
     taskCreateTool = new TaskCreateTool();
@@ -117,7 +117,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Basic Task Lifecycle', () => {
     it('should complete full task lifecycle: create → update → add note → complete → view', async () => {
-      const context = { threadId: mainThreadId } as const;
+      const context = { threadId: asThreadId(mainThreadId) } as const;
 
       // 1. Create a task
       const createResult = await taskCreateTool.execute(
@@ -131,9 +131,9 @@ describe('Task Management Workflow Integration', () => {
 
       expect(createResult.isError).toBe(false);
       expect(createResult.content[0].text).toContain('Created task');
-      const taskId = createResult.content[0].text.match(/task (\w+):/)?.[1];
-      expect(taskId).toBeDefined();
-      const validTaskId = taskId!;
+      const taskIdMatch = createResult.content[0].text?.match(/task (\w+):/);
+      expect(taskIdMatch).not.toBeNull();
+      const validTaskId = taskIdMatch![1];
 
       // 2. List tasks to verify creation
       const listResult = await taskListTool.execute({ filter: 'thread' }, context);
@@ -190,7 +190,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Bulk Task Creation Workflow', () => {
     it('should handle bulk task creation and parallel management', async () => {
-      const context = { threadId: mainThreadId } as const;
+      const context = { threadId: asThreadId(mainThreadId) } as const;
 
       // Create multiple tasks in bulk
       const bulkCreateResult = await taskCreateTool.execute(
@@ -234,7 +234,8 @@ describe('Task Management Workflow Integration', () => {
       expect(listResult.content[0].text).toContain('Write authentication tests');
 
       // Tasks should be sorted by priority (high -> medium -> low)
-      const taskLines = listResult.content[0].text.split('\n').filter((line) => line.includes('○'));
+      const taskLines =
+        listResult.content[0].text?.split('\n').filter((line) => line.includes('○')) || [];
       expect(taskLines[0]).toContain('[high]');
       expect(taskLines[1]).toContain('[medium]');
       expect(taskLines[2]).toContain('[medium]');
@@ -244,7 +245,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Task Assignment and Delegation', () => {
     it('should support task assignment and delegation workflow', async () => {
-      const context = { threadId: mainThreadId } as const;
+      const context = { threadId: asThreadId(mainThreadId) } as const;
 
       // Create task with assignment
       const createResult = await taskCreateTool.execute(
@@ -261,9 +262,9 @@ describe('Task Management Workflow Integration', () => {
       // After agent spawning, the assignment should show the delegate thread ID
       expect(createResult.content[0].text).toContain('assigned to lace_20250726_test123.delegate_');
 
-      const taskId = createResult.content[0].text.match(/task (\w+):/)?.[1];
-      expect(taskId).toBeDefined();
-      const validDelegateTaskId = taskId!;
+      const taskIdMatch = createResult.content[0].text?.match(/task (\w+):/);
+      expect(taskIdMatch).not.toBeNull();
+      const validDelegateTaskId = taskIdMatch![1];
 
       // View task to confirm assignment
       const viewResult = await taskViewTool.execute({ taskId: validDelegateTaskId }, context);
@@ -324,7 +325,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle invalid task operations gracefully', async () => {
-      const context = { threadId: mainThreadId } as const;
+      const context = { threadId: asThreadId(mainThreadId) } as const;
 
       // Try to complete non-existent task
       const completeResult = await taskCompleteTool.execute(
@@ -355,7 +356,7 @@ describe('Task Management Workflow Integration', () => {
     });
 
     it('should require TaskManager for all operations', async () => {
-      const context = { threadId: mainThreadId } as const;
+      const context = { threadId: asThreadId(mainThreadId) } as const;
 
       // Create tool instances without TaskManager injection
       const toolWithoutManager = new TaskCreateTool();
@@ -375,7 +376,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Task Filtering and Querying', () => {
     it('should support different task filtering options', async () => {
-      const context = { threadId: mainThreadId } as const;
+      const context = { threadId: asThreadId(mainThreadId) } as const;
 
       // Create various tasks with different states
       const task1Result = await taskCreateTool.execute(
@@ -422,7 +423,7 @@ describe('Task Management Workflow Integration', () => {
 
       // Verify priority sorting (high -> medium -> low)
       // Note: The high priority task will show as '◐' (in_progress) due to agent spawning
-      const taskLines = threadTasks.content[0].text
+      const taskLines = (threadTasks.content[0].text || '')
         .split('\n')
         .filter((line) => line.includes('○') || line.includes('◐'));
       expect(taskLines[0]).toContain('[high]'); // This will be '◐' due to agent spawning

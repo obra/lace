@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { asThreadId } from '~/threads/types';
+import { asThreadId, asNewAgentSpec } from '~/threads/types';
 import type { DatabasePersistence } from '~/persistence/database';
 
 describe('Agent Spawning on Assignment', () => {
@@ -40,7 +40,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Test task creation',
         prompt: 'Test prompt',
-        assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-3-5-haiku-20241022'),
       },
       taskContext
     );
@@ -76,7 +76,7 @@ describe('Agent Spawning on Assignment', () => {
     const updatedTask = await taskManager.updateTask(
       task.id,
       {
-        assignedTo: 'new:anthropic/claude-sonnet-4-20250514',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-sonnet-4-20250514'),
         status: 'in_progress', // This will be overridden by agent spawning
       },
       taskContext
@@ -108,7 +108,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Test existing assignment',
         prompt: 'Test prompt',
-        assignedTo: existingThreadId,
+        assignedTo: asThreadId(existingThreadId),
       },
       taskContext
     );
@@ -135,7 +135,7 @@ describe('Agent Spawning on Assignment', () => {
         {
           title: 'Test error handling',
           prompt: 'Test prompt',
-          assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+          assignedTo: asNewAgentSpec('new:anthropic/claude-3-5-haiku-20241022'),
         },
         taskContext
       )
@@ -150,7 +150,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Task 1',
         prompt: 'Prompt 1',
-        assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-3-5-haiku-20241022'),
       },
       taskContext
     );
@@ -160,7 +160,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Task 2',
         prompt: 'Prompt 2',
-        assignedTo: 'new:anthropic/claude-sonnet-4-20250514',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-sonnet-4-20250514'),
       },
       taskContext
     );
