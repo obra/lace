@@ -6,8 +6,6 @@
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faChevronDown, 
-  faChevronRight, 
   faCog, 
   faCheck, 
   faExclamationTriangle,
@@ -19,7 +17,6 @@ import {
   faGlobe
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
-import { formatTime } from '@/lib/format';
 
 interface ToolCallDisplayProps {
   tool: string;
@@ -47,21 +44,41 @@ const getToolIcon = (toolName: string) => {
   return faCog;
 };
 
-// Format tool arguments for display
-const formatToolArguments = (args: unknown): string => {
-  if (!args) return '';
+// Create human-readable summary of what the tool did
+const createToolSummary = (toolName: string, args: unknown): string => {
+  if (!args || typeof args !== 'object') return `Executed ${toolName}`;
   
-  if (typeof args === 'string') return args;
+  const argsObj = args as Record<string, unknown>;
   
-  if (typeof args === 'object' && args !== null) {
-    try {
-      return JSON.stringify(args, null, 2);
-    } catch {
-      return String(args);
-    }
+  switch (toolName.toLowerCase()) {
+    case 'file_list':
+      return `Listed files in ${argsObj.path || 'directory'}`;
+    
+    case 'file_read':
+      return `Read file: ${argsObj.file_path || argsObj.path || 'unknown'}`;
+    
+    case 'file_write':
+      return `Wrote file: ${argsObj.file_path || argsObj.path || 'unknown'}`;
+    
+    case 'bash':
+    case 'shell':
+      const command = String(argsObj.command || '').substring(0, 50);
+      return `Ran command: ${command}${command.length >= 50 ? '...' : ''}`;
+    
+    case 'search':
+    case 'grep':
+      return `Searched for: ${argsObj.pattern || argsObj.query || 'pattern'}`;
+    
+    case 'url_fetch':
+      return `Fetched: ${argsObj.url || 'URL'}`;
+    
+    default:
+      // For unknown tools, extract all parameters in a readable format
+      const params = Object.entries(argsObj)
+        .map(([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+        .join(', ');
+      return params ? `${toolName} (${params})` : `Executed ${toolName}`;
   }
-  
-  return String(args);
 };
 
 // Detect if result looks like an error
@@ -74,15 +91,16 @@ const isErrorResult = (result: string): boolean => {
          result.trim().startsWith('Error:');
 };
 
-// Format tool result for better display
+// Format tool result for better display  
 const formatToolResult = (result: string, toolName: string): { formatted: string; type: 'json' | 'bash' | 'file_list' | 'text' } => {
   if (!result || !result.trim()) return { formatted: '', type: 'text' };
 
-  // Try to parse as JSON first (for bash tool results)
+  // First, try to parse as JSON to extract actual content
   try {
-    const parsed = JSON.parse(result);
+    const parsed: unknown = JSON.parse(result);
+    
     if (parsed && typeof parsed === 'object') {
-      // Handle bash tool output format - check for any bash-related properties
+      // Handle bash tool output format
       if ('stdout' in parsed || 'stderr' in parsed || 'exitCode' in parsed || toolName.toLowerCase().includes('bash')) {
         const bashResult = parsed as { stdout?: string; stderr?: string; exitCode?: number };
         let formatted = '';
@@ -104,16 +122,28 @@ const formatToolResult = (result: string, toolName: string): { formatted: string
         return { formatted: formatted || '✅ Command completed with no output', type: 'bash' };
       }
       
-      // For other JSON objects, pretty print them
-      return { formatted: JSON.stringify(parsed, null, 2), type: 'json' };
+      // Handle tool result objects that contain actual content
+      if ('result' in parsed && typeof (parsed as { result: unknown }).result === 'string') {
+        // Extract the actual result content from wrapped JSON
+        const actualResult = (parsed as { result: string }).result;
+        return formatToolResult(actualResult, toolName); // Recursively format the unwrapped content
+      }
     }
-  } catch (error) {
-    // Not valid JSON, continue with text formatting
-    console.debug('Failed to parse as JSON:', error);
+    
+    // If it's a JSON string, try to extract the string content
+    if (typeof parsed === 'string') {
+      return { formatted: parsed, type: 'text' };
+    }
+    
+    // For other JSON objects, pretty print them (but this should be rare)
+    return { formatted: JSON.stringify(parsed, null, 2), type: 'json' };
+    
+  } catch {
+    // Not valid JSON, treat as plain text
   }
 
-  // Handle file listing format (tree-like structure)
-  if (result.includes('└') || result.includes('├') || result.includes('/') || toolName.includes('file_list')) {
+  // Handle file listing format (tree-like structure or paths)
+  if (result.includes('└') || result.includes('├') || result.includes('\n/') || toolName.toLowerCase().includes('file') || toolName.toLowerCase().includes('list')) {
     return { formatted: result, type: 'file_list' };
   }
 
@@ -131,9 +161,56 @@ const formatToolResult = (result: string, toolName: string): { formatted: string
     return { formatted: `ℹ️ ${result}`, type: 'text' };
   }
 
-  // Default text formatting
+  // Default text formatting - display as-is
   return { formatted: result, type: 'text' };
 };
+
+// Expandable result component with 5-line preview
+function ExpandableResult({ 
+  content, 
+  type, 
+  isError 
+}: { 
+  content: string; 
+  type: 'json' | 'bash' | 'file_list' | 'text'; 
+  isError: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const lines = content.split('\n');
+  const shouldShowExpand = lines.length > 5;
+  const displayContent = isExpanded ? content : lines.slice(0, 5).join('\n');
+  
+  return (
+    <div className="p-3">
+      <div className={`text-sm rounded border ${
+        isError 
+          ? 'bg-error/5 border-error/20 text-error' 
+          : 'bg-base-200 border-base-300 text-base-content/80'
+      }`}>
+        <pre className="p-3 font-mono text-sm whitespace-pre-wrap break-words">
+          {displayContent}
+          {shouldShowExpand && !isExpanded && (
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="text-base-content/40 hover:text-base-content/70 cursor-pointer mt-2 block"
+            >
+              ... ({lines.length - 5} more lines)
+            </button>
+          )}
+          {shouldShowExpand && isExpanded && (
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="text-base-content/40 hover:text-base-content/70 cursor-pointer mt-2 block"
+            >
+              Show less
+            </button>
+          )}
+        </pre>
+      </div>
+    </div>
+  );
+}
 
 export function ToolCallDisplay({
   tool,
@@ -143,8 +220,7 @@ export function ToolCallDisplay({
   metadata,
   className = '',
 }: ToolCallDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showArguments, setShowArguments] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   
   const toolIcon = getToolIcon(tool);
   const hasResult = result && result.trim().length > 0;
@@ -152,6 +228,7 @@ export function ToolCallDisplay({
   const isError = hasResult && isErrorResult(result);
   const args = metadata?.arguments;
   const hasArgs = args && typeof args === 'object' && args !== null && Object.keys(args).length > 0;
+  const toolSummary = createToolSummary(tool, args);
   
   return (
     <div className={`flex gap-3 ${className}`}>
@@ -169,102 +246,69 @@ export function ToolCallDisplay({
       
       <div className="flex-1 min-w-0">
         <MessageHeader
-          name="Tool Execution"
+          name={tool}
           timestamp={timestamp}
-          badge={{ text: tool, variant: isError ? 'error' : 'info' }}
         />
         
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          {/* Tool Call Header */}
-          <div 
-            className="flex items-center justify-between p-3 bg-base-50 border-b border-base-200 cursor-pointer hover:bg-base-100"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <div className="flex items-center gap-2">
-              <FontAwesomeIcon 
-                icon={isExpanded ? faChevronDown : faChevronRight} 
-                className="text-xs text-base-content/50" 
-              />
-              <span className="font-medium text-sm">{tool}</span>
-              {hasResult && (
-                <div className="flex items-center gap-1">
-                  <FontAwesomeIcon 
-                    icon={isError ? faExclamationTriangle : faCheck} 
-                    className={`text-xs ${isError ? 'text-error' : 'text-success'}`}
-                  />
-                  <span className={`text-xs ${isError ? 'text-error' : 'text-success'}`}>
-                    {isError ? 'Failed' : 'Success'}
-                  </span>
-                </div>
+          {/* Tool Summary Header */}
+          <div className="p-3 bg-base-50 border-b border-base-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {tool.toLowerCase() === 'bash' && args && typeof args === 'object' && 'command' in args ? (
+                  <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
+                    $ {String((args as { command: unknown }).command)}
+                  </code>
+                ) : (
+                  <span className="text-sm text-base-content/80">{toolSummary}</span>
+                )}
+                {hasResult && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <FontAwesomeIcon 
+                      icon={isError ? faExclamationTriangle : faCheck} 
+                      className={`text-xs ${isError ? 'text-error' : 'text-success'}`}
+                    />
+                    <span className={`text-xs ${isError ? 'text-error' : 'text-success'}`}>
+                      {isError ? 'Failed' : 'Success'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {hasArgs && (
+                <button
+                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                  className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
+                >
+                  {showTechnicalDetails ? 'Hide' : 'Show'} Details
+                </button>
               )}
             </div>
-            
-            {hasArgs && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowArguments(!showArguments);
-                }}
-                className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200"
-              >
-                {showArguments ? 'Hide' : 'Show'} Args
-              </button>
-            )}
           </div>
           
-          {/* Tool Arguments (when expanded) */}
-          {showArguments && hasArgs && (
+          {/* Technical Details (when expanded) */}
+          {showTechnicalDetails && hasArgs && (
             <div className="px-3 py-2 bg-base-50 border-b border-base-200">
-              <div className="text-xs text-base-content/70 mb-1 font-medium">Arguments:</div>
-              <pre className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
-                {formatToolArguments(args)}
-              </pre>
+              <div className="text-xs text-base-content/70 mb-1 font-medium">Technical Details:</div>
+              <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
+                <strong>Tool:</strong> {tool}
+                {'\n'}
+                <strong>Arguments:</strong> {JSON.stringify(args, null, 2)}
+              </div>
             </div>
           )}
           
           {/* Tool Result */}
           {hasResult && formattedResult && (
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-base-content/70 font-medium">
-                  {isError ? 'Error Output:' : 'Result:'}
-                </div>
-                {formattedResult.type === 'bash' && (
-                  <div className="text-xs text-base-content/50 bg-slate-100 px-2 py-1 rounded border">
-                    bash output
-                  </div>
-                )}
-                {formattedResult.type === 'json' && (
-                  <div className="text-xs text-base-content/50 bg-blue-100 px-2 py-1 rounded border">
-                    json
-                  </div>
-                )}
-                {formattedResult.type === 'file_list' && (
-                  <div className="text-xs text-base-content/50 bg-green-100 px-2 py-1 rounded border">
-                    file listing
-                  </div>
-                )}
-              </div>
-              <div className={`text-sm rounded border overflow-auto max-h-96 ${
-                isError 
-                  ? 'bg-error/5 border-error/20 text-error' 
-                  : formattedResult.type === 'bash'
-                    ? 'bg-slate-50 border-slate-200 text-slate-800'
-                    : formattedResult.type === 'json'
-                      ? 'bg-blue-50 border-blue-200 text-blue-900'
-                      : formattedResult.type === 'file_list'
-                        ? 'bg-green-50 border-green-200 text-green-900'
-                        : 'bg-base-200 border-base-300 text-base-content/80'
-              }`}>
-                <pre className="p-3 font-mono text-sm whitespace-pre-wrap break-words">
-                  {formattedResult.formatted}
-                </pre>
-              </div>
-            </div>
+            <ExpandableResult 
+              content={formattedResult.formatted}
+              type={formattedResult.type}
+              isError={isError}
+            />
           )}
           
           {/* No result message */}
-          {!hasResult && isExpanded && (
+          {!hasResult && (
             <div className="p-3 text-center text-base-content/50 text-sm">
               <FontAwesomeIcon icon={faTerminal} className="mr-2" />
               Tool executed, no output returned
