@@ -14,6 +14,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { ThreadId } from '~/threads/types';
 
 // Mock approval interface for testing
 class MockApprovalInterface implements ApprovalCallback {
@@ -77,7 +78,7 @@ describe('Tool Approval System Integration', () => {
         toolPolicies: {
           // All tools require approval by default
           bash: 'require-approval',
-          file_read: 'require-approval', 
+          file_read: 'require-approval',
           file_write: 'require-approval',
         },
       }
@@ -92,8 +93,8 @@ describe('Tool Approval System Integration', () => {
 
     // Create tool context with session for security policy enforcement
     toolContext = {
-      threadId: 'test-thread-id' as any,
-      parentThreadId: 'test-parent-thread-id' as any,
+      threadId: 'test-thread-id' as ThreadId,
+      parentThreadId: 'test-parent-thread-id' as ThreadId,
       workingDirectory: tempDirContext.tempDir,
       session, // REQUIRED for security policy enforcement
     };

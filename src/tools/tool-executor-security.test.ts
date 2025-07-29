@@ -78,7 +78,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       const emptyContext = {
         threadId: agent.threadId,
         workingDirectory: '/tmp',
-      } as any; // Cast to bypass TypeScript - simulating old code
+      } as ToolContext;
 
       await expect(toolExecutor.requestToolPermission(toolCall, emptyContext)).rejects.toThrow(
         'Tool execution denied: session context required for security policy enforcement'

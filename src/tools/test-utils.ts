@@ -3,6 +3,7 @@
 
 import { ToolCall, ToolContext } from '~/tools/types';
 import { asThreadId } from '~/threads/types';
+import { Session } from '~/sessions/session';
 
 /**
  * Creates a ToolCall object for testing
@@ -34,6 +35,13 @@ export function createToolCallFactory(toolName: string) {
 // Re-export temp directory utilities for convenience
 export { createTempDir, createTestTempDir, withTempDir } from './temp-utils';
 
+interface MockSession {
+  getToolPolicy: (toolName: string) => 'allow' | 'require-approval' | 'deny';
+  getEffectiveConfiguration: () => Record<string, unknown>;
+  getId: () => string;
+  [key: string]: unknown;
+}
+
 /**
  * Creates a mock Session for tool testing
  * @param overrides - Optional overrides for specific methods
@@ -46,7 +54,7 @@ export function createMockSession(
     getId?: () => string;
     [key: string]: unknown;
   } = {}
-): any {
+): MockSession {
   return {
     getToolPolicy: overrides.getToolPolicy || (() => 'require-approval'),
     getEffectiveConfiguration: overrides.getEffectiveConfiguration || (() => ({})),
@@ -66,7 +74,7 @@ export function createMockToolContext(
     workingDirectory?: string;
     projectId?: string;
     parentThreadId?: string;
-    session?: any;
+    session?: Session;
   } = {}
 ): ToolContext {
   return {
@@ -74,6 +82,6 @@ export function createMockToolContext(
     workingDirectory: overrides.workingDirectory, // Allow explicitly undefined
     projectId: overrides.projectId,
     parentThreadId: overrides.parentThreadId ? asThreadId(overrides.parentThreadId) : undefined,
-    session: overrides.session || createMockSession(),
+    session: overrides.session || (createMockSession() as unknown as Session),
   };
 }
