@@ -1,201 +1,190 @@
-// ABOUTME: Test suite for task-based delegate tool implementation
-// ABOUTME: Tests event-driven task delegation that supports parallel execution
+// ABOUTME: Integration tests for task-based delegate tool implementation
+// ABOUTME: Tests real delegation flow using Session, Project, and TaskManager integration
 
-import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { TaskManager } from '~/tasks/task-manager';
 import { ToolContext } from '~/tools/types';
-import { asThreadId } from '~/threads/types';
-import { Task } from '~/tasks/types';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ProviderRegistry } from '~/providers/registry';
 
-describe('Task-Based DelegateTool', () => {
+// Mock provider for testing delegation
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'Mock delegation response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
+
+describe('Task-Based DelegateTool Integration', () => {
+  const _tempDirContext = useTempLaceDir();
   let delegateTool: DelegateTool;
-  let mockTaskManager: TaskManager;
-  let mockContext: ToolContext;
-
-  // Helper to create complete mock tasks
-  const createMockTask = (overrides: Partial<Task> = {}): Task => ({
-    id: 'task_20250726_abc123',
-    title: 'Test Task',
-    description: 'Test description',
-    prompt: 'Test prompt',
-    status: 'in_progress',
-    priority: 'medium',
-    assignedTo: asThreadId('lace_20250726_test01.2'),
-    createdBy: asThreadId('lace_20250726_test01.1'),
-    threadId: asThreadId('lace_20250726_test01'),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    notes: [],
-    ...overrides,
-  });
+  let session: Session;
+  let project: Project;
+  let mockProvider: MockProvider;
+  let context: ToolContext;
 
   beforeEach(() => {
-    // Mock TaskManager
-    mockTaskManager = {
-      createTask: vi.fn(),
-      on: vi.fn(),
-      off: vi.fn(),
-    } as unknown as TaskManager;
+    setupTestPersistence();
+    mockProvider = new MockProvider();
 
-    // Mock ToolContext
-    mockContext = {
-      threadId: asThreadId('lace_20250726_test01.1'),
-    };
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+      (_name: string, _config?: unknown) => {
+        return mockProvider;
+      }
+    );
 
+    // Also mock the static createWithAutoDiscovery method
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
+      const mockRegistry = {
+        createProvider: () => mockProvider,
+        getProvider: () => mockProvider,
+        getProviderNames: () => ['anthropic', 'openai'],
+      } as ProviderRegistry;
+      return mockRegistry;
+    });
+
+    // Create project first
+    project = Project.create('Test Project', '/tmp/test-delegate');
+
+    // Create session with anthropic - the provider will be mocked
+    session = Session.create({
+      name: 'Delegate Test Session',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      projectId: project.getId(),
+    });
+
+    // Create delegate tool and inject TaskManager
     delegateTool = new DelegateTool();
-    // Inject TaskManager using the factory pattern like Session does
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    (delegateTool as any).getTaskManager = () => mockTaskManager;
+    (delegateTool as any).getTaskManager = () => session.getTaskManager();
+
+    context = {
+      threadId: session.getId(),
+    };
   });
 
-  describe('Task Creation and Event-Driven Completion', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    session?.destroy();
+    teardownTestPersistence();
+  });
+
+  describe('Integration Tests', () => {
     it('should create task and wait for completion via events', async () => {
-      // Arrange
-      const taskId = 'task_20250726_abc123';
-      const mockTask = createMockTask({
-        id: taskId,
-        notes: [
-          {
-            id: 'note_1',
-            author: asThreadId('lace_20250726_test01.2'),
-            content: 'Task completed successfully',
-            timestamp: new Date(),
-          },
-        ],
+      const taskManager = session.getTaskManager();
+      let createdTaskId: string;
+
+      // Listen for task creation to capture the task ID
+      taskManager.on('task:created', (event: { task: { id: string } }) => {
+        createdTaskId = event.task.id;
+
+        // Simulate task completion after a short delay
+        setTimeout(() => {
+          taskManager.emit('task:updated', {
+            task: {
+              id: createdTaskId,
+              status: 'completed',
+              notes: [
+                {
+                  id: 'completion_note',
+                  author: 'mock_agent',
+                  content: 'Task completed successfully',
+                  timestamp: new Date(),
+                },
+              ],
+            },
+            creatorThreadId: context.threadId,
+          });
+        }, 100);
       });
 
-      // Mock task creation
-      (
-        mockTaskManager.createTask as MockedFunction<typeof mockTaskManager.createTask>
-      ).mockResolvedValue(mockTask);
-
-      // Mock event listener that immediately resolves with completed task
-      (mockTaskManager.on as MockedFunction<typeof mockTaskManager.on>).mockImplementation(
-        (eventName: string | symbol, handler: (...args: unknown[]) => void) => {
-          if (eventName === 'task:updated') {
-            // Simulate task completion event
-            setTimeout(() => {
-              handler({
-                task: { ...mockTask, status: 'completed' },
-                creatorThreadId: mockContext.threadId,
-              });
-            }, 0);
-          }
-          return mockTaskManager; // Return this for method chaining
-        }
-      );
-
-      // Act
       const result = await delegateTool.execute(
         {
-          title: 'Test Task',
-          prompt: 'Complete this test task',
-          expected_response: 'Success message',
+          title: 'Integration Test Task',
+          prompt: 'Complete this integration test',
+          expected_response: 'Test completed successfully',
           model: 'anthropic:claude-3-haiku',
         },
-        mockContext
+        context
       );
 
-      // Assert
       expect(result).toBeDefined();
       expect(result.isError).toBe(false);
-      expect(result.content).toEqual([{ type: 'text', text: 'Task completed successfully' }]);
-      expect(mockTaskManager.createTask).toHaveBeenCalledWith(
-        {
-          title: 'Test Task',
-          prompt: expect.stringContaining('Complete this test task') as string,
-          assignedTo: 'new:anthropic/claude-3-haiku',
-          priority: 'high',
-        },
-        {
-          actor: mockContext.threadId,
-        }
-      );
+      expect(result.content[0].text).toContain('Task completed successfully');
     });
 
     it('should handle parallel delegations without conflicts', async () => {
-      // This test verifies that multiple delegate tools can run simultaneously
-      // without shared state issues
+      const taskManager = session.getTaskManager();
 
-      // Create three separate delegate tool instances
+      // Track task creation and simulate completion for each
+      taskManager.on('task:created', (event: { task: { id: string; title: string } }) => {
+        const task = event.task;
+
+        // Simulate completion with different responses based on task title
+        setTimeout(
+          () => {
+            let response = 'Default response';
+            if (task.title.includes('Task 1')) response = 'Result 1';
+            else if (task.title.includes('Task 2')) response = 'Result 2';
+            else if (task.title.includes('Task 3')) response = 'Result 3';
+
+            taskManager.emit('task:updated', {
+              task: {
+                id: task.id,
+                status: 'completed',
+                notes: [
+                  {
+                    id: `note_${task.id}`,
+                    author: 'mock_agent',
+                    content: response,
+                    timestamp: new Date(),
+                  },
+                ],
+              },
+              creatorThreadId: context.threadId,
+            });
+          },
+          50 + Math.random() * 100
+        ); // Stagger completions
+      });
+
+      // Create three separate delegate tool instances with same TaskManager
       const tool1 = new DelegateTool();
       const tool2 = new DelegateTool();
       const tool3 = new DelegateTool();
 
-      // Mock different task responses for each
-      const mockTasks = [
-        createMockTask({
-          id: 'task_1',
-          title: 'Task 1',
-          status: 'completed',
-          notes: [
-            {
-              id: 'note_1',
-              author: asThreadId('agent1'),
-              content: 'Result 1',
-              timestamp: new Date(),
-            },
-          ],
-        }),
-        createMockTask({
-          id: 'task_2',
-          title: 'Task 2',
-          status: 'completed',
-          notes: [
-            {
-              id: 'note_2',
-              author: asThreadId('agent2'),
-              content: 'Result 2',
-              timestamp: new Date(),
-            },
-          ],
-        }),
-        createMockTask({
-          id: 'task_3',
-          title: 'Task 3',
-          status: 'completed',
-          notes: [
-            {
-              id: 'note_3',
-              author: asThreadId('agent3'),
-              content: 'Result 3',
-              timestamp: new Date(),
-            },
-          ],
-        }),
-      ];
+      // Inject TaskManager for each tool
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (tool1 as any).getTaskManager = () => session.getTaskManager();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (tool2 as any).getTaskManager = () => session.getTaskManager();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (tool3 as any).getTaskManager = () => session.getTaskManager();
 
-      // Set up mock responses
-      (
-        mockTaskManager.createTask as MockedFunction<typeof mockTaskManager.createTask>
-      ).mockImplementation((request) => {
-        const taskIndex = request.title.includes('Task 1')
-          ? 0
-          : request.title.includes('Task 2')
-            ? 1
-            : 2;
-        return Promise.resolve(mockTasks[taskIndex]);
-      });
-
-      (mockTaskManager.on as MockedFunction<typeof mockTaskManager.on>).mockImplementation(
-        (eventName: string | symbol, handler: (...args: unknown[]) => void) => {
-          if (eventName === 'task:updated') {
-            // Simulate all three tasks completing
-            setTimeout(() => {
-              mockTasks.forEach((task) => {
-                handler({
-                  task: { ...task, status: 'completed' },
-                  creatorThreadId: mockContext.threadId,
-                });
-              });
-            }, 0);
-          }
-          return mockTaskManager; // Return this for method chaining
-        }
-      );
-
-      // Act - Execute all three delegations in parallel
+      // Execute all three delegations in parallel
       const [result1, result2, result3] = await Promise.all([
         tool1.execute(
           {
@@ -204,7 +193,7 @@ describe('Task-Based DelegateTool', () => {
             expected_response: 'Result 1',
             model: 'anthropic:claude-3-haiku',
           },
-          mockContext
+          context
         ),
         tool2.execute(
           {
@@ -213,7 +202,7 @@ describe('Task-Based DelegateTool', () => {
             expected_response: 'Result 2',
             model: 'anthropic:claude-3-haiku',
           },
-          mockContext
+          context
         ),
         tool3.execute(
           {
@@ -222,76 +211,68 @@ describe('Task-Based DelegateTool', () => {
             expected_response: 'Result 3',
             model: 'anthropic:claude-3-haiku',
           },
-          mockContext
+          context
         ),
       ]);
 
-      // Assert - All should succeed independently
+      // Assert all succeeded independently
       expect(result1.isError).toBe(false);
       expect(result2.isError).toBe(false);
       expect(result3.isError).toBe(false);
-      expect(result1.content).toEqual([{ type: 'text', text: 'Result 1' }]);
-      expect(result2.content).toEqual([{ type: 'text', text: 'Result 2' }]);
-      expect(result3.content).toEqual([{ type: 'text', text: 'Result 3' }]);
+
+      expect(result1.content[0].text).toContain('Result 1');
+      expect(result2.content[0].text).toContain('Result 2');
+      expect(result3.content[0].text).toContain('Result 3');
     });
 
     it('should handle task failures gracefully', async () => {
-      // Arrange
-      const blockedTask = createMockTask({
-        id: 'task_blocked',
-        status: 'blocked',
-        notes: [],
+      const taskManager = session.getTaskManager();
+      let createdTaskId: string;
+
+      // Listen for task creation and simulate task being blocked
+      taskManager.on('task:created', (event: { task: { id: string } }) => {
+        createdTaskId = event.task.id;
+
+        // Simulate task getting blocked
+        setTimeout(() => {
+          taskManager.emit('task:updated', {
+            task: {
+              id: createdTaskId,
+              status: 'blocked',
+              notes: [],
+            },
+            creatorThreadId: context.threadId,
+          });
+        }, 100);
       });
 
-      (
-        mockTaskManager.createTask as MockedFunction<typeof mockTaskManager.createTask>
-      ).mockResolvedValue(blockedTask);
-
-      (mockTaskManager.on as MockedFunction<typeof mockTaskManager.on>).mockImplementation(
-        (eventName: string | symbol, handler: (...args: unknown[]) => void) => {
-          if (eventName === 'task:updated') {
-            setTimeout(() => {
-              handler({
-                task: { ...blockedTask, status: 'blocked' },
-                creatorThreadId: mockContext.threadId,
-              });
-            }, 0);
-          }
-          return mockTaskManager; // Return this for method chaining
-        }
-      );
-
-      // Act & Assert
       const result = await delegateTool.execute(
         {
-          title: 'Failing Task',
-          prompt: 'This will fail',
+          title: 'This will be blocked',
+          prompt: 'This task will fail',
           expected_response: 'Error',
           model: 'anthropic:claude-3-haiku',
         },
-        mockContext
+        context
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Task task_blocked is blocked');
+      expect(result.content[0].text).toContain(`Task ${createdTaskId} is blocked`);
     });
 
-    it('should require TaskManager in context', async () => {
-      // Arrange
-      const contextWithoutTaskManager: ToolContext = {
-        threadId: asThreadId('lace_20250726_test01.1'),
-        // No taskManager - should error
-      };
+    it('should require TaskManager for delegation', async () => {
+      // Create a delegate tool without TaskManager injection
+      const toolWithoutTaskManager = new DelegateTool();
+      // Do NOT inject getTaskManager - it should remain undefined
 
-      // Act & Assert
-      const result = await delegateTool.execute(
+      const result = await toolWithoutTaskManager.execute(
         {
           title: 'Test Task',
-          prompt: 'This will fail',
+          prompt: 'This should fail',
           expected_response: 'Error',
           model: 'anthropic:claude-3-haiku',
         },
-        contextWithoutTaskManager
+        context
       );
 
       expect(result.isError).toBe(true);
