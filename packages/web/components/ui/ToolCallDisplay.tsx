@@ -84,11 +84,21 @@ const createToolSummary = (toolName: string, args: unknown): string => {
 // Detect if result looks like an error
 const isErrorResult = (result: string): boolean => {
   if (!result) return false;
-  const lowerResult = result.toLowerCase();
-  return lowerResult.includes('error') || 
-         lowerResult.includes('failed') || 
-         lowerResult.includes('exception') ||
-         result.trim().startsWith('Error:');
+  
+  // First, try to parse as JSON and use the isError field
+  try {
+    const parsed: unknown = JSON.parse(result);
+    if (parsed && typeof parsed === 'object' && 'isError' in parsed) {
+      return Boolean((parsed as { isError: unknown }).isError);
+    }
+  } catch {
+    // Not JSON, fall back to text-based detection
+  }
+  
+  // For non-JSON text results, use simple error detection
+  const trimmed = result.trim();
+  return trimmed.startsWith('Error:') || trimmed.startsWith('ERROR:') || 
+         trimmed.toLowerCase().includes('error occurred');
 };
 
 // Format tool result for better display  
