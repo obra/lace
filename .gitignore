@@ -42,6 +42,10 @@ playwright-report/
 logs
 *.log
 debug-log*
+
+# Version managers
+.tool-versions
+mise.toml
 debug.log*
 
 # Runtime data
