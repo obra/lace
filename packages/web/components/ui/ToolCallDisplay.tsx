@@ -17,11 +17,12 @@ import {
   faGlobe
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
+import { renderToolResult } from '@/components/timeline/tool';
 
 interface ToolCallDisplayProps {
   tool: string;
   content: string;
-  result?: string;
+  result?: { content: Array<{ text?: string }>; isError?: boolean; id?: string };
   timestamp: Date | string;
   metadata?: {
     toolId?: string;
@@ -81,108 +82,17 @@ const createToolSummary = (toolName: string, args: unknown): string => {
   }
 };
 
-// Detect if result looks like an error
-const isErrorResult = (result: string): boolean => {
-  if (!result) return false;
-  
-  // First, try to parse as JSON and use the isError field
-  try {
-    const parsed: unknown = JSON.parse(result);
-    if (parsed && typeof parsed === 'object' && 'isError' in parsed) {
-      return Boolean((parsed as { isError: unknown }).isError);
-    }
-  } catch {
-    // Not JSON, fall back to text-based detection
-  }
-  
-  // For non-JSON text results, use simple error detection
-  const trimmed = result.trim();
-  return trimmed.startsWith('Error:') || trimmed.startsWith('ERROR:') || 
-         trimmed.toLowerCase().includes('error occurred');
-};
-
-// Format tool result for better display  
-const formatToolResult = (result: string, toolName: string): { formatted: string; type: 'json' | 'bash' | 'file_list' | 'text' } => {
-  if (!result || !result.trim()) return { formatted: '', type: 'text' };
-
-  // First, try to parse as JSON to extract actual content
-  try {
-    const parsed: unknown = JSON.parse(result);
-    
-    if (parsed && typeof parsed === 'object') {
-      // Handle bash tool output format
-      if ('stdout' in parsed || 'stderr' in parsed || 'exitCode' in parsed || toolName.toLowerCase().includes('bash')) {
-        const bashResult = parsed as { stdout?: string; stderr?: string; exitCode?: number };
-        let formatted = '';
-        
-        if (bashResult.stdout && bashResult.stdout.trim()) {
-          formatted += bashResult.stdout.trim();
-        }
-        
-        if (bashResult.stderr && bashResult.stderr.trim()) {
-          if (formatted) formatted += '\n\n';
-          formatted += `❌ Error: ${bashResult.stderr.trim()}`;
-        }
-        
-        if (bashResult.exitCode !== undefined && bashResult.exitCode !== 0) {
-          if (formatted) formatted += '\n\n';
-          formatted += `⚠️ Exit code: ${bashResult.exitCode}`;
-        }
-        
-        return { formatted: formatted || '✅ Command completed with no output', type: 'bash' };
-      }
-      
-      // Handle tool result objects that contain actual content
-      if ('result' in parsed && typeof (parsed as { result: unknown }).result === 'string') {
-        // Extract the actual result content from wrapped JSON
-        const actualResult = (parsed as { result: string }).result;
-        return formatToolResult(actualResult, toolName); // Recursively format the unwrapped content
-      }
-    }
-    
-    // If it's a JSON string, try to extract the string content
-    if (typeof parsed === 'string') {
-      return { formatted: parsed, type: 'text' };
-    }
-    
-    // For other JSON objects, pretty print them (but this should be rare)
-    return { formatted: JSON.stringify(parsed, null, 2), type: 'json' };
-    
-  } catch {
-    // Not valid JSON, treat as plain text
-  }
-
-  // Handle file listing format (tree-like structure or paths)
-  if (result.includes('└') || result.includes('├') || result.includes('\n/') || toolName.toLowerCase().includes('file') || toolName.toLowerCase().includes('list')) {
-    return { formatted: result, type: 'file_list' };
-  }
-
-  // Handle file paths (for file_find results)
-  if (toolName.includes('find') && result.startsWith('/')) {
-    const paths = result.split('\n').filter(Boolean);
-    if (paths.length > 0) {
-      const formatted = paths.map(path => `📁 ${path}`).join('\n');
-      return { formatted, type: 'file_list' };
-    }
-  }
-
-  // Handle "No files found" or similar messages
-  if (result.toLowerCase().includes('no files found') || result.toLowerCase().includes('no matches found')) {
-    return { formatted: `ℹ️ ${result}`, type: 'text' };
-  }
-
-  // Default text formatting - display as-is
-  return { formatted: result, type: 'text' };
+// Detect if result is an error using ToolResult.isError field
+const isErrorResult = (result: { content: Array<{ text?: string }>; isError?: boolean; id?: string }): boolean => {
+  return Boolean(result?.isError);
 };
 
 // Expandable result component with 5-line preview
 function ExpandableResult({ 
   content, 
-  type, 
   isError 
 }: { 
   content: string; 
-  type: 'json' | 'bash' | 'file_list' | 'text'; 
   isError: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -233,9 +143,9 @@ export function ToolCallDisplay({
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   
   const toolIcon = getToolIcon(tool);
-  const hasResult = result && result.trim().length > 0;
-  const formattedResult = hasResult ? formatToolResult(result, tool) : null;
-  const isError = hasResult && isErrorResult(result);
+  const hasResult = result?.content?.some(block => block.text?.trim());
+  const formattedResult = hasResult ? formatToolResult(result!) : null;
+  const isError = hasResult && isErrorResult(result!);
   const args = metadata?.arguments;
   const hasArgs = args && typeof args === 'object' && args !== null && Object.keys(args).length > 0;
   const toolSummary = createToolSummary(tool, args);
@@ -311,8 +221,7 @@ export function ToolCallDisplay({
           {/* Tool Result */}
           {hasResult && formattedResult && (
             <ExpandableResult 
-              content={formattedResult.formatted}
-              type={formattedResult.type}
+              content={formattedResult}
               isError={isError}
             />
           )}

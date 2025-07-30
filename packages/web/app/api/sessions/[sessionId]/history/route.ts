@@ -39,20 +39,6 @@ function safeGetToolCallData(
   return null;
 }
 
-function safeGetToolResultData(
-  data: unknown
-): { content: Array<{ text?: string }>; id?: string } | null {
-  if (typeof data !== 'object' || data === null) return null;
-  const obj = data as Record<string, unknown>;
-  if ('content' in obj && Array.isArray(obj.content)) {
-    return {
-      content: obj.content as Array<{ text?: string }>,
-      id: typeof obj.id === 'string' ? obj.id : undefined,
-    };
-  }
-  return null;
-}
-
 // Convert ThreadEvent to SessionEvent with proper type handling
 function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEvent | null {
   // Convert string threadId to ThreadId type
@@ -110,32 +96,12 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'TOOL_RESULT': {
-      // ThreadEvent.data is ToolResult for TOOL_RESULT events
-      const toolResultData = safeGetToolResultData(threadEvent.data);
-      if (toolResultData) {
-        // Extract text content from the content blocks with proper type safety
-        const resultContent = toolResultData.content
-          .map((block: { text?: string }) => block.text ?? '')
-          .join('');
-        return {
-          ...baseEvent,
-          type: 'TOOL_RESULT',
-          data: {
-            toolName: toolResultData.id ?? 'unknown',
-            result: resultContent,
-          },
-        };
-      } else {
-        // Fallback for invalid tool result data
-        return {
-          ...baseEvent,
-          type: 'TOOL_RESULT',
-          data: {
-            toolName: 'unknown',
-            result: String(threadEvent.data),
-          },
-        };
-      }
+      // ThreadEvent.data is ToolResult for TOOL_RESULT events - return raw ToolResult
+      return {
+        ...baseEvent,
+        type: 'TOOL_RESULT',
+        data: threadEvent.data,
+      };
     }
 
     case 'LOCAL_SYSTEM_MESSAGE': {
