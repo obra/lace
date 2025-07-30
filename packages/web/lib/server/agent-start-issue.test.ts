@@ -34,7 +34,7 @@ describe('Agent Spawning and Thread Creation', () => {
     session = Session.create({
       name: 'Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId,
     });
   });
@@ -54,7 +54,7 @@ describe('Agent Spawning and Thread Creation', () => {
     expect(threadManager).toBeDefined();
 
     // Spawn agent (this is what SessionService.spawnAgent does)
-    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId;
 
     // Check if the agent's thread exists in ThreadManager

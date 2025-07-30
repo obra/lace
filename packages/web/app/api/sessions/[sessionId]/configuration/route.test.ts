@@ -43,14 +43,14 @@ describe('Session Configuration API', () => {
     // Create a real project and session for testing
     testProject = Project.create('Test Project', '/test/path', 'Test project', {
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
     });
 
     const session = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
     sessionId = session.id;
@@ -70,7 +70,7 @@ describe('Session Configuration API', () => {
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
       expect(data.configuration.provider).toBe('anthropic');
-      expect(data.configuration.model).toBe('claude-3-haiku-20240307');
+      expect(data.configuration.model).toBe('claude-3-5-haiku-20241022');
       expect(data.configuration.maxTokens).toBe(4000);
     });
 
@@ -198,7 +198,7 @@ describe('TDD: Direct Session Usage', () => {
     const session = await sessionService.createSession(
       'TDD Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
     testSessionId = session.id;
@@ -237,7 +237,7 @@ describe('TDD: Direct Session Configuration Update', () => {
     const session = await sessionService.createSession(
       'TDD Update Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
     testSessionId = session.id;

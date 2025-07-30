@@ -77,7 +77,7 @@ describe('Full Conversation Flow', () => {
           name: sessionName,
           configuration: {
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +108,7 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: agentName,
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -176,7 +176,7 @@ describe('Full Conversation Flow', () => {
           name: 'Multi-Agent Session',
           configuration: {
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -197,7 +197,7 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: 'pm',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -215,7 +215,7 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: 'architect',
           provider: 'anthropic',
-          model: 'claude-3-opus-20240229',
+          model: 'claude-sonnet-4-20250514',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -265,7 +265,7 @@ describe('Full Conversation Flow', () => {
           name: 'Session 1',
           configuration: {
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -282,7 +282,7 @@ describe('Full Conversation Flow', () => {
           name: 'Session 2',
           configuration: {
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },

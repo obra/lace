@@ -106,7 +106,7 @@ function createMockSession(props: {
         threadId: createThreadId(`${props.id}.${agents.length + 1}`),
         name: agentName,
         provider: provider || 'anthropic',
-        model: model || 'claude-3-haiku-20240307',
+        model: model || 'claude-3-5-haiku-20241022',
         status: 'idle',
         createdAt: new Date().toISOString(),
       };
@@ -256,7 +256,7 @@ describe('Agent Spawning API', () => {
         body: JSON.stringify({
           name: 'architect',
           provider: 'anthropic',
-          model: 'claude-3-opus-20240229',
+          model: 'claude-sonnet-4-20250514',
         }),
         headers: { 'Content-Type': 'application/json' },
       });
@@ -269,7 +269,7 @@ describe('Agent Spawning API', () => {
         threadId: `${sessionId}.3`,
         name: 'architect',
         provider: 'anthropic',
-        model: 'claude-3-opus-20240229',
+        model: 'claude-sonnet-4-20250514',
         status: 'idle',
       });
     });
@@ -320,7 +320,7 @@ describe('Agent Spawning API', () => {
         threadId,
         name: 'pm',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         status: 'idle',
         createdAt: new Date().toISOString(),
       });
@@ -366,7 +366,7 @@ describe('Agent Spawning API', () => {
         threadId: createThreadId(`${sessionId}.1`),
         name: 'agent1',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         status: 'idle',
         createdAt: new Date().toISOString(),
       });
@@ -386,7 +386,7 @@ describe('Agent Spawning API', () => {
         threadId: createThreadId(`${sessionId}.2`),
         name: 'agent2',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         status: 'idle',
         createdAt: new Date().toISOString(),
       });
@@ -485,7 +485,7 @@ describe('Agent Spawning API', () => {
           threadId: createThreadId(`${sessionId}.1`),
           name: 'pm',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
           status: 'idle',
           createdAt: new Date().toISOString(),
         }),
@@ -493,7 +493,7 @@ describe('Agent Spawning API', () => {
           threadId: createThreadId(`${sessionId}.2`),
           name: 'architect',
           provider: 'anthropic',
-          model: 'claude-3-opus-20240229',
+          model: 'claude-sonnet-4-20250514',
           status: 'idle',
           createdAt: new Date().toISOString(),
         }),
@@ -518,13 +518,13 @@ describe('Agent Spawning API', () => {
         threadId: `${sessionId}.1`,
         name: 'pm',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
       });
       expect(data.agents[1]).toMatchObject({
         threadId: `${sessionId}.2`,
         name: 'architect',
         provider: 'anthropic',
-        model: 'claude-3-opus-20240229',
+        model: 'claude-sonnet-4-20250514',
       });
     });
 
@@ -533,7 +533,7 @@ describe('Agent Spawning API', () => {
         threadId: createThreadId(`${sessionId}.1`),
         name: 'pm',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         status: 'thinking',
         createdAt: '2025-01-13T10:00:00Z',
       });
@@ -555,7 +555,7 @@ describe('Agent Spawning API', () => {
         threadId: createThreadId(`${sessionId}.1`),
         name: 'pm',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         status: 'thinking',
       });
       expect(data.agents[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);

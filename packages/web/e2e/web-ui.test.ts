@@ -69,7 +69,7 @@ describe('Web UI E2E Tests', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
 
@@ -89,13 +89,13 @@ describe('Web UI E2E Tests', () => {
       await sessionService.createSession(
         'Session 1',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       await sessionService.createSession(
         'Session 2',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
 
@@ -117,7 +117,7 @@ describe('Web UI E2E Tests', () => {
       const created = await sessionService.createSession(
         'Retrieve Test',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
 
@@ -145,7 +145,7 @@ describe('Web UI E2E Tests', () => {
       session = await sessionService.createSession(
         'Agent Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
     });
@@ -210,7 +210,7 @@ describe('Web UI E2E Tests', () => {
       const session1 = await sessionService.createSession(
         'Persistence Test',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionInstance = await sessionService.getSession(session1.id);
@@ -243,13 +243,13 @@ describe('Web UI E2E Tests', () => {
       await sessionService.createSession(
         'Session A',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       await sessionService.createSession(
         'Session B',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
 

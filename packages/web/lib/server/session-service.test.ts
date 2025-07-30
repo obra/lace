@@ -67,11 +67,11 @@ describe('SessionService Missing Methods', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     // Set up test environment
     process.env.ANTHROPIC_KEY = 'test-key';
-    
-    // Create a real test project 
+
+    // Create a real test project
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
@@ -79,7 +79,7 @@ describe('SessionService Missing Methods', () => {
       tempDirContext.path,
       {}
     );
-    
+
     sessionService = getSessionService();
     sessionService.clearActiveSessions();
 
@@ -101,13 +101,13 @@ describe('SessionService Missing Methods', () => {
       const initialSession = await sessionService.createSession(
         'Original Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 
       const updates = { name: 'Updated Session', description: 'New description' };
 
-      // Act: Update the session through the service  
+      // Act: Update the session through the service
       sessionService.updateSession(asThreadId(initialSession.id), updates);
 
       // Assert: Verify the session was actually updated in persistence
@@ -123,7 +123,7 @@ describe('SessionService Missing Methods', () => {
       const initialSession = await sessionService.createSession(
         'Original Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 
@@ -150,10 +150,10 @@ describe('SessionService approval event forwarding', () => {
   // Mock provider that returns tool calls to trigger approval flow
   class MockApprovalProvider extends TestProvider {
     private callCount = 0;
-    
+
     createResponse(): Promise<import('@/lib/server/core-types').ProviderResponse> {
       this.callCount++;
-      
+
       // Only return tool calls on first call to avoid loops
       if (this.callCount === 1) {
         return Promise.resolve({
@@ -168,7 +168,7 @@ describe('SessionService approval event forwarding', () => {
           stopReason: 'tool_use',
         });
       }
-      
+
       // Subsequent calls return normal response
       return Promise.resolve({
         content: 'Task completed.',
@@ -180,7 +180,7 @@ describe('SessionService approval event forwarding', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Set up test environment
     process.env.ANTHROPIC_KEY = 'test-key';
   });
@@ -188,7 +188,7 @@ describe('SessionService approval event forwarding', () => {
   afterEach(async () => {
     if (agent) {
       agent.stop();
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     }
     sessionService.clearActiveSessions();
     vi.restoreAllMocks();
@@ -208,13 +208,13 @@ describe('SessionService approval event forwarding', () => {
       tempDirContext.path,
       {}
     );
-    
+
     // Ensure project is saved (Project.create should handle this, but let's be explicit)
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Create mock provider that returns tool calls
     const mockProvider = new MockApprovalProvider();
-    
+
     // Mock ProviderRegistry to return our mock provider
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
     vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockReturnValue({
@@ -228,29 +228,28 @@ describe('SessionService approval event forwarding', () => {
     const sessionData = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
-    
+
     // Debug: Check if approval callback is set up
     const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
-    
 
     // Send a message - mock provider will return tool calls which should trigger approval
     await agent.sendMessage('Write to the test file');
 
     // Wait for the approval request to be processed
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Check that the expected events were created
     const events = agent.threadManager.getEvents(agent.threadId);
-    
+
     // Verify that TOOL_APPROVAL_REQUEST event was created in the thread
-    const approvalRequestEvent = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequestEvent).toBeDefined();
     expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
 
@@ -262,8 +261,8 @@ describe('SessionService approval event forwarding', () => {
         threadId: session.getId(),
         data: expect.objectContaining({
           requestId: 'test-call-123',
-          toolName: 'file_write'
-        })
+          toolName: 'file_write',
+        }),
       })
     );
   });

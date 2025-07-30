@@ -212,7 +212,7 @@ describe('HAR Integration', () => {
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: 'claude-3-sonnet-20240229',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
             messages: [{ role: 'user', content: 'Hello' }],
           }),
@@ -239,7 +239,7 @@ describe('HAR Integration', () => {
                 'content-type': 'application/json',
               },
               body: JSON.stringify({
-                model: 'claude-3-sonnet-20240229',
+                model: 'claude-sonnet-4-20250514',
                 max_tokens: 1000,
                 messages: [{ role: 'user', content: 'Hello' }],
               }),
@@ -270,7 +270,7 @@ describe('HAR Integration', () => {
           value: 'application/json',
         });
         expect(entry.request.postData?.mimeType).toBe('application/json');
-        expect(entry.request.postData?.text).toContain('"model":"claude-3-sonnet-20240229"');
+        expect(entry.request.postData?.text).toContain('"model":"claude-sonnet-4-20250514"');
 
         expect(entry.response.status).toBe(200);
         expect(entry.response.statusText).toBe('OK');

@@ -52,7 +52,7 @@ describe('Event-Based Tool Approval Integration', () => {
     const session = await sessionService.createSession(
       'Tool Approval Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       projectId
     );
     sessionId = session.id;
@@ -125,7 +125,7 @@ describe('Event-Based Tool Approval Integration', () => {
 
     // Verify TOOL_APPROVAL_REQUEST event was created
     const events = agent.threadManager.getEvents(agent.threadId);
-    const approvalRequestEvent = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequestEvent).toBeDefined();
     expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
   });
@@ -170,13 +170,13 @@ describe('Event-Based Tool Approval Integration', () => {
 
     // Should not create additional TOOL_APPROVAL_REQUEST event
     const events = agent.threadManager.getEvents(agent.threadId);
-    const requestEvents = events.filter(e => e.type === 'TOOL_APPROVAL_REQUEST');
+    const requestEvents = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(requestEvents).toHaveLength(0); // No new request should be created
   });
 
   it('should handle getPendingApprovals query correctly', async () => {
     const testFilePath = join(tempDir, 'test-file.txt');
-    
+
     // Create TOOL_CALL and TOOL_APPROVAL_REQUEST events
     const toolCall = {
       id: 'pending-call-789',
@@ -191,7 +191,7 @@ describe('Event-Based Tool Approval Integration', () => {
 
     // Query pending approvals using ThreadManager
     const pendingApprovals = agent.threadManager.getPendingApprovals(agent.threadId);
-    
+
     expect(pendingApprovals).toHaveLength(1);
     expect(pendingApprovals[0].toolCallId).toBe('pending-call-789');
     expect((pendingApprovals[0].toolCall as { name: string }).name).toBe('file-read');

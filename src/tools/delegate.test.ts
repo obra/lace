@@ -59,7 +59,7 @@ describe('DelegateTool', () => {
         title: 'Analyze test failures',
         prompt: 'Look at the failing tests and identify common patterns',
         expected_response: 'A list of failure patterns',
-        model: 'anthropic:claude-3-5-sonnet-20241022',
+        model: 'anthropic:claude-sonnet-4-20250514',
       },
       context
     );
@@ -96,7 +96,7 @@ describe('DelegateTool', () => {
         title: 'List files',
         prompt: 'List the files in the current directory',
         expected_response: 'List of files',
-        model: 'anthropic:claude-3-5-sonnet-20241022',
+        model: 'anthropic:claude-sonnet-4-20250514',
       },
       context
     );
@@ -116,7 +116,7 @@ describe('DelegateTool', () => {
         title: 'Test error',
         prompt: 'This should fail',
         expected_response: 'Error',
-        model: 'anthropic:claude-3-5-sonnet-20241022',
+        model: 'anthropic:claude-sonnet-4-20250514',
       },
       context
     );
@@ -135,7 +135,7 @@ describe('DelegateTool', () => {
           title: 'Long running task',
           prompt: 'This should timeout',
           expected_response: 'Timeout error',
-          model: 'anthropic:claude-3-5-sonnet-20241022',
+          model: 'anthropic:claude-sonnet-4-20250514',
         },
         context
       );
@@ -155,7 +155,7 @@ describe('DelegateTool', () => {
         title: 'Format test',
         prompt: 'Test system prompt formatting',
         expected_response: 'Formatted response',
-        model: 'anthropic:claude-3-5-sonnet-20241022',
+        model: 'anthropic:claude-sonnet-4-20250514',
       },
       context
     );
@@ -188,7 +188,7 @@ describe('DelegateTool', () => {
         title: 'Multi-response test',
         prompt: 'Generate multiple responses',
         expected_response: 'Combined responses',
-        model: 'anthropic:claude-3-5-sonnet-20241022',
+        model: 'anthropic:claude-sonnet-4-20250514',
       },
       context
     );
@@ -206,7 +206,7 @@ describe('DelegateTool', () => {
         title: 'Metadata test',
         prompt: 'Test metadata inclusion',
         expected_response: 'Response with metadata',
-        model: 'anthropic:claude-3-5-sonnet-20241022',
+        model: 'anthropic:claude-sonnet-4-20250514',
       },
       context
     );
@@ -218,7 +218,7 @@ describe('DelegateTool', () => {
 
   it('should accept valid model formats', async () => {
     const validModels = [
-      'anthropic:claude-3-5-sonnet-20241022',
+      'anthropic:claude-sonnet-4-20250514',
       'openai:gpt-4',
       'anthropic:claude-3-5-haiku-20241022',
     ];

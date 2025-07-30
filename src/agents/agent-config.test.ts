@@ -13,9 +13,9 @@ vi.mock('~/providers/registry', () => ({
     createWithAutoDiscovery: vi.fn().mockReturnValue({
       createProvider: vi.fn().mockReturnValue({
         type: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         providerName: 'anthropic',
-        defaultModel: 'claude-3-haiku-20240307',
+        defaultModel: 'claude-3-5-haiku-20241022',
         setSystemPrompt: vi.fn(),
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
@@ -93,7 +93,7 @@ describe('Agent Configuration', () => {
     testSession = Session.create({
       name: 'Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId,
     });
   });
@@ -155,7 +155,7 @@ describe('Agent Configuration', () => {
       });
 
       // Spawn agent with specific configuration
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Agent should have configuration methods
       expect(agent).toBeDefined();
@@ -180,7 +180,11 @@ describe('Agent Configuration', () => {
       });
 
       // Create agent with role-specific configuration
-      const agent = testSession.spawnAgent('Code Reviewer', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent(
+        'Code Reviewer',
+        'anthropic',
+        'claude-3-5-haiku-20241022'
+      );
 
       // Update agent configuration with role-specific settings
       agent.updateConfiguration({
@@ -205,7 +209,11 @@ describe('Agent Configuration', () => {
 
   describe('Role-based configuration', () => {
     it('should support role-based agent configuration', () => {
-      const agent = testSession.spawnAgent('Code Reviewer', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent(
+        'Code Reviewer',
+        'anthropic',
+        'claude-3-5-haiku-20241022'
+      );
 
       // Configure agent with role-based settings
       agent.updateConfiguration({
@@ -227,7 +235,7 @@ describe('Agent Configuration', () => {
       const agent = testSession.spawnAgent(
         'Security Agent',
         'anthropic',
-        'claude-3-haiku-20240307'
+        'claude-3-5-haiku-20241022'
       );
 
       // Configure agent with capabilities and restrictions
@@ -255,7 +263,7 @@ describe('Agent Configuration', () => {
 
   describe('Agent configuration methods', () => {
     it('should provide method to get agent configuration', () => {
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Update agent configuration
       agent.updateConfiguration({
@@ -284,7 +292,7 @@ describe('Agent Configuration', () => {
         tools: ['file-read', 'bash'],
       });
 
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Update agent configuration partially
       agent.updateConfiguration({
@@ -301,7 +309,7 @@ describe('Agent Configuration', () => {
     });
 
     it('should provide method to update agent configuration', () => {
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Update configuration multiple times
       agent.updateConfiguration({
@@ -331,7 +339,7 @@ describe('Agent Configuration', () => {
       const agent = testSession.spawnAgent(
         'Security Analyst',
         'anthropic',
-        'claude-3-haiku-20240307'
+        'claude-3-5-haiku-20241022'
       );
 
       // Configure agent role
@@ -351,7 +359,11 @@ describe('Agent Configuration', () => {
     });
 
     it('should manage agent capabilities', () => {
-      const agent = testSession.spawnAgent('Data Analyst', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent(
+        'Data Analyst',
+        'anthropic',
+        'claude-3-5-haiku-20241022'
+      );
 
       // Configure agent capabilities
       agent.updateConfiguration({
@@ -371,7 +383,7 @@ describe('Agent Configuration', () => {
       const agent = testSession.spawnAgent(
         'Read-Only Agent',
         'anthropic',
-        'claude-3-haiku-20240307'
+        'claude-3-5-haiku-20241022'
       );
 
       // Configure agent restrictions

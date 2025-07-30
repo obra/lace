@@ -62,7 +62,7 @@ export async function POST(
     const session = await sessionService.createSession(
       validatedData.name,
       (validatedData.configuration?.provider as string) || 'anthropic',
-      (validatedData.configuration?.model as string) || 'claude-3-haiku-20240307',
+      (validatedData.configuration?.model as string) || 'claude-3-5-haiku-20241022',
       projectId
     );
 

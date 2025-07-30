@@ -67,7 +67,7 @@ describe('TaskAPIClient E2E Tests', () => {
     const session = await sessionService.createSession(
       'TaskAPIClient E2E Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       projectId
     );
     // Extract string value from ThreadId branded type

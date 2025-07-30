@@ -32,7 +32,7 @@ describe('Session.spawnAgent Method', () => {
     session = Session.create({
       name: 'Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId,
     });
   });
@@ -44,7 +44,7 @@ describe('Session.spawnAgent Method', () => {
 
   it('should spawn agent and create delegate thread', () => {
     // Spawn agent
-    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
     // Verify agent properties
     expect(agent.threadId).toMatch(new RegExp(`^${session.getId()}\\.\\d+$`));
@@ -61,7 +61,7 @@ describe('Session.spawnAgent Method', () => {
 
   it('should allow retrieving spawned agent from session', () => {
     // Spawn agent
-    const agent = session.spawnAgent('Retrievable Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent('Retrievable Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId;
 
     // Retrieve agent from session
@@ -75,7 +75,7 @@ describe('Session.spawnAgent Method', () => {
 
   it('should create delegate thread that persists across ThreadManager instances', async () => {
     // Spawn agent
-    const agent = session.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId;
 
     // Import ThreadManager and create new instance to test persistence
@@ -92,9 +92,9 @@ describe('Session.spawnAgent Method', () => {
 
   it('should handle multiple spawned agents correctly', () => {
     // Spawn multiple agents
-    const agent1 = session.spawnAgent('Agent 1', 'anthropic', 'claude-3-haiku-20240307');
-    const agent2 = session.spawnAgent('Agent 2', 'anthropic', 'claude-3-haiku-20240307');
-    const agent3 = session.spawnAgent('Agent 3', 'anthropic', 'claude-3-haiku-20240307');
+    const agent1 = session.spawnAgent('Agent 1', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent2 = session.spawnAgent('Agent 2', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent3 = session.spawnAgent('Agent 3', 'anthropic', 'claude-3-5-haiku-20241022');
 
     // Verify unique thread IDs
     expect(agent1.threadId).toBe(`${session.getId()}.1`);
@@ -113,7 +113,7 @@ describe('Session.spawnAgent Method', () => {
 
   it('should start spawned agent and allow event addition', async () => {
     // Spawn agent
-    const agent = session.spawnAgent('Eventful Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent('Eventful Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId;
 
     // Agent will auto-start when needed
@@ -133,7 +133,7 @@ describe('Session.spawnAgent Method', () => {
 
   it('should handle caching issues between ThreadManager instances', async () => {
     // Spawn agent
-    const agent = session.spawnAgent('Cached Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent('Cached Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId;
 
     // Get the session agent and its ThreadManager
@@ -182,7 +182,11 @@ describe('Session.spawnAgent Method', () => {
 
   it('should handle thread persistence with multiple threads', () => {
     // Spawn agent
-    const agent = session.spawnAgent('Thread Switch Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session.spawnAgent(
+      'Thread Switch Agent',
+      'anthropic',
+      'claude-3-5-haiku-20241022'
+    );
     const agentThreadId = agent.threadId;
 
     // Get the session agent and its ThreadManager
@@ -225,7 +229,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent(
       'Reconstructable Agent',
       'anthropic',
-      'claude-3-haiku-20240307'
+      'claude-3-5-haiku-20241022'
     );
     const agentThreadId = agent.threadId;
 

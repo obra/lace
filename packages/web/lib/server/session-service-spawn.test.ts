@@ -55,7 +55,7 @@ describe('SessionService.spawnAgent Method', () => {
     const session = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       projectId
     );
     sessionId = session.id as string;
@@ -70,7 +70,7 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent via service
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Service Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session!.spawnAgent('Service Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
     // Verify agent properties
     expect(agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
@@ -96,7 +96,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Retrievable Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session!.spawnAgent(
+      'Retrievable Agent',
+      'anthropic',
+      'claude-3-5-haiku-20241022'
+    );
     const agentThreadId = agent.threadId as ThreadId;
 
     // Test immediate retrieval
@@ -119,8 +123,8 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn multiple agents
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent1 = session!.spawnAgent('Agent 1', 'anthropic', 'claude-3-haiku-20240307');
-    const agent2 = session!.spawnAgent('Agent 2', 'anthropic', 'claude-3-haiku-20240307');
+    const agent1 = session!.spawnAgent('Agent 1', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent2 = session!.spawnAgent('Agent 2', 'anthropic', 'claude-3-5-haiku-20241022');
 
     // Verify both agents are retrievable
     const retrievedAgent1 = session!.getAgent(agent1.threadId as ThreadId);
@@ -149,7 +153,7 @@ describe('SessionService.spawnAgent Method', () => {
     const agent = session!.spawnAgent(
       'Reconstructed Agent',
       'anthropic',
-      'claude-3-haiku-20240307'
+      'claude-3-5-haiku-20241022'
     );
 
     // Verify agent was spawned correctly
@@ -171,7 +175,7 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session!.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId as ThreadId;
 
     // Get the agent to ensure it's started
@@ -202,7 +206,7 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent via service
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Cache Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+    const agent = session!.spawnAgent('Cache Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     const agentThreadId = agent.threadId as ThreadId;
 
     // Verify agent is retrievable via session
@@ -255,7 +259,7 @@ describe('SessionService.spawnAgent Method', () => {
     // This should not be possible since getSession returns null
     // but we can test the error by trying to call on null
     expect(() => {
-      session?.spawnAgent('Orphan Agent', 'anthropic', 'claude-3-haiku-20240307');
+      session?.spawnAgent('Orphan Agent', 'anthropic', 'claude-3-5-haiku-20241022');
     }).not.toThrow(); // This won't throw because session is null
   });
 });

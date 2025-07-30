@@ -21,9 +21,9 @@ vi.mock('~/providers/registry', () => ({
     createWithAutoDiscovery: vi.fn().mockReturnValue({
       createProvider: vi.fn().mockReturnValue({
         type: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         providerName: 'anthropic',
-        defaultModel: 'claude-3-haiku-20240307',
+        defaultModel: 'claude-3-5-haiku-20241022',
         setSystemPrompt: vi.fn(),
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
@@ -132,7 +132,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -155,7 +155,7 @@ describe('Session Detail API Route', () => {
               threadId: sessionId,
               name: 'Lace', // Coordinator agent is always named "Lace"
               provider: 'anthropic',
-              model: 'claude-3-haiku-20240307',
+              model: 'claude-3-5-haiku-20241022',
               status: expect.any(String) as string,
             }),
           ]) as unknown[],
@@ -205,7 +205,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Original Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -277,7 +277,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -317,7 +317,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Original Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -395,7 +395,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 

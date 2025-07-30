@@ -51,7 +51,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     const newSession = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       testProjectId
     );
     testSessionId = newSession.id;
@@ -194,7 +194,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const newSession = await sessionService.createSession(
         'Empty Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         testProjectId
       );
 
