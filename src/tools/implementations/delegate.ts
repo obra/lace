@@ -6,7 +6,7 @@ import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import type { TaskManager } from '~/tasks/task-manager';
-import type { Task } from '~/tasks/types';
+import type { Task, TaskContext } from '~/tasks/types';
 import { logger } from '~/utils/logger';
 
 // Model format validation
@@ -90,6 +90,12 @@ Examples:
     const [providerName, modelName] = model.split(':');
 
     try {
+      logger.debug('DelegateTool: Creating task with agent spawning', {
+        title,
+        assignedTo: `new:${providerName}/${modelName}`,
+        actor: context?.threadId || 'unknown',
+      });
+
       // Create task with agent spawning
       const task = await taskManager.createTask(
         {
@@ -102,6 +108,12 @@ Examples:
           actor: context?.threadId || 'unknown',
         }
       );
+
+      logger.debug('DelegateTool: Task created successfully', {
+        taskId: task.id,
+        status: task.status,
+        assignedTo: task.assignedTo,
+      });
 
       // Update the task prompt with the actual task ID
       await taskManager.updateTask(
@@ -159,14 +171,30 @@ Please complete the task and provide your response in the expected format.`;
     taskManager: TaskManager,
     creatorThreadId: string
   ): Promise<string> {
+    logger.debug('DelegateTool: Starting to wait for task completion', {
+      taskId,
+      creatorThreadId,
+    });
+
     return new Promise((resolve, reject) => {
-      const handleTaskUpdate = (event: { task: Task; creatorThreadId: string }) => {
-        if (event.task.id === taskId && event.creatorThreadId === creatorThreadId) {
+      const handleTaskUpdate = (event: { task: Task; context: TaskContext; type: string }) => {
+        logger.debug('DelegateTool: Received task update event', {
+          taskId: event.task.id,
+          status: event.task.status,
+          eventCreatorContext: event.context?.actor,
+          expectedTaskId: taskId,
+          expectedCreatorThreadId: creatorThreadId,
+        });
+
+        // Match on task ID only - the assigned agent will complete it
+        if (event.task.id === taskId) {
           if (event.task.status === 'completed') {
+            logger.debug('DelegateTool: Task completed, resolving', { taskId });
             taskManager.off('task:updated', handleTaskUpdate);
             const response = this.extractResponseFromTask(event.task);
             resolve(response);
           } else if (event.task.status === 'blocked') {
+            logger.debug('DelegateTool: Task blocked, rejecting', { taskId });
             taskManager.off('task:updated', handleTaskUpdate);
             reject(new Error(`Task ${taskId} is blocked`));
           }
@@ -174,6 +202,9 @@ Please complete the task and provide your response in the expected format.`;
       };
 
       taskManager.on('task:updated', handleTaskUpdate);
+      logger.debug('DelegateTool: Registered task update handler', {
+        taskId,
+      });
     });
   }
 

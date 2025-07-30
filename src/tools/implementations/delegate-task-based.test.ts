@@ -9,29 +9,78 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
+import { ApprovalDecision } from '~/tools/approval-types';
 
-// Mock provider for testing delegation
+// Mock provider for testing delegation - responds with task_complete tool calls
 class MockProvider extends BaseMockProvider {
+  private responses: string[] = [];
+  private responseIndex = 0;
+
   constructor() {
     super({});
   }
 
   get providerName(): string {
-    return 'mock';
+    return 'anthropic';
   }
 
   get defaultModel(): string {
-    return 'mock-model';
+    return 'claude-3-5-haiku-20241022';
   }
 
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  get contextWindow(): number {
+    return 200000; // Large context window for testing
+  }
+
+  get maxOutputTokens(): number {
+    return 4096;
+  }
+
+  setMockResponses(responses: string[]): void {
+    this.responses = responses;
+    this.responseIndex = 0;
+  }
+
+  async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    // Look for task assignment message to extract task ID
+    const taskAssignmentMessage = messages.find(
+      (m) =>
+        m.content &&
+        typeof m.content === 'string' &&
+        m.content.includes('You have been assigned task')
+    );
+
+    let taskId = 'unknown';
+    if (taskAssignmentMessage && typeof taskAssignmentMessage.content === 'string') {
+      const match = taskAssignmentMessage.content.match(/assigned task '([^']+)'/);
+      if (match) {
+        taskId = match[1];
+      }
+    }
+
+    // Get the current response or use default
+    const response = this.responses[this.responseIndex] || 'Task completed successfully';
+    if (this.responseIndex < this.responses.length - 1) {
+      this.responseIndex++;
+    }
+
+    // Create a tool call to complete the task
+    const toolCall: ProviderToolCall = {
+      id: 'task_complete_call',
+      name: 'task_complete',
+      input: {
+        id: taskId,
+        message: response,
+      },
+    };
+
     return Promise.resolve({
-      content: 'Mock delegation response',
+      content: `I'll complete the task now.`,
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      toolCalls: [],
+      toolCalls: [toolCall],
     });
   }
 }
@@ -74,6 +123,9 @@ describe('Task-Based DelegateTool Integration', () => {
       provider: 'anthropic',
       model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
+      approvalCallback: {
+        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
+      },
     });
 
     // Create delegate tool and inject TaskManager
@@ -93,83 +145,28 @@ describe('Task-Based DelegateTool Integration', () => {
   });
 
   describe('Integration Tests', () => {
-    it('should create task and wait for completion via events', async () => {
-      const taskManager = session.getTaskManager();
-      let createdTaskId: string;
-
-      // Listen for task creation to capture the task ID
-      taskManager.on('task:created', (event: { task: { id: string } }) => {
-        createdTaskId = event.task.id;
-
-        // Simulate task completion after a short delay
-        setTimeout(() => {
-          taskManager.emit('task:updated', {
-            task: {
-              id: createdTaskId,
-              status: 'completed',
-              notes: [
-                {
-                  id: 'completion_note',
-                  author: 'mock_agent',
-                  content: 'Task completed successfully',
-                  timestamp: new Date(),
-                },
-              ],
-            },
-            creatorThreadId: context.threadId,
-          });
-        }, 100);
-      });
+    it('should create task and wait for completion via real delegation', async () => {
+      // Set up mock provider to respond with task completion
+      mockProvider.setMockResponses(['Integration test completed successfully']);
 
       const result = await delegateTool.execute(
         {
           title: 'Integration Test Task',
           prompt: 'Complete this integration test',
           expected_response: 'Test completed successfully',
-          model: 'anthropic:claude-3-haiku',
+          model: 'anthropic:claude-3-5-haiku-20241022',
         },
         context
       );
 
       expect(result).toBeDefined();
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Task completed successfully');
-    });
+      expect(result.content[0].text).toContain('Integration test completed successfully');
+    }, 15000); // Increase timeout to 15 seconds
 
     it('should handle parallel delegations without conflicts', async () => {
-      const taskManager = session.getTaskManager();
-
-      // Track task creation and simulate completion for each
-      taskManager.on('task:created', (event: { task: { id: string; title: string } }) => {
-        const task = event.task;
-
-        // Simulate completion with different responses based on task title
-        setTimeout(
-          () => {
-            let response = 'Default response';
-            if (task.title.includes('Task 1')) response = 'Result 1';
-            else if (task.title.includes('Task 2')) response = 'Result 2';
-            else if (task.title.includes('Task 3')) response = 'Result 3';
-
-            taskManager.emit('task:updated', {
-              task: {
-                id: task.id,
-                status: 'completed',
-                notes: [
-                  {
-                    id: `note_${task.id}`,
-                    author: 'mock_agent',
-                    content: response,
-                    timestamp: new Date(),
-                  },
-                ],
-              },
-              creatorThreadId: context.threadId,
-            });
-          },
-          50 + Math.random() * 100
-        ); // Stagger completions
-      });
+      // Set up mock provider to respond with different responses for parallel tasks
+      mockProvider.setMockResponses(['Result 1', 'Result 2', 'Result 3']);
 
       // Create three separate delegate tool instances with same TaskManager
       const tool1 = new DelegateTool();
@@ -191,7 +188,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 1',
             prompt: 'First task',
             expected_response: 'Result 1',
-            model: 'anthropic:claude-3-haiku',
+            model: 'anthropic:claude-3-5-haiku-20241022',
           },
           context
         ),
@@ -200,7 +197,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 2',
             prompt: 'Second task',
             expected_response: 'Result 2',
-            model: 'anthropic:claude-3-haiku',
+            model: 'anthropic:claude-3-5-haiku-20241022',
           },
           context
         ),
@@ -209,7 +206,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 3',
             prompt: 'Third task',
             expected_response: 'Result 3',
-            model: 'anthropic:claude-3-haiku',
+            model: 'anthropic:claude-3-5-haiku-20241022',
           },
           context
         ),
@@ -226,32 +223,50 @@ describe('Task-Based DelegateTool Integration', () => {
     });
 
     it('should handle task failures gracefully', async () => {
-      const taskManager = session.getTaskManager();
-      let createdTaskId: string;
+      // Change the mock provider to simulate task blocking instead of completion
+      mockProvider.createResponse = async (
+        messages: ProviderMessage[],
+        _tools: Tool[]
+      ): Promise<ProviderResponse> => {
+        // Look for task assignment message to extract task ID
+        const taskAssignmentMessage = messages.find(
+          (m) =>
+            m.content &&
+            typeof m.content === 'string' &&
+            m.content.includes('You have been assigned task')
+        );
 
-      // Listen for task creation and simulate task being blocked
-      taskManager.on('task:created', (event: { task: { id: string } }) => {
-        createdTaskId = event.task.id;
+        let taskId = 'unknown';
+        if (taskAssignmentMessage && typeof taskAssignmentMessage.content === 'string') {
+          const match = taskAssignmentMessage.content.match(/assigned task '([^']+)'/);
+          if (match) {
+            taskId = match[1];
+          }
+        }
 
-        // Simulate task getting blocked
-        setTimeout(() => {
-          taskManager.emit('task:updated', {
-            task: {
-              id: createdTaskId,
-              status: 'blocked',
-              notes: [],
-            },
-            creatorThreadId: context.threadId,
-          });
-        }, 100);
-      });
+        // Create a tool call to update task to blocked status instead of completing it
+        const toolCall: ProviderToolCall = {
+          id: 'task_update_call',
+          name: 'task_update',
+          input: {
+            taskId: taskId,
+            status: 'blocked',
+          },
+        };
+
+        return Promise.resolve({
+          content: `I encountered an issue and cannot complete this task.`,
+          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+          toolCalls: [toolCall],
+        });
+      };
 
       const result = await delegateTool.execute(
         {
           title: 'This will be blocked',
           prompt: 'This task will fail',
           expected_response: 'Error',
-          model: 'anthropic:claude-3-haiku',
+          model: 'anthropic:claude-3-5-haiku-20241022',
         },
         context
       );
