@@ -78,8 +78,12 @@ Bulk planning: task_add({ tasks: [
     safeInternal: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(
+    context?: ToolContext
+  ): import('~/tasks/task-manager').TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof createTaskSchema>,
@@ -89,12 +93,12 @@ Bulk planning: task_add({ tasks: [
       return this.createError('No thread context available');
     }
 
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for task creation');
     }
 
     try {
-      const taskManager = this.getTaskManager();
       const taskContext = {
         actor: context.threadId,
         isHuman: false,
@@ -189,8 +193,12 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
     safeInternal: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(
+    context?: ToolContext
+  ): import('~/tasks/task-manager').TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof listTasksSchema>,
@@ -200,12 +208,12 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
       return this.createError('No thread context available');
     }
 
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for task listing');
     }
 
     try {
-      const taskManager = this.getTaskManager();
       const taskContext = {
         actor: context.threadId,
         isHuman: false,
@@ -289,8 +297,12 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
     safeInternal: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(
+    context?: ToolContext
+  ): import('~/tasks/task-manager').TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof completeTaskSchema>,
@@ -300,12 +312,12 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
       return this.createError('No thread context available');
     }
 
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for task completion');
     }
 
     try {
-      const taskManager = this.getTaskManager();
       const taskContext = {
         actor: context.threadId,
         isHuman: false,
@@ -375,8 +387,12 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
     safeInternal: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(
+    context?: ToolContext
+  ): import('~/tasks/task-manager').TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof updateTaskSchema>,
@@ -386,7 +402,8 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
       return this.createError('No thread context available');
     }
 
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for task updates');
     }
 
@@ -396,7 +413,6 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
     }
 
     try {
-      const taskManager = this.getTaskManager();
       const taskContext = {
         actor: context.threadId,
         isHuman: false,
@@ -470,8 +486,12 @@ Notes become part of permanent task history - write for future readers.`;
     safeInternal: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(
+    context?: ToolContext
+  ): import('~/tasks/task-manager').TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof addNoteSchema>,
@@ -481,12 +501,12 @@ Notes become part of permanent task history - write for future readers.`;
       return this.createError('No thread context available');
     }
 
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for adding notes');
     }
 
     try {
-      const taskManager = this.getTaskManager();
       const taskContext = {
         actor: context.threadId,
         isHuman: false,
@@ -530,8 +550,12 @@ Example: task_view({ taskId: "task_123" })`;
     safeInternal: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(
+    context?: ToolContext
+  ): import('~/tasks/task-manager').TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
@@ -541,12 +565,12 @@ Example: task_view({ taskId: "task_123" })`;
       return this.createError('No thread context available');
     }
 
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for viewing tasks');
     }
 
     try {
-      const taskManager = this.getTaskManager();
       const taskContext = {
         actor: context.threadId,
         isHuman: false,

@@ -986,6 +986,7 @@ export class Agent extends EventEmitter {
         parentThreadId: asThreadId(this._getParentThreadId()),
         workingDirectory,
         session, // REQUIRED for security policy enforcement
+        taskManager: session.getTaskManager(), // TaskManager from session
       };
 
       // First: Check permission
@@ -1073,6 +1074,7 @@ export class Agent extends EventEmitter {
         parentThreadId: asThreadId(this._getParentThreadId()),
         workingDirectory,
         session, // REQUIRED for security policy enforcement
+        taskManager: session.getTaskManager(), // TaskManager from session
       };
 
       // Find the tool and execute directly (permission already granted via approval)

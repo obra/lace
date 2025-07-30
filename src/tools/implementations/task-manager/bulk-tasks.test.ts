@@ -61,7 +61,11 @@ describe('Bulk Task Creation', () => {
           },
         ],
       },
-      { threadId: session.getId() }
+      {
+        threadId: session.getId(),
+        session,
+        taskManager: session.getTaskManager(),
+      }
     );
 
     expect(result.isError).toBe(false);
@@ -76,7 +80,11 @@ describe('Bulk Task Creation', () => {
       {
         tasks: [],
       },
-      { threadId: session.getId() }
+      {
+        threadId: session.getId(),
+        session,
+        taskManager: session.getTaskManager(),
+      }
     );
 
     expect(result.isError).toBe(true);
@@ -94,7 +102,11 @@ describe('Bulk Task Creation', () => {
       {
         tasks,
       },
-      { threadId: session.getId() }
+      {
+        threadId: session.getId(),
+        session,
+        taskManager: session.getTaskManager(),
+      }
     );
 
     expect(result.isError).toBe(true);
@@ -112,7 +124,11 @@ describe('Bulk Task Creation', () => {
           },
         ],
       },
-      { threadId: session.getId() }
+      {
+        threadId: session.getId(),
+        session,
+        taskManager: session.getTaskManager(),
+      }
     );
 
     expect(result.isError).toBe(false);
@@ -138,7 +154,11 @@ describe('Bulk Task Creation', () => {
           },
         ],
       },
-      { threadId: session.getId() }
+      {
+        threadId: session.getId(),
+        session,
+        taskManager: session.getTaskManager(),
+      }
     );
 
     expect(result.isError).toBe(true);
@@ -168,7 +188,11 @@ describe('Bulk Task Creation', () => {
           },
         ],
       },
-      { threadId: session.getId() }
+      {
+        threadId: session.getId(),
+        session,
+        taskManager: session.getTaskManager(),
+      }
     );
 
     expect(result.isError).toBe(false);

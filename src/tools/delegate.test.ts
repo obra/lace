@@ -36,6 +36,8 @@ describe('DelegateTool', () => {
 
     context = {
       threadId: testSetup.session.getId(),
+      session: testSetup.session,
+      taskManager: testSetup.session.getTaskManager(),
     };
   });
 

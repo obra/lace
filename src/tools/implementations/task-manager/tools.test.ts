@@ -9,7 +9,6 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-  createTaskManagerTools,
 } from '~/tools/implementations/task-manager';
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
@@ -21,7 +20,6 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
-import type { TaskManager } from '~/tasks/task-manager';
 
 // Mock provider for testing agent spawning
 class MockProvider extends BaseMockProvider {
@@ -51,7 +49,7 @@ describe('Enhanced Task Manager Tools', () => {
   let context: ToolContext;
   let session: Session;
   let project: Project;
-  let tools: ReturnType<typeof createTaskManagerTools>;
+  let tools: Tool[];
   let taskCreateTool: TaskCreateTool;
   let taskListTool: TaskListTool;
   let _taskCompleteTool: TaskCompleteTool;
@@ -96,8 +94,15 @@ describe('Enhanced Task Manager Tools', () => {
       projectId: project.getId(),
     });
 
-    // Get properly injected tools
-    tools = createTaskManagerTools(() => session.getTaskManager());
+    // Create tools that get TaskManager from context
+    tools = [
+      new TaskCreateTool(),
+      new TaskListTool(),
+      new TaskCompleteTool(),
+      new TaskUpdateTool(),
+      new TaskAddNoteTool(),
+      new TaskViewTool(),
+    ];
     taskCreateTool = tools.find((t) => t.name === 'task_add') as TaskCreateTool;
     taskListTool = tools.find((t) => t.name === 'task_list') as TaskListTool;
     _taskCompleteTool = tools.find((t) => t.name === 'task_complete') as TaskCompleteTool;
@@ -108,6 +113,8 @@ describe('Enhanced Task Manager Tools', () => {
     context = {
       threadId: session.getId(),
       parentThreadId: parentThreadId,
+      session, // Provide session for TaskManager access
+      taskManager: session.getTaskManager(), // Direct TaskManager access
     };
   });
 
@@ -117,43 +124,32 @@ describe('Enhanced Task Manager Tools', () => {
     teardownTestPersistence();
   });
 
-  describe('Debug Integration', () => {
-    it('should have properly injected TaskManager', async () => {
-      console.log('Tools length:', tools.length);
-      console.log('TaskCreateTool found:', !!taskCreateTool);
-      console.log('TaskCreateTool name:', taskCreateTool?.name);
+  describe('Context Integration', () => {
+    it('should get TaskManager from context', async () => {
+      expect(tools.length).toBe(6);
+      expect(taskCreateTool).toBeDefined();
+      expect(taskCreateTool.name).toBe('task_add');
 
-      // Check if getTaskManager is actually set
-      const taskTool = taskCreateTool as unknown as {
-        getTaskManager?: () => TaskManager;
-      };
-      console.log('getTaskManager function exists:', !!taskTool.getTaskManager);
+      // Test that tools can access TaskManager via context
+      expect(context.session).toBeDefined();
+      expect(context.taskManager).toBeDefined();
+      expect(context.session?.getTaskManager()).toBe(context.taskManager);
 
-      if (taskTool.getTaskManager) {
-        try {
-          const taskManager = taskTool.getTaskManager();
-          console.log('TaskManager obtained:', !!taskManager);
-        } catch (e) {
-          console.log('Error getting TaskManager:', e);
-        }
-      }
-
+      // Test that task creation works with context-based TaskManager
       const result = await taskCreateTool.execute(
         {
           tasks: [
             {
-              title: 'Debug Task',
-              prompt: 'Debug prompt',
+              title: 'Context Test Task',
+              prompt: 'Test task with context-based TaskManager',
             },
           ],
         },
         context
       );
 
-      console.log('Result isError:', result.isError);
-      console.log('Result content:', result.content?.[0]?.text);
-
-      expect(true).toBe(true); // Just to pass the test for now
+      expect(result.isError).toBe(false);
+      expect(result.content[0]?.text).toContain('Created task');
     });
   });
 

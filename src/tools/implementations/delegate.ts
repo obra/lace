@@ -50,14 +50,17 @@ Examples:
     openWorldHint: true,
   };
 
-  // This will be injected by the factory
-  protected getTaskManager?: () => TaskManager;
+  // Get TaskManager from context (no longer injected)
+  private getTaskManagerFromContext(context?: ToolContext): TaskManager | null {
+    return context?.taskManager || context?.session?.getTaskManager() || null;
+  }
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
-    if (!this.getTaskManager) {
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
       return this.createError('TaskManager is required for delegation');
     }
 
@@ -84,7 +87,10 @@ Examples:
     context?: ToolContext
   ): Promise<ToolResult> {
     const { title, prompt, expected_response, model } = params;
-    const taskManager = this.getTaskManager!();
+    const taskManager = this.getTaskManagerFromContext(context);
+    if (!taskManager) {
+      throw new Error('TaskManager is required for delegation');
+    }
 
     // Parse provider:model format
     const [providerName, modelName] = model.split(':');

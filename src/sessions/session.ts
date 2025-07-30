@@ -9,7 +9,14 @@ import { ToolExecutor } from '~/tools/executor';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
 import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
-import { createTaskManagerTools } from '~/tools/implementations/task-manager';
+import {
+  TaskCreateTool,
+  TaskListTool,
+  TaskCompleteTool,
+  TaskUpdateTool,
+  TaskAddNoteTool,
+  TaskViewTool,
+} from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
@@ -98,9 +105,9 @@ export class Session {
     // Note: We'll update this with agent creation callback after session is created
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
-    // Create tool executor with TaskManager injection (without delegate tool initially)
+    // Create tool executor
     const toolExecutor = new ToolExecutor();
-    Session.initializeTools(toolExecutor, taskManager);
+    Session.initializeTools(toolExecutor);
 
     // Create agent
     const sessionAgent = new Agent({
@@ -126,10 +133,8 @@ export class Session {
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
 
-    // Now register delegate tool with the updated TaskManager that has agent creation callback
+    // Register delegate tool (TaskManager accessed via context)
     const delegateTool = new DelegateTool();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    (delegateTool as any).getTaskManager = () => session._taskManager;
     toolExecutor.registerTool('delegate', delegateTool);
 
     // Set up coordinator agent with approval callback if provided
@@ -207,9 +212,9 @@ export class Session {
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
 
-    // Create tool executor with TaskManager injection
+    // Create tool executor
     const toolExecutor = new ToolExecutor();
-    Session.initializeTools(toolExecutor, taskManager);
+    Session.initializeTools(toolExecutor);
 
     // Create agent with existing thread
     const sessionAgent = new Agent({
@@ -274,10 +279,8 @@ export class Session {
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
 
-    // Now register delegate tool with the updated TaskManager that has agent creation callback
+    // Register delegate tool (TaskManager accessed via context)
     const delegateTool = new DelegateTool();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    (delegateTool as any).getTaskManager = () => session._taskManager;
     toolExecutor.registerTool('delegate', delegateTool);
 
     logger.debug(`Session reconstruction complete for ${sessionId}`);
@@ -496,14 +499,12 @@ export class Session {
       providerInstance = registry.createProvider(targetProvider, { model: targetModel });
     }
 
-    // Create new toolExecutor for this agent with proper TaskManager injection
+    // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
-    Session.initializeTools(agentToolExecutor, this._taskManager);
+    Session.initializeTools(agentToolExecutor);
 
-    // Now register delegate tool with the TaskManager that has agent creation callback
+    // Register delegate tool (TaskManager accessed via context)
     const delegateTool = new DelegateTool();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    (delegateTool as any).getTaskManager = () => this._taskManager;
     agentToolExecutor.registerTool('delegate', delegateTool);
 
     // Create delegate agent with the appropriate provider instance and its own toolExecutor
@@ -593,9 +594,9 @@ export class Session {
     return this._taskManager;
   }
 
-  private static initializeTools(toolExecutor: ToolExecutor, taskManager: TaskManager): void {
-    // Register non-task tools
-    const nonTaskTools = [
+  private static initializeTools(toolExecutor: ToolExecutor): void {
+    // Register all tools - TaskManager is now provided via context
+    const tools = [
       new BashTool(),
       new FileReadTool(),
       new FileWriteTool(),
@@ -605,13 +606,16 @@ export class Session {
       new RipgrepSearchTool(),
       new FileFindTool(),
       new UrlFetchTool(),
+      // Task tools no longer need injection
+      new TaskCreateTool(),
+      new TaskListTool(),
+      new TaskCompleteTool(),
+      new TaskUpdateTool(),
+      new TaskAddNoteTool(),
+      new TaskViewTool(),
     ];
 
-    toolExecutor.registerTools(nonTaskTools);
-
-    // Register task tools with TaskManager injection
-    const taskTools = createTaskManagerTools(() => taskManager);
-    toolExecutor.registerTools(taskTools);
+    toolExecutor.registerTools(tools);
   }
 
   destroy(): void {
