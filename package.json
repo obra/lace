@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "type": "module",
   "author": "Jesse Vincent <jesse@fsck.com>",
+  "engines": {
+    "node": ">=20.18.3"
+  },
   "bin": {
     "lace": "./dist/cli.js",
     "debug-thread": "./dist/debug-thread.js"

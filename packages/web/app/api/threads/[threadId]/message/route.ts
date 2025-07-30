@@ -42,7 +42,16 @@ export async function POST(
     const threadId: ThreadId = asThreadId(threadIdResult.data);
 
     // Parse and validate request body with Zod
-    const bodyRaw: unknown = await request.json();
+    let bodyRaw: unknown;
+    try {
+      bodyRaw = await request.json();
+    } catch (error) {
+      const errorResponse: ApiErrorResponse = {
+        error: 'Invalid JSON in request body',
+      };
+      return NextResponse.json(errorResponse, { status: 400 });
+    }
+
     const bodyResult = MessageRequestSchema.safeParse(bodyRaw);
 
     if (!bodyResult.success) {
