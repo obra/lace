@@ -16,10 +16,10 @@ vi.mock('~/providers/registry', () => ({
     createWithAutoDiscovery: vi.fn().mockReturnValue({
       createProvider: vi.fn().mockReturnValue({
         type: 'anthropic',
-        model: 'claude-3-haiku-20240307',
-        modelName: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
+        modelName: 'claude-3-5-haiku-20241022',
         providerName: 'anthropic',
-        defaultModel: 'claude-3-haiku-20240307',
+        defaultModel: 'claude-3-5-haiku-20241022',
         setSystemPrompt: vi.fn(),
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
@@ -189,7 +189,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       expect(session).toBeInstanceOf(Session);
@@ -200,7 +200,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Custom Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       expect(session).toBeInstanceOf(Session);
@@ -213,7 +213,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const id = session.getId();
@@ -227,7 +227,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const info = session.getInfo();
@@ -237,13 +237,13 @@ describe('Session', () => {
         name: 'Test Session',
         createdAt: expect.any(Date) as Date,
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         agents: expect.arrayContaining([
           expect.objectContaining({
             threadId: session.getId(),
             name: 'Lace', // Coordinator agent is always named "Lace"
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
             status: expect.any(String) as string,
           }),
         ]) as unknown[],
@@ -256,7 +256,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const agent = session.spawnAgent('Test Agent');
@@ -269,7 +269,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       session.spawnAgent('Test Agent');
@@ -289,12 +289,12 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
 
       // Spawn agent with custom model
-      session.spawnAgent('Claude Opus Agent', 'anthropic', 'claude-3-opus-20240229');
+      session.spawnAgent('Claude Opus Agent', 'anthropic', 'claude-sonnet-4-20250514');
 
       const agents = session.getAgents();
       expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
@@ -304,7 +304,7 @@ describe('Session', () => {
         expect.objectContaining({
           name: 'Claude Opus Agent',
           provider: 'anthropic',
-          model: 'claude-3-opus-20240229',
+          model: 'claude-sonnet-4-20250514',
           status: expect.any(String) as string,
         })
       );
@@ -314,7 +314,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
 
@@ -339,7 +339,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
 
@@ -354,7 +354,7 @@ describe('Session', () => {
         expect.objectContaining({
           name: 'Default Agent',
           provider: 'anthropic', // Should fall back to session provider
-          model: 'claude-3-haiku-20240307', // Should fall back to session model
+          model: 'claude-3-5-haiku-20241022', // Should fall back to session model
           status: expect.any(String) as string,
         })
       );
@@ -366,7 +366,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const agents = session.getAgents();
@@ -377,7 +377,7 @@ describe('Session', () => {
           threadId: session.getId(),
           name: 'Lace', // Coordinator agent is always named "Lace"
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
           status: expect.any(String) as string,
         })
       );
@@ -387,7 +387,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const agent1 = session.spawnAgent('Agent 1');
@@ -422,7 +422,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const agent = session.getAgent(asThreadId('non-existent'));
@@ -433,7 +433,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const spawnedAgent = session.spawnAgent('Test Agent');
@@ -445,7 +445,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const coordinatorAgent = session.getAgent(session.getId());
@@ -459,7 +459,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const spawnedAgent = session.spawnAgent('Test Agent');
@@ -472,7 +472,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       await expect(session.startAgent(asThreadId('non-existent'))).rejects.toThrow(
@@ -486,7 +486,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const spawnedAgent = session.spawnAgent('Test Agent');
@@ -499,7 +499,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       expect(() => session.stopAgent(asThreadId('non-existent'))).toThrow(
@@ -513,7 +513,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProject.getId(),
       });
       const agent1 = session.spawnAgent('Agent 1');
@@ -552,7 +552,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProjectId,
       });
 
@@ -564,7 +564,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProjectId,
       });
 
@@ -576,7 +576,7 @@ describe('Session', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProjectId,
       });
 
@@ -592,13 +592,13 @@ describe('Session', () => {
       const session1 = Session.create({
         name: 'Session 1',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProjectId,
       });
       const session2 = Session.create({
         name: 'Session 2',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: testProjectId,
       });
 
@@ -635,13 +635,13 @@ describe('Session', () => {
         Session.create({
           name: 'Session 1',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
           projectId: projectId,
         });
         Session.create({
           name: 'Session 2',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
           projectId: projectId,
         });
 

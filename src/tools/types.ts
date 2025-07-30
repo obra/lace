@@ -2,6 +2,7 @@
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
 import { ThreadId } from '~/threads/types';
+import type { Session } from '~/sessions/session';
 
 export interface ToolContext {
   threadId?: ThreadId;
@@ -12,7 +13,7 @@ export interface ToolContext {
   // Session information for policy enforcement - REQUIRED for security
   sessionId?: string;
   projectId?: string;
-  session?: import('~/sessions/session').Session; // Optional for tests, required for security in ToolExecutor
+  session?: Session; // TaskManager accessed via session.getTaskManager()
 }
 
 export interface ToolAnnotations {

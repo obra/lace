@@ -21,9 +21,9 @@ vi.mock('~/providers/registry', () => ({
     createWithAutoDiscovery: vi.fn().mockReturnValue({
       createProvider: vi.fn().mockReturnValue({
         type: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         providerName: 'anthropic',
-        defaultModel: 'claude-3-haiku-20240307',
+        defaultModel: 'claude-3-5-haiku-20241022',
         setSystemPrompt: vi.fn(),
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
@@ -40,49 +40,31 @@ vi.mock('~/providers/registry', () => ({
   },
 }));
 
-// Mock tool implementations to avoid file system dependencies
-vi.mock('~/tools/implementations/task-manager', () => ({
-  createTaskManagerTools: vi.fn(() => []),
-}));
-
-vi.mock('~/tools/implementations/bash', () => ({
-  BashTool: vi.fn(() => ({ name: 'bash' })),
-}));
-
-vi.mock('~/tools/implementations/file-read', () => ({
-  FileReadTool: vi.fn(() => ({ name: 'file-read' })),
-}));
-
-vi.mock('~/tools/implementations/file-write', () => ({
-  FileWriteTool: vi.fn(() => ({ name: 'file-write' })),
-}));
-
-vi.mock('~/tools/implementations/file-edit', () => ({
-  FileEditTool: vi.fn(() => ({ name: 'file-edit' })),
-}));
-
-vi.mock('~/tools/implementations/file-insert', () => ({
-  FileInsertTool: vi.fn(() => ({ name: 'file-insert' })),
-}));
-
-vi.mock('~/tools/implementations/file-list', () => ({
-  FileListTool: vi.fn(() => ({ name: 'file-list' })),
-}));
-
-vi.mock('~/tools/implementations/ripgrep-search', () => ({
-  RipgrepSearchTool: vi.fn(() => ({ name: 'ripgrep-search' })),
-}));
-
-vi.mock('~/tools/implementations/file-find', () => ({
-  FileFindTool: vi.fn(() => ({ name: 'file-find' })),
-}));
-
-vi.mock('~/tools/implementations/delegate', () => ({
-  DelegateTool: vi.fn(() => ({ name: 'delegate' })),
-}));
-
+// Mock only external dependencies while using real tools
+// URL fetch tool might make external HTTP requests
 vi.mock('~/tools/implementations/url-fetch', () => ({
-  UrlFetchTool: vi.fn(() => ({ name: 'url-fetch' })),
+  UrlFetchTool: vi.fn(() => ({
+    name: 'url-fetch',
+    description: 'Fetch content from a URL (mocked)',
+    schema: {},
+    execute: vi.fn().mockResolvedValue({
+      isError: false,
+      content: [{ type: 'text', text: 'Mocked URL content' }],
+    }),
+  })),
+}));
+
+// Bash tool executes system commands - mock to avoid side effects
+vi.mock('~/tools/implementations/bash', () => ({
+  BashTool: vi.fn(() => ({
+    name: 'bash',
+    description: 'Execute bash commands (mocked)',
+    schema: {},
+    execute: vi.fn().mockResolvedValue({
+      isError: false,
+      content: [{ type: 'text', text: 'Mocked bash output' }],
+    }),
+  })),
 }));
 
 describe('Session Detail API Route', () => {
@@ -132,7 +114,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -155,7 +137,7 @@ describe('Session Detail API Route', () => {
               threadId: sessionId,
               name: 'Lace', // Coordinator agent is always named "Lace"
               provider: 'anthropic',
-              model: 'claude-3-haiku-20240307',
+              model: 'claude-3-5-haiku-20241022',
               status: expect.any(String) as string,
             }),
           ]) as unknown[],
@@ -205,7 +187,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Original Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -277,7 +259,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -317,7 +299,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Original Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -395,7 +377,7 @@ describe('Session Detail API Route', () => {
       const session = await sessionService.createSession(
         'Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 

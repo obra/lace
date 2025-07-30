@@ -32,7 +32,7 @@ describe('Agent Session Context', () => {
     session = Session.create({
       name: 'Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -85,7 +85,7 @@ describe('Agent Session Context', () => {
       const createdSession = Session.create({
         name: 'Roundtrip Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
       });
 

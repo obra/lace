@@ -6,9 +6,17 @@ import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
 import { ToolExecutor } from '~/tools/executor';
-import { TaskManager } from '~/tasks/task-manager';
+import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
+import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
-import { createTaskManagerTools } from '~/tools/implementations/task-manager';
+import {
+  TaskCreateTool,
+  TaskListTool,
+  TaskCompleteTool,
+  TaskUpdateTool,
+  TaskAddNoteTool,
+  TaskViewTool,
+} from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
@@ -41,6 +49,8 @@ export interface SessionInfo {
 }
 
 export class Session {
+  private static _sessionRegistry = new Map<ThreadId, Session>();
+
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
@@ -55,6 +65,9 @@ export class Session {
 
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
+
+    // Register this session in the registry
+    Session._sessionRegistry.set(this._sessionId, this);
   }
 
   static create(options: {
@@ -94,11 +107,12 @@ export class Session {
     const threadId = threadManager.createThread(sessionData.id, sessionData.id, options.projectId);
 
     // Create TaskManager using global persistence
+    // Note: We'll update this with agent creation callback after session is created
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
-    // Create tool executor with TaskManager injection
+    // Create tool executor
     const toolExecutor = new ToolExecutor();
-    Session.initializeTools(toolExecutor, taskManager);
+    Session.initializeTools(toolExecutor);
 
     // Create agent
     const sessionAgent = new Agent({
@@ -120,6 +134,13 @@ export class Session {
     const session = new Session(sessionAgent, options.projectId);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
+
+    // Set up agent creation callback for task-based agent spawning
+    session.setupAgentCreationCallback();
+
+    // Register delegate tool (TaskManager accessed via context)
+    const delegateTool = new DelegateTool();
+    toolExecutor.registerTool('delegate', delegateTool);
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getAgent(session.getId());
@@ -145,6 +166,18 @@ export class Session {
 
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
+
+    // Check if session already exists in registry
+    const existingSession = Session._sessionRegistry.get(sessionId);
+    if (existingSession && !existingSession._destroyed) {
+      logger.debug(`Session.getById: Found existing session in registry for ${sessionId}`);
+      return existingSession;
+    }
+
+    if (existingSession && existingSession._destroyed) {
+      logger.debug(`Session.getById: Removing destroyed session from registry for ${sessionId}`);
+      Session._sessionRegistry.delete(sessionId);
+    }
 
     // Get session from the sessions table
     const sessionData = Session.getSession(sessionId);
@@ -196,9 +229,9 @@ export class Session {
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
 
-    // Create tool executor with TaskManager injection
+    // Create tool executor
     const toolExecutor = new ToolExecutor();
-    Session.initializeTools(toolExecutor, taskManager);
+    Session.initializeTools(toolExecutor);
 
     // Create agent with existing thread
     const sessionAgent = new Agent({
@@ -260,7 +293,16 @@ export class Session {
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
+    // Set up agent creation callback for task-based agent spawning
+    session.setupAgentCreationCallback();
+
+    // Register delegate tool (TaskManager accessed via context)
+    const delegateTool = new DelegateTool();
+    toolExecutor.registerTool('delegate', delegateTool);
+
     logger.debug(`Session reconstruction complete for ${sessionId}`);
+
+    // Session is automatically registered in the registry via constructor
     return session;
   }
 
@@ -476,11 +518,16 @@ export class Session {
       providerInstance = registry.createProvider(targetProvider, { model: targetModel });
     }
 
-    // Create delegate agent with the appropriate provider instance
-    const agent = this._sessionAgent.createDelegateAgent(
-      this._sessionAgent.toolExecutor,
-      providerInstance
-    );
+    // Create new toolExecutor for this agent
+    const agentToolExecutor = new ToolExecutor();
+    Session.initializeTools(agentToolExecutor);
+
+    // Register delegate tool (TaskManager accessed via context)
+    const delegateTool = new DelegateTool();
+    agentToolExecutor.registerTool('delegate', delegateTool);
+
+    // Create delegate agent with the appropriate provider instance and its own toolExecutor
+    const agent = this._sessionAgent.createDelegateAgent(agentToolExecutor, providerInstance);
 
     // Store the agent metadata
     agent.updateThreadMetadata({
@@ -490,6 +537,12 @@ export class Session {
       provider: targetProvider,
       model: targetModel,
     });
+
+    // Set up approval callback for spawned agent (inherit from session agent)
+    const sessionApprovalCallback = this._sessionAgent.toolExecutor.getApprovalCallback();
+    if (sessionApprovalCallback) {
+      agent.toolExecutor.setApprovalCallback(sessionApprovalCallback);
+    }
 
     this._agents.set(agent.threadId, agent);
     return agent;
@@ -560,9 +613,9 @@ export class Session {
     return this._taskManager;
   }
 
-  private static initializeTools(toolExecutor: ToolExecutor, taskManager: TaskManager): void {
-    // Register non-task tools
-    const nonTaskTools = [
+  private static initializeTools(toolExecutor: ToolExecutor): void {
+    // Register all tools - TaskManager is now provided via context
+    const tools = [
       new BashTool(),
       new FileReadTool(),
       new FileWriteTool(),
@@ -571,15 +624,17 @@ export class Session {
       new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
-      new DelegateTool(),
       new UrlFetchTool(),
+      // Task tools no longer need injection
+      new TaskCreateTool(),
+      new TaskListTool(),
+      new TaskCompleteTool(),
+      new TaskUpdateTool(),
+      new TaskAddNoteTool(),
+      new TaskViewTool(),
     ];
 
-    toolExecutor.registerTools(nonTaskTools);
-
-    // Register task tools with TaskManager injection
-    const taskTools = createTaskManagerTools(() => taskManager);
-    toolExecutor.registerTools(taskTools);
+    toolExecutor.registerTools(tools);
   }
 
   destroy(): void {
@@ -588,6 +643,9 @@ export class Session {
     }
 
     this._destroyed = true;
+
+    // Remove from registry
+    Session._sessionRegistry.delete(this._sessionId);
 
     // Stop and cleanup the coordinator agent
     this._sessionAgent.stop();
@@ -599,6 +657,55 @@ export class Session {
       agent.removeAllListeners();
     }
     this._agents.clear();
+  }
+
+  /**
+   * Set up the agent creation callback for task-based agent spawning
+   */
+  private setupAgentCreationCallback(): void {
+    const agentCreationCallback: AgentCreationCallback = async (
+      provider: string,
+      model: string,
+      task
+    ) => {
+      // Create a more descriptive agent name based on the task
+      const agentName = `task-${task.id.split('_').pop()}`;
+
+      // Use the existing spawnAgent method to create the agent
+      const agent = this.spawnAgent(agentName, provider, model);
+
+      // Send initial task notification to the new agent
+      await this.sendTaskNotification(agent, task);
+
+      return asThreadId(agent.threadId);
+    };
+
+    // Set the callback on the existing TaskManager
+    this._taskManager.setAgentCreationCallback(agentCreationCallback);
+  }
+
+  /**
+   * Send task assignment notification to an agent
+   */
+  private async sendTaskNotification(agent: Agent, task: Task): Promise<void> {
+    const taskMessage = this.formatTaskAssignment(task);
+    await agent.sendMessage(taskMessage);
+  }
+
+  /**
+   * Format task assignment notification message
+   */
+  private formatTaskAssignment(task: Task): string {
+    return `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
+Title: "${task.title}"
+Created by: ${task.createdBy}
+Priority: ${task.priority}
+
+--- TASK DETAILS ---
+${task.prompt}
+--- END TASK DETAILS ---
+
+Use your task_add_note tool to record important notes as you work and your task_complete tool when you are done.`;
   }
 
   private static detectDefaultProvider(): string {
@@ -615,5 +722,19 @@ export class Session {
     const month = date.toLocaleDateString('en-US', { month: 'short' });
     const day = date.getDate();
     return `${weekday}, ${month} ${day}`;
+  }
+
+  /**
+   * Clear the session registry - primarily for testing
+   */
+  static clearRegistry(): void {
+    Session._sessionRegistry.clear();
+  }
+
+  /**
+   * Get registry size - primarily for testing
+   */
+  static getRegistrySize(): number {
+    return Session._sessionRegistry.size;
   }
 }

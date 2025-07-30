@@ -94,7 +94,7 @@ describe('Enhanced Agent', () => {
     session = Session.create({
       name: 'Agent Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 

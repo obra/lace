@@ -48,7 +48,7 @@ describe('SSE Stream E2E Tests', () => {
           name: 'SSE E2E Test Session',
           configuration: {
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +109,7 @@ describe('SSE Stream E2E Tests', () => {
         body: JSON.stringify({
           name: 'test-agent',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }

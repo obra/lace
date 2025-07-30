@@ -990,7 +990,7 @@ describe('Session class project support', () => {
     const session = Session.create(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       ':memory:',
       'project1' // Add projectId parameter
     );
@@ -1005,7 +1005,7 @@ describe('Session class project support', () => {
     const session = Session.create(
       'Test Session',
       'anthropic', 
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       ':memory:',
       'project1'
     );
@@ -1020,7 +1020,7 @@ describe('Session class project support', () => {
     const session = Session.create(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307', 
+      'claude-3-5-haiku-20241022', 
       ':memory:',
       'project1'
     );
@@ -1036,8 +1036,8 @@ describe('Session class project support', () => {
   it('should get sessions from table not metadata in getAll', () => {
     process.env.ANTHROPIC_KEY = 'test-key';
     
-    Session.create('Session 1', 'anthropic', 'claude-3-haiku-20240307', ':memory:', 'project1');
-    Session.create('Session 2', 'anthropic', 'claude-3-haiku-20240307', ':memory:', 'project1'); 
+    Session.create('Session 1', 'anthropic', 'claude-3-5-haiku-20241022', ':memory:', 'project1');
+    Session.create('Session 2', 'anthropic', 'claude-3-5-haiku-20241022', ':memory:', 'project1'); 
     
     const sessions = Session.getAll(':memory:');
     expect(sessions).toHaveLength(2);
@@ -1056,7 +1056,7 @@ describe('Session class project support', () => {
 static create(
   name: string,
   provider = 'anthropic',
-  model = 'claude-3-haiku-20240307',
+  model = 'claude-3-5-haiku-20241022',
   dbPath?: string,
   projectId?: string  // NEW: Add project support
 ): Session

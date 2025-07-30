@@ -3,49 +3,127 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { BashTool } from '~/tools/implementations/bash';
-import { TestProvider } from '~/test-utils/test-provider';
 import { logger } from '~/utils/logger';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ProviderRegistry } from '~/providers/registry';
+import { ApprovalDecision } from '~/tools/approval-types';
+
+// Mock provider that responds with task completion tool calls
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  get contextWindow(): number {
+    return 200000; // Large context window for testing
+  }
+
+  get maxOutputTokens(): number {
+    return 4096;
+  }
+
+  async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    // Look for task assignment message (same pattern as working tests)
+    const taskMessage = messages.find(
+      (m) =>
+        m.content &&
+        typeof m.content === 'string' &&
+        m.content.includes('You have been assigned task')
+    );
+
+    if (taskMessage) {
+      // Extract task ID from task assignment message
+      const match = taskMessage.content.match(/assigned task '([^']+)'/);
+      const taskId = match ? match[1] : 'unknown';
+
+      const response = {
+        content: 'I will analyze the project structure and provide findings.',
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+        toolCalls: [
+          {
+            id: 'complete_task_call',
+            name: 'task_complete',
+            input: {
+              id: taskId,
+              message:
+                'Successfully analyzed the project structure and found key patterns: TypeScript configuration, modular architecture, and comprehensive testing setup.',
+            },
+          },
+        ],
+      };
+      return Promise.resolve(response);
+    }
+
+    return Promise.resolve({
+      content: 'Mock response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Delegation Integration Tests', () => {
-  let tempDir: string;
+  const _tempDirContext = useTempLaceDir();
   let threadManager: ThreadManager;
-  let toolExecutor: ToolExecutor;
+  let session: Session;
+  let project: Project;
+  let mockProvider: MockProvider;
 
   beforeEach(() => {
-    // Create temporary directory for test database
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-delegation-test-'));
     setupTestPersistence();
+    mockProvider = new MockProvider();
 
-    // Set up test environment
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+      (_name: string, _config?: unknown) => {
+        return mockProvider;
+      }
+    );
+
+    // Also mock the static createWithAutoDiscovery method
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
+      const mockRegistry = {
+        createProvider: () => mockProvider,
+        getProvider: () => mockProvider,
+        getProviderNames: () => ['anthropic', 'openai'],
+      } as unknown as ProviderRegistry;
+      return mockRegistry;
+    });
+
+    // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
-    toolExecutor = new ToolExecutor();
-
-    // Register tools
-    const bashTool = new BashTool();
-    toolExecutor.registerTool('bash', bashTool);
-
-    const delegateTool = new DelegateTool();
-    // Note: setDependencies now takes (parentAgent, toolExecutor) but we don't have an agent in setup
-    // The delegate tool will be properly initialized when the Agent is created
-    toolExecutor.registerTool('delegate', delegateTool);
+    project = Project.create('Test Project', '/tmp/test-delegation');
+    session = Session.create({
+      name: 'Delegation Integration Test Session',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      projectId: project.getId(),
+      approvalCallback: {
+        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
+      },
+    });
   });
 
   afterEach(() => {
+    vi.clearAllMocks();
+    session?.destroy();
     threadManager.close();
     teardownTestPersistence();
-    vi.restoreAllMocks();
-    // Clean up temp directory
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
-    }
   });
 
   it('should create hierarchical delegate thread IDs', () => {
@@ -144,84 +222,31 @@ describe('Delegation Integration Tests', () => {
   });
 
   it('should integrate delegation with DelegateTool', async () => {
-    // Create mock provider for predictable testing
-    const mockProvider = new TestProvider({
-      mockResponse: JSON.stringify({
-        threadId: 'delegate-thread-123',
-        status: 'completed',
-        summary: 'Successfully analyzed the project structure and found key patterns',
-        totalTokens: 150,
-      }),
-    });
-
-    // Create main agent with any provider (won't be used for delegation due to mock)
-    const mainThreadId = threadManager.generateThreadId();
-    threadManager.createThread(mainThreadId);
-
-    const agent = new Agent({
-      provider: mockProvider, // Use mock provider for main agent too
-      toolExecutor,
-      threadManager,
-      threadId: mainThreadId,
-      tools: toolExecutor.getAllTools(),
-    });
-
-    // Initialize delegate tool with the agent now that it's created
+    // Get delegate tool from session (it will have proper TaskManager injection)
+    const agent = session.getAgent(session.getId());
+    const toolExecutor = agent!.toolExecutor;
     const delegateToolInstance = toolExecutor.getTool('delegate') as DelegateTool;
-    delegateToolInstance.setDependencies(agent, toolExecutor);
 
-    // Mock the DelegateTool's createProvider method to return our test provider
-    const createProviderSpy = vi
-      .spyOn(delegateToolInstance as any, 'createProvider')
-      .mockReturnValue(mockProvider);
-
-    await agent.start();
-
-    // Add initial user message
-    threadManager.addEvent(agent.threadId, 'USER_MESSAGE', 'Please analyze the code structure');
-
-    // Test delegation using the real DelegateTool
+    // Test delegation using the real DelegateTool with provider mocking
     const delegateInput = {
       title: 'Code Analysis',
       prompt: 'Analyze the project structure and identify key patterns',
       expected_response: 'Brief summary of project structure',
-      model: 'anthropic:claude-3-5-haiku-latest', // Use real provider format, will be mocked
+      model: 'anthropic:claude-3-5-haiku-20241022',
     };
 
-    // Execute delegation (this will create a sub-thread and run a mock subagent)
-    const toolCall = {
-      id: 'test-delegation-call',
-      name: 'delegate',
-      arguments: delegateInput,
-    };
-    const result = await delegateToolInstance.execute(toolCall.arguments);
+    const result = await delegateToolInstance.execute(delegateInput, {
+      threadId: session.getId(),
+      session, // TaskManager accessed via session.getTaskManager()
+    });
 
     if (result.isError) {
       logger.error('Delegation failed', { content: result.content });
     }
+
+    // The delegation should succeed with our mock provider handling task completion
     expect(result.isError).toBe(false);
-
-    // Check that delegate thread was created
-    const allEvents = threadManager.getMainAndDelegateEvents(agent.threadId);
-
-    // Should have original user message + delegate events
-    expect(allEvents.length).toBeGreaterThan(1);
-
-    // Note: Delegate events are processed by individual DelegationBox components
-    // rather than being included in the main timeline
-
-    // Check that we have events from delegate thread
-    const delegateEvents = allEvents.filter((e) => e.threadId.includes('.'));
-    expect(delegateEvents.length).toBeGreaterThan(0);
-
-    // Verify that our mock was called
-    expect(createProviderSpy).toHaveBeenCalledWith(
-      'anthropic',
-      'claude-3-5-haiku-latest',
-      expect.any(String)
-    );
-
-    // Cleanup
-    createProviderSpy.mockRestore();
-  }); // Should complete quickly with mock provider
+    expect(result.content[0].text).toContain('Successfully analyzed the project structure');
+    expect(result.metadata?.taskTitle).toBe('Code Analysis');
+  });
 });

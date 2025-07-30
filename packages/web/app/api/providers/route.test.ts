@@ -80,7 +80,7 @@ describe('Provider Discovery API', () => {
           },
           models: [
             {
-              id: 'claude-3-5-sonnet-20241022',
+              id: 'claude-sonnet-4-20250514',
               displayName: 'Claude 3.5 Sonnet',
               description: 'Most capable model for complex tasks',
               contextWindow: 200000,
@@ -89,7 +89,7 @@ describe('Provider Discovery API', () => {
               isDefault: true,
             },
             {
-              id: 'claude-3-haiku-20240307',
+              id: 'claude-3-5-haiku-20241022',
               displayName: 'Claude 3 Haiku',
               description: 'Fast and efficient for simple tasks',
               contextWindow: 200000,
@@ -136,7 +136,7 @@ describe('Provider Discovery API', () => {
       });
       expect(data.providers[0]?.models).toContainEqual(
         expect.objectContaining({
-          id: 'claude-3-5-sonnet-20241022',
+          id: 'claude-sonnet-4-20250514',
           displayName: 'Claude 3.5 Sonnet',
         })
       );
@@ -176,7 +176,7 @@ describe('Provider Discovery API', () => {
           },
           models: [
             {
-              id: 'claude-3-haiku-20240307',
+              id: 'claude-3-5-haiku-20241022',
               displayName: 'Claude 3 Haiku',
               contextWindow: 200000,
               maxOutputTokens: 4096,
@@ -223,14 +223,14 @@ describe('Provider Discovery API', () => {
           },
           models: [
             {
-              id: 'claude-3-5-sonnet-20241022',
+              id: 'claude-sonnet-4-20250514',
               displayName: 'Claude 3.5 Sonnet',
               contextWindow: 200000,
               maxOutputTokens: 8192,
               isDefault: true,
             },
             {
-              id: 'claude-3-opus-20240229',
+              id: 'claude-sonnet-4-20250514',
               displayName: 'Claude 3 Opus',
               contextWindow: 200000,
               maxOutputTokens: 4096,
@@ -251,7 +251,7 @@ describe('Provider Discovery API', () => {
       expect(provider).toBeDefined();
       const defaultModel = provider.models.find((m) => m.isDefault);
       expect(defaultModel).toBeDefined();
-      expect(defaultModel?.id).toBe('claude-3-5-sonnet-20241022');
+      expect(defaultModel?.id).toBe('claude-sonnet-4-20250514');
     });
 
     it('should include model capabilities when available', async () => {

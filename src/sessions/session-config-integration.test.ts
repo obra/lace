@@ -13,9 +13,9 @@ vi.mock('~/providers/registry', () => ({
     createWithAutoDiscovery: vi.fn().mockReturnValue({
       createProvider: vi.fn().mockReturnValue({
         type: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         providerName: 'anthropic',
-        defaultModel: 'claude-3-haiku-20240307',
+        defaultModel: 'claude-3-5-haiku-20241022',
         setSystemPrompt: vi.fn(),
         createResponse: vi.fn().mockResolvedValue({
           content: 'Mock response',
@@ -121,7 +121,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 
@@ -130,7 +130,7 @@ describe('Session Configuration Integration', () => {
       // Should inherit from project
       expect(effectiveConfig.provider).toBe('anthropic');
       // Note: Session creation model parameter overrides project model
-      expect(effectiveConfig.model).toBe('claude-3-haiku-20240307'); // From session creation
+      expect(effectiveConfig.model).toBe('claude-3-5-haiku-20241022'); // From session creation
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
 
       session.destroy();
@@ -140,13 +140,13 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 
       // Update session configuration
       session.updateConfiguration({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         temperature: 0.8,
         systemPrompt: 'You are a code reviewer.',
       });
@@ -154,7 +154,7 @@ describe('Session Configuration Integration', () => {
       const effectiveConfig = session.getEffectiveConfiguration();
 
       // Should have session overrides
-      expect(effectiveConfig.model).toBe('claude-3-haiku-20240307'); // Session override
+      expect(effectiveConfig.model).toBe('claude-3-5-haiku-20241022'); // Session override
       expect(effectiveConfig.temperature).toBe(0.8); // Session override
       expect(effectiveConfig.systemPrompt).toBe('You are a code reviewer.'); // Session override
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
@@ -174,7 +174,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 
@@ -227,7 +227,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
       session.updateConfiguration(preset!.configuration);
@@ -255,7 +255,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 
@@ -282,7 +282,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 
@@ -300,7 +300,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 
@@ -316,7 +316,7 @@ describe('Session Configuration Integration', () => {
       const session = Session.create({
         name: 'Test Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId,
       });
 

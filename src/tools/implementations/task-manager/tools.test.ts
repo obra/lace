@@ -9,15 +9,54 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager/tools';
+} from '~/tools/implementations/task-manager';
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ProviderRegistry } from '~/providers/registry';
+
+// Mock provider for testing agent spawning
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'mock response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Enhanced Task Manager Tools', () => {
   const _tempDirContext = useTempLaceDir();
   let context: ToolContext;
+  let session: Session;
+  let project: Project;
+  let tools: Tool[];
+  let taskCreateTool: TaskCreateTool;
+  let taskListTool: TaskListTool;
+  let _taskCompleteTool: TaskCompleteTool;
+  let taskUpdateTool: TaskUpdateTool;
+  let taskAddNoteTool: TaskAddNoteTool;
+  let taskViewTool: TaskViewTool;
+  let mockProvider: MockProvider;
 
   const parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
@@ -25,26 +64,104 @@ describe('Enhanced Task Manager Tools', () => {
 
   beforeEach(() => {
     setupTestPersistence();
+    mockProvider = new MockProvider();
+
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
+      (_name: string, _config?: unknown) => {
+        return mockProvider;
+      }
+    );
+
+    // Also mock the static createWithAutoDiscovery method
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
+      const mockRegistry = {
+        createProvider: () => mockProvider,
+        getProvider: () => mockProvider,
+        getProviderNames: () => ['anthropic', 'openai'],
+      } as unknown as ProviderRegistry;
+      return mockRegistry;
+    });
+
+    // Create project first
+    project = Project.create('Test Project', '/tmp/test-tools');
+
+    // Create session with anthropic - the provider will be mocked
+    session = Session.create({
+      name: 'Tool Test Session',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      projectId: project.getId(),
+    });
+
+    // Create tools that get TaskManager from context
+    tools = [
+      new TaskCreateTool(),
+      new TaskListTool(),
+      new TaskCompleteTool(),
+      new TaskUpdateTool(),
+      new TaskAddNoteTool(),
+      new TaskViewTool(),
+    ];
+    taskCreateTool = tools.find((t) => t.name === 'task_add') as TaskCreateTool;
+    taskListTool = tools.find((t) => t.name === 'task_list') as TaskListTool;
+    _taskCompleteTool = tools.find((t) => t.name === 'task_complete') as TaskCompleteTool;
+    taskUpdateTool = tools.find((t) => t.name === 'task_update') as TaskUpdateTool;
+    taskAddNoteTool = tools.find((t) => t.name === 'task_add_note') as TaskAddNoteTool;
+    taskViewTool = tools.find((t) => t.name === 'task_view') as TaskViewTool;
+
     context = {
-      threadId: agent1ThreadId,
+      threadId: session.getId(),
       parentThreadId: parentThreadId,
+      session, // TaskManager accessed via session.getTaskManager()
     };
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    session?.destroy();
     teardownTestPersistence();
+  });
+
+  describe('Context Integration', () => {
+    it('should get TaskManager from context', async () => {
+      expect(tools.length).toBe(6);
+      expect(taskCreateTool).toBeDefined();
+      expect(taskCreateTool.name).toBe('task_add');
+
+      // Test that tools can access TaskManager via session
+      expect(context.session).toBeDefined();
+      expect(context.session?.getTaskManager()).toBeDefined();
+
+      // Test that task creation works with context-based TaskManager
+      const result = await taskCreateTool.execute(
+        {
+          tasks: [
+            {
+              title: 'Context Test Task',
+              prompt: 'Test task with context-based TaskManager',
+            },
+          ],
+        },
+        context
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0]?.text).toContain('Created task');
+    });
   });
 
   describe('TaskCreateTool', () => {
     it('should create task with required fields', async () => {
-      const tool = new TaskCreateTool();
-
-      const result = await tool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Implement authentication',
-          prompt: 'Create a secure authentication system with JWT tokens',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Implement authentication',
+              prompt: 'Create a secure authentication system with JWT tokens',
+              priority: 'high',
+            },
+          ],
         },
         context
       );
@@ -55,15 +172,17 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should create task with optional fields', async () => {
-      const tool = new TaskCreateTool();
-
-      const result = await tool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Code review',
-          description: 'Review the authentication PR',
-          prompt: 'Check security best practices and code style',
-          priority: 'medium',
-          assignedTo: agent2ThreadId,
+          tasks: [
+            {
+              title: 'Code review',
+              description: 'Review the authentication PR',
+              prompt: 'Check security best practices and code style',
+              priority: 'medium',
+              assignedTo: agent2ThreadId,
+            },
+          ],
         },
         context
       );
@@ -74,30 +193,39 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should create task with new agent assignment', async () => {
-      const tool = new TaskCreateTool();
       const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
 
-      const result = await tool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Research task',
-          prompt: 'Research best practices for JWT implementation',
-          priority: 'low',
-          assignedTo: newAgentSpec,
+          tasks: [
+            {
+              title: 'Research task',
+              prompt: 'Research best practices for JWT implementation',
+              priority: 'low',
+              assignedTo: newAgentSpec,
+            },
+          ],
         },
         context
       );
 
       expect(result.isError).toBe(false);
-      expect(result.content?.[0]?.text).toContain('new:anthropic/claude-3-haiku');
+      // After agent spawning, the task should be assigned to the spawned agent thread ID
+      expect(result.content?.[0]?.text).toContain('Research task');
+      expect(result.content?.[0]?.text).toContain('assigned to');
+      // The assignment should be to a delegate thread ID, not the original spec
+      expect(result.content?.[0]?.text).toMatch(/assigned to \w+\.\d+/);
     });
 
     it('should validate required fields', async () => {
-      const tool = new TaskCreateTool();
-
-      const result = await tool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: '',
-          prompt: 'Some prompt',
+          tasks: [
+            {
+              title: '',
+              prompt: 'Some prompt',
+            },
+          ],
         } as any,
         context
       );
@@ -107,13 +235,15 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should reject invalid assignee format', async () => {
-      const tool = new TaskCreateTool();
-
-      const result = await tool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
-          assignedTo: 'invalid-format',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+              assignedTo: 'invalid-format',
+            },
+          ],
         } as any,
         context
       );
@@ -126,46 +256,55 @@ describe('Enhanced Task Manager Tools', () => {
   describe('TaskListTool', () => {
     beforeEach(async () => {
       // Create test tasks
-      const createTool = new TaskCreateTool();
 
-      await createTool.execute(
+      await taskCreateTool.execute(
         {
-          title: 'Task 1',
-          prompt: 'First task',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Task 1',
+              prompt: 'First task',
+              priority: 'high',
+            },
+          ],
         },
         context
       );
 
-      await createTool.execute(
+      await taskCreateTool.execute(
         {
-          title: 'Task 2',
-          prompt: 'Second task',
-          priority: 'medium',
-          assignedTo: agent1ThreadId,
+          tasks: [
+            {
+              title: 'Task 2',
+              prompt: 'Second task',
+              priority: 'medium',
+              assignedTo: agent1ThreadId,
+            },
+          ],
         },
         context
       );
 
-      await createTool.execute(
+      await taskCreateTool.execute(
         {
-          title: 'Task 3',
-          prompt: 'Third task',
-          priority: 'low',
-          assignedTo: agent2ThreadId,
+          tasks: [
+            {
+              title: 'Task 3',
+              prompt: 'Third task',
+              priority: 'low',
+              assignedTo: agent2ThreadId,
+            },
+          ],
         },
         { ...context, threadId: agent2ThreadId }
       );
     });
 
     it('should list my tasks', async () => {
-      const tool = new TaskListTool();
-
-      const result = await tool.execute(
+      const result = await taskListTool.execute(
         {
           filter: 'mine',
         },
-        context
+        { ...context, threadId: agent1ThreadId }
       );
 
       expect(result.isError).toBe(false);
@@ -175,9 +314,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should list all thread tasks', async () => {
-      const tool = new TaskListTool();
-
-      const result = await tool.execute(
+      const result = await taskListTool.execute(
         {
           filter: 'thread',
         },
@@ -192,9 +329,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should list tasks I created', async () => {
-      const tool = new TaskListTool();
-
-      const result = await tool.execute(
+      const result = await taskListTool.execute(
         {
           filter: 'created',
         },
@@ -209,15 +344,12 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should include completed tasks when requested', async () => {
-      const tool = new TaskListTool();
-      const updateTool = new TaskUpdateTool();
-
       // Get task ID from list
-      const listResult = await tool.execute({ filter: 'thread' }, context);
+      const listResult = await taskListTool.execute({ filter: 'thread' }, context);
       const taskId = listResult.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0];
 
       // Complete a task
-      await updateTool.execute(
+      await taskUpdateTool.execute(
         {
           taskId: taskId!,
           status: 'completed',
@@ -226,7 +358,7 @@ describe('Enhanced Task Manager Tools', () => {
       );
 
       // List without completed
-      const withoutCompleted = await tool.execute(
+      const withoutCompleted = await taskListTool.execute(
         {
           filter: 'thread',
           includeCompleted: false,
@@ -237,7 +369,7 @@ describe('Enhanced Task Manager Tools', () => {
       expect(withoutCompleted.content?.[0]?.text).not.toContain('[completed]');
 
       // List with completed
-      const withCompleted = await tool.execute(
+      const withCompleted = await taskListTool.execute(
         {
           filter: 'thread',
           includeCompleted: true,
@@ -253,12 +385,15 @@ describe('Enhanced Task Manager Tools', () => {
     let taskId: string;
 
     beforeEach(async () => {
-      const createTool = new TaskCreateTool();
-      const result = await createTool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
-          assignedTo: agent1ThreadId,
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+              assignedTo: agent1ThreadId,
+            },
+          ],
         },
         context
       );
@@ -267,9 +402,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should update task status', async () => {
-      const tool = new TaskUpdateTool();
-
-      const result = await tool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           status: 'in_progress',
@@ -281,16 +414,13 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.content?.[0]?.text).toContain('in_progress');
 
       // Verify using TaskViewTool
-      const viewTool = new TaskViewTool();
-      const viewResult = await viewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, context);
       expect(viewResult.isError).toBe(false);
       expect(viewResult.content?.[0]?.text).toContain('in_progress');
     });
 
     it('should validate status values', async () => {
-      const tool = new TaskUpdateTool();
-
-      const result = await tool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           status: 'invalid' as 'pending' | 'in_progress' | 'completed',
@@ -303,9 +433,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should handle non-existent task', async () => {
-      const tool = new TaskUpdateTool();
-
-      const result = await tool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId: 'task_99999999_nonexist',
           status: 'completed',
@@ -318,9 +446,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should reassign task to another agent', async () => {
-      const tool = new TaskUpdateTool();
-
-      const result = await tool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           assignTo: agent2ThreadId,
@@ -332,17 +458,15 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.content?.[0]?.text).toContain('assigned to');
 
       // Verify reassignment using TaskViewTool
-      const viewTool = new TaskViewTool();
-      const viewResult = await viewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, context);
       expect(viewResult.isError).toBe(false);
       expect(viewResult.content?.[0]?.text).toContain(agent2ThreadId);
     });
 
     it('should assign to new agent spec', async () => {
-      const tool = new TaskUpdateTool();
       const newAgentSpec = createNewAgentSpec('openai', 'gpt-4');
 
-      const result = await tool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           assignTo: newAgentSpec,
@@ -351,13 +475,13 @@ describe('Enhanced Task Manager Tools', () => {
       );
 
       expect(result.isError).toBe(false);
-      expect(result.content?.[0]?.text).toContain('new:openai/gpt-4');
+      // After agent spawning, assignment should be to delegate thread ID
+      expect(result.content?.[0]?.text).toContain('assigned to');
+      expect(result.content?.[0]?.text).toMatch(/assigned to \w+\.\d+/);
     });
 
     it('should validate assignee format', async () => {
-      const tool = new TaskUpdateTool();
-
-      const result = await tool.execute(
+      const result = await taskUpdateTool.execute(
         {
           taskId,
           assignTo: 'invalid',
@@ -374,11 +498,14 @@ describe('Enhanced Task Manager Tools', () => {
     let taskId: string;
 
     beforeEach(async () => {
-      const createTool = new TaskCreateTool();
-      const result = await createTool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+            },
+          ],
         },
         context
       );
@@ -387,9 +514,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should add note to task', async () => {
-      const tool = new TaskAddNoteTool();
-
-      const result = await tool.execute(
+      const result = await taskAddNoteTool.execute(
         {
           taskId,
           note: 'Started working on this task',
@@ -401,21 +526,18 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.content?.[0]?.text).toContain('Added note');
 
       // Verify note was added using TaskViewTool
-      const viewTool = new TaskViewTool();
-      const viewResult = await viewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, context);
       expect(viewResult.isError).toBe(false);
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('Started working on this task');
-      expect(taskDetails).toContain(agent1ThreadId);
+      expect(taskDetails).toContain(session.getId()); // Note author should be session ID
       // Should have 1 note in the output
       const noteMatches = taskDetails.match(/\d+\. \[/g);
       expect(noteMatches).toHaveLength(1);
     });
 
     it('should add multiple notes', async () => {
-      const tool = new TaskAddNoteTool();
-
-      await tool.execute(
+      await taskAddNoteTool.execute(
         {
           taskId,
           note: 'First note',
@@ -423,7 +545,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      await tool.execute(
+      await taskAddNoteTool.execute(
         {
           taskId,
           note: 'Second note',
@@ -432,8 +554,7 @@ describe('Enhanced Task Manager Tools', () => {
       );
 
       // Verify multiple notes using TaskViewTool
-      const viewTool = new TaskViewTool();
-      const viewResult = await viewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, context);
       expect(viewResult.isError).toBe(false);
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('First note');
@@ -449,14 +570,17 @@ describe('Enhanced Task Manager Tools', () => {
     let taskId: string;
 
     beforeEach(async () => {
-      const createTool = new TaskCreateTool();
-      const result = await createTool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Complex task',
-          description: 'This is a complex task with many details',
-          prompt: 'Implement a complex feature with multiple components',
-          priority: 'high',
-          assignedTo: agent2ThreadId,
+          tasks: [
+            {
+              title: 'Complex task',
+              description: 'This is a complex task with many details',
+              prompt: 'Implement a complex feature with multiple components',
+              priority: 'high',
+              assignedTo: agent2ThreadId,
+            },
+          ],
         },
         context
       );
@@ -464,8 +588,7 @@ describe('Enhanced Task Manager Tools', () => {
       taskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
 
       // Add some notes
-      const noteTool = new TaskAddNoteTool();
-      await noteTool.execute(
+      await taskAddNoteTool.execute(
         {
           taskId,
           note: 'Starting analysis of requirements',
@@ -473,7 +596,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      await noteTool.execute(
+      await taskAddNoteTool.execute(
         {
           taskId,
           note: 'Found some edge cases to consider',
@@ -483,9 +606,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should view task details', async () => {
-      const tool = new TaskViewTool();
-
-      const result = await tool.execute({ taskId }, context);
+      const result = await taskViewTool.execute({ taskId }, context);
 
       expect(result.isError).toBe(false);
       const text = result.content?.[0]?.text || '';
@@ -499,9 +620,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should handle non-existent task', async () => {
-      const tool = new TaskViewTool();
-
-      const result = await tool.execute(
+      const result = await taskViewTool.execute(
         {
           taskId: 'task_99999999_nonexist',
         },
@@ -517,11 +636,14 @@ describe('Enhanced Task Manager Tools', () => {
     let taskId: string;
 
     beforeEach(async () => {
-      const createTool = new TaskCreateTool();
-      const result = await createTool.execute(
+      const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+            },
+          ],
         },
         context
       );
@@ -530,26 +652,28 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should complete a task', async () => {
-      const tool = new TaskCompleteTool();
-
-      const result = await tool.execute({ id: taskId }, context);
+      const result = await _taskCompleteTool.execute(
+        {
+          id: taskId,
+          message: 'Task completed successfully',
+        },
+        context
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content?.[0]?.text).toContain('Completed task');
 
       // Verify completion using TaskViewTool
-      const viewTool = new TaskViewTool();
-      const viewResult = await viewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, context);
       expect(viewResult.isError).toBe(false);
       expect(viewResult.content?.[0]?.text).toContain('completed');
     });
 
     it('should handle non-existent task', async () => {
-      const tool = new TaskCompleteTool();
-
-      const result = await tool.execute(
+      const result = await _taskCompleteTool.execute(
         {
           id: 'task_99999999_nonexist',
+          message: 'This should fail',
         },
         context
       );

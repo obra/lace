@@ -87,7 +87,7 @@ describe('Tool Approval System Integration', () => {
     session = Session.create({
       name: 'Tool Approval Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 

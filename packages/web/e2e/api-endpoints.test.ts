@@ -94,7 +94,7 @@ describe('API Endpoints E2E Tests', () => {
           description: 'Test session description',
           configuration: {
             provider: 'anthropic',
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-3-5-haiku-20241022',
           },
         }),
       });
@@ -127,7 +127,7 @@ describe('API Endpoints E2E Tests', () => {
       await sessionService.createSession(
         'Listable Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
 
@@ -157,7 +157,7 @@ describe('API Endpoints E2E Tests', () => {
       const session = await sessionService.createSession(
         'Specific Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id as string;
@@ -194,7 +194,7 @@ describe('API Endpoints E2E Tests', () => {
       const session = await sessionService.createSession(
         'Agent Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       sessionId = session.id as string;
@@ -207,7 +207,7 @@ describe('API Endpoints E2E Tests', () => {
         body: JSON.stringify({
           name: 'API Agent',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -270,7 +270,7 @@ describe('API Endpoints E2E Tests', () => {
       const session = await sessionService.createSession(
         'Message Test Session',
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       sessionId = session.id as string;
@@ -377,7 +377,7 @@ describe('API Endpoints E2E Tests', () => {
         body: JSON.stringify({
           name: 'Test Agent',
           provider: 'anthropic',
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-3-5-haiku-20241022',
         }),
       });
 

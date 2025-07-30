@@ -231,8 +231,16 @@ export class ThreadManager {
   createDelegateThreadFor(parentThreadId: string): Thread {
     const delegateThreadId = this.generateDelegateThreadId(parentThreadId);
 
+    // Get parent thread to inherit sessionId and projectId
+    const parentThread = this.getThread(parentThreadId);
+    if (!parentThread) {
+      throw new Error(`Parent thread not found: ${parentThreadId}`);
+    }
+
     const thread: Thread = {
       id: delegateThreadId,
+      sessionId: parentThread.sessionId, // Inherit sessionId from parent
+      projectId: parentThread.projectId, // Inherit projectId from parent
       createdAt: new Date(),
       updatedAt: new Date(),
       events: [],

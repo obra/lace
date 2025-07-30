@@ -4,7 +4,6 @@
 import { Agent } from '~/agents/agent';
 import { AIProvider } from '~/providers/base-provider';
 import { ToolExecutor } from '~/tools/executor';
-import { DelegateTool } from '~/tools/implementations/delegate';
 import { ThreadManager } from '~/threads/thread-manager';
 import { logger } from '~/utils/logger';
 import { CLIOptions } from '~/cli/args';
@@ -77,11 +76,6 @@ function setupAgent(options: CLIOptions, threadId: string, threadManager: Thread
     threadId,
     tools: toolExecutor.getAllTools(),
   });
-
-  const delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
-  if (delegateTool) {
-    delegateTool.setDependencies(agent, toolExecutor);
-  }
 
   return agent;
 }

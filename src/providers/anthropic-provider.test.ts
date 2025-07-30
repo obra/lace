@@ -287,7 +287,7 @@ describe('AnthropicProvider', () => {
     it('should use custom model when provided', async () => {
       const customProvider = new AnthropicProvider({
         apiKey: 'test-key',
-        model: 'claude-3-opus-20240229',
+        model: 'claude-sonnet-4-20250514',
       });
 
       mockCreateResponse.mockResolvedValue({
@@ -299,7 +299,7 @@ describe('AnthropicProvider', () => {
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
-      expect(callArgs.model).toBe('claude-3-opus-20240229');
+      expect(callArgs.model).toBe('claude-sonnet-4-20250514');
     });
 
     it('should use custom max tokens when provided', async () => {

@@ -65,7 +65,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     const session = await sessionService.createSession(
       'Message Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       projectId
     );
     const sessionId = session.id as string;
@@ -103,7 +103,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
       const session = await sessionService.createSession(
         `Test Session ${i}`,
         'anthropic',
-        'claude-3-haiku-20240307',
+        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id as string;
@@ -123,7 +123,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     const session = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       projectId
     );
     const sessionId = session.id as string;
@@ -149,7 +149,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     const session = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       projectId
     );
     const sessionId = session.id as string;

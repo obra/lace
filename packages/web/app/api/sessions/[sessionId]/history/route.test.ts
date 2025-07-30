@@ -40,7 +40,7 @@ describe('Session History API', () => {
     const session = await sessionService.createSession(
       'Test Session',
       'anthropic',
-      'claude-3-haiku-20240307',
+      'claude-3-5-haiku-20241022',
       testProjectId
     );
     realSessionId = session.id;

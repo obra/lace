@@ -33,7 +33,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
     session = Session.create({
       name: 'Security Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -130,7 +130,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       const permissiveSession = Session.create({
         name: 'Permissive Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
           toolPolicies: {
@@ -161,7 +161,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       const restrictiveSession = Session.create({
         name: 'Restrictive Session',
         provider: 'anthropic',
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
           toolPolicies: {

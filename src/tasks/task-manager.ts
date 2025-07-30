@@ -4,14 +4,31 @@
 import { EventEmitter } from 'events';
 import { DatabasePersistence } from '~/persistence/database';
 import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
-import { ThreadId, AssigneeId, asThreadId } from '~/threads/types';
+import { ThreadId, AssigneeId, asThreadId, isNewAgentSpec } from '~/threads/types';
+import { logger } from '~/utils/logger';
+
+// Type for agent creation callback
+export type AgentCreationCallback = (
+  provider: string,
+  model: string,
+  task: Task
+) => Promise<ThreadId>;
 
 export class TaskManager extends EventEmitter {
+  private instanceId: string;
+
   constructor(
     private sessionId: ThreadId,
-    private persistence: DatabasePersistence
+    private persistence: DatabasePersistence,
+    private createAgent?: AgentCreationCallback
   ) {
     super();
+    this.instanceId = Math.random().toString(36).substring(2, 8);
+    logger.debug('TaskManager created', { sessionId, instanceId: this.instanceId });
+  }
+
+  setAgentCreationCallback(callback: AgentCreationCallback): void {
+    this.createAgent = callback;
   }
 
   async createTask(request: CreateTaskRequest, context: TaskContext): Promise<Task> {
@@ -38,6 +55,11 @@ export class TaskManager extends EventEmitter {
       updatedAt: new Date(),
       notes: [],
     };
+
+    // Handle agent spawning if assigned to "new:provider/model"
+    if (task.assignedTo && isNewAgentSpec(task.assignedTo)) {
+      await this.handleAgentSpawning(task);
+    }
 
     // Save to database
     await this.persistence.saveTask(task);
@@ -108,10 +130,30 @@ export class TaskManager extends EventEmitter {
       notes: existingTask.notes, // Preserve notes
     };
 
-    // Save to database
-    await this.persistence.updateTask(taskId, updates);
+    // Handle agent spawning if assignedTo is being updated to "new:provider/model"
+    if (updates.assignedTo && isNewAgentSpec(updates.assignedTo)) {
+      await this.handleAgentSpawning(updatedTask);
+      // handleAgentSpawning modifies updatedTask.assignedTo to the spawned agent thread ID
+      // Update our database with the final task state including the spawned agent assignment
+      await this.persistence.updateTask(taskId, {
+        ...updates,
+        assignedTo: updatedTask.assignedTo,
+        status: updatedTask.status,
+        updatedAt: updatedTask.updatedAt,
+      });
+    } else {
+      // Save to database with original updates
+      await this.persistence.updateTask(taskId, updates);
+    }
 
     // Emit event for real-time updates
+    logger.debug('TaskManager emitting task:updated event', {
+      instanceId: this.instanceId,
+      taskId: updatedTask.id,
+      status: updatedTask.status,
+      actor: context.actor,
+    });
+
     this.emit('task:updated', {
       type: 'task:updated',
       task: updatedTask,
@@ -243,5 +285,57 @@ export class TaskManager extends EventEmitter {
     });
 
     return tasks;
+  }
+
+  /**
+   * Handle agent spawning for tasks assigned to "new:provider/model"
+   * Updates the task's assignedTo field with the actual agent thread ID
+   */
+  private async handleAgentSpawning(task: Task): Promise<void> {
+    if (!task.assignedTo || !isNewAgentSpec(task.assignedTo)) {
+      return;
+    }
+
+    if (!this.createAgent) {
+      throw new Error('Agent creation callback not provided - cannot spawn agents');
+    }
+
+    // Parse "new:provider/model" format
+    const [, providerModel] = task.assignedTo.split(':');
+    if (!providerModel) {
+      throw new Error(`Invalid agent spec format: ${task.assignedTo}`);
+    }
+
+    const [provider, model] = providerModel.split('/');
+    if (!provider || !model) {
+      throw new Error(`Invalid provider/model format in: ${task.assignedTo}`);
+    }
+
+    try {
+      // Create the agent and get its thread ID
+      const agentThreadId = await this.createAgent(provider, model, task);
+
+      // Update the task assignment to the actual thread ID
+      task.assignedTo = agentThreadId;
+
+      // Update status to in_progress since we now have an assigned agent
+      task.status = 'in_progress';
+      task.updatedAt = new Date();
+
+      // Emit agent spawning event
+      this.emit('agent:spawned', {
+        type: 'agent:spawned',
+        taskId: task.id,
+        agentThreadId,
+        provider,
+        model,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      // If agent creation fails, keep task as pending with original assignment
+      throw new Error(
+        `Failed to spawn agent for task ${task.id}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 }

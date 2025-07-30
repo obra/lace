@@ -5,80 +5,58 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { ProviderRegistry } from '~/providers/registry';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ApprovalDecision } from '~/tools/approval-types';
 
-// Mock external dependencies
-vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn().mockReturnValue({
-      createProvider: vi.fn().mockReturnValue({
-        type: 'anthropic',
-        model: 'claude-3-haiku-20240307',
-        providerName: 'anthropic',
-        defaultModel: 'claude-3-haiku-20240307',
-        setSystemPrompt: vi.fn(),
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-        }),
-      }),
-    }),
-  },
-}));
+// Mock provider for testing
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
 
-// Mock all tool implementations
-vi.mock('~/tools/implementations/bash', () => ({
-  BashTool: vi.fn(() => ({ name: 'bash' })),
-}));
+  get providerName(): string {
+    return 'anthropic';
+  }
 
-vi.mock('~/tools/implementations/file-read', () => ({
-  FileReadTool: vi.fn(() => ({ name: 'file-read' })),
-}));
+  get defaultModel(): string {
+    return 'claude-3-5-haiku-20241022';
+  }
 
-vi.mock('~/tools/implementations/file-write', () => ({
-  FileWriteTool: vi.fn(() => ({ name: 'file-write' })),
-}));
-
-vi.mock('~/tools/implementations/file-edit', () => ({
-  FileEditTool: vi.fn(() => ({ name: 'file-edit' })),
-}));
-
-vi.mock('~/tools/implementations/file-insert', () => ({
-  FileInsertTool: vi.fn(() => ({ name: 'file-insert' })),
-}));
-
-vi.mock('~/tools/implementations/file-list', () => ({
-  FileListTool: vi.fn(() => ({ name: 'file-list' })),
-}));
-
-vi.mock('~/tools/implementations/ripgrep-search', () => ({
-  RipgrepSearchTool: vi.fn(() => ({ name: 'ripgrep-search' })),
-}));
-
-vi.mock('~/tools/implementations/file-find', () => ({
-  FileFindTool: vi.fn(() => ({ name: 'file-find' })),
-}));
-
-vi.mock('~/tools/implementations/delegate', () => ({
-  DelegateTool: vi.fn(() => ({ name: 'delegate' })),
-}));
-
-vi.mock('~/tools/implementations/url-fetch', () => ({
-  UrlFetchTool: vi.fn(() => ({ name: 'url-fetch' })),
-}));
-
-vi.mock('~/tools/implementations/task-manager', () => ({
-  createTaskManagerTools: vi.fn(() => []),
-}));
+  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    return Promise.resolve({
+      content: 'Mock response',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Agent Configuration', () => {
+  const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let testSession: Session;
+  let mockProvider: MockProvider;
   let projectId: string;
 
   beforeEach(() => {
     setupTestPersistence();
+    mockProvider = new MockProvider();
+
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
+      () =>
+        ({
+          createProvider: () => mockProvider,
+          getProvider: () => mockProvider,
+          getProviderNames: () => ['anthropic', 'openai'],
+        }) as unknown as ProviderRegistry
+    );
 
     // Create test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for agent config', {
@@ -93,13 +71,17 @@ describe('Agent Configuration', () => {
     testSession = Session.create({
       name: 'Test Session',
       provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-haiku-20241022',
       projectId,
+      approvalCallback: {
+        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+      },
     });
   });
 
   afterEach(() => {
-    testSession.destroy();
+    vi.clearAllMocks();
+    testSession?.destroy();
     teardownTestPersistence();
   });
 
@@ -155,7 +137,7 @@ describe('Agent Configuration', () => {
       });
 
       // Spawn agent with specific configuration
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Agent should have configuration methods
       expect(agent).toBeDefined();
@@ -180,7 +162,11 @@ describe('Agent Configuration', () => {
       });
 
       // Create agent with role-specific configuration
-      const agent = testSession.spawnAgent('Code Reviewer', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent(
+        'Code Reviewer',
+        'anthropic',
+        'claude-3-5-haiku-20241022'
+      );
 
       // Update agent configuration with role-specific settings
       agent.updateConfiguration({
@@ -205,7 +191,11 @@ describe('Agent Configuration', () => {
 
   describe('Role-based configuration', () => {
     it('should support role-based agent configuration', () => {
-      const agent = testSession.spawnAgent('Code Reviewer', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent(
+        'Code Reviewer',
+        'anthropic',
+        'claude-3-5-haiku-20241022'
+      );
 
       // Configure agent with role-based settings
       agent.updateConfiguration({
@@ -227,7 +217,7 @@ describe('Agent Configuration', () => {
       const agent = testSession.spawnAgent(
         'Security Agent',
         'anthropic',
-        'claude-3-haiku-20240307'
+        'claude-3-5-haiku-20241022'
       );
 
       // Configure agent with capabilities and restrictions
@@ -255,7 +245,7 @@ describe('Agent Configuration', () => {
 
   describe('Agent configuration methods', () => {
     it('should provide method to get agent configuration', () => {
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Update agent configuration
       agent.updateConfiguration({
@@ -284,7 +274,7 @@ describe('Agent Configuration', () => {
         tools: ['file-read', 'bash'],
       });
 
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Update agent configuration partially
       agent.updateConfiguration({
@@ -301,7 +291,7 @@ describe('Agent Configuration', () => {
     });
 
     it('should provide method to update agent configuration', () => {
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
 
       // Update configuration multiple times
       agent.updateConfiguration({
@@ -331,7 +321,7 @@ describe('Agent Configuration', () => {
       const agent = testSession.spawnAgent(
         'Security Analyst',
         'anthropic',
-        'claude-3-haiku-20240307'
+        'claude-3-5-haiku-20241022'
       );
 
       // Configure agent role
@@ -351,7 +341,11 @@ describe('Agent Configuration', () => {
     });
 
     it('should manage agent capabilities', () => {
-      const agent = testSession.spawnAgent('Data Analyst', 'anthropic', 'claude-3-haiku-20240307');
+      const agent = testSession.spawnAgent(
+        'Data Analyst',
+        'anthropic',
+        'claude-3-5-haiku-20241022'
+      );
 
       // Configure agent capabilities
       agent.updateConfiguration({
@@ -371,7 +365,7 @@ describe('Agent Configuration', () => {
       const agent = testSession.spawnAgent(
         'Read-Only Agent',
         'anthropic',
-        'claude-3-haiku-20240307'
+        'claude-3-5-haiku-20241022'
       );
 
       // Configure agent restrictions
