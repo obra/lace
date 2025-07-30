@@ -3,130 +3,45 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ProviderRegistry } from '~/providers/registry';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { ToolContext } from '~/tools/types';
+import {
+  createDelegationTestSetup,
+  DelegationTestSetup,
+} from '~/test-utils/delegation-test-helper';
 
-// Mock provider for testing delegation
-class MockProvider extends BaseMockProvider {
-  private _responses: string[] = ['Mock delegation response'];
-  private _responseIndex = 0;
-
-  constructor() {
-    super({});
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
-  setMockResponses(responses: string[]): void {
-    this._responses = responses;
-    this._responseIndex = 0;
-  }
-
-  async createResponse(messages: ProviderMessage[], tools: Tool[]): Promise<ProviderResponse> {
-    const response = this._responses[this._responseIndex] || 'Mock delegation response';
-    this._responseIndex = Math.min(this._responseIndex + 1, this._responses.length - 1);
-
-    // Check if this is a delegation request by looking for task completion instructions in the messages
-    const lastMessage = messages[messages.length - 1];
-    const hasTaskCompleteInstruction = lastMessage?.content?.includes('task_complete tool');
-    const taskCompleteTool = tools.find((t) => t.name === 'task_complete');
-
-    // Extract task ID from the message if present
-    const taskIdMatch = lastMessage?.content?.match(/complete task '([^']+)'/);
-    const taskId = taskIdMatch?.[1] || 'unknown_task';
-
-    // If this looks like a delegation request and we have the task_complete tool, use it
-    if (hasTaskCompleteInstruction && taskCompleteTool) {
-      return Promise.resolve({
-        content: `I'll complete this task: ${response}`,
-        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-        toolCalls: [
-          {
-            id: 'complete_task_call',
-            name: 'task_complete',
-            input: {
-              id: taskId,
-              message: response,
-            },
-          },
-        ],
-      });
-    }
-
-    return Promise.resolve({
-      content: response,
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      toolCalls: [],
-    });
-  }
-}
+// Using shared delegation test utilities
 
 describe('DelegateTool', () => {
   const _tempDirContext = useTempLaceDir();
+  let testSetup: DelegationTestSetup;
   let tool: DelegateTool;
-  let session: Session;
-  let project: Project;
-  let mockProvider: MockProvider;
   let context: ToolContext;
 
   beforeEach(() => {
     setupTestPersistence();
-    mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-      (_name: string, _config?: unknown) => {
-        return mockProvider;
-      }
-    );
-
-    // Also mock the static createWithAutoDiscovery method
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
-      const mockRegistry = {
-        createProvider: () => mockProvider,
-        getProvider: () => mockProvider,
-        getProviderNames: () => ['anthropic', 'openai'],
-      } as unknown as ProviderRegistry;
-      return mockRegistry;
-    });
-
-    // Create project first
-    project = Project.create('Test Project', '/tmp/test-delegate');
-
-    // Create session with anthropic - the provider will be mocked
-    session = Session.create({
-      name: 'Delegate Test Session',
-      provider: 'anthropic',
+    // Use shared delegation test setup
+    testSetup = createDelegationTestSetup({
+      sessionName: 'Delegate Test Session',
+      projectName: 'Delegate Test Project',
       model: 'claude-sonnet-4-20250514',
-      projectId: project.getId(),
     });
 
     // Get tool from session agent's toolExecutor
-    const agent = session.getAgent(session.getId());
+    const agent = testSetup.session.getAgent(testSetup.session.getId());
     const toolExecutor = agent!.toolExecutor;
     tool = toolExecutor.getTool('delegate') as DelegateTool;
 
     context = {
-      threadId: session.getId(),
+      threadId: testSetup.session.getId(),
     };
   });
 
   afterEach(() => {
     vi.clearAllMocks();
-    session?.destroy();
+    testSetup.session?.destroy();
     teardownTestPersistence();
   });
 
@@ -137,7 +52,7 @@ describe('DelegateTool', () => {
   });
 
   it('should delegate a simple task with default model', async () => {
-    mockProvider.setMockResponses(['Analysis complete: 3 test failures identified']);
+    testSetup.mockProvider.setMockResponses(['Analysis complete: 3 test failures identified']);
 
     const result = await tool.execute(
       {
@@ -156,7 +71,7 @@ describe('DelegateTool', () => {
   });
 
   it('should handle custom provider:model format', async () => {
-    mockProvider.setMockResponses(['Custom model response']);
+    testSetup.mockProvider.setMockResponses(['Custom model response']);
 
     const result = await tool.execute(
       {
@@ -174,7 +89,7 @@ describe('DelegateTool', () => {
   });
 
   it('should create delegate thread and execute subagent', async () => {
-    mockProvider.setMockResponses(['Directory listed successfully']);
+    testSetup.mockProvider.setMockResponses(['Directory listed successfully']);
 
     const result = await tool.execute(
       {
@@ -233,7 +148,7 @@ describe('DelegateTool', () => {
   });
 
   it('should format the subagent system prompt correctly', async () => {
-    mockProvider.setMockResponses(['Task completed']);
+    testSetup.mockProvider.setMockResponses(['Task completed']);
 
     const result = await tool.execute(
       {
@@ -266,7 +181,7 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    mockProvider.setMockResponses(['First response', 'Second response']);
+    testSetup.mockProvider.setMockResponses(['First response', 'Second response']);
 
     const result = await tool.execute(
       {
@@ -284,7 +199,7 @@ describe('DelegateTool', () => {
   });
 
   it('should include delegate thread ID in result metadata', async () => {
-    mockProvider.setMockResponses(['Task completed with metadata']);
+    testSetup.mockProvider.setMockResponses(['Task completed with metadata']);
 
     const result = await tool.execute(
       {
@@ -309,7 +224,7 @@ describe('DelegateTool', () => {
     ];
 
     for (const model of validModels) {
-      mockProvider.setMockResponses(['Valid model response']);
+      testSetup.mockProvider.setMockResponses(['Valid model response']);
 
       const result = await tool.execute(
         {

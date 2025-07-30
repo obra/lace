@@ -12,6 +12,7 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
+import { ApprovalDecision } from '~/tools/approval-types';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -30,16 +31,27 @@ class MockProvider extends BaseMockProvider {
     return 'mock-model';
   }
 
-  async createResponse(messages: ProviderMessage[], tools: Tool[]): Promise<ProviderResponse> {
-    const lastMessage = messages[messages.length - 1];
-    const hasTaskCompleteInstruction = lastMessage?.content?.includes('task_complete tool');
-    const taskCompleteTool = tools.find((t) => t.name === 'task_complete');
+  get contextWindow(): number {
+    return 200000; // Large context window for testing
+  }
 
-    // If this looks like a delegation request and we have the task_complete tool, use it
-    if (hasTaskCompleteInstruction && taskCompleteTool) {
-      // Extract task ID from the message
-      const taskIdMatch = lastMessage?.content?.match(/complete task '([^']+)'/);
-      const taskId = taskIdMatch?.[1] || 'unknown_task';
+  get maxOutputTokens(): number {
+    return 4096;
+  }
+
+  async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    // Look for task assignment message (same pattern as working tests)
+    const taskMessage = messages.find(
+      (m) =>
+        m.content &&
+        typeof m.content === 'string' &&
+        m.content.includes('You have been assigned task')
+    );
+
+    if (taskMessage) {
+      // Extract task ID from task assignment message
+      const match = taskMessage.content.match(/assigned task '([^']+)'/);
+      const taskId = match ? match[1] : 'unknown';
 
       return Promise.resolve({
         content: 'I will analyze the project structure and provide findings.',
@@ -104,6 +116,9 @@ describe('Delegation Integration Tests', () => {
       provider: 'anthropic',
       model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
+      approvalCallback: {
+        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
+      },
     });
   });
 

@@ -6,148 +6,51 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { ToolContext } from '~/tools/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import {
+  createDelegationTestSetup,
+  DelegationTestSetup,
+} from '~/test-utils/delegation-test-helper';
 import { ProviderMessage, ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
-import { ProviderRegistry } from '~/providers/registry';
-import { ApprovalDecision } from '~/tools/approval-types';
 
-// Mock provider for testing delegation - responds with task_complete tool calls
-class MockProvider extends BaseMockProvider {
-  private responses: string[] = [];
-  private responseIndex = 0;
-
-  constructor() {
-    super({});
-  }
-
-  get providerName(): string {
-    return 'anthropic';
-  }
-
-  get defaultModel(): string {
-    return 'claude-3-5-haiku-20241022';
-  }
-
-  get contextWindow(): number {
-    return 200000; // Large context window for testing
-  }
-
-  get maxOutputTokens(): number {
-    return 4096;
-  }
-
-  setMockResponses(responses: string[]): void {
-    this.responses = responses;
-    this.responseIndex = 0;
-  }
-
-  async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    // Look for task assignment message to extract task ID
-    const taskAssignmentMessage = messages.find(
-      (m) =>
-        m.content &&
-        typeof m.content === 'string' &&
-        m.content.includes('You have been assigned task')
-    );
-
-    let taskId = 'unknown';
-    if (taskAssignmentMessage && typeof taskAssignmentMessage.content === 'string') {
-      const match = taskAssignmentMessage.content.match(/assigned task '([^']+)'/);
-      if (match) {
-        taskId = match[1];
-      }
-    }
-
-    // Get the current response or use default
-    const response = this.responses[this.responseIndex] || 'Task completed successfully';
-    if (this.responseIndex < this.responses.length - 1) {
-      this.responseIndex++;
-    }
-
-    // Create a tool call to complete the task
-    const toolCall: ProviderToolCall = {
-      id: 'task_complete_call',
-      name: 'task_complete',
-      input: {
-        id: taskId,
-        message: response,
-      },
-    };
-
-    return Promise.resolve({
-      content: `I'll complete the task now.`,
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      toolCalls: [toolCall],
-    });
-  }
-}
+// Using shared delegation test utilities
 
 describe('Task-Based DelegateTool Integration', () => {
   const _tempDirContext = useTempLaceDir();
+  let testSetup: DelegationTestSetup;
   let delegateTool: DelegateTool;
-  let session: Session;
-  let project: Project;
-  let mockProvider: MockProvider;
   let context: ToolContext;
 
   beforeEach(() => {
     setupTestPersistence();
-    mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-      (_name: string, _config?: unknown) => {
-        return mockProvider;
-      }
-    );
-
-    // Also mock the static createWithAutoDiscovery method
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
-      const mockRegistry = {
-        createProvider: () => mockProvider,
-        getProvider: () => mockProvider,
-        getProviderNames: () => ['anthropic', 'openai'],
-      } as unknown as ProviderRegistry;
-      return mockRegistry;
-    });
-
-    // Create project first
-    project = Project.create('Test Project', '/tmp/test-delegate');
-
-    // Create session with anthropic - the provider will be mocked
-    session = Session.create({
-      name: 'Delegate Test Session',
-      provider: 'anthropic',
+    // Use shared delegation test setup
+    testSetup = createDelegationTestSetup({
+      sessionName: 'Task-Based Delegate Test Session',
+      projectName: 'Task-Based Test Project',
       model: 'claude-sonnet-4-20250514',
-      projectId: project.getId(),
-      approvalCallback: {
-        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
-      },
     });
 
     // Create delegate tool and inject TaskManager
     delegateTool = new DelegateTool();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    (delegateTool as any).getTaskManager = () => session.getTaskManager();
+    (delegateTool as any).getTaskManager = () => testSetup.session.getTaskManager();
 
     context = {
-      threadId: session.getId(),
+      threadId: testSetup.session.getId(),
     };
   });
 
   afterEach(() => {
     vi.clearAllMocks();
-    session?.destroy();
+    testSetup.session?.destroy();
     teardownTestPersistence();
   });
 
   describe('Integration Tests', () => {
     it('should create task and wait for completion via real delegation', async () => {
       // Set up mock provider to respond with task completion
-      mockProvider.setMockResponses(['Integration test completed successfully']);
+      testSetup.mockProvider.setMockResponses(['Integration test completed successfully']);
 
       const result = await delegateTool.execute(
         {
@@ -166,7 +69,7 @@ describe('Task-Based DelegateTool Integration', () => {
 
     it('should handle parallel delegations without conflicts', async () => {
       // Set up mock provider to respond with different responses for parallel tasks
-      mockProvider.setMockResponses(['Result 1', 'Result 2', 'Result 3']);
+      testSetup.mockProvider.setMockResponses(['Result 1', 'Result 2', 'Result 3']);
 
       // Create three separate delegate tool instances with same TaskManager
       const tool1 = new DelegateTool();
@@ -175,11 +78,11 @@ describe('Task-Based DelegateTool Integration', () => {
 
       // Inject TaskManager for each tool
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (tool1 as any).getTaskManager = () => session.getTaskManager();
+      (tool1 as any).getTaskManager = () => testSetup.session.getTaskManager();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (tool2 as any).getTaskManager = () => session.getTaskManager();
+      (tool2 as any).getTaskManager = () => testSetup.session.getTaskManager();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (tool3 as any).getTaskManager = () => session.getTaskManager();
+      (tool3 as any).getTaskManager = () => testSetup.session.getTaskManager();
 
       // Execute all three delegations in parallel
       const [result1, result2, result3] = await Promise.all([
@@ -224,7 +127,7 @@ describe('Task-Based DelegateTool Integration', () => {
 
     it('should handle task failures gracefully', async () => {
       // Change the mock provider to simulate task blocking instead of completion
-      mockProvider.createResponse = async (
+      testSetup.mockProvider.createResponse = async (
         messages: ProviderMessage[],
         _tools: Tool[]
       ): Promise<ProviderResponse> => {
