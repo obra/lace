@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "@fortawesome/fontawesome-svg-core/styles.css";
-@plugin "daisyui";
 
 /* Mobile-specific improvements */
 @supports (padding: max(0px)) {
