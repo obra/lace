@@ -33,11 +33,10 @@ describe('Task-Based DelegateTool Integration', () => {
 
     // Create delegate tool and inject TaskManager
     delegateTool = new DelegateTool();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    (delegateTool as any).getTaskManager = () => testSetup.session.getTaskManager();
 
     context = {
       threadId: testSetup.session.getId(),
+      session: testSetup.session, // TaskManager accessed via session.getTaskManager()
     };
   });
 
@@ -76,13 +75,7 @@ describe('Task-Based DelegateTool Integration', () => {
       const tool2 = new DelegateTool();
       const tool3 = new DelegateTool();
 
-      // Inject TaskManager for each tool
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (tool1 as any).getTaskManager = () => testSetup.session.getTaskManager();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (tool2 as any).getTaskManager = () => testSetup.session.getTaskManager();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (tool3 as any).getTaskManager = () => testSetup.session.getTaskManager();
+      // Tools get TaskManager from context
 
       // Execute all three delegations in parallel
       const [result1, result2, result3] = await Promise.all([
