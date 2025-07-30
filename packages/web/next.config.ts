@@ -12,11 +12,12 @@ const nextConfig: NextConfig = {
   // Turbopack configuration (stable as of Next.js 15)
   turbopack: {
     resolveAlias: {
-      '~': path.resolve('.'),
+      '~/': path.resolve('../../src') + '/',
+      '@/': path.resolve('.') + '/',
     },
     resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
-  
+
   // Webpack config (only for production builds when Turbopack isn't used)
   webpack: (config: unknown, { isServer, dev }: { isServer: boolean; dev: boolean }) => {
     // Skip webpack config in development with Turbopack
@@ -35,9 +36,10 @@ const nextConfig: NextConfig = {
 
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
-      '~': path.resolve('.'),
+      '~': path.resolve('../../src'),
+      '@': path.resolve('.'),
     };
-    
+
     webpackConfig.resolve.extensionAlias = {
       '.js': ['.js', '.ts'],
       '.jsx': ['.jsx', '.tsx'],

@@ -260,7 +260,7 @@ export function ToolCallDisplay({
                     $ {String((args as { command: unknown }).command)}
                   </code>
                 ) : (
-                  <span className="text-sm text-base-content/80">{toolSummary}</span>
+                  <span className="text-sm text-base-content/80">{String(toolSummary)}</span>
                 )}
                 {hasResult && (
                   <div className="flex items-center gap-1 flex-shrink-0">
