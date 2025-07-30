@@ -45,7 +45,7 @@ export async function POST(
     let bodyRaw: unknown;
     try {
       bodyRaw = await request.json();
-    } catch (error) {
+    } catch (_error) {
       const errorResponse: ApiErrorResponse = {
         error: 'Invalid JSON in request body',
       };
