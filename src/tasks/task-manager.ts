@@ -153,6 +153,7 @@ export class TaskManager extends EventEmitter {
       status: updatedTask.status,
       actor: context.actor,
     });
+
     this.emit('task:updated', {
       type: 'task:updated',
       task: updatedTask,

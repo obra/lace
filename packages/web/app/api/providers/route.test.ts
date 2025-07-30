@@ -251,7 +251,7 @@ describe('Provider Discovery API', () => {
       expect(provider).toBeDefined();
       const defaultModel = provider.models.find((m) => m.isDefault);
       expect(defaultModel).toBeDefined();
-      expect(defaultModel?.id).toBe('claude-3-5-sonnet-20241022');
+      expect(defaultModel?.id).toBe('claude-sonnet-4-20250514');
     });
 
     it('should include model capabilities when available', async () => {

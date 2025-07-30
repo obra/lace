@@ -51,7 +51,7 @@ class MockProvider extends BaseMockProvider {
       const match = taskMessage.content.match(/assigned task '([^']+)'/);
       const taskId = match ? match[1] : 'unknown';
 
-      return Promise.resolve({
+      const response = {
         content: 'I will analyze the project structure and provide findings.',
         usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
         toolCalls: [
@@ -65,7 +65,8 @@ class MockProvider extends BaseMockProvider {
             },
           },
         ],
-      });
+      };
+      return Promise.resolve(response);
     }
 
     return Promise.resolve({

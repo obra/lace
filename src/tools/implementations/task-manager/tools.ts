@@ -334,6 +334,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
 
       // Then mark the task as completed
       const task = await taskManager.updateTask(args.id, { status: 'completed' }, taskContext);
+
       logger.debug('TaskCompleteTool: Task marked as completed', {
         taskId: args.id,
         status: task.status,

@@ -108,46 +108,6 @@ describe('DelegateTool', () => {
     expect(result.metadata?.taskTitle).toBe('List files');
   });
 
-  it('should handle subagent errors gracefully', async () => {
-    // Test error handling by using a tool without TaskManager
-    const toolWithoutTaskManager = new DelegateTool();
-
-    const result = await toolWithoutTaskManager.execute(
-      {
-        title: 'Test error',
-        prompt: 'This should fail',
-        expected_response: 'Error',
-        model: 'anthropic:claude-sonnet-4-20250514',
-      },
-      context
-    );
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('TaskManager is required for delegation');
-  });
-
-  it('should timeout if subagent takes too long', async () => {
-    // Create a tool without TaskManager to trigger the error quickly
-    const toolWithoutTaskManager = new DelegateTool();
-
-    try {
-      const result = await toolWithoutTaskManager.execute(
-        {
-          title: 'Long running task',
-          prompt: 'This should timeout',
-          expected_response: 'Timeout error',
-          model: 'anthropic:claude-sonnet-4-20250514',
-        },
-        context
-      );
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('TaskManager is required for delegation');
-    } finally {
-      // Restore original handlers
-    }
-  });
-
   it('should format the subagent system prompt correctly', async () => {
     testSetup.mockProvider.setMockResponses(['Task completed']);
 

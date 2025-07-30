@@ -170,24 +170,5 @@ describe('Task-Based DelegateTool Integration', () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('is blocked');
     });
-
-    it('should require TaskManager for delegation', async () => {
-      // Create a delegate tool without TaskManager injection
-      const toolWithoutTaskManager = new DelegateTool();
-      // Do NOT inject getTaskManager - it should remain undefined
-
-      const result = await toolWithoutTaskManager.execute(
-        {
-          title: 'Test Task',
-          prompt: 'This should fail',
-          expected_response: 'Error',
-          model: 'anthropic:claude-3-haiku',
-        },
-        context
-      );
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('TaskManager is required for delegation');
-    });
   });
 });

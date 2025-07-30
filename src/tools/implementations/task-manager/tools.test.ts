@@ -209,10 +209,6 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      if (result.isError) {
-        console.log('ERROR:', result.content?.[0]?.text);
-      }
-
       expect(result.isError).toBe(false);
       // After agent spawning, the task should be assigned to the spawned agent thread ID
       expect(result.content?.[0]?.text).toContain('Research task');

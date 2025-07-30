@@ -49,6 +49,8 @@ export interface SessionInfo {
 }
 
 export class Session {
+  private static _sessionRegistry = new Map<ThreadId, Session>();
+
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
@@ -63,6 +65,9 @@ export class Session {
 
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
+
+    // Register this session in the registry
+    Session._sessionRegistry.set(this._sessionId, this);
   }
 
   static create(options: {
@@ -161,6 +166,18 @@ export class Session {
 
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
+
+    // Check if session already exists in registry
+    const existingSession = Session._sessionRegistry.get(sessionId);
+    if (existingSession && !existingSession._destroyed) {
+      logger.debug(`Session.getById: Found existing session in registry for ${sessionId}`);
+      return existingSession;
+    }
+
+    if (existingSession && existingSession._destroyed) {
+      logger.debug(`Session.getById: Removing destroyed session from registry for ${sessionId}`);
+      Session._sessionRegistry.delete(sessionId);
+    }
 
     // Get session from the sessions table
     const sessionData = Session.getSession(sessionId);
@@ -284,6 +301,8 @@ export class Session {
     toolExecutor.registerTool('delegate', delegateTool);
 
     logger.debug(`Session reconstruction complete for ${sessionId}`);
+
+    // Session is automatically registered in the registry via constructor
     return session;
   }
 
@@ -625,6 +644,9 @@ export class Session {
 
     this._destroyed = true;
 
+    // Remove from registry
+    Session._sessionRegistry.delete(this._sessionId);
+
     // Stop and cleanup the coordinator agent
     this._sessionAgent.stop();
     this._sessionAgent.removeAllListeners();
@@ -700,5 +722,19 @@ Use your task_add_note tool to record important notes as you work and your task_
     const month = date.toLocaleDateString('en-US', { month: 'short' });
     const day = date.getDate();
     return `${weekday}, ${month} ${day}`;
+  }
+
+  /**
+   * Clear the session registry - primarily for testing
+   */
+  static clearRegistry(): void {
+    Session._sessionRegistry.clear();
+  }
+
+  /**
+   * Get registry size - primarily for testing
+   */
+  static getRegistrySize(): number {
+    return Session._sessionRegistry.size;
   }
 }

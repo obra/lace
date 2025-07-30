@@ -7,6 +7,7 @@ import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import type { TaskManager } from '~/tasks/task-manager';
 import type { Task, TaskContext } from '~/tasks/types';
+import { isNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 // Model format validation
@@ -102,12 +103,11 @@ Examples:
         actor: context?.threadId || 'unknown',
       });
 
-      // Create task with agent spawning
+      // First create task without assignment to get the real task ID
       const task = await taskManager.createTask(
         {
           title,
-          prompt: this.formatDelegatePrompt(prompt, expected_response, 'TASK_ID_PLACEHOLDER'),
-          assignedTo: `new:${providerName}/${modelName}`,
+          prompt: 'Initial prompt - will be updated',
           priority: 'high',
         },
         {
@@ -118,14 +118,18 @@ Examples:
       logger.debug('DelegateTool: Task created successfully', {
         taskId: task.id,
         status: task.status,
-        assignedTo: task.assignedTo,
       });
 
-      // Update the task prompt with the actual task ID
+      // Now update with the correct prompt and assignment to trigger agent spawning
+      const assigneeSpec = `new:${providerName}/${modelName}`;
+      if (!isNewAgentSpec(assigneeSpec)) {
+        throw new Error(`Invalid assignee spec format: ${assigneeSpec}`);
+      }
       await taskManager.updateTask(
         task.id,
         {
           prompt: this.formatDelegatePrompt(prompt, expected_response, task.id),
+          assignedTo: assigneeSpec,
         },
         {
           actor: context?.threadId || 'unknown',
