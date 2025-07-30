@@ -97,18 +97,24 @@ Examples:
     const [providerName, modelName] = model.split(':');
 
     try {
+      const assigneeSpec = `new:${providerName}/${modelName}`;
+      if (!isNewAgentSpec(assigneeSpec)) {
+        throw new Error(`Invalid assignee spec format: ${assigneeSpec}`);
+      }
+
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,
-        assignedTo: `new:${providerName}/${modelName}`,
+        assignedTo: assigneeSpec,
         actor: context?.threadId || 'unknown',
       });
 
-      // First create task without assignment to get the real task ID
+      // Create task with assignment in single operation
       const task = await taskManager.createTask(
         {
           title,
-          prompt: 'Initial prompt - will be updated',
+          prompt: this.formatDelegatePrompt(prompt, expected_response),
           priority: 'high',
+          assignedTo: assigneeSpec,
         },
         {
           actor: context?.threadId || 'unknown',
@@ -119,22 +125,6 @@ Examples:
         taskId: task.id,
         status: task.status,
       });
-
-      // Now update with the correct prompt and assignment to trigger agent spawning
-      const assigneeSpec = `new:${providerName}/${modelName}`;
-      if (!isNewAgentSpec(assigneeSpec)) {
-        throw new Error(`Invalid assignee spec format: ${assigneeSpec}`);
-      }
-      await taskManager.updateTask(
-        task.id,
-        {
-          prompt: this.formatDelegatePrompt(prompt, expected_response, task.id),
-          assignedTo: assigneeSpec,
-        },
-        {
-          actor: context?.threadId || 'unknown',
-        }
-      );
 
       logger.debug('DelegateTool: Created task for delegation', {
         taskId: task.id,
@@ -165,13 +155,13 @@ Examples:
     }
   }
 
-  private formatDelegatePrompt(prompt: string, expectedResponse: string, taskId: string): string {
+  private formatDelegatePrompt(prompt: string, expectedResponse: string): string {
     return `${prompt}
 
 IMPORTANT: Your response should match this format/structure:
 ${expectedResponse}
 
-When you are done, you must complete task '${taskId}' using the task_complete tool with your result/answer as the message parameter.
+When you are done, use the task_complete tool with your result/answer as the message parameter.
 
 Please complete the task and provide your response in the expected format.`;
   }

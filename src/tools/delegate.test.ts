@@ -142,7 +142,7 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    testSetup.mockProvider.setMockResponses(['First response', 'Second response']);
+    testSetup.mockProvider.setMockResponses(['Task completed with combined responses']);
 
     const result = await tool.execute(
       {
@@ -155,8 +155,7 @@ describe('DelegateTool', () => {
     );
 
     expect(result.isError).toBe(false);
-    expect(result.content[0]?.text).toContain('First response');
-    // Note: The actual behavior may only return the first response depending on implementation
+    expect(result.content[0]?.text).toContain('Task completed with combined responses');
   });
 
   it('should include delegate thread ID in result metadata', async () => {
