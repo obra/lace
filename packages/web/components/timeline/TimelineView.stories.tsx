@@ -154,7 +154,10 @@ This component demonstrates TypeScript typing, React hooks, and props handling.`
     type: 'tool',
     tool: 'file-write',
     content: 'file-write executed',
-    result: 'Successfully created MyComponent.tsx',
+    result: {
+      content: [{ type: 'text', text: 'Successfully created MyComponent.tsx' }],
+      isError: false,
+    },
     timestamp: new Date(Date.now() - 1700000),
   },
   {

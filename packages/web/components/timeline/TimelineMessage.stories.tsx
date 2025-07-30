@@ -134,7 +134,10 @@ const mockToolEntry: TimelineEntry = {
   timestamp: new Date('2024-01-15T10:32:00Z'),
   agent: 'Claude',
   tool: 'file-search',
-  result: 'Found 5 Python files:\n- main.py\n- utils.py\n- models.py\n- tests.py\n- config.py',
+  result: {
+    content: [{ type: 'text', text: 'Found 5 Python files:\n- main.py\n- utils.py\n- models.py\n- tests.py\n- config.py' }],
+    isError: false,
+  },
   link: undefined,
   title: undefined,
   description: undefined,
