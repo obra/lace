@@ -8,7 +8,7 @@ export type { ThreadId, AssigneeId } from '~/threads/types';
 export type { ThreadEvent, EventType } from '~/threads/types';
 export { ApprovalDecision } from '~/tools/approval-types';
 export type { ApprovalCallback } from '~/tools/approval-types';
-export type { ToolAnnotations, ToolCall } from '~/tools/types';
+export type { ToolAnnotations, ToolCall, ToolResult } from '~/tools/types';
 export type { AgentState } from '~/agents/agent';
 export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
 export type { TaskFilters, Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';

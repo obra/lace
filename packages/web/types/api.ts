@@ -2,7 +2,7 @@
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
 // Import core types from Lace
-import type { AgentState, ThreadId, AssigneeId } from '@/lib/server/lace-imports';
+import type { AgentState, ThreadId, AssigneeId, ToolResult } from '@/lib/server/lace-imports';
 import type {
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
@@ -87,11 +87,6 @@ export interface ToolCallEventData {
   input: unknown;
 }
 
-export interface ToolResultEventData {
-  toolName: string;
-  result: unknown;
-}
-
 export interface LocalSystemMessageEventData {
   content: string;
 }
@@ -135,7 +130,7 @@ export type SessionEvent =
       type: 'TOOL_RESULT';
       threadId: ThreadId;
       timestamp: Date;
-      data: ToolResultEventData;
+      data: ToolResult;
     }
   | {
       type: 'LOCAL_SYSTEM_MESSAGE';
@@ -178,6 +173,12 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: Date;
       data: CompactionEventData;
+    }
+  | {
+      type: 'TOOL_APPROVAL_RESPONSE';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: { toolCallId: string; decision: string };
     };
 
 // Tool approval event data - extends what the agent emits

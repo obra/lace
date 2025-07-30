@@ -17,12 +17,12 @@ import {
   faGlobe
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
-import { renderToolResult } from '@/components/timeline/tool';
+import { getToolRenderer, type ToolResult } from '@/components/timeline/tool';
 
 interface ToolCallDisplayProps {
   tool: string;
   content: string;
-  result?: { content: Array<{ text?: string }>; isError?: boolean; id?: string };
+  result?: ToolResult;
   timestamp: Date | string;
   metadata?: {
     toolId?: string;
@@ -45,8 +45,8 @@ const getToolIcon = (toolName: string) => {
   return faCog;
 };
 
-// Create human-readable summary of what the tool did
-const createToolSummary = (toolName: string, args: unknown): string => {
+// Add near the top of the file, after imports
+function createDefaultToolSummary(toolName: string, args: unknown): string {
   if (!args || typeof args !== 'object') return `Executed ${toolName}`;
   
   const argsObj = args as Record<string, unknown>;
@@ -82,10 +82,21 @@ const createToolSummary = (toolName: string, args: unknown): string => {
   }
 };
 
-// Detect if result is an error using ToolResult.isError field
-const isErrorResult = (result: { content: Array<{ text?: string }>; isError?: boolean; id?: string }): boolean => {
+function isDefaultError(result: ToolResult): boolean {
   return Boolean(result?.isError);
-};
+}
+
+function createDefaultResultRenderer(result: ToolResult): React.ReactNode {
+  const textContent = result.content.map(block => block.text ?? '').join('');
+  const isError = Boolean(result.isError);
+  
+  return (
+    <ExpandableResult 
+      content={textContent}
+      isError={isError}
+    />
+  );
+}
 
 // Expandable result component with 5-line preview
 function ExpandableResult({ 
@@ -142,13 +153,16 @@ export function ToolCallDisplay({
 }: ToolCallDisplayProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   
-  const toolIcon = getToolIcon(tool);
+  // Get the custom renderer for this tool type
+  const renderer = getToolRenderer(tool);
+  
+  const toolIcon = renderer.getIcon?.() ?? getToolIcon(tool);
   const hasResult = result?.content?.some(block => block.text?.trim());
-  const formattedResult = hasResult ? formatToolResult(result!) : null;
-  const isError = hasResult && isErrorResult(result!);
+  const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
   const args = metadata?.arguments;
-  const hasArgs = args && typeof args === 'object' && args !== null && Object.keys(args).length > 0;
-  const toolSummary = createToolSummary(tool, args);
+  const hasArgs: boolean = Boolean(args && typeof args === 'object' && args !== null && Object.keys(args).length > 0);
+  const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
+  const resultContent = hasResult ? (renderer.renderResult?.(result!) ?? createDefaultResultRenderer(result!)) : null;
   
   return (
     <div className={`flex gap-3 ${className}`}>
@@ -171,7 +185,6 @@ export function ToolCallDisplay({
         />
         
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          {/* Tool Summary Header */}
           <div className="p-3 bg-base-50 border-b border-base-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -219,14 +232,9 @@ export function ToolCallDisplay({
           )}
           
           {/* Tool Result */}
-          {hasResult && formattedResult && (
-            <ExpandableResult 
-              content={formattedResult}
-              isError={isError}
-            />
-          )}
+          {resultContent && resultContent}
           
-          {/* No result message */}
+          {/* No result message - only show if no result content */}
           {!hasResult && (
             <div className="p-3 text-center text-base-content/50 text-sm">
               <FontAwesomeIcon icon={faTerminal} className="mr-2" />
