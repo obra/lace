@@ -8,11 +8,20 @@ import { Agent } from '~/agents/agent';
 export class EventApprovalCallback implements ApprovalCallback {
   constructor(private agent: Agent) {}
 
-  requestApproval(toolCall: ToolCall): Promise<ApprovalDecision> {
-    // Check if approval response already exists (recovery case)
+  async requestApproval(toolCall: ToolCall): Promise<ApprovalDecision> {
+    // Check if approval response already exists for this specific tool call (recovery case)
     const existingResponse = this.checkExistingApprovalResponse(toolCall.id);
     if (existingResponse) {
       return Promise.resolve(existingResponse);
+    }
+
+    // Check for session-wide approval for this tool call
+    const session = await this.agent.getFullSession();
+    if (session) {
+      const toolPolicy = session.getToolPolicy(toolCall.name);
+      if (toolPolicy === 'allow') {
+        return Promise.resolve(ApprovalDecision.ALLOW_SESSION);
+      }
     }
 
     // Check if approval request already exists to avoid duplicates

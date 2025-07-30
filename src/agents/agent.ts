@@ -6,7 +6,7 @@ import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
   ThreadEvent,
@@ -946,8 +946,15 @@ export class Agent extends EventEmitter {
       };
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
       this._hasRejectionsInBatch = true;
+    } else if (decision === ApprovalDecision.ALLOW_SESSION) {
+      // Update session tool policy for session-wide approval
+      void this._updateSessionToolPolicy(toolCall.name, 'allow');
+
+      // Execute the approved tool
+      void this._executeApprovedTool(toolCall);
+      return; // Early return to avoid double decrementing
     } else {
-      // Execute the approved tool directly (permission already granted)
+      // allow_once - just execute the tool
       void this._executeApprovedTool(toolCall);
       return; // Early return to avoid double decrementing
     }
@@ -967,7 +974,7 @@ export class Agent extends EventEmitter {
       const workingDirectory = this._getWorkingDirectory();
 
       // Get session for security policy enforcement
-      const session = await this._getFullSession();
+      const session = await this.getFullSession();
       if (!session) {
         throw new Error(
           `Tool execution denied: no session context available for thread ${this._threadId}`
@@ -1054,7 +1061,7 @@ export class Agent extends EventEmitter {
       const workingDirectory = this._getWorkingDirectory();
 
       // Get session for security policy enforcement
-      const session = await this._getFullSession();
+      const session = await this.getFullSession();
       if (!session) {
         throw new Error(
           `Tool execution denied: no session context available for thread ${this._threadId}`
@@ -2001,7 +2008,7 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private async _getFullSession(): Promise<Session | undefined> {
+  async getFullSession(): Promise<Session | undefined> {
     try {
       const thread = this._threadManager.getThread(this._threadId);
       if (!thread?.sessionId) {
@@ -2010,7 +2017,7 @@ export class Agent extends EventEmitter {
 
       return (await Session.getById(asThreadId(thread.sessionId))) || undefined;
     } catch (error) {
-      logger.error('Agent._getFullSession() - error getting session', {
+      logger.error('Agent.getFullSession() - error getting session', {
         threadId: this._threadId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -2208,5 +2215,36 @@ export class Agent extends EventEmitter {
       threadId: this._threadId,
       updates: Object.keys(updates),
     });
+  }
+
+  /**
+   * Update session tool policy for session-wide approvals
+   */
+  private async _updateSessionToolPolicy(toolName: string, policy: ToolPolicy): Promise<void> {
+    try {
+      const session = await this.getFullSession();
+      if (session) {
+        const currentConfig = session.getEffectiveConfiguration();
+        const updatedToolPolicies = {
+          ...currentConfig.toolPolicies,
+          [toolName]: policy,
+        };
+
+        session.updateConfiguration({ toolPolicies: updatedToolPolicies });
+
+        logger.debug('Session tool policy updated', {
+          threadId: this._threadId,
+          toolName,
+          policy,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to update session tool policy', {
+        threadId: this._threadId,
+        toolName,
+        policy,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }

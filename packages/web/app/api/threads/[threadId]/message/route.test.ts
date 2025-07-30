@@ -188,12 +188,11 @@ describe('Thread Messaging API', () => {
       params: Promise.resolve({ threadId: realThreadId }),
     });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400);
 
-    // Verify that the JSON parsing error was logged
-    expect(consoleLogs.length).toBeGreaterThan(0);
-    const errorLog = consoleLogs.join(' ').toLowerCase();
-    expect(errorLog).toMatch(/error.*syntaxerror.*unexpected token.*invalid json/);
+    // Verify error message in response
+    const responseData = await response.json();
+    expect(responseData.error).toBe('Invalid JSON in request body');
   });
 
   it('should work with delegate agents', async () => {

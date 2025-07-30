@@ -48,12 +48,12 @@ describe('Agent Session Context', () => {
     teardownTestPersistence();
   });
 
-  describe('_getFullSession', () => {
+  describe('getFullSession', () => {
     it('should retrieve the session that created the agent', async () => {
       // Test that agent can get its session
       const retrievedSession = await (
-        agent as unknown as { _getFullSession(): Promise<Session | undefined> }
-      )._getFullSession();
+        agent as unknown as { getFullSession(): Promise<Session | undefined> }
+      ).getFullSession();
 
       expect(retrievedSession).toBeDefined();
       expect(retrievedSession!.getId()).toBe(session.getId());
@@ -73,8 +73,8 @@ describe('Agent Session Context', () => {
       });
 
       const retrievedSession = await (
-        orphanAgent as unknown as { _getFullSession(): Promise<Session | undefined> }
-      )._getFullSession();
+        orphanAgent as unknown as { getFullSession(): Promise<Session | undefined> }
+      ).getFullSession();
       expect(retrievedSession).toBeUndefined();
     });
   });

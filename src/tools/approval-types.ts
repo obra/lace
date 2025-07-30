@@ -19,3 +19,5 @@ export class ApprovalPendingError extends Error {
     this.name = 'ApprovalPendingError';
   }
 }
+
+export type ToolPolicy = 'allow' | 'require-approval' | 'deny';
