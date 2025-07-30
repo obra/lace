@@ -496,11 +496,18 @@ export class Session {
       providerInstance = registry.createProvider(targetProvider, { model: targetModel });
     }
 
-    // Create delegate agent with the appropriate provider instance
-    const agent = this._sessionAgent.createDelegateAgent(
-      this._sessionAgent.toolExecutor,
-      providerInstance
-    );
+    // Create new toolExecutor for this agent with proper TaskManager injection
+    const agentToolExecutor = new ToolExecutor();
+    Session.initializeTools(agentToolExecutor, this._taskManager);
+
+    // Now register delegate tool with the TaskManager that has agent creation callback
+    const delegateTool = new DelegateTool();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    (delegateTool as any).getTaskManager = () => this._taskManager;
+    agentToolExecutor.registerTool('delegate', delegateTool);
+
+    // Create delegate agent with the appropriate provider instance and its own toolExecutor
+    const agent = this._sessionAgent.createDelegateAgent(agentToolExecutor, providerInstance);
 
     // Store the agent metadata
     agent.updateThreadMetadata({
@@ -510,6 +517,12 @@ export class Session {
       provider: targetProvider,
       model: targetModel,
     });
+
+    // Set up approval callback for spawned agent (inherit from session agent)
+    const sessionApprovalCallback = this._sessionAgent.toolExecutor.getApprovalCallback();
+    if (sessionApprovalCallback) {
+      agent.toolExecutor.setApprovalCallback(sessionApprovalCallback);
+    }
 
     this._agents.set(agent.threadId, agent);
     return agent;
@@ -657,14 +670,16 @@ export class Session {
    * Format task assignment notification message
    */
   private formatTaskAssignment(task: Task): string {
-    return `[LACE TASK SYSTEM] You have been assigned a new task:
+    return `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
 Title: "${task.title}"
 Created by: ${task.createdBy}
 Priority: ${task.priority}
 
 --- TASK DETAILS ---
 ${task.prompt}
---- END TASK DETAILS ---`;
+--- END TASK DETAILS ---
+
+Use your task_add_note tool to record important notes as you work and your task_complete tool when you are done.`;
   }
 
   private static detectDefaultProvider(): string {
