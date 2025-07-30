@@ -113,8 +113,7 @@ describe('Enhanced Task Manager Tools', () => {
     context = {
       threadId: session.getId(),
       parentThreadId: parentThreadId,
-      session, // Provide session for TaskManager access
-      taskManager: session.getTaskManager(), // Direct TaskManager access
+      session, // TaskManager accessed via session.getTaskManager()
     };
   });
 
@@ -130,10 +129,9 @@ describe('Enhanced Task Manager Tools', () => {
       expect(taskCreateTool).toBeDefined();
       expect(taskCreateTool.name).toBe('task_add');
 
-      // Test that tools can access TaskManager via context
+      // Test that tools can access TaskManager via session
       expect(context.session).toBeDefined();
-      expect(context.taskManager).toBeDefined();
-      expect(context.session?.getTaskManager()).toBe(context.taskManager);
+      expect(context.session?.getTaskManager()).toBeDefined();
 
       // Test that task creation works with context-based TaskManager
       const result = await taskCreateTool.execute(

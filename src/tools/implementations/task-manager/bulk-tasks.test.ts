@@ -25,14 +25,8 @@ describe('Bulk Task Creation', () => {
       projectId: project.getId(),
     });
 
-    // Get tool with proper TaskManager injection
+    // Create tool that gets TaskManager from context
     tool = new TaskCreateTool();
-    const taskManager = session.getTaskManager();
-    // Properly type the tool for testing
-    const toolWithInjection = tool as TaskCreateTool & {
-      getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
-    };
-    toolWithInjection.getTaskManager = () => taskManager;
   });
 
   afterEach(() => {
@@ -63,8 +57,7 @@ describe('Bulk Task Creation', () => {
       },
       {
         threadId: session.getId(),
-        session,
-        taskManager: session.getTaskManager(),
+        session, // TaskManager is accessed via session.getTaskManager()
       }
     );
 
@@ -82,8 +75,7 @@ describe('Bulk Task Creation', () => {
       },
       {
         threadId: session.getId(),
-        session,
-        taskManager: session.getTaskManager(),
+        session, // TaskManager is accessed via session.getTaskManager()
       }
     );
 
@@ -104,8 +96,7 @@ describe('Bulk Task Creation', () => {
       },
       {
         threadId: session.getId(),
-        session,
-        taskManager: session.getTaskManager(),
+        session, // TaskManager is accessed via session.getTaskManager()
       }
     );
 
@@ -126,8 +117,7 @@ describe('Bulk Task Creation', () => {
       },
       {
         threadId: session.getId(),
-        session,
-        taskManager: session.getTaskManager(),
+        session, // TaskManager is accessed via session.getTaskManager()
       }
     );
 
@@ -156,8 +146,7 @@ describe('Bulk Task Creation', () => {
       },
       {
         threadId: session.getId(),
-        session,
-        taskManager: session.getTaskManager(),
+        session, // TaskManager is accessed via session.getTaskManager()
       }
     );
 
@@ -190,8 +179,7 @@ describe('Bulk Task Creation', () => {
       },
       {
         threadId: session.getId(),
-        session,
-        taskManager: session.getTaskManager(),
+        session, // TaskManager is accessed via session.getTaskManager()
       }
     );
 
