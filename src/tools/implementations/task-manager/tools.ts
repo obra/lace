@@ -78,11 +78,11 @@ Bulk planning: task_add({ tasks: [
     safeInternal: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(
     context?: ToolContext
   ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
@@ -193,11 +193,11 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
     safeInternal: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(
     context?: ToolContext
   ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
@@ -297,11 +297,11 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
     safeInternal: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(
     context?: ToolContext
   ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
@@ -387,11 +387,11 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
     safeInternal: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(
     context?: ToolContext
   ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
@@ -486,11 +486,11 @@ Notes become part of permanent task history - write for future readers.`;
     safeInternal: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(
     context?: ToolContext
   ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
@@ -550,11 +550,11 @@ Example: task_view({ taskId: "task_123" })`;
     safeInternal: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(
     context?: ToolContext
   ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(

@@ -50,9 +50,9 @@ Examples:
     openWorldHint: true,
   };
 
-  // Get TaskManager from context (no longer injected)
+  // Get TaskManager from session context
   private getTaskManagerFromContext(context?: ToolContext): TaskManager | null {
-    return context?.taskManager || context?.session?.getTaskManager() || null;
+    return context?.session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
