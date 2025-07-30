@@ -81,7 +81,7 @@ describe('Enhanced Task Manager Tools', () => {
         createProvider: () => mockProvider,
         getProvider: () => mockProvider,
         getProviderNames: () => ['anthropic', 'openai'],
-      } as ProviderRegistry;
+      } as unknown as ProviderRegistry;
       return mockRegistry;
     });
 

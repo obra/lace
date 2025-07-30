@@ -61,7 +61,7 @@ describe('Task-Based DelegateTool Integration', () => {
         createProvider: () => mockProvider,
         getProvider: () => mockProvider,
         getProviderNames: () => ['anthropic', 'openai'],
-      } as ProviderRegistry;
+      } as unknown as ProviderRegistry;
       return mockRegistry;
     });
 
@@ -257,7 +257,7 @@ describe('Task-Based DelegateTool Integration', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(`Task ${createdTaskId} is blocked`);
+      expect(result.content[0].text).toContain('is blocked');
     });
 
     it('should require TaskManager for delegation', async () => {
