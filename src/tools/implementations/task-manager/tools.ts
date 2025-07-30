@@ -9,45 +9,21 @@ import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
-// Single schema that supports both single and bulk task creation
-const createTaskSchema = z
-  .object({
-    // Single task fields (mutually exclusive with tasks array)
-    title: z.string().min(1).max(200).optional(),
-    description: z.string().max(1000).optional(),
-    prompt: z.string().min(1).optional(),
-    priority: z
-      .enum(['high', 'medium', 'low'] as const)
-      .default('medium')
-      .optional(),
-    assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
-
-    // Bulk tasks array (mutually exclusive with single task fields)
-    tasks: z
-      .array(
-        z.object({
-          title: z.string().min(1).max(200),
-          description: z.string().max(1000).optional(),
-          prompt: z.string().min(1),
-          priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
-          assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
-        })
-      )
-      .min(1, 'Must provide at least 1 task')
-      .max(20, 'Cannot create more than 20 tasks at once')
-      .optional(),
-  })
-  .refine(
-    (data) => {
-      // Either single task fields OR tasks array must be provided, not both
-      const hasSingleTask = data.title && data.prompt;
-      const hasBulkTasks = data.tasks && data.tasks.length > 0;
-      return hasSingleTask !== hasBulkTasks; // XOR logic
-    },
-    {
-      message: 'Must provide either single task fields (title, prompt) OR tasks array, not both',
-    }
-  );
+// Simple schema that always takes an array of tasks
+const createTaskSchema = z.object({
+  tasks: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(1000).optional(),
+        prompt: z.string().min(1),
+        priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
+        assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
+      })
+    )
+    .min(1, 'Must provide at least 1 task')
+    .max(20, 'Cannot create more than 20 tasks at once'),
+});
 
 export class TaskCreateTool extends Tool {
   name = 'task_add';
@@ -79,24 +55,24 @@ COMMUNICATION PATTERNS:
 - Poor tasks create confusion, scope creep, and rework
 
 EXAMPLES:
-Single atomic task: task_add({
+Single task: task_add({ tasks: [{
   title: "Add failing test for bulk task creation", 
   prompt: "Create test in bulk-tasks.test.ts that expects task_add to accept {tasks: []} format. Test should fail initially. Files: src/tools/implementations/task-manager/bulk-tasks.test.ts",
   priority: "high"
-})
+}]})
 
-Investigation task: task_add({
+Investigation task: task_add({ tasks: [{
   title: "Investigate auth timeout root cause",
   prompt: "Users report 5min logout instead of 30min. Debug token expiration, session storage, renewal logic. Output: specific root cause + recommended fix approach. Context: blocking beta release",
   priority: "high"
-})
+}]})
 
 Bulk planning: task_add({ tasks: [
   {title: "Write failing test for union schema", prompt: "Test that createTaskSchema accepts both single task and {tasks: array} formats"},
   {title: "Update schema to union type", prompt: "Change createTaskSchema to z.union([singleTaskSchema, bulkTasksSchema])"},  
   {title: "Implement bulk creation logic", prompt: "Handle both formats in executeValidated, validate all before creating any"},
   {title: "Update tool description", prompt: "Add bulk examples and task sizing guidance to description"}
-]})`;
+]}`;
   schema = createTaskSchema;
   annotations = {
     safeInternal: true,
@@ -124,21 +100,8 @@ Bulk planning: task_add({ tasks: [
         isHuman: false,
       };
 
-      // Determine if single task or bulk tasks
-      const tasksToCreate = args.tasks
-        ? args.tasks
-        : [
-            {
-              title: args.title!,
-              description: args.description,
-              prompt: args.prompt!,
-              priority: args.priority || 'medium',
-              assignedTo: args.assignedTo,
-            },
-          ];
-
       // Validate all assignees before creating any tasks
-      for (const taskData of tasksToCreate) {
+      for (const taskData of args.tasks) {
         if (taskData.assignedTo && !isAssigneeId(taskData.assignedTo)) {
           return this.createError(`Invalid assignee format: ${taskData.assignedTo}`);
         }
@@ -147,7 +110,7 @@ Bulk planning: task_add({ tasks: [
       // Create all tasks atomically (all succeed or all fail)
       const createdTasks = [];
       try {
-        for (const taskData of tasksToCreate) {
+        for (const taskData of args.tasks) {
           const task = await taskManager.createTask(
             {
               title: taskData.title,

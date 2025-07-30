@@ -1,70 +1,23 @@
-// ABOUTME: Tests for bulk task creation functionality in TaskCreateTool
-// ABOUTME: Validates both single task and bulk task creation scenarios with proper validation
+// ABOUTME: Tests for bulk task creation feature in TaskCreateTool
+// ABOUTME: Validates both single task and tasks array formats with proper validation
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ProviderRegistry } from '~/providers/registry';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-
-// Mock provider for testing
-class MockProvider extends BaseMockProvider {
-  constructor() {
-    super({});
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return Promise.resolve({
-      content: 'Mock response',
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      toolCalls: [],
-    });
-  }
-}
 
 describe('Bulk Task Creation', () => {
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
-  let mockProvider: MockProvider;
 
   beforeEach(() => {
     setupTestPersistence();
-    mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-      (_name: string, _config?: unknown) => {
-        return mockProvider;
-      }
-    );
-
-    // Also mock the static createWithAutoDiscovery method
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
-      const mockRegistry = {
-        createProvider: () => mockProvider,
-        getProvider: () => mockProvider,
-        getProviderNames: () => ['anthropic', 'openai'],
-      } as unknown as ProviderRegistry;
-      return mockRegistry;
-    });
-
-    // Create project first
+    // Create session with TaskManager like real usage
     project = Project.create('Test Project', '/tmp/test-bulk-tasks');
 
-    // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Bulk Test Session',
       provider: 'anthropic',
@@ -72,14 +25,17 @@ describe('Bulk Task Creation', () => {
       projectId: project.getId(),
     });
 
-    // Get tool from session agent's toolExecutor
-    const agent = session.getAgent(session.getId());
-    const toolExecutor = agent!.toolExecutor;
-    tool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    // Get tool with proper TaskManager injection
+    tool = new TaskCreateTool();
+    const taskManager = session.getTaskManager();
+    // Properly type the tool for testing
+    const toolWithInjection = tool as TaskCreateTool & {
+      getTaskManager?: () => import('~/tasks/task-manager').TaskManager;
+    };
+    toolWithInjection.getTaskManager = () => taskManager;
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
     session?.destroy();
     teardownTestPersistence();
   });
@@ -142,15 +98,19 @@ describe('Bulk Task Creation', () => {
     );
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Cannot create more than 20 tasks');
+    expect(result.content[0].text).toContain('Cannot create more than 20 tasks at once');
   });
 
-  it('should handle single task object (backward compatibility)', async () => {
+  it('should handle single task in array', async () => {
     const result = await tool.execute(
       {
-        title: 'Single Task',
-        prompt: 'Single task prompt',
-        priority: 'medium' as const,
+        tasks: [
+          {
+            title: 'Single Task',
+            prompt: 'Single task prompt',
+            priority: 'medium' as const,
+          },
+        ],
       },
       { threadId: session.getId() }
     );
@@ -158,5 +118,63 @@ describe('Bulk Task Creation', () => {
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toContain('Created task');
     expect(result.content[0].text).toContain('Single Task');
+  });
+
+  it('should validate all assignees before creating any tasks', async () => {
+    const result = await tool.execute(
+      {
+        tasks: [
+          {
+            title: 'Valid Task',
+            prompt: 'This task has valid assignment',
+            priority: 'medium' as const,
+            assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+          },
+          {
+            title: 'Invalid Task',
+            prompt: 'This task has invalid assignment',
+            priority: 'medium' as const,
+            assignedTo: 'invalid-format',
+          },
+        ],
+      },
+      { threadId: session.getId() }
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid assignee format');
+  });
+
+  it('should create tasks with mixed priorities and assignments', async () => {
+    const result = await tool.execute(
+      {
+        tasks: [
+          {
+            title: 'High Priority Task',
+            prompt: 'Urgent work needed',
+            priority: 'high' as const,
+          },
+          {
+            title: 'Delegated Task',
+            prompt: 'Work for subagent',
+            priority: 'medium' as const,
+            assignedTo: session.getId(), // Assign to current session instead of spawning agent
+          },
+          {
+            title: 'Low Priority Task',
+            prompt: 'Can wait',
+            priority: 'low' as const,
+            description: 'Optional task with description',
+          },
+        ],
+      },
+      { threadId: session.getId() }
+    );
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toContain('Created 3 tasks');
+    expect(result.content[0].text).toContain('High Priority Task');
+    expect(result.content[0].text).toContain(`Delegated Task → ${session.getId()}`);
+    expect(result.content[0].text).toContain('Low Priority Task');
   });
 });

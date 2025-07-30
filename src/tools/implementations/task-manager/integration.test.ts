@@ -122,11 +122,15 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Step 1: Main agent creates a task
       const createResult = await createTool.execute(
         {
-          title: 'Implement user authentication',
-          description: 'Add secure login functionality',
-          prompt:
-            'Create a JWT-based authentication system with login, logout, and session management',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Implement user authentication',
+              description: 'Add secure login functionality',
+              prompt:
+                'Create a JWT-based authentication system with login, logout, and session management',
+              priority: 'high',
+            },
+          ],
         },
         mainAgentContext
       );
@@ -233,10 +237,14 @@ describe('Multi-Agent Task Manager Integration', () => {
       const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
       const createResult = await createTool.execute(
         {
-          title: 'Research best practices',
-          prompt: 'Research and document best practices for JWT security',
-          priority: 'medium',
-          assignedTo: newAgentSpec,
+          tasks: [
+            {
+              title: 'Research best practices',
+              prompt: 'Research and document best practices for JWT security',
+              priority: 'medium',
+              assignedTo: newAgentSpec,
+            },
+          ],
         },
         mainAgentContext
       );
@@ -282,9 +290,13 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create task in main thread
       await createTool.execute(
         {
-          title: 'Main thread task',
-          prompt: 'Do something in main thread',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Main thread task',
+              prompt: 'Do something in main thread',
+              priority: 'high',
+            },
+          ],
         },
         mainAgentContext
       );
@@ -292,9 +304,13 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create task in other thread
       await createTool.execute(
         {
-          title: 'Other thread task',
-          prompt: 'Do something in other thread',
-          priority: 'low',
+          tasks: [
+            {
+              title: 'Other thread task',
+              prompt: 'Do something in other thread',
+              priority: 'low',
+            },
+          ],
         },
         otherAgentContext
       );
@@ -349,9 +365,13 @@ describe('Multi-Agent Task Manager Integration', () => {
         // Create task in first session
         await createTool.execute(
           {
-            title: 'Session 1 task',
-            prompt: 'Task in session 1',
-            priority: 'high',
+            tasks: [
+              {
+                title: 'Session 1 task',
+                prompt: 'Task in session 1',
+                priority: 'high',
+              },
+            ],
           },
           mainAgentContext
         );
@@ -359,9 +379,13 @@ describe('Multi-Agent Task Manager Integration', () => {
         // Create task in second session
         await createTool2.execute(
           {
-            title: 'Session 2 task',
-            prompt: 'Task in session 2',
-            priority: 'medium',
+            tasks: [
+              {
+                title: 'Session 2 task',
+                prompt: 'Task in session 2',
+                priority: 'medium',
+              },
+            ],
           },
           session2Context
         );
@@ -389,9 +413,13 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create a task
       const createResult = await createTool.execute(
         {
-          title: 'Concurrent test task',
-          prompt: 'Test concurrent access',
-          priority: 'medium',
+          tasks: [
+            {
+              title: 'Concurrent test task',
+              prompt: 'Test concurrent access',
+              priority: 'medium',
+            },
+          ],
         },
         mainAgentContext
       );
@@ -432,29 +460,41 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create various tasks
       await createTool.execute(
         {
-          title: 'Task created by agent1',
-          prompt: 'Do something',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Task created by agent1',
+              prompt: 'Do something',
+              priority: 'high',
+            },
+          ],
         },
         mainAgentContext
       );
 
       await createTool.execute(
         {
-          title: 'Task assigned to agent2',
-          prompt: 'Do something else',
-          priority: 'medium',
-          assignedTo: agent2Context.threadId!,
+          tasks: [
+            {
+              title: 'Task assigned to agent2',
+              prompt: 'Do something else',
+              priority: 'medium',
+              assignedTo: agent2Context.threadId!,
+            },
+          ],
         },
         mainAgentContext
       );
 
       await createTool.execute(
         {
-          title: 'Task created by agent2',
-          prompt: 'Do another thing',
-          priority: 'low',
-          assignedTo: mainAgentContext.threadId!,
+          tasks: [
+            {
+              title: 'Task created by agent2',
+              prompt: 'Do another thing',
+              priority: 'low',
+              assignedTo: mainAgentContext.threadId!,
+            },
+          ],
         },
         agent2Context
       );

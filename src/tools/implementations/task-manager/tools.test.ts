@@ -140,8 +140,12 @@ describe('Enhanced Task Manager Tools', () => {
 
       const result = await taskCreateTool.execute(
         {
-          title: 'Debug Task',
-          prompt: 'Debug prompt',
+          tasks: [
+            {
+              title: 'Debug Task',
+              prompt: 'Debug prompt',
+            },
+          ],
         },
         context
       );
@@ -157,9 +161,13 @@ describe('Enhanced Task Manager Tools', () => {
     it('should create task with required fields', async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Implement authentication',
-          prompt: 'Create a secure authentication system with JWT tokens',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Implement authentication',
+              prompt: 'Create a secure authentication system with JWT tokens',
+              priority: 'high',
+            },
+          ],
         },
         context
       );
@@ -172,11 +180,15 @@ describe('Enhanced Task Manager Tools', () => {
     it('should create task with optional fields', async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Code review',
-          description: 'Review the authentication PR',
-          prompt: 'Check security best practices and code style',
-          priority: 'medium',
-          assignedTo: agent2ThreadId,
+          tasks: [
+            {
+              title: 'Code review',
+              description: 'Review the authentication PR',
+              prompt: 'Check security best practices and code style',
+              priority: 'medium',
+              assignedTo: agent2ThreadId,
+            },
+          ],
         },
         context
       );
@@ -191,10 +203,14 @@ describe('Enhanced Task Manager Tools', () => {
 
       const result = await taskCreateTool.execute(
         {
-          title: 'Research task',
-          prompt: 'Research best practices for JWT implementation',
-          priority: 'low',
-          assignedTo: newAgentSpec,
+          tasks: [
+            {
+              title: 'Research task',
+              prompt: 'Research best practices for JWT implementation',
+              priority: 'low',
+              assignedTo: newAgentSpec,
+            },
+          ],
         },
         context
       );
@@ -214,8 +230,12 @@ describe('Enhanced Task Manager Tools', () => {
     it('should validate required fields', async () => {
       const result = await taskCreateTool.execute(
         {
-          title: '',
-          prompt: 'Some prompt',
+          tasks: [
+            {
+              title: '',
+              prompt: 'Some prompt',
+            },
+          ],
         } as any,
         context
       );
@@ -227,9 +247,13 @@ describe('Enhanced Task Manager Tools', () => {
     it('should reject invalid assignee format', async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
-          assignedTo: 'invalid-format',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+              assignedTo: 'invalid-format',
+            },
+          ],
         } as any,
         context
       );
@@ -245,29 +269,41 @@ describe('Enhanced Task Manager Tools', () => {
 
       await taskCreateTool.execute(
         {
-          title: 'Task 1',
-          prompt: 'First task',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Task 1',
+              prompt: 'First task',
+              priority: 'high',
+            },
+          ],
         },
         context
       );
 
       await taskCreateTool.execute(
         {
-          title: 'Task 2',
-          prompt: 'Second task',
-          priority: 'medium',
-          assignedTo: agent1ThreadId,
+          tasks: [
+            {
+              title: 'Task 2',
+              prompt: 'Second task',
+              priority: 'medium',
+              assignedTo: agent1ThreadId,
+            },
+          ],
         },
         context
       );
 
       await taskCreateTool.execute(
         {
-          title: 'Task 3',
-          prompt: 'Third task',
-          priority: 'low',
-          assignedTo: agent2ThreadId,
+          tasks: [
+            {
+              title: 'Task 3',
+              prompt: 'Third task',
+              priority: 'low',
+              assignedTo: agent2ThreadId,
+            },
+          ],
         },
         { ...context, threadId: agent2ThreadId }
       );
@@ -361,9 +397,13 @@ describe('Enhanced Task Manager Tools', () => {
     beforeEach(async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
-          assignedTo: agent1ThreadId,
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+              assignedTo: agent1ThreadId,
+            },
+          ],
         },
         context
       );
@@ -470,8 +510,12 @@ describe('Enhanced Task Manager Tools', () => {
     beforeEach(async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+            },
+          ],
         },
         context
       );
@@ -538,11 +582,15 @@ describe('Enhanced Task Manager Tools', () => {
     beforeEach(async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Complex task',
-          description: 'This is a complex task with many details',
-          prompt: 'Implement a complex feature with multiple components',
-          priority: 'high',
-          assignedTo: agent2ThreadId,
+          tasks: [
+            {
+              title: 'Complex task',
+              description: 'This is a complex task with many details',
+              prompt: 'Implement a complex feature with multiple components',
+              priority: 'high',
+              assignedTo: agent2ThreadId,
+            },
+          ],
         },
         context
       );
@@ -600,8 +648,12 @@ describe('Enhanced Task Manager Tools', () => {
     beforeEach(async () => {
       const result = await taskCreateTool.execute(
         {
-          title: 'Test task',
-          prompt: 'Do something',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'Do something',
+            },
+          ],
         },
         context
       );

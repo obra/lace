@@ -122,9 +122,13 @@ describe('Task Management Workflow Integration', () => {
       // 1. Create a task
       const createResult = await taskCreateTool.execute(
         {
-          title: 'Implement user authentication',
-          prompt: 'Add JWT-based authentication to the API endpoints',
-          priority: 'high',
+          tasks: [
+            {
+              title: 'Implement user authentication',
+              prompt: 'Add JWT-based authentication to the API endpoints',
+              priority: 'high',
+            },
+          ],
         },
         context
       );
@@ -250,10 +254,14 @@ describe('Task Management Workflow Integration', () => {
       // Create task with assignment
       const createResult = await taskCreateTool.execute(
         {
-          title: 'Analyze security vulnerabilities',
-          prompt: 'Review codebase for common security issues and provide recommendations',
-          priority: 'high',
-          assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+          tasks: [
+            {
+              title: 'Analyze security vulnerabilities',
+              prompt: 'Review codebase for common security issues and provide recommendations',
+              priority: 'high',
+              assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+            },
+          ],
         },
         context
       );
@@ -363,8 +371,12 @@ describe('Task Management Workflow Integration', () => {
 
       const result = await toolWithoutManager.execute(
         {
-          title: 'Test task',
-          prompt: 'This should fail',
+          tasks: [
+            {
+              title: 'Test task',
+              prompt: 'This should fail',
+            },
+          ],
         },
         context
       );
@@ -381,9 +393,13 @@ describe('Task Management Workflow Integration', () => {
       // Create various tasks with different states
       const task1Result = await taskCreateTool.execute(
         {
-          title: 'Completed task',
-          prompt: 'This will be completed',
-          priority: 'low',
+          tasks: [
+            {
+              title: 'Completed task',
+              prompt: 'This will be completed',
+              priority: 'low',
+            },
+          ],
         },
         context
       );
@@ -391,9 +407,13 @@ describe('Task Management Workflow Integration', () => {
 
       const task2Result = await taskCreateTool.execute(
         {
-          title: 'In progress task',
-          prompt: 'This will be in progress',
-          priority: 'medium',
+          tasks: [
+            {
+              title: 'In progress task',
+              prompt: 'This will be in progress',
+              priority: 'medium',
+            },
+          ],
         },
         context
       );
@@ -401,10 +421,14 @@ describe('Task Management Workflow Integration', () => {
 
       const task3Result = await taskCreateTool.execute(
         {
-          title: 'Assigned task',
-          prompt: 'This will be assigned',
-          priority: 'high',
-          assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+          tasks: [
+            {
+              title: 'Assigned task',
+              prompt: 'This will be assigned',
+              priority: 'high',
+              assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+            },
+          ],
         },
         context
       );
