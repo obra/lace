@@ -105,7 +105,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     const threadId = threadManager.generateThreadId();
 
-    // Create thread WITH session ID so _getFullSession() can find it
+    // Create thread WITH session ID so getFullSession() can find it
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({

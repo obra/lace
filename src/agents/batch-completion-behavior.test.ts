@@ -119,7 +119,7 @@ describe('Tool Batch Completion Behavior', () => {
     toolExecutor.registerTool('test_tool', configurableTool);
 
     const threadId = threadManager.generateThreadId();
-    // Create thread WITH session ID so _getFullSession() can find it
+    // Create thread WITH session ID so getFullSession() can find it
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({

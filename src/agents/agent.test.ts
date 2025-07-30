@@ -158,7 +158,7 @@ describe('Enhanced Agent', () => {
 
   function createAgent(config?: Partial<AgentConfig>): Agent {
     const threadId = threadManager.generateThreadId();
-    // Create thread WITH session ID so _getFullSession() can find it
+    // Create thread WITH session ID so getFullSession() can find it
     threadManager.createThread(threadId, session.getId());
 
     const defaultConfig: AgentConfig = {
