@@ -252,7 +252,7 @@ export function ToolCallDisplay({
         
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
           {/* Tool Summary Header */}
-          <div className="p-3 bg-base-200 border-b border-base-300">
+          <div className="p-3 bg-base-50 border-b border-base-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {tool.toLowerCase() === 'bash' && args && typeof args === 'object' && 'command' in args ? (
