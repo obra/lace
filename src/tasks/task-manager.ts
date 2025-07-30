@@ -5,6 +5,7 @@ import { EventEmitter } from 'events';
 import { DatabasePersistence } from '~/persistence/database';
 import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
 import { ThreadId, AssigneeId, asThreadId, isNewAgentSpec } from '~/threads/types';
+import { logger } from '~/utils/logger';
 
 // Type for agent creation callback
 export type AgentCreationCallback = (
@@ -14,12 +15,16 @@ export type AgentCreationCallback = (
 ) => Promise<ThreadId>;
 
 export class TaskManager extends EventEmitter {
+  private instanceId: string;
+
   constructor(
     private sessionId: ThreadId,
     private persistence: DatabasePersistence,
     private createAgent?: AgentCreationCallback
   ) {
     super();
+    this.instanceId = Math.random().toString(36).substring(2, 8);
+    logger.debug('TaskManager created', { sessionId, instanceId: this.instanceId });
   }
 
   setAgentCreationCallback(callback: AgentCreationCallback): void {
@@ -142,6 +147,12 @@ export class TaskManager extends EventEmitter {
     }
 
     // Emit event for real-time updates
+    logger.debug('TaskManager emitting task:updated event', {
+      instanceId: this.instanceId,
+      taskId: updatedTask.id,
+      status: updatedTask.status,
+      actor: context.actor,
+    });
     this.emit('task:updated', {
       type: 'task:updated',
       task: updatedTask,

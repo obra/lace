@@ -7,6 +7,7 @@ import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext } from '~/tools/types';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
+import { logger } from '~/utils/logger';
 
 // Single schema that supports both single and bulk task creation
 const createTaskSchema = z
@@ -347,14 +348,28 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
         isHuman: false,
       };
 
+      logger.debug('TaskCompleteTool: Starting task completion', {
+        taskId: args.id,
+        actor: context.threadId,
+      });
+
       // Add the completion message as a note first
       await taskManager.addNote(args.id, args.message, taskContext);
+      logger.debug('TaskCompleteTool: Added completion note', { taskId: args.id });
 
       // Then mark the task as completed
       const task = await taskManager.updateTask(args.id, { status: 'completed' }, taskContext);
+      logger.debug('TaskCompleteTool: Task marked as completed', {
+        taskId: args.id,
+        status: task.status,
+      });
 
       return this.createResult(`Completed task ${args.id}: ${task.title}`);
     } catch (error) {
+      logger.error('TaskCompleteTool: Failed to complete task', {
+        taskId: args.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       return this.createError(
         `Failed to complete task: ${error instanceof Error ? error.message : 'Unknown error'}`
       );

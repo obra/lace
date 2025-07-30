@@ -107,7 +107,12 @@ export class ToolExecutor {
       );
     }
 
-    // 3. Check tool policy with session context
+    // 3. Check if tool is marked as safe internal (bypasses all approval)
+    if (tool.annotations?.safeInternal === true) {
+      return 'granted';
+    }
+
+    // 4. Check tool policy with session context
     const session = context.session;
 
     // Check if tool is allowed in configuration
@@ -131,7 +136,7 @@ export class ToolExecutor {
         break;
     }
 
-    // 4. Check approval - fail safe if no callback is configured
+    // 5. Check approval - fail safe if no callback is configured
     if (!this.approvalCallback) {
       throw new Error('Tool execution requires approval but no approval callback is configured');
     }
