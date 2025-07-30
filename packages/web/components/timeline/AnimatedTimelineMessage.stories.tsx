@@ -50,11 +50,14 @@ const toolMessage: TimelineEntry = {
   type: 'tool',
   tool: 'bash',
   content: 'git log --oneline --since="1 week ago"',
-  result: `a1b2c3d feat: add user authentication system
+  result: {
+    content: [{ type: 'text', text: `a1b2c3d feat: add user authentication system
 e4f5g6h fix: resolve memory leak in timeline component
 i7j8k9l refactor: reorganize component structure
 m1n2o3p docs: update API documentation
-q4r5s6t test: add integration tests for auth flow`,
+q4r5s6t test: add integration tests for auth flow` }],
+    isError: false,
+  },
   timestamp: new Date(Date.now() - 3400000),
 };
 
@@ -211,7 +214,10 @@ export const BashToolMessage: Story = {
       ...toolMessage,
       tool: 'bash',
       content: 'find src/ -name "*.tsx" -type f | wc -l',
-      result: '47',
+      result: {
+        content: [{ type: 'text', text: '47' }],
+        isError: false,
+      },
     },
     index: 0,
   },
@@ -230,7 +236,8 @@ export const ComplexToolMessage: Story = {
       ...toolMessage,
       tool: 'file-read',
       content: 'package.json',
-      result: `{
+      result: {
+        content: [{ type: 'text', text: `{
   "name": "lace",
   "version": "1.0.0",
   "scripts": {
@@ -244,7 +251,9 @@ export const ComplexToolMessage: Story = {
     "next": "^14.0.0",
     "framer-motion": "^10.16.0"
   }
-}`,
+}` }],
+        isError: false,
+      },
     },
     index: 0,
   },
