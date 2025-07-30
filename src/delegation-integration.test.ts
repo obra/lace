@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
@@ -13,9 +14,6 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
 import { ApprovalDecision } from '~/tools/approval-types';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 
 // Mock provider that responds with task completion tool calls
 class MockProvider extends BaseMockProvider {
@@ -79,15 +77,13 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Delegation Integration Tests', () => {
-  let tempDir: string;
+  const _tempDirContext = useTempLaceDir();
   let threadManager: ThreadManager;
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
 
   beforeEach(() => {
-    // Create temporary directory for test database
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-delegation-test-'));
     setupTestPersistence();
     mockProvider = new MockProvider();
 
@@ -110,7 +106,7 @@ describe('Delegation Integration Tests', () => {
 
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
-    project = Project.create('Test Project', tempDir);
+    project = Project.create('Test Project', '/tmp/test-delegation');
     session = Session.create({
       name: 'Delegation Integration Test Session',
       provider: 'anthropic',
@@ -127,10 +123,6 @@ describe('Delegation Integration Tests', () => {
     session?.destroy();
     threadManager.close();
     teardownTestPersistence();
-    // Clean up temp directory
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
-    }
   });
 
   it('should create hierarchical delegate thread IDs', () => {
@@ -244,6 +236,7 @@ describe('Delegation Integration Tests', () => {
 
     const result = await delegateToolInstance.execute(delegateInput, {
       threadId: session.getId(),
+      session, // TaskManager accessed via session.getTaskManager()
     });
 
     if (result.isError) {

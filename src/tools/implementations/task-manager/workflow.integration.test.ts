@@ -2,10 +2,6 @@
 // ABOUTME: Tests end-to-end scenarios from task creation through delegation to completion
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager';
-import { TaskManager } from '~/tasks/task-manager';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -15,18 +11,80 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { TestProvider } from '~/test-utils/test-provider';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { asThreadId } from '~/threads/types';
-import type { DatabasePersistence } from '~/persistence/database';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { ProviderRegistry } from '~/providers/registry';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ApprovalDecision } from '~/tools/approval-types';
+
+// Mock provider for testing
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  get contextWindow(): number {
+    return 200000;
+  }
+
+  get maxOutputTokens(): number {
+    return 4096;
+  }
+
+  async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    // Look for task assignment message
+    const taskMessage = messages.find(
+      (m) =>
+        m.content &&
+        typeof m.content === 'string' &&
+        m.content.includes('You have been assigned task')
+    );
+
+    if (taskMessage) {
+      const match = taskMessage.content.match(/assigned task '([^']+)'/);
+      const taskId = match ? match[1] : 'unknown';
+
+      return Promise.resolve({
+        content: 'Mock delegation response',
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+        toolCalls: [
+          {
+            id: 'delegation_task_complete',
+            name: 'task_complete',
+            input: {
+              id: taskId,
+              message: 'Mock delegation completed successfully',
+            },
+          },
+        ],
+      });
+    }
+
+    return Promise.resolve({
+      content: 'Mock agent response for delegation tests',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+}
 
 describe('Task Management Workflow Integration', () => {
-  let threadManager: ThreadManager;
-  let taskManager: TaskManager;
-  let toolExecutor: ToolExecutor;
-  let agent: Agent;
-  let mainThreadId: string;
-  let persistence: DatabasePersistence;
+  const _tempDirContext = useTempLaceDir();
+  let session: Session;
+  let project: Project;
+  let mockProvider: MockProvider;
 
   // Tool instances
   let taskCreateTool: TaskCreateTool;
@@ -37,87 +95,54 @@ describe('Task Management Workflow Integration', () => {
   let taskViewTool: TaskViewTool;
   let delegateTool: DelegateTool;
 
-  beforeEach(async () => {
-    persistence = setupTestPersistence();
+  beforeEach(() => {
+    setupTestPersistence();
+    mockProvider = new MockProvider();
 
-    // Initialize core services
-    threadManager = new ThreadManager();
-    mainThreadId = 'lace_20250726_test123';
+    // Mock the ProviderRegistry to return our mock provider
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
+    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
+      () =>
+        ({
+          createProvider: () => mockProvider,
+          getProvider: () => mockProvider,
+          getProviderNames: () => ['anthropic', 'openai'],
+        }) as unknown as ProviderRegistry
+    );
 
-    // Mock agent creation callback
-    const mockAgentCreator = vi.fn().mockImplementation((_provider: string, _model: string) => {
-      return Promise.resolve(asThreadId(`${mainThreadId}.delegate_${Date.now()}`));
+    // Create project and session
+    project = Project.create('Task Workflow Integration Test Project', '/tmp/test-workflow');
+    session = Session.create({
+      name: 'Task Workflow Integration Test Session',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      projectId: project.getId(),
+      approvalCallback: {
+        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+      },
     });
 
-    taskManager = new TaskManager(asThreadId(mainThreadId), persistence, mockAgentCreator);
-    toolExecutor = new ToolExecutor();
-
-    // Create main thread
-    threadManager.createThread(asThreadId(mainThreadId));
-
-    // Initialize task tools with TaskManager injection
-    taskCreateTool = new TaskCreateTool();
-    (taskCreateTool as unknown as { getTaskManager?: () => TaskManager }).getTaskManager = () =>
-      taskManager;
-
-    taskListTool = new TaskListTool();
-    (taskListTool as unknown as { getTaskManager?: () => TaskManager }).getTaskManager = () =>
-      taskManager;
-
-    taskCompleteTool = new TaskCompleteTool();
-    (taskCompleteTool as unknown as { getTaskManager?: () => TaskManager }).getTaskManager = () =>
-      taskManager;
-
-    taskUpdateTool = new TaskUpdateTool();
-    (taskUpdateTool as unknown as { getTaskManager?: () => TaskManager }).getTaskManager = () =>
-      taskManager;
-
-    taskAddNoteTool = new TaskAddNoteTool();
-    (taskAddNoteTool as unknown as { getTaskManager?: () => TaskManager }).getTaskManager = () =>
-      taskManager;
-
-    taskViewTool = new TaskViewTool();
-    (taskViewTool as unknown as { getTaskManager?: () => TaskManager }).getTaskManager = () =>
-      taskManager;
-
-    delegateTool = new DelegateTool();
-
-    // Register tools
-    toolExecutor.registerTool('task_add', taskCreateTool);
-    toolExecutor.registerTool('task_list', taskListTool);
-    toolExecutor.registerTool('task_complete', taskCompleteTool);
-    toolExecutor.registerTool('task_update', taskUpdateTool);
-    toolExecutor.registerTool('task_add_note', taskAddNoteTool);
-    toolExecutor.registerTool('task_view', taskViewTool);
-    toolExecutor.registerTool('delegate', delegateTool);
-
-    // Create agent with test provider
-    const testProvider = new TestProvider({
-      mockResponse: 'Mock agent response for delegation tests',
-    });
-
-    agent = new Agent({
-      provider: testProvider,
-      toolExecutor,
-      threadManager,
-      threadId: mainThreadId,
-      tools: toolExecutor.getAllTools(),
-    });
-
-    await agent.start();
+    // Get tools from session's agent
+    const agent = session.getAgent(session.getId());
+    const toolExecutor = agent!.toolExecutor;
+    taskCreateTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    taskListTool = toolExecutor.getTool('task_list') as TaskListTool;
+    taskCompleteTool = toolExecutor.getTool('task_complete') as TaskCompleteTool;
+    taskUpdateTool = toolExecutor.getTool('task_update') as TaskUpdateTool;
+    taskAddNoteTool = toolExecutor.getTool('task_add_note') as TaskAddNoteTool;
+    taskViewTool = toolExecutor.getTool('task_view') as TaskViewTool;
+    delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
   });
 
   afterEach(() => {
-    agent?.stop();
-    threadManager?.close();
-    persistence.close();
+    vi.clearAllMocks();
+    session?.destroy();
     teardownTestPersistence();
-    vi.restoreAllMocks();
   });
 
   describe('Basic Task Lifecycle', () => {
     it('should complete full task lifecycle: create → update → add note → complete → view', async () => {
-      const context = { threadId: asThreadId(mainThreadId) } as const;
+      const context = { threadId: session.getId(), session } as const;
 
       // 1. Create a task
       const createResult = await taskCreateTool.execute(
@@ -194,7 +219,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Bulk Task Creation Workflow', () => {
     it('should handle bulk task creation and parallel management', async () => {
-      const context = { threadId: asThreadId(mainThreadId) } as const;
+      const context = { threadId: session.getId(), session } as const;
 
       // Create multiple tasks in bulk
       const bulkCreateResult = await taskCreateTool.execute(
@@ -249,7 +274,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Task Assignment and Delegation', () => {
     it('should support task assignment and delegation workflow', async () => {
-      const context = { threadId: asThreadId(mainThreadId) } as const;
+      const context = { threadId: session.getId(), session } as const;
 
       // Create task with assignment
       const createResult = await taskCreateTool.execute(
@@ -268,7 +293,7 @@ describe('Task Management Workflow Integration', () => {
 
       expect(createResult.isError).toBe(false);
       // After agent spawning, the assignment should show the delegate thread ID
-      expect(createResult.content[0].text).toContain('assigned to lace_20250726_test123.delegate_');
+      expect(createResult.content[0].text).toMatch(/assigned to \w+\.\d+/);
 
       const taskIdMatch = createResult.content[0].text?.match(/task (\w+):/);
       expect(taskIdMatch).not.toBeNull();
@@ -278,7 +303,7 @@ describe('Task Management Workflow Integration', () => {
       const viewResult = await taskViewTool.execute({ taskId: validDelegateTaskId }, context);
       expect(viewResult.isError).toBe(false);
       // After agent spawning, the assignment should show the delegate thread ID
-      expect(viewResult.content[0].text).toContain('Assigned to: lace_20250726_test123.delegate_');
+      expect(viewResult.content[0].text).toMatch(/Assigned to: \w+\.\d+/);
 
       // Reassign task to different model
       const reassignResult = await taskUpdateTool.execute(
@@ -291,9 +316,7 @@ describe('Task Management Workflow Integration', () => {
       );
       expect(reassignResult.isError).toBe(false);
       // Task update should also trigger agent spawning, showing the delegate thread ID
-      expect(reassignResult.content[0].text).toContain(
-        'assigned to lace_20250726_test123.delegate_'
-      );
+      expect(reassignResult.content[0].text).toMatch(/assigned to \w+\.\d+/);
 
       // Mock delegation tool execution (delegation would normally create subthreads)
       vi.spyOn(delegateTool, 'execute').mockResolvedValueOnce({
@@ -333,7 +356,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle invalid task operations gracefully', async () => {
-      const context = { threadId: asThreadId(mainThreadId) } as const;
+      const context = { threadId: session.getId(), session } as const;
 
       // Try to complete non-existent task
       const completeResult = await taskCompleteTool.execute(
@@ -364,7 +387,7 @@ describe('Task Management Workflow Integration', () => {
     });
 
     it('should require TaskManager for all operations', async () => {
-      const context = { threadId: asThreadId(mainThreadId) } as const;
+      const context = { threadId: session.getId() } as const;
 
       // Create tool instances without TaskManager injection
       const toolWithoutManager = new TaskCreateTool();
@@ -388,7 +411,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Task Filtering and Querying', () => {
     it('should support different task filtering options', async () => {
-      const context = { threadId: asThreadId(mainThreadId) } as const;
+      const context = { threadId: session.getId(), session } as const;
 
       // Create various tasks with different states
       const task1Result = await taskCreateTool.execute(

@@ -56,18 +56,9 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   // Simulate three agents in a parent thread
   const parentThreadId = asThreadId('lace_20250703_parent');
-  const mainAgentContext: ToolContext = {
-    threadId: asThreadId('lace_20250703_parent.1'),
-    parentThreadId,
-  };
-  const agent2Context: ToolContext = {
-    threadId: asThreadId('lace_20250703_parent.2'),
-    parentThreadId,
-  };
-  const agent3Context: ToolContext = {
-    threadId: asThreadId('lace_20250703_parent.3'),
-    parentThreadId,
-  };
+  let mainAgentContext: ToolContext;
+  let agent2Context: ToolContext;
+  let agent3Context: ToolContext;
 
   beforeEach(() => {
     setupTestPersistence();
@@ -109,6 +100,23 @@ describe('Multi-Agent Task Manager Integration', () => {
     updateTool = toolExecutor.getTool('task_update') as TaskUpdateTool;
     noteTool = toolExecutor.getTool('task_add_note') as TaskAddNoteTool;
     viewTool = toolExecutor.getTool('task_view') as TaskViewTool;
+
+    // Initialize contexts with session for TaskManager access
+    mainAgentContext = {
+      threadId: asThreadId('lace_20250703_parent.1'),
+      parentThreadId,
+      session, // TaskManager accessed via session.getTaskManager()
+    };
+    agent2Context = {
+      threadId: asThreadId('lace_20250703_parent.2'),
+      parentThreadId,
+      session,
+    };
+    agent3Context = {
+      threadId: asThreadId('lace_20250703_parent.3'),
+      parentThreadId,
+      session,
+    };
   });
 
   afterEach(() => {
@@ -285,6 +293,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       const otherAgentContext: ToolContext = {
         threadId: asThreadId('lace_20250703_other1.1'),
         parentThreadId: otherParentThreadId,
+        session, // TaskManager accessed via session.getTaskManager()
       };
 
       // Create task in main thread
@@ -359,6 +368,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       const session2Context = {
         threadId: session2.getId(),
         parentThreadId: session2.getId(),
+        session: session2, // TaskManager accessed via session2.getTaskManager()
       };
 
       try {
