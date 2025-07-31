@@ -143,7 +143,7 @@ Bulk planning: task_add({ tasks: [
         if (task.assignedTo) {
           message += ` (assigned to ${task.assignedTo})`;
         }
-        return this.createResult(message);
+        return this.createResult(message, { task });
       } else {
         const taskSummaries = createdTasks.map((task) => {
           let summary = `${task.id}: ${task.title}`;
@@ -152,7 +152,8 @@ Bulk planning: task_add({ tasks: [
         });
 
         return this.createResult(
-          `Created ${createdTasks.length} tasks:\n${taskSummaries.join('\n')}`
+          `Created ${createdTasks.length} tasks:\n${taskSummaries.join('\n')}`,
+          { tasks: createdTasks }
         );
       }
     } catch (error) {
@@ -260,7 +261,7 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
       });
 
       const header = `Tasks (${args.filter}): ${tasks.length} found`;
-      return this.createResult(`${header}\n\n${lines.join('\n')}`);
+      return this.createResult(`${header}\n\n${lines.join('\n')}`, { tasks });
     } catch (error) {
       return this.createError(
         `Failed to list tasks: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -340,7 +341,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
         status: task.status,
       });
 
-      return this.createResult(`Completed task ${args.id}: ${task.title}`);
+      return this.createResult(`Completed task ${args.id}: ${task.title}`, { task });
     } catch (error) {
       logger.error('TaskCompleteTool: Failed to complete task', {
         taskId: args.id,
@@ -437,7 +438,9 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
       if (args.description) updateMessages.push('description');
       if (args.prompt) updateMessages.push('prompt');
 
-      return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`);
+      return this.createResult(`Updated task ${args.taskId}: ${updateMessages.join(', ')}`, {
+        task: updatedTask,
+      });
     } catch (error) {
       return this.createError(
         `Failed to update task: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -515,7 +518,10 @@ Notes become part of permanent task history - write for future readers.`;
 
       await taskManager.addNote(args.taskId, args.note, taskContext);
 
-      return this.createResult(`Added note to task ${args.taskId}`);
+      // Get the updated task to include in metadata
+      const updatedTask = await Promise.resolve(taskManager.getTask(args.taskId, taskContext));
+
+      return this.createResult(`Added note to task ${args.taskId}`, { task: updatedTask });
     } catch (error) {
       return this.createError(
         `Failed to add note: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -611,7 +617,7 @@ Example: task_view({ taskId: "task_123" })`;
         });
       }
 
-      return this.createResult(lines.join('\n'));
+      return this.createResult(lines.join('\n'), { task });
     } catch (error) {
       return this.createError(
         `Failed to view task: ${error instanceof Error ? error.message : 'Unknown error'}`
