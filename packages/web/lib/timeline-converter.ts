@@ -273,7 +273,12 @@ function convertEvent(
         toolId?: string;
         arguments?: unknown;
         call?: unknown;
-        result?: { content: Array<{ text?: string }>; isError?: boolean; id?: string };
+        result?: {
+          content: Array<{ text?: string }>;
+          isError?: boolean;
+          id?: string;
+          metadata?: unknown;
+        };
       };
       return {
         id,
