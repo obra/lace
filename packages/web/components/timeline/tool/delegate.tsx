@@ -17,6 +17,7 @@ import {
   faCode
 } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
+import type { ToolAggregatedEventData } from '@/types/api';
 
 /**
  * Status badge component for delegation status display
@@ -161,7 +162,7 @@ export const delegateRenderer: ToolRenderer = {
     return result.isError ?? false;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     if (!result.content || result.content.length === 0) {
       return (
         <div className="font-mono text-sm text-base-content/60">

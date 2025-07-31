@@ -4,8 +4,9 @@
 // TODO: We should refactor to eliminate this conversion layer - either make TimelineEntry match SessionEvent
 // TODO: or standardize on one event format throughout the system to avoid this translation step.
 
-import type { SessionEvent, Agent, ThreadId } from '@/types/api';
+import type { SessionEvent, Agent, ThreadId, ToolCallEventData } from '@/types/api';
 import type { TimelineEntry } from '@/types/design-system';
+import type { ToolResult } from '@/lib/server/lace-imports';
 
 export interface ConversionContext {
   agents: Agent[];
@@ -123,13 +124,13 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
   for (const event of events) {
     if (event.type === 'TOOL_CALL') {
       // Extract tool call ID from the event data
-      const eventData = event.data as { id?: string; [key: string]: unknown };
+      const eventData = event.data as unknown as { id?: string; [key: string]: unknown };
       const toolCallId =
         eventData?.id || `${event.threadId}-${event.timestamp}-${toolCallCounter++}`;
       pendingToolCalls.set(toolCallId, { call: event });
     } else if (event.type === 'TOOL_RESULT') {
       // Find matching tool call by ID or by proximity (most recent call on same thread)
-      const eventData = event.data as { id?: string; toolCallId?: string; [key: string]: unknown };
+      const eventData = event.data as unknown as { id?: string; toolCallId?: string; [key: string]: unknown };
       const toolCallId = eventData?.id || eventData?.toolCallId;
 
       let matchingCall = toolCallId ? pendingToolCalls.get(toolCallId) : null;
@@ -180,9 +181,9 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
       threadId: call.threadId,
       timestamp: call.timestamp,
       data: {
-        call: call.data,
-        result: result?.data,
-        toolName: callData?.toolName || callData?.name,
+        call: call.data as ToolCallEventData,
+        result: result?.data as ToolResult,
+        toolName: callData?.toolName || callData?.name || '',
         toolId: callData?.id,
         arguments: callData?.arguments || callData?.input,
       },
@@ -273,7 +274,7 @@ function convertEvent(
         toolId?: string;
         arguments?: unknown;
         call?: unknown;
-        result?: { content: Array<{ text?: string }>; isError?: boolean; id?: string };
+        result?: ToolResult;
       };
       return {
         id,

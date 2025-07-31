@@ -558,4 +558,155 @@ describe('Enhanced Task Manager Tools', () => {
       expect(result.content?.[0]?.text).toContain('not found');
     });
   });
+
+  describe('Structured Data for UI Rendering', () => {
+    describe('TaskCreateTool metadata', () => {
+      it('should return task object in result metadata for UI links', async () => {
+        const tool = new TaskCreateTool();
+        
+        const result = await tool.execute(
+          {
+            title: 'UI Test Task',
+            description: 'Testing structured data for UI',
+            prompt: 'Test that metadata contains task object',
+            priority: 'high',
+            assignedTo: agent2ThreadId,
+          },
+          context
+        );
+
+        // Basic result validation
+        expect(result.isError).toBe(false);
+        expect(result.content?.[0]?.text).toContain('UI Test Task');
+
+        // CRITICAL: Verify structured task data exists in metadata
+        expect(result.metadata).toBeDefined();
+        expect(result.metadata?.task).toBeDefined();
+        
+        const taskData = result.metadata?.task;
+        
+        // Verify all fields needed for UI rendering
+        expect(taskData.id).toBeDefined();
+        expect(taskData.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
+        expect(taskData.title).toBe('UI Test Task');
+        expect(taskData.description).toBe('Testing structured data for UI');
+        expect(taskData.prompt).toBe('Test that metadata contains task object');
+        expect(taskData.priority).toBe('high');
+        expect(taskData.status).toBe('pending');
+        expect(taskData.assignedTo).toBe(agent2ThreadId);
+        expect(taskData.createdBy).toBe(agent1ThreadId);
+        expect(taskData.threadId).toBe(parentThreadId);
+        expect(taskData.createdAt).toBeInstanceOf(Date);
+        expect(taskData.updatedAt).toBeInstanceOf(Date);
+        expect(Array.isArray(taskData.notes)).toBe(true);
+        expect(taskData.notes).toHaveLength(0);
+      });
+
+      it('should work with fallback persistence path', async () => {
+        const tool = new TaskCreateTool();
+        // Don't inject TaskManager to test fallback path
+        
+        const result = await tool.execute(
+          {
+            title: 'Fallback Test Task',
+            prompt: 'Test fallback persistence path',
+            priority: 'medium',
+          },
+          context
+        );
+
+        expect(result.isError).toBe(false);
+        expect(result.metadata?.task).toBeDefined();
+        
+        const taskData = result.metadata?.task;
+        expect(taskData.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
+        expect(taskData.title).toBe('Fallback Test Task');
+        expect(taskData.priority).toBe('medium');
+      });
+
+      it('should include assignment info in both text and metadata', async () => {
+        const tool = new TaskCreateTool();
+        
+        const result = await tool.execute(
+          {
+            title: 'Assigned Task',
+            prompt: 'Test assignment data',
+            priority: 'low',
+            assignedTo: agent2ThreadId,
+          },
+          context
+        );
+
+        expect(result.isError).toBe(false);
+        
+        // Text should mention assignment
+        expect(result.content?.[0]?.text).toContain(`assigned to ${agent2ThreadId}`);
+        
+        // Metadata should have assignment
+        expect(result.metadata?.task?.assignedTo).toBe(agent2ThreadId);
+      });
+    });
+
+    describe('Data validation for UI components', () => {
+      it('should provide all data needed for task view links', async () => {
+        const tool = new TaskCreateTool();
+        
+        const result = await tool.execute(
+          {
+            title: 'Link Test Task',
+            description: 'Test data for view links',
+            prompt: 'Ensure UI can create proper links',
+            priority: 'high',
+          },
+          context
+        );
+
+        const taskData = result.metadata?.task;
+        expect(taskData).toBeDefined();
+        expect(typeof taskData).toBe('object');
+        expect(taskData).not.toBeNull();
+        
+        // UI needs these for creating links like #/tasks/{taskId}
+        expect(taskData?.id).toBeDefined();
+        expect(typeof taskData?.id).toBe('string');
+        if (taskData && typeof taskData.id === 'string') {
+          expect(taskData.id.length).toBeGreaterThan(0);
+        }
+        
+        // UI needs these for display
+        expect(taskData.title).toBeDefined();
+        expect(taskData.priority).toBeDefined();
+        expect(taskData.status).toBeDefined();
+        expect(taskData.createdAt).toBeDefined();
+      });
+
+      it('should provide task ID without requiring text parsing', async () => {
+        const tool = new TaskCreateTool();
+        
+        const result = await tool.execute(
+          {
+            title: 'No Parsing Task',
+            prompt: 'Task ID should be in metadata, not requiring text parsing',
+            priority: 'medium',
+          },
+          context
+        );
+
+        // The old way: parsing text (should not be needed)
+        const textTaskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0];
+        
+        // The new way: structured metadata (should work)
+        const metadataTaskId = result.metadata?.task?.id as string | undefined;
+        
+        expect(metadataTaskId).toBeDefined();
+        expect(metadataTaskId).toBe(textTaskId); // Both should match
+        
+        // But UI should use metadata, not text parsing
+        expect(typeof metadataTaskId).toBe('string');
+        if (typeof metadataTaskId === 'string') {
+          expect(metadataTaskId.length).toBeGreaterThan(0);
+        }
+      });
+    });
+  });
 });

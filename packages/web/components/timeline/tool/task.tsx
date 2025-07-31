@@ -18,6 +18,7 @@ import {
   faUser
 } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
+import type { ToolAggregatedEventData } from '@/types/api';
 
 /**
  * Priority badge component for consistent priority display
@@ -113,7 +114,7 @@ const taskAddRenderer: ToolRenderer = {
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
     
     // Handle errors only
@@ -134,12 +135,9 @@ const taskAddRenderer: ToolRenderer = {
     }
     
     // Success case - show link to view task
-    const task = parsed as { taskId?: string; title?: string; id?: string };
-    
-    // Debug: Log the parsed structure to understand the actual data
-    console.log('Task add result parsed:', parsed);
-    
-    const taskId = task.taskId || task.id;
+    // Get task object from result metadata (structured data from task tools)
+    const taskData = (result as any).metadata?.task;
+    const taskId = taskData?.id;
     
     if (taskId) {
       return (
@@ -156,7 +154,6 @@ const taskAddRenderer: ToolRenderer = {
     }
     
     // If no taskId found, return empty div to prevent default renderer fallback
-    console.log('No taskId found in parsed result:', parsed);
     return <div></div>;
   },
 
@@ -190,7 +187,7 @@ const taskListRenderer: ToolRenderer = {
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
     
     if (!parsed) {
@@ -285,7 +282,7 @@ const taskCompleteRenderer: ToolRenderer = {
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
     
     if (!parsed) {
@@ -365,7 +362,7 @@ const taskUpdateRenderer: ToolRenderer = {
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
     
     if (!parsed) {
@@ -446,7 +443,7 @@ const taskAddNoteRenderer: ToolRenderer = {
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
     
     if (!parsed) {
@@ -530,7 +527,7 @@ const taskViewRenderer: ToolRenderer = {
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
     
     if (!parsed) {

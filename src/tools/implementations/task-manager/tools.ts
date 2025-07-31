@@ -74,7 +74,7 @@ export class TaskCreateTool extends Tool {
           message += ` (assigned to ${task.assignedTo})`;
         }
 
-        return this.createResult(message);
+        return this.createResult(message, { task });
       } else {
         // Fallback to original implementation for backward compatibility
         const task: Task = {
@@ -100,7 +100,7 @@ export class TaskCreateTool extends Tool {
           message += ` (assigned to ${task.assignedTo})`;
         }
 
-        return this.createResult(message);
+        return this.createResult(message, { task });
       }
     } catch (error) {
       return this.createError(

@@ -6,6 +6,7 @@
 import React from 'react';
 import { faTerminal } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
+import type { ToolAggregatedEventData } from '@/types/api';
 
 /**
  * Bash-specific tool renderer providing terminal-style formatting
@@ -35,7 +36,7 @@ export const bashRenderer: ToolRenderer = {
     }
   },
 
-  renderResult: (result: ToolResult): React.ReactNode => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     if (!result.content || result.content.length === 0) {
       return (
         <div className="font-mono text-sm text-base-content/60">
