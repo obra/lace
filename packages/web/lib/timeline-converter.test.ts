@@ -53,8 +53,8 @@ const mockSessionEvents: SessionEvent[] = [
     threadId: asThreadId('session-123.agent-1'),
     timestamp: new Date('2025-07-21T10:31:15Z'),
     data: {
-      toolName: 'file_read',
-      result: { content: 'interface User { id: number; name: string; }' },
+      content: [{ type: 'text', text: 'interface User { id: number; name: string; }' }],
+      isError: false,
     },
   },
   {
@@ -133,7 +133,15 @@ describe('convertSessionEventsToTimeline', () => {
         type: 'tool',
         content: 'file_read',
         tool: 'file_read',
-        result: expect.stringContaining('interface User') as string,
+        result: expect.objectContaining({
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'text',
+              text: expect.stringContaining('interface User'),
+            }),
+          ]),
+          isError: false,
+        }),
         timestamp: new Date('2025-07-21T10:31:00Z'), // Uses TOOL_CALL timestamp
         agent: 'Claude',
         metadata: expect.objectContaining({
