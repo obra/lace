@@ -12,6 +12,7 @@ import {
 } from '~/tools/implementations/task-manager';
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
+import type { Task } from '~/tasks/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Session } from '~/sessions/session';
@@ -680,6 +681,217 @@ describe('Enhanced Task Manager Tools', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content?.[0]?.text).toContain('not found');
+    });
+  });
+
+  describe('Structured Data for UI Rendering', () => {
+    describe('TaskCreateTool metadata', () => {
+      it('should return task object in result metadata for single task UI links', async () => {
+        const result = await taskCreateTool.execute(
+          {
+            tasks: [
+              {
+                title: 'UI Test Task',
+                description: 'Testing structured data for UI',
+                prompt: 'Test that metadata contains task object',
+                priority: 'high',
+                assignedTo: agent2ThreadId,
+              },
+            ],
+          },
+          context
+        );
+
+        // Basic result validation
+        expect(result.isError).toBe(false);
+        expect(result.content?.[0]?.text).toContain('UI Test Task');
+
+        // CRITICAL: Verify structured task data exists in metadata for single task
+        expect(result.metadata).toBeDefined();
+        expect(result.metadata?.task).toBeDefined();
+
+        const taskData = result.metadata?.task as Task;
+
+        // Verify all fields needed for UI rendering
+        expect(taskData.id).toBeDefined();
+        expect(taskData.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
+        expect(taskData.title).toBe('UI Test Task');
+        expect(taskData.description).toBe('Testing structured data for UI');
+        expect(taskData.prompt).toBe('Test that metadata contains task object');
+        expect(taskData.priority).toBe('high');
+        expect(taskData.status).toBe('pending');
+        expect(taskData.assignedTo).toBe(agent2ThreadId);
+        expect(taskData.createdAt).toBeInstanceOf(Date);
+        expect(taskData.updatedAt).toBeInstanceOf(Date);
+        expect(Array.isArray(taskData.notes)).toBe(true);
+        expect(taskData.notes).toHaveLength(0);
+      });
+
+      it('should return tasks array in result metadata for multiple task UI links', async () => {
+        const result = await taskCreateTool.execute(
+          {
+            tasks: [
+              {
+                title: 'First Task',
+                prompt: 'First task for testing',
+                priority: 'high',
+              },
+              {
+                title: 'Second Task',
+                prompt: 'Second task for testing',
+                priority: 'medium',
+              },
+            ],
+          },
+          context
+        );
+
+        // Basic result validation
+        expect(result.isError).toBe(false);
+        expect(result.content?.[0]?.text).toContain('Created 2 tasks');
+
+        // CRITICAL: Verify structured tasks array exists in metadata
+        expect(result.metadata).toBeDefined();
+        expect(result.metadata?.tasks).toBeDefined();
+        expect(Array.isArray(result.metadata?.tasks)).toBe(true);
+
+        const tasksData = result.metadata?.tasks as Task[];
+        expect(tasksData).toHaveLength(2);
+
+        // Verify first task
+        expect(tasksData[0].id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
+        expect(tasksData[0].title).toBe('First Task');
+        expect(tasksData[0].priority).toBe('high');
+
+        // Verify second task
+        expect(tasksData[1].id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
+        expect(tasksData[1].title).toBe('Second Task');
+        expect(tasksData[1].priority).toBe('medium');
+      });
+
+      it('should include assignment info in both text and metadata', async () => {
+        const result = await taskCreateTool.execute(
+          {
+            tasks: [
+              {
+                title: 'Assigned Task',
+                prompt: 'Test assignment data',
+                priority: 'low',
+                assignedTo: agent2ThreadId,
+              },
+            ],
+          },
+          context
+        );
+
+        expect(result.isError).toBe(false);
+
+        // Text should mention assignment
+        expect(result.content?.[0]?.text).toContain(`assigned to ${agent2ThreadId}`);
+
+        // Metadata should have assignment
+        expect((result.metadata?.task as Task)?.assignedTo).toBe(agent2ThreadId);
+      });
+    });
+
+    describe('Data validation for UI components', () => {
+      it('should provide all data needed for task view links', async () => {
+        const result = await taskCreateTool.execute(
+          {
+            tasks: [
+              {
+                title: 'Link Test Task',
+                description: 'Test data for view links',
+                prompt: 'Ensure UI can create proper links',
+                priority: 'high',
+              },
+            ],
+          },
+          context
+        );
+
+        const taskData = result.metadata?.task as Task;
+        expect(taskData).toBeDefined();
+        expect(typeof taskData).toBe('object');
+        expect(taskData).not.toBeNull();
+
+        // UI needs these for creating links like #/tasks/{taskId}
+        expect(taskData?.id).toBeDefined();
+        expect(typeof taskData?.id).toBe('string');
+        if (taskData && typeof taskData.id === 'string') {
+          expect(taskData.id.length).toBeGreaterThan(0);
+        }
+
+        // UI needs these for display
+        expect(taskData.title).toBeDefined();
+        expect(taskData.priority).toBeDefined();
+        expect(taskData.status).toBeDefined();
+        expect(taskData.createdAt).toBeDefined();
+      });
+
+      it('should provide task ID without requiring text parsing', async () => {
+        const result = await taskCreateTool.execute(
+          {
+            tasks: [
+              {
+                title: 'No Parsing Task',
+                prompt: 'Task ID should be in metadata, not requiring text parsing',
+                priority: 'medium',
+              },
+            ],
+          },
+          context
+        );
+
+        // The old way: parsing text (should not be needed)
+        const textTaskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0];
+
+        // The new way: structured metadata (should work)
+        const metadataTaskId = (result.metadata?.task as Task)?.id;
+
+        expect(metadataTaskId).toBeDefined();
+        expect(metadataTaskId).toBe(textTaskId); // Both should match
+
+        // But UI should use metadata, not text parsing
+        expect(typeof metadataTaskId).toBe('string');
+        if (typeof metadataTaskId === 'string') {
+          expect(metadataTaskId.length).toBeGreaterThan(0);
+        }
+      });
+
+      it('should provide multiple task IDs for array-based creation', async () => {
+        const result = await taskCreateTool.execute(
+          {
+            tasks: [
+              {
+                title: 'First Array Task',
+                prompt: 'First task in array',
+                priority: 'high',
+              },
+              {
+                title: 'Second Array Task',
+                prompt: 'Second task in array',
+                priority: 'low',
+              },
+            ],
+          },
+          context
+        );
+
+        // Structured metadata should work for arrays
+        const tasksMetadata = result.metadata?.tasks as Task[];
+
+        expect(Array.isArray(tasksMetadata)).toBe(true);
+        expect(tasksMetadata).toHaveLength(2);
+
+        // Each task should have proper ID structure
+        tasksMetadata.forEach((task, index) => {
+          expect(task.id).toBeDefined();
+          expect(typeof task.id).toBe('string');
+          expect(task.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
+          expect(task.title).toBe(index === 0 ? 'First Array Task' : 'Second Array Task');
+        });
+      });
     });
   });
 });
