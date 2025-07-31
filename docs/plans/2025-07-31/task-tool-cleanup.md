@@ -507,6 +507,50 @@ it('should show meaningful task updates in timeline', async () => {
    - Event-time snapshots preserve historical accuracy
    - Timeline renders instantly with cached metadata
 
+## Task 10: Fix Type Duplication Between Core and Web
+
+**Goal:** Eliminate duplicate type definitions between core and web packages
+
+**Problem:** The web package has duplicate type definitions in `@/types/api` that shadow core types from `~/tasks/types`, `~/threads/types`, etc. This creates maintenance burden and potential drift between definitions.
+
+**Files to modify:**
+- `packages/web/types/api.ts` - Remove duplicate types, re-export from core
+- `packages/web/lib/core-types-import.ts` - Add client-safe core type imports  
+- All web components importing shadowed types - Update imports
+
+**Implementation:**
+
+1. **Audit type duplication:**
+   - Task, TaskNote, TaskStatus, TaskPriority (duplicated from `~/tasks/types`)
+   - ThreadId, AssigneeId (duplicated from `~/threads/types`) 
+   - ToolResult (duplicated from `~/tools/types`)
+
+2. **Update core-types-import.ts to include client-safe types:**
+```typescript
+// Add to packages/web/lib/core-types-import.ts
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
+export type { ThreadId, AssigneeId } from '~/threads/types';
+export type { ToolResult } from '~/tools/types';
+```
+
+3. **Update api.ts to re-export instead of duplicate:**
+```typescript
+// Remove duplicate definitions, add re-exports
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '@/lib/core-types-import';
+export type { ThreadId, AssigneeId } from '@/lib/core-types-import';
+```
+
+4. **Update all component imports systematically**
+
+5. **Verify no build/type errors**
+
+**Testing:**
+- Full TypeScript compilation
+- All existing tests pass
+- No runtime behavior changes
+
+**Priority:** High - Technical debt that affects maintainability
+
 ## Rollback Plan
 
 If issues arise:
