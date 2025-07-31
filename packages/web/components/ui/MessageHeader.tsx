@@ -12,6 +12,7 @@ interface MessageHeaderProps {
     variant?: 'default' | 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'info';
     className?: string;
   };
+  icon?: ReactNode;
   role?: 'user' | 'assistant';
   className?: string;
 }
@@ -21,6 +22,7 @@ export default function MessageHeader({
   timestamp,
   avatar,
   badge,
+  icon,
   role,
   className = '',
 }: MessageHeaderProps) {
@@ -62,7 +64,12 @@ export default function MessageHeader({
       {/* Header content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-medium text-sm text-base-content">{name}</span>
+          <div className="flex items-center gap-2">
+            {icon && (
+              <span className="text-sm">{icon}</span>
+            )}
+            <span className="font-medium text-sm text-base-content">{name}</span>
+          </div>
           <span className="text-xs text-base-content/50">
             {typeof timestamp === 'string' ? timestamp : formatTime(timestamp)}
           </span>

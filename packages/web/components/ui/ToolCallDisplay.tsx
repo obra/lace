@@ -161,8 +161,17 @@ export function ToolCallDisplay({
   const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
   const args = metadata?.arguments;
   const hasArgs: boolean = Boolean(args && typeof args === 'object' && args !== null && Object.keys(args).length > 0);
+  const toolDisplayName = renderer.getDisplayName?.(tool, result || undefined) ?? tool;
   const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
   const resultContent = hasResult ? (renderer.renderResult?.(result!) ?? createDefaultResultRenderer(result!)) : null;
+  
+  // Create success/error icon for header
+  const statusIcon = hasResult ? (
+    <FontAwesomeIcon 
+      icon={isError ? faExclamationTriangle : faCheck}
+      className={`text-xs ${isError ? 'text-error' : 'text-success'}`}
+    />
+  ) : null;
   
   return (
     <div className={`flex gap-3 ${className}`}>
@@ -180,8 +189,9 @@ export function ToolCallDisplay({
       
       <div className="flex-1 min-w-0">
         <MessageHeader
-          name={tool}
+          name={toolDisplayName}
           timestamp={timestamp}
+          icon={statusIcon}
         />
         
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
@@ -194,17 +204,6 @@ export function ToolCallDisplay({
                   </code>
                 ) : (
                   <span className="text-sm text-base-content/80">{String(toolSummary)}</span>
-                )}
-                {hasResult && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <FontAwesomeIcon 
-                      icon={isError ? faExclamationTriangle : faCheck} 
-                      className={`text-xs ${isError ? 'text-error' : 'text-success'}`}
-                    />
-                    <span className={`text-xs ${isError ? 'text-error' : 'text-success'}`}>
-                      {isError ? 'Failed' : 'Success'}
-                    </span>
-                  </div>
                 )}
               </div>
               
