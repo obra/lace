@@ -18,6 +18,7 @@ import {
   faUser
 } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
+import type { Task } from '@/types/api';
 
 /**
  * Priority badge component for consistent priority display
@@ -97,10 +98,22 @@ const taskAddRenderer: ToolRenderer = {
   },
 
   getSummary: (args: unknown): string => {
+    // Handle array-based args (main branch schema)
+    if (typeof args === 'object' && args !== null && 'tasks' in args) {
+      const tasks = (args as { tasks?: Array<{ title?: string }> }).tasks;
+      if (Array.isArray(tasks) && tasks.length > 0) {
+        if (tasks.length === 1) {
+          return tasks[0].title || 'New task';
+        } else {
+          return `Create ${tasks.length} tasks`;
+        }
+      }
+    }
+    // Handle single task args (backwards compatibility)
     if (typeof args === 'object' && args !== null && 'title' in args) {
       const title = (args as { title?: string }).title;
       if (typeof title === 'string') {
-        return title; // Just show the task title, nothing else
+        return title;
       }
     }
     return 'New task';
@@ -133,12 +146,46 @@ const taskAddRenderer: ToolRenderer = {
       );
     }
     
-    // Success case - show link to view task
+    // Success case - get task data from result metadata (structured data from task tools)
+    const resultMetadata = result.metadata as { task?: Task; tasks?: Task[] } | undefined;
+    
+    // Handle single task metadata
+    const singleTask = resultMetadata?.task;
+    if (singleTask && singleTask.id) {
+      return (
+        <div className="p-3">
+          <a
+            href={`#/tasks/${singleTask.id}`}
+            className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 hover:underline"
+          >
+            <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
+            View task
+          </a>
+        </div>
+      );
+    }
+    
+    // Handle multiple tasks metadata (array-based)
+    const multipleTasks = resultMetadata?.tasks;
+    if (Array.isArray(multipleTasks) && multipleTasks.length > 0) {
+      return (
+        <div className="p-3 space-y-2">
+          {multipleTasks.map((task, index) => (
+            <a
+              key={task.id || index}
+              href={`#/tasks/${task.id}`}
+              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 hover:underline block"
+            >
+              <FontAwesomeIcon icon={faEye} className="w-4 h-4" />
+              View task: {task.title || task.id}
+            </a>
+          ))}
+        </div>
+      );
+    }
+    
+    // Fallback: try to extract from parsed text (backwards compatibility)
     const task = parsed as { taskId?: string; title?: string; id?: string };
-    
-    // Debug: Log the parsed structure to understand the actual data
-    console.log('Task add result parsed:', parsed);
-    
     const taskId = task.taskId || task.id;
     
     if (taskId) {
@@ -155,8 +202,7 @@ const taskAddRenderer: ToolRenderer = {
       );
     }
     
-    // If no taskId found, return empty div to prevent default renderer fallback
-    console.log('No taskId found in parsed result:', parsed);
+    // If no task data found, return empty div to prevent default renderer fallback
     return <div></div>;
   },
 
