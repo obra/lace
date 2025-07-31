@@ -157,7 +157,7 @@ export function ToolCallDisplay({
   const renderer = getToolRenderer(tool);
   
   const toolIcon = renderer.getIcon?.() ?? getToolIcon(tool);
-  const hasResult = result?.content?.some(block => block.text?.trim());
+  const hasResult = result?.content?.some(block => block.text?.trim()) || !!result?.metadata;
   const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
   const args = metadata?.arguments;
   const hasArgs: boolean = Boolean(args && typeof args === 'object' && args !== null && Object.keys(args).length > 0);

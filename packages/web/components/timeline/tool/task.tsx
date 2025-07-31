@@ -143,6 +143,31 @@ const taskAddRenderer: ToolRenderer = {
       timestamp: new Date().toISOString(),
     };
     
+    // DEBUG: Always show debug dump for now
+    return (
+      <div className="space-y-3">
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="font-semibold text-blue-800 mb-2">
+            🔍 DEBUG: Task Metadata Flow (Real-time)
+          </div>
+          <div className="text-xs">
+            <details className="mb-2">
+              <summary className="cursor-pointer text-blue-700 font-medium">
+                Click to expand raw data dump
+              </summary>
+              <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
+                {JSON.stringify(debugData, null, 2)}
+              </pre>
+            </details>
+            <div className="text-blue-600">
+              Expected: Task metadata in result.metadata.task or result.metadata.tasks
+            </div>
+          </div>
+        </div>
+        
+        {/* Original rendering logic below */}
+        {(() => {
+    
     // Handle errors only
     if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string; code?: string };
@@ -216,25 +241,15 @@ const taskAddRenderer: ToolRenderer = {
       );
     }
     
-    // DEBUG: Show detailed data dump when no task data found
+    // Fallback: No task data found  
     return (
       <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <div className="font-semibold text-yellow-800 mb-2">
-          🔍 DEBUG: Task Metadata Flow
+        <div className="text-yellow-600 text-sm">
+          No task metadata found - check debug dump above
         </div>
-        <div className="text-xs">
-          <details className="mb-2">
-            <summary className="cursor-pointer text-yellow-700 font-medium">
-              Click to expand raw data dump
-            </summary>
-            <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
-              {JSON.stringify(debugData, null, 2)}
-            </pre>
-          </details>
-          <div className="text-yellow-600">
-            Expected: Task metadata in result.metadata.task or result.metadata.tasks
-          </div>
-        </div>
+      </div>
+    );
+        })()}
       </div>
     );
   },
