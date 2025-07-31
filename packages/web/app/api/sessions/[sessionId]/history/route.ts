@@ -4,10 +4,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { SessionEvent, ApiErrorResponse } from '@/types/api';
-import type { ThreadEvent } from '@/lib/server/core-types';
+import type { ThreadEvent, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/core-types';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import type { CompactionData } from '@/lib/core-types-import';
+
+function isToolResult(data: unknown): data is ToolResult {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'content' in data &&
+    Array.isArray((data as { content: unknown }).content)
+  );
+}
 
 // Use core ThreadId validation instead of custom validation
 // isThreadId is imported from core-types and handles proper format validation
@@ -96,12 +105,16 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'TOOL_RESULT': {
-      // ThreadEvent.data is ToolResult for TOOL_RESULT events - return raw ToolResult
-      return {
-        ...baseEvent,
-        type: 'TOOL_RESULT',
-        data: threadEvent.data,
-      };
+      // ThreadEvent.data should be ToolResult for TOOL_RESULT events
+      if (isToolResult(threadEvent.data)) {
+        return {
+          ...baseEvent,
+          type: 'TOOL_RESULT',
+          data: threadEvent.data,
+        };
+      }
+      // Skip malformed TOOL_RESULT events
+      return null;
     }
 
     case 'LOCAL_SYSTEM_MESSAGE': {
