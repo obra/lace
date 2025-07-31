@@ -129,6 +129,20 @@ const taskAddRenderer: ToolRenderer = {
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
     
+    // DEBUG: Show raw data dump for debugging metadata flow
+    const debugData = {
+      resultStructure: {
+        isError: result.isError,
+        contentLength: result.content?.length,
+        hasMetadata: !!result.metadata,
+        metadataKeys: result.metadata ? Object.keys(result.metadata) : [],
+        metadataType: typeof result.metadata,
+      },
+      resultMetadata: result.metadata,
+      rawResult: result,
+      timestamp: new Date().toISOString(),
+    };
+    
     // Handle errors only
     if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string; code?: string };
@@ -202,8 +216,27 @@ const taskAddRenderer: ToolRenderer = {
       );
     }
     
-    // If no task data found, return empty div to prevent default renderer fallback
-    return <div></div>;
+    // DEBUG: Show detailed data dump when no task data found
+    return (
+      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="font-semibold text-yellow-800 mb-2">
+          🔍 DEBUG: Task Metadata Flow
+        </div>
+        <div className="text-xs">
+          <details className="mb-2">
+            <summary className="cursor-pointer text-yellow-700 font-medium">
+              Click to expand raw data dump
+            </summary>
+            <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
+              {JSON.stringify(debugData, null, 2)}
+            </pre>
+          </details>
+          <div className="text-yellow-600">
+            Expected: Task metadata in result.metadata.task or result.metadata.tasks
+          </div>
+        </div>
+      </div>
+    );
   },
 
   getIcon: () => faPlus,
