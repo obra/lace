@@ -563,7 +563,7 @@ describe('Enhanced Task Manager Tools', () => {
     describe('TaskCreateTool metadata', () => {
       it('should return task object in result metadata for UI links', async () => {
         const tool = new TaskCreateTool();
-        
+
         const result = await tool.execute(
           {
             title: 'UI Test Task',
@@ -582,9 +582,22 @@ describe('Enhanced Task Manager Tools', () => {
         // CRITICAL: Verify structured task data exists in metadata
         expect(result.metadata).toBeDefined();
         expect(result.metadata?.task).toBeDefined();
-        
-        const taskData = result.metadata?.task;
-        
+
+        const taskData = result.metadata?.task as {
+          id: string;
+          title: string;
+          description?: string;
+          prompt: string;
+          priority: string;
+          status: string;
+          assignedTo?: string;
+          createdBy: string;
+          threadId: string;
+          createdAt: Date;
+          updatedAt: Date;
+          notes: unknown[];
+        };
+
         // Verify all fields needed for UI rendering
         expect(taskData.id).toBeDefined();
         expect(taskData.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
@@ -605,7 +618,7 @@ describe('Enhanced Task Manager Tools', () => {
       it('should work with fallback persistence path', async () => {
         const tool = new TaskCreateTool();
         // Don't inject TaskManager to test fallback path
-        
+
         const result = await tool.execute(
           {
             title: 'Fallback Test Task',
@@ -617,8 +630,8 @@ describe('Enhanced Task Manager Tools', () => {
 
         expect(result.isError).toBe(false);
         expect(result.metadata?.task).toBeDefined();
-        
-        const taskData = result.metadata?.task;
+
+        const taskData = result.metadata?.task as { id: string; title: string; priority: string };
         expect(taskData.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
         expect(taskData.title).toBe('Fallback Test Task');
         expect(taskData.priority).toBe('medium');
@@ -626,7 +639,7 @@ describe('Enhanced Task Manager Tools', () => {
 
       it('should include assignment info in both text and metadata', async () => {
         const tool = new TaskCreateTool();
-        
+
         const result = await tool.execute(
           {
             title: 'Assigned Task',
@@ -638,19 +651,19 @@ describe('Enhanced Task Manager Tools', () => {
         );
 
         expect(result.isError).toBe(false);
-        
+
         // Text should mention assignment
         expect(result.content?.[0]?.text).toContain(`assigned to ${agent2ThreadId}`);
-        
+
         // Metadata should have assignment
-        expect(result.metadata?.task?.assignedTo).toBe(agent2ThreadId);
+        expect((result.metadata?.task as { assignedTo?: string })?.assignedTo).toBe(agent2ThreadId);
       });
     });
 
     describe('Data validation for UI components', () => {
       it('should provide all data needed for task view links', async () => {
         const tool = new TaskCreateTool();
-        
+
         const result = await tool.execute(
           {
             title: 'Link Test Task',
@@ -661,18 +674,22 @@ describe('Enhanced Task Manager Tools', () => {
           context
         );
 
-        const taskData = result.metadata?.task;
+        const taskData = result.metadata?.task as {
+          id: string;
+          title: string;
+          priority: string;
+          status: string;
+          createdAt: Date;
+        };
         expect(taskData).toBeDefined();
         expect(typeof taskData).toBe('object');
         expect(taskData).not.toBeNull();
-        
+
         // UI needs these for creating links like #/tasks/{taskId}
-        expect(taskData?.id).toBeDefined();
-        expect(typeof taskData?.id).toBe('string');
-        if (taskData && typeof taskData.id === 'string') {
-          expect(taskData.id.length).toBeGreaterThan(0);
-        }
-        
+        expect(taskData.id).toBeDefined();
+        expect(typeof taskData.id).toBe('string');
+        expect(taskData.id.length).toBeGreaterThan(0);
+
         // UI needs these for display
         expect(taskData.title).toBeDefined();
         expect(taskData.priority).toBeDefined();
@@ -682,7 +699,7 @@ describe('Enhanced Task Manager Tools', () => {
 
       it('should provide task ID without requiring text parsing', async () => {
         const tool = new TaskCreateTool();
-        
+
         const result = await tool.execute(
           {
             title: 'No Parsing Task',
@@ -694,13 +711,13 @@ describe('Enhanced Task Manager Tools', () => {
 
         // The old way: parsing text (should not be needed)
         const textTaskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0];
-        
+
         // The new way: structured metadata (should work)
-        const metadataTaskId = result.metadata?.task?.id as string | undefined;
-        
+        const metadataTaskId = (result.metadata?.task as { id?: string })?.id;
+
         expect(metadataTaskId).toBeDefined();
         expect(metadataTaskId).toBe(textTaskId); // Both should match
-        
+
         // But UI should use metadata, not text parsing
         expect(typeof metadataTaskId).toBe('string');
         if (typeof metadataTaskId === 'string') {

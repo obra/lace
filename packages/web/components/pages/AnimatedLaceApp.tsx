@@ -262,7 +262,10 @@ export function AnimatedLaceApp({
         type: 'tool',
         tool: toolName,
         content: `${toolName} executed`,
-        result: `${toolName} completed successfully`,
+        result: {
+          content: [{ type: 'text', text: `${toolName} completed successfully` }],
+          isError: false,
+        },
         timestamp: new Date(),
       };
 

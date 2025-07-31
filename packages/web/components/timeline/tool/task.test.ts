@@ -115,15 +115,15 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task listing', () => {
       const summary = taskRenderers.task_list.getSummary?.(mockTaskListArgs);
-      expect(summary).toBe('List my tasks');
+      expect(summary).toBe('my tasks');
     });
 
     test('should handle different filter types', () => {
       const allTasksSummary = taskRenderers.task_list.getSummary?.({ filter: 'all' });
-      expect(allTasksSummary).toBe('List all tasks');
+      expect(allTasksSummary).toBe('all tasks');
 
       const threadTasksSummary = taskRenderers.task_list.getSummary?.({ filter: 'thread' });
-      expect(threadTasksSummary).toBe('List thread tasks');
+      expect(threadTasksSummary).toBe('thread tasks');
     });
 
     test('should return clipboard icon', () => {
@@ -140,7 +140,7 @@ describe('Task Tool Renderers', () => {
 
   describe('task_complete renderer', () => {
     const mockTaskCompleteArgs = {
-      taskId: 'task-456',
+      id: 'task-456',
       result: 'Successfully implemented authentication with JWT tokens',
     };
 
@@ -161,7 +161,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task completion', () => {
       const summary = taskRenderers.task_complete.getSummary?.(mockTaskCompleteArgs);
-      expect(summary).toBe('Complete task: task-456');
+      expect(summary).toBe('task-456');
     });
 
     test('should return check icon', () => {
@@ -201,7 +201,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task updates', () => {
       const summary = taskRenderers.task_update.getSummary?.(mockTaskUpdateArgs);
-      expect(summary).toBe('Update task: task-456');
+      expect(summary).toBe('task-456');
     });
 
     test('should return edit icon', () => {
@@ -239,7 +239,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for adding notes', () => {
       const summary = taskRenderers.task_add_note.getSummary?.(mockTaskAddNoteArgs);
-      expect(summary).toBe('Add note to task: task-456');
+      expect(summary).toBe('note to task-456');
     });
 
     test('should return sticky note icon', () => {
@@ -286,7 +286,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task viewing', () => {
       const summary = taskRenderers.task_view.getSummary?.(mockTaskViewArgs);
-      expect(summary).toBe('View task: task-456');
+      expect(summary).toBe('task-456');
     });
 
     test('should return eye icon', () => {

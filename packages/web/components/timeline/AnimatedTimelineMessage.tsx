@@ -14,6 +14,7 @@ import {
 } from '@/lib/fontawesome';
 import { Carousel } from '@/components/ui/Carousel';
 import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
+import { getToolRenderer } from '@/components/timeline/tool';
 import {
   messageVariants,
   fadeInUp,
@@ -261,14 +262,16 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
             >
               {formatTime(entry.timestamp)}
             </motion.span>
-            <motion.span
-              className="text-xs px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/60"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.4, ...springConfig.bouncy }}
-            >
-              {entry.tool}
-            </motion.span>
+            {!entry.tool?.startsWith('task_') && entry.tool !== 'delegate' && (
+              <motion.span
+                className="text-xs px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/60"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.4, ...springConfig.bouncy }}
+              >
+                {entry.tool}
+              </motion.span>
+            )}
           </motion.div>
           <motion.div
             className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300"
@@ -284,12 +287,19 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               $ {entry.content}
             </motion.div>
             <motion.div
-              className="text-base-content/60 text-xs whitespace-pre-wrap"
+              className="text-base-content/60 text-xs"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              {entry.result}
+              {entry.result && entry.tool && (() => {
+                const renderer = getToolRenderer(entry.tool);
+                return renderer.renderResult?.(entry.result) || (
+                  <div className="text-sm text-base-content/60 whitespace-pre-wrap">
+                    {entry.result.content?.map(block => block.text || '').join('') || 'Tool executed'}
+                  </div>
+                );
+              })()}
             </motion.div>
           </motion.div>
         </motion.div>
