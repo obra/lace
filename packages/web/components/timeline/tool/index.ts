@@ -2,10 +2,13 @@
 // ABOUTME: Maps tool names to their custom display logic with fallback support
 
 import type { ToolRenderer } from './types';
+import { bashRenderer } from './bash';
 
 // Registry of tool renderers - add new tools here
 const toolRenderers: Record<string, ToolRenderer> = {
-  // Will be populated in later tasks
+  bash: bashRenderer,
+  bash_exec: bashRenderer, // Handle alternative bash tool name
+  shell: bashRenderer, // Handle shell commands as bash
 };
 
 /**
