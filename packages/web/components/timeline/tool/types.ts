@@ -4,6 +4,7 @@
 import type { ToolResult } from '@/lib/server/lace-imports';
 
 export interface ToolRenderer {
+  getDisplayName?: (toolName: string, result?: ToolResult) => string;
   getSummary?: (args: unknown) => string;
   isError?: (result: ToolResult) => boolean;
   renderResult?: (result: ToolResult) => React.ReactNode;
