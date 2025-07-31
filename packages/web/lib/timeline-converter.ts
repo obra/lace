@@ -175,6 +175,7 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
       input?: unknown;
       [key: string]: unknown;
     };
+
     const aggregatedEvent: SessionEvent = {
       type: 'TOOL_AGGREGATED',
       threadId: call.threadId,

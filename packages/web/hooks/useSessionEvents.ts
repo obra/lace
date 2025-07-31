@@ -96,23 +96,6 @@ export function useSessionEvents(
           timestamp: new Date(event.timestamp),
         }));
 
-      // DEBUG: Log tool events during persistence reload
-      const toolEvents = eventsWithDateTimestamps.filter(
-        (e) => e.type === 'TOOL_CALL' || e.type === 'TOOL_RESULT'
-      );
-      if (toolEvents.length > 0) {
-        console.group(`🔧 RELOAD EVENTS: Found ${toolEvents.length} tool events`);
-        toolEvents.forEach((event) => {
-          console.log(`📊 ${event.type}:`, {
-            type: event.type,
-            threadId: event.threadId,
-            dataKeys: Object.keys(event.data || {}),
-            data: event.data,
-          });
-        });
-        console.groupEnd();
-      }
-
       setAllEvents(eventsWithDateTimestamps);
     } catch (error) {
       console.error('Failed to load conversation history:', error);
@@ -267,20 +250,6 @@ export function useSessionEvents(
                 ...eventData,
                 timestamp,
               } as SessionEvent;
-
-              // DEBUG: Log all events during real-time streaming
-              if (sessionEvent.type === 'TOOL_CALL' || sessionEvent.type === 'TOOL_RESULT') {
-                console.group(`🔧 REAL-TIME EVENT: ${sessionEvent.type}`);
-                console.log('📊 Event Structure:', {
-                  type: sessionEvent.type,
-                  threadId: sessionEvent.threadId,
-                  timestamp: sessionEvent.timestamp,
-                  dataKeys: Object.keys(sessionEvent.data || {}),
-                });
-                console.log('📦 Event Data:', sessionEvent.data);
-                console.log('🔍 Full Event:', sessionEvent);
-                console.groupEnd();
-              }
 
               // Add to ALL events - filtering happens at render time
               setAllEvents((prev) => [...prev, sessionEvent]);

@@ -155,24 +155,27 @@ export class SessionService {
       sseManager.broadcast(sessionId, event);
     });
 
-    agent.on('tool_call_start', ({ toolName, input }: { toolName: string; input: unknown }) => {
-      const event: SessionEvent = {
-        type: 'TOOL_CALL',
-        threadId,
-        timestamp: new Date(),
-        data: { toolName, input },
-      };
-      sseManager.broadcast(sessionId, event);
-    });
+    agent.on(
+      'tool_call_start',
+      ({ toolName, input, callId }: { toolName: string; input: unknown; callId: string }) => {
+        const event: SessionEvent = {
+          type: 'TOOL_CALL',
+          threadId,
+          timestamp: new Date(),
+          data: { id: callId, name: toolName, arguments: input },
+        };
+        sseManager.broadcast(sessionId, event);
+      }
+    );
 
     agent.on(
       'tool_call_complete',
-      ({ toolName, result }: { toolName: string; result: unknown }) => {
+      ({ result }: { toolName: string; result: unknown; callId: string }) => {
         const event: SessionEvent = {
           type: 'TOOL_RESULT',
           threadId,
           timestamp: new Date(),
-          data: { toolName, result },
+          data: result, // Use direct result to match persistence format
         };
         sseManager.broadcast(sessionId, event);
       }
@@ -203,65 +206,74 @@ export class SessionService {
     // Note: Tool approval is now handled by core EventApprovalCallback via ThreadManager events
 
     // Handle thread events (including approval events)
-    agent.on('thread_event_added', ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
-      // Convert thread events to session events and broadcast them
-      if (event.type === 'TOOL_APPROVAL_REQUEST') {
-        const toolCallData = event.data as { toolCallId: string };
-        
-        // Get the related TOOL_CALL event to reconstruct approval request data
-        const events = agent.threadManager.getEvents(eventThreadId);
-        const toolCallEvent = events.find(e => 
-          e.type === 'TOOL_CALL' && 
-          e.data && typeof e.data === 'object' && 'id' in e.data &&
-          (e.data as { id: string }).id === toolCallData.toolCallId
-        );
-        
-        if (toolCallEvent) {
-          const toolCall = toolCallEvent.data as ToolCall;
-          
-          // Try to get tool metadata
-          let tool;
-          try {
-            tool = agent.toolExecutor?.getTool(toolCall.name);
-          } catch {
-            tool = null;
+    agent.on(
+      'thread_event_added',
+      ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
+        // Convert thread events to session events and broadcast them
+        if (event.type === 'TOOL_APPROVAL_REQUEST') {
+          const toolCallData = event.data as { toolCallId: string };
+
+          // Get the related TOOL_CALL event to reconstruct approval request data
+          const events = agent.threadManager.getEvents(eventThreadId);
+          const toolCallEvent = events.find(
+            (e) =>
+              e.type === 'TOOL_CALL' &&
+              e.data &&
+              typeof e.data === 'object' &&
+              'id' in e.data &&
+              (e.data as { id: string }).id === toolCallData.toolCallId
+          );
+
+          if (toolCallEvent) {
+            const toolCall = toolCallEvent.data as ToolCall;
+
+            // Try to get tool metadata
+            let tool;
+            try {
+              tool = agent.toolExecutor?.getTool(toolCall.name);
+            } catch {
+              tool = null;
+            }
+
+            const sessionEvent: SessionEvent = {
+              type: 'TOOL_APPROVAL_REQUEST',
+              threadId: asThreadId(eventThreadId),
+              timestamp: new Date(event.timestamp),
+              data: {
+                requestId: toolCallData.toolCallId,
+                toolName: toolCall.name,
+                input: toolCall.arguments,
+                isReadOnly: tool?.annotations?.readOnlyHint ?? false,
+                toolDescription: tool?.description,
+                toolAnnotations: tool?.annotations,
+                riskLevel: tool?.annotations?.readOnlyHint
+                  ? 'safe'
+                  : tool?.annotations?.destructiveHint
+                    ? 'destructive'
+                    : 'moderate',
+              },
+            };
+
+            sseManager.broadcast(sessionId, sessionEvent);
           }
-          
+        } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+          // Forward approval response events to UI so modal can refresh
+          const responseData = event.data as { toolCallId: string; decision: string };
+
           const sessionEvent: SessionEvent = {
-            type: 'TOOL_APPROVAL_REQUEST',
+            type: 'TOOL_APPROVAL_RESPONSE',
             threadId: asThreadId(eventThreadId),
             timestamp: new Date(event.timestamp),
             data: {
-              requestId: toolCallData.toolCallId,
-              toolName: toolCall.name,
-              input: toolCall.arguments,
-              isReadOnly: tool?.annotations?.readOnlyHint ?? false,
-              toolDescription: tool?.description,
-              toolAnnotations: tool?.annotations,
-              riskLevel: tool?.annotations?.readOnlyHint ? 'safe' : 
-                        tool?.annotations?.destructiveHint ? 'destructive' : 'moderate',
+              toolCallId: responseData.toolCallId,
+              decision: responseData.decision,
             },
           };
-          
+
           sseManager.broadcast(sessionId, sessionEvent);
         }
-      } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
-        // Forward approval response events to UI so modal can refresh
-        const responseData = event.data as { toolCallId: string; decision: string };
-        
-        const sessionEvent: SessionEvent = {
-          type: 'TOOL_APPROVAL_RESPONSE',
-          threadId: asThreadId(eventThreadId),
-          timestamp: new Date(event.timestamp),
-          data: {
-            toolCallId: responseData.toolCallId,
-            decision: responseData.decision,
-          },
-        };
-        
-        sseManager.broadcast(sessionId, sessionEvent);
       }
-    });
+    );
   }
 
   // Service layer methods to eliminate direct business logic calls from API routes
@@ -278,11 +290,12 @@ export class SessionService {
       if (coordinatorAgent) {
         coordinatorAgent.stop();
       }
-      
+
       // Stop all delegate agents
       const agentMetadata = session.getAgents();
       for (const agentMeta of agentMetadata) {
-        if (agentMeta.threadId !== session.getId()) { // Skip coordinator (already stopped)
+        if (agentMeta.threadId !== session.getId()) {
+          // Skip coordinator (already stopped)
           const agent = session.getAgent(agentMeta.threadId);
           if (agent) {
             agent.stop();
