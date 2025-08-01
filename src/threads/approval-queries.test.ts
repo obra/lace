@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence } from '~/persistence/database';
 import { ThreadEvent } from '~/threads/types';
+import { ApprovalDecision } from '~/tools/approval-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Approval Database Queries', () => {
@@ -79,7 +80,7 @@ describe('Approval Database Queries', () => {
         threadId,
         type: 'TOOL_APPROVAL_RESPONSE',
         timestamp: new Date('2025-01-01T10:02:00Z'),
-        data: { toolCallId: 'call_123', decision: 'allow_once' },
+        data: { toolCallId: 'call_123', decision: ApprovalDecision.ALLOW_ONCE },
       });
 
       // Should not return any pending approvals
@@ -122,7 +123,7 @@ describe('Approval Database Queries', () => {
         threadId,
         type: 'TOOL_APPROVAL_RESPONSE',
         timestamp: new Date(),
-        data: { toolCallId: 'call_123', decision: 'allow_session' },
+        data: { toolCallId: 'call_123', decision: ApprovalDecision.ALLOW_SESSION },
       });
 
       const decision = db.getApprovalDecision('call_123');

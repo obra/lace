@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TrimToolResultsStrategy } from '~/threads/compaction/trim-tool-results-strategy';
 import type { ThreadEvent } from '~/threads/types';
 import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
+import type { ToolResult } from '~/tools/types';
 
 describe('TrimToolResultsStrategy', () => {
   const strategy = new TrimToolResultsStrategy();
@@ -52,9 +53,9 @@ describe('TrimToolResultsStrategy', () => {
           timestamp: new Date(),
           data: {
             id: 'tool-call-1',
-            content: [{ type: 'text', text: longResult }],
+            content: [{ type: 'text' as const, text: longResult }],
             isError: false,
-          },
+          } satisfies ToolResult,
         },
       ];
 
@@ -79,9 +80,9 @@ describe('TrimToolResultsStrategy', () => {
           timestamp: new Date(),
           data: {
             id: 'tool-call-2',
-            content: [{ type: 'text', text: shortResult }],
+            content: [{ type: 'text' as const, text: shortResult }],
             isError: false,
-          },
+          } satisfies ToolResult,
         },
       ];
 
@@ -95,10 +96,10 @@ describe('TrimToolResultsStrategy', () => {
     });
 
     it('handles ToolResult objects with content array', async () => {
-      const toolResult = {
+      const toolResult: ToolResult = {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: 'line1\nline2\nline3\nline4\nline5',
           },
         ],
@@ -136,9 +137,9 @@ describe('TrimToolResultsStrategy', () => {
           timestamp: new Date(),
           data: {
             id: 'tool-call-3',
-            content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
+            content: [{ type: 'text' as const, text: 'line1\nline2\nline3\nline4' }],
             isError: false,
-          },
+          } satisfies ToolResult,
         },
         {
           id: 'e2',
@@ -160,15 +161,15 @@ describe('TrimToolResultsStrategy', () => {
     });
 
     it('handles mixed content types in ToolResult', async () => {
-      const toolResult = {
+      const toolResult: ToolResult = {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: 'line1\nline2\nline3\nline4',
           },
           {
-            type: 'image',
-            url: 'http://example.com/image.png',
+            type: 'image' as const,
+            uri: 'http://example.com/image.png',
           },
         ],
         isError: false,
@@ -193,15 +194,15 @@ describe('TrimToolResultsStrategy', () => {
       );
       expect(compactedData.content[1]).toEqual({
         type: 'image',
-        url: 'http://example.com/image.png',
+        uri: 'http://example.com/image.png',
       });
     });
 
     it('handles tool results with no content', async () => {
-      const toolResult = {
+      const toolResult: ToolResult = {
         content: [],
         isError: true,
-        errorMessage: 'Tool failed',
+        metadata: { errorMessage: 'Tool failed' },
       };
 
       const events: ThreadEvent[] = [

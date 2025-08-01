@@ -12,6 +12,48 @@ import {
   TaskPriority,
 } from '~/tools/implementations/task-manager/types';
 import { logger } from '~/utils/logger';
+import type { CompactionData } from '~/threads/compaction/types';
+import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
+
+// Helper function to create properly typed ThreadEvent from database row
+function createThreadEventFromDb(
+  id: string,
+  threadId: string,
+  type: EventType,
+  timestamp: Date,
+  data: unknown
+): ThreadEvent {
+  const baseEvent = { id, threadId, timestamp };
+
+  switch (type) {
+    case 'USER_MESSAGE':
+    case 'AGENT_MESSAGE':
+    case 'LOCAL_SYSTEM_MESSAGE':
+    case 'SYSTEM_PROMPT':
+    case 'USER_SYSTEM_PROMPT':
+      return { ...baseEvent, type, data: data as string };
+
+    case 'TOOL_CALL':
+      return { ...baseEvent, type, data: data as ToolCall };
+
+    case 'TOOL_RESULT':
+      return { ...baseEvent, type, data: data as ToolResult };
+
+    case 'COMPACTION':
+      return { ...baseEvent, type, data: data as CompactionData };
+
+    case 'TOOL_APPROVAL_REQUEST':
+      return { ...baseEvent, type, data: data as ToolApprovalRequestData };
+
+    case 'TOOL_APPROVAL_RESPONSE':
+      return { ...baseEvent, type, data: data as ToolApprovalResponseData };
+
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown event type: ${String(_exhaustive)}`);
+    }
+  }
+}
 
 export interface ProjectData {
   id: string;
@@ -364,13 +406,13 @@ export class DatabasePersistence {
 
     return rows.map((row) => {
       try {
-        return {
-          id: row.id,
-          threadId: row.thread_id,
-          type: row.type as EventType,
-          timestamp: new Date(row.timestamp),
-          data: JSON.parse(row.data) as string | ToolCall | ToolResult,
-        };
+        return createThreadEventFromDb(
+          row.id,
+          row.thread_id,
+          row.type as EventType,
+          new Date(row.timestamp),
+          JSON.parse(row.data) as unknown
+        );
       } catch (error) {
         throw new Error(
           `Failed to parse event data for event ${row.id}: ${error instanceof Error ? error.message : String(error)}`

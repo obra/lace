@@ -3,6 +3,7 @@
 
 import type { ThreadEvent } from '~/threads/types';
 import type { CompactionStrategy, CompactionContext } from '~/threads/compaction/types';
+import type { ToolResult, ContentBlock } from '~/tools/types';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
   id = 'trim-tool-results';
@@ -64,13 +65,10 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
 
   private trimToolResult(event: ThreadEvent): ThreadEvent {
     // Handle ToolResult objects (they have a 'content' field)
-    if (event.data && typeof event.data === 'object' && 'content' in event.data) {
-      const toolResult = event.data as {
-        content: Array<{ type: string; text?: string }>;
-        [key: string]: unknown;
-      };
+    if (event.type === 'TOOL_RESULT') {
+      const toolResult = event.data;
 
-      const truncatedContent = toolResult.content.map((block) => {
+      const truncatedContent: ContentBlock[] = toolResult.content.map((block) => {
         if (block.type === 'text' && block.text) {
           return {
             ...block,
@@ -80,12 +78,14 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
         return block;
       });
 
+      const updatedToolResult: ToolResult = {
+        ...toolResult,
+        content: truncatedContent,
+      };
+
       return {
         ...event,
-        data: {
-          ...toolResult,
-          content: truncatedContent,
-        },
+        data: updatedToolResult,
       };
     }
 
