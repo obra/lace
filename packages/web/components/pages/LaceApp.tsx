@@ -250,24 +250,45 @@ export const LaceApp = memo(function LaceApp() {
 
 
   const sendMessage = useCallback(async (message: string) => {
-    if (!selectedAgent || !message.trim()) return;
+    console.log('[LACE_APP] sendMessage called with:', { selectedAgent, message });
+    
+    if (!selectedAgent || !message.trim()) {
+      console.log('[LACE_APP] Early return - no agent or empty message');
+      return;
+    }
 
+    console.log('[LACE_APP] Setting sendingMessage to true');
     setSendingMessage(true);
+    
     try {
-      const res = await fetch(`/api/threads/${selectedAgent}/message`, {
+      const url = `/api/threads/${selectedAgent}/message`;
+      const body = JSON.stringify({ message });
+      console.log('[LACE_APP] Making fetch request to:', url);
+      console.log('[LACE_APP] Request body:', body);
+      
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body,
       });
 
+      console.log('[LACE_APP] Response status:', res.status);
+      console.log('[LACE_APP] Response ok:', res.ok);
+
       if (res.ok) {
+        console.log('[LACE_APP] Success - returning true');
         return true; // Indicate success so the input can clear itself
       }
+      
+      console.log('[LACE_APP] Response not ok, parsing error');
+      const errorData = await res.text();
+      console.log('[LACE_APP] Error response text:', errorData);
       return false;
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('[LACE_APP] Error in sendMessage:', error);
       return false;
     } finally {
+      console.log('[LACE_APP] Setting sendingMessage to false');
       setSendingMessage(false);
     }
   }, [selectedAgent]);
@@ -983,9 +1004,14 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
   const [message, setMessage] = useState('');
 
   const handleSubmit = useCallback(async () => {
+    console.log('[MEMOIZED_CHAT_INPUT] handleSubmit called with message:', message);
     const success = await onSubmit(message);
+    console.log('[MEMOIZED_CHAT_INPUT] onSubmit returned:', success);
     if (success) {
+      console.log('[MEMOIZED_CHAT_INPUT] Success - clearing message');
       setMessage('');
+    } else {
+      console.log('[MEMOIZED_CHAT_INPUT] onSubmit failed - keeping message');
     }
   }, [message, onSubmit]);
 
