@@ -135,7 +135,11 @@ export async function POST(
       data: { content: body.message },
     };
     console.log('[MESSAGE_API] User message event:', userMessageEvent);
-    sseManager.broadcastToSession(sessionId, userMessageEvent);
+    sseManager.broadcast({
+      eventType: 'session',
+      scope: { sessionId },
+      data: userMessageEvent,
+    });
     console.log('[MESSAGE_API] SSE broadcast complete');
 
     // Generate message ID
@@ -162,7 +166,11 @@ export async function POST(
           data: { content: `Error: ${errorMessage}` },
         };
         console.log('[MESSAGE_API] Broadcasting error event:', errorEvent);
-        sseManager.broadcastToSession(sessionId, errorEvent);
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: errorEvent,
+        });
       });
 
     // Return immediate acknowledgment
