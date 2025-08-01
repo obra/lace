@@ -16,7 +16,10 @@ export const ThreadIdSchema = z
 export const ToolCallIdSchema = z
   .string()
   .min(1, 'toolCallId cannot be empty')
-  .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid toolCallId format. Expected alphanumeric characters, underscores, and hyphens only');
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    'Invalid toolCallId format. Expected alphanumeric characters, underscores, and hyphens only'
+  );
 
 // Message request schema with size limits
 export const MessageRequestSchema = z.object({
@@ -80,11 +83,5 @@ export const SpawnAgentRequestSchema = z.object({
   isCoordinator: z.boolean().optional().default(false),
 });
 
-// Type exports for use in code
-export type ThreadId = z.infer<typeof ThreadIdSchema>;
-export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
-export type MessageRequest = z.infer<typeof MessageRequestSchema>;
-export type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
-export type UpdateTaskRequest = z.infer<typeof UpdateTaskRequestSchema>;
-export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
-export type SpawnAgentRequest = z.infer<typeof SpawnAgentRequestSchema>;
+// This file only exports schemas for validation, not types
+// Types are inferred in @/types/web from these schemas
