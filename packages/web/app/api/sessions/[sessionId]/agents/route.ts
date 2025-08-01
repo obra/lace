@@ -74,15 +74,15 @@ export async function POST(
     };
 
     // Test SSE broadcast
-    const { SSEManager } = await import('@/lib/sse-manager');
-    const sseManager = SSEManager.getInstance();
+    const { EventStreamManager } = await import('@/lib/event-stream-manager');
+    const sseManager = EventStreamManager.getInstance();
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentResponse.threadId as ThreadId,
       timestamp: new Date(),
       data: { content: `Agent "${agentResponse.name}" spawned successfully` },
     };
-    sseManager.broadcast(sessionId, testEvent);
+    sseManager.broadcastToSession(sessionId, testEvent);
 
     return NextResponse.json({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {

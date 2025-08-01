@@ -148,8 +148,7 @@ export const LaceAppSidebar = memo(function LaceAppSidebar({
             defaultCollapsed={false}
           >
             <TaskListSidebar
-              projectId={selectedProject}
-              sessionId={selectedSessionDetails.id}
+              taskManager={taskManager}
               onTaskClick={() => {
                 // For now, just ignore - could open task detail modal in future
               }}

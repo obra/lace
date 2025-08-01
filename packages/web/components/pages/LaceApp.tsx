@@ -90,10 +90,11 @@ export const LaceApp = memo(function LaceApp() {
   // Use session API hook for all API calls
   const { sendMessage: sendMessageAPI, loading: sendingMessage } = useSessionAPI();
 
-  // Note: sendingMessage state is now managed by useSessionAPI hook
-
-  // Add task manager hook when project and session are selected
-  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
+  // Task manager - only create when we have a project and session
+  const taskManager = useTaskManager(
+    selectedProject || '',
+    selectedSession || ''
+  );
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
@@ -651,8 +652,7 @@ export const LaceApp = memo(function LaceApp() {
                   collapsible={false}
                 >
                   <TaskListSidebar
-                    projectId={selectedProject}
-                    sessionId={selectedSession}
+                    taskManager={taskManager}
                     onTaskClick={(taskId) => {
                       // For now, just close mobile nav - could open task detail modal in future
                       setShowMobileNav(false); // Close mobile nav when task is clicked
@@ -787,8 +787,7 @@ export const LaceApp = memo(function LaceApp() {
               defaultCollapsed={false}
             >
               <TaskListSidebar
-                projectId={selectedProject}
-                sessionId={selectedSession}
+                taskManager={taskManager}
                 onTaskClick={(taskId) => {
                   // For now, just ignore - could open task detail modal in future
                 }}

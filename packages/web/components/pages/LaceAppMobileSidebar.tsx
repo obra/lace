@@ -167,8 +167,7 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
                 collapsible={false}
               >
                 <TaskListSidebar
-                  projectId={selectedProject}
-                  sessionId={selectedSessionDetails.id}
+                  taskManager={taskManager}
                   onTaskClick={() => {
                     // For now, just close mobile nav - could open task detail modal in future
                     onClose();
