@@ -2,25 +2,27 @@
 
 ## Overview
 
-This plan implements a system for configuring multiple AI provider instances through a web UI. Currently, lace only supports providers configured via environment variables (ANTHROPIC_API_KEY, OPENAI_API_KEY). We need to support multiple instances of the same provider type with different endpoints and credentials.
+This plan implements a flexible provider system with three key components: provider catalogs (available models/metadata), provider instances (connection configs), and agent-level model selection. The system uses Catwalk's provider data as a baseline catalog while supporting user extensions and multiple instance configurations.
 
 ## Key Concepts for the Engineer
 
-### What is a Provider?
-- A provider is a service that hosts AI models (like OpenAI, Anthropic)
-- Provider **types** are the actual code implementations (src/providers/)
-- Provider **instances** are configured uses of those types (what we're adding)
+### Three-Tier Architecture
+1. **Provider Catalogs**: Available models and metadata (shipped Catwalk data + user extensions)
+2. **Provider Instances**: Connection configurations (credentials, endpoints, timeouts)
+3. **Agent/Session Model Selection**: Users pick specific models from available catalogs when creating agents
 
 ### Current System
 - Providers are created based on environment variables
 - Only one instance per provider type is possible
+- Limited model metadata
 - No UI for configuration
 
 ### New System
-- Multiple instances of each provider type
-- Configuration stored in JSON files
-- Web UI for management
-- Secure credential storage
+- Rich provider/model catalogs with costs and capabilities
+- Multiple instances of each provider type with custom configurations
+- User-extensible catalogs for local/custom providers
+- Model selection happens at agent creation time
+- Web UI for catalog browsing and instance management
 
 ## Architecture Guidelines
 
@@ -45,146 +47,216 @@ This plan implements a system for configuring multiple AI provider instances thr
 
 ## Implementation Tasks
 
-### Task 1: Create Provider Configuration Types
+### Task 1: Create Provider Catalog and Instance Types
 
 **Files to create:**
-- `src/providers/provider-config.ts`
-- `src/providers/provider-config.test.ts`
+- `src/providers/catalog/catalog-types.ts`
+- `src/providers/catalog/catalog-types.test.ts`
 
 **What to implement:**
 
 ```typescript
-// src/providers/provider-config.ts
-// ABOUTME: Types and schemas for provider instance configuration
-// ABOUTME: Defines the shape of provider configs stored in providers.json
+// src/providers/catalog/catalog-types.ts
+// ABOUTME: Types and schemas for provider catalogs and instances
+// ABOUTME: Defines Catwalk catalog format and user instance configuration
 
 import { z } from 'zod';
 
-// Provider instance configuration schema
+// Catwalk catalog model schema
+export const CatalogModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  cost_per_1m_in: z.number(),
+  cost_per_1m_out: z.number(),
+  cost_per_1m_in_cached: z.number().optional(),
+  cost_per_1m_out_cached: z.number().optional(),
+  context_window: z.number(),
+  default_max_tokens: z.number(),
+  can_reason: z.boolean().optional(),
+  has_reasoning_effort: z.boolean().optional(),
+  supports_attachments: z.boolean().optional()
+});
+
+// Catwalk catalog provider schema
+export const CatalogProviderSchema = z.object({
+  name: z.string(),
+  id: z.string(),
+  type: z.string(),
+  api_key: z.string().optional(),
+  api_endpoint: z.string().optional(),
+  default_large_model_id: z.string(),
+  default_small_model_id: z.string(),
+  models: z.array(CatalogModelSchema)
+});
+
+// User provider instance schema (connection config only)
 export const ProviderInstanceSchema = z.object({
-  name: z.string().min(1),
-  type: z.enum(['anthropic-api', 'openai-api']),
-  config: z.record(z.unknown()) // JSONB extensibility
+  displayName: z.string().min(1),
+  catalogProviderId: z.string().min(1),
+  endpoint: z.string().url().optional(),
+  timeout: z.number().int().positive().optional(),
+  retryPolicy: z.string().optional()
 });
 
-export type ProviderInstance = z.infer<typeof ProviderInstanceSchema>;
-
-// Full providers.json schema
-export const ProvidersConfigSchema = z.object({
+// User instances configuration file
+export const ProviderInstancesConfigSchema = z.object({
   version: z.literal('1.0'),
-  providers: z.record(ProviderInstanceSchema)
+  instances: z.record(ProviderInstanceSchema)
 });
 
-export type ProvidersConfig = z.infer<typeof ProvidersConfigSchema>;
-
-// Credential schema
+// Credential schema (unchanged)
 export const CredentialSchema = z.object({
   apiKey: z.string().min(1),
   additionalAuth: z.record(z.unknown()).optional()
 });
 
+export type CatalogModel = z.infer<typeof CatalogModelSchema>;
+export type CatalogProvider = z.infer<typeof CatalogProviderSchema>;
+export type ProviderInstance = z.infer<typeof ProviderInstanceSchema>;
+export type ProviderInstancesConfig = z.infer<typeof ProviderInstancesConfigSchema>;
 export type Credential = z.infer<typeof CredentialSchema>;
 ```
 
 **How to test:**
 ```typescript
-// src/providers/provider-config.test.ts
+// src/providers/catalog/catalog-types.test.ts
 import { describe, it, expect } from 'vitest';
-import { ProviderInstanceSchema, ProvidersConfigSchema } from './provider-config';
+import { CatalogProviderSchema, ProviderInstanceSchema } from './catalog-types';
+
+describe('CatalogProviderSchema', () => {
+  it('validates Catwalk provider format', () => {
+    const valid = {
+      name: 'OpenAI',
+      id: 'openai',
+      type: 'openai',
+      default_large_model_id: 'gpt-4o',
+      default_small_model_id: 'gpt-4o-mini',
+      models: [{
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        cost_per_1m_in: 2.5,
+        cost_per_1m_out: 10.0,
+        context_window: 128000,
+        default_max_tokens: 4096
+      }]
+    };
+    
+    const result = CatalogProviderSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+  });
+});
 
 describe('ProviderInstanceSchema', () => {
-  it('validates valid provider instance', () => {
+  it('validates provider instance connection config', () => {
     const valid = {
-      name: 'OpenAI Production',
-      type: 'openai-api',
-      config: { baseUrl: 'https://api.openai.com/v1' }
+      displayName: 'OpenAI Production',
+      catalogProviderId: 'openai',
+      timeout: 30000
     };
     
     const result = ProviderInstanceSchema.safeParse(valid);
     expect(result.success).toBe(true);
   });
-
-  it('rejects invalid provider type', () => {
-    const invalid = {
-      name: 'Invalid',
-      type: 'invalid-api',
-      config: {}
-    };
-    
-    const result = ProviderInstanceSchema.safeParse(invalid);
-    expect(result.success).toBe(false);
-  });
 });
 ```
 
-**Commit message:** "feat: add provider configuration types and schemas"
+**Commit message:** "feat: add provider catalog and instance types with Catwalk schema support"
 
-### Task 2: Create Provider Configuration Manager
+### Task 2: Create Provider Catalog Manager
 
 **Files to create:**
-- `src/providers/provider-config-manager.ts`
-- `src/providers/provider-config-manager.test.ts`
+- `src/providers/catalog/catalog-manager.ts`
+- `src/providers/catalog/catalog-manager.test.ts`
+- Copy Catwalk JSON files to `src/providers/catalog/data/`
 
 **What to implement:**
 
 ```typescript
-// src/providers/provider-config-manager.ts
-// ABOUTME: Manages loading and saving provider configurations
-// ABOUTME: Handles providers.json and credential files in LACE_DIR
+// src/providers/catalog/catalog-manager.ts
+// ABOUTME: Manages provider catalogs from shipped data and user extensions
+// ABOUTME: Provides unified interface for browsing available providers and models
 
 import fs from 'fs';
 import path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
-import { ProvidersConfig, ProvidersConfigSchema, Credential, CredentialSchema } from './provider-config';
+import { CatalogProvider, CatalogProviderSchema, CatalogModel } from './catalog-types';
 
-export class ProviderConfigManager {
-  private configPath: string;
-  private credentialsDir: string;
+export class ProviderCatalogManager {
+  private shippedCatalogDir: string;
+  private userCatalogDir: string;
+  private catalogCache: Map<string, CatalogProvider> = new Map();
 
   constructor() {
-    const laceDir = getLaceDir();
-    this.configPath = path.join(laceDir, 'providers.json');
-    this.credentialsDir = path.join(laceDir, 'credentials');
+    this.shippedCatalogDir = path.join(__dirname, 'data');
+    this.userCatalogDir = path.join(getLaceDir(), 'user-catalog');
   }
 
-  async loadConfig(): Promise<ProvidersConfig> {
-    try {
-      const content = await fs.promises.readFile(this.configPath, 'utf-8');
-      return ProvidersConfigSchema.parse(JSON.parse(content));
-    } catch (error) {
-      // Return default config if file doesn't exist
-      return {
-        version: '1.0',
-        providers: {}
-      };
+  async loadCatalogs(): Promise<void> {
+    this.catalogCache.clear();
+    
+    // Load shipped catalogs
+    await this.loadCatalogDirectory(this.shippedCatalogDir);
+    
+    // Load user catalog extensions (override shipped if same ID)
+    if (await this.directoryExists(this.userCatalogDir)) {
+      await this.loadCatalogDirectory(this.userCatalogDir);
     }
   }
 
-  async saveConfig(config: ProvidersConfig): Promise<void> {
-    await fs.promises.writeFile(
-      this.configPath,
-      JSON.stringify(config, null, 2)
-    );
-  }
-
-  async loadCredential(providerId: string): Promise<Credential | null> {
-    try {
-      const credPath = path.join(this.credentialsDir, `${providerId}.json`);
-      const content = await fs.promises.readFile(credPath, 'utf-8');
-      return CredentialSchema.parse(JSON.parse(content));
-    } catch (error) {
-      return null;
+  private async loadCatalogDirectory(dirPath: string): Promise<void> {
+    const files = await fs.promises.readdir(dirPath);
+    
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        try {
+          const filePath = path.join(dirPath, file);
+          const content = await fs.promises.readFile(filePath, 'utf-8');
+          const provider = CatalogProviderSchema.parse(JSON.parse(content));
+          this.catalogCache.set(provider.id, provider);
+        } catch (error) {
+          console.warn(`Failed to load catalog file ${file}:`, error);
+        }
+      }
     }
   }
 
-  async saveCredential(providerId: string, credential: Credential): Promise<void> {
-    await fs.promises.mkdir(this.credentialsDir, { recursive: true });
-    const credPath = path.join(this.credentialsDir, `${providerId}.json`);
+  getAvailableProviders(): CatalogProvider[] {
+    return Array.from(this.catalogCache.values());
+  }
+
+  getProvider(providerId: string): CatalogProvider | null {
+    return this.catalogCache.get(providerId) || null;
+  }
+
+  getProviderModels(providerId: string): CatalogModel[] {
+    const provider = this.getProvider(providerId);
+    return provider?.models || [];
+  }
+
+  getModel(providerId: string, modelId: string): CatalogModel | null {
+    const models = this.getProviderModels(providerId);
+    return models.find(m => m.id === modelId) || null;
+  }
+
+  async saveUserCatalog(providerId: string, provider: CatalogProvider): Promise<void> {
+    await fs.promises.mkdir(this.userCatalogDir, { recursive: true });
+    const filePath = path.join(this.userCatalogDir, `${providerId}.json`);
     await fs.promises.writeFile(
-      credPath,
-      JSON.stringify(credential, null, 2),
-      { mode: 0o600 } // Secure permissions
+      filePath,
+      JSON.stringify(provider, null, 2)
     );
+    
+    // Update cache
+    this.catalogCache.set(provider.id, provider);
+  }
+
+  private async directoryExists(dirPath: string): Promise<boolean> {
+    try {
+      const stat = await fs.promises.stat(dirPath);
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
   }
 }
 ```
@@ -235,7 +307,93 @@ describe('ProviderConfigManager', () => {
 });
 ```
 
-**Commit message:** "feat: add provider configuration manager"
+**Commit message:** "feat: add provider catalog manager with Catwalk data support"
+
+### Task 3: Create Provider Instance Manager
+
+**Files to create:**
+- `src/providers/instance/instance-manager.ts`
+- `src/providers/instance/instance-manager.test.ts`
+
+**What to implement:**
+
+```typescript
+// src/providers/instance/instance-manager.ts
+// ABOUTME: Manages user provider instances and credential storage
+// ABOUTME: Handles provider-instances.json and credentials directory
+
+import fs from 'fs';
+import path from 'path';
+import { getLaceDir } from '~/config/lace-dir';
+import { ProviderInstancesConfig, ProviderInstancesConfigSchema, ProviderInstance, Credential, CredentialSchema } from '../catalog/catalog-types';
+
+export class ProviderInstanceManager {
+  private configPath: string;
+  private credentialsDir: string;
+
+  constructor() {
+    const laceDir = getLaceDir();
+    this.configPath = path.join(laceDir, 'provider-instances.json');
+    this.credentialsDir = path.join(laceDir, 'credentials');
+  }
+
+  async loadInstances(): Promise<ProviderInstancesConfig> {
+    try {
+      const content = await fs.promises.readFile(this.configPath, 'utf-8');
+      return ProviderInstancesConfigSchema.parse(JSON.parse(content));
+    } catch (error) {
+      return {
+        version: '1.0',
+        instances: {}
+      };
+    }
+  }
+
+  async saveInstances(config: ProviderInstancesConfig): Promise<void> {
+    await fs.promises.writeFile(
+      this.configPath,
+      JSON.stringify(config, null, 2)
+    );
+  }
+
+  async loadCredential(instanceId: string): Promise<Credential | null> {
+    try {
+      const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
+      const content = await fs.promises.readFile(credPath, 'utf-8');
+      return CredentialSchema.parse(JSON.parse(content));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async saveCredential(instanceId: string, credential: Credential): Promise<void> {
+    await fs.promises.mkdir(this.credentialsDir, { recursive: true });
+    const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
+    await fs.promises.writeFile(
+      credPath,
+      JSON.stringify(credential, null, 2),
+      { mode: 0o600 }
+    );
+  }
+
+  async deleteInstance(instanceId: string): Promise<void> {
+    // Remove from instances config
+    const config = await this.loadInstances();
+    delete config.instances[instanceId];
+    await this.saveInstances(config);
+
+    // Remove credential file
+    try {
+      const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
+      await fs.promises.unlink(credPath);
+    } catch {
+      // Ignore if credential file doesn't exist
+    }
+  }
+}
+```
+
+**Commit message:** "feat: add provider instance manager for connection configuration"
 
 ### Task 3: Create Provider Factory Updates
 
