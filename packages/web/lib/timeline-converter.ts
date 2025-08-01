@@ -282,12 +282,13 @@ function convertEvent(
         result: toolData.result,
         timestamp,
         agent: agent,
-        // Add extra metadata for rich rendering
+        // Add extra metadata for rich rendering - match ToolAggregatedEventData structure
         metadata: {
+          call: toolData.call as ToolCallEventData,
+          result: toolData.result,
+          toolName: toolData.toolName || 'Unknown Tool',
           toolId: toolData.toolId,
           arguments: toolData.arguments,
-          callData: toolData.call,
-          resultData: toolData.result,
         },
       };
 

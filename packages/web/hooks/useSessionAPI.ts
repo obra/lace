@@ -189,29 +189,44 @@ export function useSessionAPI() {
   }, []);
 
   const sendMessage = useCallback(async (threadId: ThreadId, message: string): Promise<boolean> => {
+    console.log('[SEND_MESSAGE] sendMessage called with:', { threadId, message });
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/threads/${threadId}/message`, {
+      const url = `/api/threads/${threadId}/message`;
+      const body = JSON.stringify({ message });
+      console.log('[SEND_MESSAGE] Making fetch request to:', url);
+      console.log('[SEND_MESSAGE] Request body:', body);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body,
       });
 
+      console.log('[SEND_MESSAGE] Response status:', response.status);
+      console.log('[SEND_MESSAGE] Response ok:', response.ok);
+
       if (!response.ok) {
+        console.log('[SEND_MESSAGE] Response not ok, parsing error');
         const error: unknown = await response.json();
+        console.log('[SEND_MESSAGE] Error response:', error);
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to send message');
         }
         throw new Error('Failed to send message');
       }
 
+      const responseData = await response.json();
+      console.log('[SEND_MESSAGE] Success response:', responseData);
       return true;
     } catch (error) {
+      console.error('[SEND_MESSAGE] Error occurred:', error);
       setError(error instanceof Error ? error.message : 'Unknown error');
       return false;
     } finally {
+      console.log('[SEND_MESSAGE] Setting loading to false');
       setLoading(false);
     }
   }, []);
