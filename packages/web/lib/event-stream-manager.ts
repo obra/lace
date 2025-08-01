@@ -50,7 +50,9 @@ export class EventStreamManager {
       if (process.env.NODE_ENV === 'development') {
         this.cleanupStaleConnections();
         if (this.connections.size >= this.MAX_CONNECTIONS) {
-          throw new Error(`Maximum connections (${this.MAX_CONNECTIONS}) reached even after cleanup`);
+          throw new Error(
+            `Maximum connections (${this.MAX_CONNECTIONS}) reached even after cleanup`
+          );
         }
       } else {
         throw new Error(`Maximum connections (${this.MAX_CONNECTIONS}) reached`);
@@ -81,7 +83,9 @@ export class EventStreamManager {
       },
     });
 
-    console.log(`[EVENT_STREAM] Client connected: ${connectionId}, total: ${this.connections.size}`);
+    console.log(
+      `[EVENT_STREAM] Client connected: ${connectionId}, total: ${this.connections.size}`
+    );
     return connectionId;
   }
 
@@ -96,7 +100,9 @@ export class EventStreamManager {
         console.warn(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
       }
       this.connections.delete(connectionId);
-      console.log(`[EVENT_STREAM] Client disconnected: ${connectionId}, total: ${this.connections.size}`);
+      console.log(
+        `[EVENT_STREAM] Client disconnected: ${connectionId}, total: ${this.connections.size}`
+      );
     }
   }
 
@@ -128,34 +134,9 @@ export class EventStreamManager {
       this.removeConnection(connectionId);
     }
 
-    console.log(`[EVENT_STREAM] Broadcast sent to ${sentCount}/${this.connections.size} connections`);
-  }
-
-  // Send event specifically to session (for backward compatibility)
-  broadcastToSession(sessionId: string, data: any): void {
-    this.broadcast({
-      eventType: 'session',
-      scope: { sessionId },
-      data,
-    });
-  }
-
-  // Send event specifically to project
-  broadcastToProject(projectId: string, data: any): void {
-    this.broadcast({
-      eventType: 'project',
-      scope: { projectId },
-      data,
-    });
-  }
-
-  // Send global event
-  broadcastGlobal(data: any): void {
-    this.broadcast({
-      eventType: 'global',
-      scope: { global: true },
-      data,
-    });
+    console.log(
+      `[EVENT_STREAM] Broadcast sent to ${sentCount}/${this.connections.size} connections`
+    );
   }
 
   // Check if event should be sent to connection based on subscription
@@ -259,18 +240,18 @@ export class EventStreamManager {
   private cleanupStaleConnections(): void {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const staleConnections: string[] = [];
-    
+
     for (const [connectionId, connection] of this.connections) {
       if (connection.connectedAt < fiveMinutesAgo) {
         staleConnections.push(connectionId);
       }
     }
-    
+
     for (const connectionId of staleConnections) {
       console.log(`[EVENT_STREAM] Cleaning up stale connection: ${connectionId}`);
       this.removeConnection(connectionId);
     }
-    
+
     console.log(`[EVENT_STREAM] Cleaned up ${staleConnections.length} stale connections`);
   }
 
