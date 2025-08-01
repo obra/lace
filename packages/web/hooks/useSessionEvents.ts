@@ -5,6 +5,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEventStream } from './useEventStream';
 import type { SessionEvent, ThreadId, ToolApprovalRequestData } from '@/types/api';
 import type { StreamEvent } from '@/types/stream-events';
+import {
+  parseSessionEvent,
+  parseSessionEvents,
+  StreamEventTimestampSchema,
+} from '@/lib/validation/session-event-schemas';
 
 interface PendingApproval {
   toolCallId: string;
@@ -58,61 +63,67 @@ export function useSessionEvents(
 
   // Handle events from stream
   const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
-    const sessionEvent = streamEvent.data as SessionEvent;
+    try {
+      // Parse and validate SessionEvent with proper date hydration
+      const sessionEvent = parseSessionEvent(streamEvent.data);
 
-    // Ensure timestamp is a Date object (it comes as string from JSON)
-    if (typeof sessionEvent.timestamp === 'string') {
-      sessionEvent.timestamp = new Date(sessionEvent.timestamp);
-    }
+      // Also ensure the StreamEvent timestamp is a Date
+      const streamTimestamp = StreamEventTimestampSchema.parse(streamEvent.timestamp);
 
-    // Handle tool approval requests
-    if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
-      const approvalData = sessionEvent.data as ToolApprovalRequestData & { toolCallId?: string };
+      // Handle tool approval requests
+      if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
+        const approvalData = sessionEvent.data as ToolApprovalRequestData & { toolCallId?: string };
 
-      const pendingApproval: PendingApproval = {
-        toolCallId: approvalData.toolCallId || approvalData.requestId,
-        toolCall: {
-          name: approvalData.toolName,
-          arguments: approvalData.input,
-        },
-        requestedAt: new Date(streamEvent.timestamp),
-        requestData: approvalData,
-      };
+        const pendingApproval: PendingApproval = {
+          toolCallId: approvalData.toolCallId || approvalData.requestId,
+          toolCall: {
+            name: approvalData.toolName,
+            arguments: approvalData.input,
+          },
+          requestedAt: streamTimestamp,
+          requestData: approvalData,
+        };
 
-      setPendingApprovals((prev) => {
-        const exists = prev.some((p) => p.toolCallId === pendingApproval.toolCallId);
+        setPendingApprovals((prev) => {
+          const exists = prev.some((p) => p.toolCallId === pendingApproval.toolCallId);
+          if (exists) return prev;
+          return [...prev, pendingApproval];
+        });
+
+        // Don't add approval requests to timeline
+        return;
+      }
+
+      // Handle tool approval responses
+      if (sessionEvent.type === 'TOOL_APPROVAL_RESPONSE') {
+        const responseData = sessionEvent.data as { toolCallId: string };
+        setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== responseData.toolCallId));
+
+        // Don't add approval responses to timeline
+        return;
+      }
+
+      // Add to events list
+      setEvents((prev) => {
+        // Avoid duplicates by checking event content
+        const exists = prev.some(
+          (e) =>
+            e.type === sessionEvent.type &&
+            e.timestamp.getTime() === sessionEvent.timestamp.getTime() &&
+            e.threadId === sessionEvent.threadId &&
+            JSON.stringify(e.data) === JSON.stringify(sessionEvent.data)
+        );
+
         if (exists) return prev;
-        return [...prev, pendingApproval];
+
+        return [...prev, sessionEvent].sort(
+          (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+        );
       });
-
-      // Don't add approval requests to timeline
-      return;
+    } catch (error) {
+      console.error('[SESSION_EVENTS] Failed to parse stream event:', error, streamEvent);
+      // Don't crash the app - just skip invalid events
     }
-
-    // Handle tool approval responses
-    if (sessionEvent.type === 'TOOL_APPROVAL_RESPONSE') {
-      const responseData = sessionEvent.data as { toolCallId: string };
-      setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== responseData.toolCallId));
-
-      // Don't add approval responses to timeline
-      return;
-    }
-
-    // Add to events list
-    setEvents((prev) => {
-      // Avoid duplicates by checking event content
-      const exists = prev.some(
-        (e) =>
-          e.type === sessionEvent.type &&
-          e.timestamp.getTime() === sessionEvent.timestamp.getTime() &&
-          e.threadId === sessionEvent.threadId &&
-          JSON.stringify(e.data) === JSON.stringify(sessionEvent.data)
-      );
-
-      if (exists) return prev;
-
-      return [...prev, sessionEvent].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    });
   }, []);
 
   // Use event stream
@@ -143,17 +154,21 @@ export function useSessionEvents(
       .then((res) => res.json())
       .then((data) => {
         if (data.events) {
-          const eventsWithDateTimestamps: SessionEvent[] = data.events
-            .filter(
-              (event: SessionEvent) =>
-                event.type !== 'TOOL_APPROVAL_REQUEST' && event.type !== 'TOOL_APPROVAL_RESPONSE'
-            )
-            .map((event: SessionEvent & { timestamp: string }) => ({
-              ...event,
-              timestamp: new Date(event.timestamp),
-            }));
+          try {
+            // Parse and validate all events with proper date hydration
+            const allEvents = parseSessionEvents(data.events);
 
-          setEvents(eventsWithDateTimestamps);
+            // Filter out approval events (they're handled separately)
+            const timelineEvents = allEvents.filter(
+              (event) =>
+                event.type !== 'TOOL_APPROVAL_REQUEST' && event.type !== 'TOOL_APPROVAL_RESPONSE'
+            );
+
+            setEvents(timelineEvents);
+          } catch (error) {
+            console.error('[SESSION_EVENTS] Failed to parse history events:', error);
+            setEvents([]); // Fallback to empty array
+          }
         }
       })
       .catch((error) => {
