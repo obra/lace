@@ -188,6 +188,7 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
         arguments: callData?.arguments || callData?.input,
       },
     };
+
     processed.push(aggregatedEvent);
   }
 
