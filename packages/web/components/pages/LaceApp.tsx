@@ -956,14 +956,9 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
   const [message, setMessage] = useState('');
 
   const handleSubmit = useCallback(async () => {
-    console.log('[MEMOIZED_CHAT_INPUT] handleSubmit called with message:', message);
     const success = await onSubmit(message);
-    console.log('[MEMOIZED_CHAT_INPUT] onSubmit returned:', success);
     if (success) {
-      console.log('[MEMOIZED_CHAT_INPUT] Success - clearing message');
       setMessage('');
-    } else {
-      console.log('[MEMOIZED_CHAT_INPUT] onSubmit failed - keeping message');
     }
   }, [message, onSubmit]);
 

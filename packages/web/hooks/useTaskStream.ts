@@ -28,8 +28,15 @@ interface UseTaskStreamOptions {
 }
 
 function isTaskEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.scope === 'session' && 
-         ['task:created', 'task:updated', 'task:deleted', 'task:note_added'].includes(streamEvent.type);
+  // Task events must have eventType: 'task' - no compatibility fallbacks
+  if (streamEvent.eventType !== 'task') {
+    return false;
+  }
+
+  // Verify the event has valid task event type
+  return ['task:created', 'task:updated', 'task:deleted', 'task:note_added'].includes(
+    (streamEvent.data as TaskEvent).type
+  );
 }
 
 export function useTaskStream({
@@ -41,39 +48,44 @@ export function useTaskStream({
   onTaskNoteAdded,
   onError,
 }: UseTaskStreamOptions) {
-  
   // Handle stream events
-  const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
-    // Only process task events
-    if (!isTaskEvent(streamEvent)) {
-      return;
-    }
+  const handleStreamEvent = useCallback(
+    (streamEvent: StreamEvent) => {
+      // Only process task events
+      if (!isTaskEvent(streamEvent)) {
+        return;
+      }
 
-    const taskEvent = streamEvent.data as TaskEvent;
-    
-    // Dispatch to appropriate handler
-    switch (taskEvent.type) {
-      case 'task:created':
-        onTaskCreated?.(taskEvent);
-        break;
-      case 'task:updated':
-        onTaskUpdated?.(taskEvent);
-        break;
-      case 'task:deleted':
-        onTaskDeleted?.(taskEvent);
-        break;
-      case 'task:note_added':
-        onTaskNoteAdded?.(taskEvent);
-        break;
-    }
-  }, [onTaskCreated, onTaskUpdated, onTaskDeleted, onTaskNoteAdded]);
+      const taskEvent = streamEvent.data as TaskEvent;
+
+      // Dispatch to appropriate handler
+      switch (taskEvent.type) {
+        case 'task:created':
+          onTaskCreated?.(taskEvent);
+          break;
+        case 'task:updated':
+          onTaskUpdated?.(taskEvent);
+          break;
+        case 'task:deleted':
+          onTaskDeleted?.(taskEvent);
+          break;
+        case 'task:note_added':
+          onTaskNoteAdded?.(taskEvent);
+          break;
+      }
+    },
+    [onTaskCreated, onTaskUpdated, onTaskDeleted, onTaskNoteAdded]
+  );
 
   // Memoize subscription to prevent reconnections
-  const subscription = useMemo(() => ({
-    projects: projectId ? [projectId] : [],
-    sessions: sessionId ? [sessionId] : [],
-    eventTypes: ['task:created', 'task:updated', 'task:deleted', 'task:note_added'],
-  }), [projectId, sessionId]);
+  const subscription = useMemo(
+    () => ({
+      projects: projectId ? [projectId] : [],
+      sessions: sessionId ? [sessionId] : [],
+      eventTypes: ['task'], // Subscribe to task event type, not individual task event names
+    }),
+    [projectId, sessionId]
+  );
 
   // Use event stream with project and session filtering
   const { close } = useEventStream({

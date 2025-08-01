@@ -67,7 +67,35 @@ vi.mock('@/types/events', () => ({
 const mockFetch = vi.fn(() => new Promise(() => {})); // Promise that never resolves
 global.fetch = mockFetch as unknown as typeof fetch;
 
-// Try without mocking EventSource - let's see if the component actually needs it
+// Mock EventSource for useEventStream hook
+class MockEventSource {
+  static readonly CLOSED = 2;
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  readyState: number = MockEventSource.CONNECTING;
+  url: string;
+
+  constructor(url: string) {
+    this.url = url;
+    // Simulate immediate connection failure to avoid hanging tests
+    setTimeout(() => {
+      this.readyState = MockEventSource.CLOSED;
+      if (this.onerror) {
+        this.onerror(new Event('error'));
+      }
+    }, 0);
+  }
+
+  close() {
+    this.readyState = MockEventSource.CLOSED;
+  }
+}
+
+global.EventSource = MockEventSource as unknown as typeof EventSource;
 
 // Helper to render with real theme provider
 const renderWithProviders = (component: React.ReactElement) => {
