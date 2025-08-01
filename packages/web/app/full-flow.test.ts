@@ -12,7 +12,7 @@ vi.mock('server-only', () => ({}));
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
-import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
+import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { ThreadId, Session } from '@/types/api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
@@ -126,11 +126,9 @@ describe('Full Conversation Flow', () => {
 
     // 3. Connect to SSE stream
     const streamRequest = new NextRequest(
-      `http://localhost:3000/api/sessions/${sessionId}/events/stream`
+      `http://localhost:3000/api/events/stream?sessions=${sessionId}`
     );
-    const streamResponse = await streamEvents(streamRequest, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
-    });
+    const streamResponse = await streamEvents(streamRequest);
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
@@ -300,13 +298,11 @@ describe('Full Conversation Flow', () => {
 
     // Connect to streams
     await streamEvents(
-      new NextRequest(`http://localhost:3000/api/sessions/${session1Id}/events/stream`),
-      { params: Promise.resolve({ sessionId: session1Id as string }) }
+      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session1Id}`)
     );
 
     await streamEvents(
-      new NextRequest(`http://localhost:3000/api/sessions/${session2Id}/events/stream`),
-      { params: Promise.resolve({ sessionId: session2Id as string }) }
+      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session2Id}`)
     );
 
     // Verify each session has its own connection

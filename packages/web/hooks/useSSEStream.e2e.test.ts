@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET as sseStream } from '@/app/api/sessions/[sessionId]/events/stream/route';
+import { GET as sseStream } from '@/app/api/events/stream/route';
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
@@ -76,28 +76,24 @@ describe('SSE Stream E2E Tests', () => {
   });
 
   it('should establish SSE stream connection for valid session', async () => {
-    const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/events/stream`);
+    const request = new NextRequest(`http://localhost/api/events/stream?sessions=${sessionId}`);
 
-    const response = await sseStream(request, {
-      params: Promise.resolve({ sessionId }),
-    });
+    const response = await sseStream(request);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/event-stream');
-    expect(response.headers.get('Cache-Control')).toBe('no-cache, no-transform');
+    expect(response.headers.get('Cache-Control')).toBe('no-cache, no-store, must-revalidate');
     expect(response.headers.get('Connection')).toBe('keep-alive');
   });
 
-  it('should return 404 for non-existent session', async () => {
-    const request = new NextRequest(`http://localhost/api/sessions/invalid-session/events/stream`);
+  it('should handle invalid session gracefully', async () => {
+    const request = new NextRequest(`http://localhost/api/events/stream?sessions=invalid-session`);
 
-    const response = await sseStream(request, {
-      params: Promise.resolve({ sessionId: 'invalid-session' }),
-    });
+    const response = await sseStream(request);
 
-    expect(response.status).toBe(404);
-    const data = (await response.json()) as { error: string };
-    expect(data).toHaveProperty('error');
+    // The event stream should still work but won't receive events for invalid sessions
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
   });
 
   it('should stream real events when agent sends message', async () => {
@@ -126,10 +122,8 @@ describe('SSE Stream E2E Tests', () => {
     const agentThreadId = agentData.agent.threadId;
 
     // Establish SSE connection
-    const sseRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/events/stream`);
-    const sseResponse = await sseStream(sseRequest, {
-      params: Promise.resolve({ sessionId }),
-    });
+    const sseRequest = new NextRequest(`http://localhost/api/events/stream?sessions=${sessionId}`);
+    const sseResponse = await sseStream(sseRequest);
     expect(sseResponse.status).toBe(200);
 
     // Get the stream reader
@@ -197,13 +191,10 @@ describe('SSE Stream E2E Tests', () => {
 
   it('should handle multiple concurrent SSE connections', async () => {
     // Create multiple SSE connections
-    const request1 = new NextRequest(`http://localhost/api/sessions/${sessionId}/events/stream`);
-    const request2 = new NextRequest(`http://localhost/api/sessions/${sessionId}/events/stream`);
+    const request1 = new NextRequest(`http://localhost/api/events/stream?sessions=${sessionId}`);
+    const request2 = new NextRequest(`http://localhost/api/events/stream?sessions=${sessionId}`);
 
-    const [response1, response2] = await Promise.all([
-      sseStream(request1, { params: Promise.resolve({ sessionId }) }),
-      sseStream(request2, { params: Promise.resolve({ sessionId }) }),
-    ]);
+    const [response1, response2] = await Promise.all([sseStream(request1), sseStream(request2)]);
 
     expect(response1.status).toBe(200);
     expect(response2.status).toBe(200);
@@ -216,11 +207,9 @@ describe('SSE Stream E2E Tests', () => {
   });
 
   it('should handle SSE connection cleanup on stream close', async () => {
-    const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/events/stream`);
+    const request = new NextRequest(`http://localhost/api/events/stream?sessions=${sessionId}`);
 
-    const response = await sseStream(request, {
-      params: Promise.resolve({ sessionId }),
-    });
+    const response = await sseStream(request);
 
     expect(response.status).toBe(200);
 
