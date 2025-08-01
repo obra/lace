@@ -1,24 +1,20 @@
 // ABOUTME: Type definitions for the web API endpoints
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
-// Import core types from Lace
-import type { AgentState, ThreadId, AssigneeId, ToolResult } from '@/lib/server/lace-imports';
+// Import core types from unified core imports
 import type {
+  AgentState,
+  ThreadId,
+  AssigneeId,
+  ToolResult,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
-} from '@/lib/server/core-types';
+} from '@/lib/core';
+import { ApprovalDecision } from '@/lib/core';
 
 // Re-export imported types
 export type { ThreadId, AssigneeId, AgentState };
-
-// Define ApprovalDecision locally to avoid import issues
-export const ApprovalDecision = {
-  ALLOW_ONCE: 'allow_once',
-  ALLOW_SESSION: 'allow_session',
-  DENY: 'deny',
-} as const;
-
-export type ApprovalDecision = (typeof ApprovalDecision)[keyof typeof ApprovalDecision];
+export { ApprovalDecision };
 
 export interface Session {
   id: ThreadId; // sessionId (parent threadId)

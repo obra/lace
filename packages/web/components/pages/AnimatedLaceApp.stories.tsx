@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnimatedLaceApp } from './AnimatedLaceApp';
 import { asThreadId } from '@/lib/server/core-types';
-import type { Project, Timeline, Task, RecentFile } from '@/types';
+import type { Project, Timeline, Task, RecentFile } from '@/types/design-system';
 
 // Mock data for stories
 const mockProjects: Project[] = [
