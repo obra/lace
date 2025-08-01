@@ -611,107 +611,1063 @@ Use Playwright for E2E tests or create integration tests that start the Next.js 
 
 **Commit message:** "feat: add provider management API endpoints"
 
-### Task 6: Create Web UI Components
+### Task 6: Provider Management App Routes & Layout
 
 **Files to create:**
-- `src/interfaces/web/components/providers/provider-list.tsx`
-- `src/interfaces/web/components/providers/provider-form.tsx`
-- `src/interfaces/web/app/providers/page.tsx`
+- `packages/web/app/providers/layout.tsx`
+- `packages/web/app/providers/page.tsx`
+- `packages/web/app/providers/catalog/page.tsx`
+- `packages/web/app/providers/catalog/[providerId]/page.tsx`
 
 **What to implement:**
 
 ```typescript
-// src/interfaces/web/components/providers/provider-list.tsx
-// List of configured providers with actions
+// packages/web/app/providers/layout.tsx
+// ABOUTME: Layout for provider management section with navigation
+// ABOUTME: Provides consistent header and navigation structure
 
-import { useEffect, useState } from 'react';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 
-interface Provider {
-  id: string;
-  name: string;
-  type: string;
-  hasCredential: boolean;
+export default function ProvidersLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <SectionHeader title="Provider Management" />
+      <div className="flex gap-4 border-b">
+        <a href="/providers" className="tab tab-active">Instances</a>
+        <a href="/providers/catalog" className="tab">Browse Catalog</a>
+      </div>
+      {children}
+    </div>
+  );
 }
 
-export function ProviderList() {
-  const [providers, setProviders] = useState<Provider[]>([]);
+// packages/web/app/providers/page.tsx  
+// ABOUTME: Main provider instances dashboard
+// ABOUTME: Shows configured instances with status and management actions
 
-  useEffect(() => {
-    fetch('/api/providers')
-      .then(res => res.json())
-      .then(data => setProviders(data.providers));
-  }, []);
+import { ProviderInstanceList } from '@/components/providers/ProviderInstanceList';
+import { AddInstanceButton } from '@/components/providers/AddInstanceButton';
 
+export default function ProvidersPage() {
   return (
-    <div>
-      <h2>Configured Providers</h2>
-      <ul>
-        {providers.map(provider => (
-          <li key={provider.id}>
-            {provider.name} ({provider.type})
-            {!provider.hasCredential && <span> - No credential</span>}
-          </li>
-        ))}
-      </ul>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Configured Instances</h2>
+        <AddInstanceButton />
+      </div>
+      <ProviderInstanceList />
     </div>
   );
 }
 ```
 
-**UI Testing approach:**
-- Unit tests with Vitest for components
-- E2E tests with Playwright for full flow
+**Commit message:** "feat: add provider management app routes with Next.js app router"
 
-**Commit message:** "feat: add provider management UI"
-
-### Task 7: Add Provider Selection to Sessions
-
-**Files to modify:**
-- `src/sessions/session-config.ts`
-- `src/agents/agent.ts`
-
-**What to change:**
-Update session creation to accept a provider instance ID instead of provider type.
-
-**Commit message:** "feat: integrate configured providers with sessions"
-
-### Task 8: Add Default Provider Configuration
+### Task 7: Provider Catalog Browser Components
 
 **Files to create:**
-- `src/providers/default-providers.json`
+- `packages/web/components/providers/ProviderCatalogGrid.tsx`
+- `packages/web/components/providers/ProviderCatalogCard.tsx`
+- `packages/web/components/providers/ModelComparisonTable.tsx`
 
 **What to implement:**
 
-```json
-{
-  "version": "1.0",
-  "providers": {
-    "anthropic-main": {
-      "name": "Anthropic",
-      "type": "anthropic-api",
-      "config": {
-        "baseUrl": "https://api.anthropic.com/v1",
-        "timeout": 30000
-      }
-    },
-    "openai-main": {
-      "name": "OpenAI",
-      "type": "openai-api",
-      "config": {
-        "baseUrl": "https://api.openai.com/v1",
-        "timeout": 30000
-      }
-    },
-    "openrouter": {
-      "name": "OpenRouter",
-      "type": "openai-api",
-      "config": {
-        "baseUrl": "https://openrouter.ai/api/v1",
-        "timeout": 60000
-      }
-    }
-  }
+```typescript
+// packages/web/components/providers/ProviderCatalogGrid.tsx
+// ABOUTME: Grid display of available providers from catalogs
+// ABOUTME: Shows provider cards with model counts and pricing info
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import { ProviderCatalogCard } from './ProviderCatalogCard';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+
+interface CatalogProvider {
+  id: string;
+  name: string;
+  type: string;
+  models: Array<{
+    id: string;
+    name: string;
+    cost_per_1m_in: number;
+    cost_per_1m_out: number;
+  }>;
 }
+
+export function ProviderCatalogGrid() {
+  const [providers, setProviders] = useState<CatalogProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/providers/catalog')
+      .then(res => res.json())
+      .then(data => {
+        setProviders(data.providers);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <LoadingSkeleton count={6} className="h-48" />;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {providers.map(provider => (
+        <ProviderCatalogCard
+          key={provider.id}
+          provider={provider}
+          onAddInstance={() => {/* TODO: Open add instance modal */}}
+        />
+      ))}
+    </div>
+  );
+}
+
+// packages/web/components/providers/ProviderCatalogCard.tsx
+// ABOUTME: Individual provider card showing models and pricing
+// ABOUTME: Uses design system cards, badges, and buttons
+
+import { Badge } from '@/components/ui/Badge';
+
+interface ProviderCatalogCardProps {
+  provider: {
+    id: string;
+    name: string;
+    type: string;
+    models: Array<{
+      cost_per_1m_in: number;
+      cost_per_1m_out: number;
+    }>;
+  };
+  onAddInstance: () => void;
+}
+
+export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalogCardProps) {
+  const minPrice = Math.min(...provider.models.map(m => m.cost_per_1m_in));
+  const maxPrice = Math.max(...provider.models.map(m => m.cost_per_1m_out));
+
+  return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <div className="flex items-center justify-between">
+          <h3 className="card-title">{provider.name}</h3>
+          <Badge variant="primary" size="sm">
+            {provider.models.length} models
+          </Badge>
+        </div>
+        
+        <p className="text-sm text-base-content/60">
+          ${minPrice}-${maxPrice}/1M tokens
+        </p>
+        
+        <div className="space-y-1 text-xs">
+          {provider.models.slice(0, 2).map(model => (
+            <div key={model.id}>• {model.name}</div>
+          ))}
+          {provider.models.length > 2 && (
+            <div>• And {provider.models.length - 2} more...</div>
+          )}
+        </div>
+        
+        <div className="card-actions justify-end">
+          <button 
+            className="btn btn-primary btn-sm"
+            onClick={onAddInstance}
+          >
+            Add Instance
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Commit message:** "feat: add provider catalog browser components with design system"
+
+### Task 8: Provider Instance Management Components
+
+**Files to create:**
+- `packages/web/components/providers/ProviderInstanceList.tsx`
+- `packages/web/components/providers/ProviderInstanceCard.tsx`
+- `packages/web/components/providers/AddInstanceModal.tsx`
+- `packages/web/components/providers/EditInstanceModal.tsx`
+
+**What to implement:**
+
+```typescript
+// packages/web/components/providers/ProviderInstanceList.tsx
+// ABOUTME: List of configured provider instances with status indicators
+// ABOUTME: Shows connection status, available models, and management actions
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import { ProviderInstanceCard } from './ProviderInstanceCard';
+import { AddInstanceModal } from './AddInstanceModal';
+
+interface ProviderInstance {
+  id: string;
+  displayName: string;
+  catalogProviderId: string;
+  status: 'connected' | 'error' | 'untested';
+  modelCount: number;
+  lastTested?: string;
+}
+
+export function ProviderInstanceList() {
+  const [instances, setInstances] = useState<ProviderInstance[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  useEffect(() => {
+    loadInstances();
+  }, []);
+
+  const loadInstances = async () => {
+    const response = await fetch('/api/providers/instances');
+    const data = await response.json();
+    setInstances(data.instances);
+  };
+
+  const handleDelete = async (instanceId: string) => {
+    await fetch(`/api/providers/instances/${instanceId}`, {
+      method: 'DELETE'
+    });
+    loadInstances();
+  };
+
+  const handleTest = async (instanceId: string) => {
+    await fetch(`/api/providers/instances/${instanceId}/test`, {
+      method: 'POST'
+    });
+    loadInstances();
+  };
+
+  return (
+    <>
+      <div className="space-y-3">
+        {instances.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-base-content/60 mb-4">No provider instances configured</p>
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowAddModal(true)}
+            >
+              Add Your First Instance
+            </button>
+          </div>
+        ) : (
+          instances.map(instance => (
+            <ProviderInstanceCard
+              key={instance.id}
+              instance={instance}
+              onTest={() => handleTest(instance.id)}
+              onDelete={() => handleDelete(instance.id)}
+            />
+          ))
+        )}
+      </div>
+
+      <AddInstanceModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={loadInstances}
+      />
+    </>
+  );
+}
+
+// packages/web/components/providers/ProviderInstanceCard.tsx
+// ABOUTME: Individual instance card with status, actions, and details
+// ABOUTME: Uses StatusDot, Badge, and card components from design system
+
+import { StatusDot } from '@/components/ui/StatusDot';
+
+interface ProviderInstanceCardProps {
+  instance: {
+    id: string;
+    displayName: string;
+    catalogProviderId: string;
+    status: 'connected' | 'error' | 'untested';
+    modelCount: number;
+    lastTested?: string;
+  };
+  onTest: () => void;
+  onDelete: () => void;
+}
+
+export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderInstanceCardProps) {
+  const getStatusProps = (status: string) => {
+    switch (status) {
+      case 'connected': return { status: 'success' as const, text: 'Connected' };
+      case 'error': return { status: 'error' as const, text: 'Connection Error' };
+      default: return { status: 'warning' as const, text: 'Untested' };
+    }
+  };
+
+  const statusProps = getStatusProps(instance.status);
+
+  return (
+    <div className="card bg-base-100 shadow-sm">
+      <div className="card-body py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <StatusDot status={statusProps.status} size="md" />
+            <div>
+              <h4 className="font-medium">{instance.displayName}</h4>
+              <p className="text-sm text-base-content/60">
+                {instance.modelCount} models available • {statusProps.text}
+                {instance.lastTested && (
+                  <span> • Last tested: {new Date(instance.lastTested).toLocaleDateString()}</span>
+                )}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex space-x-2">
+            <button className="btn btn-ghost btn-sm" onClick={onTest}>
+              Test
+            </button>
+            <button className="btn btn-outline btn-sm">
+              Edit
+            </button>
+            <button className="btn btn-ghost btn-sm text-error" onClick={onDelete}>
+              ×
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Commit message:** "feat: add provider instance management components"
+
+### Task 9: Instance Configuration Modals
+
+**Files to create:**
+- `packages/web/components/providers/AddInstanceModal.tsx`
+- `packages/web/components/providers/ModelSelectionForm.tsx`
+- `packages/web/components/providers/CredentialInput.tsx`
+
+**What to implement:**
+
+```typescript
+// packages/web/components/providers/AddInstanceModal.tsx
+// ABOUTME: Modal for configuring new provider instances
+// ABOUTME: Multi-step form with catalog selection, configuration, and credentials
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Modal } from '@/components/ui/Modal';
+import { Badge } from '@/components/ui/Badge';
+
+interface AddInstanceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+interface CatalogProvider {
+  id: string;
+  name: string;
+  type: string;
+  models: Array<{ id: string; name: string }>;
+}
+
+export function AddInstanceModal({ isOpen, onClose, onSuccess }: AddInstanceModalProps) {
+  const [step, setStep] = useState<'select' | 'configure'>('select');
+  const [providers, setProviders] = useState<CatalogProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<CatalogProvider | null>(null);
+  const [formData, setFormData] = useState({
+    displayName: '',
+    endpoint: '',
+    timeout: 30000,
+    apiKey: ''
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/providers/catalog')
+        .then(res => res.json())
+        .then(data => setProviders(data.providers));
+    }
+  }, [isOpen]);
+
+  const handleProviderSelect = (provider: CatalogProvider) => {
+    setSelectedProvider(provider);
+    setFormData({
+      ...formData,
+      displayName: `${provider.name} Instance`
+    });
+    setStep('configure');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const response = await fetch('/api/providers/instances', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: formData.displayName,
+        catalogProviderId: selectedProvider?.id,
+        endpoint: formData.endpoint || undefined,
+        timeout: formData.timeout,
+        credential: { apiKey: formData.apiKey }
+      })
+    });
+
+    if (response.ok) {
+      onSuccess();
+      onClose();
+      resetForm();
+    }
+  };
+
+  const resetForm = () => {
+    setStep('select');
+    setSelectedProvider(null);
+    setFormData({ displayName: '', endpoint: '', timeout: 30000, apiKey: '' });
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={() => {
+        onClose();
+        resetForm();
+      }}
+      title={step === 'select' ? 'Select Provider' : 'Configure Instance'}
+      size="md"
+    >
+      {step === 'select' ? (
+        <div className="space-y-4">
+          <p className="text-sm text-base-content/60">
+            Choose a provider from the catalog to create a new instance.
+          </p>
+          
+          <div className="grid gap-3">
+            {providers.map(provider => (
+              <button
+                key={provider.id}
+                className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow text-left"
+                onClick={() => handleProviderSelect(provider)}
+              >
+                <div className="card-body py-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">{provider.name}</h4>
+                      <p className="text-xs text-base-content/60">
+                        {provider.models.length} models available
+                      </p>
+                    </div>
+                    <Badge variant="outline" size="sm">{provider.type}</Badge>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">
+              <span className="label-text">Instance Name</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={formData.displayName}
+              onChange={(e) => setFormData({...formData, displayName: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="label">
+              <span className="label-text">Provider</span>
+            </label>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline">{selectedProvider?.name}</Badge>
+              <span className="text-sm text-base-content/60">from catalog</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">
+              <span className="label-text">Custom Endpoint (optional)</span>
+            </label>
+            <input
+              type="url"
+              className="input input-bordered w-full"
+              value={formData.endpoint}
+              onChange={(e) => setFormData({...formData, endpoint: e.target.value})}
+              placeholder="Leave empty to use default"
+            />
+          </div>
+
+          <div>
+            <label className="label">
+              <span className="label-text">API Key</span>
+            </label>
+            <input
+              type="password"
+              className="input input-bordered w-full"
+              value={formData.apiKey}
+              onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+              required
+            />
+          </div>
+
+          <div className="bg-base-200 p-3 rounded-lg">
+            <p className="text-sm font-medium mb-1">This will enable:</p>
+            <p className="text-xs text-base-content/60">
+              {selectedProvider?.models.slice(0, 3).map(m => m.name).join(', ')}
+              {selectedProvider && selectedProvider.models.length > 3 && 
+                ` and ${selectedProvider.models.length - 3} more models`
+              }
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button type="button" className="btn btn-ghost" onClick={() => setStep('select')}>
+              Back
+            </button>
+            <button type="submit" className="btn btn-primary">
+              Create Instance
+            </button>
+          </div>
+        </form>
+      )}
+    </Modal>
+  );
+}
+```
+
+**Commit message:** "feat: add instance configuration modal with multi-step form"
+
+### Task 10: Session Creation Integration
+
+**Files to modify:**
+- `packages/web/components/sessions/CreateSessionModal.tsx` (or equivalent)
+- `packages/web/components/sessions/ModelSelectionForm.tsx`
+
+**What to implement:**
+
+```typescript
+// packages/web/components/sessions/ModelSelectionForm.tsx  
+// ABOUTME: Model selection component for session creation
+// ABOUTME: Shows available models from selected provider instance with pricing
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/Badge';
+import { StatusDot } from '@/components/ui/StatusDot';
+
+interface Model {
+  id: string;
+  name: string;
+  cost_per_1m_in: number;
+  cost_per_1m_out: number;
+  context_window: number;
+  can_reason?: boolean;
+  supports_attachments?: boolean;
+}
+
+interface ProviderInstance {
+  id: string;
+  displayName: string;
+  status: 'connected' | 'error' | 'untested';
+  modelCount: number;
+}
+
+interface ModelSelectionFormProps {
+  onSelectionChange: (instanceId: string, modelId: string) => void;
+}
+
+export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProps) {
+  const [instances, setInstances] = useState<ProviderInstance[]>([]);
+  const [selectedInstance, setSelectedInstance] = useState<string>('');
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+
+  useEffect(() => {
+    // Load configured instances
+    fetch('/api/providers/instances')
+      .then(res => res.json())
+      .then(data => setInstances(data.instances));
+  }, []);
+
+  useEffect(() => {
+    if (selectedInstance) {
+      // Load models for selected instance
+      fetch(`/api/providers/instances/${selectedInstance}/models`)
+        .then(res => res.json())
+        .then(data => setAvailableModels(data.models));
+    }
+  }, [selectedInstance]);
+
+  useEffect(() => {
+    if (selectedInstance && selectedModel) {
+      onSelectionChange(selectedInstance, selectedModel);
+    }
+  }, [selectedInstance, selectedModel, onSelectionChange]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="label">
+          <span className="label-text">Provider Instance</span>
+        </label>
+        <select 
+          className="select select-bordered w-full"
+          value={selectedInstance}
+          onChange={(e) => setSelectedInstance(e.target.value)}
+        >
+          <option value="">Select provider instance</option>
+          {instances.map(instance => (
+            <option key={instance.id} value={instance.id}>
+              {instance.displayName}
+            </option>
+          ))}
+        </select>
+        
+        {selectedInstance && (
+          <div className="flex items-center space-x-2 mt-1">
+            <StatusDot status="success" size="sm" />
+            <span className="text-xs text-base-content/60">
+              Connected • {availableModels.length} models available
+            </span>
+          </div>
+        )}
+      </div>
+
+      {availableModels.length > 0 && (
+        <div>
+          <label className="label">
+            <span className="label-text">Model</span>
+          </label>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {availableModels.map(model => (
+              <label key={model.id} className="cursor-pointer">
+                <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-base-200">
+                  <input
+                    type="radio"
+                    name="model"
+                    value={model.id}
+                    className="radio radio-primary radio-sm"
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{model.name}</span>
+                      <Badge variant="primary" size="xs">
+                        ${model.cost_per_1m_in}/${model.cost_per_1m_out}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-base-content/60 mt-1">
+                      {model.context_window / 1000}K context
+                      {model.can_reason && ' • Reasoning'}
+                      {model.supports_attachments && ' • Attachments'}
+                    </div>
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {selectedModel && (
+            <div className="bg-info/20 p-3 rounded-lg mt-4">
+              <div className="text-sm">
+                <div className="font-medium">Estimated cost: ~$0.05 per conversation</div>
+                <div className="text-xs text-base-content/60 mt-1">
+                  Based on typical usage patterns
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Commit message:** "feat: integrate provider instance and model selection into session creation"
+
+### Task 11: Custom Provider Catalog Management
+
+**Files to create:**
+- `packages/web/app/providers/catalog/custom/page.tsx`
+- `packages/web/components/providers/CustomCatalogForm.tsx`
+- `packages/web/components/providers/ModelDefinitionForm.tsx`
+
+**What to implement:**
+
+```typescript
+// packages/web/components/providers/CustomCatalogForm.tsx
+// ABOUTME: Form for creating custom provider catalog entries
+// ABOUTME: Allows users to define local/experimental providers with models
+
+'use client';
+
+import { useState } from 'react';
+import { Modal } from '@/components/ui/Modal';
+import { Badge } from '@/components/ui/Badge';
+
+interface CustomCatalogFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+interface ModelDefinition {
+  id: string;
+  name: string;
+  cost_per_1m_in: number;
+  cost_per_1m_out: number;
+  context_window: number;
+  can_reason: boolean;
+  supports_attachments: boolean;
+  default_max_tokens: number;
+}
+
+export function CustomCatalogForm({ isOpen, onClose, onSuccess }: CustomCatalogFormProps) {
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    type: 'ollama',
+    api_endpoint: 'http://localhost:11434'
+  });
+  const [models, setModels] = useState<ModelDefinition[]>([]);
+  const [showModelForm, setShowModelForm] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const catalogEntry = {
+      ...formData,
+      models
+    };
+
+    const response = await fetch('/api/providers/user-catalog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(catalogEntry)
+    });
+
+    if (response.ok) {
+      onSuccess();
+      onClose();
+      resetForm();
+    }
+  };
+
+  const addModel = (model: ModelDefinition) => {
+    setModels([...models, model]);
+  };
+
+  const removeModel = (modelId: string) => {
+    setModels(models.filter(m => m.id !== modelId));
+  };
+
+  const resetForm = () => {
+    setFormData({ id: '', name: '', type: 'ollama', api_endpoint: '' });
+    setModels([]);
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Custom Provider"
+      size="lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">
+              <span className="label-text">Provider ID</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={formData.id}
+              onChange={(e) => setFormData({...formData, id: e.target.value})}
+              placeholder="my-ollama"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="label">
+              <span className="label-text">Display Name</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              placeholder="Local Ollama"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">
+              <span className="label-text">API Type</span>
+            </label>
+            <select
+              className="select select-bordered w-full"
+              value={formData.type}
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+            >
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI Compatible</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="label">
+              <span className="label-text">API Endpoint</span>
+            </label>
+            <input
+              type="url"
+              className="input input-bordered w-full"
+              value={formData.api_endpoint}
+              onChange={(e) => setFormData({...formData, api_endpoint: e.target.value})}
+              placeholder="http://localhost:11434"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="label">
+              <span className="label-text">Available Models</span>
+            </label>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setShowModelForm(true)}
+            >
+              Add Model
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            {models.map(model => (
+              <div key={model.id} className="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <div>
+                  <div className="font-medium">{model.name}</div>
+                  <div className="text-xs text-base-content/60">
+                    {model.context_window / 1000}K context • ${model.cost_per_1m_in}/${model.cost_per_1m_out}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error"
+                  onClick={() => removeModel(model.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            
+            {models.length === 0 && (
+              <div className="text-center py-6 text-base-content/60">
+                No models defined. Add at least one model to continue.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={models.length === 0}
+          >
+            Create Provider
+          </button>
+        </div>
+      </form>
+
+      {/* Model Definition Modal would go here */}
+    </Modal>
+  );
+}
+```
+
+**Commit message:** "feat: add custom provider catalog management"
+
+### Task 12: Provider Testing & Status Components  
+
+**Files to create:**
+- `packages/web/components/providers/ConnectionTest.tsx`
+- `packages/web/components/providers/ProviderStatusBadge.tsx`
+- `packages/web/hooks/useProviderStatus.ts`
+
+**What to implement:**
+
+```typescript
+// packages/web/hooks/useProviderStatus.ts
+// ABOUTME: Custom hook for managing provider connection status
+// ABOUTME: Handles testing, status updates, and real-time status monitoring
+
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+
+interface ProviderStatus {
+  status: 'connected' | 'error' | 'untested' | 'testing';
+  lastTested?: string;
+  error?: string;
+}
+
+export function useProviderStatus(instanceId: string) {
+  const [status, setStatus] = useState<ProviderStatus>({ status: 'untested' });
+
+  const testConnection = useCallback(async () => {
+    setStatus(prev => ({ ...prev, status: 'testing' }));
+
+    try {
+      const response = await fetch(`/api/providers/instances/${instanceId}/test`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        setStatus({
+          status: 'connected',
+          lastTested: new Date().toISOString()
+        });
+      } else {
+        const error = await response.text();
+        setStatus({
+          status: 'error',
+          lastTested: new Date().toISOString(),
+          error
+        });
+      }
+    } catch (error) {
+      setStatus({
+        status: 'error',
+        lastTested: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Connection failed'
+      });
+    }
+  }, [instanceId]);
+
+  return { status, testConnection };
+}
+
+// packages/web/components/providers/ConnectionTest.tsx
+// ABOUTME: Component for testing provider connections with real-time feedback
+// ABOUTME: Shows loading states, success/error messages, and retry options
+
+import { useState } from 'react';
+import { StatusDot } from '@/components/ui/StatusDot';
+import { useProviderStatus } from '@/hooks/useProviderStatus';
+
+interface ConnectionTestProps {
+  instanceId: string;
+  onStatusChange?: (status: string) => void;
+}
+
+export function ConnectionTest({ instanceId, onStatusChange }: ConnectionTestProps) {
+  const { status, testConnection } = useProviderStatus(instanceId);
+
+  const handleTest = async () => {
+    await testConnection();
+    onStatusChange?.(status.status);
+  };
+
+  const getStatusDisplay = () => {
+    switch (status.status) {
+      case 'testing':
+        return { dot: 'info' as const, text: 'Testing...', color: 'text-info' };
+      case 'connected':
+        return { dot: 'success' as const, text: 'Connected', color: 'text-success' };
+      case 'error':
+        return { dot: 'error' as const, text: 'Connection Error', color: 'text-error' };
+      default:
+        return { dot: 'warning' as const, text: 'Untested', color: 'text-warning' };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay();
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <StatusDot 
+            status={statusDisplay.dot} 
+            size="sm" 
+            pulse={status.status === 'testing'}
+          />
+          <span className={`text-sm ${statusDisplay.color}`}>
+            {statusDisplay.text}
+          </span>
+        </div>
+        
+        <button
+          className="btn btn-outline btn-sm"
+          onClick={handleTest}
+          disabled={status.status === 'testing'}
+        >
+          {status.status === 'testing' ? 'Testing...' : 'Test Connection'}
+        </button>
+      </div>
+
+      {status.lastTested && (
+        <p className="text-xs text-base-content/60">
+          Last tested: {new Date(status.lastTested).toLocaleString()}
+        </p>
+      )}
+
+      {status.error && (
+        <div className="bg-error/20 p-2 rounded text-sm text-error">
+          {status.error}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Commit message:** "feat: add provider connection testing with real-time status"
+
+### Task 13: Backend Integration & API Updates
+
+**Files to modify:**
+- Update existing session APIs to use instance + model IDs
+- Update agent initialization to resolve provider instances
+- Add catalog loading to provider registry
+
+**What to change:**
+- Session creation endpoints accept `providerInstanceId` and `modelId`
+- Provider registry resolves instances from catalog + user config
+- Agent initialization uses resolved provider instances
+
+**Commit message:** "feat: integrate provider system with existing session/agent infrastructure"
 ```
 
 **Commit message:** "feat: add default provider configurations"
