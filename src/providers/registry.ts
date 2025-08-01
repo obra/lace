@@ -35,11 +35,11 @@ export class ProviderRegistry {
   async initialize(): Promise<void> {
     // Load catalog data
     await this.catalogManager.loadCatalogs();
-    
+
     // Load user instances
     const config = await this.instanceManager.loadInstances();
     this.configuredInstances.clear();
-    
+
     for (const [instanceId, instance] of Object.entries(config.instances)) {
       this.configuredInstances.set(instanceId, instance);
     }
@@ -51,7 +51,7 @@ export class ProviderRegistry {
 
   getConfiguredInstances(): ConfiguredInstance[] {
     const instances: ConfiguredInstance[] = [];
-    
+
     for (const [instanceId, instance] of this.configuredInstances.entries()) {
       instances.push({
         id: instanceId,
@@ -63,7 +63,7 @@ export class ProviderRegistry {
         hasCredentials: false, // TODO: Check credentials without loading them
       });
     }
-    
+
     return instances;
   }
 

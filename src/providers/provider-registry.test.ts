@@ -193,23 +193,23 @@ describe('ProviderRegistry', () => {
       await registry.initialize();
     });
 
-    it('should load provider catalogs on initialization', async () => {
+    it('should load provider catalogs on initialization', () => {
       const catalogProviders = registry.getCatalogProviders();
       expect(catalogProviders.length).toBeGreaterThan(0);
-      
+
       const anthropic = catalogProviders.find((p) => p.id === 'anthropic');
       expect(anthropic).toBeTruthy();
       expect(anthropic?.models.length).toBeGreaterThan(0);
     });
 
-    it('should return model from catalog', async () => {
+    it('should return model from catalog', () => {
       const model = registry.getModelFromCatalog('anthropic', 'claude-3-5-haiku-20241022');
       expect(model).toBeTruthy();
       expect(model?.id).toBe('claude-3-5-haiku-20241022');
       expect(model?.name).toBe('Claude 3.5 Haiku');
     });
 
-    it('should return null for non-existent model', async () => {
+    it('should return null for non-existent model', () => {
       const model = registry.getModelFromCatalog('anthropic', 'non-existent-model');
       expect(model).toBeNull();
     });
@@ -220,7 +220,7 @@ describe('ProviderRegistry', () => {
       await registry.initialize();
     });
 
-    it('should return empty instances when none configured', async () => {
+    it('should return empty instances when none configured', () => {
       const instances = registry.getConfiguredInstances();
       expect(instances).toEqual([]);
     });
@@ -326,9 +326,9 @@ describe('ProviderRegistry', () => {
     });
 
     it('should throw error for non-existent instance', async () => {
-      await expect(
-        registry.createProviderFromInstance('non-existent')
-      ).rejects.toThrow('Provider instance not found: non-existent');
+      await expect(registry.createProviderFromInstance('non-existent')).rejects.toThrow(
+        'Provider instance not found: non-existent'
+      );
     });
 
     it('should throw error for instance without credentials', async () => {
@@ -349,9 +349,9 @@ describe('ProviderRegistry', () => {
 
       await registry.initialize();
 
-      await expect(
-        registry.createProviderFromInstance('no-creds')
-      ).rejects.toThrow('No credentials found for instance: no-creds');
+      await expect(registry.createProviderFromInstance('no-creds')).rejects.toThrow(
+        'No credentials found for instance: no-creds'
+      );
     });
   });
 });
