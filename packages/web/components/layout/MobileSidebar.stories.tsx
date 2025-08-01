@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { MobileSidebar } from './MobileSidebar';
 import { Timeline } from '@/types/design-system';
-import { Project, Task,  asThreadId } from '@/lib/server/core-types';
+import type { ProjectInfo as Project, Task } from '@/lib/core';
+import { asThreadId } from '@/lib/server/core-types';
 
 const meta: Meta<typeof MobileSidebar> = {
   title: 'Organisms/MobileSidebar',
