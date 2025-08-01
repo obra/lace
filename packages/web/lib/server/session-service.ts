@@ -106,7 +106,7 @@ export class SessionService {
     return session;
   }
 
-  private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
+  setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     // Prevent duplicate event handler registration
     if (this.registeredAgents.has(agent)) {
       return;
