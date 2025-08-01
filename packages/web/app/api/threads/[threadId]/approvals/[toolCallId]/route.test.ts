@@ -51,16 +51,19 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should create TOOL_APPROVAL_RESPONSE event with correct data', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
     // Create mock request
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     // Mock params
     const params = { threadId, toolCallId };
@@ -78,16 +81,19 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should handle different approval decisions', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decisions = ['allow_once', 'allow_session', 'deny'];
 
     for (const decision of decisions) {
-      const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-        method: 'POST',
-        body: JSON.stringify({ decision }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ decision }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
       const params = { threadId, toolCallId };
       const response = await POST(request, { params });
@@ -107,18 +113,21 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return error if agent not found', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
@@ -132,14 +141,17 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return error for invalid JSON', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: 'invalid json',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: 'invalid json',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
@@ -150,14 +162,17 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return error for missing decision', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({}), // Missing decision
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}), // Missing decision
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
@@ -168,7 +183,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should handle duplicate approval requests gracefully', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
@@ -179,11 +194,14 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
 
     // First request should succeed
-    const request1 = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request1 = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response1 = await POST(request1, { params });
@@ -193,11 +211,14 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(data1).toEqual({ success: true });
 
     // Second request (duplicate) should also succeed
-    const request2 = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request2 = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const response2 = await POST(request2, { params });
 
@@ -210,18 +231,21 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should throw non-constraint errors normally', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
     // Mock handleApprovalResponse to throw a non-constraint error
     mockAgent.handleApprovalResponse.mockRejectedValueOnce(new Error('Some other agent error'));
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });

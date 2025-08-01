@@ -70,7 +70,7 @@ describe('Session History API', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const nonExistentId = 'lace_20240101_nonexistent'; // Valid format, but non-existent
+      const nonExistentId = 'lace_20240101_fake12'; // Valid format, but non-existent
       const request = new NextRequest(`http://localhost/api/sessions/${nonExistentId}/history`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: nonExistentId }),

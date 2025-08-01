@@ -174,7 +174,7 @@ describe('Agent Spawning API', () => {
 
   describe('TDD: Direct Session Usage', () => {
     it('should spawn agent using session.spawnAgent() directly', async () => {
-      const sessionId: ThreadId = createThreadId('lace_20250113_session1');
+      const sessionId: ThreadId = createThreadId('lace_20250113_abc123');
       const mockAgent: Agent = createAgent({
         threadId: createThreadId(`${sessionId}.1`),
         name: 'test-agent',
@@ -219,7 +219,7 @@ describe('Agent Spawning API', () => {
   });
 
   describe('POST /api/sessions/{sessionId}/agents', () => {
-    const sessionId: ThreadId = createThreadId('lace_20250113_session1');
+    const sessionId: ThreadId = createThreadId('lace_20250113_abc123');
 
     it('should create agent with threadId like {sessionId}.{n}', async () => {
       // Mock session exists with existing agents
@@ -452,7 +452,7 @@ describe('Agent Spawning API', () => {
     });
 
     it('should auto-generate agent name when empty', async () => {
-      const sessionId: ThreadId = createThreadId('lace_20250113_session1');
+      const sessionId: ThreadId = createThreadId('lace_20250113_abc123');
 
       const mockSession = createMockSession({
         id: sessionId,
@@ -477,7 +477,7 @@ describe('Agent Spawning API', () => {
   });
 
   describe('GET /api/sessions/{sessionId}/agents', () => {
-    const sessionId: ThreadId = createThreadId('lace_20250113_session1');
+    const sessionId: ThreadId = createThreadId('lace_20250113_abc123');
 
     it('should list all agents in session', async () => {
       const agents: Agent[] = [

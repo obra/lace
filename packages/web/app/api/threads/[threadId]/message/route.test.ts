@@ -119,7 +119,7 @@ describe('Thread Messaging API', () => {
     });
 
     const response = await POST(request, {
-      params: Promise.resolve({ threadId: 'lace_20240101_nonexistent' }),
+      params: Promise.resolve({ threadId: 'lace_20240101_fake12' }),
     });
 
     expect(response.status).toBe(404);

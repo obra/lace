@@ -39,8 +39,8 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       toolExecutor: {
         getTool: vi.fn().mockReturnValue({
           description: 'Mock tool description',
-          annotations: { readOnlyHint: false }
-        })
+          annotations: { readOnlyHint: false },
+        }),
       },
     };
 
@@ -62,7 +62,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return pending approvals from ThreadManager', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const mockPendingApprovals = [
       {
         toolCallId: 'call_456',
@@ -110,7 +110,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
+    );
     const params = { threadId };
 
     const response = await GET(request, { params });
@@ -125,29 +127,33 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should return empty array when no pending approvals', async () => {
-    const threadId = 'lace_20250101_test456';
-    
+    const threadId = 'lace_20250101_test45';
+
     mockAgent.getPendingApprovals.mockReturnValue([]);
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
+    );
     const params = { threadId };
 
     const response = await GET(request, { params });
 
     expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
     expect(response.status).toBe(200);
-    
+
     const data = (await response.json()) as { pendingApprovals: unknown[] };
     expect(data).toEqual({ pendingApprovals: [] });
   });
 
   it('should return error if agent not found', async () => {
-    const threadId = 'lace_20250101_nonexist';
+    const threadId = 'lace_20250101_fake01';
 
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
+    );
     const params = { threadId };
 
     const response = await GET(request, { params });
@@ -161,29 +167,29 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should handle multiple pending approvals with different tool types', async () => {
-    const threadId = 'lace_20250101_test789';
+    const threadId = 'lace_20250101_test78';
     const mockPendingApprovals = [
       {
         toolCallId: 'call_bash',
-        toolCall: { 
-          name: 'bash', 
-          arguments: { command: 'rm -rf /important' } 
+        toolCall: {
+          name: 'bash',
+          arguments: { command: 'rm -rf /important' },
         },
         requestedAt: new Date('2025-01-24T10:00:00Z'),
       },
       {
         toolCallId: 'call_file_write',
-        toolCall: { 
-          name: 'file-write', 
-          arguments: { path: '/etc/passwd', content: 'malicious' } 
+        toolCall: {
+          name: 'file-write',
+          arguments: { path: '/etc/passwd', content: 'malicious' },
         },
         requestedAt: new Date('2025-01-24T10:01:00Z'),
       },
       {
         toolCallId: 'call_url_fetch',
-        toolCall: { 
-          name: 'url-fetch', 
-          arguments: { url: 'https://malicious.com/data' } 
+        toolCall: {
+          name: 'url-fetch',
+          arguments: { url: 'https://malicious.com/data' },
         },
         requestedAt: new Date('2025-01-24T10:02:00Z'),
       },
@@ -193,9 +199,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const expectedJsonResponse = [
       {
         toolCallId: 'call_bash',
-        toolCall: { 
-          name: 'bash', 
-          arguments: { command: 'rm -rf /important' } 
+        toolCall: {
+          name: 'bash',
+          arguments: { command: 'rm -rf /important' },
         },
         requestedAt: '2025-01-24T10:00:00.000Z',
         requestData: {
@@ -210,9 +216,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
       {
         toolCallId: 'call_file_write',
-        toolCall: { 
-          name: 'file-write', 
-          arguments: { path: '/etc/passwd', content: 'malicious' } 
+        toolCall: {
+          name: 'file-write',
+          arguments: { path: '/etc/passwd', content: 'malicious' },
         },
         requestedAt: '2025-01-24T10:01:00.000Z',
         requestData: {
@@ -227,9 +233,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       },
       {
         toolCallId: 'call_url_fetch',
-        toolCall: { 
-          name: 'url-fetch', 
-          arguments: { url: 'https://malicious.com/data' } 
+        toolCall: {
+          name: 'url-fetch',
+          arguments: { url: 'https://malicious.com/data' },
         },
         requestedAt: '2025-01-24T10:02:00.000Z',
         requestData: {
@@ -246,7 +252,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
+    );
     const params = { threadId };
 
     const response = await GET(request, { params });
@@ -258,13 +266,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
   });
 
   it('should handle Agent errors gracefully', async () => {
-    const threadId = 'lace_20250101_test999';
-    
+    const threadId = 'lace_20250101_test99';
+
     mockAgent.getPendingApprovals.mockImplementation(() => {
       throw new Error('Database connection failed');
     });
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
+    );
     const params = { threadId };
 
     const response = await GET(request, { params });
