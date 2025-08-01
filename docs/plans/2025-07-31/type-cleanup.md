@@ -52,6 +52,40 @@ This plan addresses the chaotic type organization in `packages/web/` where types
 - **Real codepaths**: Never mock the functionality under test
 - **Co-location**: Test files next to source files (`file.ts` → `file.test.ts`)
 - **Type safety**: Tests must be fully typed, no `any`
+- **MANDATORY VERIFICATION**: Run tests and linting before AND after EVERY task
+- **Zero tolerance**: If any test fails or linting errors exist, STOP and fix before proceeding
+
+## CRITICAL: Task Verification Template
+
+**BEFORE starting ANY task:**
+```bash
+# Verify clean starting state
+npm test
+npm run lint
+npm run build
+```
+**All commands must pass with zero errors/warnings before proceeding.**
+
+**AFTER completing ANY task:**
+```bash
+# Verify changes don't break anything
+npm test
+npm run lint  
+npm run build
+```
+**All commands must pass with zero errors/warnings before committing.**
+
+**If ANY command fails:**
+1. STOP immediately - do not proceed to next task
+2. Fix all errors and warnings
+3. Re-run verification commands
+4. Only proceed when everything passes
+
+## TASK FORMAT: Every task below follows this pattern:
+1. **BEFORE**: Run verification commands (test, lint, build)
+2. Implement the task changes
+3. **AFTER**: Run verification commands (test, lint, build)
+4. Only commit if all verifications pass
 
 ## Implementation Tasks
 
@@ -59,16 +93,18 @@ This plan addresses the chaotic type organization in `packages/web/` where types
 
 #### Task 1.1: Create backup branch and setup
 **Files**: Git operations
+
+**BEFORE**: Run verification template commands above ⬆️
+
 ```bash
 # Create feature branch
 git checkout -b f/type-cleanup
 
 # Ensure clean state
 git status
-npm run build
-npm run lint
-npm test
 ```
+
+**AFTER**: Run verification template commands above ⬆️
 
 #### Task 1.2: Document current import usage
 **Files**: `docs/type-audit.md` (create)
@@ -119,7 +155,8 @@ describe('Type Integrity', () => {
 });
 ```
 
-**Test**: `npm test type-integrity.test.ts`
+**BEFORE**: Run verification template commands above ⬆️
+**AFTER**: Run verification template commands above ⬆️
 **Expected**: Test passes, documenting current state
 **Commit**: `test: add type integrity test for cleanup safety`
 
@@ -171,6 +208,10 @@ export {
 export type {
   ProjectInfo
 } from '~/projects/project';
+
+export type {
+  SessionInfo
+} from '~/sessions/session';
 
 // Re-export utility functions
 export {
@@ -224,48 +265,31 @@ describe('Core Type Imports', () => {
 });
 ```
 
-**Test**: `npm test core.test.ts`
-**Expected**: All imports work correctly
+**BEFORE/AFTER**: Run verification commands ⬆️
+**Expected**: All imports work correctly, zero test/lint/build failures
 **Commit**: `feat: add unified core type imports`
 
-#### Task 2.2: Create clean web-specific types file
+#### Task 2.2: Create web request/response types file  
 **Files**: `packages/web/types/web.ts` (create)
-**Purpose**: Web-only types that don't exist in core
+**Purpose**: ONLY types that don't exist in core - requests, web-specific contracts
 ```typescript
-// ABOUTME: Web-specific type definitions for API endpoints and UI
-// ABOUTME: Contains only types unique to web package, imports core types from @/lib/core
+// ABOUTME: Web-specific request/response types that don't exist in core
+// ABOUTME: Uses core types for data models, defines web request contracts from schemas
 
-import type { 
-  ThreadId, 
-  AssigneeId, 
-  AgentState, 
-  ToolResult,
-  Task,
-  TaskNote,
-  TaskStatus,
-  TaskPriority,
-  ApprovalDecision
-} from '@/lib/core';
+import { z } from 'zod';
+import { 
+  MessageRequestSchema,
+  CreateTaskRequestSchema,
+  UpdateTaskRequestSchema,
+  CreateSessionRequestSchema,
+  SpawnAgentRequestSchema,
+  ToolCallIdSchema
+} from '@/lib/validation/schemas';
 
-// API request/response types
-export interface Session {
-  id: ThreadId;
-  name: string;
-  createdAt: string;
-  agentCount?: number;
-  agents?: Agent[];
-}
+// Use core types for API responses - no duplication
+export type { SessionInfo as Session } from '@/lib/core';
 
-export interface Agent {
-  threadId: ThreadId;
-  name: string;
-  provider: string;
-  model: string;
-  status: AgentState;
-  createdAt: string;
-}
-
-// Re-export core types for convenience
+// Re-export core types 
 export type { 
   ThreadId, 
   AssigneeId, 
@@ -276,23 +300,17 @@ export type {
   TaskPriority,
   ApprovalDecision,
   ToolResult
-};
+} from '@/lib/core';
 
-// API request/response interfaces
-export interface MessageRequest {
-  message: string;
-}
+// Request types (inferred from validation schemas) - ONLY PLACE THESE EXIST
+export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
+export type MessageRequest = z.infer<typeof MessageRequestSchema>;
+export type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
+export type UpdateTaskRequest = z.infer<typeof UpdateTaskRequestSchema>;
+export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
+export type SpawnAgentRequest = z.infer<typeof SpawnAgentRequestSchema>;
 
-export interface CreateSessionRequest {
-  name?: string;
-}
-
-export interface CreateAgentRequest {
-  name?: string;
-  provider?: string;
-  model?: string;
-}
-
+// Response types (only if they don't exist in core)
 export interface MessageResponse {
   status: 'accepted';
   threadId: ThreadId;
@@ -580,72 +598,19 @@ import type { ApprovalDecision } from '@/lib/core';
 export type { ApprovalDecision };
 ```
 
-**Test**: `npm test`
-**Expected**: All tests pass, no breaking changes
+**BEFORE/AFTER**: Run verification commands ⬆️
+**CRITICAL**: This changes existing types - verify no imports break
+**Expected**: All tests pass, no breaking changes, zero lint errors
 **Commit**: `refactor: remove duplicate ApprovalDecision, use core import`
 
-#### Task 3.2: Fix ThreadId type shadowing
+#### Task 3.2: Fix ThreadId type shadowing in schemas
 **Files**: `packages/web/lib/validation/schemas.ts` (modify)
-**Purpose**: Use core ThreadId instead of Zod-inferred type
+**Purpose**: Remove type exports from schemas file - schemas are for validation only
 
-Current problematic code (line 84):
+**Current problematic code (lines 84-90):**
 ```typescript
+// Remove these type exports - they shadow core types and belong in web types
 export type ThreadId = z.infer<typeof ThreadIdSchema>;
-```
-
-Replace with:
-```typescript
-import type { ThreadId } from '@/lib/core';
-// Remove the z.infer line, use imported ThreadId type
-```
-
-Update the schema to work with branded type:
-```typescript
-export const ThreadIdSchema = z
-  .string()
-  .refine(
-    (value) => isValidThreadId(value),
-    'Invalid thread ID format. Expected: lace_YYYYMMDD_randomId, UUID, or either with .number suffix'
-  )
-  .transform((value): ThreadId => {
-    // Import from core instead of local function
-    const { asThreadId } = await import('@/lib/core');
-    return asThreadId(value);
-  });
-```
-
-**Test**: `npm test schemas.test.ts`
-**Expected**: Schema validation works with core ThreadId type
-**Commit**: `fix: use core ThreadId type in schemas, remove shadowing`
-
-#### Task 3.2.1: Move other Zod-inferred types to web types
-**Files**: `packages/web/lib/validation/schemas.ts` (modify), `packages/web/types/web.ts` (modify)
-**Purpose**: Move request/response types to appropriate location, avoid schema file exporting domain types
-
-Remove from `packages/web/lib/validation/schemas.ts` (lines 85-90):
-```typescript
-// Remove these exports:
-// export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
-// export type MessageRequest = z.infer<typeof MessageRequestSchema>;
-// export type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
-// export type UpdateTaskRequest = z.infer<typeof UpdateTaskRequestSchema>;
-// export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
-// export type SpawnAgentRequest = z.infer<typeof SpawnAgentRequestSchema>;
-```
-
-Add to `packages/web/types/web.ts`:
-```typescript
-// Import schemas for type inference
-import { 
-  ToolCallIdSchema,
-  MessageRequestSchema,
-  CreateTaskRequestSchema,
-  UpdateTaskRequestSchema,
-  CreateSessionRequestSchema,
-  SpawnAgentRequestSchema
-} from '@/lib/validation/schemas';
-
-// Add these type exports
 export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
 export type MessageRequest = z.infer<typeof MessageRequestSchema>;
 export type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
@@ -654,25 +619,42 @@ export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 export type SpawnAgentRequest = z.infer<typeof SpawnAgentRequestSchema>;
 ```
 
-Update imports in files that use these types:
+**Replace with:**
+```typescript
+// This file only exports schemas for validation, not types
+// Types are inferred in @/types/web from these schemas
+```
+
+**CRITICAL**: Don't change the schemas themselves, only remove the type exports. The schemas are used for validation and type inference happens in the web types file.
+
+**BEFORE/AFTER**: Run verification commands ⬆️
+**Expected**: Schema validation still works, but no type shadowing
+**Commit**: `fix: remove type exports from schemas, eliminate shadowing`
+
+#### Task 3.2.1: Fix broken imports after removing schema type exports
+**Files**: All files importing request types from schemas
+**Purpose**: Update imports to use web types instead of schemas
+
+**CRITICAL**: Task 3.2 will break imports. Find and fix them immediately:
+
 ```bash
-# Find files using these types
-grep -r "MessageRequest\|CreateTaskRequest\|CreateSessionRequest" packages/web --include="*.ts" --include="*.tsx"
+# Find files that will break
+grep -r "import.*MessageRequest\|CreateTaskRequest\|CreateSessionRequest.*from.*schemas" packages/web --include="*.ts" --include="*.tsx" -l
 ```
 
-Change imports from:
+For each file found, update imports:
 ```typescript
+// OLD (now broken):
 import type { MessageRequest } from '@/lib/validation/schemas';
-```
 
-To:
-```typescript
+// NEW (correct):
 import type { MessageRequest } from '@/types/web';
 ```
 
-**Test**: `npm test && npm run build`
-**Expected**: Types available from web types file, not validation schemas
-**Commit**: `refactor: move request/response types from schemas to web types`
+**BEFORE/AFTER**: Run verification commands ⬆️
+**CRITICAL**: All imports must be fixed or build will fail
+**Expected**: No import errors, all types resolve correctly
+**Commit**: `fix: update request type imports to use web types`
 
 #### Task 3.3: Update validation to use core functions
 **Files**: `packages/web/lib/validation/thread-id-validation.ts` (modify)
@@ -720,7 +702,9 @@ Example files to update:
 - `packages/web/hooks/useHashRouter.ts`
 - `packages/web/app/api/sessions/[sessionId]/route.ts`
 
-**Test**: After each batch: `npm test && npm run build`
+**BEFORE/AFTER EACH BATCH**: Run verification commands ⬆️
+**CRITICAL**: Test after EVERY batch - don't accumulate changes
+**Expected**: Zero failures after each batch
 **Commit**: After each batch: `refactor: migrate [file names] to @/lib/core imports`
 
 #### Task 3.5: Migrate files to new import structure (Batch 2)
@@ -1007,8 +991,11 @@ After successful completion:
 
 ## Notes for Implementation
 
-- **Commit frequently**: After each task completion
-- **Test incrementally**: Don't accumulate changes without testing
+- **MANDATORY TESTING**: Run `npm test && npm run lint && npm run build` before AND after EVERY task
+- **Zero tolerance policy**: If ANY command fails, STOP and fix before proceeding
+- **Commit frequently**: After each task completion, but only when all verifications pass
+- **Test incrementally**: Don't accumulate changes without testing - verify each small change
 - **Check TypeScript errors carefully**: Strict mode catches type issues early
 - **Use type assertions sparingly**: Prefer type guards over `as` casting
 - **Document any deviations**: If implementation differs from plan, document why
+- **When stuck**: If tests fail repeatedly, consider smaller incremental changes or ask for help
