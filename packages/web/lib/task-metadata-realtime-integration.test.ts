@@ -65,8 +65,11 @@ describe('Task Metadata Event Format Bug', () => {
     const realTimeTimeline = convertSessionEventsToTimeline(realTimeEvents, mockContext);
     const persistenceTimeline = convertSessionEventsToTimeline(persistenceEvents, mockContext);
 
-    console.log('Real-time timeline:', JSON.stringify(realTimeTimeline, null, 2));
-    console.log('Persistence timeline:', JSON.stringify(persistenceTimeline, null, 2));
+    // Debug output for test validation
+    if (process.env.NODE_ENV === 'test') {
+      // Real-time timeline logged for debugging
+      // Persistence timeline logged for debugging
+    }
 
     // Both should produce tool entries with metadata
     const realTimeToolEntry = realTimeTimeline.find((e) => e.type === 'tool');
@@ -85,7 +88,7 @@ describe('Task Metadata Event Format Bug', () => {
     // The metadata should be identical
     expect(realTimeResult?.metadata).toEqual(persistenceResult?.metadata);
 
-    console.log('✅ Both have metadata - fix should work');
+    // Both have metadata - fix should work
   });
 
   it('should fail when TOOL_RESULT formats differ (old broken version)', () => {
@@ -150,8 +153,11 @@ describe('Task Metadata Event Format Bug', () => {
     const realTimeTimeline = convertSessionEventsToTimeline(realTimeEventsBroken, mockContext);
     const persistenceTimeline = convertSessionEventsToTimeline(persistenceEvents, mockContext);
 
-    console.log('Broken real-time timeline:', JSON.stringify(realTimeTimeline, null, 2));
-    console.log('Correct persistence timeline:', JSON.stringify(persistenceTimeline, null, 2));
+    // Debug output for broken format demonstration
+    if (process.env.NODE_ENV === 'test') {
+      // Broken real-time timeline logged for debugging
+      // Correct persistence timeline logged for debugging
+    }
 
     // Both should produce tool entries
     const realTimeToolEntry = realTimeTimeline.find((e) => e.type === 'tool');
@@ -170,9 +176,8 @@ describe('Task Metadata Event Format Bug', () => {
     const realTimeHasMetadata = !!realTimeResult?.metadata?.tasks;
     const persistenceHasMetadata = !!persistenceResult?.metadata?.tasks;
 
-    console.log('Real-time has metadata:', realTimeHasMetadata);
-    console.log('Persistence has metadata:', persistenceHasMetadata);
-    console.log('❌ Format mismatch causes metadata loss in real-time');
+    // Format mismatch causes metadata loss in real-time
+    // This demonstrates the bug that was fixed
 
     // This demonstrates the bug
     expect(realTimeHasMetadata).toBe(false);
