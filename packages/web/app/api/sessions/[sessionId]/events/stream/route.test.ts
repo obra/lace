@@ -69,7 +69,7 @@ describe('Session SSE Stream API', () => {
   });
 
   describe('GET /api/sessions/{sessionId}/events/stream', () => {
-    const sessionId: ThreadId = 'lace_20250113_session1' as ThreadId;
+    const sessionId: ThreadId = 'lace_20250113_abc123' as ThreadId;
 
     // Helper function to create properly typed mock sessions
     const createMockSession = (id: ThreadId): Session => {
