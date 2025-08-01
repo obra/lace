@@ -1,7 +1,9 @@
-// ABOUTME: React hook for subscribing to real-time task updates via SSE
-// ABOUTME: Provides event callbacks for task create, update, delete, and note events
+// ABOUTME: Event stream hook for task events
+// ABOUTME: Real-time task updates via event stream
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useEventStream } from './useEventStream';
+import type { StreamEvent } from '@/types/stream-events';
 import type { Task } from '@/lib/core';
 
 export interface TaskEvent {
@@ -25,6 +27,11 @@ interface UseTaskStreamOptions {
   onError?: (error: Error) => void;
 }
 
+function isTaskEvent(streamEvent: StreamEvent): boolean {
+  return streamEvent.scope === 'session' && 
+         ['task:created', 'task:updated', 'task:deleted', 'task:note_added'].includes(streamEvent.type);
+}
+
 export function useTaskStream({
   projectId,
   sessionId,
@@ -34,67 +41,48 @@ export function useTaskStream({
   onTaskNoteAdded,
   onError,
 }: UseTaskStreamOptions) {
-  const eventSourceRef = useRef<EventSource | null>(null);
-
-  useEffect(() => {
-    if (!projectId || !sessionId) return;
-
-    // Create SSE connection
-    const eventSource = new EventSource(
-      `/api/projects/${projectId}/sessions/${sessionId}/tasks/stream`
-    );
-    eventSourceRef.current = eventSource;
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data as string) as
-          | TaskEvent
-          | { type: 'connected'; sessionId: string };
-
-        if (data.type === 'connected') {
-          // Connected to task stream
-          return;
-        }
-
-        // Handle task events
-        const taskEvent = data;
-        switch (taskEvent.type) {
-          case 'task:created':
-            onTaskCreated?.(taskEvent);
-            break;
-          case 'task:updated':
-            onTaskUpdated?.(taskEvent);
-            break;
-          case 'task:deleted':
-            onTaskDeleted?.(taskEvent);
-            break;
-          case 'task:note_added':
-            onTaskNoteAdded?.(taskEvent);
-            break;
-        }
-      } catch (error) {
-        onError?.(error as Error);
-      }
-    };
-
-    eventSource.onerror = (_error) => {
-      onError?.(new Error('Task stream connection failed'));
-    };
-
-    // Cleanup on unmount
-    return () => {
-      eventSource.close();
-      eventSourceRef.current = null;
-    };
-  }, [projectId, sessionId, onTaskCreated, onTaskUpdated, onTaskDeleted, onTaskNoteAdded, onError]);
-
-  // Return a function to manually close the stream if needed
-  const close = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+  
+  // Handle stream events
+  const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
+    // Only process task events
+    if (!isTaskEvent(streamEvent)) {
+      return;
     }
-  };
+
+    const taskEvent = streamEvent.data as TaskEvent;
+    
+    // Dispatch to appropriate handler
+    switch (taskEvent.type) {
+      case 'task:created':
+        onTaskCreated?.(taskEvent);
+        break;
+      case 'task:updated':
+        onTaskUpdated?.(taskEvent);
+        break;
+      case 'task:deleted':
+        onTaskDeleted?.(taskEvent);
+        break;
+      case 'task:note_added':
+        onTaskNoteAdded?.(taskEvent);
+        break;
+    }
+  }, [onTaskCreated, onTaskUpdated, onTaskDeleted, onTaskNoteAdded]);
+
+  // Memoize subscription to prevent reconnections
+  const subscription = useMemo(() => ({
+    projects: projectId ? [projectId] : [],
+    sessions: sessionId ? [sessionId] : [],
+    eventTypes: ['task:created', 'task:updated', 'task:deleted', 'task:note_added'],
+  }), [projectId, sessionId]);
+
+  // Use event stream with project and session filtering
+  const { close } = useEventStream({
+    subscription,
+    onEvent: handleStreamEvent,
+    onError: (error) => {
+      onError?.(error);
+    },
+  });
 
   return { close };
 }

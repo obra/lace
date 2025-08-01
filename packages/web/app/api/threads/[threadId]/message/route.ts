@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
 import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
 import { asThreadId, type ThreadId } from '@/lib/server/core-types';
-import { SSEManager } from '@/lib/sse-manager';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
 
@@ -126,7 +126,7 @@ export async function POST(
 
     // Broadcast user message event via SSE
     console.log('[MESSAGE_API] Broadcasting user message event via SSE');
-    const sseManager = SSEManager.getInstance();
+    const sseManager = EventStreamManager.getInstance();
 
     const userMessageEvent: SessionEvent = {
       type: 'USER_MESSAGE' as const,
@@ -135,7 +135,7 @@ export async function POST(
       data: { content: body.message },
     };
     console.log('[MESSAGE_API] User message event:', userMessageEvent);
-    sseManager.broadcast(sessionId, userMessageEvent);
+    sseManager.broadcastToSession(sessionId, userMessageEvent);
     console.log('[MESSAGE_API] SSE broadcast complete');
 
     // Generate message ID
@@ -162,7 +162,7 @@ export async function POST(
           data: { content: `Error: ${errorMessage}` },
         };
         console.log('[MESSAGE_API] Broadcasting error event:', errorEvent);
-        sseManager.broadcast(sessionId, errorEvent);
+        sseManager.broadcastToSession(sessionId, errorEvent);
       });
 
     // Return immediate acknowledgment

@@ -6,7 +6,7 @@ import type { ThreadId } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
 import { Session as SessionType, Agent as AgentType, SessionEvent } from '@/types/api';
-import { SSEManager } from '@/lib/sse-manager';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 // Active session instances
 const activeSessions = new Map<ThreadId, Session>();
@@ -127,7 +127,7 @@ export class SessionService {
   }
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
-    const sseManager = SSEManager.getInstance();
+    const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
