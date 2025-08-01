@@ -2,7 +2,6 @@
 // ABOUTME: Provides --port and --host options for network configuration
 
 import { createServer } from 'http';
-import { parse } from 'url';
 import next from 'next';
 import { parseArgs } from 'util';
 
@@ -49,13 +48,49 @@ Examples:
   process.exit(0);
 }
 
-const port = parseInt(values.port || '3000', 10);
+const requestedPort = parseInt(values.port || '3000', 10);
 const hostname = values.host || 'localhost';
 const dev = process.env.NODE_ENV !== 'production';
+const userSpecifiedPort = !!values.port; // Track if user manually specified port
 
 // Validate port
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
+if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
   console.error(`Error: Invalid port number: ${values.port}`);
+  process.exit(1);
+}
+
+// Function to find an available port
+async function findAvailablePort(startPort: number, userSpecified: boolean): Promise<number> {
+  const { createServer } = await import('http');
+  
+  const testPort = (port: number): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const server = createServer();
+      server.listen(port, hostname, () => {
+        server.close(() => resolve(true));
+      });
+      server.on('error', () => resolve(false));
+    });
+  };
+
+  // If user specified port, only try that one
+  if (userSpecified) {
+    const isAvailable = await testPort(startPort);
+    if (!isAvailable) {
+      console.error(`Error: Port ${startPort} is already in use`);
+      process.exit(1);
+    }
+    return startPort;
+  }
+
+  // Try ports starting from the requested port
+  for (let port = startPort; port <= startPort + 100; port++) {
+    if (await testPort(port)) {
+      return port;
+    }
+  }
+
+  console.error(`Error: Could not find an available port starting from ${startPort}`);
   process.exit(1);
 }
 
@@ -75,11 +110,14 @@ console.log(`Starting Lace in ${dev ? 'development' : 'production'} mode...`);
 
 app
   .prepare()
-  .then(() => {
-    createServer((req, res) => {
-      const parsedUrl = parse(req.url || '/', true);
-      handle(req, res, parsedUrl);
-    }).listen(port, hostname, () => {
+  .then(async () => {
+    const port = await findAvailablePort(requestedPort, userSpecifiedPort);
+    
+    const server = createServer((req, res) => {
+      handle(req, res);
+    });
+
+    server.listen(port, hostname, () => {
       console.log(`
 ✅ Lace is ready!
    
@@ -90,6 +128,7 @@ app
    Press Ctrl+C to stop
 `);
     });
+
   })
   .catch((err) => {
     console.error('Error starting server:', err);
