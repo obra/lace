@@ -82,7 +82,11 @@ export async function POST(
       timestamp: new Date(),
       data: { content: `Agent "${agentResponse.name}" spawned successfully` },
     };
-    sseManager.broadcastToSession(sessionId, testEvent);
+    sseManager.broadcast({
+      eventType: 'session',
+      scope: { sessionId },
+      data: testEvent,
+    });
 
     return NextResponse.json({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {
