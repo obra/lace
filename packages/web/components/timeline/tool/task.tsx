@@ -245,26 +245,21 @@ const taskListRenderer: ToolRenderer = {
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
     
-    if (!parsed) {
-      return (
-        <div className="text-sm text-base-content/60 italic">
-          No tasks available
-        </div>
-      );
-    }
-    
-    if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
+    // Handle errors first
+    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="text-error text-sm">{error.error}</div>
+          <div className="text-error text-sm">{error?.error || 'Unknown error'}</div>
         </div>
       );
     }
     
-    const data = parsed as { tasks?: Array<{ id: string; title: string; status: string; priority: string; assignedTo?: string }>; totalCount?: number };
+    // Get tasks from metadata (structured data from task tools)
+    const resultMetadata = result.metadata as { tasks?: Task[] } | undefined;
+    const tasks = resultMetadata?.tasks;
     
-    if (!data.tasks || data.tasks.length === 0) {
+    if (!tasks || tasks.length === 0) {
       return (
         <div className="bg-base-100 border border-base-300 rounded-lg p-4 text-center">
           <div className="text-base-content/50 text-sm">No tasks found</div>
@@ -277,12 +272,12 @@ const taskListRenderer: ToolRenderer = {
         <div className="p-3 border-b border-base-300 bg-base-200/50">
           <div className="flex items-center gap-2 text-sm font-medium text-base-content">
             <FontAwesomeIcon icon={faClipboardList} className="w-4 h-4" />
-            {data.totalCount ? `${data.totalCount} tasks` : `${data.tasks.length} tasks`}
+            {tasks.length} tasks
           </div>
         </div>
         
         <div className="divide-y divide-base-300">
-          {data.tasks.map((task, index) => (
+          {tasks.map((task, index) => (
             <div key={task.id || index} className="p-4 hover:bg-base-50">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
