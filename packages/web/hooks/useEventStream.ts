@@ -2,12 +2,12 @@
 // ABOUTME: Real-time events across projects and sessions
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { 
-  StreamEvent, 
-  StreamSubscription, 
+import type {
+  StreamEvent,
+  StreamSubscription,
   StreamConnection,
   EventFilter,
-  createEventFilter 
+  createEventFilter,
 } from '@/types/stream-events';
 
 interface UseEventStreamOptions {
@@ -42,14 +42,14 @@ export function useEventStream({
     reconnectAttempts: 0,
     maxReconnectAttempts: 5,
   });
-  
+
   const [lastEvent, setLastEvent] = useState<StreamEvent>();
   const [sendCount, setSendCount] = useState(0);
-  
+
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const filterRef = useRef<EventFilter>();
-  
+
   // Store callbacks in refs to avoid recreating connect on every callback change
   const callbackRefs = useRef({
     onEvent,
@@ -57,7 +57,7 @@ export function useEventStream({
     onDisconnect,
     onError,
   });
-  
+
   // Update callback refs when callbacks change
   useEffect(() => {
     callbackRefs.current = {
@@ -67,7 +67,7 @@ export function useEventStream({
       onError,
     };
   }, [onEvent, onConnect, onDisconnect, onError]);
-  
+
   // Create event filter from subscription
   useEffect(() => {
     // Import the function dynamically to avoid circular dependencies
@@ -79,13 +79,13 @@ export function useEventStream({
   // Build query string from subscription
   const buildQueryString = useCallback((sub: StreamSubscription): string => {
     const params = new URLSearchParams();
-    
+
     if (sub.projects?.length) params.set('projects', sub.projects.join(','));
     if (sub.sessions?.length) params.set('sessions', sub.sessions.join(','));
     if (sub.threads?.length) params.set('threads', sub.threads.join(','));
     if (sub.global) params.set('global', 'true');
     if (sub.eventTypes?.length) params.set('eventTypes', sub.eventTypes.join(','));
-    
+
     return params.toString();
   }, []);
 
@@ -97,15 +97,15 @@ export function useEventStream({
 
     const queryString = buildQueryString(subscription);
     const url = `/api/events/stream${queryString ? `?${queryString}` : ''}`;
-    
+
     console.log('[EVENT_STREAM_HOOK] Connecting to:', url);
-    
+
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
       console.log('[EVENT_STREAM_HOOK] Connected');
-      setConnection(prev => ({
+      setConnection((prev) => ({
         ...prev,
         connected: true,
         reconnectAttempts: 0,
@@ -116,21 +116,21 @@ export function useEventStream({
     eventSource.onmessage = (event) => {
       try {
         const streamEvent = JSON.parse(event.data) as StreamEvent;
-        
+
         // Apply client-side filtering
-        if (filterRef.current && !filterRef.current(streamEvent)) {
+        if (filterRef.current && !filterRef.current.shouldIncludeEvent(streamEvent)) {
           return;
         }
-        
+
         console.log('[EVENT_STREAM_HOOK] Received event:', streamEvent);
-        
+
         setLastEvent(streamEvent);
-        setSendCount(prev => prev + 1);
-        setConnection(prev => ({
+        setSendCount((prev) => prev + 1);
+        setConnection((prev) => ({
           ...prev,
           lastEventId: streamEvent.id,
         }));
-        
+
         callbackRefs.current.onEvent?.(streamEvent);
       } catch (error) {
         console.error('[EVENT_STREAM_HOOK] Failed to parse event:', error);
@@ -140,26 +140,31 @@ export function useEventStream({
 
     eventSource.onerror = (error) => {
       console.error('[EVENT_STREAM_HOOK] Connection error:', error);
-      
-      setConnection(prev => {
+
+      setConnection((prev) => {
         const newState = {
           ...prev,
           connected: false,
           reconnectAttempts: prev.reconnectAttempts + 1,
         };
-        
+
         callbackRefs.current.onDisconnect?.();
         callbackRefs.current.onError?.(new Error('SSE connection failed'));
-        
+
         // Auto-reconnect logic using current state
         if (autoReconnect && newState.reconnectAttempts < newState.maxReconnectAttempts) {
-          console.log(`[EVENT_STREAM_HOOK] Reconnecting in ${reconnectInterval}ms (attempt ${newState.reconnectAttempts})`);
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, reconnectInterval * Math.pow(2, newState.reconnectAttempts - 1)); // Exponential backoff
+          console.log(
+            `[EVENT_STREAM_HOOK] Reconnecting in ${reconnectInterval}ms (attempt ${newState.reconnectAttempts})`
+          );
+
+          reconnectTimeoutRef.current = setTimeout(
+            () => {
+              connect();
+            },
+            reconnectInterval * Math.pow(2, newState.reconnectAttempts - 1)
+          ); // Exponential backoff
         }
-        
+
         return newState;
       });
     };
@@ -167,7 +172,7 @@ export function useEventStream({
 
   // Manual reconnect
   const reconnect = useCallback(() => {
-    setConnection(prev => ({ ...prev, reconnectAttempts: 0 }));
+    setConnection((prev) => ({ ...prev, reconnectAttempts: 0 }));
     connect();
   }, [connect]);
 
@@ -177,31 +182,31 @@ export function useEventStream({
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
-    
+
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    
-    setConnection(prev => ({ ...prev, connected: false }));
+
+    setConnection((prev) => ({ ...prev, connected: false }));
   }, []);
 
   // Connect on mount, reconnect when subscription changes
   useEffect(() => {
     connect();
-    
+
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      
+
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      
-      setConnection(prev => ({ ...prev, connected: false }));
+
+      setConnection((prev) => ({ ...prev, connected: false }));
     };
   }, [connect]);
 
@@ -236,7 +241,10 @@ export function useGlobalStream(options?: Partial<UseEventStreamOptions>) {
   });
 }
 
-export function useMultiSessionStream(sessionIds: string[], options?: Partial<UseEventStreamOptions>) {
+export function useMultiSessionStream(
+  sessionIds: string[],
+  options?: Partial<UseEventStreamOptions>
+) {
   return useEventStream({
     subscription: { sessions: sessionIds },
     ...options,
