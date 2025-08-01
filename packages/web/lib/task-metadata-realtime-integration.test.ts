@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { convertSessionEventsToTimeline } from './timeline-converter';
-import type { SessionEvent, Agent as AgentType, ToolResult } from '@/types/api';
+import type { SessionEvent, Agent as AgentType, ToolResult, ThreadId } from '@/types/api';
 
 describe('Task Metadata Event Format Bug', () => {
   it('should produce identical timeline results when TOOL_RESULT formats match', () => {
@@ -26,16 +26,17 @@ describe('Task Metadata Event Format Bug', () => {
     };
 
     // Real-time events (how session-service.ts supposedly sends them after my fix)
+    const testThreadId = 'test-thread' as ThreadId;
     const realTimeEvents: SessionEvent[] = [
       {
         type: 'TOOL_CALL',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId,
         timestamp: new Date(),
         data: { id: 'call-123', name: 'task_add', arguments: { tasks: [{ title: 'Test task' }] } },
       },
       {
         type: 'TOOL_RESULT',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId,
         timestamp: new Date(),
         data: toolResult, // Direct result format (the fix)
       },
@@ -45,13 +46,13 @@ describe('Task Metadata Event Format Bug', () => {
     const persistenceEvents: SessionEvent[] = [
       {
         type: 'TOOL_CALL',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId,
         timestamp: new Date(),
         data: { id: 'call-123', name: 'task_add', arguments: { tasks: [{ title: 'Test task' }] } },
       },
       {
         type: 'TOOL_RESULT',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId,
         timestamp: new Date(),
         data: toolResult, // Same format
       },
@@ -59,7 +60,7 @@ describe('Task Metadata Event Format Bug', () => {
 
     // Convert both to timeline
     const mockContext = {
-      agents: [{ threadId: 'test-thread' as any, name: 'Test Agent' } as AgentType],
+      agents: [{ threadId: testThreadId, name: 'Test Agent' } as AgentType],
     };
 
     const realTimeTimeline = convertSessionEventsToTimeline(realTimeEvents, mockContext);
@@ -111,21 +112,22 @@ describe('Task Metadata Event Format Bug', () => {
     };
 
     // Real-time events (old broken format before my fix)
+    const testThreadId2 = 'test-thread' as ThreadId;
     const realTimeEventsBroken: SessionEvent[] = [
       {
         type: 'TOOL_CALL',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId2,
         timestamp: new Date(),
         data: { id: 'call-123', name: 'task_add', arguments: { tasks: [{ title: 'Test task' }] } },
       },
       {
         type: 'TOOL_RESULT',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId2,
         timestamp: new Date(),
         data: {
           toolName: 'task_add',
           result: toolResult, // Wrapped format (the bug)
-        } as any,
+        } as { toolName: string; result: unknown },
       },
     ];
 
@@ -133,13 +135,13 @@ describe('Task Metadata Event Format Bug', () => {
     const persistenceEvents: SessionEvent[] = [
       {
         type: 'TOOL_CALL',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId2,
         timestamp: new Date(),
         data: { id: 'call-123', name: 'task_add', arguments: { tasks: [{ title: 'Test task' }] } },
       },
       {
         type: 'TOOL_RESULT',
-        threadId: 'test-thread' as any,
+        threadId: testThreadId2,
         timestamp: new Date(),
         data: toolResult, // Direct format
       },
@@ -147,7 +149,7 @@ describe('Task Metadata Event Format Bug', () => {
 
     // Convert both to timeline
     const mockContext = {
-      agents: [{ threadId: 'test-thread' as any, name: 'Test Agent' } as AgentType],
+      agents: [{ threadId: testThreadId2, name: 'Test Agent' } as AgentType],
     };
 
     const realTimeTimeline = convertSessionEventsToTimeline(realTimeEventsBroken, mockContext);
@@ -167,13 +169,13 @@ describe('Task Metadata Event Format Bug', () => {
     expect(persistenceToolEntry).toBeDefined();
 
     // But real-time should NOT have metadata (due to wrong format)
-    const realTimeResult = realTimeToolEntry?.result as any;
+    const realTimeResult = realTimeToolEntry?.result as unknown;
     const persistenceResult = persistenceToolEntry?.result as ToolResult;
 
     expect(persistenceResult?.metadata?.tasks).toBeDefined();
 
     // This would be the bug - real-time doesn't have metadata
-    const realTimeHasMetadata = !!realTimeResult?.metadata?.tasks;
+    const realTimeHasMetadata = !!(realTimeResult as ToolResult)?.metadata?.tasks;
     const persistenceHasMetadata = !!persistenceResult?.metadata?.tasks;
 
     // Format mismatch causes metadata loss in real-time
