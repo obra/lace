@@ -66,12 +66,12 @@ describe('Type Integrity - Current State', () => {
       // Valid formats
       expect(isValidThreadId('lace_20250731_abc123')).toBe(true);
       expect(isValidThreadId('lace_20250731_abc123.1')).toBe(true);
-      expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
 
       // Invalid formats
       expect(isValidThreadId('invalid')).toBe(false);
       expect(isValidThreadId('')).toBe(false);
       expect(isValidThreadId('lace_invalid_date')).toBe(false);
+      expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(false); // UUIDs not valid
     });
 
     it('should create Session types correctly', async () => {
