@@ -7,7 +7,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import type { Task } from '@/types';
+import type { Task } from '@/lib/core';
 import { asThreadId, type ThreadId, type AssigneeId } from '@/lib/server/core-types';
 
 const mockTasks: Task[] = [

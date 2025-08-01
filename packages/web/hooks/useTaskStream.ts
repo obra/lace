@@ -2,7 +2,7 @@
 // ABOUTME: Provides event callbacks for task create, update, delete, and note events
 
 import { useEffect, useRef } from 'react';
-import type { Task } from '@/types';
+import type { Task } from '@/lib/core';
 
 export interface TaskEvent {
   type: 'task:created' | 'task:updated' | 'task:deleted' | 'task:note_added';

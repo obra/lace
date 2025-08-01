@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import { useTaskStream, type TaskEvent } from '@/hooks/useTaskStream';
-import type { Task } from '@/types';
+import type { Task } from '@/lib/core';
 import type { TaskFilters, CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
 
 export function useTaskManager(projectId: string, sessionId: string) {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TaskBoardModal } from './TaskBoardModal';
-import { Task } from '@/types';
+import { Task } from '@/lib/core';
 import { asThreadId } from '@/lib/server/core-types';
 
 // Demo columns definition for stories

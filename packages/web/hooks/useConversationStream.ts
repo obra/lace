@@ -2,7 +2,7 @@
 // ABOUTME: Provides real-time streaming conversation interface with event handling
 
 import { useState, useCallback, useRef } from 'react';
-import type { StreamEvent } from '@/types';
+import type { StreamEvent } from '@/types/design-system';
 
 interface UseConversationStreamOptions {
   onStreamEvent?: (event: StreamEvent) => void;
