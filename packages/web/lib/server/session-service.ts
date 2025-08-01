@@ -137,7 +137,11 @@ export class SessionService {
         timestamp: new Date(),
         data: { content },
       };
-      sseManager.broadcast(sessionId, event);
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     // Handle streaming tokens
@@ -152,7 +156,11 @@ export class SessionService {
         timestamp: new Date(),
         data: { token },
       };
-      sseManager.broadcast(sessionId, event);
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     agent.on(
@@ -164,7 +172,11 @@ export class SessionService {
           timestamp: new Date(),
           data: { id: callId, name: toolName, arguments: input },
         };
-        sseManager.broadcast(sessionId, event);
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
       }
     );
 
@@ -177,7 +189,11 @@ export class SessionService {
           timestamp: new Date(),
           data: result as ToolResult, // Cast to ToolResult for type safety
         };
-        sseManager.broadcast(sessionId, event);
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
       }
     );
 
@@ -195,7 +211,11 @@ export class SessionService {
         timestamp: new Date(),
         data: { content: `Agent error: ${error.message}` },
       };
-      sseManager.broadcast(sessionId, event);
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     // Listen for conversation complete
@@ -254,7 +274,11 @@ export class SessionService {
               },
             };
 
-            sseManager.broadcast(sessionId, sessionEvent);
+            sseManager.broadcast({
+              eventType: 'session',
+              scope: { sessionId },
+              data: sessionEvent,
+            });
           }
         } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
           // Forward approval response events to UI so modal can refresh
@@ -270,7 +294,11 @@ export class SessionService {
             },
           };
 
-          sseManager.broadcast(sessionId, sessionEvent);
+          sseManager.broadcast({
+            eventType: 'session',
+            scope: { sessionId },
+            data: sessionEvent,
+          });
         }
       }
     );
