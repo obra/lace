@@ -14,9 +14,9 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-// Mock SSE Manager
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
+// Mock EventStreamManager
+vi.mock('@/lib/event-stream-manager', () => ({
+  EventStreamManager: {
     getInstance: () => ({
       broadcast: vi.fn(),
       addConnection: vi.fn(),

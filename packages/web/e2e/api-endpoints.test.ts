@@ -13,8 +13,8 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 vi.mock('server-only', () => ({}));
 
 // Mock only external dependencies, not core functionality
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
+vi.mock('@/lib/event-stream-manager', () => ({
+  EventStreamManager: {
     getInstance: () => ({
       broadcast: vi.fn(),
       addConnection: vi.fn(),

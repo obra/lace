@@ -32,8 +32,8 @@ vi.mock('@/lib/server/approval-manager', () => ({
   }),
 }));
 
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
+vi.mock('@/lib/event-stream-manager', () => ({
+  EventStreamManager: {
     getInstance: () => ({
       broadcast: vi.fn(),
     }),

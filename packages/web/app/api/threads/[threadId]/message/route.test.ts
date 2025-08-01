@@ -18,15 +18,15 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 let consoleLogs: string[] = [];
 let originalConsoleError: typeof console.error;
 
-// Mock SSE manager to capture events
-const mockSSEManager = {
+// Mock EventStreamManager to capture events
+const mockEventStreamManager = {
   broadcast: vi.fn(),
   getInstance: vi.fn(),
 };
 
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => mockSSEManager,
+vi.mock('@/lib/event-stream-manager', () => ({
+  EventStreamManager: {
+    getInstance: () => mockEventStreamManager,
   },
 }));
 
@@ -153,7 +153,7 @@ describe('Thread Messaging API', () => {
     expect(response.status).toBe(400);
   });
 
-  it('should broadcast user message event via SSE', async () => {
+  it('should broadcast user message event via EventStreamManager', async () => {
     const request = new NextRequest('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -165,13 +165,14 @@ describe('Thread Messaging API', () => {
     });
 
     // Should broadcast the user message event
-    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
-      realSessionId,
-      expect.objectContaining({
+    expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: realSessionId },
+      data: expect.objectContaining({
         type: 'USER_MESSAGE',
         data: { content: 'Test message' },
-      })
-    );
+      }),
+    });
   });
 
   it('should handle malformed JSON gracefully', async () => {

@@ -18,17 +18,17 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
-// Mock SSE manager
-const mockSSEManager = {
+// Mock EventStreamManager
+const mockEventStreamManager = {
   addConnection: vi.fn(),
   removeConnection: vi.fn(),
   broadcast: vi.fn(),
   sessionStreams: new Map(),
 };
 
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => mockSSEManager,
+vi.mock('@/lib/event-stream-manager', () => ({
+  EventStreamManager: {
+    getInstance: () => mockEventStreamManager,
   },
 }));
 
@@ -38,7 +38,7 @@ describe('Full Conversation Flow', () => {
   beforeEach(() => {
     setupTestPersistence();
     vi.clearAllMocks();
-    mockSSEManager.sessionStreams.clear();
+    mockEventStreamManager.sessionStreams.clear();
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
@@ -134,7 +134,10 @@ describe('Full Conversation Flow', () => {
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
+    expect(mockEventStreamManager.addConnection).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Object)
+    );
 
     // 4. Send message
     const message = 'Hello, assistant!';
@@ -155,8 +158,11 @@ describe('Full Conversation Flow', () => {
     const messageData = (await messageResponse.json()) as { status: string };
     expect(messageData.status).toBe('accepted');
 
-    // 5. Verify SSE connection was established
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
+    // 5. Verify EventStreamManager connection was established
+    expect(mockEventStreamManager.addConnection).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Object)
+    );
   });
 
   it('should handle multi-agent scenario', async () => {
@@ -304,8 +310,10 @@ describe('Full Conversation Flow', () => {
     );
 
     // Verify each session has its own connection
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(session1Id, expect.any(Object));
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(session2Id, expect.any(Object));
-    expect(mockSSEManager.addConnection).toHaveBeenCalledTimes(2);
+    expect(mockEventStreamManager.addConnection).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Object)
+    );
+    expect(mockEventStreamManager.addConnection).toHaveBeenCalledTimes(2);
   });
 });
