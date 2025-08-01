@@ -75,7 +75,12 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
           <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
             <div className="text-base-content/80 mb-2 font-mono">$ {entry.content}</div>
             {entry.result && (
-              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">{entry.result}</div>
+              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
+                {typeof entry.result === 'string' 
+                  ? entry.result 
+                  : entry.result?.content?.map(block => block.text).join('') || 'No result'
+                }
+              </div>
             )}
           </div>
         </div>

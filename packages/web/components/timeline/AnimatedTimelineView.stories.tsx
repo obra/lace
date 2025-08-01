@@ -59,7 +59,8 @@ const sampleEntries: TimelineEntry[] = [
     type: 'tool',
     tool: 'bash',
     content: 'npm run build -- --analyze',
-    result: `Bundle Analysis:
+    result: {
+      content: [{ type: 'text', text: `Bundle Analysis:
 ┌─────────────────────────────────────────────────────────────┐
 │                      Bundle Size Report                     │
 ├─────────────────────────────────────────────────────────────┤
@@ -71,7 +72,9 @@ const sampleEntries: TimelineEntry[] = [
 │ • react-dom: 120KB                                         │
 │ • framer-motion: 95KB                                      │
 │ • lodash: 70KB (consider tree-shaking)                     │
-└─────────────────────────────────────────────────────────────┘`,
+└─────────────────────────────────────────────────────────────┘` }],
+      isError: false,
+    },
     timestamp: new Date(Date.now() - 3300000),
   },
   {
@@ -138,11 +141,14 @@ const longConversation: TimelineEntry[] = [
     type: 'tool',
     tool: 'file-write',
     content: 'next.config.js',
-    result: `Configuration updated with:
+    result: {
+      content: [{ type: 'text', text: `Configuration updated with:
 - Bundle analyzer plugin
 - Image optimization settings  
 - Tree shaking configuration
-- Compression middleware`,
+- Compression middleware` }],
+      isError: false,
+    },
     timestamp: new Date(Date.now() - 2800000),
   },
   {
@@ -380,7 +386,10 @@ export const PerformanceTest: Story = {
       timestamp: new Date(Date.now() - (20 - i) * 300000),
       ...(i % 4 === 2 && {
         tool: 'bash',
-        result: `Command output for message ${i + 1}`,
+        result: {
+          content: [{ type: 'text', text: `Command output for message ${i + 1}` }],
+          isError: false,
+        },
       }),
     })) as TimelineEntry[],
     isTyping: true,

@@ -4,10 +4,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { SessionEvent, ApiErrorResponse } from '@/types/api';
-import type { ThreadEvent } from '@/lib/server/core-types';
+import type { ThreadEvent, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/core-types';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import type { CompactionData } from '@/lib/core-types-import';
+
+function isToolResult(data: unknown): data is ToolResult {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'content' in data &&
+    Array.isArray((data as { content: unknown }).content)
+  );
+}
 
 // Use core ThreadId validation instead of custom validation
 // isThreadId is imported from core-types and handles proper format validation
@@ -34,20 +43,6 @@ function safeGetToolCallData(
         string,
         unknown
       >,
-    };
-  }
-  return null;
-}
-
-function safeGetToolResultData(
-  data: unknown
-): { content: Array<{ text?: string }>; id?: string } | null {
-  if (typeof data !== 'object' || data === null) return null;
-  const obj = data as Record<string, unknown>;
-  if ('content' in obj && Array.isArray(obj.content)) {
-    return {
-      content: obj.content as Array<{ text?: string }>,
-      id: typeof obj.id === 'string' ? obj.id : undefined,
     };
   }
   return null;
@@ -110,32 +105,16 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'TOOL_RESULT': {
-      // ThreadEvent.data is ToolResult for TOOL_RESULT events
-      const toolResultData = safeGetToolResultData(threadEvent.data);
-      if (toolResultData) {
-        // Extract text content from the content blocks with proper type safety
-        const resultContent = toolResultData.content
-          .map((block: { text?: string }) => block.text ?? '')
-          .join('');
+      // ThreadEvent.data should be ToolResult for TOOL_RESULT events
+      if (isToolResult(threadEvent.data)) {
         return {
           ...baseEvent,
           type: 'TOOL_RESULT',
-          data: {
-            toolName: toolResultData.id ?? 'unknown',
-            result: resultContent,
-          },
-        };
-      } else {
-        // Fallback for invalid tool result data
-        return {
-          ...baseEvent,
-          type: 'TOOL_RESULT',
-          data: {
-            toolName: 'unknown',
-            result: String(threadEvent.data),
-          },
+          data: threadEvent.data,
         };
       }
+      // Skip malformed TOOL_RESULT events
+      return null;
     }
 
     case 'LOCAL_SYSTEM_MESSAGE': {

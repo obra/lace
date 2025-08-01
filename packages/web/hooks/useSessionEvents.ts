@@ -124,7 +124,6 @@ export function useSessionEvents(
 
       const approvalData = parseResult.data;
 
-
       // Set all pending approvals (spec Phase 3.2: support multiple approvals)
       if (approvalData.pendingApprovals && approvalData.pendingApprovals.length > 0) {
         const approvals = approvalData.pendingApprovals.map((approval) => ({
@@ -133,8 +132,7 @@ export function useSessionEvents(
           requestedAt: new Date(approval.requestedAt),
           requestData: approval.requestData as ToolApprovalRequestData,
         }));
-        
-        
+
         setPendingApprovals(approvals);
       } else {
         setPendingApprovals([]);
@@ -152,7 +150,7 @@ export function useSessionEvents(
   // SSE connection effect
   useEffect(() => {
     // SSE effect running for session
-    
+
     if (!sessionId) {
       setAllEvents([]);
       setConnected(false);
@@ -173,7 +171,7 @@ export function useSessionEvents(
     const eventTypes = getAllEventTypes();
 
     // Registering event listeners for all event types
-    
+
     eventTypes.forEach((eventType) => {
       const listener = (event: MessageEvent) => {
         try {
@@ -192,7 +190,6 @@ export function useSessionEvents(
             if (eventData.type === 'TOOL_APPROVAL_REQUEST') {
               const approvalData = eventData.data as ToolApprovalRequestData;
 
-
               // Create PendingApproval from the event data
               const pendingApproval: PendingApproval = {
                 toolCallId: approvalData.requestId,
@@ -210,33 +207,34 @@ export function useSessionEvents(
 
               setPendingApprovals((prev) => {
                 // Check if this approval already exists to prevent duplicates
-                const existingApproval = prev.find(p => p.toolCallId === approvalData.requestId);
+                const existingApproval = prev.find((p) => p.toolCallId === approvalData.requestId);
                 if (existingApproval) {
                   return prev;
                 }
-                
+
                 const updated = [...prev, pendingApproval];
                 return updated;
               });
-              
+
               // Don't add approval request events to timeline
               return;
             } else if (eventData.type === 'TOOL_APPROVAL_RESPONSE') {
               // Remove approved item from pending list (spec Phase 3.2)
               const responseData = eventData.data as { toolCallId: string; decision: string };
-              
 
               setPendingApprovals((prev) => {
                 // Check if the approval actually exists before trying to remove it
-                const existingApproval = prev.find(p => p.toolCallId === responseData.toolCallId);
+                const existingApproval = prev.find((p) => p.toolCallId === responseData.toolCallId);
                 if (!existingApproval) {
                   return prev;
                 }
-                
-                const updated = prev.filter((approval) => approval.toolCallId !== responseData.toolCallId);
+
+                const updated = prev.filter(
+                  (approval) => approval.toolCallId !== responseData.toolCallId
+                );
                 return updated;
               });
-              
+
               // Don't add approval response events to timeline
               return;
             } else if (eventData.threadId) {

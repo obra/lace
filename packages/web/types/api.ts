@@ -2,7 +2,7 @@
 // ABOUTME: Defines interfaces for sessions, agents, and events
 
 // Import core types from Lace
-import type { AgentState, ThreadId, AssigneeId } from '@/lib/server/lace-imports';
+import type { AgentState, ThreadId, AssigneeId, ToolResult } from '@/lib/server/lace-imports';
 import type {
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
@@ -37,31 +37,8 @@ export interface Agent {
   createdAt: string;
 }
 
-// Task management types
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
-export type TaskPriority = 'high' | 'medium' | 'low';
-
-export interface TaskNote {
-  id: string;
-  author: ThreadId;
-  content: string;
-  timestamp: Date | string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  prompt: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  assignedTo?: AssigneeId;
-  createdBy: ThreadId;
-  threadId: ThreadId;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  notes: TaskNote[];
-}
+// Task management types - re-exported from core
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '@/lib/core-types-import';
 
 // Types for session events
 type _SessionEventType =
@@ -69,6 +46,7 @@ type _SessionEventType =
   | 'AGENT_MESSAGE'
   | 'TOOL_CALL'
   | 'TOOL_RESULT'
+  | 'TOOL_AGGREGATED'
   | 'LOCAL_SYSTEM_MESSAGE'
   | 'SYSTEM_PROMPT'
   | 'USER_SYSTEM_PROMPT';
@@ -87,9 +65,12 @@ export interface ToolCallEventData {
   input: unknown;
 }
 
-export interface ToolResultEventData {
+export interface ToolAggregatedEventData {
+  call: ToolCallEventData;
+  result?: ToolResult;
   toolName: string;
-  result: unknown;
+  toolId?: string;
+  arguments?: unknown;
 }
 
 export interface LocalSystemMessageEventData {
@@ -135,7 +116,13 @@ export type SessionEvent =
       type: 'TOOL_RESULT';
       threadId: ThreadId;
       timestamp: Date;
-      data: ToolResultEventData;
+      data: ToolResult;
+    }
+  | {
+      type: 'TOOL_AGGREGATED';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: ToolAggregatedEventData;
     }
   | {
       type: 'LOCAL_SYSTEM_MESSAGE';
@@ -178,6 +165,12 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: Date;
       data: CompactionEventData;
+    }
+  | {
+      type: 'TOOL_APPROVAL_RESPONSE';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: { toolCallId: string; decision: string };
     };
 
 // Tool approval event data - extends what the agent emits

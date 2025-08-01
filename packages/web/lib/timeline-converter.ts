@@ -98,15 +98,19 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
 
   // Sort by timestamp to maintain chronological order (optimized)
   if (processed.length <= 1) return processed;
-  
+
   return processed.sort((a, b) => {
     // Optimize timestamp comparison - avoid repeated Date creation
-    const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : 
-      (a.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
-      new Date(a.timestamp).getTime();
-    const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : 
-      (b.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
-      new Date(b.timestamp).getTime();
+    const aTime =
+      a.timestamp instanceof Date
+        ? a.timestamp.getTime()
+        : ((a.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
+          new Date(a.timestamp).getTime());
+    const bTime =
+      b.timestamp instanceof Date
+        ? b.timestamp.getTime()
+        : ((b.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
+          new Date(b.timestamp).getTime());
     return aTime - bTime;
   });
 }
@@ -120,25 +124,32 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
     if (event.type === 'TOOL_CALL') {
       // Extract tool call ID from the event data
       const eventData = event.data as { id?: string; [key: string]: unknown };
-      const toolCallId = eventData?.id || `${event.threadId}-${event.timestamp}-${toolCallCounter++}`;
+      const toolCallId =
+        eventData?.id || `${event.threadId}-${event.timestamp}-${toolCallCounter++}`;
       pendingToolCalls.set(toolCallId, { call: event });
     } else if (event.type === 'TOOL_RESULT') {
-      // Find matching tool call by ID or by proximity (most recent call on same thread)  
+      // Find matching tool call by ID or by proximity (most recent call on same thread)
       const eventData = event.data as { id?: string; toolCallId?: string; [key: string]: unknown };
       const toolCallId = eventData?.id || eventData?.toolCallId;
-      
+
       let matchingCall = toolCallId ? pendingToolCalls.get(toolCallId) : null;
-      
+
       // If no exact match, find the oldest tool call without a result on the same thread
       if (!matchingCall) {
         const threadCalls = Array.from(pendingToolCalls.entries())
           .filter(([_, data]) => data.call.threadId === event.threadId && !data.result)
           .sort(([_, a], [__, b]) => {
-            const aTime = a.call.timestamp instanceof Date ? a.call.timestamp.getTime() : new Date(a.call.timestamp).getTime();
-            const bTime = b.call.timestamp instanceof Date ? b.call.timestamp.getTime() : new Date(b.call.timestamp).getTime();
+            const aTime =
+              a.call.timestamp instanceof Date
+                ? a.call.timestamp.getTime()
+                : new Date(a.call.timestamp).getTime();
+            const bTime =
+              b.call.timestamp instanceof Date
+                ? b.call.timestamp.getTime()
+                : new Date(b.call.timestamp).getTime();
             return aTime - bTime; // Oldest first (FIFO matching)
           });
-        
+
         if (threadCalls.length > 0) {
           const [callId, callData] = threadCalls[0];
           matchingCall = callData;
@@ -156,7 +167,15 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
   // Add aggregated tool calls to processed events
   for (const { call, result } of pendingToolCalls.values()) {
     // Create an aggregated tool event
-    const callData = call.data as { toolName?: string; name?: string; id?: string; arguments?: unknown; input?: unknown; [key: string]: unknown };
+    const callData = call.data as {
+      toolName?: string;
+      name?: string;
+      id?: string;
+      arguments?: unknown;
+      input?: unknown;
+      [key: string]: unknown;
+    };
+
     const aggregatedEvent: SessionEvent = {
       type: 'TOOL_AGGREGATED',
       threadId: call.threadId,
@@ -169,20 +188,25 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
         arguments: callData?.arguments || callData?.input,
       },
     };
+
     processed.push(aggregatedEvent);
   }
 
   // Sort by timestamp to maintain chronological order (optimized)
   if (processed.length <= 1) return processed;
-  
+
   return processed.sort((a, b) => {
     // Optimize timestamp comparison - avoid repeated Date creation
-    const aTime = a.timestamp instanceof Date ? a.timestamp.getTime() : 
-      (a.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
-      new Date(a.timestamp).getTime();
-    const bTime = b.timestamp instanceof Date ? b.timestamp.getTime() : 
-      (b.timestamp as unknown as { getTime?: () => number }).getTime?.() ?? 
-      new Date(b.timestamp).getTime();
+    const aTime =
+      a.timestamp instanceof Date
+        ? a.timestamp.getTime()
+        : ((a.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
+          new Date(a.timestamp).getTime());
+    const bTime =
+      b.timestamp instanceof Date
+        ? b.timestamp.getTime()
+        : ((b.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
+          new Date(b.timestamp).getTime());
     return aTime - bTime;
   });
 }
@@ -216,7 +240,11 @@ function convertEvent(
       };
 
     case 'TOOL_CALL':
-      const toolCallData = event.data as { toolName?: string; input?: unknown; [key: string]: unknown };
+      const toolCallData = event.data as {
+        toolName?: string;
+        input?: unknown;
+        [key: string]: unknown;
+      };
       return {
         id,
         type: 'tool',
@@ -231,37 +259,35 @@ function convertEvent(
       };
 
     case 'TOOL_RESULT':
-      const resultData = event.data.result;
-      const resultString = typeof resultData === 'string' ? resultData : JSON.stringify(resultData);
+      // Pass through raw ToolResult object for rich UI handling
       return {
         id,
         type: 'tool',
-        content: resultString,
-        result: resultString,
+        content: 'Tool Result',
+        result: event.data,
         timestamp,
         agent: agent,
       };
 
     case 'TOOL_AGGREGATED':
-      const toolData = event.data as { 
-        toolName?: string; 
-        toolId?: string; 
-        arguments?: unknown; 
-        call?: unknown; 
-        result?: { content?: string } | string; 
+      const toolData = event.data as {
+        toolName?: string;
+        toolId?: string;
+        arguments?: unknown;
+        call?: unknown;
+        result?: {
+          content: Array<{ text?: string }>;
+          isError?: boolean;
+          id?: string;
+          metadata?: unknown;
+        };
       };
       return {
         id,
         type: 'tool',
         content: `${toolData.toolName || 'Unknown Tool'}`,
         tool: toolData.toolName,
-        result: toolData.result ? (
-          typeof toolData.result === 'object' && toolData.result !== null && 'content' in toolData.result 
-            ? toolData.result.content 
-            : typeof toolData.result === 'string' 
-              ? toolData.result
-              : JSON.stringify(toolData.result)
-        ) : undefined,
+        result: toolData.result,
         timestamp,
         agent: agent,
         // Add extra metadata for rich rendering
@@ -327,4 +353,3 @@ function getAgentName(threadId: ThreadId, agents: Agent[]): string {
   }
   return 'Agent';
 }
-

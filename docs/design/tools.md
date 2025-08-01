@@ -244,6 +244,374 @@ export class DestructiveTool extends Tool {
 }
 ```
 
+## Tool Metadata Architecture
+
+Tools capture structured domain data at event-time in metadata, enabling rich timeline displays without requiring additional API calls during rendering. This architecture applies to all tools that manipulate domain entities (tasks, files, configurations, etc.).
+
+### Metadata Data Flow
+
+```
+Tool Execution → ToolResult with Metadata → SessionEvent → TimelineEntry → Rich UI Renderer
+```
+
+### General Metadata Patterns
+
+#### Single Entity Operations
+
+For tools that operate on individual domain entities (create, update, delete, view):
+
+```typescript
+interface EntityOperationMetadata<T> {
+  entity: T;  // Complete entity object at event time
+  changes?: Record<string, { from: unknown; to: unknown }>;  // What changed for updates
+  operation: 'create' | 'update' | 'delete' | 'view';
+  entityType: string;  // e.g., 'task', 'file', 'config'
+}
+```
+
+#### Collection Operations
+
+For tools that operate on collections (list, search, filter):
+
+```typescript
+interface CollectionOperationMetadata<T> {
+  entities: T[];  // Array of complete entity objects
+  totalCount?: number;
+  filter?: unknown;  // Filter criteria used
+  operation: 'list' | 'search' | 'filter';
+  entityType: string;
+}
+```
+
+#### Action Operations
+
+For tools that perform actions without returning entities (execute, process, analyze):
+
+```typescript
+interface ActionOperationMetadata {
+  operation: string;  // Specific action performed
+  inputs?: unknown;   // Key inputs that affected the action
+  outputs?: unknown;  // Structured outputs if applicable
+  context?: unknown;  // Relevant context for display
+}
+```
+
+### Tool-Specific Examples
+
+#### Task Tools
+
+Task tools demonstrate the full metadata architecture with complete domain objects and change tracking:
+
+```typescript
+interface TaskEventMetadata {
+  task: Task;  // Complete Task object from types.ts at event time
+  changes?: Record<string, { from: unknown; to: unknown }>;
+  operation: 'create' | 'update' | 'complete' | 'view' | 'add_note';
+}
+
+interface TaskListEventMetadata {
+  tasks: Task[];  // Array of complete Task objects
+  totalCount?: number;
+  filter: string;  // Filter criteria used
+  operation: 'list';
+}
+
+// Complete Task interface (from src/tools/implementations/task-manager/types.ts)
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  status: TaskStatus;  // 'pending' | 'in_progress' | 'completed' | 'blocked'
+  priority: TaskPriority;  // 'high' | 'medium' | 'low'
+  assignedTo?: AssigneeId;
+  createdBy: ThreadId;
+  threadId: ThreadId;
+  createdAt: Date;
+  updatedAt: Date;
+  notes: TaskNote[];
+}
+```
+
+#### File Tools
+
+```typescript
+interface FileEventMetadata {
+  file: {
+    path: string;
+    name: string;
+    size?: number;
+    lastModified?: Date;
+    content?: string;  // For small files
+  };
+  changes?: Record<string, { from: unknown; to: unknown }>;
+  operation: 'read' | 'write' | 'edit' | 'delete' | 'create';
+}
+```
+
+#### Search Tools
+
+```typescript
+interface SearchEventMetadata {
+  query: string;
+  results: Array<{
+    path: string;
+    matches: number;
+    context?: string;
+  }>;
+  totalMatches: number;
+  operation: 'search';
+}
+```
+
+#### System Tools
+
+```typescript
+interface SystemEventMetadata {
+  command: string;
+  exitCode: number;
+  workingDirectory: string;
+  operation: 'execute';
+}
+```
+
+### Implementation Patterns
+
+#### Entity Update Tool Pattern (Task Example)
+
+```typescript
+class TaskUpdateTool extends Tool {
+  protected async executeValidated(args: TaskUpdateArgs, context: ToolContext): Promise<ToolResult> {
+    // 1. Load existing task to capture "before" state
+    const existingTask = await this.loadTask(args.taskId);
+    if (!existingTask) {
+      return this.createError(`Task ${args.taskId} not found`);
+    }
+    
+    // 2. Track what's changing
+    const changes: Record<string, {from: unknown, to: unknown}> = {};
+    if (args.status && args.status !== existingTask.status) {
+      changes.status = { from: existingTask.status, to: args.status };
+    }
+    if (args.priority && args.priority !== existingTask.priority) {
+      changes.priority = { from: existingTask.priority, to: args.priority };
+    }
+    if (args.assignTo && args.assignTo !== existingTask.assignedTo) {
+      changes.assignedTo = { from: existingTask.assignedTo, to: args.assignTo };
+    }
+    
+    // 3. Apply updates
+    const updates: Partial<Task> = {};
+    if (args.status) updates.status = args.status;
+    if (args.priority) updates.priority = args.priority;
+    if (args.assignTo) updates.assignedTo = args.assignTo as AssigneeId;
+    
+    const updatedTask = await this.updateTask(args.taskId, updates);
+    
+    // 4. Return with complete metadata
+    const metadata = {
+      task: updatedTask,  // Complete Task object
+      changes: Object.keys(changes).length > 0 ? changes : undefined,
+      operation: 'update' as const
+    };
+    
+    const updateMessages = Object.keys(changes).map(field => 
+      `${field}: ${changes[field].from} → ${changes[field].to}`
+    );
+    const humanMessage = `Updated task ${updatedTask.title}: ${updateMessages.join(', ')}`;
+    
+    return this.createResult(humanMessage, metadata);
+  }
+}
+```
+
+#### Collection Tool Pattern (Task List Example)
+
+```typescript
+class TaskListTool extends Tool {
+  protected async executeValidated(args: TaskListArgs, context: ToolContext): Promise<ToolResult> {
+    // 1. Execute query with filtering
+    let tasks: Task[] = [];
+    
+    const parentThreadId = context.parentThreadId || context.threadId;
+    const persistence = getPersistence();
+    
+    switch (args.filter) {
+      case 'mine':
+        tasks = persistence.loadTasksByAssignee(context.threadId);
+        break;
+      case 'created':
+        tasks = persistence.loadTasksByThread(parentThreadId)
+          .filter(t => t.createdBy === context.threadId);
+        break;
+      case 'thread':
+        tasks = persistence.loadTasksByThread(parentThreadId);
+        break;
+      case 'all':
+        const assignedToMe = persistence.loadTasksByAssignee(context.threadId);
+        const inThread = persistence.loadTasksByThread(parentThreadId);
+        const taskMap = new Map<string, Task>();
+        [...assignedToMe, ...inThread].forEach(t => taskMap.set(t.id, t));
+        tasks = Array.from(taskMap.values());
+        break;
+    }
+    
+    // 2. Apply additional filtering
+    if (!args.includeCompleted) {
+      tasks = tasks.filter(t => t.status !== 'completed');
+    }
+    
+    // 3. Sort by priority and creation date
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    tasks.sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+    
+    // 4. Return with complete metadata
+    const metadata = {
+      tasks: tasks,  // Array of complete Task objects
+      totalCount: tasks.length,
+      filter: args.filter,
+      operation: 'list' as const
+    };
+    
+    const humanMessage = tasks.length === 0 
+      ? 'No tasks found'
+      : `Tasks (${args.filter}): ${tasks.length} found\n\n${formatTaskList(tasks)}`;
+    
+    return this.createResult(humanMessage, metadata);
+  }
+}
+```
+
+#### Action Tool Pattern
+
+```typescript
+class ActionTool extends Tool {
+  protected async executeValidated(args: ActionArgs, context: ToolContext): Promise<ToolResult> {
+    // 1. Capture relevant inputs
+    const inputs = this.extractRelevantInputs(args);
+    
+    // 2. Execute action
+    const result = await this.performAction(args);
+    
+    // 3. Return with action metadata
+    const metadata = {
+      operation: this.actionName,
+      inputs: inputs,
+      outputs: this.extractRelevantOutputs(result),
+      context: this.getDisplayContext(args, result)
+    };
+    
+    return this.createResult(humanMessage, metadata);
+  }
+}
+```
+
+### Key Principles
+
+#### 1. Event-Time Snapshots
+- Metadata captures entity state at the moment of the event
+- Historical accuracy: "what did the entity look like when this happened?"
+- No API calls needed during timeline rendering
+
+#### 2. Complete State Capture
+- Always include complete domain objects, not partial data
+- UI can access any field needed: `entity.title`, `entity.status`, etc.
+- Consistent with existing domain interface definitions
+
+#### 3. Change Tracking
+- For update operations, record both old and new values
+- Enables rich displays: "Status changed from pending to in_progress"
+- Only include changes that actually occurred
+
+#### 4. Performance Optimization
+- Timeline rendering is synchronous with cached metadata
+- Avoids N+1 query problems (no API calls per timeline entry)
+- Event store contains all data needed for display
+
+### Benefits
+
+#### Rich UI Displays
+- Meaningful names instead of IDs: "Fix authentication bug" vs "task_20250730_yk2p41"
+- Change details: "Priority changed from low to high", "File modified: 42 lines added"
+- Complete context without additional lookups
+- Consistent display patterns across all tool types
+
+#### Performance
+- No API calls during timeline rendering
+- Fast, synchronous display of historical data
+- Scalable to timelines with hundreds of events
+- Eliminates N+1 query problems
+
+#### Historical Accuracy
+- Shows entity state at event time, not current state
+- Preserves context even if entities are later modified or deleted
+- Complete audit trail of all changes
+- Event-time snapshots for reliable historical views
+
+#### Type Safety
+- Uses existing domain interfaces consistently
+- No `any` types or text parsing required
+- Full TypeScript support throughout data flow
+- Compile-time validation of metadata structures
+
+#### Maintainability
+- Consistent patterns across all tool types
+- Clear separation between tool logic and UI concerns
+- Reusable renderer patterns
+- Easy to extend for new tool types
+
+### Tool Migration Strategy
+
+#### Phase 1: Core Entity Tools
+1. **Task tools** - Already partially implemented
+2. **File tools** - High usage, big impact on UX
+3. **System tools** - Bash commands, environment changes
+
+#### Phase 2: Secondary Tools
+4. **Search tools** - Grep, find operations
+5. **Configuration tools** - Settings, preferences
+6. **Analysis tools** - Code analysis, diagnostics
+
+#### Phase 3: Specialized Tools
+7. **Integration tools** - External service calls
+8. **Workflow tools** - Multi-step operations
+9. **Utility tools** - Helper operations
+
+#### Migration Checklist
+
+For each tool:
+- [ ] Identify what entities/data the tool operates on
+- [ ] Choose appropriate metadata pattern (Entity/Collection/Action)
+- [ ] Implement metadata in tool's `executeValidated` method
+- [ ] Add comprehensive unit tests for metadata structure
+- [ ] Update corresponding timeline renderer
+- [ ] Test end-to-end data flow
+- [ ] Update documentation
+
+### Migration Considerations
+
+#### Backward Compatibility
+- Existing timeline entries without metadata continue to work
+- Renderers fall back to text parsing for old events
+- Gradual migration as new events include metadata
+- No breaking changes to existing tool APIs
+
+#### Event Store Impact
+- Metadata increases event size but provides significant value
+- Event-time snapshots prevent data loss from entity deletions
+- Consider event pruning strategies for long-term storage
+- Monitor event store growth and performance
+
+#### Performance Monitoring
+- Timeline rendering performance with metadata
+- Memory usage patterns
+- Event storage growth rates
+- API call reduction metrics
+
 ## Schema Design & Validation
 
 ### Common Schema Patterns

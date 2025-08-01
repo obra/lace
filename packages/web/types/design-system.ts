@@ -1,6 +1,8 @@
 // ABOUTME: Design system specific types imported from f-web-spicy
 // ABOUTME: Essential interfaces for UI components, timeline, and chat functionality
 
+import type { ToolResult } from '@/lib/server/lace-imports';
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -64,7 +66,7 @@ export interface TimelineEntry {
   timestamp: Date;
   agent?: string;
   tool?: string;
-  result?: string;
+  result?: ToolResult;
   action?: string;
   title?: string;
   description?: string;
