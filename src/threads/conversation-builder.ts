@@ -3,7 +3,6 @@
 
 import type { ThreadEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
-import type { ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 
 /**
@@ -48,7 +47,7 @@ function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
         );
       }
 
-      const toolResult = event.data as ToolResult;
+      const toolResult = event.data;
       const toolCallId = toolResult.id;
 
       if (!toolCallId) {

@@ -292,7 +292,11 @@ describe('conversation-builder', () => {
         threadId: 'test-thread',
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: { invalid: 'data' }, // Missing required CompactionData fields
+        data: {
+          strategyId: 123, // Invalid type - should be string
+          originalEventCount: 'invalid', // Invalid type - should be number
+          compactedEvents: 'not-an-array', // Invalid type - should be array
+        } as unknown as CompactionData, // Type assertion to bypass TS checking
       };
 
       const newEvent: ThreadEvent = {
@@ -316,7 +320,10 @@ describe('conversation-builder', () => {
         threadId: 'test-thread',
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {}, // Empty object missing required CompactionData fields
+        data: {
+          // Missing required fields to make it truly invalid
+          wrongField: 'this is not CompactionData',
+        } as unknown as CompactionData, // Type assertion to bypass TS checking
       };
 
       const newEvent: ThreadEvent = {

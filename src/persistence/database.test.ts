@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { ApprovalDecision } from '~/tools/approval-types';
 import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {
@@ -264,7 +265,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     // Should succeed
@@ -283,7 +284,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     // Should throw constraint violation
@@ -314,7 +315,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     // Create second approval event with different toolCallId
@@ -323,7 +324,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-456', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-456', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     // Both should succeed
@@ -371,7 +372,7 @@ describe('tool approval unique constraint', () => {
       threadId: threadId1,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     const event2 = {
@@ -379,7 +380,7 @@ describe('tool approval unique constraint', () => {
       threadId: threadId2,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     // Both should succeed
@@ -428,7 +429,7 @@ describe('tool approval unique constraint', () => {
       threadId,
       type: 'TOOL_APPROVAL_RESPONSE',
       timestamp: new Date().toISOString(),
-      data: JSON.stringify({ toolCallId: 'tool-123', decision: 'approve' }),
+      data: JSON.stringify({ toolCallId: 'tool-123', decision: ApprovalDecision.ALLOW_ONCE }),
     };
 
     // Both should succeed (constraint only applies to RESPONSE events)

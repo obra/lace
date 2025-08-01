@@ -296,8 +296,8 @@ describe('Tool Batch Completion Behavior', () => {
     expect(toolResults).toHaveLength(2);
 
     // One success, one failure
-    const successResult = toolResults.find((e) => !(e.data as ToolResult).isError);
-    const failureResult = toolResults.find((e) => (e.data as ToolResult).isError);
+    const successResult = toolResults.find((e) => !e.data.isError);
+    const failureResult = toolResults.find((e) => e.data.isError);
 
     expect(successResult).toBeDefined();
     expect(failureResult).toBeDefined();

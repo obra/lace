@@ -7,7 +7,6 @@ import { SessionEvent, ApiErrorResponse } from '@/types/api';
 import type { ThreadEvent, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/core-types';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import type { CompactionData } from '@/lib/core-types-import';
 
 function isToolResult(data: unknown): data is ToolResult {
   return (
@@ -130,16 +129,15 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'COMPACTION': {
-      // Convert CompactionData from core to web format
-      const compactionData = threadEvent.data as CompactionData;
+      // With discriminated union, TypeScript knows threadEvent.data is CompactionData
       return {
         ...baseEvent,
         type: 'COMPACTION',
         data: {
-          strategyId: compactionData.strategyId,
-          originalEventCount: compactionData.originalEventCount,
-          compactedEvents: compactionData.compactedEvents,
-          metadata: compactionData.metadata,
+          strategyId: threadEvent.data.strategyId,
+          originalEventCount: threadEvent.data.originalEventCount,
+          compactedEvents: threadEvent.data.compactedEvents,
+          metadata: threadEvent.data.metadata,
         },
       };
     }
@@ -176,13 +174,12 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
 
     default: {
       // Exhaustive check - this should never be reached if all event types are handled
-      const _exhaustiveCheck: never = threadEvent.type;
-      console.warn('Unknown event type encountered:', _exhaustiveCheck);
+      console.warn('Unknown event type encountered:', threadEvent.type);
       // Return a fallback for runtime safety
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event type: ${String(_exhaustiveCheck)}` },
+        data: { content: `Unknown event type: ${String(threadEvent.type)}` },
       } as SessionEvent;
     }
   }
