@@ -38,6 +38,7 @@ import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
+import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 export const LaceApp = memo(function LaceApp() {
@@ -75,7 +76,6 @@ export const LaceApp = memo(function LaceApp() {
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
 
   // Use session events hook for event management
@@ -87,20 +87,10 @@ export const LaceApp = memo(function LaceApp() {
     clearApprovalRequest,
   } = useSessionEvents(selectedSession, selectedAgent);
 
-  // Reset thinking indicator when agent completes response or encounters error
-  useEffect(() => {
-    if (events?.length > 0) {
-      const lastEvent = events[events.length - 1];
-      if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
-          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
-           lastEvent.data?.content && 
-           (lastEvent.data.content.toLowerCase().includes('error') || 
-            lastEvent.data.content.toLowerCase().includes('failed') ||
-            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
-        setSendingMessage(false);
-      }
-    }
-  }, [events, sendingMessage]);
+  // Use session API hook for all API calls
+  const { sendMessage: sendMessageAPI, loading: sendingMessage } = useSessionAPI();
+
+  // Note: sendingMessage state is now managed by useSessionAPI hook
 
   // Add task manager hook when project and session are selected
   const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
@@ -250,48 +240,11 @@ export const LaceApp = memo(function LaceApp() {
 
 
   const sendMessage = useCallback(async (message: string) => {
-    console.log('[LACE_APP] sendMessage called with:', { selectedAgent, message });
-    
     if (!selectedAgent || !message.trim()) {
-      console.log('[LACE_APP] Early return - no agent or empty message');
-      return;
-    }
-
-    console.log('[LACE_APP] Setting sendingMessage to true');
-    setSendingMessage(true);
-    
-    try {
-      const url = `/api/threads/${selectedAgent}/message`;
-      const body = JSON.stringify({ message });
-      console.log('[LACE_APP] Making fetch request to:', url);
-      console.log('[LACE_APP] Request body:', body);
-      
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      });
-
-      console.log('[LACE_APP] Response status:', res.status);
-      console.log('[LACE_APP] Response ok:', res.ok);
-
-      if (res.ok) {
-        console.log('[LACE_APP] Success - returning true');
-        return true; // Indicate success so the input can clear itself
-      }
-      
-      console.log('[LACE_APP] Response not ok, parsing error');
-      const errorData = await res.text();
-      console.log('[LACE_APP] Error response text:', errorData);
       return false;
-    } catch (error) {
-      console.error('[LACE_APP] Error in sendMessage:', error);
-      return false;
-    } finally {
-      console.log('[LACE_APP] Setting sendingMessage to false');
-      setSendingMessage(false);
     }
-  }, [selectedAgent]);
+    return await sendMessageAPI(selectedAgent, message);
+  }, [selectedAgent, sendMessageAPI]);
 
   // Handle tool approval decision
   const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
