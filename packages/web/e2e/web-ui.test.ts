@@ -11,8 +11,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 // Mock only essential external dependencies
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
+vi.mock('@/lib/event-stream-manager', () => ({
+  EventStreamManager: {
     getInstance: () => ({
       broadcast: vi.fn(),
       addConnection: vi.fn(),

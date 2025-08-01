@@ -49,7 +49,7 @@ describe('SessionService after getSessionData removal', () => {
   });
 });
 
-// Don't mock SSEManager - we want to spy on the real one
+// Don't mock EventStreamManager - we want to spy on the real one
 
 // Use real persistence with temporary directory instead of complex mocking
 
@@ -194,11 +194,11 @@ describe('SessionService approval event forwarding', () => {
     vi.restoreAllMocks();
   });
 
-  it('should forward TOOL_APPROVAL_REQUEST events to SSE when tool requires approval', async () => {
-    // Instrument real SSEManager to capture broadcasts
-    const { SSEManager } = await import('@/lib/sse-manager');
-    const realSSEManager = SSEManager.getInstance();
-    const broadcastSpy = vi.spyOn(realSSEManager, 'broadcast');
+  it('should forward TOOL_APPROVAL_REQUEST events to EventStreamManager when tool requires approval', async () => {
+    // Instrument real EventStreamManager to capture broadcasts
+    const { EventStreamManager } = await import('@/lib/event-stream-manager');
+    const realEventStreamManager = EventStreamManager.getInstance();
+    const broadcastSpy = vi.spyOn(realEventStreamManager, 'broadcast');
 
     // Create a real test project using temp directory
     const { Project } = await import('@/lib/server/lace-imports');
@@ -253,21 +253,22 @@ describe('SessionService approval event forwarding', () => {
     expect(approvalRequestEvent).toBeDefined();
     expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
 
-    // Verify that SessionService forwarded the event to real SSEManager
-    expect(broadcastSpy).toHaveBeenCalledWith(
-      session.getId(),
-      expect.objectContaining({
+    // Verify that SessionService forwarded the event to real EventStreamManager
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: session.getId() },
+      data: expect.objectContaining({
         type: 'TOOL_APPROVAL_REQUEST',
         threadId: session.getId(),
         data: expect.objectContaining({
           requestId: 'test-call-123',
           toolName: 'file_write',
         }),
-      })
-    );
+      }),
+    });
   });
 
-  it('should forward TOOL_APPROVAL_RESPONSE events to SSE when approval is given', async () => {
+  it('should forward TOOL_APPROVAL_RESPONSE events to EventStreamManager when approval is given', async () => {
     // This test needs to reuse the setup from the first test or set up its own environment
     // For now, let's skip this test since it requires complex setup coordination
     // TODO: Refactor tests to share setup properly
