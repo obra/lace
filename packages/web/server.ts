@@ -59,24 +59,46 @@ if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 655
   process.exit(1);
 }
 
-// Function to find an available port
-async function findAvailablePort(startPort: number, userSpecified: boolean): Promise<number> {
-  const { createServer } = await import('http');
-  
-  const testPort = (port: number): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const server = createServer();
-      server.listen(port, hostname, () => {
-        server.close(() => resolve(true));
-      });
-      server.on('error', () => resolve(false));
-    });
-  };
+// Function to attempt starting the server on a specific port
+async function tryStartServer(
+  server: ReturnType<typeof createServer>, 
+  port: number, 
+  hostname: string
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const onListening = () => {
+      server.removeListener('error', onError);
+      resolve(true);
+    };
+    
+    const onError = (err: NodeJS.ErrnoException) => {
+      server.removeListener('listening', onListening);
+      if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+        resolve(false);
+      } else {
+        // For other errors, we should fail
+        console.error(`Server error on port ${port}:`, err.message);
+        process.exit(1);
+      }
+    };
+    
+    server.once('listening', onListening);
+    server.once('error', onError);
+    server.listen(port, hostname);
+  });
+}
 
+// Function to find an available port and start server
+async function startServerOnAvailablePort(
+  server: ReturnType<typeof createServer>,
+  startPort: number, 
+  userSpecified: boolean,
+  hostname: string
+): Promise<number> {
   // If user specified port, only try that one
   if (userSpecified) {
-    const isAvailable = await testPort(startPort);
-    if (!isAvailable) {
+    const success = await tryStartServer(server, startPort, hostname);
+    if (!success) {
       console.error(`Error: Port ${startPort} is already in use`);
       process.exit(1);
     }
@@ -85,7 +107,8 @@ async function findAvailablePort(startPort: number, userSpecified: boolean): Pro
 
   // Try ports starting from the requested port
   for (let port = startPort; port <= startPort + 100; port++) {
-    if (await testPort(port)) {
+    const success = await tryStartServer(server, port, hostname);
+    if (success) {
       return port;
     }
   }
@@ -111,14 +134,21 @@ console.log(`Starting Lace in ${dev ? 'development' : 'production'} mode...`);
 app
   .prepare()
   .then(async () => {
-    const port = await findAvailablePort(requestedPort, userSpecifiedPort);
-    
     const server = createServer((req, res) => {
-      handle(req, res);
+      try {
+        handle(req, res);
+      } catch (error) {
+        console.error('Request handling error:', error);
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.end('Internal Server Error');
+        }
+      }
     });
 
-    server.listen(port, hostname, () => {
-      console.log(`
+    const port = await startServerOnAvailablePort(server, requestedPort, userSpecifiedPort, hostname);
+    
+    console.log(`
 ✅ Lace is ready!
    
    🌐 URL: http://${hostname}:${port}
@@ -127,8 +157,6 @@ app
    
    Press Ctrl+C to stop
 `);
-    });
-
   })
   .catch((err) => {
     console.error('Error starting server:', err);
