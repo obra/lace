@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { logger } from '~/utils/logger';
-import type { Task } from '@/types/api';
+import type { Task, SerializedTask } from '@/types/web';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
@@ -79,7 +79,7 @@ export function serializeDate(date: Date | string | undefined): string | undefin
 }
 
 // Task serialization utility
-export function serializeTask(task: Task): Task {
+export function serializeTask(task: Task): SerializedTask {
   return {
     ...task,
     createdAt: serializeDate(task.createdAt),
@@ -88,7 +88,7 @@ export function serializeTask(task: Task): Task {
       ...note,
       timestamp: serializeDate(note.timestamp),
     })),
-  } as Task;
+  };
 }
 
 // Error response helper

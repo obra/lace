@@ -16,6 +16,8 @@ export { ApprovalDecision } from '~/tools/approval-types';
 
 export type { ProjectInfo } from '~/projects/project';
 
+export type { SessionInfo } from '~/sessions/session';
+
 // Re-export utility functions
 export {
   asThreadId,
