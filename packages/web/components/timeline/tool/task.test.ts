@@ -140,8 +140,8 @@ describe('Task Tool Renderers', () => {
 
   describe('task_complete renderer', () => {
     const mockTaskCompleteArgs = {
-      taskId: 'task-456',
-      result: 'Successfully implemented authentication with JWT tokens',
+      id: 'task_20250731_n9q0qi',
+      message: 'Successfully implemented authentication with JWT tokens',
     };
 
     const mockTaskCompleteResult: ToolResult = {
@@ -161,7 +161,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task completion', () => {
       const summary = taskRenderers.task_complete.getSummary?.(mockTaskCompleteArgs);
-      expect(summary).toBe('Complete task: task-456');
+      expect(summary).toBe('Mark task task_20250731_n9q0qi as completed');
     });
 
     test('should return check icon', () => {
@@ -201,7 +201,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task updates', () => {
       const summary = taskRenderers.task_update.getSummary?.(mockTaskUpdateArgs);
-      expect(summary).toBe('Update task: task-456');
+      expect(summary).toBe('Updated task task-456');
     });
 
     test('should return edit icon', () => {
