@@ -12,8 +12,10 @@ import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
-import { TimelineEntry, Timeline, Task, RecentFile } from '@/types/design-system';
-import { Project, asThreadId } from '@/lib/server/core-types';
+import { TimelineEntry, Timeline, RecentFile } from '@/types/design-system';
+import type { Task } from '@/lib/core';
+import type { ProjectInfo as Project } from '@/lib/core';
+import { asThreadId } from '@/lib/server/core-types';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import {
   pageTransition,
