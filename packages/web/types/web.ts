@@ -11,8 +11,7 @@ import {
   ToolCallIdSchema,
 } from '@/lib/validation/schemas';
 
-// Use core types for API responses - no duplication
-export type { SessionInfo as Session } from '@/lib/core';
+// Note: SessionInfo is available from @/lib/core if needed, but we prefer explicit Session interface in api.ts
 
 // Re-export core types
 export type {
