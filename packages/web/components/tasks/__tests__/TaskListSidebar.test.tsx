@@ -118,10 +118,10 @@ describe('TaskListSidebar', () => {
   });
 
   it('should render task summary', () => {
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
@@ -129,10 +129,10 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show in progress tasks first', () => {
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
@@ -141,10 +141,10 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show pending tasks', () => {
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
@@ -153,10 +153,10 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show blocked tasks', () => {
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
@@ -168,10 +168,10 @@ describe('TaskListSidebar', () => {
     const mockOnOpenTaskBoard = vi.fn();
     const user = userEvent.setup();
 
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
         onOpenTaskBoard={mockOnOpenTaskBoard}
       />
     );
@@ -189,10 +189,10 @@ describe('TaskListSidebar', () => {
     const mockOnCreateTask = vi.fn();
     const user = userEvent.setup();
 
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
         onCreateTask={mockOnCreateTask}
       />
     );
@@ -218,10 +218,10 @@ describe('TaskListSidebar', () => {
       refetch: vi.fn(),
     });
 
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
@@ -243,10 +243,10 @@ describe('TaskListSidebar', () => {
       refetch: vi.fn(),
     });
 
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
@@ -300,10 +300,10 @@ describe('TaskListSidebar', () => {
       refetch: vi.fn(),
     });
 
+    const mockTaskManager = mockUseTaskManager();
     render(
       <TaskListSidebar
-        projectId="test-project"
-        sessionId="test-session"
+        taskManager={mockTaskManager}
       />
     );
 
