@@ -64,6 +64,12 @@ export function useSessionEvents(
   // Handle events from stream
   const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
     try {
+      // Only process session events - other event types (global, task, project)
+      // should be handled by their respective hooks
+      if (streamEvent.eventType !== 'session') {
+        return;
+      }
+
       // Parse and validate SessionEvent with proper date hydration
       const sessionEvent = parseSessionEvent(streamEvent.data);
 
