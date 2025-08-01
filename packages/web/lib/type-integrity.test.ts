@@ -34,8 +34,8 @@ describe('Type Integrity - Current State', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should import ThreadId from @/lib/core-types-import', async () => {
-      const coreImports = await import('@/lib/core-types-import');
+    it('should import ThreadId from @/lib/core', async () => {
+      const coreImports = await import('@/lib/core');
       // ThreadId is a type export, so we test it exists in the import
       expect(coreImports).toBeDefined();
     });
@@ -158,7 +158,7 @@ describe('Type Integrity - Current State', () => {
         () => import('@/types/api'),
         () => import('@/lib/server/core-types'),
         () => import('@/lib/server/lace-imports'),
-        () => import('@/lib/core-types-import'),
+        () => import('@/lib/core'),
         () => import('@/lib/validation/schemas'),
         () => import('@/lib/validation/thread-id-validation'),
         () => import('@/types/events-constants'),

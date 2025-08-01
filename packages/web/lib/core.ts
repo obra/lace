@@ -18,6 +18,8 @@ export type { ProjectInfo } from '~/projects/project';
 
 export type { SessionInfo } from '~/sessions/session';
 
+export type { CompactionData } from '~/threads/compaction/types';
+
 // Re-export utility functions
 export {
   asThreadId,

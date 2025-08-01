@@ -34,7 +34,7 @@ export interface Agent {
 }
 
 // Task management types - re-exported from core
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '@/lib/core-types-import';
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '@/lib/core';
 
 // Types for session events
 type _SessionEventType =
