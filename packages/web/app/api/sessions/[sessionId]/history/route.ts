@@ -87,8 +87,9 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
           ...baseEvent,
           type: 'TOOL_CALL',
           data: {
-            toolName: toolCallData.name,
-            input: toolCallData.arguments,
+            id: threadEvent.id || '',
+            name: toolCallData.name,
+            arguments: toolCallData.arguments,
           },
         };
       } else {
@@ -97,8 +98,9 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
           ...baseEvent,
           type: 'TOOL_CALL',
           data: {
-            toolName: 'unknown',
-            input: {},
+            id: threadEvent.id || '',
+            name: 'unknown',
+            arguments: {},
           },
         };
       }

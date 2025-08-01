@@ -27,6 +27,9 @@ export type {
   ToolResult,
 } from '@/lib/core';
 
+// Import types for explicit usage
+import type { ThreadId, ApprovalDecision, Task } from '@/lib/core';
+
 // Request types (inferred from validation schemas) - ONLY PLACE THESE EXIST
 export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
 export type MessageRequest = z.infer<typeof MessageRequestSchema>;

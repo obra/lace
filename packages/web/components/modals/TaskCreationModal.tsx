@@ -76,7 +76,7 @@ export function TaskCreationModal({
 
     const newTask = {
       title: taskData.title.trim(),
-      description: taskData.description.trim() || undefined,
+      description: taskData.description.trim() || '',
       prompt: taskData.prompt.trim(),
       priority: taskData.priority,
       assignedTo: taskData.assignedTo || undefined,

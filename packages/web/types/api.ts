@@ -61,8 +61,9 @@ export interface AgentMessageEventData {
 }
 
 export interface ToolCallEventData {
-  toolName: string;
-  input: unknown;
+  id: string;
+  name: string;
+  arguments: unknown;
 }
 
 export interface ToolAggregatedEventData {

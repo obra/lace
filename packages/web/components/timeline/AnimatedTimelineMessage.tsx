@@ -289,7 +289,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              {entry.result}
+              {entry.result?.content?.map((block, i) => block.type === 'text' ? block.text : '').join('')}
             </motion.div>
           </motion.div>
         </motion.div>

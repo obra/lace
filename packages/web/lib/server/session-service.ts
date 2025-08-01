@@ -3,7 +3,7 @@
 
 import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolCall } from '@/lib/server/core-types';
+import type { ThreadEvent, ToolCall, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
 import { Session as SessionType, Agent as AgentType, SessionEvent } from '@/types/api';
 import { SSEManager } from '@/lib/sse-manager';
@@ -175,7 +175,7 @@ export class SessionService {
           type: 'TOOL_RESULT',
           threadId,
           timestamp: new Date(),
-          data: result, // Use direct result to match persistence format
+          data: result as ToolResult, // Cast to ToolResult for type safety
         };
         sseManager.broadcast(sessionId, event);
       }
