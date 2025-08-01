@@ -8,10 +8,10 @@ import { asThreadId } from '@/lib/server/lace-imports';
 import { Session as SessionType, Agent as AgentType, SessionEvent } from '@/types/api';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
-// Active session instances
-const activeSessions = new Map<ThreadId, Session>();
-
 export class SessionService {
+  // Track agents that already have event handlers set up to prevent duplicates
+  private registeredAgents = new WeakSet<Agent>();
+
   constructor() {}
 
   async createSession(
@@ -47,71 +47,48 @@ export class SessionService {
       this.setupAgentEventHandlers(coordinatorAgent, sessionId);
     }
 
-    // Store the session instance
-    activeSessions.set(sessionId, session);
+    // Register Session with EventStreamManager for TaskManager event forwarding
+    EventStreamManager.getInstance().registerSession(session);
 
+    // Session is automatically stored in Session._sessionRegistry via constructor
     // Return metadata for API response
     return this.sessionToMetadata(session);
   }
 
   async listSessions(): Promise<SessionType[]> {
     const sessionInfos = Session.getAll();
-
-    // Create a map of persisted sessions
-    const persistedSessions = new Map<string, SessionType>();
+    const sessions: SessionType[] = [];
 
     for (const sessionInfo of sessionInfos) {
-      let session = activeSessions.get(sessionInfo.id);
-
-      if (!session) {
-        // Reconstruct session from database
-        session = (await Session.getById(sessionInfo.id)) ?? undefined;
-        if (session) {
-          activeSessions.set(sessionInfo.id, session);
-
-          // Set up event handlers for all agents in the reconstructed session
-          const agents = session.getAgents();
-          for (const agentInfo of agents) {
-            const agent = session.getAgent(agentInfo.threadId);
-            if (agent) {
-              this.setupAgentEventHandlers(agent, sessionInfo.id);
-            }
-          }
-        }
-      }
+      // Try to get from registry first, then reconstruct if needed
+      let session = await Session.getById(sessionInfo.id);
 
       if (session) {
-        persistedSessions.set(sessionInfo.id, this.sessionToMetadata(session));
+        // Set up event handlers for all agents in the session
+        const agents = session.getAgents();
+        for (const agentInfo of agents) {
+          const agent = session.getAgent(agentInfo.threadId);
+          if (agent) {
+            this.setupAgentEventHandlers(agent, sessionInfo.id);
+          }
+        }
+
+        // Register Session with EventStreamManager (WeakSet prevents duplicates)
+        EventStreamManager.getInstance().registerSession(session);
+
+        sessions.push(this.sessionToMetadata(session));
       }
     }
 
-    // Add any active sessions that aren't in the persisted list
-    activeSessions.forEach((session, sessionId) => {
-      if (!persistedSessions.has(sessionId)) {
-        try {
-          persistedSessions.set(sessionId, this.sessionToMetadata(session));
-        } catch (error) {
-          console.error(`Failed to get metadata for session ${sessionId}:`, error);
-        }
-      }
-    });
-
-    return Array.from(persistedSessions.values());
+    return sessions;
   }
 
   async getSession(sessionId: ThreadId): Promise<Session | null> {
-    // Try to get from active sessions first
-    let session = activeSessions.get(sessionId);
+    // Use Session's internal registry - this will reconstruct from database if needed
+    const session = await Session.getById(sessionId);
 
-    if (!session) {
-      // Try to load from database by reconstructing the session
-      session = (await Session.getById(sessionId)) ?? undefined;
-      if (!session) {
-        return null;
-      }
-      activeSessions.set(sessionId, session);
-
-      // Set up approval callbacks and event handlers for all agents in the reconstructed session
+    if (session) {
+      // Set up approval callbacks and event handlers for all agents in the session
       const agents = session.getAgents();
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
@@ -121,12 +98,20 @@ export class SessionService {
           this.setupAgentEventHandlers(agent, sessionId);
         }
       }
+
+      // Register Session with EventStreamManager (WeakSet prevents duplicates)
+      EventStreamManager.getInstance().registerSession(session);
     }
 
     return session;
   }
 
   private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
+    // Prevent duplicate event handler registration
+    if (this.registeredAgents.has(agent)) {
+      return;
+    }
+    this.registeredAgents.add(agent);
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
 
@@ -310,32 +295,36 @@ export class SessionService {
     Session.updateSession(sessionId, updates);
   }
 
-  // Test helper method to stop all agents and clear active sessions
+  // Test helper method to stop all agents and clear sessions
   async stopAllAgents(): Promise<void> {
-    for (const session of activeSessions.values()) {
-      // Stop the coordinator agent
-      const coordinatorAgent = session.getAgent(session.getId());
-      if (coordinatorAgent) {
-        coordinatorAgent.stop();
-      }
+    const sessionInfos = Session.getAll();
+    for (const sessionInfo of sessionInfos) {
+      const session = await Session.getById(sessionInfo.id);
+      if (session) {
+        // Stop the coordinator agent
+        const coordinatorAgent = session.getAgent(session.getId());
+        if (coordinatorAgent) {
+          coordinatorAgent.stop();
+        }
 
-      // Stop all delegate agents
-      const agentMetadata = session.getAgents();
-      for (const agentMeta of agentMetadata) {
-        if (agentMeta.threadId !== session.getId()) {
-          // Skip coordinator (already stopped)
-          const agent = session.getAgent(agentMeta.threadId);
-          if (agent) {
-            agent.stop();
+        // Stop all delegate agents
+        const agentMetadata = session.getAgents();
+        for (const agentMeta of agentMetadata) {
+          if (agentMeta.threadId !== session.getId()) {
+            // Skip coordinator (already stopped)
+            const agent = session.getAgent(agentMeta.threadId);
+            if (agent) {
+              agent.stop();
+            }
           }
         }
       }
     }
   }
 
-  // Test helper method to clear active sessions
+  // Test helper method to clear session registry
   clearActiveSessions(): void {
-    activeSessions.clear();
+    Session.clearRegistry();
   }
 
   // Helper to convert Session instance to SessionType for API responses
