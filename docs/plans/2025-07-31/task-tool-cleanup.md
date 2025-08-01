@@ -551,12 +551,144 @@ export type { ThreadId, AssigneeId } from '@/lib/core-types-import';
 
 **Priority:** High - Technical debt that affects maintainability
 
+## Implementation Status - COMPLETED ✅
+
+**Date Completed:** 2025-08-01  
+**Branch:** `task-metadata-on-main`  
+**Status:** All tasks completed, tests passing, ready for merge
+
+### What Was Actually Implemented
+
+#### The Real Problem
+The issue wasn't in the task tools - they were already returning proper metadata. The problem was a **critical event format inconsistency** between real-time and persistence paths:
+
+**Real-time events (session-service.ts):**
+```typescript
+// BROKEN FORMAT
+data: { toolName: 'task_add', result: toolResult }
+```
+
+**Persistence events (ThreadManager):**
+```typescript  
+// CORRECT FORMAT
+data: toolResult  // Direct ToolResult object
+```
+
+This format mismatch caused `timeline-converter.ts` to lose metadata during real-time processing, while page reloads worked correctly because they used the persistence format.
+
+#### Root Cause Solution
+**Fixed session-service.ts event format consistency:**
+```typescript
+// packages/web/lib/server/session-service.ts
+agent.on('tool_call_complete', ({ result }) => {
+  const event: SessionEvent = {
+    type: 'TOOL_RESULT',
+    threadId,
+    timestamp: new Date(),
+    data: result, // Use direct result to match persistence format
+  };
+  sseManager.broadcast(sessionId, event);
+});
+```
+
+#### Enhanced Implementation Beyond Original Plan
+
+1. **Rich Task Renderers with Design System:**
+   - Beautiful task completion cards showing task titles prominently
+   - Change tracking for updates (before/after values with arrows)
+   - Proper design system components (Badge, InlineCode, cards)
+   - Graceful fallback for missing metadata
+
+2. **Comprehensive Integration Testing:**
+   - `task-metadata-realtime-integration.test.ts` - Tests event format consistency
+   - 674 total tests passing including full integration coverage
+   - Type safety throughout with zero `any` usage
+
+3. **Timeline Converter Enhancements:**
+   - Enhanced `TOOL_AGGREGATED` event processing
+   - Proper metadata passing to tool renderers
+   - Maintained backwards compatibility
+
+### Files Modified
+
+#### Core Architecture
+- `packages/web/lib/server/session-service.ts` - **Critical fix**: Event format consistency
+- `packages/web/lib/timeline-converter.ts` - Enhanced metadata handling
+
+#### UI Components  
+- `packages/web/components/timeline/tool/task.tsx` - Rich renderers with design system
+- `packages/web/components/timeline/tool/types.ts` - Enhanced renderer interface
+
+#### Testing
+- `packages/web/lib/task-metadata-realtime-integration.test.ts` - Integration tests
+- `packages/web/components/timeline/tool/task.test.ts` - Updated unit tests
+- `packages/web/components/timeline/tool/task-integration.test.ts` - Fixed integration tests
+
+### Test Results
+```
+✅ 674 tests passing (2 skipped)
+✅ Zero ESLint warnings  
+✅ Full TypeScript strict mode compliance
+✅ Integration tests verify real-time = persistence behavior
+```
+
+### User Experience Improvement
+
+**Before (Broken):**
+- Real-time: "Tool executed, no output returned"
+- After reload: "Remove unused build artifacts from _build directory"
+
+**After (Fixed):**
+- Real-time: Rich task completion card with title, completion message, and metadata
+- After reload: Identical rich display
+- Consistent UX in both scenarios
+
+### Integration Testing Strategy Implemented
+
+1. **Event Format Consistency Tests:**
+   - Verify real-time and persistence use identical TOOL_RESULT formats
+   - Test metadata preservation through timeline conversion
+   - Demonstrate the bug with broken format for regression prevention
+
+2. **End-to-End Integration:**
+   - Full session service → event system → timeline converter → UI renderer flow
+   - Real task metadata from actual tool execution
+   - Comprehensive error handling and fallback testing
+
+3. **UI Component Integration:**
+   - Task renderers handle both metadata and fallback scenarios  
+   - Design system component integration
+   - Responsive display of task information
+
+### Lessons Learned
+
+1. **Event Sourcing Consistency is Critical:**
+   - Real-time and persistence event formats MUST be identical
+   - Format mismatches cause silent data loss that's hard to debug
+   - Always verify event format consistency in integration tests
+
+2. **Debugging Timeline Issues:**
+   - Check session-service.ts event emission format first
+   - Verify timeline-converter.ts metadata passing
+   - Test both real-time streaming and page reload scenarios
+
+3. **Progressive Enhancement Works:**
+   - Rich renderers with graceful fallback enable incremental improvement
+   - Backwards compatibility prevents breaking existing functionality
+   - Design system consistency improves overall UX
+
+### Next Steps
+
+1. **Ready for Merge:** All implementation complete, tests passing
+2. **Future Enhancement:** Consider similar metadata flow for other tool types
+3. **Monitoring:** Watch for any edge cases in production usage
+
 ## Rollback Plan
 
 If issues arise:
-1. Revert to previous commit: `git revert <commit-hash>`
-2. Task renderers fall back to text parsing (already implemented)
-3. Fix metadata issues in task tools
-4. Re-deploy with proper metadata
+1. Revert specific commits: `git revert <commit-hash>`
+2. Task renderers have graceful fallback to text parsing (already implemented)
+3. Event format inconsistency is the main risk - monitor session-service.ts changes
+4. Integration tests will catch any regression in event format consistency
 
-The current fallback behavior ensures the UI remains functional even with incomplete metadata implementation.
+The implementation maintains backwards compatibility and graceful degradation.
