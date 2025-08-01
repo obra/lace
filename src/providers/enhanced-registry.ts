@@ -1,11 +1,11 @@
 // ABOUTME: Enhanced provider registry with catalog and instance support
 // ABOUTME: Integrates catalog system with existing provider registry functionality
 
-import { ProviderRegistry } from './registry';
-import { ProviderCatalogManager } from './catalog/manager';
-import { ProviderInstanceManager } from './instance/manager';
-import { AIProvider, ProviderConfig } from './base-provider';
-import type { CatalogProvider, CatalogModel, ProviderInstance } from './catalog/types';
+import { ProviderRegistry } from '~/providers/registry';
+import { ProviderCatalogManager } from '~/providers/catalog/manager';
+import { ProviderInstanceManager } from '~/providers/instance/manager';
+import { AIProvider, ProviderConfig } from '~/providers/base-provider';
+import type { CatalogProvider, CatalogModel, ProviderInstance } from '~/providers/catalog/types';
 
 export interface ConfiguredInstance {
   id: string;
@@ -31,11 +31,11 @@ export class EnhancedProviderRegistry extends ProviderRegistry {
   async initialize(): Promise<void> {
     // Load catalog data
     await this.catalogManager.loadCatalogs();
-    
+
     // Load user instances
     const config = await this.instanceManager.loadInstances();
     this.configuredInstances.clear();
-    
+
     for (const [instanceId, instance] of Object.entries(config.instances)) {
       this.configuredInstances.set(instanceId, instance);
     }
@@ -47,7 +47,7 @@ export class EnhancedProviderRegistry extends ProviderRegistry {
 
   getConfiguredInstances(): ConfiguredInstance[] {
     const instances: ConfiguredInstance[] = [];
-    
+
     for (const [instanceId, instance] of this.configuredInstances.entries()) {
       instances.push({
         id: instanceId,
@@ -59,7 +59,7 @@ export class EnhancedProviderRegistry extends ProviderRegistry {
         hasCredentials: false, // TODO: Check credentials without loading them
       });
     }
-    
+
     return instances;
   }
 
@@ -96,7 +96,7 @@ export class EnhancedProviderRegistry extends ProviderRegistry {
   }
 
   async createProviderFromInstanceAndModel(
-    instanceId: string, 
+    instanceId: string,
     modelId: string
   ): Promise<AIProvider> {
     const instance = this.configuredInstances.get(instanceId);
@@ -117,7 +117,9 @@ export class EnhancedProviderRegistry extends ProviderRegistry {
     // Verify model exists in catalog
     const model = this.getModelFromCatalog(instance.catalogProviderId, modelId);
     if (!model) {
-      throw new Error(`Model not found in catalog: ${modelId} for provider ${instance.catalogProviderId}`);
+      throw new Error(
+        `Model not found in catalog: ${modelId} for provider ${instance.catalogProviderId}`
+      );
     }
 
     // Build provider config with model

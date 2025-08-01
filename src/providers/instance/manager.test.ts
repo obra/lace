@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ProviderInstanceManager } from './manager';
-import type { ProviderInstancesConfig, Credential } from '../catalog/types';
+import { ProviderInstanceManager } from '~/providers/instance/manager';
+import type { ProviderInstancesConfig, Credential } from '~/providers/catalog/types';
 
 describe('ProviderInstanceManager', () => {
   let tempDir: string;
@@ -48,7 +48,7 @@ describe('ProviderInstanceManager', () => {
             timeout: 30000,
           },
           'anthropic-dev': {
-            displayName: 'Anthropic Development',  
+            displayName: 'Anthropic Development',
             catalogProviderId: 'anthropic',
             endpoint: 'https://api.anthropic.com/v1',
           },
@@ -104,19 +104,19 @@ describe('ProviderInstanceManager', () => {
       const configPath = path.join(tempDir, 'provider-instances.json');
       expect(fs.existsSync(configPath)).toBe(true);
 
-      const savedContent = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const savedContent = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as unknown;
       expect(savedContent).toEqual(testConfig);
     });
 
     it('overwrites existing configuration', async () => {
       const initialConfig: ProviderInstancesConfig = {
         version: '1.0',
-        instances: { 'old': { displayName: 'Old', catalogProviderId: 'openai' } },
+        instances: { old: { displayName: 'Old', catalogProviderId: 'openai' } },
       };
 
       const newConfig: ProviderInstancesConfig = {
         version: '1.0',
-        instances: { 'new': { displayName: 'New', catalogProviderId: 'anthropic' } },
+        instances: { new: { displayName: 'New', catalogProviderId: 'anthropic' } },
       };
 
       await manager.saveInstances(initialConfig);
@@ -189,7 +189,7 @@ describe('ProviderInstanceManager', () => {
       expect(fs.existsSync(credentialPath)).toBe(true);
 
       // Check file content
-      const savedContent = JSON.parse(fs.readFileSync(credentialPath, 'utf-8'));
+      const savedContent = JSON.parse(fs.readFileSync(credentialPath, 'utf-8')) as unknown;
       expect(savedContent).toEqual(testCredential);
 
       // Check file permissions (0o600)

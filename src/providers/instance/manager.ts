@@ -9,7 +9,7 @@ import {
   ProviderInstancesConfigSchema,
   Credential,
   CredentialSchema,
-} from '../catalog/types';
+} from '~/providers/catalog/types';
 
 export class ProviderInstanceManager {
   private configPath: string;
@@ -24,42 +24,39 @@ export class ProviderInstanceManager {
   async loadInstances(): Promise<ProviderInstancesConfig> {
     try {
       const content = await fs.promises.readFile(this.configPath, 'utf-8');
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as unknown;
       const result = ProviderInstancesConfigSchema.safeParse(parsed);
-      
+
       if (result.success) {
         return result.data;
       } else {
         console.warn('Invalid provider instances config, using default:', result.error);
         return this.getDefaultConfig();
       }
-    } catch (error) {
+    } catch (_error) {
       // File doesn't exist or can't be read, return default
       return this.getDefaultConfig();
     }
   }
 
   async saveInstances(config: ProviderInstancesConfig): Promise<void> {
-    await fs.promises.writeFile(
-      this.configPath,
-      JSON.stringify(config, null, 2)
-    );
+    await fs.promises.writeFile(this.configPath, JSON.stringify(config, null, 2));
   }
 
   async loadCredential(instanceId: string): Promise<Credential | null> {
     try {
       const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
       const content = await fs.promises.readFile(credPath, 'utf-8');
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as unknown;
       const result = CredentialSchema.safeParse(parsed);
-      
+
       if (result.success) {
         return result.data;
       } else {
         console.warn(`Invalid credential for instance ${instanceId}:`, result.error);
         return null;
       }
-    } catch (error) {
+    } catch (_error) {
       // File doesn't exist or can't be read
       return null;
     }
@@ -68,11 +65,7 @@ export class ProviderInstanceManager {
   async saveCredential(instanceId: string, credential: Credential): Promise<void> {
     await fs.promises.mkdir(this.credentialsDir, { recursive: true });
     const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
-    await fs.promises.writeFile(
-      credPath,
-      JSON.stringify(credential, null, 2),
-      { mode: 0o600 }
-    );
+    await fs.promises.writeFile(credPath, JSON.stringify(credential, null, 2), { mode: 0o600 });
   }
 
   async deleteInstance(instanceId: string): Promise<void> {

@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
-import { CatalogProvider, CatalogProviderSchema, CatalogModel } from './types';
+import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
 
 export class ProviderCatalogManager {
   private shippedCatalogDir: string;
@@ -18,10 +18,10 @@ export class ProviderCatalogManager {
 
   async loadCatalogs(): Promise<void> {
     this.catalogCache.clear();
-    
+
     // Load shipped catalogs
     await this.loadCatalogDirectory(this.shippedCatalogDir);
-    
+
     // Load user catalog extensions (override shipped if same ID)
     if (await this.directoryExists(this.userCatalogDir)) {
       await this.loadCatalogDirectory(this.userCatalogDir);
@@ -31,7 +31,7 @@ export class ProviderCatalogManager {
   private async loadCatalogDirectory(dirPath: string): Promise<void> {
     try {
       const files = await fs.promises.readdir(dirPath);
-      
+
       for (const file of files) {
         if (file.endsWith('.json')) {
           try {
@@ -39,12 +39,12 @@ export class ProviderCatalogManager {
             const content = await fs.promises.readFile(filePath, 'utf-8');
             const provider = CatalogProviderSchema.parse(JSON.parse(content));
             this.catalogCache.set(provider.id, provider);
-          } catch (error) {
-            console.warn(`Failed to load catalog file ${file}:`, error);
+          } catch (_error) {
+            console.warn(`Failed to load catalog file ${file}:`, _error);
           }
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Directory doesn't exist or can't be read, just continue
     }
   }
@@ -64,17 +64,14 @@ export class ProviderCatalogManager {
 
   getModel(providerId: string, modelId: string): CatalogModel | null {
     const models = this.getProviderModels(providerId);
-    return models.find(m => m.id === modelId) || null;
+    return models.find((m) => m.id === modelId) || null;
   }
 
   async saveUserCatalog(providerId: string, provider: CatalogProvider): Promise<void> {
     await fs.promises.mkdir(this.userCatalogDir, { recursive: true });
     const filePath = path.join(this.userCatalogDir, `${providerId}.json`);
-    await fs.promises.writeFile(
-      filePath,
-      JSON.stringify(provider, null, 2)
-    );
-    
+    await fs.promises.writeFile(filePath, JSON.stringify(provider, null, 2));
+
     // Update cache
     this.catalogCache.set(provider.id, provider);
   }

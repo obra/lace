@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ProviderCatalogManager } from './manager';
+import { ProviderCatalogManager } from '~/providers/catalog/manager';
 
 describe('ProviderCatalogManager', () => {
   let tempDir: string;
@@ -33,10 +33,10 @@ describe('ProviderCatalogManager', () => {
   describe('loadCatalogs', () => {
     it('loads built-in catalog data from shipped directory', async () => {
       await manager.loadCatalogs();
-      
+
       const providers = manager.getAvailableProviders();
       expect(providers.length).toBeGreaterThan(0);
-      
+
       // Should have Anthropic from shipped data
       const anthropic = manager.getProvider('anthropic');
       expect(anthropic).toBeTruthy();
@@ -125,7 +125,7 @@ describe('ProviderCatalogManager', () => {
 
       // Should not throw, just warn
       await expect(manager.loadCatalogs()).resolves.not.toThrow();
-      
+
       // Should still load valid providers
       const providers = manager.getAvailableProviders();
       expect(providers.length).toBeGreaterThan(0);
@@ -134,7 +134,7 @@ describe('ProviderCatalogManager', () => {
     it('handles non-existent user catalog directory gracefully', async () => {
       // User catalog directory doesn't exist
       await expect(manager.loadCatalogs()).resolves.not.toThrow();
-      
+
       const providers = manager.getAvailableProviders();
       expect(providers.length).toBeGreaterThan(0);
     });
@@ -208,14 +208,16 @@ describe('ProviderCatalogManager', () => {
         type: 'custom',
         default_large_model_id: 'test-model',
         default_small_model_id: 'test-model',
-        models: [{
-          id: 'test-model',
-          name: 'Test Model',
-          cost_per_1m_in: 1,
-          cost_per_1m_out: 2,
-          context_window: 1000,
-          default_max_tokens: 500,
-        }],
+        models: [
+          {
+            id: 'test-model',
+            name: 'Test Model',
+            cost_per_1m_in: 1,
+            cost_per_1m_out: 2,
+            context_window: 1000,
+            default_max_tokens: 500,
+          },
+        ],
       };
 
       await manager.saveUserCatalog('test-provider', customProvider);
@@ -225,7 +227,7 @@ describe('ProviderCatalogManager', () => {
       expect(fs.existsSync(userCatalogPath)).toBe(true);
 
       // Verify content
-      const savedContent = JSON.parse(fs.readFileSync(userCatalogPath, 'utf-8'));
+      const savedContent = JSON.parse(fs.readFileSync(userCatalogPath, 'utf-8')) as unknown;
       expect(savedContent).toEqual(customProvider);
 
       // Verify it's available in manager

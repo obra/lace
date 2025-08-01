@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { EnhancedProviderRegistry } from './enhanced-registry';
-import type { ProviderInstancesConfig, Credential } from './catalog/types';
+import { EnhancedProviderRegistry } from '~/providers/enhanced-registry';
+import type { ProviderInstancesConfig, Credential } from '~/providers/catalog/types';
 
 describe('EnhancedProviderRegistry', () => {
   let tempDir: string;
@@ -34,19 +34,19 @@ describe('EnhancedProviderRegistry', () => {
   describe('initialization', () => {
     it('loads catalogs and instances on initialization', async () => {
       await registry.initialize();
-      
+
       // Should have loaded built-in catalog providers
       const catalogProviders = registry.getCatalogProviders();
       expect(catalogProviders.length).toBeGreaterThan(0);
-      
-      const anthropic = catalogProviders.find(p => p.id === 'anthropic');
+
+      const anthropic = catalogProviders.find((p) => p.id === 'anthropic');
       expect(anthropic).toBeTruthy();
       expect(anthropic?.models.length).toBeGreaterThan(0);
     });
 
     it('handles missing instance configuration gracefully', async () => {
       await registry.initialize();
-      
+
       const instances = registry.getConfiguredInstances();
       expect(instances).toEqual([]);
     });
@@ -136,9 +136,9 @@ describe('EnhancedProviderRegistry', () => {
     });
 
     it('throws error for non-existent instance', async () => {
-      await expect(
-        registry.createProviderFromInstance('non-existent')
-      ).rejects.toThrow('Provider instance not found: non-existent');
+      await expect(registry.createProviderFromInstance('non-existent')).rejects.toThrow(
+        'Provider instance not found: non-existent'
+      );
     });
 
     it('throws error for instance without credentials', async () => {
@@ -159,9 +159,9 @@ describe('EnhancedProviderRegistry', () => {
 
       await registry.initialize();
 
-      await expect(
-        registry.createProviderFromInstance('no-creds')
-      ).rejects.toThrow('No credentials found for instance: no-creds');
+      await expect(registry.createProviderFromInstance('no-creds')).rejects.toThrow(
+        'No credentials found for instance: no-creds'
+      );
     });
   });
 
@@ -222,8 +222,8 @@ describe('EnhancedProviderRegistry', () => {
     it('provides available catalog providers', () => {
       const providers = registry.getCatalogProviders();
       expect(providers.length).toBeGreaterThan(0);
-      
-      const anthropic = providers.find(p => p.id === 'anthropic');
+
+      const anthropic = providers.find((p) => p.id === 'anthropic');
       expect(anthropic).toBeTruthy();
       expect(anthropic?.name).toBe('Anthropic');
     });
