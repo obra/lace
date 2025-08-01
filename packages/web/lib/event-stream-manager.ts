@@ -1,8 +1,50 @@
 // ABOUTME: Event stream manager for real-time client notifications
 // ABOUTME: Manages global event distribution with client-side filtering
 
-import type { StreamEvent, EventScope } from '@/types/stream-events';
+import type { StreamEvent, EventType } from '@/types/stream-events';
+import type { Task, TaskContext, ThreadId } from '@/lib/core';
+import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
+
+// TaskManager event interfaces
+interface TaskCreatedEvent {
+  type: 'task:created';
+  task: Task;
+  context: TaskContext;
+  timestamp: string;
+}
+
+interface TaskUpdatedEvent {
+  type: 'task:updated';
+  task: Task;
+  context: TaskContext;
+  timestamp: string;
+}
+
+interface TaskDeletedEvent {
+  type: 'task:deleted';
+  taskId: string;
+  task: Task;
+  context: TaskContext;
+  timestamp: string;
+}
+
+interface TaskNoteAddedEvent {
+  type: 'task:note_added';
+  task: Task;
+  context: TaskContext;
+  timestamp: string;
+}
+
+interface AgentSpawnedEvent {
+  type: 'agent:spawned';
+  taskId: string;
+  agentThreadId: ThreadId;
+  provider: string;
+  model: string;
+  context: TaskContext;
+  timestamp: string;
+}
 
 // Client connection with subscription filters
 interface ClientConnection {
@@ -13,7 +55,7 @@ interface ClientConnection {
     sessions?: string[];
     threads?: string[];
     global?: boolean;
-    eventTypes?: string[];
+    eventTypes?: EventType[];
   };
   lastEventId?: string;
   connectedAt: Date;
@@ -31,6 +73,99 @@ export class EventStreamManager {
   private eventIdCounter = 0;
 
   private constructor() {}
+
+  // Register a Session to forward its TaskManager events to the stream
+  // Called once per Session instance from SessionService
+  registerSession(session: Session): void {
+    const taskManager = session.getTaskManager();
+    const sessionId = session.getId();
+    const projectId = session.getProjectId();
+
+    // Use WeakSet to ensure we only add listeners once per TaskManager
+    if (EventStreamManager.registeredTaskManagers.has(taskManager)) {
+      return;
+    }
+
+    console.warn('[EVENT_STREAM_MANAGER] Registering TaskManager for session:', sessionId);
+    EventStreamManager.registeredTaskManagers.add(taskManager);
+
+    // Forward all TaskManager events
+    taskManager.on('task:created', (event: TaskCreatedEvent) => {
+      this.broadcast({
+        eventType: 'task',
+        scope: { projectId, sessionId, taskId: event.task.id },
+        data: {
+          type: 'task:created',
+          task: event.task,
+          context: event.context,
+          timestamp: event.timestamp,
+        },
+      });
+    });
+
+    taskManager.on('task:updated', (event: unknown) => {
+      const eventData = event as any;
+      this.broadcast({
+        eventType: 'task',
+        scope: { projectId, sessionId, taskId: eventData.task?.id },
+        data: {
+          type: 'task:updated',
+          task: eventData.task,
+          context: eventData.context,
+          timestamp: eventData.timestamp,
+        },
+      });
+    });
+
+    taskManager.on('task:deleted', (event: unknown) => {
+      const eventData = event as any;
+      this.broadcast({
+        eventType: 'task',
+        scope: { projectId, sessionId, taskId: eventData.taskId },
+        data: {
+          type: 'task:deleted',
+          taskId: eventData.taskId,
+          task: eventData.task,
+          context: eventData.context,
+          timestamp: eventData.timestamp,
+        },
+      });
+    });
+
+    taskManager.on('task:note_added', (event: unknown) => {
+      const eventData = event as any;
+      this.broadcast({
+        eventType: 'task',
+        scope: { projectId, sessionId, taskId: eventData.task?.id },
+        data: {
+          type: 'task:note_added',
+          task: eventData.task,
+          context: eventData.context,
+          timestamp: eventData.timestamp,
+        },
+      });
+    });
+
+    taskManager.on('agent:spawned', (event: unknown) => {
+      const eventData = event as any;
+      this.broadcast({
+        eventType: 'task',
+        scope: { projectId, sessionId, taskId: eventData.taskId },
+        data: {
+          type: 'agent:spawned',
+          taskId: eventData.taskId,
+          agentThreadId: eventData.agentThreadId,
+          provider: eventData.provider,
+          model: eventData.model,
+          context: eventData.context,
+          timestamp: eventData.timestamp,
+        },
+      });
+    });
+  }
+
+  // WeakSet to track registered TaskManager instances
+  private static registeredTaskManagers = new WeakSet<unknown>();
 
   static getInstance(): EventStreamManager {
     if (!global.eventStreamManager) {
@@ -72,20 +207,18 @@ export class EventStreamManager {
     // Send connection confirmation
     this.sendToConnection(connection, {
       id: this.generateEventId(),
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       eventType: 'global',
       scope: { global: true },
       data: {
         type: 'system:notification',
         message: 'Connected to unified event stream',
         severity: 'info',
-        context: { actor: 'system' },
+        context: { actor: 'system', isHuman: false },
+        timestamp: new Date().toISOString(),
       },
     });
 
-    console.log(
-      `[EVENT_STREAM] Client connected: ${connectionId}, total: ${this.connections.size}`
-    );
     return connectionId;
   }
 
@@ -100,9 +233,6 @@ export class EventStreamManager {
         console.warn(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
       }
       this.connections.delete(connectionId);
-      console.log(
-        `[EVENT_STREAM] Client disconnected: ${connectionId}, total: ${this.connections.size}`
-      );
     }
   }
 
@@ -111,17 +241,15 @@ export class EventStreamManager {
     const fullEvent: StreamEvent = {
       ...event,
       id: this.generateEventId(),
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
 
-    let sentCount = 0;
     const deadConnections: string[] = [];
 
     for (const [connectionId, connection] of this.connections) {
       if (this.shouldSendToConnection(connection, fullEvent)) {
         try {
           this.sendToConnection(connection, fullEvent);
-          sentCount++;
         } catch (error) {
           console.error(`[EVENT_STREAM] Failed to send to connection ${connectionId}:`, error);
           deadConnections.push(connectionId);
@@ -133,10 +261,6 @@ export class EventStreamManager {
     for (const connectionId of deadConnections) {
       this.removeConnection(connectionId);
     }
-
-    console.log(
-      `[EVENT_STREAM] Broadcast sent to ${sentCount}/${this.connections.size} connections`
-    );
   }
 
   // Check if event should be sent to connection based on subscription
@@ -169,10 +293,9 @@ export class EventStreamManager {
       }
     }
 
-    // Event type filtering
+    // Event type filtering (filters by top-level eventType, not event.data.type)
     if (subscription.eventTypes && subscription.eventTypes.length > 0) {
-      const eventDataType = (event.data as { type?: string }).type;
-      if (eventDataType && !subscription.eventTypes.includes(eventDataType)) {
+      if (!subscription.eventTypes.includes(event.eventType)) {
         return false;
       }
     }
@@ -248,11 +371,8 @@ export class EventStreamManager {
     }
 
     for (const connectionId of staleConnections) {
-      console.log(`[EVENT_STREAM] Cleaning up stale connection: ${connectionId}`);
       this.removeConnection(connectionId);
     }
-
-    console.log(`[EVENT_STREAM] Cleaned up ${staleConnections.length} stale connections`);
   }
 
   // Clean up all connections (for shutdown)
@@ -260,6 +380,5 @@ export class EventStreamManager {
     for (const connectionId of this.connections.keys()) {
       this.removeConnection(connectionId);
     }
-    console.log('[EVENT_STREAM] All connections cleaned up');
   }
 }
