@@ -63,6 +63,10 @@ export async function POST(
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
     setupAgentApprovals(agent, sessionId);
 
+    // CRITICAL: Setup event handlers for real-time updates
+    // Without this, newly spawned agents won't emit events to the UI until page refresh
+    sessionService.setupAgentEventHandlers(agent, sessionId);
+
     // Convert to API format - use agent's improved API
     const agentResponse = {
       threadId: agent.threadId,
