@@ -6,7 +6,7 @@ export type { ThreadId, AssigneeId, EventType, ThreadEvent, Thread } from '~/thr
 
 export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
+export type { Task, TaskNote, TaskStatus, TaskPriority, TaskContext } from '~/tasks/types';
 
 export type { AgentState } from '~/agents/agent';
 
