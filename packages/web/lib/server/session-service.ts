@@ -4,8 +4,7 @@
 import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/types/core';
-import { ApiSession, ApiAgent } from '@/types/api';
+import type { ThreadId, SessionInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
@@ -20,7 +19,7 @@ export class SessionService {
     provider: string,
     model: string,
     projectId: string
-  ): Promise<ApiSession> {
+  ): Promise<SessionInfo> {
     // Create project-based session
     const { Project } = await import('@/lib/server/lace-imports');
     const project = Project.getById(projectId);
@@ -56,9 +55,9 @@ export class SessionService {
     return this.sessionToMetadata(session);
   }
 
-  async listSessions(): Promise<ApiSession[]> {
+  async listSessions(): Promise<SessionInfo[]> {
     const sessionInfos = Session.getAll();
-    const sessions: ApiSession[] = [];
+    const sessions: SessionInfo[] = [];
 
     for (const sessionInfo of sessionInfos) {
       // Try to get from registry first, then reconstruct if needed
@@ -331,8 +330,8 @@ export class SessionService {
     Session.clearRegistry();
   }
 
-  // Helper to convert Session instance to ApiSession for API responses
-  private sessionToMetadata(session: Session): ApiSession {
+  // Helper to convert Session instance to SessionInfo for API responses
+  private sessionToMetadata(session: Session): SessionInfo {
     const sessionInfo = session.getInfo();
     if (!sessionInfo) {
       throw new Error('Failed to get session info');
@@ -343,14 +342,15 @@ export class SessionService {
     return {
       id: session.getId(),
       name: sessionInfo.name,
-      createdAt: sessionInfo.createdAt.toISOString(),
+      createdAt: sessionInfo.createdAt,
+      provider: sessionInfo.provider,
+      model: sessionInfo.model,
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
-        status: agent.status as ApiAgent['status'],
-        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+        status: agent.status,
       })),
     };
   }

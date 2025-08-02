@@ -2,6 +2,7 @@
 // ABOUTME: Uses superjson to preserve types across API boundaries and SSE
 
 import superjson from 'superjson';
+import { NextResponse } from 'next/server';
 import type { ThreadId } from '@/types/core';
 
 // Import NewAgentSpec type for branded type registration
@@ -47,4 +48,15 @@ export function serializeEvent<T>(event: T): string {
 
 export function deserializeEvent<T>(data: string): T {
   return parse(data);
+}
+
+// Next.js API route helper that preserves NextResponse optimizations
+export function createSuperjsonResponse<T>(data: T, init?: ResponseInit) {
+  return new NextResponse(stringify(data), {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...init?.headers,
+    },
+  });
 }

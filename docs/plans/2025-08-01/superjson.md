@@ -169,13 +169,11 @@ export async function GET() {
   return NextResponse.json({ sessions: apiSessions });
 }
 
-// AFTER (SUPERJSON):
-import { stringify } from '@/lib/serialization';
+// AFTER (SUPERJSON with NextResponse):
+import { createSuperjsonResponse } from '@/lib/serialization';
 export async function GET() {
   const sessions = await sessionService.listSessions(); // Returns SessionInfo[]
-  return new Response(stringify({ sessions }), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+  return createSuperjsonResponse({ sessions });
 }
 ```
 
