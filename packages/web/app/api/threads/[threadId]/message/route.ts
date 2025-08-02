@@ -96,7 +96,7 @@ export async function POST(
     const userMessageEvent: SessionEvent = {
       type: 'USER_MESSAGE' as const,
       threadId,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       data: { content: body.message },
     };
     sseManager.broadcast({

@@ -3,18 +3,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import type { StreamSubscription } from '@/types/stream-events';
+import type { StreamSubscription, EventType } from '@/types/stream-events';
 
 // Parse subscription from query parameters
 function parseSubscription(request: NextRequest): StreamSubscription {
   const url = new URL(request.url);
+
+  const eventTypesParam = url.searchParams.get('eventTypes')?.split(',').filter(Boolean);
 
   return {
     projects: url.searchParams.get('projects')?.split(',').filter(Boolean),
     sessions: url.searchParams.get('sessions')?.split(',').filter(Boolean),
     threads: url.searchParams.get('threads')?.split(',').filter(Boolean),
     global: url.searchParams.get('global') === 'true',
-    eventTypes: url.searchParams.get('eventTypes')?.split(',').filter(Boolean),
+    eventTypes: eventTypesParam as EventType[] | undefined,
   };
 }
 
