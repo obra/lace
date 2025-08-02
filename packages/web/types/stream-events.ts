@@ -1,6 +1,8 @@
 // ABOUTME: Event stream types for real-time notifications
 // ABOUTME: Clean re-export of core event types - no duplicate definitions
 
+import type { StreamEvent, StreamSubscription } from '~/events/types';
+
 // Re-export all core event types (single source of truth)
 export type {
   EventType,
