@@ -18,17 +18,8 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 let consoleLogs: string[] = [];
 let originalConsoleError: typeof console.error;
 
-// Mock EventStreamManager to capture events
-const mockEventStreamManager = {
-  broadcast: vi.fn(),
-  getInstance: vi.fn(),
-};
-
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: () => mockEventStreamManager,
-  },
-}));
+// Import real EventStreamManager for integration testing
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Thread Messaging API', () => {
   let sessionService: ReturnType<typeof getSessionService>;
@@ -154,6 +145,9 @@ describe('Thread Messaging API', () => {
   });
 
   it('should broadcast user message event via EventStreamManager', async () => {
+    // Set up spy on real EventStreamManager to verify broadcast is called
+    const broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
+
     const request = new NextRequest('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -165,7 +159,7 @@ describe('Thread Messaging API', () => {
     });
 
     // Should broadcast the user message event
-    expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
+    expect(broadcastSpy).toHaveBeenCalledWith({
       eventType: 'session',
       scope: { sessionId: realSessionId },
       data: expect.objectContaining({
@@ -173,6 +167,8 @@ describe('Thread Messaging API', () => {
         data: { content: 'Test message' },
       }),
     });
+
+    broadcastSpy.mockRestore();
   });
 
   it('should handle malformed JSON gracefully', async () => {
