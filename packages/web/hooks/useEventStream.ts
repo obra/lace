@@ -2,7 +2,12 @@
 // ABOUTME: Single EventSource connection handling session, task, project, and approval events
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import type { StreamEvent, StreamSubscription, StreamConnection } from '@/types/stream-events';
+import type {
+  StreamEvent,
+  StreamSubscription,
+  StreamConnection,
+  EventType,
+} from '@/types/stream-events';
 import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import type { Task } from '@/lib/core';
 import {
@@ -307,7 +312,7 @@ export function useEventStream({
       sessions: sessionId ? [sessionId] : [],
       threads: threadIds || [],
       global: includeGlobal,
-      eventTypes: ['session', 'task', 'project', 'global'] as const,
+      eventTypes: ['session', 'task', 'project', 'global'] as EventType[],
     }),
     [projectId, sessionId, threadIds, includeGlobal]
   );

@@ -97,7 +97,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.task.id },
-        data: { type: 'task:created', ...e },
+        data: { type: 'task:created', taskId: e.task.id, ...e },
       });
     });
 
@@ -106,7 +106,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.task?.id },
-        data: { type: 'task:updated', ...e },
+        data: { type: 'task:updated', taskId: e.task?.id || '', ...e },
       });
     });
 
@@ -115,7 +115,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.taskId },
-        data: { type: 'task:deleted', ...e },
+        data: { type: 'task:deleted', taskId: e.taskId, ...e },
       });
     });
 
@@ -124,7 +124,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.task?.id },
-        data: { type: 'task:note_added', ...e },
+        data: { type: 'task:note_added', taskId: e.task?.id || '', ...e },
       });
     });
 
