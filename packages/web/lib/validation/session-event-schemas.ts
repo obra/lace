@@ -7,13 +7,11 @@ import type { ThreadId } from '@/types/api';
 // ThreadId schema (assumes string validation exists elsewhere)
 const ThreadIdSchema = z.string() as z.ZodType<ThreadId>;
 
-// Date transformation schema - converts ISO strings to Date objects
-const DateTimeSchema = z
-  .union([
-    z.date(), // Already a Date
-    z.string().datetime(), // ISO string
-  ])
-  .transform((val) => (val instanceof Date ? val : new Date(val)));
+// Timestamp schema - preserves ISO strings for JSON serialization compatibility
+const DateTimeSchema = z.union([
+  z.date().transform((date) => date.toISOString()), // Convert Date to ISO string
+  z.string().datetime(), // Keep ISO string as-is
+]);
 
 // Event data schemas
 const UserMessageEventDataSchema = z.object({

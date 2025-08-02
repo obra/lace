@@ -163,7 +163,7 @@ export function ToolCallDisplay({
   const hasArgs: boolean = Boolean(args && typeof args === 'object' && args !== null && Object.keys(args).length > 0);
   const toolDisplayName = renderer.getDisplayName?.(tool, result || undefined) ?? tool;
   const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
-  const resultContent = hasResult ? (renderer.renderResult?.(result!, metadata) ?? createDefaultResultRenderer(result!)) : null;
+  const resultContent = hasResult ? (renderer.renderResult?.(result!, undefined) ?? createDefaultResultRenderer(result!)) : null;
   
   // Create success/error icon for header
   const statusIcon = hasResult ? (

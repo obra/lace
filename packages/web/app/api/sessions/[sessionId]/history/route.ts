@@ -54,7 +54,10 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
 
   const baseEvent = {
     threadId,
-    timestamp: threadEvent.timestamp,
+    timestamp:
+      threadEvent.timestamp instanceof Date
+        ? threadEvent.timestamp.toISOString()
+        : String(threadEvent.timestamp),
   };
 
   switch (threadEvent.type) {

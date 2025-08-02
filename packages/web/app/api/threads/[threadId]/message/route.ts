@@ -122,7 +122,7 @@ export async function POST(
         const errorEvent: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE' as const,
           threadId,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           data: { content: `Error: ${errorMessage}` },
         };
         sseManager.broadcast({

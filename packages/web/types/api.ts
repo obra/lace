@@ -94,79 +94,79 @@ export type SessionEvent =
   | {
       type: 'USER_MESSAGE';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: UserMessageEventData;
     }
   | {
       type: 'AGENT_MESSAGE';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: AgentMessageEventData;
     }
   | {
       type: 'TOOL_CALL';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: ToolCallEventData;
     }
   | {
       type: 'TOOL_RESULT';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: ToolResult;
     }
   | {
       type: 'TOOL_AGGREGATED';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: ToolAggregatedEventData;
     }
   | {
       type: 'LOCAL_SYSTEM_MESSAGE';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: LocalSystemMessageEventData;
     }
   | {
       type: 'AGENT_TOKEN';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: { token: string };
     }
   | {
       type: 'AGENT_STREAMING';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: { content: string };
     }
   | {
       type: 'TOOL_APPROVAL_REQUEST';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: ToolApprovalRequestData;
     }
   | {
       type: 'SYSTEM_PROMPT';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: SystemPromptEventData;
     }
   | {
       type: 'USER_SYSTEM_PROMPT';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: UserSystemPromptEventData;
     }
   | {
       type: 'COMPACTION';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: CompactionEventData;
     }
   | {
       type: 'TOOL_APPROVAL_RESPONSE';
       threadId: ThreadId;
-      timestamp: Date;
+      timestamp: string;
       data: { toolCallId: string; decision: string };
     };
 
@@ -195,7 +195,7 @@ export interface PendingApproval {
     name: string;
     arguments: unknown;
   };
-  requestedAt: Date;
+  requestedAt: string;
   requestData: ToolApprovalRequestData;
 }
 

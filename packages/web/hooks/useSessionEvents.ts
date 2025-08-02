@@ -3,18 +3,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEventStream } from './useEventStream';
-import type { SessionEvent, ThreadId, ToolApprovalRequestData } from '@/types/api';
+import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
-
-interface PendingApproval {
-  toolCallId: string;
-  toolCall: {
-    name: string;
-    arguments: unknown;
-  };
-  requestedAt: Date;
-  requestData: ToolApprovalRequestData;
-}
 
 interface UseSessionEventsReturn {
   allEvents: SessionEvent[];
@@ -40,14 +30,16 @@ export function useSessionEvents(
       const exists = prev.some(
         (e) =>
           e.type === sessionEvent.type &&
-          e.timestamp.getTime() === sessionEvent.timestamp.getTime() &&
+          e.timestamp === sessionEvent.timestamp &&
           e.threadId === sessionEvent.threadId &&
           JSON.stringify(e.data) === JSON.stringify(sessionEvent.data)
       );
 
       if (exists) return prev;
 
-      return [...prev, sessionEvent].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      return [...prev, sessionEvent].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
     });
   }, []);
 
@@ -139,7 +131,7 @@ export function useSessionEvents(
           const approvals = data.pendingApprovals.map((approval: any) => ({
             toolCallId: approval.toolCallId,
             toolCall: approval.toolCall,
-            requestedAt: new Date(approval.requestedAt),
+            requestedAt: approval.requestedAt, // Keep as string now
             requestData: approval.requestData,
           }));
           setPendingApprovals(approvals);
