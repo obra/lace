@@ -10,6 +10,7 @@ import { LaceApp } from '@/components/pages/LaceApp';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useTaskManager } from '@/hooks/useTaskManager';
+import { createFetchMock } from '@/test-utils/mock-fetch';
 
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
@@ -97,46 +98,29 @@ describe('LaceApp Task Sidebar Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Mock fetch to return session details
-    global.fetch = vi.fn((url: string) => {
-      if (url.includes('/api/projects')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ 
-            projects: [{
-              id: 'test-project',
-              name: 'Test Project',
-              description: 'Test project description',
-              workingDirectory: '/test',
-              isArchived: false,
-              createdAt: new Date(),
-              lastUsedAt: new Date(),
-              sessionCount: 1
-            }]
-          }),
-        });
+    // Mock fetch using the new utility that handles superjson properly
+    global.fetch = vi.fn(createFetchMock({
+      '/api/projects': { 
+        projects: [{
+          id: 'test-project',
+          name: 'Test Project',
+          description: 'Test project description',
+          workingDirectory: '/test',
+          isArchived: false,
+          createdAt: new Date(),
+          lastUsedAt: new Date(),
+          sessionCount: 1
+        }]
+      },
+      '/api/providers': { providers: [] },
+      '/api/sessions/test-session': { 
+        session: { 
+          id: 'test-session', 
+          name: 'Test Session',
+          agents: [] 
+        } 
       }
-      if (url.includes('/api/providers')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: [] }),
-        });
-      }
-      if (url.includes('/api/sessions/test-session')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ 
-            session: { 
-              id: 'test-session', 
-              name: 'Test Session',
-              agents: [] 
-            } 
-          }),
-        });
-      }
-      // Default to never resolve for loading states
-      return new Promise(() => {});
-    });
+    }));
     
     // Default hash router mock with session
     vi.mocked(useHashRouter).mockReturnValue({

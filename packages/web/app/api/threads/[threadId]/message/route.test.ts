@@ -13,6 +13,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];
@@ -82,7 +83,7 @@ describe('Thread Messaging API', () => {
     });
 
     expect(response.status).toBe(202);
-    const data = (await response.json()) as MessageResponse;
+    const data = await parseResponse<MessageResponse>(response);
     expect(data.status).toBe('accepted');
     expect(data.messageId).toBeDefined();
     expect(data.threadId).toBe(realThreadId);
@@ -188,7 +189,7 @@ describe('Thread Messaging API', () => {
     expect(response.status).toBe(400);
 
     // Verify error message in response
-    const responseData = await response.json();
+    const responseData = await parseResponse<{ error: string }>(response);
     expect(responseData.error).toBe('Invalid JSON in request body');
   });
 
@@ -211,7 +212,7 @@ describe('Thread Messaging API', () => {
     });
 
     expect(response.status).toBe(202);
-    const data = (await response.json()) as MessageResponse;
+    const data = await parseResponse<MessageResponse>(response);
     expect(data.status).toBe('accepted');
   });
 

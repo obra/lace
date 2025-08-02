@@ -118,8 +118,8 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
             );
             
             if (method === 'GET') {
-              const responseData = (await response.json()) as unknown;
-              return new Response(JSON.stringify(responseData), {
+              const responseText = await response.text();
+              return new Response(responseText, {
                 status: response.status,
                 headers: { 'Content-Type': 'application/json' }
               });

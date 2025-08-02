@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { ApiSession } from '@/types/api';
+import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
@@ -126,7 +127,7 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: ApiSession };
+      const data = await parseResponse<{ session: ApiSession }>(response);
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -152,7 +153,7 @@ describe('Session Detail API Route', () => {
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: String(sessionId) }),
       });
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid session ID');
@@ -165,7 +166,7 @@ describe('Session Detail API Route', () => {
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: String(sessionId) }),
       });
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid session ID');
@@ -209,14 +210,14 @@ describe('Session Detail API Route', () => {
       });
 
       if (response.status !== 200) {
-        const errorData = (await response.json()) as { error: string };
+        const errorData = await parseResponse<{ error: string }>(response);
         console.error('PATCH failed with status:', response.status);
         console.error('Error data:', errorData);
         // Don't throw - let the test assertion handle the failure
       }
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: ApiSession };
+      const data = await parseResponse<{ session: ApiSession }>(response);
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -240,7 +241,7 @@ describe('Session Detail API Route', () => {
         params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid session ID');
     });
@@ -279,7 +280,7 @@ describe('Session Detail API Route', () => {
         params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
-      const data = (await response.json()) as { error: string; details?: unknown };
+      const data = await parseResponse<{ error: string; details?: unknown }>(response);
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
       expect(data.details).toBeDefined();
@@ -321,7 +322,7 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: ApiSession };
+      const data = await parseResponse<{ session: ApiSession }>(response);
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -343,7 +344,7 @@ describe('Session Detail API Route', () => {
         params: Promise.resolve({ sessionId: String(sessionId) }),
       });
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid session ID');
     });

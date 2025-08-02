@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/agents/[agentId]/route';
+import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
 interface AgentResponse {
@@ -58,6 +59,7 @@ vi.mock('@/lib/server/session-service', () => ({
 
 vi.mock('@/types/core', () => ({
   asThreadId: vi.fn((id: string) => id),
+  isThreadId: vi.fn((id: string) => id.match(/^lace_\d{8}_[a-z0-9]{6}(\.\d+)?$/)),
 }));
 
 // Using real validation with valid threadId formats
@@ -85,7 +87,7 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as AgentResponse;
+      const data = await parseResponse<AgentResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.agent).toEqual({
@@ -111,7 +113,7 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as AgentResponse;
+      const data = await parseResponse<AgentResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.agent.name).toBe('Agent lace_20241122_abc123.1');
@@ -122,7 +124,7 @@ describe('Agent API', () => {
     it('should return 400 for invalid agent ID', async () => {
       const request = new NextRequest('http://localhost/api/agents/invalid-id');
       const response = await GET(request, { params: Promise.resolve({ agentId: 'invalid-id' }) });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid agent ID');
@@ -135,7 +137,7 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
@@ -148,7 +150,7 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.99' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Agent not found');
@@ -161,7 +163,7 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
@@ -189,7 +191,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as AgentResponse;
+      const data = await parseResponse<AgentResponse>(response);
 
       expect(response.status).toBe(200);
       expect(mockAgent.updateThreadMetadata).toHaveBeenCalledWith({
@@ -253,7 +255,7 @@ describe('Agent API', () => {
       });
 
       const response = await PUT(request, { params: Promise.resolve({ agentId: 'invalid-id' }) });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid agent ID');
@@ -273,7 +275,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -292,7 +294,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
@@ -310,7 +312,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.99' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Agent not found');
@@ -326,7 +328,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toContain('Unexpected token');
@@ -346,7 +348,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Update failed');

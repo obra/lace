@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import type { ProviderInfo, ModelInfo } from '@/types/core';
 import { ApiErrorResponse } from '@/types/api';
+import { createSuperjsonResponse } from '@/lib/serialization';
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
   return error instanceof Error;
@@ -32,12 +33,12 @@ export async function GET(): Promise<NextResponse<ProvidersResponse | ApiErrorRe
       })
     );
 
-    return NextResponse.json({ providers });
+    return createSuperjsonResponse({ providers });
   } catch (error: unknown) {
     console.error('Failed to get providers:', error);
 
     const errorMessage = isError(error) ? error.message : 'Failed to retrieve providers';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createSuperjsonResponse(errorResponse, { status: 500 });
   }
 }

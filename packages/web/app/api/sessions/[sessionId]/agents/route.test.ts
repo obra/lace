@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -39,10 +40,7 @@ interface ErrorResponse {
   error: string;
 }
 
-// Type-safe response parsing
-function parseResponse<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
-}
+// Note: parseResponse is imported from @/lib/serialization
 
 describe('Agent Spawning API E2E Tests', () => {
   let sessionService: SessionService;

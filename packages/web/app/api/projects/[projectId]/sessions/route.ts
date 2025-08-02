@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 const CreateSessionSchema = z.object({
@@ -20,7 +21,7 @@ export async function GET(
     const { projectId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     const sessionData = project.getSessions();
@@ -34,9 +35,9 @@ export async function GET(
       // Full agent details will be populated when individual session is selected
     }));
 
-    return NextResponse.json({ sessions });
+    return createSuperjsonResponse({ sessions });
   } catch (error: unknown) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to fetch sessions' },
       { status: 500 }
     );
@@ -54,7 +55,7 @@ export async function POST(
 
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     // Use sessionService to create session, which handles both database and in-memory management
@@ -66,16 +67,16 @@ export async function POST(
       projectId
     );
 
-    return NextResponse.json({ session }, { status: 201 });
+    return createSuperjsonResponse({ session }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to create session' },
       { status: 500 }
     );

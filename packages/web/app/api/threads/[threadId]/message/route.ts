@@ -10,6 +10,7 @@ import { asThreadId, type ThreadId } from '@/types/core';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
+import { createSuperjsonResponse } from '@/lib/serialization';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -36,7 +37,7 @@ export async function POST(
       const errorResponse: ApiErrorResponse = {
         error: threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
       };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     // TypeScript now knows threadIdResult.success is true, so data is properly typed
@@ -50,7 +51,7 @@ export async function POST(
       const errorResponse: ApiErrorResponse = {
         error: 'Invalid JSON in request body',
       };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     const bodyResult = MessageRequestSchema.safeParse(bodyRaw);
@@ -59,7 +60,7 @@ export async function POST(
       const errorResponse: ApiErrorResponse = {
         error: bodyResult.error.errors[0]?.message || 'Invalid request body',
       };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     const body = bodyResult.data;
@@ -81,14 +82,14 @@ export async function POST(
     const session = await sessionService.getSession(sessionId);
     if (!session) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createSuperjsonResponse(errorResponse, { status: 404 });
     }
 
     const agent = session.getAgent(threadId);
 
     if (!agent) {
       const errorResponse: ApiErrorResponse = { error: 'Agent not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createSuperjsonResponse(errorResponse, { status: 404 });
     }
 
     // Broadcast user message event via SSE
@@ -140,12 +141,12 @@ export async function POST(
       messageId,
     };
 
-    return NextResponse.json(response, { status: 202 });
+    return createSuperjsonResponse(response, { status: 202 });
   } catch (error: unknown) {
     console.error('[MESSAGE_API] Error in POST /api/threads/[threadId]/message:', error);
 
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createSuperjsonResponse(errorResponse, { status: 500 });
   }
 }

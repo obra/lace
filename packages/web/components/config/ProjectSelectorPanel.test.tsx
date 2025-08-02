@@ -5,6 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProjectSelectorPanel } from './ProjectSelectorPanel';
+import { createMockResponse } from '@/test-utils/mock-fetch';
 
 const mockProps = {
   projects: [],
@@ -27,10 +28,9 @@ describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ project: { id: '1', name: 'Test' } }),
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createMockResponse({ project: { id: '1', name: 'Test' } })
+    );
   });
 
   it('should show simplified creation form in auto-open mode', async () => {

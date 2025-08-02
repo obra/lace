@@ -28,9 +28,10 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { ApiSession as SessionType } from '@/types/api';
+import type { SessionInfo as SessionType } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 
 describe('API Endpoints E2E Tests', () => {
   let sessionService: SessionService;
@@ -92,8 +93,7 @@ describe('API Endpoints E2E Tests', () => {
       });
       expect(response.status).toBe(201);
 
-      const responseData: unknown = await response.json();
-      const data = responseData as { session: SessionType };
+      const data = (await response.json()) as { session: SessionType };
       expect(data.session.name).toBe('API Test Session');
       expect(data.session.id).toBeDefined();
 
@@ -127,8 +127,7 @@ describe('API Endpoints E2E Tests', () => {
       const response = await listSessions(listRequest);
       expect(response.status).toBe(200);
 
-      const responseData: unknown = await response.json();
-      const data = responseData as { sessions: SessionType[] };
+      const data = await parseResponse<{ sessions: SessionType[] }>(response);
       expect(data.sessions).toHaveLength(2); // 1 auto-created + 1 explicitly created
       expect(data.sessions.find((s) => s.name === 'Listable Session')).toBeDefined();
     });
@@ -160,8 +159,7 @@ describe('API Endpoints E2E Tests', () => {
       });
       expect(response.status).toBe(200);
 
-      const responseData: unknown = await response.json();
-      const data = responseData as { session: SessionType };
+      const data = await parseResponse<{ session: SessionType }>(response);
       expect(data.session.name).toBe('Specific Session');
       expect(data.session.id).toBe(sessionId);
     });
@@ -202,10 +200,9 @@ describe('API Endpoints E2E Tests', () => {
       const response = await spawnAgent(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(201);
 
-      const responseData: unknown = await response.json();
-      const data = responseData as {
+      const data = await parseResponse<{
         agent: { name: string; provider: string; model: string; threadId: string };
-      };
+      }>(response);
       expect(data.agent.name).toBe('API Agent');
       expect(data.agent.provider).toBe('anthropic');
       expect(data.agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
@@ -234,8 +231,7 @@ describe('API Endpoints E2E Tests', () => {
       const response = await getSession(getRequest, {
         params: Promise.resolve({ sessionId: sessionId }),
       });
-      const responseData: unknown = await response.json();
-      const data = responseData as { session: SessionType };
+      const data = await parseResponse<{ session: SessionType }>(response);
 
       expect(data.session.agents || []).toHaveLength(2); // Coordinator + spawned agent
       expect(data.session.agents?.find((a) => a.name === 'Reflected Agent')).toBeDefined();
@@ -299,13 +295,12 @@ describe('API Endpoints E2E Tests', () => {
       });
 
       if (response.status !== 202) {
-        const errorResponseData: unknown = await response.json();
+        const errorResponseData = await parseResponse<unknown>(response);
         const _errorData = errorResponseData as { error: string };
       }
       expect(response.status).toBe(202);
 
-      const responseData: unknown = await response.json();
-      const data = responseData as { status: string; threadId: string };
+      const data = await parseResponse<{ status: string; threadId: string }>(response);
       expect(data.status).toBe('accepted');
       expect(data.threadId).toBe(agentThreadId);
     });

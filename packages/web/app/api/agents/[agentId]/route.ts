@@ -1,10 +1,11 @@
 // ABOUTME: REST API endpoints for individual agent management - GET, PUT for agent updates
 // ABOUTME: Handles agent configuration updates including provider and model changes
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 const AgentUpdateSchema = z.object({
@@ -21,7 +22,7 @@ export async function GET(
     const { agentId } = await params;
 
     if (!isValidThreadId(agentId)) {
-      return NextResponse.json({ error: 'Invalid agent ID' }, { status: 400 });
+      return createSuperjsonResponse({ error: 'Invalid agent ID' }, { status: 400 });
     }
 
     const agentThreadId = asThreadId(agentId);
@@ -33,13 +34,13 @@ export async function GET(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
     const agent = session.getAgent(agentThreadId);
 
     if (!agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
 
     const metadata = agent.getThreadMetadata();
@@ -53,9 +54,9 @@ export async function GET(
       createdAt: new Date().toISOString(), // TODO: Get actual creation time
     };
 
-    return NextResponse.json({ agent: agentResponse });
+    return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to fetch agent' },
       { status: 500 }
     );
@@ -70,7 +71,7 @@ export async function PUT(
     const { agentId } = await params;
 
     if (!isValidThreadId(agentId)) {
-      return NextResponse.json({ error: 'Invalid agent ID' }, { status: 400 });
+      return createSuperjsonResponse({ error: 'Invalid agent ID' }, { status: 400 });
     }
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -85,13 +86,13 @@ export async function PUT(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
     const agent = session.getAgent(agentThreadId);
 
     if (!agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
 
     // Update agent properties via thread metadata
@@ -124,16 +125,16 @@ export async function PUT(
       createdAt: new Date().toISOString(), // TODO: Get actual creation time
     };
 
-    return NextResponse.json({ agent: agentResponse });
+    return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to update agent' },
       { status: 500 }
     );

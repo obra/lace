@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { ThreadIdSchema } from '@/lib/validation/schemas';
+import { createSuperjsonResponse } from '@/lib/serialization';
 
 // Validation schema
 const ParamsSchema = z.object({
@@ -20,7 +21,7 @@ export async function GET(
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(await params);
     if (!paramsResult.success) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         {
           error: 'Invalid parameters',
           details: paramsResult.error.format(),
@@ -41,12 +42,12 @@ export async function GET(
 
     const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
     const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
-      return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Agent not found for thread' }, { status: 404 });
     }
 
     // Use Agent interface to get pending approvals
@@ -93,8 +94,8 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ pendingApprovals });
+    return createSuperjsonResponse({ pendingApprovals });
   } catch (_error) {
-    return NextResponse.json({ error: 'Failed to get pending approvals' }, { status: 500 });
+    return createSuperjsonResponse({ error: 'Failed to get pending approvals' }, { status: 500 });
   }
 }

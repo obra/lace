@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import { asThreadId } from '@/types/core';
+import { createMockResponse, createMockErrorResponse } from '@/test-utils/mock-fetch';
 
 // Mock fetch to capture requests without making real calls
 global.fetch = vi.fn() as unknown as typeof fetch;
@@ -18,10 +19,7 @@ describe('TaskAPIClient Unit Tests', () => {
     mockFetch = vi.mocked(global.fetch);
 
     // Default successful response mock
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ tasks: [], task: {} }),
-    } as Response);
+    mockFetch.mockResolvedValue(createMockResponse({ tasks: [], task: {} }));
   });
 
   afterEach(() => {
@@ -137,11 +135,7 @@ describe('TaskAPIClient Unit Tests', () => {
 
   describe('Error Handling', () => {
     it('should throw error on failed request', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        json: () => Promise.resolve({ error: 'Server error' }),
-      } as Response);
+      mockFetch.mockResolvedValue(createMockErrorResponse('Server error', { status: 500 }));
 
       await expect(client.listTasks('project_123', 'lace_20240101_session')).rejects.toThrow(
         'Failed to fetch tasks'
@@ -149,11 +143,7 @@ describe('TaskAPIClient Unit Tests', () => {
     });
 
     it('should throw appropriate errors for failed requests', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ error: 'Bad request' }),
-      } as Response);
+      mockFetch.mockResolvedValue(createMockErrorResponse('Bad request', { status: 400 }));
 
       await expect(
         client.createTask('project_123', 'invalid-session', { title: '', prompt: '' })

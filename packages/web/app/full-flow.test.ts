@@ -13,9 +13,10 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/events/stream/route';
-import type { ApiSession } from '@/types/api';
+import type { SessionInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
@@ -92,7 +93,7 @@ describe('Full Conversation Flow', () => {
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: ApiSession };
+    const sessionData = (await sessionResponse.json()) as { session: SessionInfo };
     expect(sessionData.session.name).toBe(sessionName);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
@@ -116,9 +117,9 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(agentResponse.status).toBe(201);
-    const agentData = (await agentResponse.json()) as {
+    const agentData = await parseResponse<{
       agent: { threadId: ThreadId; name: string };
-    };
+    }>(agentResponse);
     expect(agentData.agent.name).toBe(agentName);
     const agentThreadId: ThreadId = agentData.agent.threadId as ThreadId;
 
@@ -148,7 +149,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ threadId: agentThreadId as string }),
     });
     expect(messageResponse.status).toBe(202);
-    const messageData = (await messageResponse.json()) as { status: string };
+    const messageData = await parseResponse<{ status: string }>(messageResponse);
     expect(messageData.status).toBe('accepted');
 
     // 5. Verify EventStreamManager connection was established
@@ -182,7 +183,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: ApiSession };
+    const sessionData = (await sessionResponse.json()) as { session: SessionInfo };
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
     // Spawn first agent
@@ -229,7 +230,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(listResponse.status).toBe(200);
-    const listData = (await listResponse.json()) as { agents: Array<{ name: string }> };
+    const listData = await parseResponse<{ agents: Array<{ name: string }> }>(listResponse);
     const { agents } = listData;
 
     expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
@@ -268,7 +269,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId1 }) }
     );
-    const session1Data = (await session1Response.json()) as { session: ApiSession };
+    const session1Data = (await session1Response.json()) as { session: SessionInfo };
     const session1Id: ThreadId = session1Data.session.id as ThreadId;
 
     const session2Response = await createProjectSession(
@@ -285,7 +286,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId2 }) }
     );
-    const session2Data = (await session2Response.json()) as { session: ApiSession };
+    const session2Data = (await session2Response.json()) as { session: SessionInfo };
     const session2Id: ThreadId = session2Data.session.id as ThreadId;
 
     // Connect to streams

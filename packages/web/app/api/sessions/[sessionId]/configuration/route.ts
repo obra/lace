@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
@@ -26,14 +27,14 @@ export async function GET(
     const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
     const configuration = session.getEffectiveConfiguration();
 
-    return NextResponse.json({ configuration });
+    return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to fetch configuration' },
       { status: 500 }
     );
@@ -53,27 +54,27 @@ export async function PUT(
     const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
     // Update session configuration directly
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
-    return NextResponse.json({ configuration });
+    return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
     if (error instanceof Error && error.message === 'Session not found') {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to update configuration' },
       { status: 500 }
     );

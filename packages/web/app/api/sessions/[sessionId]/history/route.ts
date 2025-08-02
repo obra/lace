@@ -8,6 +8,7 @@ import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadEvent, ToolResult } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@/lib/serialization';
 
 function isToolResult(data: unknown): data is ToolResult {
   return (
@@ -200,7 +201,7 @@ export async function GET(
     // Validate session ID format using client-safe validation that accepts both lace and UUID formats
     if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID format' };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     const sessionId = sessionIdParam;
@@ -210,14 +211,14 @@ export async function GET(
 
     if (!session) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createSuperjsonResponse(errorResponse, { status: 404 });
     }
 
     // Get the coordinator agent and load events through it (proper architecture)
     const coordinatorAgent = session.getAgent(asThreadId(sessionId));
     if (!coordinatorAgent) {
       const errorResponse: ApiErrorResponse = { error: 'Could not access session coordinator' };
-      return NextResponse.json(errorResponse, { status: 500 });
+      return createSuperjsonResponse(errorResponse, { status: 500 });
     }
 
     // Load all events from the session and its delegates through the Agent layer
@@ -228,12 +229,12 @@ export async function GET(
       .map(convertThreadEventToSessionEvent)
       .filter((event): event is SessionEvent => event !== null);
 
-    return NextResponse.json({ events }, { status: 200 });
+    return createSuperjsonResponse({ events }, { status: 200 });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/history:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createSuperjsonResponse(errorResponse, { status: 500 });
   }
 }

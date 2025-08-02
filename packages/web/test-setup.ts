@@ -4,6 +4,9 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
+// Import superjson to ensure it's available in test environment
+import 'superjson';
+
 // Mock EventSource for SSE testing
 class MockEventSource {
   static CONNECTING = 0;

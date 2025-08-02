@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId, ApprovalDecision } from '@/types/core';
 import { ThreadIdSchema, ToolCallIdSchema } from '@/lib/validation/schemas';
+import { createSuperjsonResponse } from '@/lib/serialization';
 
 // Validation schemas
 const ParamsSchema = z.object({
@@ -27,7 +28,7 @@ export async function POST(
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(await params);
     if (!paramsResult.success) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         {
           error: 'Invalid parameters',
           details: paramsResult.error.format(),
@@ -43,12 +44,12 @@ export async function POST(
     try {
       requestBody = await request.json();
     } catch (_error) {
-      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+      return createSuperjsonResponse({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
 
     const bodyResult = BodySchema.safeParse(requestBody);
     if (!bodyResult.success) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         {
           error: 'Invalid request body',
           details: bodyResult.error.format(),
@@ -69,12 +70,12 @@ export async function POST(
 
     const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
     }
 
     const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
-      return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Agent not found for thread' }, { status: 404 });
     }
 
     // Use Agent interface - no direct ThreadManager access
@@ -82,8 +83,8 @@ export async function POST(
     const approvalDecision = decision as ApprovalDecision;
     await agent.handleApprovalResponse(toolCallId, approvalDecision);
 
-    return NextResponse.json({ success: true });
+    return createSuperjsonResponse({ success: true });
   } catch (_error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return createSuperjsonResponse({ error: 'Internal server error' }, { status: 500 });
   }
 }

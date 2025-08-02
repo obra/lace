@@ -18,6 +18,7 @@ import { ProviderRegistry } from '~/providers/registry';
 import { asThreadId } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 import type { StreamEvent } from '@/types/stream-events';
 import type { ThreadId } from '@/types/core';
 
@@ -207,7 +208,7 @@ describe('Task Event Deduplication E2E', () => {
     });
     expect(spawnResponse.status).toBe(201);
 
-    const spawnData = (await spawnResponse.json()) as { agent: { threadId: ThreadId } };
+    const spawnData = await parseResponse<{ agent: { threadId: ThreadId } }>(spawnResponse);
     const agentThreadId = spawnData.agent.threadId;
 
     // Send message via API that will trigger task creation
@@ -271,7 +272,7 @@ describe('Task Event Deduplication E2E', () => {
     });
     expect(spawnResponse.status).toBe(201);
 
-    const spawnData = (await spawnResponse.json()) as { agent: { threadId: ThreadId } };
+    const spawnData = await parseResponse<{ agent: { threadId: ThreadId } }>(spawnResponse);
     const agentThreadId = spawnData.agent.threadId;
 
     // Send message via API
@@ -325,7 +326,7 @@ describe('Task Event Deduplication E2E', () => {
     });
     expect(spawnResponse1.status).toBe(201);
 
-    const spawnData1 = (await spawnResponse1.json()) as { agent: { threadId: ThreadId } };
+    const spawnData1 = await parseResponse<{ agent: { threadId: ThreadId } }>(spawnResponse1);
     const agentThreadId1 = spawnData1.agent.threadId;
 
     // Send message to agent 1
@@ -367,7 +368,7 @@ describe('Task Event Deduplication E2E', () => {
     });
     expect(spawnResponse2.status).toBe(201);
 
-    const spawnData2 = (await spawnResponse2.json()) as { agent: { threadId: ThreadId } };
+    const spawnData2 = await parseResponse<{ agent: { threadId: ThreadId } }>(spawnResponse2);
     const agentThreadId2 = spawnData2.agent.threadId;
 
     // Send message to agent 2

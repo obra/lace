@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock environment variables to provide test API keys
 vi.mock('~/config/env-loader', () => ({
@@ -76,7 +77,7 @@ describe('Projects API Integration Tests', () => {
       Session.create({ name: 'Session 2', projectId: project1.getId() });
 
       const response = await GET();
-      const data = (await response.json()) as ProjectsResponse;
+      const data = await parseResponse<ProjectsResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.projects).toHaveLength(2); // 2 created projects
@@ -100,7 +101,7 @@ describe('Projects API Integration Tests', () => {
 
     it('should return empty projects array when no projects exist', async () => {
       const response = await GET();
-      const data = (await response.json()) as ProjectsResponse;
+      const data = await parseResponse<ProjectsResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.projects).toHaveLength(0); // No projects in clean database
@@ -123,7 +124,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       expect(response.status).toBe(201);
       expect(data.project.name).toBe('New Project');
@@ -157,7 +158,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       expect(response.status).toBe(201);
       expect(data.project.name).toBe('Minimal Project');
@@ -185,7 +186,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -205,7 +206,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       expect(response.status).toBe(201);
       expect(data.project.name).toBe('my-awesome-project');
@@ -225,7 +226,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -240,7 +241,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBeDefined();
@@ -274,7 +275,7 @@ describe('Projects API Integration Tests', () => {
 
       // Verify both projects exist
       const getResponse = await GET();
-      const data = (await getResponse.json()) as ProjectsResponse;
+      const data = await parseResponse<ProjectsResponse>(getResponse);
       const duplicateProjects = data.projects.filter((p) => p.name === 'Duplicate Project');
       expect(duplicateProjects).toHaveLength(2);
     });

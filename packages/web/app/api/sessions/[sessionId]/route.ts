@@ -6,6 +6,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { ApiErrorResponse } from '@/types/api';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 // Type guard for ThreadId using client-safe validation
@@ -28,7 +29,7 @@ export async function GET(
 
     if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     const sessionId = sessionIdParam;
@@ -37,7 +38,7 @@ export async function GET(
 
     if (!session) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createSuperjsonResponse(errorResponse, { status: 404 });
     }
 
     // Convert Session instance to metadata for JSON response
@@ -58,13 +59,13 @@ export async function GET(
       })),
     };
 
-    return NextResponse.json({ session: sessionData });
+    return createSuperjsonResponse({ session: sessionData });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]:', error);
 
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createSuperjsonResponse(errorResponse, { status: 500 });
   }
 }
 
@@ -85,7 +86,7 @@ export async function PATCH(
 
     if (!isValidThreadId(sessionIdParam)) {
       const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     const sessionId = sessionIdParam;
@@ -94,7 +95,7 @@ export async function PATCH(
     const existingSession = await sessionService.getSession(sessionId);
     if (!existingSession) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createSuperjsonResponse(errorResponse, { status: 404 });
     }
 
     // Parse and validate request body
@@ -106,7 +107,7 @@ export async function PATCH(
         error: 'Invalid request data',
         details: bodyResult.error.errors,
       };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createSuperjsonResponse(errorResponse, { status: 400 });
     }
 
     const updates = bodyResult.data;
@@ -124,7 +125,7 @@ export async function PATCH(
     const updatedSession = await sessionService.getSession(sessionId);
     if (!updatedSession) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
-      return NextResponse.json(errorResponse, { status: 500 });
+      return createSuperjsonResponse(errorResponse, { status: 500 });
     }
 
     // Get updated session data directly from database to ensure we have the latest values
@@ -132,7 +133,7 @@ export async function PATCH(
     const updatedSessionData = Session.getSession(sessionId);
     if (!updatedSessionData) {
       const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
-      return NextResponse.json(errorResponse, { status: 500 });
+      return createSuperjsonResponse(errorResponse, { status: 500 });
     }
 
     // Convert to API response format
@@ -154,12 +155,12 @@ export async function PATCH(
       })),
     };
 
-    return NextResponse.json({ session: sessionData });
+    return createSuperjsonResponse({ session: sessionData });
   } catch (error: unknown) {
     console.error('Error in PATCH /api/sessions/[sessionId]:', error);
 
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createSuperjsonResponse(errorResponse, { status: 500 });
   }
 }

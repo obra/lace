@@ -2,10 +2,10 @@
 // ABOUTME: Provides validation, serialization, and common patterns for RESTful endpoints
 
 import { z } from 'zod';
-import { NextResponse } from 'next/server';
 import { logger } from '~/utils/logger';
 import type { Task } from '@/types/core';
 import type { SerializedTask } from '@/types/web';
+import { createSuperjsonResponse } from '@/lib/serialization';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
@@ -95,10 +95,10 @@ export function serializeTask(task: Task): SerializedTask {
 // Error response helper
 export function createErrorResponse(message: string, status: number = 400, error?: unknown) {
   logger.error(`API Error: ${message}`, { status, error });
-  return NextResponse.json({ error: message }, { status });
+  return createSuperjsonResponse({ error: message }, { status });
 }
 
 // Success response helper
 export function createSuccessResponse<T>(data: T, status: number = 200) {
-  return NextResponse.json(data, { status });
+  return createSuperjsonResponse(data, { status });
 }
