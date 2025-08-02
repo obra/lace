@@ -108,7 +108,7 @@ export const LaceApp = memo(function LaceApp() {
       // Event stream connected - no logging needed for production
     },
     onError: (error) => {
-      console.error('[LACE_APP] Event stream error:', error);
+      console.error('Event stream error:', error);
     },
     // Session event handlers - wire to useSessionEvents
     onUserMessage: addSessionEvent,

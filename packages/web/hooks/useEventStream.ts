@@ -495,13 +495,10 @@ export function useEventStream({
     const queryString = buildQueryString(subscriptionRef.current);
     const url = `/api/events/stream${queryString ? `?${queryString}` : ''}`;
 
-    console.log('[EVENT_STREAM] Connecting to:', url);
-
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('[EVENT_STREAM] Connected');
       setConnection((prev) => ({
         ...prev,
         connected: true,
@@ -513,8 +510,6 @@ export function useEventStream({
     eventSource.onmessage = (event) => {
       try {
         const streamEvent = JSON.parse(event.data) as StreamEvent;
-
-        console.log('[EVENT_STREAM] Received event:', streamEvent);
 
         setLastEvent(streamEvent);
         setSendCount((prev) => prev + 1);
@@ -532,9 +527,7 @@ export function useEventStream({
 
     eventSource.onerror = (error) => {
       // Check if this is a normal close or an actual error
-      if (eventSource.readyState === EventSource.CLOSED) {
-        console.log('[EVENT_STREAM] Connection closed');
-      } else {
+      if (eventSource.readyState !== EventSource.CLOSED) {
         console.error('[EVENT_STREAM] Connection error:', error);
       }
 
@@ -558,10 +551,6 @@ export function useEventStream({
           newState.reconnectAttempts < newState.maxReconnectAttempts &&
           !isClosingRef.current // Don't reconnect if we're closing
         ) {
-          console.log(
-            `[EVENT_STREAM] Reconnecting in ${reconnectIntervalRef.current}ms (attempt ${newState.reconnectAttempts})`
-          );
-
           reconnectTimeoutRef.current = setTimeout(
             () => {
               // Use a fresh connect call to avoid stale closures
@@ -618,7 +607,6 @@ export function useEventStream({
 
     // Only reconnect if subscription actually changed
     if (prevSubscriptionKeyRef.current !== currentKey) {
-      console.log('[EVENT_STREAM] Subscription changed, reconnecting:', currentKey);
       prevSubscriptionKeyRef.current = currentKey;
       connect();
     }
