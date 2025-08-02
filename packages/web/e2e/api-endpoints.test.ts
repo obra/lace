@@ -13,15 +13,6 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 vi.mock('server-only', () => ({}));
 
 // Mock only external dependencies, not core functionality
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-      addConnection: vi.fn(),
-      removeConnection: vi.fn(),
-    }),
-  },
-}));
 
 vi.mock('@/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
@@ -57,7 +48,7 @@ describe('API Endpoints E2E Tests', () => {
   });
 
   afterEach(async () => {
-    // Stop all agents first to prevent async operations continuing after database teardown
+    // CRITICAL: Stop agents BEFORE closing database in teardownTestPersistence
     if (sessionService) {
       await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
@@ -67,11 +58,7 @@ describe('API Endpoints E2E Tests', () => {
   });
 
   afterAll(async () => {
-    // Clear everything after all tests are done
-    if (sessionService) {
-      await sessionService.stopAllAgents();
-      sessionService.clearActiveSessions();
-    }
+    // No need to stop agents again - they were already stopped in afterEach
     global.sessionService = undefined;
   });
 
