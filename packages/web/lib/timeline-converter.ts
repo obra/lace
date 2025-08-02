@@ -4,12 +4,12 @@
 // TODO: We should refactor to eliminate this conversion layer - either make TimelineEntry match SessionEvent
 // TODO: or standardize on one event format throughout the system to avoid this translation step.
 
-import type { SessionEvent, Agent, ThreadId, ToolCallEventData } from '@/types/api';
+import type { SessionEvent, ApiAgent, ThreadId, ToolCallEventData } from '@/types/api';
 import type { ToolResult } from '@/lib/server/lace-imports';
 import type { TimelineEntry } from '@/types/design-system';
 
 export interface ConversionContext {
-  agents: Agent[];
+  agents: ApiAgent[];
   selectedAgent?: ThreadId;
 }
 
@@ -309,7 +309,7 @@ function convertEvent(
   }
 }
 
-function getAgentName(threadId: ThreadId, agents: Agent[]): string {
+function getAgentName(threadId: ThreadId, agents: ApiAgent[]): string {
   const agent = agents.find((a) => a.threadId === threadId);
   if (agent) return agent.name;
 

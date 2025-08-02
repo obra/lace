@@ -8,7 +8,7 @@ import { faFolder, faComments, faRobot, faCog, faTasks } from '@/lib/fontawesome
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { Session, ThreadId, ProjectInfo } from '@/types/api';
+import type { ApiSession, ThreadId, ApiProject } from '@/types/api';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 
 interface LaceAppMobileSidebarProps {
@@ -16,9 +16,9 @@ interface LaceAppMobileSidebarProps {
   onClose: () => void;
   onSettingsClick: () => void;
   selectedProject: string | null;
-  currentProject: ProjectInfo;
-  sessions: Session[];
-  selectedSessionDetails: Session | null;
+  currentProject: ApiProject;
+  sessions: ApiSession[];
+  selectedSessionDetails: ApiSession | null;
   selectedAgent: ThreadId | null;
   taskManager: ReturnType<typeof useTaskManager> | null;
   onProjectSwitch: () => void;

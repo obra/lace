@@ -7,9 +7,9 @@ import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
-import type { ProjectInfo } from '@/types/api';
+import type { ApiProject } from '@/types/api';
 
-const mockProjects: ProjectInfo[] = [
+const mockProjects: ApiProject[] = [
   {
     id: 'project-1',
     name: 'Test Project 1',

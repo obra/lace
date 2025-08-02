@@ -11,7 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 
 // Mock the useTaskManager hook
 vi.mock('@/hooks/useTaskManager', () => ({

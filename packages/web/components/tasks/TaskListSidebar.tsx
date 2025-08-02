@@ -9,7 +9,7 @@ import { faPlus } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 
 // Task display limits for each status section
 const TASK_DISPLAY_LIMITS = {

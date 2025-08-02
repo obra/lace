@@ -6,13 +6,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
-import type { ProjectInfo, ProviderInfo } from '@/types/api';
+import type { ApiProject, ProviderInfo } from '@/types/api';
 
 interface ProjectSelectorPanelProps {
-  projects: ProjectInfo[];
-  selectedProject: ProjectInfo | null;
+  projects: ApiProject[];
+  selectedProject: ApiProject | null;
   providers?: ProviderInfo[];
-  onProjectSelect: (project: ProjectInfo) => void;
+  onProjectSelect: (project: ApiProject) => void;
   onProjectCreate?: () => void;
   onProjectUpdate?: (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: ProjectConfiguration }) => void;
   loading?: boolean;
@@ -66,7 +66,7 @@ export function ProjectSelectorPanel({
   const [filter, setFilter] = useState<ProjectFilter>('active');
   const [timeFrame, setTimeFrame] = useState<ProjectTimeFrame>('week');
   const [showContextMenu, setShowContextMenu] = useState<string | null>(null);
-  const [editingProject, setEditingProject] = useState<ProjectInfo | null>(null);
+  const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editWorkingDirectory, setEditWorkingDirectory] = useState('');
@@ -125,7 +125,7 @@ export function ProjectSelectorPanel({
   }, [providers]);
 
   // Helper function to check if project was active in given timeframe
-  const isProjectActiveInTimeframe = (project: ProjectInfo, timeframe: ProjectTimeFrame): boolean => {
+  const isProjectActiveInTimeframe = (project: ApiProject, timeframe: ProjectTimeFrame): boolean => {
     const now = new Date();
     const lastUsed = new Date(project.lastUsedAt);
     const diffMs = now.getTime() - lastUsed.getTime();
@@ -344,7 +344,7 @@ export function ProjectSelectorPanel({
         return;
       }
 
-      const projectData = await projectRes.json() as { project: ProjectInfo };
+      const projectData = await projectRes.json() as { project: ApiProject };
       const projectId = projectData.project.id;
 
       // Call the callback to refresh projects list if available

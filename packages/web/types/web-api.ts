@@ -1,15 +1,10 @@
 // ABOUTME: API-specific types for web endpoints (requests, responses, models)
 // ABOUTME: Imports shared event data from web-events.ts to avoid duplication
 
-// Import core types from unified core imports
+// Import core types that are used in this file
 import type {
   AgentState,
   ThreadId,
-  AssigneeId,
-  Task,
-  TaskNote,
-  TaskStatus,
-  TaskPriority,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
 } from '@/types/core';
@@ -18,21 +13,17 @@ import { ApprovalDecision } from '@/types/core';
 // Import shared event data types
 import type { ToolApprovalRequestData } from './web-events';
 
-// Re-export imported types for convenience
-export type { ThreadId, AssigneeId, AgentState, Task, TaskNote, TaskStatus, TaskPriority };
-export { ApprovalDecision };
-
 // API model types
 
-export interface Session {
+export interface ApiSession {
   id: ThreadId; // sessionId (parent threadId)
   name: string;
   createdAt: string;
   agentCount?: number; // Count of agents for list view
-  agents?: Agent[]; // Optional for list view, populated when session is selected
+  agents?: ApiAgent[]; // Optional for list view, populated when session is selected
 }
 
-export interface Agent {
+export interface ApiAgent {
   threadId: ThreadId; // Full thread ID like sessionId.1
   name: string;
   provider: string;
@@ -109,15 +100,15 @@ export function isApiSuccess<T>(response: unknown): response is ApiSuccessRespon
 
 // Specific API response types
 export interface SessionsResponse {
-  sessions: Session[];
+  sessions: ApiSession[];
 }
 
 export interface SessionResponse {
-  session: Session;
+  session: ApiSession;
 }
 
 export interface AgentResponse {
-  agent: Agent;
+  agent: ApiAgent;
 }
 
 export interface ProvidersResponse {
@@ -134,7 +125,7 @@ export interface ProviderInfo extends BackendProviderInfo {
 export type ModelInfo = BackendModelInfo;
 
 // Project management types
-export interface ProjectInfo {
+export interface ApiProject {
   id: string;
   name: string;
   description: string;
@@ -146,11 +137,11 @@ export interface ProjectInfo {
 }
 
 export interface ProjectsResponse {
-  projects: ProjectInfo[];
+  projects: ApiProject[];
 }
 
 export interface ProjectResponse {
-  project: ProjectInfo;
+  project: ApiProject;
 }
 
 export interface CreateProjectRequest {

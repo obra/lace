@@ -20,14 +20,14 @@ import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type {
-  Session,
+  ApiSession,
   ThreadId,
   SessionEvent,
   ToolApprovalRequestData,
-  Agent,
+  ApiAgent,
   SessionsResponse,
   SessionResponse,
-  ProjectInfo,
+  ApiProject,
   ProviderInfo,
   ProvidersResponse,
   CreateAgentRequest,
@@ -69,12 +69,12 @@ export const LaceApp = memo(function LaceApp() {
   
 
   // Business Logic State (from current app/page.tsx)
-  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [projects, setProjects] = useState<ApiProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
+  const [sessions, setSessions] = useState<ApiSession[]>([]);
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<ApiSession | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -140,7 +140,7 @@ export const LaceApp = memo(function LaceApp() {
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   // Project loading function
-  const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
+  const loadProjects = useCallback(async (): Promise<ApiProject[]> => {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
@@ -148,7 +148,7 @@ export const LaceApp = memo(function LaceApp() {
       
       // Type guard for API response
       if (typeof data === 'object' && data !== null && 'projects' in data) {
-        const projectsData = data as { projects: ProjectInfo[] };
+        const projectsData = data as { projects: ApiProject[] };
         setProjects(projectsData.projects);
         setLoadingProjects(false);
         return projectsData.projects;

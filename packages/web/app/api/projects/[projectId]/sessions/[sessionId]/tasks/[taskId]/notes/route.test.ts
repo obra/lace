@@ -11,7 +11,7 @@ import { POST } from './route';
 import { Project, asThreadId } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));

@@ -6,7 +6,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskAPIClient } from '@/lib/client/task-api';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 import { asThreadId } from '@/lib/server/core-types';
 
 // Mock TaskAPIClient for isolated hook testing

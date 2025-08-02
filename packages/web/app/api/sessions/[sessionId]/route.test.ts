@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
-import type { Session } from '@/types/api';
+import type { ApiSession } from '@/types/api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
@@ -126,7 +126,7 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: Session };
+      const data = (await response.json()) as { session: ApiSession };
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -216,7 +216,7 @@ describe('Session Detail API Route', () => {
       }
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: Session };
+      const data = (await response.json()) as { session: ApiSession };
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -321,7 +321,7 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { session: Session };
+      const data = (await response.json()) as { session: ApiSession };
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,

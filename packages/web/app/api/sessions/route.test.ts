@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
-import type { Session } from '@/types/api';
+import type { ApiSession } from '@/types/api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock only environment variables - avoid requiring real API keys in tests
@@ -88,7 +88,7 @@ describe('Session API Routes', () => {
       // Act: Call the API endpoint
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = (await response.json()) as { sessions: Session[] };
+      const data = (await response.json()) as { sessions: ApiSession[] };
 
       // Assert: Verify real HTTP response with real data
       expect(response.status).toBe(200);

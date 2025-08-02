@@ -3,8 +3,8 @@
 
 import { useState, useCallback } from 'react';
 import {
-  Session,
-  Agent,
+  ApiSession,
+  ApiAgent,
   CreateSessionRequest,
   CreateAgentRequest,
   ThreadId,
@@ -35,7 +35,7 @@ export function useSessionAPI() {
   };
 
   const createSession = useCallback(
-    async (request: CreateSessionRequest): Promise<Session | null> => {
+    async (request: CreateSessionRequest): Promise<ApiSession | null> => {
       setLoading(true);
       setError(null);
 
@@ -56,7 +56,7 @@ export function useSessionAPI() {
 
         const data: unknown = await response.json();
         if (isApiSuccess<SessionResponse>(data) && 'session' in data) {
-          return data['session'] as Session;
+          return data['session'] as ApiSession;
         }
         throw new Error('Invalid response format');
       } catch (error) {
@@ -69,7 +69,7 @@ export function useSessionAPI() {
     []
   );
 
-  const listSessions = useCallback(async (): Promise<Session[]> => {
+  const listSessions = useCallback(async (): Promise<ApiSession[]> => {
     setLoading(true);
     setError(null);
 
@@ -86,7 +86,7 @@ export function useSessionAPI() {
 
       const data: unknown = await response.json();
       if (isApiSuccess<SessionsResponse>(data) && 'sessions' in data) {
-        return data['sessions'] as Session[];
+        return data['sessions'] as ApiSession[];
       }
       throw new Error('Invalid response format');
     } catch (error) {
@@ -97,7 +97,7 @@ export function useSessionAPI() {
     }
   }, []);
 
-  const getSession = useCallback(async (sessionId: ThreadId): Promise<Session | null> => {
+  const getSession = useCallback(async (sessionId: ThreadId): Promise<ApiSession | null> => {
     setLoading(true);
     setError(null);
 
@@ -114,7 +114,7 @@ export function useSessionAPI() {
 
       const data: unknown = await response.json();
       if (isApiSuccess<SessionResponse>(data) && 'session' in data) {
-        return data['session'] as Session;
+        return data['session'] as ApiSession;
       }
       throw new Error('Invalid response format');
     } catch (error) {
@@ -126,7 +126,7 @@ export function useSessionAPI() {
   }, []);
 
   const spawnAgent = useCallback(
-    async (sessionId: ThreadId, request: CreateAgentRequest): Promise<Agent | null> => {
+    async (sessionId: ThreadId, request: CreateAgentRequest): Promise<ApiAgent | null> => {
       setLoading(true);
       setError(null);
 
@@ -147,7 +147,7 @@ export function useSessionAPI() {
 
         const data: unknown = await response.json();
         if (isApiSuccess<AgentResponse>(data) && 'agent' in data) {
-          return data['agent'] as Agent;
+          return data['agent'] as ApiAgent;
         }
         throw new Error('Invalid response format');
       } catch (error) {
@@ -160,7 +160,7 @@ export function useSessionAPI() {
     []
   );
 
-  const listAgents = useCallback(async (sessionId: ThreadId): Promise<Agent[]> => {
+  const listAgents = useCallback(async (sessionId: ThreadId): Promise<ApiAgent[]> => {
     setLoading(true);
     setError(null);
 
@@ -176,8 +176,8 @@ export function useSessionAPI() {
       }
 
       const data: unknown = await response.json();
-      if (isApiSuccess<{ agents: Agent[] }>(data) && 'agents' in data) {
-        return data['agents'] as Agent[];
+      if (isApiSuccess<{ agents: ApiAgent[] }>(data) && 'agents' in data) {
+        return data['agents'] as ApiAgent[];
       }
       throw new Error('Invalid response format');
     } catch (error) {

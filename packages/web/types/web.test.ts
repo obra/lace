@@ -3,13 +3,13 @@
 
 import { describe, it, expect } from 'vitest';
 import type { MessageRequest } from './web';
-import type { Session } from './api';
+import type { ApiSession } from './api';
 import { isApiError, isApiSuccess } from './web-api';
 import { asThreadId } from '@/types/core';
 
 describe('Web Types', () => {
   it('should create valid Session type', () => {
-    const session: Session = {
+    const session: ApiSession = {
       id: asThreadId('lace_20250731_abc123'),
       name: 'Test Session',
       createdAt: new Date(),

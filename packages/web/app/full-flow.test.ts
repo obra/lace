@@ -13,7 +13,7 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/events/stream/route';
-import type { ThreadId, Session } from '@/types/api';
+import type { ThreadId, ApiSession } from '@/types/api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
@@ -91,7 +91,7 @@ describe('Full Conversation Flow', () => {
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: Session };
+    const sessionData = (await sessionResponse.json()) as { session: ApiSession };
     expect(sessionData.session.name).toBe(sessionName);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
@@ -181,7 +181,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: Session };
+    const sessionData = (await sessionResponse.json()) as { session: ApiSession };
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
     // Spawn first agent
@@ -267,7 +267,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId1 }) }
     );
-    const session1Data = (await session1Response.json()) as { session: Session };
+    const session1Data = (await session1Response.json()) as { session: ApiSession };
     const session1Id: ThreadId = session1Data.session.id as ThreadId;
 
     const session2Response = await createProjectSession(
@@ -284,7 +284,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId2 }) }
     );
-    const session2Data = (await session2Response.json()) as { session: Session };
+    const session2Data = (await session2Response.json()) as { session: ApiSession };
     const session2Id: ThreadId = session2Data.session.id as ThreadId;
 
     // Connect to streams

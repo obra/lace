@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { convertSessionEventsToTimeline } from './timeline-converter';
-import type { SessionEvent, Agent as AgentType, ToolResult, ThreadId } from '@/types/api';
+import type { SessionEvent, ApiAgent as AgentType, ToolResult, ThreadId } from '@/types/api';
 
 describe('Task Metadata Event Format Bug', () => {
   it('should produce identical timeline results when TOOL_RESULT formats match', () => {

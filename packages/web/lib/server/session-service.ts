@@ -5,7 +5,7 @@ import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall, ToolResult } from '@/lib/server/core-types';
 import { asThreadId } from '@/lib/server/lace-imports';
-import { Session as SessionType, Agent as AgentType, SessionEvent } from '@/types/api';
+import { ApiSession, ApiAgent, SessionEvent } from '@/types/api';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 export class SessionService {
@@ -19,7 +19,7 @@ export class SessionService {
     provider: string,
     model: string,
     projectId: string
-  ): Promise<SessionType> {
+  ): Promise<ApiSession> {
     // Create project-based session
     const { Project } = await import('@/lib/server/lace-imports');
     const project = Project.getById(projectId);
@@ -55,9 +55,9 @@ export class SessionService {
     return this.sessionToMetadata(session);
   }
 
-  async listSessions(): Promise<SessionType[]> {
+  async listSessions(): Promise<ApiSession[]> {
     const sessionInfos = Session.getAll();
-    const sessions: SessionType[] = [];
+    const sessions: ApiSession[] = [];
 
     for (const sessionInfo of sessionInfos) {
       // Try to get from registry first, then reconstruct if needed
@@ -330,8 +330,8 @@ export class SessionService {
     Session.clearRegistry();
   }
 
-  // Helper to convert Session instance to SessionType for API responses
-  private sessionToMetadata(session: Session): SessionType {
+  // Helper to convert Session instance to ApiSession for API responses
+  private sessionToMetadata(session: Session): ApiSession {
     const sessionInfo = session.getInfo();
     if (!sessionInfo) {
       throw new Error('Failed to get session info');
@@ -348,7 +348,7 @@ export class SessionService {
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
-        status: agent.status as AgentType['status'],
+        status: agent.status as ApiAgent['status'],
         createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
       })),
     };

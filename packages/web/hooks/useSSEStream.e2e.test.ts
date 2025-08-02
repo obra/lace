@@ -13,7 +13,7 @@ import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route'
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { Session } from '@/types/api';
+import type { ApiSession } from '@/types/api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('SSE Stream E2E Tests', () => {
@@ -60,7 +60,7 @@ describe('SSE Stream E2E Tests', () => {
     });
     expect(sessionResponse.status).toBe(201);
 
-    const sessionData = (await sessionResponse.json()) as { session: Session };
+    const sessionData = (await sessionResponse.json()) as { session: ApiSession };
     sessionId = sessionData.session.id as string;
   });
 

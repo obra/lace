@@ -5,43 +5,34 @@
 import type {
   AgentState,
   ThreadId,
-  AssigneeId,
-  ToolResult,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
 } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 
-// Import shared event data types from web-events.ts
-import type {
-  UserMessageEventData,
-  AgentMessageEventData,
-  ToolCallEventData,
-  ToolAggregatedEventData,
-  LocalSystemMessageEventData,
-  SystemPromptEventData,
-  UserSystemPromptEventData,
-  CompactionEventData,
-  ToolApprovalRequestData,
-} from './web-events';
+// Import only the types we actually use
+import type { ToolApprovalRequestData } from './web-events';
 
-// API model types
+// API response types
+// These represent the JSON-serialized format sent to clients
+// Core types use Date objects, but these use ISO strings for JSON compatibility
+// Prefixed with 'Api' to distinguish from core types
 
-export interface Session {
+export interface ApiSession {
   id: ThreadId; // sessionId (parent threadId)
   name: string;
-  createdAt: string;
+  createdAt: string; // ISO string from Date serialization
   agentCount?: number; // Count of agents for list view
-  agents?: Agent[]; // Optional for list view, populated when session is selected
+  agents?: ApiAgent[]; // Optional for list view, populated when session is selected
 }
 
-export interface Agent {
+export interface ApiAgent {
   threadId: ThreadId; // Full thread ID like sessionId.1
   name: string;
   provider: string;
   model: string;
   status: AgentState;
-  createdAt: string;
+  createdAt: string; // ISO string from Date serialization
 }
 
 // Tool approval types
@@ -112,15 +103,15 @@ export function isApiSuccess<T>(response: unknown): response is ApiSuccessRespon
 
 // Specific API response types
 export interface SessionsResponse {
-  sessions: Session[];
+  sessions: ApiSession[];
 }
 
 export interface SessionResponse {
-  session: Session;
+  session: ApiSession;
 }
 
 export interface AgentResponse {
-  agent: Agent;
+  agent: ApiAgent;
 }
 
 export interface ProvidersResponse {
@@ -137,7 +128,7 @@ export interface ProviderInfo extends BackendProviderInfo {
 export type ModelInfo = BackendModelInfo;
 
 // Project management types
-export interface ProjectInfo {
+export interface ApiProject {
   id: string;
   name: string;
   description: string;
@@ -149,11 +140,11 @@ export interface ProjectInfo {
 }
 
 export interface ProjectsResponse {
-  projects: ProjectInfo[];
+  projects: ApiProject[];
 }
 
 export interface ProjectResponse {
-  project: ProjectInfo;
+  project: ApiProject;
 }
 
 export interface CreateProjectRequest {

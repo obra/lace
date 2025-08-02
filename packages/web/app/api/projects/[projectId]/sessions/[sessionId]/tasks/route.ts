@@ -16,7 +16,7 @@ import {
   createSuccessResponse,
 } from '@/lib/server/api-utils';
 import type { TaskFilters } from '@/lib/server/core-types';
-import type { TaskStatus, TaskPriority } from '@/types/api';
+import type { TaskStatus, TaskPriority } from '@/types/core';
 
 const RouteParamsSchema = z.object({
   projectId: ProjectIdSchema,

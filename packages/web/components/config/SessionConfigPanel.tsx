@@ -9,8 +9,8 @@ import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from 
 import { ModelDropdown } from './ModelDropdown';
 import { ProviderDropdown } from './ProviderDropdown';
 import type { 
-  Session, 
-  ProjectInfo, 
+  ApiSession, 
+  ApiProject, 
   ProviderInfo, 
   ModelInfo, 
   CreateAgentRequest 
@@ -28,16 +28,16 @@ interface SessionConfiguration {
 }
 
 interface SessionConfigPanelProps {
-  selectedProject: ProjectInfo;
-  sessions: Session[];
-  selectedSession: Session | null;
+  selectedProject: ApiProject;
+  sessions: ApiSession[];
+  selectedSession: ApiSession | null;
   providers: ProviderInfo[];
   onSessionCreate: (sessionData: { name: string; description?: string; configuration?: SessionConfiguration }) => void;
-  onSessionSelect: (session: Session) => void;
+  onSessionSelect: (session: ApiSession) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
   onAgentSelect?: (agentId: string) => void;
   onAgentUpdate?: () => void | Promise<void>;
-  onSessionUpdate?: (sessionId: string, updates: Partial<Session & { configuration?: SessionConfiguration }>) => void;
+  onSessionUpdate?: (sessionId: string, updates: Partial<ApiSession & { configuration?: SessionConfiguration }>) => void;
   loading?: boolean;
 }
 

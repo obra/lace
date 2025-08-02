@@ -20,7 +20,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/api';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 import Badge from '@/components/ui/Badge';
 import InlineCode from '@/components/ui/InlineCode';
 
