@@ -7,6 +7,7 @@ import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -65,7 +66,7 @@ describe('Session Configuration API', () => {
     it('should return session effective configuration when found', async () => {
       const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/configuration`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
-      const data = (await response.json()) as ConfigurationResponse;
+      const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
@@ -79,7 +80,7 @@ describe('Session Configuration API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
@@ -96,7 +97,7 @@ describe('Session Configuration API', () => {
 
       // Should return 404 for non-existent session (which is the actual behavior)
       expect(response.status).toBe(404);
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
       expect(data.error).toBe('Session not found');
     });
   });
@@ -120,7 +121,7 @@ describe('Session Configuration API', () => {
       });
 
       const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
-      const data = (await response.json()) as ConfigurationResponse;
+      const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
@@ -139,7 +140,7 @@ describe('Session Configuration API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ sessionId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found');
@@ -160,7 +161,7 @@ describe('Session Configuration API', () => {
       });
 
       const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -216,7 +217,7 @@ describe('TDD: Direct Session Usage', () => {
     // This verifies that the route successfully calls the session's getEffectiveConfiguration method
     // (not a duplicated SessionService method that we removed)
     expect(response.status).toBe(200);
-    const data = (await response.json()) as ConfigurationResponse;
+    const data = await parseResponse<ConfigurationResponse>(response);
     expect(data.configuration).toBeDefined();
   });
 });
@@ -273,7 +274,7 @@ describe('TDD: Direct Session Configuration Update', () => {
     // This verifies that the route successfully calls session.updateConfiguration() directly
     // (not a duplicated SessionService method that we removed)
     expect(response.status).toBe(200);
-    const data = (await response.json()) as ConfigurationResponse;
+    const data = await parseResponse<ConfigurationResponse>(response);
     expect(data.configuration).toBeDefined();
     expect(data.configuration.provider).toBe('anthropic');
     expect(data.configuration.model).toBe('claude-3-sonnet');

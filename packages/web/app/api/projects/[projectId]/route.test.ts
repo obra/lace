@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
+import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
 interface ProjectResponse {
@@ -65,7 +66,7 @@ describe('Individual Project API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.project).toEqual({
@@ -74,8 +75,8 @@ describe('Individual Project API', () => {
         description: 'A test project',
         workingDirectory: '/test/path',
         isArchived: false,
-        createdAt: '2023-01-01T00:00:00.000Z',
-        lastUsedAt: '2023-01-01T00:00:00.000Z',
+        createdAt: new Date('2023-01-01T00:00:00.000Z'),
+        lastUsedAt: new Date('2023-01-01T00:00:00.000Z'),
         sessionCount: 0,
       });
     });
@@ -88,7 +89,7 @@ describe('Individual Project API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -104,7 +105,7 @@ describe('Individual Project API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
@@ -131,7 +132,7 @@ describe('Individual Project API', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.project).toBeDefined();
@@ -150,7 +151,7 @@ describe('Individual Project API', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -174,7 +175,7 @@ describe('Individual Project API', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -197,7 +198,7 @@ describe('Individual Project API', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Update failed');
@@ -213,7 +214,7 @@ describe('Individual Project API', () => {
       const response = await DELETE(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as SuccessResponse;
+      const data = await parseResponse<SuccessResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -227,7 +228,7 @@ describe('Individual Project API', () => {
       const response = await DELETE(request, {
         params: Promise.resolve({ projectId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -244,7 +245,7 @@ describe('Individual Project API', () => {
       const response = await DELETE(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Deletion failed');

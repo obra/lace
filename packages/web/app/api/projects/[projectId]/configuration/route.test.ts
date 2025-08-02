@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/projects/[projectId]/configuration/route';
+import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -61,7 +62,7 @@ describe('Project Configuration API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ConfigurationResponse;
+      const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.configuration).toEqual({
@@ -86,7 +87,7 @@ describe('Project Configuration API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -102,7 +103,7 @@ describe('Project Configuration API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
@@ -135,7 +136,7 @@ describe('Project Configuration API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ConfigurationResponse;
+      const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
@@ -154,7 +155,7 @@ describe('Project Configuration API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ projectId: 'nonexistent' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -180,7 +181,7 @@ describe('Project Configuration API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -203,7 +204,7 @@ describe('Project Configuration API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Update failed');

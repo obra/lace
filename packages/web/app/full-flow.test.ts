@@ -13,8 +13,8 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/events/stream/route';
-import type { SessionInfo } from '@/types/core';
-import type { ThreadId } from '@/types/core';
+import type { SessionInfo, ThreadId } from '@/types/core';
+import type { ApiSession } from '@/types/api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { parseResponse } from '@/lib/serialization';
 import { Project } from '@/lib/server/lace-imports';
@@ -93,7 +93,7 @@ describe('Full Conversation Flow', () => {
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
+    const sessionData = await parseResponse<{ session: ApiSession }>(sessionResponse);
     expect(sessionData.session.name).toBe(sessionName);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
@@ -183,7 +183,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
+    const sessionData = await parseResponse<{ session: ApiSession }>(sessionResponse);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
     // Spawn first agent

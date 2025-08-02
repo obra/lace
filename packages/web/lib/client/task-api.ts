@@ -2,6 +2,7 @@
 // ABOUTME: Provides type-safe methods for interacting with task API endpoints
 
 import type { Task, TaskStatus, TaskPriority, TaskFilters } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 
 export interface CreateTaskRequest {
   title: string;
@@ -47,7 +48,7 @@ export class TaskAPIClient {
       throw new Error('Failed to fetch tasks');
     }
 
-    const data = (await response.json()) as { tasks: Task[] };
+    const data = await parseResponse<{ tasks: Task[] }>(response);
     return data.tasks;
   }
 
@@ -65,7 +66,7 @@ export class TaskAPIClient {
       throw new Error('Failed to create task');
     }
 
-    const data = (await response.json()) as { task: Task };
+    const data = await parseResponse<{ task: Task }>(response);
     return data.task;
   }
 
@@ -78,7 +79,7 @@ export class TaskAPIClient {
       throw new Error('Failed to fetch task');
     }
 
-    const data = (await response.json()) as { task: Task };
+    const data = await parseResponse<{ task: Task }>(response);
     return data.task;
   }
 
@@ -101,7 +102,7 @@ export class TaskAPIClient {
       throw new Error('Failed to update task');
     }
 
-    const data = (await response.json()) as { task: Task };
+    const data = await parseResponse<{ task: Task }>(response);
     return data.task;
   }
 
@@ -143,7 +144,7 @@ export class TaskAPIClient {
       throw new Error('Failed to add note');
     }
 
-    const data = (await response.json()) as { message: string; task: Task };
+    const data = await parseResponse<{ message: string; task: Task }>(response);
     return data.task;
   }
 }

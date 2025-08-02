@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 import { getSessionService } from '@/lib/server/session-service';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');
@@ -76,7 +77,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
     // Verify response
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { success: boolean };
+    const data = await parseResponse<{ success: boolean }>(response);
     expect(data).toEqual({ success: true });
   });
 
@@ -101,7 +102,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
 
       expect(response.status).toBe(200);
-      const data = (await response.json()) as { success: boolean };
+      const data = await parseResponse<{ success: boolean }>(response);
       expect(data).toEqual({ success: true });
 
       // Clear mocks between iterations
@@ -136,7 +137,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(mockAgent.handleApprovalResponse).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toEqual({ error: 'Agent not found for thread' });
   });
 
@@ -157,7 +158,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toHaveProperty('error');
   });
 
@@ -178,7 +179,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toHaveProperty('error');
   });
 
@@ -207,7 +208,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response1 = await POST(request1, { params });
 
     expect(response1.status).toBe(200);
-    const data1 = (await response1.json()) as { success: boolean };
+    const data1 = await parseResponse<{ success: boolean }>(response1);
     expect(data1).toEqual({ success: true });
 
     // Second request (duplicate) should also succeed
@@ -223,7 +224,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response2 = await POST(request2, { params });
 
     expect(response2.status).toBe(200);
-    const data2 = (await response2.json()) as { success: boolean };
+    const data2 = await parseResponse<{ success: boolean }>(response2);
     expect(data2).toEqual({ success: true });
 
     // Verify handleApprovalResponse was called twice
@@ -251,7 +252,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(request, { params });
 
     expect(response.status).toBe(500);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toEqual({ error: 'Internal server error' });
   });
 });

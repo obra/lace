@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
 import { Project } from '@/lib/server/lace-imports';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock Project
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -81,7 +82,7 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = (await response.json()) as { sessions: typeof mockSessions };
+      const data = await parseResponse<{ sessions: typeof mockSessions }>(response);
 
       expect(response.status).toBe(200);
       expect(data.sessions).toHaveLength(2);
@@ -99,7 +100,7 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = (await response.json()) as { sessions: [] };
+      const data = await parseResponse<{ sessions: [] }>(response);
 
       expect(response.status).toBe(200);
       expect(data.sessions).toHaveLength(0);
@@ -116,7 +117,7 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -134,7 +135,7 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
@@ -162,9 +163,9 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
-      const data = (await response.json()) as {
+      const data = await parseResponse<{
         session: { id: string; name: string; projectId: string };
-      };
+      }>(response);
 
       expect(response.status).toBe(201);
       expect(data.session.id).toBe('test-session-id');
@@ -185,7 +186,7 @@ describe('Session API endpoints under projects', () => {
       const response = await POST(request, {
         params: Promise.resolve({ projectId: 'nonexistent' }),
       });
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -200,7 +201,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
-      const data = (await response.json()) as { error: string; details?: unknown };
+      const data = await parseResponse<{ error: string; details?: unknown }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -214,7 +215,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -238,9 +239,9 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
-      const data = (await response.json()) as {
+      const data = await parseResponse<{
         session: { id: string; name: string };
-      };
+      }>(response);
 
       expect(response.status).toBe(201);
       expect(data.session.id).toBe('test-session-id');
@@ -258,7 +259,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');

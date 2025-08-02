@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { getSessionService } from '@/lib/server/session-service';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');
@@ -81,7 +82,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       {
         toolCallId: 'call_456',
         toolCall: { name: 'bash', arguments: { command: 'ls' } },
-        requestedAt: '2025-01-24T12:00:00.000Z',
+        requestedAt: new Date('2025-01-24T12:00:00.000Z'),
         requestData: {
           requestId: 'call_456',
           toolName: 'bash',
@@ -95,7 +96,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       {
         toolCallId: 'call_789',
         toolCall: { name: 'file-write', arguments: { path: '/test.txt', content: 'test' } },
-        requestedAt: '2025-01-24T12:01:00.000Z',
+        requestedAt: new Date('2025-01-24T12:01:00.000Z'),
         requestData: {
           requestId: 'call_789',
           toolName: 'file-write',
@@ -122,7 +123,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     // Verify response
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { pendingApprovals: unknown[] };
+    const data = await parseResponse<{ pendingApprovals: unknown[] }>(response);
     expect(data).toEqual({ pendingApprovals: expectedJsonResponse });
   });
 
@@ -141,7 +142,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
     expect(response.status).toBe(200);
 
-    const data = (await response.json()) as { pendingApprovals: unknown[] };
+    const data = await parseResponse<{ pendingApprovals: unknown[] }>(response);
     expect(data).toEqual({ pendingApprovals: [] });
   });
 
@@ -162,7 +163,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     expect(mockAgent.getPendingApprovals).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toEqual({ error: 'Agent not found for thread' });
   });
 
@@ -203,7 +204,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
           name: 'bash',
           arguments: { command: 'rm -rf /important' },
         },
-        requestedAt: '2025-01-24T10:00:00.000Z',
+        requestedAt: new Date('2025-01-24T10:00:00Z'),
         requestData: {
           requestId: 'call_bash',
           toolName: 'bash',
@@ -220,7 +221,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
           name: 'file-write',
           arguments: { path: '/etc/passwd', content: 'malicious' },
         },
-        requestedAt: '2025-01-24T10:01:00.000Z',
+        requestedAt: new Date('2025-01-24T10:01:00Z'),
         requestData: {
           requestId: 'call_file_write',
           toolName: 'file-write',
@@ -237,7 +238,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
           name: 'url-fetch',
           arguments: { url: 'https://malicious.com/data' },
         },
-        requestedAt: '2025-01-24T10:02:00.000Z',
+        requestedAt: new Date('2025-01-24T10:02:00Z'),
         requestData: {
           requestId: 'call_url_fetch',
           toolName: 'url-fetch',
@@ -260,7 +261,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const response = await GET(request, { params });
 
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { pendingApprovals: unknown[] };
+    const data = await parseResponse<{ pendingApprovals: unknown[] }>(response);
     expect(data.pendingApprovals).toHaveLength(3);
     expect(data.pendingApprovals).toEqual(expectedJsonResponse);
   });
@@ -280,7 +281,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const response = await GET(request, { params });
 
     expect(response.status).toBe(500);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toEqual({ error: 'Failed to get pending approvals' });
   });
 });

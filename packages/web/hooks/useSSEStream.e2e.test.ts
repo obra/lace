@@ -14,6 +14,7 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { ApiSession } from '@/types/api';
+import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('SSE Stream E2E Tests', () => {
@@ -60,7 +61,7 @@ describe('SSE Stream E2E Tests', () => {
     });
     expect(sessionResponse.status).toBe(201);
 
-    const sessionData = (await sessionResponse.json()) as { session: ApiSession };
+    const sessionData = await parseResponse<{ session: ApiSession }>(sessionResponse);
     sessionId = sessionData.session.id as string;
   });
 
@@ -116,9 +117,9 @@ describe('SSE Stream E2E Tests', () => {
     });
     expect(agentResponse.status).toBe(201);
 
-    const agentData = (await agentResponse.json()) as {
+    const agentData = await parseResponse<{
       agent: { threadId: string };
-    };
+    }>(agentResponse);
     const agentThreadId = agentData.agent.threadId;
 
     // Establish SSE connection
