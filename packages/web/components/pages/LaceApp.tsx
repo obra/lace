@@ -120,11 +120,11 @@ export const LaceApp = memo(function LaceApp() {
     // Approval handlers
     onApprovalRequest: handleApprovalRequest,
     onApprovalResponse: handleApprovalResponse,
-    // Task event handlers - wire to useTaskManager
-    onTaskCreated: taskManager.handleTaskCreated,
-    onTaskUpdated: taskManager.handleTaskUpdated, 
-    onTaskDeleted: taskManager.handleTaskDeleted,
-    onTaskNoteAdded: taskManager.handleTaskNoteAdded,
+    // Task event handlers - wire to useTaskManager (only if available)
+    onTaskCreated: taskManager?.handleTaskCreated,
+    onTaskUpdated: taskManager?.handleTaskUpdated, 
+    onTaskDeleted: taskManager?.handleTaskDeleted,
+    onTaskNoteAdded: taskManager?.handleTaskNoteAdded,
   });
   
   const connected = connection.connected;
