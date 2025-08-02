@@ -7,33 +7,16 @@ import type {
   ThreadId,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
+  SessionInfo,
+  AgentInfo,
+  ProjectInfo,
 } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 
 // Import only the types we actually use
 import type { ToolApprovalRequestData } from './web-events';
 
-// API response types
-// These represent the JSON-serialized format sent to clients
-// Core types use Date objects, but these use ISO strings for JSON compatibility
-// Prefixed with 'Api' to distinguish from core types
-
-export interface ApiSession {
-  id: string; // JSON-serialized ThreadId
-  name: string;
-  createdAt: string; // ISO string from Date serialization
-  agentCount?: number; // Count of agents for list view
-  agents?: ApiAgent[]; // Optional for list view, populated when session is selected
-}
-
-export interface ApiAgent {
-  threadId: string; // JSON-serialized ThreadId
-  name: string;
-  provider: string;
-  model: string;
-  status: AgentState;
-  createdAt: string; // ISO string from Date serialization
-}
+// DESTROYED: API response types removed - using core types with superjson everywhere
 
 // Tool approval types
 
@@ -101,17 +84,17 @@ export function isApiSuccess<T>(response: unknown): response is ApiSuccessRespon
   return typeof response === 'object' && response !== null && !('error' in response);
 }
 
-// Specific API response types
+// Specific API response types - now using core types
 export interface SessionsResponse {
-  sessions: ApiSession[];
+  sessions: SessionInfo[];
 }
 
 export interface SessionResponse {
-  session: ApiSession;
+  session: SessionInfo;
 }
 
 export interface AgentResponse {
-  agent: ApiAgent;
+  agent: AgentInfo;
 }
 
 export interface ProvidersResponse {
@@ -127,24 +110,13 @@ export interface ProviderInfo extends BackendProviderInfo {
 // Re-export backend ModelInfo directly - it matches what we need
 export type ModelInfo = BackendModelInfo;
 
-// Project management types
-export interface ApiProject {
-  id: string;
-  name: string;
-  description: string;
-  workingDirectory: string;
-  isArchived: boolean;
-  createdAt: Date | string;
-  lastUsedAt: Date | string;
-  sessionCount?: number;
-}
-
+// Project management types - now using core types
 export interface ProjectsResponse {
-  projects: ApiProject[];
+  projects: ProjectInfo[];
 }
 
 export interface ProjectResponse {
-  project: ApiProject;
+  project: ProjectInfo;
 }
 
 export interface CreateProjectRequest {
