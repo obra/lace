@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TaskAPIClient } from '@/lib/client/task-api';
-import { useTaskStream, type TaskEvent } from '@/hooks/useTaskStream';
+import { useEventStream, type TaskEvent } from '@/hooks/useEventStream';
 import type { Task } from '@/lib/core';
 import type { TaskFilters, CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
 
@@ -62,8 +62,8 @@ export function useTaskManager(projectId: string, sessionId: string) {
     }, 100);
   }, [fetchTasks]);
 
-  // Subscribe to real-time task updates
-  useTaskStream({
+  // Subscribe to real-time task updates using unified event stream
+  useEventStream({
     projectId,
     sessionId,
     onTaskCreated: useCallback((event: TaskEvent) => {
