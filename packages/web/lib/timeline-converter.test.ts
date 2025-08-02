@@ -5,7 +5,7 @@ import { describe, test, expect } from 'vitest';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ApiAgent } from '@/types/api';
 import type { TimelineEntry } from '@/types/design-system';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { convertSessionEventsToTimeline, type ConversionContext } from '@/lib/timeline-converter';
 
 const mockAgents: ApiAgent[] = [

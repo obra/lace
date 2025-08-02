@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolCall, ToolResult } from '@/lib/server/core-types';
+import type { ThreadEvent, ToolCall, ToolResult } from '@/types/core';
 import { asThreadId } from '@/lib/server/lace-imports';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';

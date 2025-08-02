@@ -15,7 +15,7 @@ export type {
   TaskFilters,
 } from '~/tasks/types';
 
-export type { AgentState } from '~/agents/agent';
+export type { AgentState, AgentInfo } from '~/agents/agent';
 
 export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
 

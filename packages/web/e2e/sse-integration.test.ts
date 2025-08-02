@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SessionEvent } from '@/types/web-sse';
 import type { StreamEvent } from '@/types/stream-events';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock types for SSE controller

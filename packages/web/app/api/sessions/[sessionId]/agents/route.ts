@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { CreateAgentRequest } from '@/types/api';
-import { asThreadId, ThreadId } from '@/lib/server/core-types';
+import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 
 // Type guard for unknown error values

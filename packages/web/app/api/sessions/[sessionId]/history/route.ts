@@ -5,8 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ApiErrorResponse } from '@/types/api';
 import type { SessionEvent } from '@/types/web-sse';
-import type { ThreadEvent, ToolResult } from '@/lib/server/core-types';
-import { asThreadId } from '@/lib/server/core-types';
+import type { ThreadEvent, ToolResult } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 
 function isToolResult(data: unknown): data is ToolResult {

@@ -45,6 +45,14 @@ export interface AgentResponse {
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 
+export interface AgentInfo {
+  threadId: ThreadId;
+  name: string;
+  provider: string;
+  model: string;
+  status: AgentState;
+}
+
 export interface CurrentTurnMetrics {
   startTime: Date;
   elapsedMs: number;
@@ -400,8 +408,18 @@ export class Agent extends EventEmitter {
     return (metadata?.model as string) || this._provider.modelName || 'unknown-model';
   }
 
-  get status(): string {
+  get status(): AgentState {
     return this._state;
+  }
+
+  getInfo(): AgentInfo {
+    return {
+      threadId: asThreadId(this._threadId),
+      name: this.name,
+      provider: this.provider,
+      model: this.model,
+      status: this.status,
+    };
   }
 
   // Token budget management

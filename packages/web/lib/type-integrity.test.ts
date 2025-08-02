@@ -17,8 +17,8 @@ describe('Type Integrity - Current State', () => {
       expect(threadIdTyped).toBe(testId);
     });
 
-    it('should import ThreadId from @/lib/server/core-types', async () => {
-      const { asThreadId, isThreadId } = await import('@/lib/server/core-types');
+    it('should import ThreadId from @/types/core', async () => {
+      const { asThreadId, isThreadId } = await import('@/types/core');
 
       const testId = 'lace_20250731_abc123';
       expect(isThreadId(testId)).toBe(true);

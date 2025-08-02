@@ -30,7 +30,7 @@ import { getSessionService, SessionService } from '@/lib/server/session-service'
 import { Project } from '@/lib/server/lace-imports';
 import type { ApiSession as SessionType } from '@/types/api';
 import type { ThreadId } from '@/types/core';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 
 describe('API Endpoints E2E Tests', () => {
   let sessionService: SessionService;

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
@@ -16,7 +16,10 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
+) {
   try {
     const { sessionId } = await params;
     const sessionService = getSessionService();
@@ -37,7 +40,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
+) {
   try {
     const { sessionId } = await params;
     const body = (await request.json()) as Record<string, unknown>;

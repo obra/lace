@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { MessageResponse } from '@/types/api';
 import { Project } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 

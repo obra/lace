@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
 import { MessageResponse, ApiErrorResponse } from '@/types/api';
 import type { SessionEvent } from '@/types/web-sse';
-import { asThreadId, type ThreadId } from '@/lib/server/core-types';
+import { asThreadId, type ThreadId } from '@/types/core';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
