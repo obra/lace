@@ -25,13 +25,6 @@ vi.mock('@/lib/server/approval-manager', () => ({
   }),
 }));
 
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-    }),
-  },
-}));
 
 describe('TaskAPIClient E2E with Real API Routes', () => {
   let sessionId: string;

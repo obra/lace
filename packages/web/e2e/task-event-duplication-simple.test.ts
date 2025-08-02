@@ -12,6 +12,7 @@ vi.mock('@/lib/event-stream-manager', () => ({
   EventStreamManager: {
     getInstance: vi.fn(() => ({
       broadcast: vi.fn(),
+      registerSession: vi.fn(),
     })),
   },
 }));
