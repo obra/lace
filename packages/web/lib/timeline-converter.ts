@@ -50,7 +50,7 @@ function filterEventsByAgent(events: SessionEvent[], selectedAgent?: ThreadId): 
 
 function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
   const processed: SessionEvent[] = [];
-  const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
+  const streamingMessages = new Map<string, { content: string; timestamp: string }>();
 
   for (const event of events) {
     if (event.type === 'AGENT_TOKEN') {
@@ -60,11 +60,11 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
 
       if (existing) {
         existing.content += event.data.token;
-        existing.timestamp = new Date(event.timestamp);
+        existing.timestamp = event.timestamp;
       } else {
         streamingMessages.set(key, {
           content: event.data.token,
-          timestamp: new Date(event.timestamp),
+          timestamp: event.timestamp,
         });
       }
 
@@ -90,7 +90,7 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
     const streamingEvent: SessionEvent = {
       type: 'AGENT_STREAMING',
       threadId: threadId as ThreadId,
-      timestamp: timestamp instanceof Date ? timestamp.toISOString() : timestamp,
+      timestamp: timestamp,
       data: { content },
     };
     processed.push(streamingEvent);
