@@ -1,7 +1,7 @@
 // ABOUTME: REST API endpoints for individual project operations - GET, PATCH, DELETE by project ID
 // ABOUTME: Handles project retrieval, updates, and deletion with proper error handling and validation
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';

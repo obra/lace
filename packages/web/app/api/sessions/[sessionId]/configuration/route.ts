@@ -1,7 +1,7 @@
 // ABOUTME: REST API endpoints for session configuration - GET, PUT for configuration management
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { createSuperjsonResponse } from '@/lib/serialization';

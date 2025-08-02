@@ -1,7 +1,7 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';

@@ -20,7 +20,7 @@ export interface ProvidersResponse {
   providers: ProviderWithModels[];
 }
 
-export async function GET(): Promise<NextResponse<ProvidersResponse | ApiErrorResponse>> {
+export async function GET(): Promise<NextResponse> {
   try {
     const registry = ProviderRegistry.createWithAutoDiscovery();
     const providerData = registry.getAvailableProviders();

@@ -93,7 +93,7 @@ describe('API Endpoints E2E Tests', () => {
       });
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as { session: SessionType };
+      const data = await parseResponse<{ session: SessionType }>(response);
       expect(data.session.name).toBe('API Test Session');
       expect(data.session.id).toBeDefined();
 

@@ -88,12 +88,12 @@ describe('Full Conversation Flow', () => {
     });
 
     if (sessionResponse.status !== 201) {
-      const errorData = (await sessionResponse.json()) as { error: string };
+      const errorData = await parseResponse<{ error: string }>(sessionResponse);
       console.error('Session creation failed:', errorData);
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: SessionInfo };
+    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
     expect(sessionData.session.name).toBe(sessionName);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
@@ -183,7 +183,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: SessionInfo };
+    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
     // Spawn first agent
@@ -269,7 +269,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId1 }) }
     );
-    const session1Data = (await session1Response.json()) as { session: SessionInfo };
+    const session1Data = await parseResponse<{ session: SessionInfo }>(session1Response);
     const session1Id: ThreadId = session1Data.session.id as ThreadId;
 
     const session2Response = await createProjectSession(
@@ -286,7 +286,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId2 }) }
     );
-    const session2Data = (await session2Response.json()) as { session: SessionInfo };
+    const session2Data = await parseResponse<{ session: SessionInfo }>(session2Response);
     const session2Id: ThreadId = session2Data.session.id as ThreadId;
 
     // Connect to streams

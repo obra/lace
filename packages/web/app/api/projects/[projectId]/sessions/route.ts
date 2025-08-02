@@ -1,7 +1,7 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { createSuperjsonResponse } from '@/lib/serialization';

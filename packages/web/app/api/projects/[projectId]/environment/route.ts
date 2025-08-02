@@ -56,7 +56,7 @@ export async function PUT(
 
     const updatedVariables = project.getEnvironmentVariables();
 
-    return NextResponse.json({ variables: updatedVariables });
+    return createSuperjsonResponse({ variables: updatedVariables });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return createSuperjsonResponse(
