@@ -56,7 +56,7 @@ vi.mock('@/lib/server/session-service', () => ({
   getSessionService: vi.fn(() => mockSessionService),
 }));
 
-vi.mock('@/lib/server/core-types', () => ({
+vi.mock('@/types/core', () => ({
   asThreadId: vi.fn((id: string) => id),
 }));
 

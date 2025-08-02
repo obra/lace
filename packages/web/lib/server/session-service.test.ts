@@ -151,7 +151,7 @@ describe('SessionService approval event forwarding', () => {
   class MockApprovalProvider extends TestProvider {
     private callCount = 0;
 
-    createResponse(): Promise<import('@/lib/server/core-types').ProviderResponse> {
+    createResponse(): Promise<import('@/types/core').ProviderResponse> {
       this.callCount++;
 
       // Only return tool calls on first call to avoid loops
