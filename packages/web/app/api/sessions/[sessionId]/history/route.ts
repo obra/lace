@@ -173,13 +173,14 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     default: {
-      // Exhaustive check - this should never be reached if all event types are handled
-      console.warn('Unknown event type encountered:', threadEvent.type);
+      // TypeScript exhaustiveness check - cast to access type property
+      const unknownEvent = threadEvent as { type: string };
+      console.warn('Unknown event type encountered:', unknownEvent.type);
       // Return a fallback for runtime safety
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event type: ${String(threadEvent.type)}` },
+        data: { content: `Unknown event type: ${unknownEvent.type}` },
       } as SessionEvent;
     }
   }
