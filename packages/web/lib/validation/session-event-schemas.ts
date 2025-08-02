@@ -2,10 +2,11 @@
 // ABOUTME: Transforms string timestamps to Date objects during JSON parsing
 
 import { z } from 'zod';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId, SessionEvent } from '@/types/api';
+import type { ToolResult } from '@/lib/core';
 
 // ThreadId schema (assumes string validation exists elsewhere)
-const ThreadIdSchema = z.string() as z.ZodType<ThreadId>;
+const ThreadIdSchema = z.string() as unknown as z.ZodType<ThreadId>;
 
 // Timestamp schema - preserves ISO strings for JSON serialization compatibility
 const DateTimeSchema = z.union([
@@ -25,10 +26,10 @@ const AgentMessageEventDataSchema = z.object({
 const ToolCallEventDataSchema = z.object({
   id: z.string(),
   name: z.string(),
-  arguments: z.unknown(),
+  arguments: z.unknown().optional(),
 });
 
-const ToolResultSchema = z.unknown(); // Keep as unknown for now
+const ToolResultSchema = z.unknown() as unknown as z.ZodType<ToolResult>;
 
 const ToolAggregatedEventDataSchema = z.object({
   call: ToolCallEventDataSchema,
@@ -174,11 +175,11 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
 export const StreamEventTimestampSchema = DateTimeSchema;
 
 // Helper function to safely parse SessionEvent from JSON
-export function parseSessionEvent(data: unknown): import('@/types/api').SessionEvent {
+export function parseSessionEvent(data: unknown): SessionEvent {
   return SessionEventSchema.parse(data);
 }
 
 // Helper function to safely parse array of SessionEvents
-export function parseSessionEvents(data: unknown[]): import('@/types/api').SessionEvent[] {
+export function parseSessionEvents(data: unknown[]): SessionEvent[] {
   return data.map(parseSessionEvent);
 }
