@@ -7,30 +7,16 @@ import type {
   ThreadId,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
+  SessionInfo,
+  AgentInfo,
+  ProjectInfo,
 } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 
 // Import shared event data types
 import type { ToolApprovalRequestData } from './web-events';
 
-// API model types
-
-export interface ApiSession {
-  id: ThreadId; // sessionId (parent threadId)
-  name: string;
-  createdAt: string;
-  agentCount?: number; // Count of agents for list view
-  agents?: ApiAgent[]; // Optional for list view, populated when session is selected
-}
-
-export interface ApiAgent {
-  threadId: ThreadId; // Full thread ID like sessionId.1
-  name: string;
-  provider: string;
-  model: string;
-  status: AgentState;
-  createdAt: string;
-}
+// DESTROYED: API model types eliminated - using core types with superjson everywhere
 
 // Tool approval types
 
@@ -100,15 +86,15 @@ export function isApiSuccess<T>(response: unknown): response is ApiSuccessRespon
 
 // Specific API response types
 export interface SessionsResponse {
-  sessions: ApiSession[];
+  sessions: SessionInfo[];
 }
 
 export interface SessionResponse {
-  session: ApiSession;
+  session: SessionInfo;
 }
 
 export interface AgentResponse {
-  agent: ApiAgent;
+  agent: AgentInfo;
 }
 
 export interface ProvidersResponse {
@@ -124,24 +110,13 @@ export interface ProviderInfo extends BackendProviderInfo {
 // Re-export backend ModelInfo directly - it matches what we need
 export type ModelInfo = BackendModelInfo;
 
-// Project management types
-export interface ApiProject {
-  id: string;
-  name: string;
-  description: string;
-  workingDirectory: string;
-  isArchived: boolean;
-  createdAt: Date | string;
-  lastUsedAt: Date | string;
-  sessionCount?: number;
-}
-
+// Project management types - using core types with superjson serialization
 export interface ProjectsResponse {
-  projects: ApiProject[];
+  projects: ProjectInfo[];
 }
 
 export interface ProjectResponse {
-  project: ApiProject;
+  project: ProjectInfo;
 }
 
 export interface CreateProjectRequest {

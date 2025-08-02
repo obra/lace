@@ -7,14 +7,13 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faUser, faFlag, faClipboard } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import type { ApiAgent } from '@/types/api';
-import type { Task, AssigneeId, TaskPriority } from '@/types/core';
+import type { Task, AssigneeId, TaskPriority, AgentInfo } from '@/types/core';
 
 interface TaskCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>) => void;
-  agents?: ApiAgent[];
+  agents?: AgentInfo[];
   loading?: boolean;
 }
 

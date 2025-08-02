@@ -4,6 +4,7 @@
 import superjson from 'superjson';
 import { NextResponse } from 'next/server';
 import type { ThreadId } from '@/types/core';
+import { isThreadId } from '@/types/core';
 
 // Import NewAgentSpec type for branded type registration
 type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
@@ -11,8 +12,7 @@ type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
 // Register custom transformers for branded types
 superjson.registerCustom<ThreadId, string>(
   {
-    isApplicable: (v): v is ThreadId =>
-      typeof v === 'string' && v.match(/^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/),
+    isApplicable: (v): v is ThreadId => typeof v === 'string' && isThreadId(v),
     serialize: (v) => v as string,
     deserialize: (v) => v as ThreadId,
   },

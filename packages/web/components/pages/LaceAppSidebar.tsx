@@ -6,7 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faComments, faRobot, faCog, faTasks } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { ApiSession, ApiProject } from '@/types/api';
+import type { SessionInfo, ProjectInfo } from '@/types/core';
+import type { ProviderInfo } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 
@@ -15,9 +16,9 @@ interface LaceAppSidebarProps {
   onToggleSidebar: () => void;
   onSettingsClick: () => void;
   selectedProject: string | null;
-  currentProject: ApiProject;
-  sessions: ApiSession[];
-  selectedSessionDetails: ApiSession | null;
+  currentProject: ProjectInfo;
+  sessions: SessionInfo[];
+  selectedSessionDetails: SessionInfo | null;
   selectedAgent: ThreadId | null;
   taskManager: ReturnType<typeof useTaskManager> | null;
   onProjectSwitch: () => void;

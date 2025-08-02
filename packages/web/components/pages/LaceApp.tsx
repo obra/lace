@@ -160,7 +160,7 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProviders(true);
     try {
       const res = await fetch('/api/providers');
-      const data: unknown = parse(await res.text());
+      const data: unknown = await parseResponse<unknown>(res);
       
       if (isApiError(data)) {
         console.error('Failed to load providers:', data.error);
@@ -183,7 +183,7 @@ export const LaceApp = memo(function LaceApp() {
 
     try {
       const res = await fetch(`/api/projects/${selectedProject}/sessions`);
-      const data: unknown = parse(await res.text());
+      const data: unknown = await parseResponse<unknown>(res);
 
       if (isApiError(data)) {
         console.error('Failed to load sessions:', data.error);
@@ -215,7 +215,7 @@ export const LaceApp = memo(function LaceApp() {
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}`);
-      const data: unknown = parse(await res.text());
+      const data: unknown = await parseResponse<unknown>(res);
 
       if (isApiError(data)) {
         console.error('Failed to load session details:', data.error);
@@ -893,7 +893,7 @@ export const LaceApp = memo(function LaceApp() {
                   selectedSession={selectedSessionDetails}
                   providers={providers}
                   onSessionCreate={handleSessionCreate}
-                  onSessionSelect={(session) => handleSessionSelect(session.id)}
+                  onSessionSelect={(session: SessionInfo) => handleSessionSelect(session.id)}
                   onAgentCreate={handleAgentCreate}
                   onAgentSelect={handleAgentSelect}
                   onAgentUpdate={handleAgentUpdate}
