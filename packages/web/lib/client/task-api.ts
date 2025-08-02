@@ -1,14 +1,7 @@
 // ABOUTME: Client-side API for task management operations
 // ABOUTME: Provides type-safe methods for interacting with task API endpoints
 
-import type { Task, TaskStatus, TaskPriority } from '@/types/core';
-
-export interface TaskFilters {
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  assignedTo?: string;
-  createdBy?: string;
-}
+import type { Task, TaskStatus, TaskPriority, TaskFilters } from '@/types/core';
 
 export interface CreateTaskRequest {
   title: string;
