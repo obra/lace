@@ -29,31 +29,15 @@ export interface EventContext {
 // TASK EVENTS
 // =============================================================================
 
+// Import the actual types - JSON.stringify will handle serialization
+import type { Task, TaskContext } from '~/tasks/types';
+
 export interface TaskEventData {
   type: 'task:created' | 'task:updated' | 'task:deleted' | 'task:note_added';
   taskId: string;
-  task?: {
-    // Full task data (except for delete events)
-    id: string;
-    title: string;
-    description?: string;
-    prompt: string;
-    status: 'pending' | 'in_progress' | 'completed' | 'blocked';
-    priority: 'high' | 'medium' | 'low';
-    assignedTo?: string;
-    createdBy: string;
-    threadId: string;
-    createdAt: string; // ISO string
-    updatedAt: string; // ISO string
-    notes: Array<{
-      id: string;
-      author: string;
-      content: string;
-      timestamp: string; // ISO string
-    }>;
-  };
-  context: EventContext;
-  timestamp: string; // ISO string
+  task?: Task; // Use actual Task type - JSON.stringify handles conversion
+  context: TaskContext; // Use actual TaskContext
+  timestamp: string; // Keep as string since we set this explicitly
 }
 
 // =============================================================================
