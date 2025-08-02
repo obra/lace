@@ -19,8 +19,8 @@ export const EVENT_TYPES = [
   'COMPACTION',
 ] as const;
 
-// Derive EventType union from the array
-export type EventType = (typeof EVENT_TYPES)[number];
+// Derive ThreadEventType union from the array
+export type ThreadEventType = (typeof EVENT_TYPES)[number];
 
 // Tool approval event data types
 export interface ToolApprovalRequestData {

@@ -7,8 +7,8 @@ import type { ThreadId } from '~/threads/types';
 // CORE EVENT ARCHITECTURE
 // =============================================================================
 
-// Event type union - primary event categories
-export type EventType = 'session' | 'task' | 'project' | 'global';
+// Stream event category union - primary event categories
+export type StreamEventCategory = 'session' | 'task' | 'project' | 'global';
 
 // Event scope for hierarchical filtering and routing
 export interface EventScope {
@@ -110,7 +110,7 @@ export interface SessionEventData {
 export interface StreamEvent {
   id: string; // Unique event identifier
   timestamp: string; // ISO string - CONSISTENT across all events
-  eventType: EventType; // Primary categorization
+  eventType: StreamEventCategory; // Primary categorization
   scope: EventScope; // Hierarchical routing information
   data: SessionEventData | TaskEventData | AgentEventData | ProjectEventData | GlobalEventData;
 }
@@ -121,7 +121,7 @@ export interface StreamSubscription {
   sessions?: string[]; // Filter to specific session IDs
   threads?: string[]; // Filter to specific thread IDs
   global?: boolean; // Include global system events
-  eventTypes?: EventType[]; // Filter to specific event types (type-safe!)
+  eventTypes?: StreamEventCategory[]; // Filter to specific event types (type-safe!)
 }
 
 // =============================================================================

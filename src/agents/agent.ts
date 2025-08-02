@@ -10,7 +10,7 @@ import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
   ThreadEvent,
-  EventType,
+  ThreadEventType,
   ToolApprovalResponseData,
   ToolApprovalRequestData,
   ThreadId,
@@ -1715,7 +1715,7 @@ export class Agent extends EventEmitter {
       return null;
     }
 
-    const event = this._threadManager.addEvent(threadId, type as EventType, data);
+    const event = this._threadManager.addEvent(threadId, type as ThreadEventType, data);
     if (event) {
       this.emit('thread_event_added', { event, threadId });
     }

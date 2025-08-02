@@ -7,7 +7,7 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, EventType, ThreadEventData } from '~/threads/types';
+import { Thread, ThreadEvent, ThreadEventType, ThreadEventData } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { estimateTokens } from '~/utils/token-estimation';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
@@ -294,7 +294,11 @@ export class ThreadManager {
    * prevents duplicate approvals for the same toolCallId, causing
    * this method to throw if a duplicate is attempted.
    */
-  addEvent(threadId: string, type: EventType, eventData: ThreadEventData): ThreadEvent | null {
+  addEvent(
+    threadId: string,
+    type: ThreadEventType,
+    eventData: ThreadEventData
+  ): ThreadEvent | null {
     const thread = this.getThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found`);

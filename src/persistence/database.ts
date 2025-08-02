@@ -3,7 +3,7 @@
 
 import Database from 'better-sqlite3';
 import { getLaceDbPath } from '~/config/lace-dir';
-import { Thread, ThreadEvent, EventType, ThreadId, AssigneeId } from '~/threads/types';
+import { Thread, ThreadEvent, ThreadEventType, ThreadId, AssigneeId } from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
 import {
   Task,
@@ -19,7 +19,7 @@ import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/thread
 function createThreadEventFromDb(
   id: string,
   threadId: string,
-  type: EventType,
+  type: ThreadEventType,
   timestamp: Date,
   data: unknown
 ): ThreadEvent {
@@ -409,7 +409,7 @@ export class DatabasePersistence {
         return createThreadEventFromDb(
           row.id,
           row.thread_id,
-          row.type as EventType,
+          row.type as ThreadEventType,
           new Date(row.timestamp),
           JSON.parse(row.data) as unknown
         );
