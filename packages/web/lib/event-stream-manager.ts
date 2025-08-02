@@ -1,7 +1,7 @@
 // ABOUTME: Event stream manager for real-time client notifications
 // ABOUTME: Manages global event distribution with client-side filtering
 
-import type { StreamEvent, EventType } from '@/types/stream-events';
+import type { StreamEvent, StreamEventCategory } from '@/types/stream-events';
 import type { Task, TaskContext, ThreadId } from '@/lib/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
@@ -63,7 +63,7 @@ interface ClientConnection {
     sessions?: string[];
     threads?: string[];
     global?: boolean;
-    eventTypes?: EventType[];
+    eventTypes?: StreamEventCategory[];
   };
   lastEventId?: string;
   connectedAt: Date;

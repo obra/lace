@@ -12,7 +12,7 @@ export { EventApprovalCallback } from '~/tools/event-approval-callback';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
 export { ThreadManager } from '~/threads/thread-manager';
-export { EVENT_TYPES, type EventType } from '~/threads/types';
+export { EVENT_TYPES, type ThreadEventType } from '~/threads/types';
 
 // Re-export types and utilities from core-types for backward compatibility
 export * from './core-types';

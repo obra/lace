@@ -5,7 +5,7 @@ import type { StreamEvent, StreamSubscription } from '~/events/types';
 
 // Re-export all core event types (single source of truth)
 export type {
-  EventType,
+  StreamEventCategory,
   EventScope,
   EventContext,
   StreamEvent,

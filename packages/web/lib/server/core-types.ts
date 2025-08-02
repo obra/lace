@@ -5,7 +5,7 @@ import 'server-only';
 
 // Types
 export type { ThreadId, AssigneeId } from '~/threads/types';
-export type { ThreadEvent, EventType } from '~/threads/types';
+export type { ThreadEvent, ThreadEventType } from '~/threads/types';
 export { ApprovalDecision } from '~/tools/approval-types';
 export type { ApprovalCallback } from '~/tools/approval-types';
 export type { ToolAnnotations, ToolCall, ToolResult } from '~/tools/types';

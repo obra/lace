@@ -6,7 +6,7 @@ import type {
   StreamEvent,
   StreamSubscription,
   StreamConnection,
-  EventType,
+  StreamEventCategory,
 } from '@/types/stream-events';
 import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import type { Task } from '@/lib/core';
@@ -336,7 +336,7 @@ export function useEventStream({
       sessions: sessionId ? [sessionId] : [],
       threads: threadIds || [],
       global: includeGlobal,
-      eventTypes: ['session', 'task', 'project', 'global'] as EventType[],
+      eventTypes: ['session', 'task', 'project', 'global'] as StreamEventCategory[],
     }),
     [subscriptionKey] // Only recreate when actual content changes
   );
@@ -599,7 +599,7 @@ export function useEventStream({
   }, []);
 
   // Track previous subscription to detect actual changes
-  const prevSubscriptionKeyRef = useRef<string>();
+  const prevSubscriptionKeyRef = useRef<string | undefined>(undefined);
 
   // Connect on mount, reconnect only when subscription actually changes
   useEffect(() => {

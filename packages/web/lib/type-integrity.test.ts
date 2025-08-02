@@ -144,9 +144,9 @@ describe('Type Integrity - Current State', () => {
       expect(EVENT_TYPES).toContain('TOOL_RESULT');
     });
 
-    it('should import EventType from events constants', async () => {
+    it('should import ThreadEventType from events constants', async () => {
       const eventsModule = await import('@/types/events-constants');
-      expect(eventsModule.EventType).toBeUndefined(); // EventType is a type, not a value
+      expect(eventsModule.ThreadEventType).toBeUndefined(); // ThreadEventType is a type, not a value
       expect(eventsModule).toBeDefined();
     });
   });

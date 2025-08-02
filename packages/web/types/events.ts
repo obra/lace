@@ -1,11 +1,11 @@
 // ABOUTME: Combined event type definitions for web interface
 // ABOUTME: Consolidates events and event constants into single file
 
-import type { EventType, ThreadId, ToolResult } from '@/lib/core';
+import type { ThreadEventType, ThreadId, ToolResult } from '@/lib/core';
 import { EVENT_TYPES } from '@/lib/core';
 
 // Re-export core event types
-export { EVENT_TYPES, type EventType };
+export { EVENT_TYPES, type ThreadEventType };
 
 // UI-only event types (not persisted)
 export const UI_EVENT_TYPES = [
@@ -19,7 +19,7 @@ export const UI_EVENT_TYPES = [
 export type UIEventType = (typeof UI_EVENT_TYPES)[number];
 
 // Combined event types for SSE streaming
-export type SessionEventType = EventType | UIEventType;
+export type SessionEventType = ThreadEventType | UIEventType;
 
 // Event data interfaces
 export interface UserMessageEventData {
@@ -165,6 +165,6 @@ export function getAllEventTypes(): SessionEventType[] {
   return [...EVENT_TYPES, ...UI_EVENT_TYPES];
 }
 
-export function isPersistedEvent(type: SessionEventType): type is EventType {
+export function isPersistedEvent(type: SessionEventType): type is ThreadEventType {
   return (EVENT_TYPES as readonly string[]).includes(type);
 }
