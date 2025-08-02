@@ -60,12 +60,11 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
 
       if (existing) {
         existing.content += event.data.token;
-        existing.timestamp =
-          event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
+        existing.timestamp = new Date(event.timestamp);
       } else {
         streamingMessages.set(key, {
           content: event.data.token,
-          timestamp: event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp),
+          timestamp: new Date(event.timestamp),
         });
       }
 
@@ -91,7 +90,7 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
     const streamingEvent: SessionEvent = {
       type: 'AGENT_STREAMING',
       threadId: threadId as ThreadId,
-      timestamp: timestamp instanceof Date ? timestamp : new Date(timestamp),
+      timestamp: timestamp instanceof Date ? timestamp.toISOString() : timestamp,
       data: { content },
     };
     processed.push(streamingEvent);
@@ -101,17 +100,9 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
   if (processed.length <= 1) return processed;
 
   return processed.sort((a, b) => {
-    // Optimize timestamp comparison - avoid repeated Date creation
-    const aTime =
-      a.timestamp instanceof Date
-        ? a.timestamp.getTime()
-        : ((a.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(a.timestamp).getTime());
-    const bTime =
-      b.timestamp instanceof Date
-        ? b.timestamp.getTime()
-        : ((b.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(b.timestamp).getTime());
+    // Optimize timestamp comparison - all timestamps are now strings
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }
@@ -140,14 +131,8 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
         const threadCalls = Array.from(pendingToolCalls.entries())
           .filter(([_, data]) => data.call.threadId === event.threadId && !data.result)
           .sort(([_, a], [__, b]) => {
-            const aTime =
-              a.call.timestamp instanceof Date
-                ? a.call.timestamp.getTime()
-                : new Date(a.call.timestamp).getTime();
-            const bTime =
-              b.call.timestamp instanceof Date
-                ? b.call.timestamp.getTime()
-                : new Date(b.call.timestamp).getTime();
+            const aTime = new Date(a.call.timestamp).getTime();
+            const bTime = new Date(b.call.timestamp).getTime();
             return aTime - bTime; // Oldest first (FIFO matching)
           });
 
@@ -197,17 +182,9 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
   if (processed.length <= 1) return processed;
 
   return processed.sort((a, b) => {
-    // Optimize timestamp comparison - avoid repeated Date creation
-    const aTime =
-      a.timestamp instanceof Date
-        ? a.timestamp.getTime()
-        : ((a.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(a.timestamp).getTime());
-    const bTime =
-      b.timestamp instanceof Date
-        ? b.timestamp.getTime()
-        : ((b.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(b.timestamp).getTime());
+    // Optimize timestamp comparison - all timestamps are now strings
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }
@@ -218,7 +195,7 @@ function convertEvent(
   context: ConversionContext
 ): TimelineEntry {
   const agent = getAgentName(event.threadId, context.agents);
-  const timestamp = event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
+  const timestamp = new Date(event.timestamp);
   const id = `${event.threadId}-${timestamp.getTime()}-${index}`;
 
   switch (event.type) {
