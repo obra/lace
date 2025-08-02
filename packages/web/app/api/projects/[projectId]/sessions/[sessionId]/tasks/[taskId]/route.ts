@@ -3,7 +3,8 @@
 
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
+import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import {
   ProjectIdSchema,

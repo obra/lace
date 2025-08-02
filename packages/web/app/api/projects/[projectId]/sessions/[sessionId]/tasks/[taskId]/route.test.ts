@@ -8,10 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, PATCH, DELETE } from './route';
-import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
+import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { Task } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -102,7 +104,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await GET(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { task: Task };
+      const data = await parseResponse<{ task: Task }>(response);
       expect(data.task.id).toBe(testTaskId);
       expect(data.task.title).toBe('Test Task');
     });
@@ -122,7 +124,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await GET(request, context)) as NextResponse;
       expect(response.status).toBe(500);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toContain('Invalid route parameters:');
       expect(data.error).toContain('projectId');
       expect(data.error).toContain('sessionId');
@@ -144,7 +146,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await GET(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Project not found');
     });
 
@@ -164,7 +166,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await GET(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Session not found in this project');
     });
 
@@ -183,7 +185,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await GET(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Task not found');
     });
   });
@@ -212,7 +214,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await PATCH(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { task: Task };
+      const data = await parseResponse<{ task: Task }>(response);
       expect(data.task.title).toBe('Updated Title');
       expect(data.task.status).toBe('in_progress');
     });
@@ -239,7 +241,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await PATCH(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Project not found');
     });
 
@@ -264,7 +266,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await PATCH(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { task: Task };
+      const data = await parseResponse<{ task: Task }>(response);
       expect(data.task.priority).toBe('high');
       expect(data.task.title).toBe('Test Task'); // Should remain unchanged
     });
@@ -286,7 +288,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await DELETE(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { message: string };
+      const data = await parseResponse<{ message: string }>(response);
       expect(data.message).toBe('Task deleted successfully');
     });
 
@@ -306,7 +308,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await DELETE(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Project not found');
     });
 
@@ -340,7 +342,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const response = (await DELETE(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Task not found');
     });
   });

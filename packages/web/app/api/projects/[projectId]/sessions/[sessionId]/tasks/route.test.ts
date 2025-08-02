@@ -8,10 +8,12 @@
 import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from './route';
-import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
+import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { Task } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -98,7 +100,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { tasks: Task[] };
+      const data = await parseResponse<{ tasks: Task[] }>(response);
       expect(data).toHaveProperty('tasks');
       expect(Array.isArray(data.tasks)).toBe(true);
       expect(data.tasks).toHaveLength(1);
@@ -118,7 +120,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Project not found');
     });
 
@@ -135,7 +137,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Session not found in this project');
     });
 
@@ -150,7 +152,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { tasks: Task[] };
+      const data = await parseResponse<{ tasks: Task[] }>(response);
       expect(data.tasks).toHaveLength(1);
       expect(data.tasks[0].status).toBe('pending');
     });
@@ -166,7 +168,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { tasks: Task[] };
+      const data = await parseResponse<{ tasks: Task[] }>(response);
       expect(data.tasks).toHaveLength(1);
       expect(data.tasks[0].priority).toBe('medium');
     });
@@ -182,7 +184,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { tasks: Task[] };
+      const data = await parseResponse<{ tasks: Task[] }>(response);
       expect(data.tasks).toHaveLength(1);
       expect(data.tasks[0].status).toBe('pending');
       expect(data.tasks[0].priority).toBe('medium');
@@ -208,7 +210,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await GET(request, context);
       expect(response.status).toBe(200);
 
-      const data = (await response.json()) as { tasks: Task[] };
+      const data = await parseResponse<{ tasks: Task[] }>(response);
       expect(data.tasks).toHaveLength(0);
     });
   });
@@ -237,7 +239,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await POST(request, context);
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as { task: Task };
+      const data = await parseResponse<{ task: Task }>(response);
       expect(data.task).toHaveProperty('id');
       expect(data.task.title).toBe('New Test Task');
       expect(data.task.prompt).toBe('New test prompt');
@@ -261,7 +263,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await POST(request, context);
       expect(response.status).toBe(400);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toContain('prompt: Required');
     });
 
@@ -284,7 +286,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await POST(request, context);
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Project not found');
     });
 
@@ -307,7 +309,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await POST(request, context);
       expect(response.status).toBe(404);
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toBe('Session not found in this project');
     });
 
@@ -336,7 +338,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await POST(request, context);
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as { task: Task };
+      const data = await parseResponse<{ task: Task }>(response);
       expect(data.task.title).toBe('Task with Optional Fields');
       expect(data.task.description).toBe('Task with description');
       expect(data.task.assignedTo).toBe('specific-user');
@@ -366,7 +368,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const response = await POST(request, context);
       expect(response.status).toBe(201);
 
-      const data = (await response.json()) as { task: Task };
+      const data = await parseResponse<{ task: Task }>(response);
       expect(data.task.title).toBe('Second Test Task');
       expect(data.task.priority).toBe('low');
     });
