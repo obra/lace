@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import type { ThreadId, SessionEvent } from '@/types/api';
-import type { ToolResult } from '@/lib/core';
+import type { ToolResult } from '@/types/core';
 
 // ThreadId schema (assumes string validation exists elsewhere)
 const ThreadIdSchema = z.string() as unknown as z.ZodType<ThreadId>;

@@ -2,9 +2,10 @@
 // ABOUTME: Verifies API types and type guards work correctly
 
 import { describe, it, expect } from 'vitest';
-import type { Session, MessageRequest } from './web';
-import { isApiError, isApiSuccess } from './web';
-import { asThreadId } from '@/lib/core';
+import type { MessageRequest } from './web';
+import type { Session } from './api';
+import { isApiError, isApiSuccess } from './web-api';
+import { asThreadId } from '@/types/core';
 
 describe('Web Types', () => {
   it('should create valid Session type', () => {

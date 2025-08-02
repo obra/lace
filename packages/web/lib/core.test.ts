@@ -2,8 +2,8 @@
 // ABOUTME: Ensures all expected types and functions are exported correctly
 
 import { describe, it, expect } from 'vitest';
-import type { ThreadId, Task } from './core';
-import { isThreadId, asThreadId, EVENT_TYPES, ApprovalDecision } from './core';
+import type { ThreadId, Task } from '@/types/core';
+import { isThreadId, asThreadId, EVENT_TYPES, ApprovalDecision } from '@/types/core';
 
 describe('Core Type Imports', () => {
   it('should export ThreadId type correctly', () => {

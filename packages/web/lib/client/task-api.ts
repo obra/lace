@@ -1,7 +1,7 @@
 // ABOUTME: Client-side API for task management operations
 // ABOUTME: Provides type-safe methods for interacting with task API endpoints
 
-import type { Task, TaskStatus, TaskPriority } from '@/lib/core';
+import type { Task, TaskStatus, TaskPriority } from '@/types/core';
 
 export interface TaskFilters {
   status?: TaskStatus;

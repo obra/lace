@@ -1,29 +1,26 @@
-// ABOUTME: Type definitions for the web API endpoints
-// ABOUTME: Defines interfaces for sessions, agents, and events
+// ABOUTME: API-specific types for web endpoints (requests, responses, models)
+// ABOUTME: Imports shared event data from web-events.ts to avoid duplication
 
 // Import core types from unified core imports
 import type {
   AgentState,
   ThreadId,
   AssigneeId,
-  ToolResult,
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
 } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 
-// Import shared event data types from web-events.ts
-import type {
-  UserMessageEventData,
-  AgentMessageEventData,
-  ToolCallEventData,
-  ToolAggregatedEventData,
-  LocalSystemMessageEventData,
-  SystemPromptEventData,
-  UserSystemPromptEventData,
-  CompactionEventData,
-  ToolApprovalRequestData,
-} from './web-events';
+// Import shared event data types
+import type { ToolApprovalRequestData } from './web-events';
+
+// Re-export imported types for convenience
+export type { ThreadId, AssigneeId, AgentState, Task, TaskNote, TaskStatus, TaskPriority };
+export { ApprovalDecision };
 
 // API model types
 
@@ -88,7 +85,7 @@ export interface MessageResponse {
   messageId: string;
 }
 
-// API response types for proper error handling
+// Generic API response types for proper error handling
 export interface ApiSuccessResponse<T> {
   data?: T;
   [key: string]: unknown;

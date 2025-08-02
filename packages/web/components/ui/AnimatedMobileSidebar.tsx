@@ -5,8 +5,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faTerminal, faTasks, faFolder } from '@/lib/fontawesome';
 import { ChevronLeftIcon } from '@/lib/heroicons';
 import { Timeline } from '@/types/design-system';
-import type { Task } from '@/lib/core';
-import type { ProjectInfo as Project } from '@/lib/core';
+import type { Task } from '@/types/core';
+import type { ProjectInfo as Project } from '@/types/core';
 import {
   fadeInLeft,
   fadeInUp,

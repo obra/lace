@@ -13,8 +13,8 @@ import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { TimelineEntry, Timeline, RecentFile } from '@/types/design-system';
-import type { Task } from '@/lib/core';
-import type { ProjectInfo as Project } from '@/lib/core';
+import type { Task } from '@/types/core';
+import type { ProjectInfo as Project } from '@/types/core';
 import { asThreadId } from '@/lib/server/core-types';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import {

@@ -2,7 +2,7 @@
 // ABOUTME: Uses core thread types as single source of truth
 
 // Import thread event types from core package to maintain consistency
-import { EVENT_TYPES, type ThreadEventType } from '@/lib/core';
+import { EVENT_TYPES, type ThreadEventType } from '@/types/core';
 
 // Re-export for backward compatibility
 export { EVENT_TYPES, type ThreadEventType };

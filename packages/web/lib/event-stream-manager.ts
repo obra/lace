@@ -2,7 +2,7 @@
 // ABOUTME: Manages global event distribution with client-side filtering
 
 import type { StreamEvent, StreamEventCategory } from '@/types/stream-events';
-import type { Task, TaskContext, ThreadId } from '@/lib/core';
+import type { Task, TaskContext, ThreadId } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 

@@ -34,16 +34,16 @@ describe('Type Integrity - Current State', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should import ThreadId from @/lib/core', async () => {
-      const coreImports = await import('@/lib/core');
+    it('should import ThreadId from @/types/core', async () => {
+      const coreImports = await import('@/types/core');
       // ThreadId is a type export, so we test it exists in the import
       expect(coreImports).toBeDefined();
     });
   });
 
   describe('ApprovalDecision imports', () => {
-    it('should import ApprovalDecision from @/types/api', async () => {
-      const { ApprovalDecision } = await import('@/types/api');
+    it('should import ApprovalDecision from @/types/core', async () => {
+      const { ApprovalDecision } = await import('@/types/core');
 
       expect(ApprovalDecision.ALLOW_ONCE).toBe('allow_once');
       expect(ApprovalDecision.ALLOW_SESSION).toBe('allow_session');
@@ -124,13 +124,13 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should have compatible ApprovalDecision enums', async () => {
-      const { ApprovalDecision: ApiApproval } = await import('@/types/api');
-      const { ApprovalDecision: CoreApproval } = await import('@/lib/server/core-types');
+      const { ApprovalDecision: CoreApproval } = await import('@/types/core');
+      const { ApprovalDecision: ServerApproval } = await import('@/lib/server/core-types');
 
       // Values should be identical
-      expect(ApiApproval.ALLOW_ONCE).toBe(CoreApproval.ALLOW_ONCE);
-      expect(ApiApproval.ALLOW_SESSION).toBe(CoreApproval.ALLOW_SESSION);
-      expect(ApiApproval.DENY).toBe(CoreApproval.DENY);
+      expect(CoreApproval.ALLOW_ONCE).toBe(ServerApproval.ALLOW_ONCE);
+      expect(CoreApproval.ALLOW_SESSION).toBe(ServerApproval.ALLOW_SESSION);
+      expect(CoreApproval.DENY).toBe(ServerApproval.DENY);
     });
   });
 
@@ -158,7 +158,7 @@ describe('Type Integrity - Current State', () => {
         () => import('@/types/api'),
         () => import('@/lib/server/core-types'),
         () => import('@/lib/server/lace-imports'),
-        () => import('@/lib/core'),
+        () => import('@/types/core'),
         () => import('@/lib/validation/schemas'),
         () => import('@/lib/validation/thread-id-validation'),
         () => import('@/types/events-constants'),

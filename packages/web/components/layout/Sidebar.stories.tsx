@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Timeline, RecentFile } from '@/types/design-system';
-import type { ProjectInfo as Project, Task } from '@/lib/core';
+import type { ProjectInfo as Project, Task } from '@/types/core';
 import { asThreadId, asNewAgentSpec } from '@/lib/server/core-types';
 
 const meta: Meta<typeof Sidebar> = {

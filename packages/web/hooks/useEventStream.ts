@@ -9,7 +9,7 @@ import type {
   StreamEventCategory,
 } from '@/types/stream-events';
 import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
-import type { Task } from '@/lib/core';
+import type { Task } from '@/types/core';
 import {
   parseSessionEvent,
   StreamEventTimestampSchema,

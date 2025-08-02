@@ -2,7 +2,10 @@
 // ABOUTME: Real-time updates using unified event stream
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
+import type { PendingApproval } from '@/types/api';
+import type { ToolApprovalRequestData } from '@/types/web-events';
+import type { ThreadId } from '@/types/core';
 import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
 
 interface UseSessionEventsReturn {

@@ -8,8 +8,8 @@ import {
   getAllEventTypes,
   isPersistedEvent,
   type SessionEvent,
-} from './events';
-import { asThreadId } from '@/lib/core';
+} from './web-sse';
+import { asThreadId } from '@/types/core';
 
 describe('Event Types', () => {
   it('should export core EVENT_TYPES', () => {
@@ -39,7 +39,7 @@ describe('Event Types', () => {
     const event: SessionEvent = {
       type: 'USER_MESSAGE',
       threadId: asThreadId('lace_20250731_test123'),
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       data: { content: 'Hello' },
     };
 
