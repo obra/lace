@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId, ApprovalDecision } from '@/lib/server/lace-imports';
+import { asThreadId, ApprovalDecision } from '@/types/core';
 import { ThreadIdSchema, ToolCallIdSchema } from '@/lib/validation/schemas';
 
 // Validation schemas

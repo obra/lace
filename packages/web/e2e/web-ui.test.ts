@@ -19,8 +19,9 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId, Project } from '@/lib/server/lace-imports';
-import type { ApiSession as SessionType } from '@/types/api';
+import { asThreadId } from '@/types/core';
+import { Project } from '@/lib/server/lace-imports';
+import type { SessionInfo as SessionType } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Web UI E2E Tests', () => {

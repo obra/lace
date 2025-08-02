@@ -3,7 +3,7 @@
 
 import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall, ToolResult } from '@/types/core';
-import { asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
 import { EventStreamManager } from '@/lib/event-stream-manager';

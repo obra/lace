@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
 import { ThreadIdSchema } from '@/lib/validation/schemas';
 
 // Validation schema
@@ -20,39 +20,42 @@ export async function GET(
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(await params);
     if (!paramsResult.success) {
-      return NextResponse.json({ 
-        error: 'Invalid parameters',
-        details: paramsResult.error.format()
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'Invalid parameters',
+          details: paramsResult.error.format(),
+        },
+        { status: 400 }
+      );
     }
-    
+
     const { threadId } = paramsResult.data;
-    
+
     // Get session first, then agent (following existing pattern)
     const sessionService = getSessionService();
-    
+
     // Determine session ID (parent thread for agents, or self for sessions)
     const sessionIdStr: string = threadId.includes('.')
       ? (threadId.split('.')[0] ?? threadId)
       : threadId;
-    
+
     const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
-    
+
     const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
     }
-    
+
     // Use Agent interface to get pending approvals
     const rawPendingApprovals = agent.getPendingApprovals();
-    
+
     // Reconstruct ToolApprovalRequestData for each pending approval
     const pendingApprovals = rawPendingApprovals.map((approval) => {
       const toolCall = approval.toolCall as { name: string; arguments: unknown };
-      
+
       // Try to get tool from executor to determine metadata (may not be available in all contexts)
       let tool;
       try {
@@ -61,9 +64,9 @@ export async function GET(
         // Tool not available, use defaults
         tool = null;
       }
-      
+
       const isReadOnly = tool?.annotations?.readOnlyHint ?? false;
-      
+
       // Determine risk level based on tool annotations
       let riskLevel: 'safe' | 'moderate' | 'destructive' = 'moderate';
       if (tool?.annotations?.readOnlyHint) {
@@ -71,7 +74,7 @@ export async function GET(
       } else if (tool?.annotations?.destructiveHint) {
         riskLevel = 'destructive';
       }
-      
+
       const requestData = {
         requestId: approval.toolCallId,
         toolName: toolCall.name,
@@ -81,7 +84,7 @@ export async function GET(
         toolAnnotations: tool?.annotations,
         riskLevel,
       };
-      
+
       return {
         toolCallId: approval.toolCallId,
         toolCall: approval.toolCall,
@@ -89,7 +92,7 @@ export async function GET(
         requestData,
       };
     });
-    
+
     return NextResponse.json({ pendingApprovals });
   } catch (_error) {
     return NextResponse.json({ error: 'Failed to get pending approvals' }, { status: 500 });

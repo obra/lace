@@ -36,3 +36,6 @@ export {
   createNewAgentSpec,
   EVENT_TYPES,
 } from '~/threads/types';
+
+// Re-export thread event types
+export type { ThreadEventType } from '~/threads/types';

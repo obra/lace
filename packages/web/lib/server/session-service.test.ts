@@ -3,7 +3,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { asThreadId, Agent, Session } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
+import { Agent, Session } from '@/lib/server/lace-imports';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { TestProvider } from '~/test-utils/test-provider';
 

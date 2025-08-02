@@ -8,7 +8,7 @@ import type { AgentInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ToolCallEventData } from '@/types/web-events';
 import type { ThreadId } from '@/types/core';
-import type { ToolResult } from '@/lib/server/lace-imports';
+import type { ToolResult } from '@/types/core';
 import type { TimelineEntry } from '@/types/design-system';
 
 export interface ConversionContext {
