@@ -39,6 +39,7 @@ import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
+import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 export const LaceApp = memo(function LaceApp() {
@@ -78,14 +79,16 @@ export const LaceApp = memo(function LaceApp() {
   const [loading, setLoading] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
 
-  // Use session events hook for event management
+  // Use session events hook for event management (without event stream)
   const {
     filteredEvents: events,
     pendingApprovals,
     loadingHistory,
-    connected,
     clearApprovalRequest,
-  } = useSessionEvents(selectedSession, selectedAgent);
+    addSessionEvent,
+    handleApprovalRequest,
+    handleApprovalResponse,
+  } = useSessionEvents(selectedSession, selectedAgent, false); // Connection state will be passed to component that needs it
 
   // Use session API hook for all API calls
   const { sendMessage: sendMessageAPI, loading: sendingMessage } = useSessionAPI();
@@ -95,6 +98,36 @@ export const LaceApp = memo(function LaceApp() {
     selectedProject || '',
     selectedSession || ''
   );
+
+  // Single unified event stream connection with all event handlers
+  const { connection } = useEventStream({
+    projectId: selectedProject || undefined,
+    sessionId: selectedSession || undefined,
+    threadIds: selectedAgent ? [selectedAgent] : undefined,
+    onConnect: () => {
+      // Event stream connected - no logging needed for production
+    },
+    onError: (error) => {
+      console.error('[LACE_APP] Event stream error:', error);
+    },
+    // Session event handlers - wire to useSessionEvents
+    onUserMessage: addSessionEvent,
+    onAgentMessage: addSessionEvent,
+    onAgentToken: addSessionEvent,
+    onToolCall: addSessionEvent,
+    onToolResult: addSessionEvent,
+    onSystemMessage: addSessionEvent,
+    // Approval handlers
+    onApprovalRequest: handleApprovalRequest,
+    onApprovalResponse: handleApprovalResponse,
+    // Task event handlers - wire to useTaskManager
+    onTaskCreated: taskManager.handleTaskCreated,
+    onTaskUpdated: taskManager.handleTaskUpdated, 
+    onTaskDeleted: taskManager.handleTaskDeleted,
+    onTaskNoteAdded: taskManager.handleTaskNoteAdded,
+  });
+  
+  const connected = connection.connected;
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
