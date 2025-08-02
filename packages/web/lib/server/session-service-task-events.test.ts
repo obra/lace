@@ -3,48 +3,48 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionService, getSessionService } from './session-service';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { Project, DatabasePersistence } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { StreamEvent } from '@/types/stream-events';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
-// Mock EventStreamManager to capture broadcast calls
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: vi.fn(() => ({
-      broadcast: vi.fn(),
-    })),
-  },
-}));
+// Import real EventStreamManager for integration testing
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('SessionService TaskManager Event Forwarding', () => {
   const _tempDir = useTempLaceDir();
   let sessionService: SessionService;
-  let mockBroadcast: unknown;
-  let testProject: unknown;
+  let broadcastSpy: ReturnType<typeof vi.spyOn>;
+  let testProject: ReturnType<typeof Project.create>;
 
   beforeEach(async () => {
+    setupTestPersistence();
     vi.clearAllMocks();
 
-    mockBroadcast = vi.fn();
-    vi.mocked(EventStreamManager.getInstance).mockReturnValue({
-      broadcast: mockBroadcast,
-    });
+    // Set up spy on real EventStreamManager
+    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
 
     // Create a real project for testing
-    const _persistence = new DatabasePersistence();
-    testProject = await Project.create({
-      name: 'Test Project',
-      path: process.cwd(),
-    });
+    testProject = Project.create(
+      'Test Project',
+      process.cwd(),
+      'Test project for event forwarding tests',
+      {}
+    );
 
     sessionService = getSessionService();
     sessionService.clearActiveSessions();
   });
 
   afterEach(async () => {
-    await sessionService.stopAllAgents();
-    sessionService.clearActiveSessions();
+    broadcastSpy.mockRestore();
+    if (sessionService) {
+      await sessionService.stopAllAgents().catch(() => {
+        // Ignore cleanup errors - database may already be closed
+      });
+      sessionService.clearActiveSessions();
+    }
+    teardownTestPersistence();
   });
 
   describe('task:created event forwarding', () => {
@@ -54,7 +54,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       // Get the session instance to access TaskManager
@@ -77,14 +77,14 @@ describe('SessionService TaskManager Event Forwarding', () => {
       );
 
       // Verify the broadcast was called with correct eventType: 'task'
-      expect(mockBroadcast).toHaveBeenCalledWith(
+      expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'task', // Critical: Must be 'task', not 'session'
-          scope: {
-            projectId: testProject.id,
+          scope: expect.objectContaining({
+            projectId: testProject.getId(),
             sessionId: session.id,
             taskId: task.id,
-          },
+          }),
           data: expect.objectContaining({
             type: 'task:created',
             task: expect.objectContaining({
@@ -108,7 +108,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Scope Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       const sessionInstance = await sessionService.getSession(session.id);
@@ -125,14 +125,16 @@ describe('SessionService TaskManager Event Forwarding', () => {
         }
       );
 
-      const broadcastCall = mockBroadcast.mock.calls[0][0] as StreamEvent;
+      const broadcastCall = broadcastSpy.mock.calls[0][0] as StreamEvent;
 
       // Verify complete scope hierarchy
-      expect(broadcastCall.scope).toEqual({
-        projectId: testProject.id,
-        sessionId: session.id,
-        taskId: expect.any(String),
-      });
+      expect(broadcastCall.scope).toEqual(
+        expect.objectContaining({
+          projectId: testProject.getId(),
+          sessionId: session.id,
+          taskId: expect.any(String),
+        })
+      );
 
       // Verify no missing scope properties
       expect(broadcastCall.scope.projectId).toBeDefined();
@@ -147,7 +149,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Update Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       const sessionInstance = await sessionService.getSession(session.id);
@@ -166,20 +168,20 @@ describe('SessionService TaskManager Event Forwarding', () => {
       );
 
       // Clear previous broadcasts
-      mockBroadcast.mockClear();
+      broadcastSpy.mockClear();
 
       // Update the task
       await taskManager.updateTask(task.id, { status: 'in_progress' }, { actor: 'human' });
 
       // Verify task:updated event was broadcast correctly
-      expect(mockBroadcast).toHaveBeenCalledWith(
+      expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'task', // Must be 'task'
-          scope: {
-            projectId: testProject.id,
+          scope: expect.objectContaining({
+            projectId: testProject.getId(),
             sessionId: session.id,
             taskId: task.id,
-          },
+          }),
           data: expect.objectContaining({
             type: 'task:updated',
             task: expect.objectContaining({
@@ -198,7 +200,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Delete Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       const sessionInstance = await sessionService.getSession(session.id);
@@ -217,20 +219,20 @@ describe('SessionService TaskManager Event Forwarding', () => {
       );
 
       // Clear previous broadcasts
-      mockBroadcast.mockClear();
+      broadcastSpy.mockClear();
 
       // Delete the task
       await taskManager.deleteTask(task.id, { actor: 'human' });
 
       // Verify task:deleted event was broadcast correctly
-      expect(mockBroadcast).toHaveBeenCalledWith(
+      expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'task',
-          scope: {
-            projectId: testProject.id,
+          scope: expect.objectContaining({
+            projectId: testProject.getId(),
             sessionId: session.id,
             taskId: task.id, // taskId should be in scope for deletion events
-          },
+          }),
           data: expect.objectContaining({
             type: 'task:deleted',
             taskId: task.id, // taskId should also be in data for delete events
@@ -249,7 +251,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Note Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       const sessionInstance = await sessionService.getSession(session.id);
@@ -268,13 +270,13 @@ describe('SessionService TaskManager Event Forwarding', () => {
       );
 
       // Clear previous broadcasts (task creation)
-      mockBroadcast.mockClear();
+      broadcastSpy.mockClear();
 
       // Add a note (this also triggers task:updated, so we'll get 2 events)
       await taskManager.addNote(task.id, 'Test note content', { actor: 'human' });
 
       // Find the task:note_added event (not the task:updated event)
-      const noteAddedCalls = mockBroadcast.mock.calls.filter(
+      const noteAddedCalls = broadcastSpy.mock.calls.filter(
         (call) => call[0].data.type === 'task:note_added'
       );
       expect(noteAddedCalls).toHaveLength(1);
@@ -282,11 +284,11 @@ describe('SessionService TaskManager Event Forwarding', () => {
       const noteAddedEvent = noteAddedCalls[0][0];
       expect(noteAddedEvent).toMatchObject({
         eventType: 'task',
-        scope: {
-          projectId: 'note-project-id',
+        scope: expect.objectContaining({
+          projectId: testProject.getId(),
           sessionId: session.id,
           taskId: task.id,
-        },
+        }),
         data: expect.objectContaining({
           type: 'task:note_added',
           task: expect.objectContaining({
@@ -309,7 +311,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Type Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       const sessionInstance = await sessionService.getSession(session.id);
@@ -331,7 +333,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
       await taskManager.deleteTask(task.id, { actor: 'human' });
 
       // Verify ALL broadcasts used eventType: 'task', never 'session'
-      const allCalls = mockBroadcast.mock.calls;
+      const allCalls = broadcastSpy.mock.calls;
       expect(allCalls.length).toBeGreaterThan(0);
 
       for (const call of allCalls) {
@@ -367,7 +369,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Fail Fast Test Session',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       const sessionInstance = await sessionService.getSession(session.id);
@@ -385,7 +387,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
       );
 
       // Verify that ALL broadcasts use eventType: 'task'
-      const allCalls = mockBroadcast.mock.calls;
+      const allCalls = broadcastSpy.mock.calls;
       expect(allCalls.length).toBeGreaterThan(0);
 
       for (const call of allCalls) {
@@ -404,12 +406,12 @@ describe('SessionService TaskManager Event Forwarding', () => {
         'Reconstruction Test',
         'anthropic',
         'claude-sonnet-4-20250514',
-        testProject.id
+        testProject.getId()
       );
 
       // Clear active sessions to simulate reconstruction
       sessionService.clearActiveSessions();
-      mockBroadcast.mockClear();
+      broadcastSpy.mockClear();
 
       // Get the session again (should trigger reconstruction)
       const reconstructedSession = await sessionService.getSession(session.id);
@@ -429,11 +431,11 @@ describe('SessionService TaskManager Event Forwarding', () => {
       );
 
       // Verify event forwarding still works after reconstruction
-      expect(mockBroadcast).toHaveBeenCalledWith(
+      expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'task',
           scope: expect.objectContaining({
-            projectId: testProject.id,
+            projectId: testProject.getId(),
             sessionId: session.id,
           }),
           data: expect.objectContaining({

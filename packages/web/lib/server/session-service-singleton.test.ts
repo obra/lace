@@ -14,17 +14,6 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
-// Mock EventStreamManager
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-      addConnection: vi.fn(),
-      removeConnection: vi.fn(),
-    }),
-  },
-}));
-
 // Mock approval manager
 vi.mock('@/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
