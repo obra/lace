@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { StreamEvent, StreamSubscription, StreamConnection } from '@/types/stream-events';
-import type { SessionEvent, ThreadId, ToolApprovalRequestData } from '@/types/api';
+import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import type { Task } from '@/lib/core';
 import {
   parseSessionEvent,
@@ -20,17 +20,6 @@ export interface TaskEvent {
     isHuman?: boolean;
   };
   timestamp: string;
-}
-
-// Approval event types
-interface PendingApproval {
-  toolCallId: string;
-  toolCall: {
-    name: string;
-    arguments: unknown;
-  };
-  requestedAt: Date;
-  requestData: ToolApprovalRequestData;
 }
 
 // Project event types
@@ -340,7 +329,7 @@ export function useEventStream({
   const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
     try {
       if (isSessionEvent(streamEvent)) {
-        // Parse and validate SessionEvent with proper date hydration
+        // Parse and validate SessionEvent
         const sessionEvent = parseSessionEvent(streamEvent.data);
         const streamTimestamp = StreamEventTimestampSchema.parse(streamEvent.timestamp);
 
@@ -355,7 +344,7 @@ export function useEventStream({
               name: approvalData.toolName,
               arguments: approvalData.input,
             },
-            requestedAt: streamTimestamp,
+            requestedAt: streamTimestamp, // Now a string
             requestData: approvalData,
           };
           callbackRefs.current.onApprovalRequest?.(pendingApproval);
