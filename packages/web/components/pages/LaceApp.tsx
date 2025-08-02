@@ -20,11 +20,8 @@ import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type {
-  ApiSession,
-  ApiAgent,
   SessionsResponse,
   SessionResponse,
-  ApiProject,
   ProviderInfo,
   ProvidersResponse,
   CreateAgentRequest,
@@ -32,7 +29,8 @@ import type {
   MessageResponse,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import type { ThreadId, Task } from '@/types/core';
+import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
+import { parse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ToolApprovalRequestData } from '@/types/web-events';
@@ -71,12 +69,12 @@ export const LaceApp = memo(function LaceApp() {
   
 
   // Business Logic State (from current app/page.tsx)
-  const [projects, setProjects] = useState<ApiProject[]>([]);
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  const [sessions, setSessions] = useState<ApiSession[]>([]);
-  const [selectedSessionDetails, setSelectedSessionDetails] = useState<ApiSession | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionInfo | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -142,15 +140,15 @@ export const LaceApp = memo(function LaceApp() {
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   // Project loading function
-  const loadProjects = useCallback(async (): Promise<ApiProject[]> => {
+  const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
-      const data: unknown = await res.json();
+      const data: unknown = parse(await res.text());
       
       // Type guard for API response
       if (typeof data === 'object' && data !== null && 'projects' in data) {
-        const projectsData = data as { projects: ApiProject[] };
+        const projectsData = data as { projects: ProjectInfo[] };
         setProjects(projectsData.projects);
         setLoadingProjects(false);
         return projectsData.projects;
@@ -167,7 +165,7 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProviders(true);
     try {
       const res = await fetch('/api/providers');
-      const data: unknown = await res.json();
+      const data: unknown = parse(await res.text());
       
       if (isApiError(data)) {
         console.error('Failed to load providers:', data.error);
@@ -190,7 +188,7 @@ export const LaceApp = memo(function LaceApp() {
 
     try {
       const res = await fetch(`/api/projects/${selectedProject}/sessions`);
-      const data: unknown = await res.json();
+      const data: unknown = parse(await res.text());
 
       if (isApiError(data)) {
         console.error('Failed to load sessions:', data.error);
@@ -222,7 +220,7 @@ export const LaceApp = memo(function LaceApp() {
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}`);
-      const data: unknown = await res.json();
+      const data: unknown = parse(await res.text());
 
       if (isApiError(data)) {
         console.error('Failed to load session details:', data.error);

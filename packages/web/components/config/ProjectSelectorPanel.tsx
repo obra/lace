@@ -7,6 +7,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
 import type { ProjectInfo, ProviderInfo } from '@/types/api';
+import { parse } from '@/lib/serialization';
 
 interface ProjectSelectorPanelProps {
   projects: ProjectInfo[];
@@ -244,7 +245,7 @@ export function ProjectSelectorPanel({
         
         handleCancelEdit();
       } else {
-        const errorData = await res.json() as { error: string };
+        const errorData = parse(await res.text()) as { error: string };
         console.error('Failed to update project:', errorData.error);
       }
     } catch (error) {
@@ -306,7 +307,7 @@ export function ProjectSelectorPanel({
       const res = await fetch(`/api/projects/${projectId}/configuration`);
       
       if (res.ok) {
-        const data = await res.json() as { configuration: ProjectConfiguration };
+        const data = parse(await res.text()) as { configuration: ProjectConfiguration };
         setEditConfig(data.configuration);
       } else {
         console.error('Failed to load project configuration');
@@ -339,12 +340,12 @@ export function ProjectSelectorPanel({
       });
 
       if (!projectRes.ok) {
-        const errorData = await projectRes.json() as { error: string };
+        const errorData = parse(await projectRes.text()) as { error: string };
         console.error('Failed to create project:', errorData.error);
         return;
       }
 
-      const projectData = await projectRes.json() as { project: ProjectInfo };
+      const projectData = parse(await projectRes.text()) as { project: ProjectInfo };
       const projectId = projectData.project.id;
 
       // Call the callback to refresh projects list if available
@@ -357,7 +358,7 @@ export function ProjectSelectorPanel({
         // Step 2: Get sessions (project creation should have created a default session)
         const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
         if (sessionsRes.ok) {
-          const sessionsData = await sessionsRes.json() as { sessions: Array<{ id: string }> };
+          const sessionsData = parse(await sessionsRes.text()) as { sessions: Array<{ id: string }> };
           const sessionId = sessionsData.sessions[0]?.id;
 
           if (sessionId) {

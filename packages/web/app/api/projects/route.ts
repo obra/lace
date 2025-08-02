@@ -1,8 +1,9 @@
 // ABOUTME: REST API endpoints for project management - GET all projects, POST new project
 // ABOUTME: Uses Project class for business logic and validation with proper error handling
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 const CreateProjectSchema = z.object({
@@ -16,9 +17,9 @@ export async function GET() {
   try {
     const projects = Project.getAll();
 
-    return NextResponse.json({ projects });
+    return createSuperjsonResponse({ projects });
   } catch (error) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to fetch projects' },
       { status: 500 }
     );
@@ -39,16 +40,16 @@ export async function POST(request: NextRequest) {
 
     const projectInfo = project.getInfo();
 
-    return NextResponse.json({ project: projectInfo }, { status: 201 });
+    return createSuperjsonResponse({ project: projectInfo }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to create project' },
       { status: 500 }
     );
