@@ -19,7 +19,7 @@ import { asThreadId } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { StreamEvent } from '@/types/stream-events';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 
 // Mock provider that responds with task_add tool calls ONLY ONCE per conversation
 class TaskCreatingMockProvider extends BaseMockProvider {

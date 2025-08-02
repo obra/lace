@@ -2,7 +2,8 @@
 // ABOUTME: Transforms string timestamps to Date objects during JSON parsing
 
 import { z } from 'zod';
-import type { ThreadId, SessionEvent } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ThreadId } from '@/types/core';
 import type { ToolResult } from '@/types/core';
 
 // ThreadId schema (assumes string validation exists elsewhere)

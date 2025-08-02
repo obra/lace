@@ -4,7 +4,8 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { logger } from '~/utils/logger';
-import type { Task, SerializedTask } from '@/types/web';
+import type { Task } from '@/types/core';
+import type { SerializedTask } from '@/types/web';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');

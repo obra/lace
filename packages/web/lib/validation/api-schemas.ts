@@ -2,7 +2,7 @@
 // ABOUTME: Handles Date to string conversion for JSON serialization
 
 import { z } from 'zod';
-import type { SessionInfo, ProjectInfo } from '@/types/core';
+import type { SessionInfo, ProjectInfo, ThreadId } from '@/types/core';
 import type { ApiSession, ApiProject } from '@/types/api';
 
 // Transform Date to ISO string for API responses
@@ -10,18 +10,18 @@ const dateToString = z.date().transform((date) => date.toISOString());
 
 // Schema to transform core SessionInfo to API Session type
 export const sessionTransformSchema = z.object({
-  id: z.string(),
+  id: z.custom<ThreadId>().transform((id) => id as string),
   name: z.string(),
   createdAt: dateToString,
   // Skip provider and model at session level - they're on the agents
   agents: z
     .array(
       z.object({
-        threadId: z.string(),
+        threadId: z.custom<ThreadId>().transform((id) => id as string),
         name: z.string(),
         provider: z.string(),
         model: z.string(),
-        status: z.string(),
+        status: z.custom<AgentState>(),
       })
     )
     .transform((agents) =>
@@ -30,7 +30,7 @@ export const sessionTransformSchema = z.object({
         createdAt: new Date().toISOString(), // Agent createdAt not in core type
       }))
     ),
-}) as z.ZodType<Omit<ApiSession, 'agentCount'>, z.ZodTypeDef, SessionInfo>;
+});
 
 // Schema to transform core ProjectInfo to API ProjectInfo type
 export const projectTransformSchema = z.object({
@@ -41,7 +41,7 @@ export const projectTransformSchema = z.object({
   isArchived: z.boolean(),
   createdAt: z.union([dateToString, z.string()]),
   lastUsedAt: z.union([dateToString, z.string()]),
-}) as z.ZodType<Omit<ApiProject, 'sessionCount'>, z.ZodTypeDef, ProjectInfo>;
+});
 
 // Helper functions to transform and validate
 export function transformSessionInfo(sessionInfo: SessionInfo): ApiSession {

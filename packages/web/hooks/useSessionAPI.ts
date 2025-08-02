@@ -7,13 +7,13 @@ import {
   ApiAgent,
   CreateSessionRequest,
   CreateAgentRequest,
-  ThreadId,
   SessionResponse,
   SessionsResponse,
   AgentResponse,
   isApiError,
   isApiSuccess,
 } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 
 interface APIState {
   loading: boolean;

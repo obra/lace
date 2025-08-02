@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, ApiErrorResponse } from '@/types/api';
+import { ApiErrorResponse } from '@/types/api';
+import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { z } from 'zod';
 

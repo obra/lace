@@ -28,7 +28,8 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { ApiSession as SessionType, ThreadId } from '@/types/api';
+import type { ApiSession as SessionType } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/lib/server/core-types';
 
 describe('API Endpoints E2E Tests', () => {

@@ -23,7 +23,8 @@ vi.mock('@/lib/server/approval-manager', () => ({
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { ThreadId, ApiAgent } from '@/types/api';
+import type { ApiAgent } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 
 // Response types
 interface AgentResponse {

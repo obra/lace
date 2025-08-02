@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 
 // ✅ ESSENTIAL MOCK - Mock fetch to avoid network calls in tests
 // Tests focus on hook state management behavior, not API implementation

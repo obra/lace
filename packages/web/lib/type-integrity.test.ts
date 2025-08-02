@@ -6,13 +6,14 @@ import { describe, it, expect } from 'vitest';
 // Test that all key types can be imported from current paths
 describe('Type Integrity - Current State', () => {
   describe('ThreadId imports', () => {
-    it('should import ThreadId from @/types/api', async () => {
-      const apiTypes = await import('@/types/api');
-      expect(apiTypes.ThreadId).toBeUndefined(); // ThreadId is a type, not a value
+    it('should import ThreadId from @/types/core', async () => {
+      const coreTypes = await import('@/types/core');
+      expect(coreTypes.ThreadId).toBeUndefined(); // ThreadId is a type, not a value
 
       // But we can test that the type exists by using it
       const testId = 'lace_20250731_abc123';
-      const threadIdTyped: typeof apiTypes.ThreadId = testId as unknown as typeof apiTypes.ThreadId;
+      const threadIdTyped: typeof coreTypes.ThreadId =
+        testId as unknown as typeof coreTypes.ThreadId;
       expect(threadIdTyped).toBe(testId);
     });
 

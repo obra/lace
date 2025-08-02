@@ -2,7 +2,8 @@
 // ABOUTME: Comprehensive TDD tests for timeline converter functionality
 
 import { describe, test, expect } from 'vitest';
-import type { SessionEvent, ApiAgent } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ApiAgent } from '@/types/api';
 import type { TimelineEntry } from '@/types/design-system';
 import { asThreadId } from '@/lib/server/core-types';
 import { convertSessionEventsToTimeline, type ConversionContext } from '@/lib/timeline-converter';

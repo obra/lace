@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import {
-  ProjectInfo,
+  ApiProject,
   CreateProjectRequest,
   UpdateProjectRequest,
   ProjectsResponse,
@@ -32,7 +32,7 @@ export function useProjectAPI() {
     setState((prev) => ({ ...prev, error }));
   };
 
-  const listProjects = useCallback(async (): Promise<ProjectInfo[]> => {
+  const listProjects = useCallback(async (): Promise<ApiProject[]> => {
     setLoading(true);
     setError(null);
 
@@ -49,7 +49,7 @@ export function useProjectAPI() {
 
       const data: unknown = await response.json();
       if (isApiSuccess<ProjectsResponse>(data) && 'projects' in data) {
-        return data['projects'] as ProjectInfo[];
+        return data['projects'] as ApiProject[];
       }
       throw new Error('Invalid response format');
     } catch (error) {
@@ -60,7 +60,7 @@ export function useProjectAPI() {
     }
   }, []);
 
-  const getProject = useCallback(async (projectId: string): Promise<ProjectInfo | null> => {
+  const getProject = useCallback(async (projectId: string): Promise<ApiProject | null> => {
     setLoading(true);
     setError(null);
 
@@ -77,7 +77,7 @@ export function useProjectAPI() {
 
       const data: unknown = await response.json();
       if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
-        return data['project'] as ProjectInfo;
+        return data['project'] as ApiProject;
       }
       throw new Error('Invalid response format');
     } catch (error) {
@@ -89,7 +89,7 @@ export function useProjectAPI() {
   }, []);
 
   const createProject = useCallback(
-    async (request: CreateProjectRequest): Promise<ProjectInfo | null> => {
+    async (request: CreateProjectRequest): Promise<ApiProject | null> => {
       setLoading(true);
       setError(null);
 
@@ -110,7 +110,7 @@ export function useProjectAPI() {
 
         const data: unknown = await response.json();
         if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
-          return data['project'] as ProjectInfo;
+          return data['project'] as ApiProject;
         }
         throw new Error('Invalid response format');
       } catch (error) {
@@ -124,7 +124,7 @@ export function useProjectAPI() {
   );
 
   const updateProject = useCallback(
-    async (projectId: string, request: UpdateProjectRequest): Promise<ProjectInfo | null> => {
+    async (projectId: string, request: UpdateProjectRequest): Promise<ApiProject | null> => {
       setLoading(true);
       setError(null);
 
@@ -145,7 +145,7 @@ export function useProjectAPI() {
 
         const data: unknown = await response.json();
         if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
-          return data['project'] as ProjectInfo;
+          return data['project'] as ApiProject;
         }
         throw new Error('Invalid response format');
       } catch (error) {

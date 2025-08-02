@@ -8,7 +8,10 @@ import type {
   StreamConnection,
   StreamEventCategory,
 } from '@/types/stream-events';
-import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ThreadId } from '@/types/core';
+import type { ToolApprovalRequestData } from '@/types/web-events';
+import type { PendingApproval } from '@/types/api';
 import type { Task } from '@/types/core';
 import {
   parseSessionEvent,

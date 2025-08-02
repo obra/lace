@@ -21,9 +21,6 @@ import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type {
   ApiSession,
-  ThreadId,
-  SessionEvent,
-  ToolApprovalRequestData,
   ApiAgent,
   SessionsResponse,
   SessionResponse,
@@ -31,9 +28,14 @@ import type {
   ProviderInfo,
   ProvidersResponse,
   CreateAgentRequest,
-  Task,
+  MessageRequest,
+  MessageResponse,
 } from '@/types/api';
-import { isApiError, ApprovalDecision } from '@/types/api';
+import { isApiError } from '@/types/api';
+import type { ThreadId, Task } from '@/types/core';
+import { ApprovalDecision } from '@/types/core';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ToolApprovalRequestData } from '@/types/web-events';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';

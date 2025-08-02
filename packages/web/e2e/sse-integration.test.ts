@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { SessionEvent } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
 import type { StreamEvent } from '@/types/stream-events';
 import { asThreadId } from '@/lib/server/core-types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';

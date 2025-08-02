@@ -8,7 +8,8 @@ import { faFolder, faComments, faRobot, faCog, faTasks } from '@/lib/fontawesome
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { ApiSession, ThreadId, ApiProject } from '@/types/api';
+import type { ApiSession, ApiProject } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 
 interface LaceAppMobileSidebarProps {

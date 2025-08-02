@@ -19,7 +19,7 @@ import type { ToolApprovalRequestData } from './web-events';
 // Prefixed with 'Api' to distinguish from core types
 
 export interface ApiSession {
-  id: ThreadId; // sessionId (parent threadId)
+  id: string; // JSON-serialized ThreadId
   name: string;
   createdAt: string; // ISO string from Date serialization
   agentCount?: number; // Count of agents for list view
@@ -27,7 +27,7 @@ export interface ApiSession {
 }
 
 export interface ApiAgent {
-  threadId: ThreadId; // Full thread ID like sessionId.1
+  threadId: string; // JSON-serialized ThreadId
   name: string;
   provider: string;
   model: string;

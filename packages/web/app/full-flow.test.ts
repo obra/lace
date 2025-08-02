@@ -13,7 +13,8 @@ import { POST as createProjectSession } from '@/app/api/projects/[projectId]/ses
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/events/stream/route';
-import type { ThreadId, ApiSession } from '@/types/api';
+import type { ApiSession } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
