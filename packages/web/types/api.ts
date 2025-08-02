@@ -59,7 +59,7 @@ export interface AgentMessageEventData {
 export interface ToolCallEventData {
   id: string;
   name: string;
-  arguments: unknown;
+  arguments?: unknown;
 }
 
 export interface ToolAggregatedEventData {
@@ -174,7 +174,7 @@ export type SessionEvent =
 export interface ToolApprovalRequestData {
   requestId: string;
   toolName: string;
-  input: unknown; // Matches backend - not just Record<string, unknown>
+  input?: unknown; // Matches backend - not just Record<string, unknown>
   isReadOnly: boolean;
   // Additional metadata for UI
   toolDescription?: string;

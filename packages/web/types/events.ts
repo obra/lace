@@ -33,7 +33,7 @@ export interface AgentMessageEventData {
 export interface ToolCallEventData {
   id: string;
   name: string;
-  arguments: unknown;
+  arguments?: unknown;
 }
 
 export interface ToolAggregatedEventData {
