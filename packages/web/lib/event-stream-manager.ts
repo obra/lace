@@ -6,6 +6,8 @@ import type { Task, TaskContext, ThreadId } from '@/lib/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 
+// No conversion needed - JSON.stringify happens at the network boundary
+
 // TaskManager event interfaces
 interface TaskCreatedEvent {
   type: 'task:created';
@@ -38,11 +40,14 @@ interface TaskNoteAddedEvent {
 
 interface AgentSpawnedEvent {
   type: 'agent:spawned';
-  taskId: string;
+  taskId?: string;
   agentThreadId: ThreadId;
   provider: string;
   model: string;
-  context: TaskContext;
+  context: {
+    actor: string;
+    isHuman: boolean;
+  };
   timestamp: string;
 }
 
@@ -97,7 +102,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.task.id },
-        data: { type: 'task:created', taskId: e.task.id, ...e },
+        data: { taskId: e.task.id, ...e },
       });
     });
 
@@ -106,7 +111,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.task?.id },
-        data: { type: 'task:updated', taskId: e.task?.id || '', ...e },
+        data: { taskId: e.task?.id || '', ...e },
       });
     });
 
@@ -115,7 +120,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.taskId },
-        data: { type: 'task:deleted', taskId: e.taskId, ...e },
+        data: { ...e },
       });
     });
 
@@ -124,7 +129,7 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.task?.id },
-        data: { type: 'task:note_added', taskId: e.task?.id || '', ...e },
+        data: { taskId: e.task?.id || '', ...e },
       });
     });
 
@@ -133,13 +138,13 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.taskId },
-        data: { type: 'agent:spawned', ...e },
+        data: { ...e },
       });
     });
   }
 
   // WeakSet to track registered TaskManager instances
-  private static registeredTaskManagers = new WeakSet<unknown>();
+  private static registeredTaskManagers = new WeakSet<object>();
 
   static getInstance(): EventStreamManager {
     if (!global.eventStreamManager) {
