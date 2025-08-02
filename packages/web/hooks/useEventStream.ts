@@ -554,8 +554,6 @@ export function useEventStream({
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-
-      setConnection((prev) => ({ ...prev, connected: false }));
     };
   }, [connect]);
 
