@@ -212,6 +212,7 @@ export function useEventStream({
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleStreamEventRef = useRef<(event: StreamEvent) => void>(() => {});
 
   // Store callbacks in refs to avoid recreating connect on every callback change
   const callbackRefs = useRef({
@@ -443,6 +444,11 @@ export function useEventStream({
     }
   }, []);
 
+  // Update handleStreamEvent ref when it changes
+  useEffect(() => {
+    handleStreamEventRef.current = handleStreamEvent;
+  }, [handleStreamEvent]);
+
   // Connect to stream
   const connect = useCallback(() => {
     if (eventSourceRef.current) {
@@ -480,7 +486,7 @@ export function useEventStream({
           lastEventId: streamEvent.id,
         }));
 
-        handleStreamEvent(streamEvent);
+        handleStreamEventRef.current?.(streamEvent);
       } catch (error) {
         console.error('[EVENT_STREAM] Failed to parse event:', error);
         callbackRefs.current.onError?.(error as Error);
@@ -517,7 +523,7 @@ export function useEventStream({
         return newState;
       });
     };
-  }, [subscription, buildQueryString, autoReconnect, reconnectInterval, handleStreamEvent]);
+  }, [subscription, buildQueryString, autoReconnect, reconnectInterval]);
 
   // Manual reconnect
   const reconnect = useCallback(() => {
