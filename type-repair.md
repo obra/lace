@@ -15,64 +15,48 @@ This document provides a comprehensive, phased approach to resolving the critica
 
 ---
 
-## Phase 1: Critical Safety Fixes (Week 1)
+## Phase 1: Critical Safety Fixes (Week 1) ✅ COMPLETED
 
-### 🔴 CRITICAL: Resolve EventType Name Collision
+### 🟢 COMPLETED: Resolve EventType Name Collision
 
 **Problem**: Two different `EventType` definitions cause import confusion and potential runtime errors.
 
 **Solution**: Rename conflicting types to be domain-specific.
 
-**Implementation:**
+**✅ COMPLETED Implementation:**
 
-1. **Rename Core Events EventType** → `ThreadEventType`
+1. **✅ Renamed Core Events EventType** → `ThreadEventType`
    ```typescript
-   // src/threads/types.ts (BEFORE)
-   export type EventType = (typeof EVENT_TYPES)[number];
-   
-   // src/threads/types.ts (AFTER)  
+   // src/threads/types.ts (COMPLETED)
    export type ThreadEventType = (typeof EVENT_TYPES)[number];
-   
-   // Keep legacy export for transition
-   /** @deprecated Use ThreadEventType instead */
-   export type EventType = ThreadEventType;
    ```
 
-2. **Rename Streaming EventType** → `StreamEventCategory`
+2. **✅ Renamed Streaming EventType** → `StreamEventCategory`
    ```typescript
-   // src/events/types.ts (BEFORE)
-   export type EventType = 'session' | 'task' | 'project' | 'global';
-   
-   // src/events/types.ts (AFTER)
+   // src/events/types.ts (COMPLETED)
    export type StreamEventCategory = 'session' | 'task' | 'project' | 'global';
-   
-   // Keep legacy export for transition
-   /** @deprecated Use StreamEventCategory instead */
-   export type EventType = StreamEventCategory;
    ```
 
-3. **Update Core Imports Incrementally**
-   - Update `StreamEvent` interface to use `StreamEventCategory`
-   - Update `ThreadEvent` references to use `ThreadEventType`
-   - Run tests after each file change
+3. **✅ Updated Core Imports**
+   - ✅ Updated `StreamEvent` interface to use `StreamEventCategory`
+   - ✅ Updated `ThreadEvent` references to use `ThreadEventType` 
+   - ✅ Updated all agent, persistence, and thread-manager imports
 
-4. **Update Web Package Imports**
-   - Update `/packages/web/lib/core.ts` exports
-   - Update all web package imports to use new names
-   - Test web UI functionality
+4. **✅ Updated Web Package Imports**
+   - ✅ Updated `/packages/web/lib/core.ts` exports
+   - ✅ Updated all web package imports to use new names
+   - ✅ Fixed EventSource mock in test-setup.ts
 
-**Testing Strategy:**
-```bash
-# After each change
-npm run test:unit src/threads/
-npm run test:unit src/events/  
-npm run test:unit packages/web/
-npm run build  # Ensure TypeScript compilation
-```
+**✅ Results:**
+- All tests passing (684 tests)
+- Build working for both core and web packages
+- Linting clean with no ESLint errors
+- Type safety improved - no more dangerous name collisions
+- EventSource mock properly structured as class instead of broken function mock
 
-**Rollback Plan**: If issues arise, the legacy exports allow immediate rollback.
+**✅ Commit**: `fix: resolve EventType name collision between threads and streaming`
 
-**Estimated Time**: 2-3 days
+**Actual Time**: 1 day (faster than estimated due to stepping back from hacky approaches)
 
 ---
 
