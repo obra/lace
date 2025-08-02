@@ -24,7 +24,7 @@ interface TaskUpdatedEvent {
 interface TaskDeletedEvent {
   type: 'task:deleted';
   taskId: string;
-  task: Task;
+  task?: Task;
   context: TaskContext;
   timestamp: string;
 }
@@ -45,6 +45,9 @@ interface AgentSpawnedEvent {
   context: TaskContext;
   timestamp: string;
 }
+
+// NOTE: These events come from our own TaskManager, so the types are known and safe.
+// Using explicit casting to satisfy ESLint while maintaining type safety.
 
 // Client connection with subscription filters
 interface ClientConnection {
@@ -86,80 +89,51 @@ export class EventStreamManager {
       return;
     }
 
-    console.warn('[EVENT_STREAM_MANAGER] Registering TaskManager for session:', sessionId);
     EventStreamManager.registeredTaskManagers.add(taskManager);
 
-    // Forward all TaskManager events
-    taskManager.on('task:created', (event: TaskCreatedEvent) => {
+    // Forward all TaskManager events - these are known types from our own TaskManager
+    taskManager.on('task:created', (event: unknown) => {
+      const e = event as TaskCreatedEvent;
       this.broadcast({
         eventType: 'task',
-        scope: { projectId, sessionId, taskId: event.task.id },
-        data: {
-          type: 'task:created',
-          task: event.task,
-          context: event.context,
-          timestamp: event.timestamp,
-        },
+        scope: { projectId, sessionId, taskId: e.task.id },
+        data: { type: 'task:created', ...e },
       });
     });
 
     taskManager.on('task:updated', (event: unknown) => {
-      const eventData = event as any;
+      const e = event as TaskUpdatedEvent;
       this.broadcast({
         eventType: 'task',
-        scope: { projectId, sessionId, taskId: eventData.task?.id },
-        data: {
-          type: 'task:updated',
-          task: eventData.task,
-          context: eventData.context,
-          timestamp: eventData.timestamp,
-        },
+        scope: { projectId, sessionId, taskId: e.task?.id },
+        data: { type: 'task:updated', ...e },
       });
     });
 
     taskManager.on('task:deleted', (event: unknown) => {
-      const eventData = event as any;
+      const e = event as TaskDeletedEvent;
       this.broadcast({
         eventType: 'task',
-        scope: { projectId, sessionId, taskId: eventData.taskId },
-        data: {
-          type: 'task:deleted',
-          taskId: eventData.taskId,
-          task: eventData.task,
-          context: eventData.context,
-          timestamp: eventData.timestamp,
-        },
+        scope: { projectId, sessionId, taskId: e.taskId },
+        data: { type: 'task:deleted', ...e },
       });
     });
 
     taskManager.on('task:note_added', (event: unknown) => {
-      const eventData = event as any;
+      const e = event as TaskNoteAddedEvent;
       this.broadcast({
         eventType: 'task',
-        scope: { projectId, sessionId, taskId: eventData.task?.id },
-        data: {
-          type: 'task:note_added',
-          task: eventData.task,
-          context: eventData.context,
-          timestamp: eventData.timestamp,
-        },
+        scope: { projectId, sessionId, taskId: e.task?.id },
+        data: { type: 'task:note_added', ...e },
       });
     });
 
     taskManager.on('agent:spawned', (event: unknown) => {
-      const eventData = event as any;
+      const e = event as AgentSpawnedEvent;
       this.broadcast({
         eventType: 'task',
-        scope: { projectId, sessionId, taskId: eventData.taskId },
-        data: {
-          type: 'agent:spawned',
-          taskId: eventData.taskId,
-          agentThreadId: eventData.agentThreadId,
-          provider: eventData.provider,
-          model: eventData.model,
-          context: eventData.context,
-          timestamp: eventData.timestamp,
-        },
+        scope: { projectId, sessionId, taskId: e.taskId },
+        data: { type: 'agent:spawned', ...e },
       });
     });
   }
