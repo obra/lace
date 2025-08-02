@@ -377,7 +377,7 @@ export class EventStreamManager {
     for (const [connectionId, connection] of this.connections) {
       try {
         connection.controller.enqueue(keepAliveBytes);
-      } catch (error) {
+      } catch (_error) {
         // Connection is dead
         deadConnections.push(connectionId);
       }
