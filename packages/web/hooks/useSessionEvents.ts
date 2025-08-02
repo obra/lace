@@ -2,7 +2,6 @@
 // ABOUTME: Real-time updates using unified event stream
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useEventStream } from './useEventStream';
 import type { SessionEvent, ThreadId, ToolApprovalRequestData, PendingApproval } from '@/types/api';
 import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
 
@@ -13,11 +12,16 @@ interface UseSessionEventsReturn {
   loadingHistory: boolean;
   connected: boolean;
   clearApprovalRequest: () => void;
+  // Event handlers for the parent to wire to useEventStream
+  addSessionEvent: (event: SessionEvent) => void;
+  handleApprovalRequest: (approval: PendingApproval) => void;
+  handleApprovalResponse: (toolCallId: string) => void;
 }
 
 export function useSessionEvents(
   sessionId: ThreadId | null,
-  selectedAgent: ThreadId | null
+  selectedAgent: ThreadId | null,
+  connected = false // Connection state passed from parent
 ): UseSessionEventsReturn {
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
@@ -57,27 +61,7 @@ export function useSessionEvents(
     setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
   }, []);
 
-  // Use unified event stream
-  const { connection } = useEventStream({
-    sessionId: sessionId || undefined,
-    threadIds: selectedAgent ? [selectedAgent] : undefined,
-    onConnect: () => {
-      setLoadingHistory(false);
-    },
-    onError: (error) => {
-      console.error('[SESSION_EVENTS] Stream error:', error);
-    },
-    // Session event handlers - only add non-approval events to timeline
-    onUserMessage: addSessionEvent,
-    onAgentMessage: addSessionEvent,
-    onAgentToken: addSessionEvent,
-    onToolCall: addSessionEvent,
-    onToolResult: addSessionEvent,
-    onSystemMessage: addSessionEvent,
-    // Approval handlers
-    onApprovalRequest: handleApprovalRequest,
-    onApprovalResponse: handleApprovalResponse,
-  });
+  // Connection state is now managed by parent
 
   // Load historical events when session changes
   useEffect(() => {
@@ -169,7 +153,11 @@ export function useSessionEvents(
     filteredEvents,
     pendingApprovals,
     loadingHistory,
-    connected: connection.connected,
+    connected,
     clearApprovalRequest,
+    // Export event handlers for parent to use
+    addSessionEvent,
+    handleApprovalRequest,
+    handleApprovalResponse,
   };
 }
