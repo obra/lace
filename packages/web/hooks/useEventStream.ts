@@ -213,6 +213,8 @@ export function useEventStream({
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handleStreamEventRef = useRef<(event: StreamEvent) => void>(() => {});
+  const autoReconnectRef = useRef(autoReconnect);
+  const reconnectIntervalRef = useRef(reconnectInterval);
 
   // Store callbacks in refs to avoid recreating connect on every callback change
   const callbackRefs = useRef({
@@ -276,6 +278,10 @@ export function useEventStream({
       onGlobalEvent,
       onSystemNotification,
     };
+
+    // Update reconnection settings refs
+    autoReconnectRef.current = autoReconnect;
+    reconnectIntervalRef.current = reconnectInterval;
   }, [
     onConnect,
     onDisconnect,
@@ -304,6 +310,8 @@ export function useEventStream({
     onAgentStopped,
     onGlobalEvent,
     onSystemNotification,
+    autoReconnect,
+    reconnectInterval,
   ]);
 
   // Create unified subscription for ALL event types
@@ -318,8 +326,8 @@ export function useEventStream({
     [projectId, sessionId, threadIds, includeGlobal]
   );
 
-  // Build query string from subscription
-  const buildQueryString = useCallback((sub: StreamSubscription): string => {
+  // Build query string from subscription - pure function, no need for useCallback
+  const buildQueryString = (sub: StreamSubscription): string => {
     const params = new URLSearchParams();
 
     if (sub.projects?.length) params.set('projects', sub.projects.join(','));
@@ -329,7 +337,7 @@ export function useEventStream({
     if (sub.eventTypes?.length) params.set('eventTypes', sub.eventTypes.join(','));
 
     return params.toString();
-  }, []);
+  };
 
   // Unified event handler that routes to specific callbacks
   const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
@@ -506,24 +514,30 @@ export function useEventStream({
         callbackRefs.current.onDisconnect?.();
         callbackRefs.current.onError?.(new Error('SSE connection failed'));
 
-        // Auto-reconnect logic using current state
-        if (autoReconnect && newState.reconnectAttempts < newState.maxReconnectAttempts) {
+        // Auto-reconnect logic using ref values to avoid stale closures
+        if (
+          autoReconnectRef.current &&
+          newState.reconnectAttempts < newState.maxReconnectAttempts
+        ) {
           console.log(
-            `[EVENT_STREAM] Reconnecting in ${reconnectInterval}ms (attempt ${newState.reconnectAttempts})`
+            `[EVENT_STREAM] Reconnecting in ${reconnectIntervalRef.current}ms (attempt ${newState.reconnectAttempts})`
           );
 
           reconnectTimeoutRef.current = setTimeout(
             () => {
-              connect();
+              // Use a fresh connect call to avoid stale closures
+              if (eventSourceRef.current?.readyState !== EventSource.CONNECTING) {
+                connect();
+              }
             },
-            reconnectInterval * Math.pow(2, newState.reconnectAttempts - 1)
+            reconnectIntervalRef.current * Math.pow(2, newState.reconnectAttempts - 1)
           ); // Exponential backoff
         }
 
         return newState;
       });
     };
-  }, [subscription, buildQueryString, autoReconnect, reconnectInterval]);
+  }, [subscription]);
 
   // Manual reconnect
   const reconnect = useCallback(() => {
