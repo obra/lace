@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { MobileSidebar } from './MobileSidebar';
 import { Timeline } from '@/types/design-system';
 import type { ProjectInfo as Project, Task } from '@/types/core';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 
 const meta: Meta<typeof MobileSidebar> = {
   title: 'Organisms/MobileSidebar',

@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash } from '@/lib/fontawesome';
 import type { ProjectInfo, ProviderInfo } from '@/types/api';
-import { parse } from '@/lib/serialization';
+import { parseResponse, parseTyped } from '@/lib/serialization';
 
 interface ProjectSelectorPanelProps {
   projects: ProjectInfo[];
@@ -245,7 +245,7 @@ export function ProjectSelectorPanel({
         
         handleCancelEdit();
       } else {
-        const errorData = parse(await res.text()) as { error: string };
+        const errorData = await parseResponse<any>(res) as { error: string };
         console.error('Failed to update project:', errorData.error);
       }
     } catch (error) {
@@ -307,7 +307,7 @@ export function ProjectSelectorPanel({
       const res = await fetch(`/api/projects/${projectId}/configuration`);
       
       if (res.ok) {
-        const data = parse(await res.text()) as { configuration: ProjectConfiguration };
+        const data = await parseResponse<any>(res) as { configuration: ProjectConfiguration };
         setEditConfig(data.configuration);
       } else {
         console.error('Failed to load project configuration');

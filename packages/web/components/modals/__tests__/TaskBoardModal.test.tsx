@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import type { Task } from '@/types/core';
-import { asThreadId, type ThreadId } from '@/lib/server/core-types';
+import { asThreadId, type ThreadId } from '@/types/core';
 
 const mockTask: Task = {
   id: 'test-task-1',

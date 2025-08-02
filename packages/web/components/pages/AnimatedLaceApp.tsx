@@ -15,7 +15,7 @@ import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { TimelineEntry, Timeline, RecentFile } from '@/types/design-system';
 import type { Task } from '@/types/core';
 import type { ProjectInfo as Project } from '@/types/core';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import {
   pageTransition,

@@ -51,8 +51,8 @@ describe('Type Integrity - Current State', () => {
       expect(ApprovalDecision.DENY).toBe('deny');
     });
 
-    it('should import ApprovalDecision from @/lib/server/core-types', async () => {
-      const { ApprovalDecision } = await import('@/lib/server/core-types');
+    it('should import ApprovalDecision from @/types/core', async () => {
+      const { ApprovalDecision } = await import('@/types/core');
 
       expect(ApprovalDecision.ALLOW_ONCE).toBe('allow_once');
       expect(ApprovalDecision.ALLOW_SESSION).toBe('allow_session');
@@ -76,7 +76,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should create Session types correctly', async () => {
-      const { asThreadId } = await import('@/lib/server/core-types');
+      const { asThreadId } = await import('@/types/core');
       const _apiTypes = await import('@/types/api');
 
       // Test Session creation with proper ThreadId
@@ -92,7 +92,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should create Agent types correctly', async () => {
-      const { asThreadId } = await import('@/lib/server/core-types');
+      const { asThreadId } = await import('@/types/core');
       const _apiTypes = await import('@/types/api');
 
       // Test Agent creation with proper ThreadId
@@ -113,7 +113,7 @@ describe('Type Integrity - Current State', () => {
 
   describe('Type compatibility', () => {
     it('should have compatible ThreadId types across imports', async () => {
-      const { asThreadId: asThreadIdCore } = await import('@/lib/server/core-types');
+      const { asThreadId: asThreadIdCore } = await import('@/types/core');
       const { asValidThreadId } = await import('@/lib/validation/thread-id-validation');
 
       const testId = 'lace_20250731_abc123';
@@ -126,7 +126,7 @@ describe('Type Integrity - Current State', () => {
 
     it('should have compatible ApprovalDecision enums', async () => {
       const { ApprovalDecision: CoreApproval } = await import('@/types/core');
-      const { ApprovalDecision: ServerApproval } = await import('@/lib/server/core-types');
+      const { ApprovalDecision: ServerApproval } = await import('@/types/core');
 
       // Values should be identical
       expect(CoreApproval.ALLOW_ONCE).toBe(ServerApproval.ALLOW_ONCE);
@@ -157,7 +157,7 @@ describe('Type Integrity - Current State', () => {
       // Test that all current import paths can be resolved
       const imports = [
         () => import('@/types/api'),
-        () => import('@/lib/server/core-types'),
+        () => import('@/types/core'),
         () => import('@/lib/server/lace-imports'),
         () => import('@/types/core'),
         () => import('@/lib/validation/schemas'),

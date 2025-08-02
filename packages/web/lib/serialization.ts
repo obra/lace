@@ -60,3 +60,12 @@ export function createSuperjsonResponse<T>(data: T, init?: ResponseInit) {
     },
   });
 }
+
+// Typed parsing helpers for better type safety
+export function parseResponse<T>(response: Response): Promise<T> {
+  return response.text().then((text) => parse(text) as T);
+}
+
+export function parseTyped<T>(text: string): T {
+  return parse(text) as T;
+}

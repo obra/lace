@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import type { Task } from '@/types/core';
-import { asThreadId, type ThreadId, type AssigneeId } from '@/lib/server/core-types';
+import { asThreadId, type ThreadId, type AssigneeId } from '@/types/core';
 
 const mockTasks: Task[] = [
   {

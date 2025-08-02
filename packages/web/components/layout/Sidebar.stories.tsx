@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Timeline, RecentFile } from '@/types/design-system';
 import type { ProjectInfo as Project, Task } from '@/types/core';
-import { asThreadId, asNewAgentSpec } from '@/lib/server/core-types';
+import { asThreadId, asNewAgentSpec } from '@/types/core';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Organisms/Sidebar',

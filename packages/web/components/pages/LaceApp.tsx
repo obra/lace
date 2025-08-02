@@ -30,7 +30,7 @@ import type {
 } from '@/types/api';
 import { isApiError } from '@/types/api';
 import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ToolApprovalRequestData } from '@/types/web-events';
@@ -144,15 +144,10 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
-      const data: unknown = parse(await res.text());
-      
-      // Type guard for API response
-      if (typeof data === 'object' && data !== null && 'projects' in data) {
-        const projectsData = data as { projects: ProjectInfo[] };
-        setProjects(projectsData.projects);
-        setLoadingProjects(false);
-        return projectsData.projects;
-      }
+      const data = await parseResponse<{ projects: ProjectInfo[] }>(res);
+      setProjects(data.projects);
+      setLoadingProjects(false);
+      return data.projects;
     } catch (error) {
       console.error('Failed to load projects:', error);
     }
