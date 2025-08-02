@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
@@ -15,27 +16,33 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
     const resolvedParams = await params;
     const project = Project.getById(resolvedParams.projectId);
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     const configuration = project.getConfiguration();
 
-    return NextResponse.json({ configuration });
+    return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to fetch configuration' },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
@@ -44,23 +51,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const project = Project.getById(resolvedParams.projectId);
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     project.updateConfiguration(validatedData);
 
     const configuration = project.getConfiguration();
 
-    return NextResponse.json({ configuration });
+    return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to update configuration' },
       { status: 500 }
     );

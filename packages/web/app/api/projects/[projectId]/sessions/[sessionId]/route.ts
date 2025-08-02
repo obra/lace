@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@/lib/serialization';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({
@@ -20,17 +21,20 @@ export async function GET(
     const { projectId, sessionId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     const session = project.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createSuperjsonResponse(
+        { error: 'Session not found in this project' },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ session });
+    return createSuperjsonResponse({ session });
   } catch (error: unknown) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to fetch session' },
       { status: 500 }
     );
@@ -48,24 +52,27 @@ export async function PATCH(
 
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     const session = project.updateSession(sessionId, validatedData);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createSuperjsonResponse(
+        { error: 'Session not found in this project' },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ session });
+    return createSuperjsonResponse({ session });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to update session' },
       { status: 500 }
     );
@@ -80,17 +87,20 @@ export async function DELETE(
     const { projectId, sessionId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
     }
 
     const success = project.deleteSession(sessionId);
     if (!success) {
-      return NextResponse.json({ error: 'Session not found in this project' }, { status: 404 });
+      return createSuperjsonResponse(
+        { error: 'Session not found in this project' },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ success: true });
+    return createSuperjsonResponse({ success: true });
   } catch (error: unknown) {
-    return NextResponse.json(
+    return createSuperjsonResponse(
       { error: error instanceof Error ? error.message : 'Failed to delete session' },
       { status: 500 }
     );
