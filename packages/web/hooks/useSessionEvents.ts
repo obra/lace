@@ -1,15 +1,10 @@
 // ABOUTME: Event stream hook for session events and tool approvals
-// ABOUTME: Real-time updates with client-side filtering
+// ABOUTME: Real-time updates using unified event stream
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useEventStream } from './useEventStream';
 import type { SessionEvent, ThreadId, ToolApprovalRequestData } from '@/types/api';
-import type { StreamEvent } from '@/types/stream-events';
-import {
-  parseSessionEvent,
-  parseSessionEvents,
-  StreamEventTimestampSchema,
-} from '@/lib/validation/session-event-schemas';
+import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
 
 interface PendingApproval {
   toolCallId: string;
@@ -38,110 +33,58 @@ export function useSessionEvents(
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Set up unified stream subscription
-  const subscription = useMemo(
-    () => ({
-      sessions: sessionId ? [sessionId] : [],
-      threads: selectedAgent ? [selectedAgent] : [],
-      eventTypes: [
-        'USER_MESSAGE',
-        'AGENT_MESSAGE',
-        'TOOL_CALL',
-        'TOOL_RESULT',
-        'TOOL_APPROVAL_REQUEST',
-        'TOOL_APPROVAL_RESPONSE',
-        'LOCAL_SYSTEM_MESSAGE',
-        'AGENT_TOKEN',
-        'AGENT_STREAMING',
-        'COMPACTION',
-        'SYSTEM_PROMPT',
-        'USER_SYSTEM_PROMPT',
-      ],
-    }),
-    [sessionId, selectedAgent]
-  );
+  // Add session event to timeline
+  const addSessionEvent = useCallback((sessionEvent: SessionEvent) => {
+    setEvents((prev) => {
+      // Avoid duplicates by checking event content
+      const exists = prev.some(
+        (e) =>
+          e.type === sessionEvent.type &&
+          e.timestamp.getTime() === sessionEvent.timestamp.getTime() &&
+          e.threadId === sessionEvent.threadId &&
+          JSON.stringify(e.data) === JSON.stringify(sessionEvent.data)
+      );
 
-  // Handle events from stream
-  const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
-    try {
-      // Only process session events - other event types (global, task, project)
-      // should be handled by their respective hooks
-      if (streamEvent.eventType !== 'session') {
-        return;
-      }
+      if (exists) return prev;
 
-      // Parse and validate SessionEvent with proper date hydration
-      const sessionEvent = parseSessionEvent(streamEvent.data);
-
-      // Also ensure the StreamEvent timestamp is a Date
-      const streamTimestamp = StreamEventTimestampSchema.parse(streamEvent.timestamp);
-
-      // Handle tool approval requests
-      if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
-        const approvalData = sessionEvent.data as ToolApprovalRequestData & { toolCallId?: string };
-
-        const pendingApproval: PendingApproval = {
-          toolCallId: approvalData.toolCallId || approvalData.requestId,
-          toolCall: {
-            name: approvalData.toolName,
-            arguments: approvalData.input,
-          },
-          requestedAt: streamTimestamp,
-          requestData: approvalData,
-        };
-
-        setPendingApprovals((prev) => {
-          const exists = prev.some((p) => p.toolCallId === pendingApproval.toolCallId);
-          if (exists) return prev;
-          return [...prev, pendingApproval];
-        });
-
-        // Don't add approval requests to timeline
-        return;
-      }
-
-      // Handle tool approval responses
-      if (sessionEvent.type === 'TOOL_APPROVAL_RESPONSE') {
-        const responseData = sessionEvent.data as { toolCallId: string };
-        setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== responseData.toolCallId));
-
-        // Don't add approval responses to timeline
-        return;
-      }
-
-      // Add to events list
-      setEvents((prev) => {
-        // Avoid duplicates by checking event content
-        const exists = prev.some(
-          (e) =>
-            e.type === sessionEvent.type &&
-            e.timestamp.getTime() === sessionEvent.timestamp.getTime() &&
-            e.threadId === sessionEvent.threadId &&
-            JSON.stringify(e.data) === JSON.stringify(sessionEvent.data)
-        );
-
-        if (exists) return prev;
-
-        return [...prev, sessionEvent].sort(
-          (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-        );
-      });
-    } catch (error) {
-      console.error('[SESSION_EVENTS] Failed to parse stream event:', error, streamEvent);
-      // Don't crash the app - just skip invalid events
-    }
+      return [...prev, sessionEvent].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    });
   }, []);
 
-  // Use event stream
+  // Handle approval requests
+  const handleApprovalRequest = useCallback((approval: PendingApproval) => {
+    setPendingApprovals((prev) => {
+      const exists = prev.some((p) => p.toolCallId === approval.toolCallId);
+      if (exists) return prev;
+      return [...prev, approval];
+    });
+  }, []);
+
+  // Handle approval responses
+  const handleApprovalResponse = useCallback((toolCallId: string) => {
+    setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
+  }, []);
+
+  // Use unified event stream
   const { connection } = useEventStream({
-    subscription,
-    onEvent: handleStreamEvent,
+    sessionId: sessionId || undefined,
+    threadIds: selectedAgent ? [selectedAgent] : undefined,
     onConnect: () => {
       setLoadingHistory(false);
     },
     onError: (error) => {
       console.error('[SESSION_EVENTS] Stream error:', error);
     },
+    // Session event handlers - only add non-approval events to timeline
+    onUserMessage: addSessionEvent,
+    onAgentMessage: addSessionEvent,
+    onAgentToken: addSessionEvent,
+    onToolCall: addSessionEvent,
+    onToolResult: addSessionEvent,
+    onSystemMessage: addSessionEvent,
+    // Approval handlers
+    onApprovalRequest: handleApprovalRequest,
+    onApprovalResponse: handleApprovalResponse,
   });
 
   // Load historical events when session changes
