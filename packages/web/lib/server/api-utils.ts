@@ -93,9 +93,20 @@ export function serializeTask(task: Task): SerializedTask {
 }
 
 // Error response helper
-export function createErrorResponse(message: string, status: number = 400, error?: unknown) {
-  logger.error(`API Error: ${message}`, { status, error });
-  return createSuperjsonResponse({ error: message }, { status });
+export function createErrorResponse(
+  message: string,
+  status: number = 400,
+  options?: { code?: string; error?: unknown; details?: unknown }
+) {
+  logger.error(`API Error: ${message}`, { status, code: options?.code, error: options?.error });
+  return createSuperjsonResponse(
+    {
+      error: message,
+      ...(options?.code && { code: options.code }),
+      ...(options?.details && { details: options.details }),
+    },
+    { status }
+  );
 }
 
 // Success response helper

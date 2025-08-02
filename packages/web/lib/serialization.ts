@@ -22,7 +22,7 @@ superjson.registerCustom<ThreadId, string>(
 superjson.registerCustom<NewAgentSpec, string>(
   {
     isApplicable: (v): v is NewAgentSpec =>
-      typeof v === 'string' && v.startsWith('agent-') && !v.match(/^lace_\d{8}_[a-z0-9]{6}/),
+      typeof v === 'string' && v.startsWith('agent-') && !isThreadId(v),
     serialize: (v) => v as string,
     deserialize: (v) => v as NewAgentSpec,
   },

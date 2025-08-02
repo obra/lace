@@ -68,8 +68,10 @@ export interface ApiSuccessResponse<T> {
   [key: string]: unknown;
 }
 
+// Simple error response with optional code for better client-side error handling
 export interface ApiErrorResponse {
   error: string;
+  code?: string;
   details?: unknown;
 }
 
