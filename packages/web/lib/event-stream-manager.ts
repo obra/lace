@@ -79,8 +79,12 @@ export class EventStreamManager {
   private encoder = new TextEncoder();
   private readonly MAX_CONNECTIONS = 100; // Global limit
   private eventIdCounter = 0;
+  private keepAliveInterval: NodeJS.Timeout | null = null;
+  private readonly KEEPALIVE_INTERVAL = 30000; // 30 seconds
 
-  private constructor() {}
+  private constructor() {
+    this.startKeepAlive();
+  }
 
   // Register a Session to forward its TaskManager events to the stream
   // Called once per Session instance from SessionService
@@ -182,6 +186,11 @@ export class EventStreamManager {
     };
 
     this.connections.set(connectionId, connection);
+
+    // Start keepalive if this is the first connection
+    if (this.connections.size === 1) {
+      this.startKeepAlive();
+    }
 
     // Send connection confirmation
     this.sendToConnection(connection, {
@@ -336,6 +345,53 @@ export class EventStreamManager {
 
     stats.oldestConnection = oldest;
     return stats;
+  }
+
+  // Start keepalive timer
+  private startKeepAlive(): void {
+    // Clear any existing interval
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+    }
+
+    // Send keepalive every 30 seconds
+    this.keepAliveInterval = setInterval(() => {
+      this.sendKeepAlive();
+    }, this.KEEPALIVE_INTERVAL);
+  }
+
+  // Stop keepalive timer
+  private stopKeepAlive(): void {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+  }
+
+  // Send keepalive comment to all connections
+  private sendKeepAlive(): void {
+    const deadConnections: string[] = [];
+    const keepAliveData = `: keepalive ${new Date().toISOString()}\n\n`;
+    const keepAliveBytes = this.encoder.encode(keepAliveData);
+
+    for (const [connectionId, connection] of this.connections) {
+      try {
+        connection.controller.enqueue(keepAliveBytes);
+      } catch (error) {
+        // Connection is dead
+        deadConnections.push(connectionId);
+      }
+    }
+
+    // Clean up dead connections
+    for (const connectionId of deadConnections) {
+      this.removeConnection(connectionId);
+    }
+
+    // Stop keepalive if no connections
+    if (this.connections.size === 0) {
+      this.stopKeepAlive();
+    }
   }
 
   // Clean up stale connections (for development)

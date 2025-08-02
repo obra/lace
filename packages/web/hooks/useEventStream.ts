@@ -315,6 +315,21 @@ export function useEventStream({
   ]);
 
   // Create unified subscription for ALL event types
+  // Use JSON.stringify to create a stable reference that only changes when content changes
+  const subscriptionKey = useMemo(
+    () => {
+      // Sort arrays to ensure consistent key even if order changes
+      const sortedThreadIds = threadIds ? [...threadIds].sort() : [];
+      return JSON.stringify({
+        projects: projectId ? [projectId] : [],
+        sessions: sessionId ? [sessionId] : [],
+        threads: sortedThreadIds,
+        global: includeGlobal,
+      });
+    },
+    [projectId, sessionId, threadIds?.join(','), includeGlobal] // Use join for array stability
+  );
+
   const subscription = useMemo(
     () => ({
       projects: projectId ? [projectId] : [],
@@ -323,7 +338,7 @@ export function useEventStream({
       global: includeGlobal,
       eventTypes: ['session', 'task', 'project', 'global'] as EventType[],
     }),
-    [projectId, sessionId, threadIds, includeGlobal]
+    [subscriptionKey] // Only recreate when actual content changes
   );
 
   // Build query string from subscription - pure function, no need for useCallback
@@ -457,13 +472,27 @@ export function useEventStream({
     handleStreamEventRef.current = handleStreamEvent;
   }, [handleStreamEvent]);
 
-  // Connect to stream
+  // Store subscription in ref to access current value without recreating connect
+  const subscriptionRef = useRef(subscription);
+  useEffect(() => {
+    subscriptionRef.current = subscription;
+  }, [subscription]);
+
+  // Track if we're intentionally closing to prevent reconnect storms
+  const isClosingRef = useRef(false);
+
+  // Connect to stream - no dependencies, uses refs for current values
   const connect = useCallback(() => {
+    // Don't connect if we're in the process of closing
+    if (isClosingRef.current) {
+      return;
+    }
+
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
 
-    const queryString = buildQueryString(subscription);
+    const queryString = buildQueryString(subscriptionRef.current);
     const url = `/api/events/stream${queryString ? `?${queryString}` : ''}`;
 
     console.log('[EVENT_STREAM] Connecting to:', url);
@@ -502,7 +531,12 @@ export function useEventStream({
     };
 
     eventSource.onerror = (error) => {
-      console.error('[EVENT_STREAM] Connection error:', error);
+      // Check if this is a normal close or an actual error
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('[EVENT_STREAM] Connection closed');
+      } else {
+        console.error('[EVENT_STREAM] Connection error:', error);
+      }
 
       setConnection((prev) => {
         const newState = {
@@ -512,12 +546,17 @@ export function useEventStream({
         };
 
         callbackRefs.current.onDisconnect?.();
-        callbackRefs.current.onError?.(new Error('SSE connection failed'));
+
+        // Only treat as error if not intentionally closed
+        if (eventSource.readyState !== EventSource.CLOSED) {
+          callbackRefs.current.onError?.(new Error('SSE connection failed'));
+        }
 
         // Auto-reconnect logic using ref values to avoid stale closures
         if (
           autoReconnectRef.current &&
-          newState.reconnectAttempts < newState.maxReconnectAttempts
+          newState.reconnectAttempts < newState.maxReconnectAttempts &&
+          !isClosingRef.current // Don't reconnect if we're closing
         ) {
           console.log(
             `[EVENT_STREAM] Reconnecting in ${reconnectIntervalRef.current}ms (attempt ${newState.reconnectAttempts})`
@@ -526,7 +565,10 @@ export function useEventStream({
           reconnectTimeoutRef.current = setTimeout(
             () => {
               // Use a fresh connect call to avoid stale closures
-              if (eventSourceRef.current?.readyState !== EventSource.CONNECTING) {
+              if (
+                eventSourceRef.current?.readyState !== EventSource.CONNECTING &&
+                !isClosingRef.current
+              ) {
                 connect();
               }
             },
@@ -537,7 +579,7 @@ export function useEventStream({
         return newState;
       });
     };
-  }, [subscription]);
+  }, []); // No dependencies - connect is now stable
 
   // Manual reconnect
   const reconnect = useCallback(() => {
@@ -547,6 +589,8 @@ export function useEventStream({
 
   // Close connection
   const close = useCallback(() => {
+    isClosingRef.current = true;
+
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -558,13 +602,30 @@ export function useEventStream({
     }
 
     setConnection((prev) => ({ ...prev, connected: false }));
+
+    // Reset closing flag after a small delay
+    setTimeout(() => {
+      isClosingRef.current = false;
+    }, 100);
   }, []);
 
-  // Connect on mount, reconnect when subscription changes
+  // Track previous subscription to detect actual changes
+  const prevSubscriptionKeyRef = useRef<string>();
+
+  // Connect on mount, reconnect only when subscription actually changes
   useEffect(() => {
-    connect();
+    const currentKey = subscriptionKey;
+
+    // Only reconnect if subscription actually changed
+    if (prevSubscriptionKeyRef.current !== currentKey) {
+      console.log('[EVENT_STREAM] Subscription changed, reconnecting:', currentKey);
+      prevSubscriptionKeyRef.current = currentKey;
+      connect();
+    }
 
     return () => {
+      isClosingRef.current = true;
+
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -574,8 +635,11 @@ export function useEventStream({
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
+
+      // Reset closing flag
+      isClosingRef.current = false;
     };
-  }, [connect]);
+  }, [subscriptionKey, connect]);
 
   return {
     connection,
