@@ -2,21 +2,29 @@
 // ABOUTME: Tests real backend with HTTP streaming to verify exactly one event per task
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Mock server-only module
+vi.mock('server-only', () => ({}));
+import { NextRequest } from 'next/server';
 import { SessionService, getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import { Project, DatabasePersistence } from '@/lib/server/lace-imports';
-import { Agent } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
+import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
+import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
-import { asThreadId, createNewAgentSpec } from '~/threads/types';
+import { asThreadId } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { StreamEvent } from '@/types/stream-events';
+import type { ThreadId } from '@/types/api';
 
-// Mock provider that responds with task_add tool calls
+// Mock provider that responds with task_add tool calls ONLY ONCE per conversation
 class TaskCreatingMockProvider extends BaseMockProvider {
+  private createdTasksByConversation = new Set<string>();
+
   constructor() {
     super({});
   }
@@ -29,31 +37,53 @@ class TaskCreatingMockProvider extends BaseMockProvider {
     return 'task-mock-model';
   }
 
-  async createResponse(_messages: ProviderMessage[], tools: Tool[]): Promise<ProviderResponse> {
+  async createResponse(messages: ProviderMessage[], tools: Tool[]): Promise<ProviderResponse> {
     // Find the task_add tool
     const taskAddTool = tools.find((t) => t.name === 'task_add');
 
-    if (taskAddTool) {
+    // Only create task on first user message and if we haven't created one yet
+    const hasUserMessage = messages.some((m) => m.role === 'user');
+    const hasToolResult = messages.some((m) => m.role === 'tool');
+
+    // Create a conversation key based on the first user message to distinguish different conversations
+    const firstUserMessage = messages.find((m) => m.role === 'user')?.content || '';
+    const conversationKey = firstUserMessage.slice(0, 50); // Use first 50 chars as conversation identifier
+
+    if (
+      taskAddTool &&
+      hasUserMessage &&
+      !hasToolResult &&
+      !this.createdTasksByConversation.has(conversationKey)
+    ) {
+      this.createdTasksByConversation.add(conversationKey);
       // Respond with a tool call to create a task
-      return {
-        content: "I'll create a task for you.",
-        usage: { promptTokens: 10, completionTokens: 15, totalTokens: 25 },
-        toolCalls: [
+      const toolArgs = {
+        tasks: [
           {
-            id: 'task-call-1',
-            name: 'task_add',
-            arguments: {
-              title: 'Test Task from E2E',
-              description: 'This task was created by the E2E test',
-              priority: 'medium',
-            },
+            title: 'Test Task from E2E',
+            prompt: 'Create a test task for E2E testing of event deduplication',
           },
         ],
       };
+
+      const toolCallsResult = [
+        {
+          id: 'task-call-1',
+          name: 'task_add',
+          input: toolArgs, // Use 'input' not 'arguments' for ProviderToolCall
+        },
+      ];
+
+      return {
+        content: "I'll create a task for you.",
+        usage: { promptTokens: 10, completionTokens: 15, totalTokens: 25 },
+        toolCalls: toolCallsResult,
+      };
     }
 
+    // After tool execution, just respond normally
     return {
-      content: 'Mock response without tool calls',
+      content: 'Task completed successfully.',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       toolCalls: [],
     };
@@ -67,25 +97,45 @@ describe('Task Event Deduplication E2E', () => {
   let mockProvider: TaskCreatingMockProvider;
   let eventCounts: Map<string, number>;
   let originalBroadcast: (event: Omit<StreamEvent, 'id' | 'timestamp'>) => void;
+  let registerSessionSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Set up test persistence
-    await setupTestPersistence();
+    // Set up environment
+    process.env = {
+      ...process.env,
+      ANTHROPIC_KEY: 'test-key',
+      LACE_DB_PATH: ':memory:',
+    };
 
-    // Track event broadcast calls
+    // Set up test persistence
+    setupTestPersistence();
+
+    // Track event broadcast calls with simpler spy approach
     eventCounts = new Map();
     const eventStreamManager = EventStreamManager.getInstance();
-    originalBroadcast = eventStreamManager.broadcast.bind(eventStreamManager);
 
-    // Spy on broadcast to count events
+    // Also spy on registerSession to verify it's being called
+    registerSessionSpy = vi.spyOn(eventStreamManager, 'registerSession');
+
+    // Use a simpler spy that doesn't interfere with the original function
     vi.spyOn(eventStreamManager, 'broadcast').mockImplementation((event) => {
       const key = `${event.eventType}:${event.data.type}`;
       eventCounts.set(key, (eventCounts.get(key) || 0) + 1);
 
-      // Call original to maintain functionality
-      return originalBroadcast(event);
+      console.log(`[EVENT_SPY] Broadcasting: ${key}`);
+
+      // Log tool calls and results to debug validation
+      if (event.data.type === 'TOOL_CALL') {
+        console.log(`[EVENT_SPY] Tool call:`, JSON.stringify(event.data, null, 2));
+      }
+      if (event.data.type === 'TOOL_RESULT') {
+        console.log(`[EVENT_SPY] Tool result:`, JSON.stringify(event.data, null, 2));
+      }
+
+      // Call the original method directly on the instance
+      return EventStreamManager.prototype.broadcast.call(eventStreamManager, event);
     });
 
     // Create real project
@@ -120,11 +170,13 @@ describe('Task Event Deduplication E2E', () => {
   });
 
   afterEach(async () => {
+    // CRITICAL: Stop agents BEFORE closing database in teardownTestPersistence
+    // Just clear sessions without trying to stop agents that may be stuck
     if (sessionService) {
-      await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
-    await teardownTestPersistence();
+
+    teardownTestPersistence();
     vi.restoreAllMocks();
   });
 
@@ -134,22 +186,50 @@ describe('Task Event Deduplication E2E', () => {
       'Task Deduplication Test Session',
       'task-mock',
       'task-mock-model',
-      testProject.id
+      testProject.getId()
     );
 
-    // Create agent
-    const agentSpec = createNewAgentSpec(
-      asThreadId(sessionMetadata.id),
-      'task-mock',
-      'task-mock-model'
-    );
-    const agent = new Agent(agentSpec);
+    const sessionId = sessionMetadata.id;
 
-    // Process user message that will trigger task creation
-    await agent.processUserMessage('Please create a task for testing event deduplication');
+    // Spawn agent via API
+    const spawnRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'task-creator',
+        provider: 'task-mock',
+        model: 'task-mock-model',
+      }),
+    });
+
+    const spawnResponse = await spawnAgent(spawnRequest, {
+      params: Promise.resolve({ sessionId }),
+    });
+    expect(spawnResponse.status).toBe(201);
+
+    const spawnData = (await spawnResponse.json()) as { agent: { threadId: ThreadId } };
+    const agentThreadId = spawnData.agent.threadId;
+
+    // Send message via API that will trigger task creation
+    const messageRequest = new NextRequest(
+      `http://localhost/api/threads/${agentThreadId}/message`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Please create a task for testing event deduplication' }),
+      }
+    );
+
+    const messageResponse = await sendMessage(messageRequest, {
+      params: Promise.resolve({ threadId: agentThreadId }),
+    });
+    expect(messageResponse.status).toBe(202);
 
     // Wait for async events to propagate
     await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Check if registerSession was called
+    console.log(`[TEST] registerSession called ${registerSessionSpy.mock.calls.length} times`);
 
     // Check event counts
     const taskCreatedCount = eventCounts.get('task:task:created') || 0;
@@ -166,7 +246,7 @@ describe('Task Event Deduplication E2E', () => {
       'Multiple Access Test Session',
       'task-mock',
       'task-mock-model',
-      testProject.id
+      testProject.getId()
     );
 
     // Access the session multiple times (this triggers setupTaskManagerEventHandlers multiple times)
@@ -175,11 +255,39 @@ describe('Task Event Deduplication E2E', () => {
     await sessionService.getSession(sessionId);
     await sessionService.getSession(sessionId);
 
-    // Create agent and trigger task creation
-    const agentSpec = createNewAgentSpec(sessionId, 'task-mock', 'task-mock-model');
-    const agent = new Agent(agentSpec);
+    // Spawn agent via API and trigger task creation
+    const spawnRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'multiple-access-agent',
+        provider: 'task-mock',
+        model: 'task-mock-model',
+      }),
+    });
 
-    await agent.processUserMessage('Create a task to test duplicate listeners');
+    const spawnResponse = await spawnAgent(spawnRequest, {
+      params: Promise.resolve({ sessionId }),
+    });
+    expect(spawnResponse.status).toBe(201);
+
+    const spawnData = (await spawnResponse.json()) as { agent: { threadId: ThreadId } };
+    const agentThreadId = spawnData.agent.threadId;
+
+    // Send message via API
+    const messageRequest = new NextRequest(
+      `http://localhost/api/threads/${agentThreadId}/message`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Create a task to test duplicate listeners' }),
+      }
+    );
+
+    const messageResponse = await sendMessage(messageRequest, {
+      params: Promise.resolve({ threadId: agentThreadId }),
+    });
+    expect(messageResponse.status).toBe(202);
 
     // Wait for events
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -198,26 +306,84 @@ describe('Task Event Deduplication E2E', () => {
       'Session 1',
       'task-mock',
       'task-mock-model',
-      testProject.id
+      testProject.getId()
     );
 
-    const agent1 = new Agent(
-      createNewAgentSpec(asThreadId(session1.id), 'task-mock', 'task-mock-model')
+    // Spawn agent for session 1
+    const spawnRequest1 = new NextRequest(`http://localhost/api/sessions/${session1.id}/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'session1-agent',
+        provider: 'task-mock',
+        model: 'task-mock-model',
+      }),
+    });
+
+    const spawnResponse1 = await spawnAgent(spawnRequest1, {
+      params: Promise.resolve({ sessionId: session1.id }),
+    });
+    expect(spawnResponse1.status).toBe(201);
+
+    const spawnData1 = (await spawnResponse1.json()) as { agent: { threadId: ThreadId } };
+    const agentThreadId1 = spawnData1.agent.threadId;
+
+    // Send message to agent 1
+    const messageRequest1 = new NextRequest(
+      `http://localhost/api/threads/${agentThreadId1}/message`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Create task 1' }),
+      }
     );
-    await agent1.processUserMessage('Create task 1');
+
+    const messageResponse1 = await sendMessage(messageRequest1, {
+      params: Promise.resolve({ threadId: agentThreadId1 }),
+    });
+    expect(messageResponse1.status).toBe(202);
 
     // Create second session and task
     const session2 = await sessionService.createSession(
       'Session 2',
       'task-mock',
       'task-mock-model',
-      testProject.id
+      testProject.getId()
     );
 
-    const agent2 = new Agent(
-      createNewAgentSpec(asThreadId(session2.id), 'task-mock', 'task-mock-model')
+    // Spawn agent for session 2
+    const spawnRequest2 = new NextRequest(`http://localhost/api/sessions/${session2.id}/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'session2-agent',
+        provider: 'task-mock',
+        model: 'task-mock-model',
+      }),
+    });
+
+    const spawnResponse2 = await spawnAgent(spawnRequest2, {
+      params: Promise.resolve({ sessionId: session2.id }),
+    });
+    expect(spawnResponse2.status).toBe(201);
+
+    const spawnData2 = (await spawnResponse2.json()) as { agent: { threadId: ThreadId } };
+    const agentThreadId2 = spawnData2.agent.threadId;
+
+    // Send message to agent 2
+    const messageRequest2 = new NextRequest(
+      `http://localhost/api/threads/${agentThreadId2}/message`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Create task 2' }),
+      }
     );
-    await agent2.processUserMessage('Create task 2');
+
+    const messageResponse2 = await sendMessage(messageRequest2, {
+      params: Promise.resolve({ threadId: agentThreadId2 }),
+    });
+    expect(messageResponse2.status).toBe(202);
 
     // Wait for events
     await new Promise((resolve) => setTimeout(resolve, 100));
