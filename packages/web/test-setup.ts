@@ -5,17 +5,28 @@ import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
 // Mock EventSource for SSE testing
-global.EventSource = vi.fn().mockImplementation(() => ({
-  close: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  onopen: null,
-  onmessage: null,
-  onerror: null,
-  readyState: 1, // OPEN
-  url: '',
-  withCredentials: false,
-}));
+class MockEventSource {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSED = 2;
+
+  close = vi.fn();
+  addEventListener = vi.fn();
+  removeEventListener = vi.fn();
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  readyState = MockEventSource.OPEN;
+  url = '';
+  withCredentials = false;
+
+  constructor(url: string, eventSourceInitDict?: EventSourceInit) {
+    this.url = url;
+    this.withCredentials = eventSourceInitDict?.withCredentials ?? false;
+  }
+}
+
+global.EventSource = MockEventSource as any;
 
 // Mock server-only to avoid import issues in tests
 // This is the current workaround as suggested in Next.js GitHub issue #60038
