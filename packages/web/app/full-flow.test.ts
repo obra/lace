@@ -18,27 +18,21 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
-// Mock EventStreamManager
-const mockEventStreamManager = {
-  addConnection: vi.fn(),
-  removeConnection: vi.fn(),
-  broadcast: vi.fn(),
-  sessionStreams: new Map(),
-};
-
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: () => mockEventStreamManager,
-  },
-}));
+// Use real EventStreamManager for integration testing
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Full Conversation Flow', () => {
   let sessionService: ReturnType<typeof getSessionService>;
+  let addConnectionSpy: ReturnType<typeof vi.spyOn>;
+  let broadcastSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     setupTestPersistence();
     vi.clearAllMocks();
-    mockEventStreamManager.sessionStreams.clear();
+
+    // Set up spies on real EventStreamManager
+    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection');
+    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
@@ -51,6 +45,9 @@ describe('Full Conversation Flow', () => {
     // Stop all agents first to prevent async operations after database closure
     await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
+    // Clean up spies
+    addConnectionSpy?.mockRestore();
+    broadcastSpy?.mockRestore();
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
@@ -132,10 +129,7 @@ describe('Full Conversation Flow', () => {
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
-    expect(mockEventStreamManager.addConnection).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.any(Object)
-    );
+    expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
 
     // 4. Send message
     const message = 'Hello, assistant!';
@@ -157,10 +151,7 @@ describe('Full Conversation Flow', () => {
     expect(messageData.status).toBe('accepted');
 
     // 5. Verify EventStreamManager connection was established
-    expect(mockEventStreamManager.addConnection).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.any(Object)
-    );
+    expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
   });
 
   it('should handle multi-agent scenario', async () => {
@@ -306,10 +297,7 @@ describe('Full Conversation Flow', () => {
     );
 
     // Verify each session has its own connection
-    expect(mockEventStreamManager.addConnection).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.any(Object)
-    );
-    expect(mockEventStreamManager.addConnection).toHaveBeenCalledTimes(2);
+    expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
+    expect(addConnectionSpy).toHaveBeenCalledTimes(2);
   });
 });
