@@ -32,14 +32,6 @@ vi.mock('@/lib/server/approval-manager', () => ({
   }),
 }));
 
-vi.mock('@/lib/event-stream-manager', () => ({
-  EventStreamManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-    }),
-  },
-}));
-
 describe('TaskAPIClient E2E Tests', () => {
   let client: TaskAPIClient;
   let sessionId: string;
