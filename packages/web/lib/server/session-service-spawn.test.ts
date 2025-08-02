@@ -21,6 +21,7 @@ vi.mock('@/lib/event-stream-manager', () => ({
       broadcast: vi.fn(),
       addConnection: vi.fn(),
       removeConnection: vi.fn(),
+      registerSession: vi.fn(),
     }),
   },
 }));

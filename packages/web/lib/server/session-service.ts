@@ -109,19 +109,16 @@ export class SessionService {
   setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
     // Prevent duplicate event handler registration
     if (this.registeredAgents.has(agent)) {
-      console.warn(
-        `[SESSION_SERVICE] Agent ${agent.threadId} already has event handlers - skipping`
-      );
       return;
     }
-    console.warn(
-      `[SESSION_SERVICE] Setting up event handlers for agent ${agent.threadId} in session ${sessionId}`
-    );
     this.registeredAgents.add(agent);
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
+      console.warn(
+        `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
+      );
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
