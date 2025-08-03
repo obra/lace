@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // Get updated task to return
       const task = taskManager.getTaskById(taskId);
       if (!task) {
-        return createErrorResponse('Task not found', 404);
+        return createErrorResponse('Task not found', 404, { code: 'RESOURCE_NOT_FOUND' });
       }
 
       // Get updated task to return (use serializeTask utility)
@@ -95,15 +95,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     } catch (error: unknown) {
       if (error instanceof Error && error.message === 'Task not found') {
-        return createErrorResponse('Task not found', 404);
+        return createErrorResponse('Task not found', 404, { code: 'RESOURCE_NOT_FOUND' });
       }
       throw error;
     }
   } catch (error: unknown) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to add note',
-      500,
-      error
-    );
+    return createErrorResponse(error instanceof Error ? error.message : 'Failed to add note', 500, {
+      code: 'INTERNAL_SERVER_ERROR',
+    });
   }
 }

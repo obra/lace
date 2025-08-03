@@ -7,6 +7,7 @@ import { CreateAgentRequest } from '@/types/api';
 import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -36,7 +37,7 @@ export async function POST(
     const { sessionId: sessionIdParam } = await params;
 
     if (!isValidThreadId(sessionIdParam)) {
-      return createSuperjsonResponse({ error: 'Invalid session ID' }, { status: 400 });
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = asThreadId(sessionIdParam);
@@ -45,7 +46,7 @@ export async function POST(
     const bodyData: unknown = await request.json();
 
     if (!isCreateAgentRequest(bodyData)) {
-      return createSuperjsonResponse({ error: 'Invalid request body' }, { status: 400 });
+      return createErrorResponse('Invalid request body', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const body: CreateAgentRequest = bodyData;
@@ -55,7 +56,7 @@ export async function POST(
     // Get session and spawn agent directly
     const session = await sessionService.getSession(sessionId);
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = await session.spawnAgent(body.name || '', body.provider, body.model);
@@ -98,10 +99,10 @@ export async function POST(
     console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
 
     if (isError(error) && error.message === 'Session not found') {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    return createSuperjsonResponse({ error: 'Internal server error' }, { status: 500 });
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -114,7 +115,7 @@ export async function GET(
     const { sessionId: sessionIdParam } = await params;
 
     if (!isValidThreadId(sessionIdParam)) {
-      return createSuperjsonResponse({ error: 'Invalid session ID' }, { status: 400 });
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = asThreadId(sessionIdParam);
@@ -122,7 +123,7 @@ export async function GET(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Get agents from Session instance
@@ -139,6 +140,6 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
-    return createSuperjsonResponse({ error: 'Internal server error' }, { status: 500 });
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

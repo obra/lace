@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
@@ -27,16 +28,17 @@ export async function GET(
     const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const configuration = session.getEffectiveConfiguration();
 
     return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to fetch configuration' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch configuration',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -54,7 +56,7 @@ export async function PUT(
     const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Update session configuration directly
@@ -64,19 +66,20 @@ export async function PUT(
     return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createSuperjsonResponse(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
     if (error instanceof Error && error.message === 'Session not found') {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to update configuration' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to update configuration',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import type { StreamSubscription, StreamEventCategory } from '@/types/stream-events';
 
 // Parse subscription from query parameters
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 

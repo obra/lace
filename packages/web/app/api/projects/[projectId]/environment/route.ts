@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const SetEnvironmentVariablesSchema = z.object({
@@ -23,7 +24,7 @@ export async function GET(
     const { projectId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const variables = project.getEnvironmentVariables();
@@ -31,7 +32,7 @@ export async function GET(
     return createSuperjsonResponse({ variables });
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to fetch environment variables';
-    return createSuperjsonResponse({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -43,7 +44,7 @@ export async function PUT(
     const { projectId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const body: unknown = await request.json();
@@ -59,14 +60,14 @@ export async function PUT(
     return createSuperjsonResponse({ variables: updatedVariables });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createSuperjsonResponse(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
     const errorMessage = isError(error) ? error.message : 'Failed to update environment variables';
-    return createSuperjsonResponse({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -78,17 +79,16 @@ export async function DELETE(
     const { projectId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const url = new URL(request.url);
     const key = url.searchParams.get('key');
 
     if (!key) {
-      return createSuperjsonResponse(
-        { error: 'Environment variable key is required' },
-        { status: 400 }
-      );
+      return createErrorResponse('Environment variable key is required', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
 
     project.deleteEnvironmentVariable(key);
@@ -96,6 +96,6 @@ export async function DELETE(
     return createSuperjsonResponse({ success: true });
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to delete environment variable';
-    return createSuperjsonResponse({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

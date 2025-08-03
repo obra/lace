@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch tasks',
       500,
-      error
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to create task',
       500,
-      error
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

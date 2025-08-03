@@ -7,6 +7,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { ThreadIdSchema } from '@/lib/validation/schemas';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Validation schema
 const ParamsSchema = z.object({
@@ -42,12 +43,12 @@ export async function GET(
 
     const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
-      return createSuperjsonResponse({ error: 'Agent not found for thread' }, { status: 404 });
+      return createErrorResponse('Agent not found for thread', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Use Agent interface to get pending approvals
@@ -96,6 +97,8 @@ export async function GET(
 
     return createSuperjsonResponse({ pendingApprovals });
   } catch (_error) {
-    return createSuperjsonResponse({ error: 'Failed to get pending approvals' }, { status: 500 });
+    return createErrorResponse('Failed to get pending approvals', 500, {
+      code: 'INTERNAL_SERVER_ERROR',
+    });
   }
 }

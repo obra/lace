@@ -4,6 +4,7 @@
 import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const UpdateProjectSchema = z.object({
@@ -23,16 +24,17 @@ export async function GET(
     const project = Project.getById(projectId);
 
     if (!project) {
-      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const projectInfo = project.getInfo();
 
     return createSuperjsonResponse({ project: projectInfo });
   } catch (error) {
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to fetch project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -49,7 +51,7 @@ export async function PATCH(
     const project = Project.getById(projectId);
 
     if (!project) {
-      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     project.updateInfo(validatedData);
@@ -59,15 +61,16 @@ export async function PATCH(
     return createSuperjsonResponse({ project: updatedProjectInfo });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createSuperjsonResponse(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to update project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to update project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -81,16 +84,17 @@ export async function DELETE(
     const project = Project.getById(projectId);
 
     if (!project) {
-      return createSuperjsonResponse({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     project.delete();
 
     return createSuperjsonResponse({ success: true });
   } catch (error) {
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to delete project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to delete project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

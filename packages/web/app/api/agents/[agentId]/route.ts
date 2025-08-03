@@ -6,6 +6,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const AgentUpdateSchema = z.object({
@@ -22,7 +23,7 @@ export async function GET(
     const { agentId } = await params;
 
     if (!isValidThreadId(agentId)) {
-      return createSuperjsonResponse({ error: 'Invalid agent ID' }, { status: 400 });
+      return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const agentThreadId = asThreadId(agentId);
@@ -34,13 +35,13 @@ export async function GET(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = session.getAgent(agentThreadId);
 
     if (!agent) {
-      return createSuperjsonResponse({ error: 'Agent not found' }, { status: 404 });
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const metadata = agent.getThreadMetadata();
@@ -56,9 +57,10 @@ export async function GET(
 
     return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to fetch agent' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch agent',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -71,7 +73,7 @@ export async function PUT(
     const { agentId } = await params;
 
     if (!isValidThreadId(agentId)) {
-      return createSuperjsonResponse({ error: 'Invalid agent ID' }, { status: 400 });
+      return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -86,13 +88,13 @@ export async function PUT(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return createSuperjsonResponse({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = session.getAgent(agentThreadId);
 
     if (!agent) {
-      return createSuperjsonResponse({ error: 'Agent not found' }, { status: 404 });
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Update agent properties via thread metadata
@@ -128,15 +130,16 @@ export async function PUT(
     return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createSuperjsonResponse(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to update agent' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to update agent',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

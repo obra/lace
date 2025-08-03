@@ -4,6 +4,7 @@
 import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const CreateProjectSchema = z.object({
@@ -19,9 +20,10 @@ export async function GET() {
 
     return createSuperjsonResponse({ projects });
   } catch (error) {
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to fetch projects' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch projects',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -43,15 +45,16 @@ export async function POST(request: NextRequest) {
     return createSuperjsonResponse({ project: projectInfo }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createSuperjsonResponse(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
-    return createSuperjsonResponse(
-      { error: error instanceof Error ? error.message : 'Failed to create project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to create project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

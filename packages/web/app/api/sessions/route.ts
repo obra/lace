@@ -3,8 +3,8 @@
 
 import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ApiErrorResponse } from '@/types/api';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -21,8 +21,7 @@ export async function GET(_request: NextRequest) {
     console.error('Error in GET /api/sessions:', error);
 
     const errorMessage = isError(error) ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return createSuperjsonResponse(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
