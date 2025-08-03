@@ -3,7 +3,11 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { SessionEvent } from '@/types/web-sse';
-import type { PendingApproval } from '@/types/api';
+import type {
+  PendingApproval,
+  SessionHistoryResponse,
+  PendingApprovalsResponse,
+} from '@/types/api';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 import type { ThreadId } from '@/types/core';
 import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
@@ -106,7 +110,7 @@ export function useSessionEvents(
     fetch(`/api/sessions/${sessionId}/history`)
       .then(async (res) => {
         const text = await res.text();
-        return parse(text); // Use superjson to parse the response
+        return parse(text) as SessionHistoryResponse;
       })
       .then((data) => {
         if (data.events) {
@@ -144,7 +148,7 @@ export function useSessionEvents(
     fetch(`/api/threads/${selectedAgent}/approvals/pending`)
       .then(async (res) => {
         const text = await res.text();
-        return parse(text);
+        return parse(text) as PendingApprovalsResponse;
       })
       .then((data) => {
         if (data.pendingApprovals?.length > 0) {

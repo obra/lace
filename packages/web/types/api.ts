@@ -15,6 +15,7 @@ import { ApprovalDecision } from '@/types/core';
 
 // Import only the types we actually use
 import type { ToolApprovalRequestData } from './web-events';
+import type { SessionEvent } from './web-sse';
 
 // DESTROYED: API response types removed - using core types with superjson everywhere
 
@@ -101,6 +102,14 @@ export interface AgentResponse {
 
 export interface ProvidersResponse {
   providers: ProviderInfo[];
+}
+
+export interface SessionHistoryResponse {
+  events: SessionEvent[];
+}
+
+export interface PendingApprovalsResponse {
+  pendingApprovals: PendingApproval[];
 }
 
 // Extend backend types with web-specific additions
