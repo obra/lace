@@ -7,6 +7,15 @@ import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
 
+// Type guard for errors with code property (Web Streams API errors)
+function hasErrorCode(error: unknown): error is Error & { code: string } {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    typeof (error as Record<string, unknown>).code === 'string'
+  );
+}
+
 // No conversion needed - JSON.stringify happens at the network boundary
 
 // TaskManager event interfaces
@@ -222,7 +231,7 @@ export class EventStreamManager {
         }
       } catch (error) {
         // Connection may already be closed - only log if it's an unexpected error
-        if ((error as Error).code !== 'ERR_INVALID_STATE') {
+        if (!hasErrorCode(error) || error.code !== 'ERR_INVALID_STATE') {
           logger.debug(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
         }
       }
@@ -307,7 +316,7 @@ export class EventStreamManager {
       connection.lastEventId = event.id;
     } catch (error) {
       // Controller may have been closed between broadcast and send
-      if ((error as Error).code === 'ERR_INVALID_STATE') {
+      if (hasErrorCode(error) && error.code === 'ERR_INVALID_STATE') {
         throw new Error('Controller is closed');
       }
       throw error;
