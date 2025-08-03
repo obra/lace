@@ -11,7 +11,7 @@
     "debug-thread": "./dist/debug-thread.js"
   },
   "scripts": {
-    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true",
+    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true && cd packages/web && npm run build",
     "start": "npm run build && node dist/cli.js",
     "debug-thread": "npm run build && node dist/debug-thread.js",
     "typecheck": "tsc --noEmit",
