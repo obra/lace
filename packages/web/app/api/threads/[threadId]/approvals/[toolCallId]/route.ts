@@ -29,13 +29,10 @@ export async function POST(
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(await params);
     if (!paramsResult.success) {
-      return createSuperjsonResponse(
-        {
-          error: 'Invalid parameters',
-          details: paramsResult.error.format(),
-        },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid parameters', 400, {
+        code: 'VALIDATION_FAILED',
+        details: paramsResult.error.format(),
+      });
     }
 
     const { threadId, toolCallId } = paramsResult.data;
@@ -52,13 +49,10 @@ export async function POST(
 
     const bodyResult = BodySchema.safeParse(requestBody);
     if (!bodyResult.success) {
-      return createSuperjsonResponse(
-        {
-          error: 'Invalid request body',
-          details: bodyResult.error.format(),
-        },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request body', 400, {
+        code: 'VALIDATION_FAILED',
+        details: bodyResult.error.format(),
+      });
     }
 
     const { decision } = bodyResult.data;
@@ -88,6 +82,6 @@ export async function POST(
 
     return createSuperjsonResponse({ success: true });
   } catch (_error) {
-    return createSuperjsonResponse({ error: 'Internal server error' }, { status: 500 });
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

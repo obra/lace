@@ -4,13 +4,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
-import { MessageResponse, ApiErrorResponse } from '@/types/api';
+import { MessageResponse } from '@/types/api';
 import type { SessionEvent } from '@/types/web-sse';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -34,10 +35,11 @@ export async function POST(
     // Validate thread ID with Zod
     const threadIdResult = ThreadIdSchema.safeParse(threadIdParam);
     if (!threadIdResult.success) {
-      const errorResponse: ApiErrorResponse = {
-        error: threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
-      };
-      return createSuperjsonResponse(errorResponse, { status: 400 });
+      return createErrorResponse(
+        threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
+        400,
+        { code: 'VALIDATION_FAILED' }
+      );
     }
 
     // TypeScript now knows threadIdResult.success is true, so data is properly typed
@@ -48,19 +50,19 @@ export async function POST(
     try {
       bodyRaw = await request.json();
     } catch (_error) {
-      const errorResponse: ApiErrorResponse = {
-        error: 'Invalid JSON in request body',
-      };
-      return createSuperjsonResponse(errorResponse, { status: 400 });
+      return createErrorResponse('Invalid JSON in request body', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
 
     const bodyResult = MessageRequestSchema.safeParse(bodyRaw);
 
     if (!bodyResult.success) {
-      const errorResponse: ApiErrorResponse = {
-        error: bodyResult.error.errors[0]?.message || 'Invalid request body',
-      };
-      return createSuperjsonResponse(errorResponse, { status: 400 });
+      return createErrorResponse(
+        bodyResult.error.errors[0]?.message || 'Invalid request body',
+        400,
+        { code: 'VALIDATION_FAILED' }
+      );
     }
 
     const body = bodyResult.data;
@@ -81,15 +83,13 @@ export async function POST(
     // Get agent instance through session
     const session = await sessionService.getSession(sessionId);
     if (!session) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return createSuperjsonResponse(errorResponse, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = session.getAgent(threadId);
 
     if (!agent) {
-      const errorResponse: ApiErrorResponse = { error: 'Agent not found' };
-      return createSuperjsonResponse(errorResponse, { status: 404 });
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Broadcast user message event via SSE
@@ -146,7 +146,6 @@ export async function POST(
     console.error('[MESSAGE_API] Error in POST /api/threads/[threadId]/message:', error);
 
     const errorMessage = isError(error) ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return createSuperjsonResponse(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

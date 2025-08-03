@@ -3,12 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ApiErrorResponse } from '@/types/api';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadEvent, ToolResult } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 function isToolResult(data: unknown): data is ToolResult {
   return (
@@ -200,8 +200,7 @@ export async function GET(
 
     // Validate session ID format using client-safe validation that accepts both lace and UUID formats
     if (!isValidThreadId(sessionIdParam)) {
-      const errorResponse: ApiErrorResponse = { error: 'Invalid session ID format' };
-      return createSuperjsonResponse(errorResponse, { status: 400 });
+      return createErrorResponse('Invalid session ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = sessionIdParam;
@@ -210,15 +209,15 @@ export async function GET(
     const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return createSuperjsonResponse(errorResponse, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Get the coordinator agent and load events through it (proper architecture)
     const coordinatorAgent = session.getAgent(asThreadId(sessionId));
     if (!coordinatorAgent) {
-      const errorResponse: ApiErrorResponse = { error: 'Could not access session coordinator' };
-      return createSuperjsonResponse(errorResponse, { status: 500 });
+      return createErrorResponse('Could not access session coordinator', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
     }
 
     // Load all events from the session and its delegates through the Agent layer
@@ -234,7 +233,6 @@ export async function GET(
     console.error('Error in GET /api/sessions/[sessionId]/history:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return createSuperjsonResponse(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR', error });
   }
 }
