@@ -2,6 +2,7 @@
 // ABOUTME: Tests real backend with HTTP streaming to verify exactly one event per task
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { logger } from '~/utils/logger';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -125,14 +126,14 @@ describe('Task Event Deduplication E2E', () => {
       const key = `${event.eventType}:${event.data.type}`;
       eventCounts.set(key, (eventCounts.get(key) || 0) + 1);
 
-      console.log(`[EVENT_SPY] Broadcasting: ${key}`);
+      logger.debug(`[EVENT_SPY] Broadcasting: ${key}`);
 
       // Log tool calls and results to debug validation
       if (event.data.type === 'TOOL_CALL') {
-        console.log(`[EVENT_SPY] Tool call:`, JSON.stringify(event.data, null, 2));
+        logger.debug(`[EVENT_SPY] Tool call:`, JSON.stringify(event.data, null, 2));
       }
       if (event.data.type === 'TOOL_RESULT') {
-        console.log(`[EVENT_SPY] Tool result:`, JSON.stringify(event.data, null, 2));
+        logger.debug(`[EVENT_SPY] Tool result:`, JSON.stringify(event.data, null, 2));
       }
 
       // Call the original method directly on the instance
@@ -230,12 +231,12 @@ describe('Task Event Deduplication E2E', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check if registerSession was called
-    console.log(`[TEST] registerSession called ${registerSessionSpy.mock.calls.length} times`);
+    logger.debug(`[TEST] registerSession called ${registerSessionSpy.mock.calls.length} times`);
 
     // Check event counts
     const taskCreatedCount = eventCounts.get('task:task:created') || 0;
 
-    console.log('Event counts:', Object.fromEntries(eventCounts.entries()));
+    logger.debug('Event counts:', Object.fromEntries(eventCounts.entries()));
 
     // Should have exactly 1 task:created event
     expect(taskCreatedCount).toBe(1);
@@ -296,7 +297,10 @@ describe('Task Event Deduplication E2E', () => {
     // Check event counts - should still be exactly 1 despite multiple session accesses
     const taskCreatedCount = eventCounts.get('task:task:created') || 0;
 
-    console.log('Event counts after multiple accesses:', Object.fromEntries(eventCounts.entries()));
+    logger.debug(
+      'Event counts after multiple accesses:',
+      Object.fromEntries(eventCounts.entries())
+    );
 
     expect(taskCreatedCount).toBe(1);
   });
@@ -392,7 +396,7 @@ describe('Task Event Deduplication E2E', () => {
     // Should have exactly 2 task:created events (one per task)
     const taskCreatedCount = eventCounts.get('task:task:created') || 0;
 
-    console.log('Event counts across sessions:', Object.fromEntries(eventCounts.entries()));
+    logger.debug('Event counts across sessions:', Object.fromEntries(eventCounts.entries()));
 
     expect(taskCreatedCount).toBe(2);
   });

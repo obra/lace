@@ -118,7 +118,6 @@ export async function POST(
         // Message processing started
       })
       .catch((error: unknown) => {
-        console.error('[MESSAGE_API] Error processing message:', error);
         // Emit error event
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorEvent: SessionEvent = {
@@ -143,8 +142,6 @@ export async function POST(
 
     return createSuperjsonResponse(response, { status: 202 });
   } catch (error: unknown) {
-    console.error('[MESSAGE_API] Error in POST /api/threads/[threadId]/message:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }

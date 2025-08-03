@@ -96,8 +96,6 @@ export async function POST(
 
     return createSuperjsonResponse({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {
-    console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
-
     if (isError(error) && error.message === 'Session not found') {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -139,7 +137,6 @@ export async function GET(
       })),
     });
   } catch (error: unknown) {
-    console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

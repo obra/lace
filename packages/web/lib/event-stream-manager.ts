@@ -5,6 +5,7 @@ import type { StreamEvent, StreamEventCategory } from '@/types/stream-events';
 import type { Task, TaskContext, ThreadId } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
+import { logger } from '~/utils/logger';
 
 // No conversion needed - JSON.stringify happens at the network boundary
 
@@ -222,7 +223,7 @@ export class EventStreamManager {
       } catch (error) {
         // Connection may already be closed - only log if it's an unexpected error
         if ((error as Error).code !== 'ERR_INVALID_STATE') {
-          console.warn(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
+          logger.debug(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
         }
       }
       this.connections.delete(connectionId);
@@ -244,7 +245,7 @@ export class EventStreamManager {
         try {
           this.sendToConnection(connection, fullEvent);
         } catch (error) {
-          console.error(`[EVENT_STREAM] Failed to send to connection ${connectionId}:`, error);
+          logger.debug(`[EVENT_STREAM] Failed to send to connection ${connectionId}:`, error);
           deadConnections.push(connectionId);
         }
       }

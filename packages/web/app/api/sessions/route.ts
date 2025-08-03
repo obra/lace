@@ -18,8 +18,6 @@ export async function GET(_request: NextRequest) {
 
     return createSuperjsonResponse({ sessions });
   } catch (error: unknown) {
-    console.error('Error in GET /api/sessions:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }

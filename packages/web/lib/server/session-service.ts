@@ -7,6 +7,7 @@ import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import { logger } from '~/utils/logger';
 
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates
@@ -116,7 +117,7 @@ export class SessionService {
     const threadId = agent.threadId;
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
-      console.warn(
+      logger.debug(
         `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
       );
       const event: SessionEvent = {
@@ -192,7 +193,7 @@ export class SessionService {
 
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
-      console.error(`Agent ${threadId} error:`, error);
+      logger.error(`Agent ${threadId} error:`, error);
       const event: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId,

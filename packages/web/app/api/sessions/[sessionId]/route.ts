@@ -59,8 +59,6 @@ export async function GET(
 
     return createSuperjsonResponse({ session: sessionData });
   } catch (error: unknown) {
-    console.error('Error in GET /api/sessions/[sessionId]:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
@@ -153,8 +151,6 @@ export async function PATCH(
 
     return createSuperjsonResponse({ session: sessionData });
   } catch (error: unknown) {
-    console.error('Error in PATCH /api/sessions/[sessionId]:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }

@@ -180,7 +180,6 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     default: {
       // TypeScript exhaustiveness check - cast to access type property
       const unknownEvent = threadEvent as { type: string };
-      console.warn('Unknown event type encountered:', unknownEvent.type);
       // Return a fallback for runtime safety
       return {
         ...baseEvent,
@@ -230,8 +229,6 @@ export async function GET(
 
     return createSuperjsonResponse({ events }, { status: 200 });
   } catch (error: unknown) {
-    console.error('Error in GET /api/sessions/[sessionId]/history:', error);
-
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR', error });
   }
