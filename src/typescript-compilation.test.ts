@@ -19,13 +19,13 @@ describe('TypeScript Compilation', () => {
 
   it('should have clean TypeScript output for build', () => {
     expect(() => {
-      // Run the actual build command
+      // Run the actual build command (includes web package build)
       execSync('npm run build', {
         stdio: 'pipe',
         encoding: 'utf8',
         cwd: process.cwd(),
-        timeout: 30000, // 30 second timeout
+        timeout: 60000, // 60 second timeout for full build including web package
       });
     }).not.toThrow();
-  }, 35000); // 35 second timeout for vitest
+  }, 70000); // 70 second timeout for vitest
 });
