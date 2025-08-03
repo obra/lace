@@ -53,7 +53,6 @@ export async function GET(
         provider: agent.provider,
         model: agent.model,
         status: agent.status,
-        createdAt: (agent as { createdAt?: Date }).createdAt ?? new Date(),
       })),
     };
 
@@ -145,7 +144,6 @@ export async function PATCH(
         provider: agent.provider,
         model: agent.model,
         status: agent.status,
-        createdAt: (agent as { createdAt?: Date }).createdAt ?? new Date(),
       })),
     };
 

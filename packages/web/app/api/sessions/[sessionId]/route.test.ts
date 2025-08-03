@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
-import type { ApiSession } from '@/types/api';
+import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { getSessionService } from '@/lib/server/session-service';
@@ -127,7 +127,7 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ session: ApiSession }>(response);
+      const data = await parseResponse<{ session: SessionInfo }>(response);
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -217,7 +217,7 @@ describe('Session Detail API Route', () => {
       }
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ session: ApiSession }>(response);
+      const data = await parseResponse<{ session: SessionInfo }>(response);
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
@@ -322,7 +322,7 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ session: ApiSession }>(response);
+      const data = await parseResponse<{ session: SessionInfo }>(response);
       expect(data.session).toEqual(
         expect.objectContaining({
           id: sessionId,
