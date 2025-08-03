@@ -96,7 +96,7 @@ describe('Agent API', () => {
         provider: 'anthropic',
         model: 'claude-3-sonnet',
         status: 'idle',
-        createdAt: expect.any(String) as string,
+        createdAt: expect.any(Date) as Date,
       });
       expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20241122_abc123');
       expect(mockSession.getAgent).toHaveBeenCalledWith('lace_20241122_abc123.1');
@@ -205,7 +205,7 @@ describe('Agent API', () => {
         provider: 'anthropic',
         model: 'claude-3-sonnet',
         status: 'idle',
-        createdAt: expect.any(String) as string,
+        createdAt: expect.any(Date) as Date,
       });
     });
 

@@ -6,6 +6,7 @@ import type { Task, TaskContext, ThreadId } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
+import { stringify } from '@/lib/serialization';
 
 // Type guard for errors with code property (Web Streams API errors)
 function hasErrorCode(error: unknown): error is Error & { code: string } {
@@ -308,7 +309,7 @@ export class EventStreamManager {
 
   // Send event to specific connection
   private sendToConnection(connection: ClientConnection, event: StreamEvent): void {
-    const eventData = `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
+    const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
 
     try {

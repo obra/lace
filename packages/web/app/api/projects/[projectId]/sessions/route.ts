@@ -31,7 +31,7 @@ export async function GET(
     const sessions = sessionData.map((data) => ({
       id: data.id,
       name: data.name,
-      createdAt: data.createdAt.toISOString(),
+      createdAt: data.createdAt,
       agentCount: data.agentCount,
       // Full agent details will be populated when individual session is selected
     }));

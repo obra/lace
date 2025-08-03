@@ -132,7 +132,7 @@ describe('Session Detail API Route', () => {
         expect.objectContaining({
           id: sessionId,
           name: 'Test Session',
-          createdAt: expect.any(String) as string,
+          createdAt: expect.any(Date) as Date,
           agents: expect.arrayContaining([
             expect.objectContaining({
               threadId: sessionId,

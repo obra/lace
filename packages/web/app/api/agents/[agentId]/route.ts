@@ -52,7 +52,7 @@ export async function GET(
       provider: (metadata?.provider as string) || agent.providerName,
       model: (metadata?.model as string) || 'unknown',
       status: agent.getCurrentState(),
-      createdAt: new Date().toISOString(), // TODO: Get actual creation time
+      createdAt: new Date(), // TODO: Get actual creation time
     };
 
     return createSuperjsonResponse({ agent: agentResponse });
@@ -124,7 +124,7 @@ export async function PUT(
       provider: (metadata?.provider as string) || agent.providerName,
       model: (metadata?.model as string) || 'unknown',
       status: agent.getCurrentState(),
-      createdAt: new Date().toISOString(), // TODO: Get actual creation time
+      createdAt: new Date(), // TODO: Get actual creation time
     };
 
     return createSuperjsonResponse({ agent: agentResponse });

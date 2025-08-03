@@ -76,7 +76,7 @@ export async function POST(
       provider: agent.provider,
       model: agent.model,
       status: agent.status,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     };
 
     // Test SSE broadcast
@@ -133,7 +133,7 @@ export async function GET(
         provider: agent.provider,
         model: agent.model,
         status: agent.status,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
       })),
     });
   } catch (_error: unknown) {
