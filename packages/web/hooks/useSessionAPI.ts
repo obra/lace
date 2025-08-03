@@ -219,6 +219,37 @@ export function useSessionAPI() {
     }
   }, []);
 
+  const stopAgent = useCallback(async (agentId: ThreadId): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/agents/${agentId}/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const error: unknown = parse(await response.text());
+        if (isApiError(error)) {
+          throw new Error(error.error || 'Failed to stop agent');
+        }
+        throw new Error('Failed to stop agent');
+      }
+
+      const data: unknown = parse(await response.text());
+      if (isApiSuccess<{ success: boolean }>(data) && 'success' in data) {
+        return data['success'] as boolean;
+      }
+      return true; // Default to success if response format is unexpected
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unknown error');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading: state.loading,
     error: state.error,
@@ -228,5 +259,6 @@ export function useSessionAPI() {
     spawnAgent,
     listAgents,
     sendMessage,
+    stopAgent,
   };
 }

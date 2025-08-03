@@ -91,7 +91,7 @@ export const LaceApp = memo(function LaceApp() {
   } = useSessionEvents(selectedSession, selectedAgent, false); // Connection state will be passed to component that needs it
 
   // Use session API hook for all API calls
-  const { sendMessage: sendMessageAPI, loading: sendingMessage } = useSessionAPI();
+  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI, loading: sendingMessage } = useSessionAPI();
 
   // Task manager - only create when we have a project and session
   const taskManager = useTaskManager(
@@ -274,6 +274,11 @@ export const LaceApp = memo(function LaceApp() {
     }
     return await sendMessageAPI(selectedAgent, message);
   }, [selectedAgent, sendMessageAPI]);
+
+  const stopGeneration = useCallback(async () => {
+    if (!selectedAgent) return false;
+    return await stopAgentAPI(selectedAgent);
+  }, [selectedAgent, stopAgentAPI]);
 
   // Handle tool approval decision
   const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
@@ -880,7 +885,9 @@ export const LaceApp = memo(function LaceApp() {
                 {/* Chat Input */}
                 <MemoizedChatInput
                   onSubmit={sendMessage}
+                  onInterrupt={stopGeneration}
                   disabled={sendingMessage}
+                  isStreaming={sendingMessage}
                   placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
                 />
               </div>
@@ -974,11 +981,15 @@ export const LaceApp = memo(function LaceApp() {
 // Memoized chat input component to prevent parent re-renders
 const MemoizedChatInput = memo(function MemoizedChatInput({ 
   onSubmit, 
-  disabled, 
+  onInterrupt,
+  disabled,
+  isStreaming,
   placeholder 
 }: { 
   onSubmit: (message: string) => Promise<boolean | void>;
+  onInterrupt?: () => Promise<boolean | void>;
   disabled: boolean;
+  isStreaming?: boolean;
   placeholder: string;
 }) {
   const [message, setMessage] = useState('');
@@ -1000,8 +1011,10 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
         value={message}
         onChange={setMessage}
         onSubmit={handleSubmit}
+        onInterrupt={onInterrupt}
         disabled={disabled}
         isListening={false}
+        isStreaming={isStreaming}
         onStartVoice={() => {}}
         onStopVoice={() => {}}
         placeholder={placeholder}
