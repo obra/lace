@@ -163,8 +163,8 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     expect(mockAgent.getPendingApprovals).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = await parseResponse<{ error: string }>(response);
-    expect(data).toEqual({ error: 'Agent not found for thread' });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({ error: 'Agent not found for thread', code: 'RESOURCE_NOT_FOUND' });
   });
 
   it('should handle multiple pending approvals with different tool types', async () => {
@@ -281,7 +281,10 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const response = await GET(request, { params });
 
     expect(response.status).toBe(500);
-    const data = await parseResponse<{ error: string }>(response);
-    expect(data).toEqual({ error: 'Failed to get pending approvals' });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({
+      error: 'Failed to get pending approvals',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
   });
 });

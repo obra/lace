@@ -137,8 +137,8 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(mockAgent.handleApprovalResponse).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = await parseResponse<{ error: string }>(response);
-    expect(data).toEqual({ error: 'Agent not found for thread' });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({ error: 'Agent not found for thread', code: 'RESOURCE_NOT_FOUND' });
   });
 
   it('should return error for invalid JSON', async () => {
@@ -252,7 +252,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const response = await POST(request, { params });
 
     expect(response.status).toBe(500);
-    const data = await parseResponse<{ error: string }>(response);
-    expect(data).toEqual({ error: 'Internal server error' });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({ error: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
   });
 });
