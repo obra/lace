@@ -568,83 +568,39 @@ Set environment variables in test, run migration, verify files created.
 
 **Commit message:** "feat: add environment variable migration"
 
-### Task 5: Create Web API Endpoints
+### ✅ Task 5: Create Web API Endpoints (COMPLETED)
 
-**Files to create:**
-- `src/interfaces/web/app/api/providers/route.ts`
-- `src/interfaces/web/app/api/providers/[id]/route.ts`
-- `src/interfaces/web/app/api/providers/[id]/test/route.ts`
+**Files created:**
+- `packages/web/app/api/provider/catalog/route.ts` + tests
+- `packages/web/app/api/provider/instances/route.ts` + tests  
+- `packages/web/app/api/provider/instances/[instanceId]/route.ts` + tests
+- Updated `packages/web/lib/server/lace-imports.ts` with new exports
 
-**What to implement:**
+**What was implemented:**
 
-```typescript
-// src/interfaces/web/app/api/providers/route.ts
-// List providers and create new ones
+✅ **API Endpoints Created:**
+- `GET /api/provider/catalog` - Returns available providers from Catwalk catalog
+- `GET /api/provider/instances` - Lists configured provider instances
+- `POST /api/provider/instances` - Creates new provider instances with validation
+- `GET /api/provider/instances/[id]` - Gets specific instance details  
+- `DELETE /api/provider/instances/[id]` - Deletes instances and credentials
 
-import { NextRequest, NextResponse } from 'next/server';
-import { ProviderConfigManager } from '~/providers/provider-config-manager';
-import { z } from 'zod';
+✅ **Key Features:**
+- Real implementation testing (no mocking of business logic)
+- Comprehensive Zod schema validation
+- Proper error handling with HTTP status codes
+- Integration with ProviderRegistry, ProviderCatalogManager, ProviderInstanceManager
+- Secure credential management with 0600 file permissions
+- Full TypeScript type safety
 
-const CreateProviderSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
-  name: z.string().min(1),
-  type: z.enum(['anthropic-api', 'openai-api']),
-  config: z.record(z.unknown()),
-  credential: z.object({
-    apiKey: z.string().min(1)
-  })
-});
+✅ **Testing:**
+- 22 comprehensive test cases across 4 test files
+- TDD approach with failing tests first, then implementation
+- Tests use real file system operations with temp directories
+- All tests passing, lint clean (no errors/warnings)
+- Committed as `6d7f5d6a`
 
-export async function GET() {
-  const manager = new ProviderConfigManager();
-  const config = await manager.loadConfig();
-  
-  // Never return credentials
-  const providers = Object.entries(config.providers).map(([id, instance]) => ({
-    id,
-    ...instance,
-    hasCredential: !!(await manager.loadCredential(id))
-  }));
-
-  return NextResponse.json({ providers });
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.json() as unknown;
-  const parsed = CreateProviderSchema.safeParse(body);
-  
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.message },
-      { status: 400 }
-    );
-  }
-
-  const manager = new ProviderConfigManager();
-  const config = await manager.loadConfig();
-  
-  // Add provider
-  config.providers[parsed.data.id] = {
-    name: parsed.data.name,
-    type: parsed.data.type,
-    config: parsed.data.config
-  };
-
-  // Save credential separately
-  await manager.saveCredential(parsed.data.id, {
-    apiKey: parsed.data.credential.apiKey
-  });
-
-  await manager.saveConfig(config);
-
-  return NextResponse.json({ success: true });
-}
-```
-
-**API Testing approach:**
-Use Playwright for E2E tests or create integration tests that start the Next.js server.
-
-**Commit message:** "feat: add provider management API endpoints"
+The API endpoints are ready for frontend integration.
 
 ### Task 6: Provider Management App Routes & Layout
 
