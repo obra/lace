@@ -136,7 +136,7 @@ export async function GET(
         createdAt: new Date().toISOString(),
       })),
     });
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

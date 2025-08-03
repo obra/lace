@@ -24,6 +24,10 @@ describe('CodeBlock', () => {
 
   describe('Basic Rendering', () => {
     it('renders code with auto-detection for unknown language', () => {
+      // Mock console.error to suppress highlight.js warning about unknown language
+      const originalConsoleError = console.error;
+      console.error = vi.fn();
+      
       render(
         <CodeBlock 
           code="const test = 'hello';" 
@@ -36,6 +40,14 @@ describe('CodeBlock', () => {
       expect(codeElement.innerHTML).toContain('const');
       expect(codeElement.innerHTML).toContain('test');
       expect(codeElement.innerHTML).toContain('hello');
+      
+      // Verify the warning was called (expected behavior)
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("Could not find the language 'unknown-lang'")
+      );
+      
+      // Restore console.error
+      console.error = originalConsoleError;
     });
 
     it('renders plain text when no language is specified', () => {
