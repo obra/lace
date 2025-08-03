@@ -215,10 +215,15 @@ export class EventStreamManager {
     const connection = this.connections.get(connectionId);
     if (connection) {
       try {
-        connection.controller.close();
+        // Check if controller is still open before trying to close
+        if (connection.controller.desiredSize !== null) {
+          connection.controller.close();
+        }
       } catch (error) {
-        // Connection may already be closed
-        console.warn(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
+        // Connection may already be closed - only log if it's an unexpected error
+        if ((error as Error).code !== 'ERR_INVALID_STATE') {
+          console.warn(`[EVENT_STREAM] Error closing connection ${connectionId}:`, error);
+        }
       }
       this.connections.delete(connectionId);
     }
@@ -295,8 +300,17 @@ export class EventStreamManager {
   private sendToConnection(connection: ClientConnection, event: StreamEvent): void {
     const eventData = `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
-    connection.controller.enqueue(chunk);
-    connection.lastEventId = event.id;
+
+    try {
+      connection.controller.enqueue(chunk);
+      connection.lastEventId = event.id;
+    } catch (error) {
+      // Controller may have been closed between broadcast and send
+      if ((error as Error).code === 'ERR_INVALID_STATE') {
+        throw new Error('Controller is closed');
+      }
+      throw error;
+    }
   }
 
   // Generate unique event IDs
@@ -376,7 +390,12 @@ export class EventStreamManager {
 
     for (const [connectionId, connection] of this.connections) {
       try {
-        connection.controller.enqueue(keepAliveBytes);
+        // Check if controller is still open before trying to send
+        if (connection.controller.desiredSize !== null) {
+          connection.controller.enqueue(keepAliveBytes);
+        } else {
+          deadConnections.push(connectionId);
+        }
       } catch (_error) {
         // Connection is dead
         deadConnections.push(connectionId);
