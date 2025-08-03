@@ -1,7 +1,7 @@
 // ABOUTME: Event stream types for real-time notifications
 // ABOUTME: Clean re-export of core event types - no duplicate definitions
 
-import type { StreamEvent, StreamSubscription } from '~/events/types';
+import type { StreamEvent, StreamSubscription } from '~/stream-events/types';
 
 // Re-export all core event types (single source of truth)
 export type {
@@ -25,7 +25,7 @@ export type {
   isProjectEvent,
   isGlobalEvent,
   isSessionEvent,
-} from '~/events/types';
+} from '~/stream-events/types';
 
 // Web-specific connection state (not part of core events)
 export interface StreamConnection {

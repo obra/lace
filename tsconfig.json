@@ -24,6 +24,10 @@
   "exclude": ["node_modules", "dist", "packages"],
   "tsc-alias": {
     "resolveFullPaths": true,
-    "resolveFullExtension": ".js"
+    "resolveFullExtension": ".js",
+    "verbose": false,
+    "replacers": {
+      "~/*": "./*"
+    }
   }
 }
