@@ -63,66 +63,40 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   // Take screenshot after clicking for debugging
   await page.screenshot({ path: 'debug-after-new-project-click.png' });
   
-  // Wait for the project creation modal to appear (use more specific selector)
+  // Wait for the project creation modal to appear
   await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({ timeout: 10000 });
   
-  // Find the directory input field (the main input in the modal)
-  const directoryInput = page.locator('input[placeholder*="path"]')
-    .or(page.locator('input[placeholder*="project"]'))
-    .or(page.locator('input').first())
-    .first();
-  
+  // Find the directory input field using the actual placeholder we discovered
+  const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
   await directoryInput.waitFor({ timeout: 5000 });
   
   // Create a project directory path that includes the project name
   const projectPath = path.join(tempDir, projectName.replace(/\s+/g, '-').toLowerCase());
-  await directoryInput.fill(projectPath);
   
-  // Trigger blur/change events to activate form validation
-  await directoryInput.blur();
-  await page.waitForTimeout(500);
-  
-  // The form might need to validate the directory path
-  // Try pressing Tab to move focus and trigger validation
-  await page.keyboard.press('Tab');
-  await page.waitForTimeout(1000);
-  
-  // Check if there are advanced options we need to expand
-  const advancedButton = page.locator('button:has-text("Advanced Options")');
-  if (await advancedButton.isVisible()) {
-    await advancedButton.click();
-    await page.waitForTimeout(500);
-  }
-  
-  // Create the directory first so the form validation passes
+  // Create the directory first so validation passes
   await fs.promises.mkdir(projectPath, { recursive: true });
   
-  // Skip the problematic click - project should be ready to create
+  // Fill the directory path
+  await directoryInput.fill(projectPath);
   
-  // Wait for the Create Project button to become enabled (form validation)
+  // Trigger events to activate form validation
+  await directoryInput.blur();
+  await page.waitForTimeout(1000);
+  
+  // Click the Create Project button - it should be enabled now
   const createButton = page.locator('button:has-text("Create Project")');
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
   
-  // If button is still disabled, try force-enabling it via JavaScript
-  const isEnabled = await createButton.isEnabled();
-  if (!isEnabled) {
-    console.log('Button still disabled, attempting to force enable...');
-    await page.evaluate(() => {
-      // Find button by text content more reliably
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const createButton = buttons.find((btn) => btn.textContent?.includes('Create Project'));
-      if (createButton) {
-        (createButton as HTMLButtonElement).disabled = false;
-      }
-    });
-    await page.waitForTimeout(500);
-  }
+  // Wait for button to be enabled (form validation should pass with valid directory)
+  await expect(createButton).toBeEnabled({ timeout: 5000 });
   
   // Click the button
   await createButton.click();
   
   // Wait for project to be created and become visible
-  await expect(page.getByText(projectName)).toBeVisible({ timeout: 15000 });
+  // The project name is derived from the directory path (lowercased with dashes)
+  const displayedProjectName = projectName.replace(/\s+/g, '-').toLowerCase();
+  await expect(page.getByRole('heading', { name: displayedProjectName })).toBeVisible({ timeout: 15000 });
 }
 
 export async function selectProject(page: Page, projectName: string) {
