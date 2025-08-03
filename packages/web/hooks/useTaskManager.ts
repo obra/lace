@@ -5,11 +5,23 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TaskAPIClient } from '@/lib/client/task-api';
-import { useTaskStream, type TaskEvent } from '@/hooks/useTaskStream';
-import type { Task } from '@/types';
-import type { TaskFilters, CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
+import type { TaskEvent } from '@/hooks/useEventStream';
+import type { Task } from '@/types/core';
+import type { TaskFilters } from '@/types/core';
+import type { CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
 
-export function useTaskManager(projectId: string, sessionId: string) {
+interface TaskEventHandlers {
+  onTaskCreated?: (event: TaskEvent) => void;
+  onTaskUpdated?: (event: TaskEvent) => void;
+  onTaskDeleted?: (event: TaskEvent) => void;
+  onTaskNoteAdded?: (event: TaskEvent) => void;
+}
+
+export function useTaskManager(
+  projectId: string,
+  sessionId: string,
+  eventHandlers?: TaskEventHandlers
+) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -62,34 +74,46 @@ export function useTaskManager(projectId: string, sessionId: string) {
     }, 100);
   }, [fetchTasks]);
 
-  // Subscribe to real-time task updates
-  useTaskStream({
-    projectId,
-    sessionId,
-    onTaskCreated: useCallback((event: TaskEvent) => {
+  // Task event handlers for real-time updates
+  const handleTaskCreated = useCallback(
+    (event: TaskEvent) => {
       if (event.task) {
         setTasks((prev) => [...prev, event.task!]);
       }
-    }, []),
-    onTaskUpdated: useCallback((event: TaskEvent) => {
+      eventHandlers?.onTaskCreated?.(event);
+    },
+    [eventHandlers]
+  );
+
+  const handleTaskUpdated = useCallback(
+    (event: TaskEvent) => {
       if (event.task) {
         setTasks((prev) => prev.map((task) => (task.id === event.task!.id ? event.task! : task)));
       }
-    }, []),
-    onTaskDeleted: useCallback((event: TaskEvent) => {
+      eventHandlers?.onTaskUpdated?.(event);
+    },
+    [eventHandlers]
+  );
+
+  const handleTaskDeleted = useCallback(
+    (event: TaskEvent) => {
       if (event.taskId) {
         setTasks((prev) => prev.filter((task) => task.id !== event.taskId));
       }
-    }, []),
-    onTaskNoteAdded: useCallback((event: TaskEvent) => {
+      eventHandlers?.onTaskDeleted?.(event);
+    },
+    [eventHandlers]
+  );
+
+  const handleTaskNoteAdded = useCallback(
+    (event: TaskEvent) => {
       if (event.task) {
         setTasks((prev) => prev.map((task) => (task.id === event.task!.id ? event.task! : task)));
       }
-    }, []),
-    onError: useCallback((error: Error) => {
-      console.error('Task stream error:', error);
-    }, []),
-  });
+      eventHandlers?.onTaskNoteAdded?.(event);
+    },
+    [eventHandlers]
+  );
 
   // Initial fetch
   useEffect(() => {
@@ -227,5 +251,10 @@ export function useTaskManager(projectId: string, sessionId: string) {
     updateTask,
     deleteTask,
     addNote,
+    // Export event handlers for parent to wire to useEventStream
+    handleTaskCreated,
+    handleTaskUpdated,
+    handleTaskDeleted,
+    handleTaskNoteAdded,
   };
 }

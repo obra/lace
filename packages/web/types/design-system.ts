@@ -1,7 +1,7 @@
 // ABOUTME: Design system specific types imported from f-web-spicy
 // ABOUTME: Essential interfaces for UI components, timeline, and chat functionality
 
-import type { ToolResult } from '@/lib/server/lace-imports';
+import type { ToolResult } from '@/types/core';
 
 export interface Message {
   id: string;

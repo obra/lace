@@ -2,10 +2,10 @@
 // ABOUTME: Uses core thread types as single source of truth
 
 // Import thread event types from core package to maintain consistency
-import { EVENT_TYPES, type EventType } from '@/lib/core-types-import';
+import { EVENT_TYPES, type ThreadEventType } from '@/types/core';
 
 // Re-export for backward compatibility
-export { EVENT_TYPES, type EventType };
+export { EVENT_TYPES, type ThreadEventType };
 
 // UI-only event types that are NOT persisted to the database
 export const UI_EVENT_TYPES = [
@@ -17,7 +17,7 @@ export const UI_EVENT_TYPES = [
 export type UIEventType = (typeof UI_EVENT_TYPES)[number];
 
 // Combined event types for SSE streaming
-export type SessionEventType = EventType | UIEventType;
+export type SessionEventType = ThreadEventType | UIEventType;
 
 // Get all event types for SSE listeners
 export function getAllEventTypes(): SessionEventType[] {
@@ -25,6 +25,6 @@ export function getAllEventTypes(): SessionEventType[] {
 }
 
 // Helper to check if an event should be persisted
-export function isPersistedEvent(type: SessionEventType): type is EventType {
+export function isPersistedEvent(type: SessionEventType): type is ThreadEventType {
   return (EVENT_TYPES as readonly string[]).includes(type);
 }

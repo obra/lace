@@ -8,22 +8,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/lib/server/lace-imports';
+import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
-
-// Mock SSE Manager
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-      addConnection: vi.fn(),
-      removeConnection: vi.fn(),
-    }),
-  },
-}));
 
 // Mock approval manager
 vi.mock('@/lib/server/approval-manager', () => ({

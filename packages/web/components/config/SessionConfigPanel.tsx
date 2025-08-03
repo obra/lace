@@ -9,12 +9,11 @@ import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from 
 import { ModelDropdown } from './ModelDropdown';
 import { ProviderDropdown } from './ProviderDropdown';
 import type { 
-  Session, 
-  ProjectInfo, 
   ProviderInfo, 
   ModelInfo, 
   CreateAgentRequest 
 } from '@/types/api';
+import type { SessionInfo, ProjectInfo } from '@/types/core';
 
 interface SessionConfiguration {
   provider?: string;
@@ -29,15 +28,15 @@ interface SessionConfiguration {
 
 interface SessionConfigPanelProps {
   selectedProject: ProjectInfo;
-  sessions: Session[];
-  selectedSession: Session | null;
+  sessions: SessionInfo[];
+  selectedSession: SessionInfo | null;
   providers: ProviderInfo[];
   onSessionCreate: (sessionData: { name: string; description?: string; configuration?: SessionConfiguration }) => void;
-  onSessionSelect: (session: Session) => void;
+  onSessionSelect: (session: SessionInfo) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
   onAgentSelect?: (agentId: string) => void;
   onAgentUpdate?: () => void | Promise<void>;
-  onSessionUpdate?: (sessionId: string, updates: Partial<Session & { configuration?: SessionConfiguration }>) => void;
+  onSessionUpdate?: (sessionId: string, updates: Partial<SessionInfo & { configuration?: SessionConfiguration }>) => void;
   loading?: boolean;
 }
 
@@ -400,7 +399,7 @@ export function SessionConfigPanel({
                     <h4 className="font-medium text-base-content">{session.name}</h4>
                     <div className="flex items-center gap-4 mt-2 text-sm text-base-content/60">
                       <span>Created {new Date(session.createdAt).toLocaleDateString()}</span>
-                      <span>{session.agentCount || 0} agents</span>
+                      <span>{session.agents?.length || 0} agents</span>
                     </div>
                   </div>
                   

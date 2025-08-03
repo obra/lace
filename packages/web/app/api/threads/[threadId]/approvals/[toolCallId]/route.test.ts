@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 import { getSessionService } from '@/lib/server/session-service';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');
@@ -51,16 +52,19 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should create TOOL_APPROVAL_RESPONSE event with correct data', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
     // Create mock request
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     // Mock params
     const params = { threadId, toolCallId };
@@ -73,21 +77,24 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
     // Verify response
     expect(response.status).toBe(200);
-    const data = (await response.json()) as { success: boolean };
+    const data = await parseResponse<{ success: boolean }>(response);
     expect(data).toEqual({ success: true });
   });
 
   it('should handle different approval decisions', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decisions = ['allow_once', 'allow_session', 'deny'];
 
     for (const decision of decisions) {
-      const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-        method: 'POST',
-        body: JSON.stringify({ decision }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ decision }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
       const params = { threadId, toolCallId };
       const response = await POST(request, { params });
@@ -95,7 +102,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
 
       expect(response.status).toBe(200);
-      const data = (await response.json()) as { success: boolean };
+      const data = await parseResponse<{ success: boolean }>(response);
       expect(data).toEqual({ success: true });
 
       // Clear mocks between iterations
@@ -107,18 +114,21 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should return error if agent not found', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
@@ -127,48 +137,54 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(mockAgent.handleApprovalResponse).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = (await response.json()) as { error: string };
-    expect(data).toEqual({ error: 'Agent not found for thread' });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({ error: 'Agent not found for thread', code: 'RESOURCE_NOT_FOUND' });
   });
 
   it('should return error for invalid JSON', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: 'invalid json',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: 'invalid json',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toHaveProperty('error');
   });
 
   it('should return error for missing decision', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({}), // Missing decision
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}), // Missing decision
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
-    const data = (await response.json()) as { error: string };
+    const data = await parseResponse<{ error: string }>(response);
     expect(data).toHaveProperty('error');
   });
 
   it('should handle duplicate approval requests gracefully', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
@@ -179,30 +195,36 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
 
     // First request should succeed
-    const request1 = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request1 = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response1 = await POST(request1, { params });
 
     expect(response1.status).toBe(200);
-    const data1 = (await response1.json()) as { success: boolean };
+    const data1 = await parseResponse<{ success: boolean }>(response1);
     expect(data1).toEqual({ success: true });
 
     // Second request (duplicate) should also succeed
-    const request2 = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request2 = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const response2 = await POST(request2, { params });
 
     expect(response2.status).toBe(200);
-    const data2 = (await response2.json()) as { success: boolean };
+    const data2 = await parseResponse<{ success: boolean }>(response2);
     expect(data2).toEqual({ success: true });
 
     // Verify handleApprovalResponse was called twice
@@ -210,24 +232,27 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
   });
 
   it('should throw non-constraint errors normally', async () => {
-    const threadId = 'lace_20250101_test123';
+    const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
     const decision = 'allow_once';
 
     // Mock handleApprovalResponse to throw a non-constraint error
     mockAgent.handleApprovalResponse.mockRejectedValueOnce(new Error('Some other agent error'));
 
-    const request = new NextRequest(`http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`, {
-      method: 'POST',
-      body: JSON.stringify({ decision }),
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
     const params = { threadId, toolCallId };
     const response = await POST(request, { params });
 
     expect(response.status).toBe(500);
-    const data = (await response.json()) as { error: string };
-    expect(data).toEqual({ error: 'Internal server error' });
+    const data = await parseResponse<{ error: string; code?: string }>(response);
+    expect(data).toEqual({ error: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
   });
 });

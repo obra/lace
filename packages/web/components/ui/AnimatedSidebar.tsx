@@ -15,7 +15,9 @@ import {
   faFileCode,
 } from '@/lib/fontawesome';
 import { ChevronDownIcon, ChevronRightIcon, ChevronLeftIcon } from '@/lib/heroicons';
-import { Timeline, Project, Task, RecentFile } from '@/types';
+import { Timeline, RecentFile } from '@/types/design-system';
+import type { Task } from '@/types/core';
+import type { ProjectInfo as Project } from '@/types/core';
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { AccountDropdown } from '@/components/ui/AccountDropdown';
 import {

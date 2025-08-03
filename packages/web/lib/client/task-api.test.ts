@@ -3,7 +3,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskAPIClient } from '@/lib/client/task-api';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
+import { createMockResponse, createMockErrorResponse } from '@/test-utils/mock-fetch';
 
 // Mock fetch to capture requests without making real calls
 global.fetch = vi.fn() as unknown as typeof fetch;
@@ -18,10 +19,7 @@ describe('TaskAPIClient Unit Tests', () => {
     mockFetch = vi.mocked(global.fetch);
 
     // Default successful response mock
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ tasks: [], task: {} }),
-    } as Response);
+    mockFetch.mockResolvedValue(createMockResponse({ tasks: [], task: {} }));
   });
 
   afterEach(() => {
@@ -45,7 +43,9 @@ describe('TaskAPIClient Unit Tests', () => {
       });
 
       const requestUrl = mockFetch.mock.calls[0][0] as string;
-      expect(requestUrl).toContain('/api/projects/project_123/sessions/lace_20240101_session/tasks?');
+      expect(requestUrl).toContain(
+        '/api/projects/project_123/sessions/lace_20240101_session/tasks?'
+      );
       expect(requestUrl).toContain('status=pending');
       expect(requestUrl).toContain('assignedTo=lace_20240101_agent1');
       expect(requestUrl).toContain('priority=high');
@@ -55,7 +55,9 @@ describe('TaskAPIClient Unit Tests', () => {
       await client.getTask('project_123', 'lace_20240101_session', 'task_20240101_abc123');
 
       const requestUrl = mockFetch.mock.calls[0][0] as string;
-      expect(requestUrl).toBe('/api/projects/project_123/sessions/lace_20240101_session/tasks/task_20240101_abc123');
+      expect(requestUrl).toBe(
+        '/api/projects/project_123/sessions/lace_20240101_session/tasks/task_20240101_abc123'
+      );
     });
   });
 
@@ -90,7 +92,9 @@ describe('TaskAPIClient Unit Tests', () => {
       });
 
       const fetchCall = mockFetch.mock.calls[0];
-      expect(fetchCall[0]).toBe('/api/projects/project_123/sessions/lace_20240101_session/tasks/task_123');
+      expect(fetchCall[0]).toBe(
+        '/api/projects/project_123/sessions/lace_20240101_session/tasks/task_123'
+      );
       expect(fetchCall[1]).toEqual({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -106,7 +110,9 @@ describe('TaskAPIClient Unit Tests', () => {
       await client.deleteTask('project_123', 'lace_20240101_session', 'task_123');
 
       const fetchCall = mockFetch.mock.calls[0];
-      expect(fetchCall[0]).toBe('/api/projects/project_123/sessions/lace_20240101_session/tasks/task_123');
+      expect(fetchCall[0]).toBe(
+        '/api/projects/project_123/sessions/lace_20240101_session/tasks/task_123'
+      );
       expect(fetchCall[1]).toEqual({ method: 'DELETE' });
     });
 
@@ -114,7 +120,9 @@ describe('TaskAPIClient Unit Tests', () => {
       await client.addNote('project_123', 'lace_20240101_session', 'task_123', 'Test note');
 
       const fetchCall = mockFetch.mock.calls[0];
-      expect(fetchCall[0]).toBe('/api/projects/project_123/sessions/lace_20240101_session/tasks/task_123/notes');
+      expect(fetchCall[0]).toBe(
+        '/api/projects/project_123/sessions/lace_20240101_session/tasks/task_123/notes'
+      );
       expect(fetchCall[1]).toEqual({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,11 +135,7 @@ describe('TaskAPIClient Unit Tests', () => {
 
   describe('Error Handling', () => {
     it('should throw error on failed request', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        json: () => Promise.resolve({ error: 'Server error' }),
-      } as Response);
+      mockFetch.mockResolvedValue(createMockErrorResponse('Server error', { status: 500 }));
 
       await expect(client.listTasks('project_123', 'lace_20240101_session')).rejects.toThrow(
         'Failed to fetch tasks'
@@ -139,15 +143,11 @@ describe('TaskAPIClient Unit Tests', () => {
     });
 
     it('should throw appropriate errors for failed requests', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ error: 'Bad request' }),
-      } as Response);
+      mockFetch.mockResolvedValue(createMockErrorResponse('Bad request', { status: 400 }));
 
-      await expect(client.createTask('project_123', 'invalid-session', { title: '', prompt: '' })).rejects.toThrow(
-        'Failed to create task'
-      );
+      await expect(
+        client.createTask('project_123', 'invalid-session', { title: '', prompt: '' })
+      ).rejects.toThrow('Failed to create task');
     });
 
     it('should handle network errors', async () => {

@@ -3,11 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { SessionEvent, ApiErrorResponse } from '@/types/api';
-import type { ThreadEvent, ToolResult } from '@/lib/server/core-types';
-import { asThreadId } from '@/lib/server/core-types';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ThreadEvent, ToolResult } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import type { CompactionData } from '@/lib/core-types-import';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 function isToolResult(data: unknown): data is ToolResult {
   return (
@@ -55,7 +56,10 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
 
   const baseEvent = {
     threadId,
-    timestamp: threadEvent.timestamp,
+    timestamp:
+      threadEvent.timestamp instanceof Date
+        ? threadEvent.timestamp.toISOString()
+        : String(threadEvent.timestamp),
   };
 
   switch (threadEvent.type) {
@@ -87,8 +91,9 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
           ...baseEvent,
           type: 'TOOL_CALL',
           data: {
-            toolName: toolCallData.name,
-            input: toolCallData.arguments,
+            id: threadEvent.id || '',
+            name: toolCallData.name,
+            arguments: toolCallData.arguments,
           },
         };
       } else {
@@ -97,8 +102,9 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
           ...baseEvent,
           type: 'TOOL_CALL',
           data: {
-            toolName: 'unknown',
-            input: {},
+            id: threadEvent.id || '',
+            name: 'unknown',
+            arguments: {},
           },
         };
       }
@@ -128,16 +134,15 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'COMPACTION': {
-      // Convert CompactionData from core to web format
-      const compactionData = threadEvent.data as CompactionData;
+      // With discriminated union, TypeScript knows threadEvent.data is CompactionData
       return {
         ...baseEvent,
         type: 'COMPACTION',
         data: {
-          strategyId: compactionData.strategyId,
-          originalEventCount: compactionData.originalEventCount,
-          compactedEvents: compactionData.compactedEvents,
-          metadata: compactionData.metadata,
+          strategyId: threadEvent.data.strategyId,
+          originalEventCount: threadEvent.data.originalEventCount,
+          compactedEvents: threadEvent.data.compactedEvents,
+          metadata: threadEvent.data.metadata,
         },
       };
     }
@@ -173,14 +178,13 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     default: {
-      // Exhaustive check - this should never be reached if all event types are handled
-      const _exhaustiveCheck: never = threadEvent.type;
-      console.warn('Unknown event type encountered:', _exhaustiveCheck);
+      // TypeScript exhaustiveness check - cast to access type property
+      const unknownEvent = threadEvent as { type: string };
       // Return a fallback for runtime safety
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event type: ${String(_exhaustiveCheck)}` },
+        data: { content: `Unknown event type: ${unknownEvent.type}` },
       } as SessionEvent;
     }
   }
@@ -195,8 +199,7 @@ export async function GET(
 
     // Validate session ID format using client-safe validation that accepts both lace and UUID formats
     if (!isValidThreadId(sessionIdParam)) {
-      const errorResponse: ApiErrorResponse = { error: 'Invalid session ID format' };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createErrorResponse('Invalid session ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = sessionIdParam;
@@ -205,15 +208,15 @@ export async function GET(
     const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Get the coordinator agent and load events through it (proper architecture)
     const coordinatorAgent = session.getAgent(asThreadId(sessionId));
     if (!coordinatorAgent) {
-      const errorResponse: ApiErrorResponse = { error: 'Could not access session coordinator' };
-      return NextResponse.json(errorResponse, { status: 500 });
+      return createErrorResponse('Could not access session coordinator', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
     }
 
     // Load all events from the session and its delegates through the Agent layer
@@ -224,12 +227,9 @@ export async function GET(
       .map(convertThreadEventToSessionEvent)
       .filter((event): event is SessionEvent => event !== null);
 
-    return NextResponse.json({ events }, { status: 200 });
+    return createSuperjsonResponse({ events }, { status: 200 });
   } catch (error: unknown) {
-    console.error('Error in GET /api/sessions/[sessionId]/history:', error);
-
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR', error });
   }
 }

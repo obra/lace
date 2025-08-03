@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
 import { Project } from '@/lib/server/lace-imports';
+import { parseResponse } from '@/lib/serialization';
 
 // Mock Project
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -50,7 +51,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = (await response.json()) as { session: typeof mockSession };
+      const data = await parseResponse<{ session: typeof mockSession }>(response);
 
       expect(response.status).toBe(200);
       expect(data.session.id).toBe('session1');
@@ -67,7 +68,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -81,7 +82,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found in this project');
@@ -97,7 +98,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
@@ -129,7 +130,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = (await response.json()) as { session: typeof updatedSession };
+      const data = await parseResponse<{ session: typeof updatedSession }>(response);
 
       expect(response.status).toBe(200);
       expect(data.session.name).toBe('Updated Session');
@@ -152,7 +153,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -175,7 +176,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }),
       });
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found in this project');
@@ -193,7 +194,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = (await response.json()) as { error: string; details?: unknown };
+      const data = await parseResponse<{ error: string; details?: unknown }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -220,7 +221,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = (await response.json()) as { session: typeof updatedSession };
+      const data = await parseResponse<{ session: typeof updatedSession }>(response);
 
       expect(response.status).toBe(200);
       expect(data.session.name).toBe('Partially Updated Session');
@@ -243,7 +244,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
@@ -259,7 +260,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = (await response.json()) as { success: boolean };
+      const data = await parseResponse<{ success: boolean }>(response);
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -274,7 +275,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
@@ -288,7 +289,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Session not found in this project');
@@ -304,7 +305,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');

@@ -1,8 +1,10 @@
 // ABOUTME: REST API endpoints for individual project operations - GET, PATCH, DELETE by project ID
 // ABOUTME: Handles project retrieval, updates, and deletion with proper error handling and validation
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const UpdateProjectSchema = z.object({
@@ -22,16 +24,17 @@ export async function GET(
     const project = Project.getById(projectId);
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const projectInfo = project.getInfo();
 
-    return NextResponse.json({ project: projectInfo });
+    return createSuperjsonResponse({ project: projectInfo });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -48,25 +51,26 @@ export async function PATCH(
     const project = Project.getById(projectId);
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     project.updateInfo(validatedData);
 
     const updatedProjectInfo = project.getInfo();
 
-    return NextResponse.json({ project: updatedProjectInfo });
+    return createSuperjsonResponse({ project: updatedProjectInfo });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to update project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -80,16 +84,17 @@ export async function DELETE(
     const project = Project.getById(projectId);
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     project.delete();
 
-    return NextResponse.json({ success: true });
+    return createSuperjsonResponse({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete project' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to delete project',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

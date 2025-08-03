@@ -4,7 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faTerminal, faTasks, faFolder } from '@/lib/fontawesome';
 import { ChevronLeftIcon } from '@/lib/heroicons';
-import { Timeline, Project, Task } from '@/types';
+import { Timeline } from '@/types/design-system';
+import type { Task } from '@/types/core';
+import type { ProjectInfo as Project } from '@/types/core';
 import {
   fadeInLeft,
   fadeInUp,

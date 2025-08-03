@@ -4,8 +4,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { CreateAgentRequest } from '@/types/api';
-import { asThreadId, ThreadId } from '@/lib/server/core-types';
+import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -35,7 +37,7 @@ export async function POST(
     const { sessionId: sessionIdParam } = await params;
 
     if (!isValidThreadId(sessionIdParam)) {
-      return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = asThreadId(sessionIdParam);
@@ -44,7 +46,7 @@ export async function POST(
     const bodyData: unknown = await request.json();
 
     if (!isCreateAgentRequest(bodyData)) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      return createErrorResponse('Invalid request body', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const body: CreateAgentRequest = bodyData;
@@ -54,7 +56,7 @@ export async function POST(
     // Get session and spawn agent directly
     const session = await sessionService.getSession(sessionId);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = await session.spawnAgent(body.name || '', body.provider, body.model);
@@ -63,6 +65,10 @@ export async function POST(
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
     setupAgentApprovals(agent, sessionId);
 
+    // CRITICAL: Setup event handlers for real-time updates
+    // Without this, newly spawned agents won't emit events to the UI until page refresh
+    sessionService.setupAgentEventHandlers(agent, sessionId);
+
     // Convert to API format - use agent's improved API
     const agentResponse = {
       threadId: agent.threadId,
@@ -70,29 +76,31 @@ export async function POST(
       provider: agent.provider,
       model: agent.model,
       status: agent.status,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     };
 
     // Test SSE broadcast
-    const { SSEManager } = await import('@/lib/sse-manager');
-    const sseManager = SSEManager.getInstance();
+    const { EventStreamManager } = await import('@/lib/event-stream-manager');
+    const sseManager = EventStreamManager.getInstance();
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentResponse.threadId as ThreadId,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       data: { content: `Agent "${agentResponse.name}" spawned successfully` },
     };
-    sseManager.broadcast(sessionId, testEvent);
+    sseManager.broadcast({
+      eventType: 'session',
+      scope: { sessionId },
+      data: testEvent,
+    });
 
-    return NextResponse.json({ agent: agentResponse }, { status: 201 });
+    return createSuperjsonResponse({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {
-    console.error('Error in POST /api/sessions/[sessionId]/agents:', error);
-
     if (isError(error) && error.message === 'Session not found') {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -105,7 +113,7 @@ export async function GET(
     const { sessionId: sessionIdParam } = await params;
 
     if (!isValidThreadId(sessionIdParam)) {
-      return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = asThreadId(sessionIdParam);
@@ -113,23 +121,22 @@ export async function GET(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Get agents from Session instance
     const agents = session.getAgents();
-    return NextResponse.json({
+    return createSuperjsonResponse({
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
         status: agent.status,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
       })),
     });
-  } catch (error: unknown) {
-    console.error('Error in GET /api/sessions/[sessionId]/agents:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  } catch (_error: unknown) {
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

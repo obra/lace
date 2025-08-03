@@ -150,13 +150,17 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Start agent conversation - this creates TOOL_CALL events and triggers approval
     const conversationPromise = agent.sendMessage('Please run ls command');
 
-    // Wait for tool calls to be processed (but not for full conversation completion)
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Check that both TOOL_CALL and TOOL_APPROVAL_REQUEST events were created
-    const events = threadManager.getEvents(agent.threadId);
-    const toolCallEvent = events.find((e) => e.type === 'TOOL_CALL');
-    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    // Wait for tool calls to be processed with polling
+    let toolCallEvent;
+    let approvalRequestEvent;
+    let events;
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      events = threadManager.getEvents(agent.threadId);
+      toolCallEvent = events.find((e) => e.type === 'TOOL_CALL');
+      approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      if (toolCallEvent && approvalRequestEvent) break;
+    }
 
     expect(toolCallEvent).toBeDefined();
     expect(toolCallEvent?.data).toMatchObject({

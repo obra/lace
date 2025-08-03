@@ -20,24 +20,26 @@ import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type {
-  Session,
-  ThreadId,
-  SessionEvent,
-  ToolApprovalRequestData,
-  Agent,
   SessionsResponse,
   SessionResponse,
-  ProjectInfo,
   ProviderInfo,
   ProvidersResponse,
   CreateAgentRequest,
-  Task,
+  MessageRequest,
+  MessageResponse,
 } from '@/types/api';
-import { isApiError, ApprovalDecision } from '@/types/api';
+import { isApiError } from '@/types/api';
+import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
+import { ApprovalDecision } from '@/types/core';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ToolApprovalRequestData } from '@/types/web-events';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
+import { useSessionAPI } from '@/hooks/useSessionAPI';
+import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 export const LaceApp = memo(function LaceApp() {
@@ -71,39 +73,61 @@ export const LaceApp = memo(function LaceApp() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedSessionDetails, setSelectedSessionDetails] = useState<Session | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionInfo | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
 
-  // Use session events hook for event management
+  // Use session events hook for event management (without event stream)
   const {
     filteredEvents: events,
     pendingApprovals,
     loadingHistory,
-    connected,
     clearApprovalRequest,
-  } = useSessionEvents(selectedSession, selectedAgent);
+    addSessionEvent,
+    handleApprovalRequest,
+    handleApprovalResponse,
+  } = useSessionEvents(selectedSession, selectedAgent, false); // Connection state will be passed to component that needs it
 
-  // Reset thinking indicator when agent completes response or encounters error
-  useEffect(() => {
-    if (events?.length > 0) {
-      const lastEvent = events[events.length - 1];
-      if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
-          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
-           lastEvent.data?.content && 
-           (lastEvent.data.content.toLowerCase().includes('error') || 
-            lastEvent.data.content.toLowerCase().includes('failed') ||
-            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
-        setSendingMessage(false);
-      }
-    }
-  }, [events, sendingMessage]);
+  // Use session API hook for all API calls
+  const { sendMessage: sendMessageAPI, loading: sendingMessage } = useSessionAPI();
 
-  // Add task manager hook when project and session are selected
-  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
+  // Task manager - only create when we have a project and session
+  const taskManager = useTaskManager(
+    selectedProject || '',
+    selectedSession || ''
+  );
+
+  // Single unified event stream connection with all event handlers
+  const { connection } = useEventStream({
+    projectId: selectedProject || undefined,
+    sessionId: selectedSession || undefined,
+    threadIds: selectedAgent ? [selectedAgent] : undefined,
+    onConnect: () => {
+      // Event stream connected - no logging needed for production
+    },
+    onError: (error) => {
+      console.error('Event stream error:', error);
+    },
+    // Session event handlers - wire to useSessionEvents
+    onUserMessage: addSessionEvent,
+    onAgentMessage: addSessionEvent,
+    onAgentToken: addSessionEvent,
+    onToolCall: addSessionEvent,
+    onToolResult: addSessionEvent,
+    onSystemMessage: addSessionEvent,
+    // Approval handlers
+    onApprovalRequest: handleApprovalRequest,
+    onApprovalResponse: handleApprovalResponse,
+    // Task event handlers - wire to useTaskManager (only if available)
+    onTaskCreated: taskManager?.handleTaskCreated,
+    onTaskUpdated: taskManager?.handleTaskUpdated, 
+    onTaskDeleted: taskManager?.handleTaskDeleted,
+    onTaskNoteAdded: taskManager?.handleTaskNoteAdded,
+  });
+  
+  const connected = connection.connected;
 
   // Convert SessionEvents to TimelineEntries for the design system
   const timelineEntries = useMemo(() => {
@@ -120,15 +144,10 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
-      const data: unknown = await res.json();
-      
-      // Type guard for API response
-      if (typeof data === 'object' && data !== null && 'projects' in data) {
-        const projectsData = data as { projects: ProjectInfo[] };
-        setProjects(projectsData.projects);
-        setLoadingProjects(false);
-        return projectsData.projects;
-      }
+      const data = await parseResponse<{ projects: ProjectInfo[] }>(res);
+      setProjects(data.projects);
+      setLoadingProjects(false);
+      return data.projects;
     } catch (error) {
       console.error('Failed to load projects:', error);
     }
@@ -141,7 +160,7 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProviders(true);
     try {
       const res = await fetch('/api/providers');
-      const data: unknown = await res.json();
+      const data: unknown = await parseResponse<unknown>(res);
       
       if (isApiError(data)) {
         console.error('Failed to load providers:', data.error);
@@ -164,7 +183,7 @@ export const LaceApp = memo(function LaceApp() {
 
     try {
       const res = await fetch(`/api/projects/${selectedProject}/sessions`);
-      const data: unknown = await res.json();
+      const data: unknown = await parseResponse<unknown>(res);
 
       if (isApiError(data)) {
         console.error('Failed to load sessions:', data.error);
@@ -196,7 +215,7 @@ export const LaceApp = memo(function LaceApp() {
   const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}`);
-      const data: unknown = await res.json();
+      const data: unknown = await parseResponse<unknown>(res);
 
       if (isApiError(data)) {
         console.error('Failed to load session details:', data.error);
@@ -250,27 +269,11 @@ export const LaceApp = memo(function LaceApp() {
 
 
   const sendMessage = useCallback(async (message: string) => {
-    if (!selectedAgent || !message.trim()) return;
-
-    setSendingMessage(true);
-    try {
-      const res = await fetch(`/api/threads/${selectedAgent}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-      });
-
-      if (res.ok) {
-        return true; // Indicate success so the input can clear itself
-      }
+    if (!selectedAgent || !message.trim()) {
       return false;
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      return false;
-    } finally {
-      setSendingMessage(false);
     }
-  }, [selectedAgent]);
+    return await sendMessageAPI(selectedAgent, message);
+  }, [selectedAgent, sendMessageAPI]);
 
   // Handle tool approval decision
   const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
@@ -677,8 +680,7 @@ export const LaceApp = memo(function LaceApp() {
                   collapsible={false}
                 >
                   <TaskListSidebar
-                    projectId={selectedProject}
-                    sessionId={selectedSession}
+                    taskManager={taskManager}
                     onTaskClick={(taskId) => {
                       // For now, just close mobile nav - could open task detail modal in future
                       setShowMobileNav(false); // Close mobile nav when task is clicked
@@ -813,8 +815,7 @@ export const LaceApp = memo(function LaceApp() {
               defaultCollapsed={false}
             >
               <TaskListSidebar
-                projectId={selectedProject}
-                sessionId={selectedSession}
+                taskManager={taskManager}
                 onTaskClick={(taskId) => {
                   // For now, just ignore - could open task detail modal in future
                 }}
@@ -892,7 +893,7 @@ export const LaceApp = memo(function LaceApp() {
                   selectedSession={selectedSessionDetails}
                   providers={providers}
                   onSessionCreate={handleSessionCreate}
-                  onSessionSelect={(session) => handleSessionSelect(session.id)}
+                  onSessionSelect={(session: SessionInfo) => handleSessionSelect(session.id)}
                   onAgentCreate={handleAgentCreate}
                   onAgentSelect={handleAgentSelect}
                   onAgentUpdate={handleAgentUpdate}

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Agent, Project } from '@/lib/server/lace-imports';
-import { type ThreadId } from '@/lib/server/core-types';
+import { type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';

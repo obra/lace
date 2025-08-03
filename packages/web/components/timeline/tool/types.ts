@@ -1,8 +1,8 @@
 // ABOUTME: Type definitions for tool renderer system
 // ABOUTME: Defines interfaces and helper types for customizable tool display logic
 
-import type { ToolResult } from '@/lib/server/lace-imports';
-import type { ToolAggregatedEventData } from '@/types/api';
+import type { ToolResult } from '@/types/core';
+import type { ToolAggregatedEventData } from '@/types/web-events';
 
 export interface ToolRenderer {
   getDisplayName?: (toolName: string, result?: ToolResult) => string;

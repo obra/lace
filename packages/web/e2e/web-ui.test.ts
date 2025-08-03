@@ -11,15 +11,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 // Mock only essential external dependencies
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-      addConnection: vi.fn(),
-      removeConnection: vi.fn(),
-    }),
-  },
-}));
 
 vi.mock('@/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
@@ -28,8 +19,9 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId, Project } from '@/lib/server/lace-imports';
-import type { Session as SessionType } from '@/types/api';
+import { asThreadId } from '@/types/core';
+import { Project } from '@/lib/server/lace-imports';
+import type { SessionInfo as SessionType } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('Web UI E2E Tests', () => {

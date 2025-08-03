@@ -6,7 +6,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faComments, faRobot, faCog, faTasks } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { Session, ThreadId, ProjectInfo } from '@/types/api';
+import type { SessionInfo, ProjectInfo } from '@/types/core';
+import type { ProviderInfo } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 
 interface LaceAppSidebarProps {
@@ -15,8 +17,8 @@ interface LaceAppSidebarProps {
   onSettingsClick: () => void;
   selectedProject: string | null;
   currentProject: ProjectInfo;
-  sessions: Session[];
-  selectedSessionDetails: Session | null;
+  sessions: SessionInfo[];
+  selectedSessionDetails: SessionInfo | null;
   selectedAgent: ThreadId | null;
   taskManager: ReturnType<typeof useTaskManager> | null;
   onProjectSwitch: () => void;
@@ -148,8 +150,7 @@ export const LaceAppSidebar = memo(function LaceAppSidebar({
             defaultCollapsed={false}
           >
             <TaskListSidebar
-              projectId={selectedProject}
-              sessionId={selectedSessionDetails.id}
+              taskManager={taskManager}
               onTaskClick={() => {
                 // For now, just ignore - could open task detail modal in future
               }}

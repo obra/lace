@@ -2,12 +2,13 @@
 // ABOUTME: Comprehensive TDD tests for timeline converter functionality
 
 import { describe, test, expect } from 'vitest';
-import type { SessionEvent, Agent } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
+import type { AgentInfo } from '@/types/core';
 import type { TimelineEntry } from '@/types/design-system';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { convertSessionEventsToTimeline, type ConversionContext } from '@/lib/timeline-converter';
 
-const mockAgents: Agent[] = [
+const mockAgents: AgentInfo[] = [
   {
     threadId: asThreadId('session-123.agent-1'),
     name: 'Claude',

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LaceApp } from './LaceApp';
+import { createFetchMock, createMockResponse } from '@/test-utils/mock-fetch';
 
 // Mock external dependencies
 const mockSetters = {
@@ -54,58 +55,41 @@ describe('LaceApp Onboarding Integration', () => {
     
     // Mock API responses for full onboarding flow
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string, options?: RequestInit) => {
+      const method = options?.method || 'GET';
       
-      if (url === '/api/projects' && (!options?.method || options?.method === 'GET')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ projects: [] }),
-        });
+      if (url === '/api/projects' && method === 'GET') {
+        return Promise.resolve(createMockResponse({ projects: [] }));
       }
       
-      if (url === '/api/projects' && options?.method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ 
-            project: { id: 'project-1', name: 'test-project', workingDirectory: '/test' } 
-          }),
-        });
+      if (url === '/api/projects' && method === 'POST') {
+        return Promise.resolve(createMockResponse({ 
+          project: { id: 'project-1', name: 'test-project', workingDirectory: '/test' } 
+        }));
       }
       
-      if (url.includes('/sessions') && options?.method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ 
-            session: { id: 'session-1', name: 'Thursday, Jul 24' } 
-          }),
-        });
+      if (url.includes('/sessions') && method === 'POST') {
+        return Promise.resolve(createMockResponse({ 
+          session: { id: 'session-1', name: 'Thursday, Jul 24' } 
+        }));
       }
       
-      if (url.includes('/sessions') && options?.method === 'GET') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ 
-            sessions: [{ id: 'session-1', name: 'Thursday, Jul 24' }] 
-          }),
-        });
+      if (url.includes('/sessions') && method === 'GET') {
+        return Promise.resolve(createMockResponse({ 
+          sessions: [{ id: 'session-1', name: 'Thursday, Jul 24' }] 
+        }));
       }
       
-      if (url.includes('/agents') && options?.method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ 
-            agent: { threadId: 'agent-1', name: 'Lace' } 
-          }),
-        });
+      if (url.includes('/agents') && method === 'POST') {
+        return Promise.resolve(createMockResponse({ 
+          agent: { threadId: 'agent-1', name: 'Lace' } 
+        }));
       }
       
       if (url === '/api/providers') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: [] }),
-        });
+        return Promise.resolve(createMockResponse({ providers: [] }));
       }
       
-      return Promise.reject(new Error(`Unhandled URL: ${url} with method: ${options?.method || 'GET'}`));
+      return Promise.reject(new Error(`Unhandled URL: ${url} with method: ${method}`));
     });
   });
 

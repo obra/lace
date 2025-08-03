@@ -7,9 +7,9 @@ import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
-import { useTaskManager } from '@/hooks/useTaskManager';
+import type { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 
 // Task display limits for each status section
 const TASK_DISPLAY_LIMITS = {
@@ -19,21 +19,19 @@ const TASK_DISPLAY_LIMITS = {
 } as const;
 
 interface TaskListSidebarProps {
-  projectId: string;
-  sessionId: string;
+  taskManager: ReturnType<typeof useTaskManager>;
   onTaskClick?: (taskId: string) => void;
   onOpenTaskBoard?: () => void;
   onCreateTask?: () => void;
 }
 
 export function TaskListSidebar({ 
-  projectId, 
-  sessionId, 
+  taskManager,
   onTaskClick, 
   onOpenTaskBoard,
   onCreateTask
 }: TaskListSidebarProps) {
-  const { tasks, isLoading, error } = useTaskManager(projectId, sessionId);
+  const { tasks, isLoading, error } = taskManager;
   
   const tasksByStatus = useMemo(() => ({
     pending: tasks.filter(t => t.status === 'pending'),

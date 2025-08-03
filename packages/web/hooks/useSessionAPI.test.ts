@@ -4,7 +4,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
-import type { ThreadId } from '@/types/api';
+import type { ThreadId } from '@/types/core';
+import { createMockResponse, createMockErrorResponse } from '@/test-utils/mock-fetch';
 
 // ✅ ESSENTIAL MOCK - Mock fetch to avoid network calls in tests
 // Tests focus on hook state management behavior, not API implementation
@@ -26,10 +27,7 @@ describe('useSessionAPI', () => {
         agents: [],
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValueOnce({ session: mockSession }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse({ session: mockSession }));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -49,10 +47,7 @@ describe('useSessionAPI', () => {
     });
 
     it('should handle error states and return null on failure', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Failed to create session' }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to create session'));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -101,10 +96,7 @@ describe('useSessionAPI', () => {
         },
       ];
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ sessions: mockSessions }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse({ sessions: mockSessions }));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -120,10 +112,7 @@ describe('useSessionAPI', () => {
     });
 
     it('should return empty array and set error state on failure', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Failed to list sessions' }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to list sessions'));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -157,10 +146,7 @@ describe('useSessionAPI', () => {
         ],
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ session: mockSession }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse({ session: mockSession }));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -176,10 +162,7 @@ describe('useSessionAPI', () => {
     it('should return null for non-existent session', async () => {
       const sessionId = 'invalid' as ThreadId;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Session not found' }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Session not found'));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -206,10 +189,7 @@ describe('useSessionAPI', () => {
         createdAt: new Date().toISOString(),
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ agent: mockAgent }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse({ agent: mockAgent }));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -240,10 +220,7 @@ describe('useSessionAPI', () => {
     it('should handle agent spawn errors', async () => {
       const sessionId = 'lace_20250113_test123' as ThreadId;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Failed to spawn agent' }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to spawn agent'));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -281,10 +258,7 @@ describe('useSessionAPI', () => {
         },
       ];
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ agents: mockAgents }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse({ agents: mockAgents }));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -305,15 +279,13 @@ describe('useSessionAPI', () => {
     it('should send message successfully', async () => {
       const threadId = 'lace_20250113_test123.1' as ThreadId;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            status: 'accepted',
-            threadId,
-            messageId: 'msg123',
-          }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          status: 'accepted',
+          threadId,
+          messageId: 'msg123',
+        })
+      );
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -338,10 +310,7 @@ describe('useSessionAPI', () => {
     it('should handle message send errors', async () => {
       const threadId = 'lace_20250113_test123.1' as ThreadId;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Failed to send message' }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to send message'));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -386,10 +355,7 @@ describe('useSessionAPI', () => {
 
       // Resolve the async operation
       await act(async () => {
-        resolvePromise!({
-          ok: true,
-          json: () => Promise.resolve({ session: mockSession }),
-        });
+        resolvePromise!(createMockResponse({ session: mockSession }));
         await promise;
       });
 
@@ -403,10 +369,7 @@ describe('useSessionAPI', () => {
       const { result } = renderHook(() => useSessionAPI());
 
       // First operation fails
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'First error' }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('First error'));
 
       await act(async () => {
         await result.current.createSession({ name: 'Test Session' });
@@ -415,10 +378,7 @@ describe('useSessionAPI', () => {
       expect(result.current.error).toBe('First error');
 
       // Second operation succeeds - error should be cleared
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ sessions: [] }),
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse({ sessions: [] }));
 
       await act(async () => {
         await result.current.listSessions();

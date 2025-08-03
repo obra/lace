@@ -7,13 +7,13 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faUser, faFlag, faClipboard } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import type { Task, Agent, AssigneeId, TaskPriority } from '@/types/api';
+import type { Task, AssigneeId, TaskPriority, AgentInfo } from '@/types/core';
 
 interface TaskCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>) => void;
-  agents?: Agent[];
+  agents?: AgentInfo[];
   loading?: boolean;
 }
 
@@ -45,7 +45,7 @@ export function TaskCreationModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (field: keyof NewTaskData, value: string | TaskPriority | Task['status'] | AssigneeId) => {
-    setTaskData(prev => ({ ...prev, [field]: value }));
+    setTaskData(prev => ({ ...prev, [field]: value as NewTaskData[typeof field] }));
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -76,7 +76,7 @@ export function TaskCreationModal({
 
     const newTask = {
       title: taskData.title.trim(),
-      description: taskData.description.trim() || undefined,
+      description: taskData.description.trim() || '',
       prompt: taskData.prompt.trim(),
       priority: taskData.priority,
       assignedTo: taskData.assignedTo || undefined,

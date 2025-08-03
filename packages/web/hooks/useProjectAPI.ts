@@ -3,7 +3,6 @@
 
 import { useState, useCallback } from 'react';
 import {
-  ProjectInfo,
   CreateProjectRequest,
   UpdateProjectRequest,
   ProjectsResponse,
@@ -12,6 +11,8 @@ import {
   isApiError,
   isApiSuccess,
 } from '@/types/api';
+import type { ProjectInfo } from '@/types/core';
+import { parse } from '@/lib/serialization';
 
 interface APIState {
   loading: boolean;
@@ -40,14 +41,14 @@ export function useProjectAPI() {
       const response = await fetch('/api/projects');
 
       if (!response.ok) {
-        const error: unknown = await response.json();
+        const error: unknown = parse(await response.text());
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to list projects');
         }
         throw new Error('Failed to list projects');
       }
 
-      const data: unknown = await response.json();
+      const data: unknown = parse(await response.text());
       if (isApiSuccess<ProjectsResponse>(data) && 'projects' in data) {
         return data['projects'] as ProjectInfo[];
       }
@@ -68,14 +69,14 @@ export function useProjectAPI() {
       const response = await fetch(`/api/projects/${projectId}`);
 
       if (!response.ok) {
-        const error: unknown = await response.json();
+        const error: unknown = parse(await response.text());
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to get project');
         }
         throw new Error('Failed to get project');
       }
 
-      const data: unknown = await response.json();
+      const data: unknown = parse(await response.text());
       if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
         return data['project'] as ProjectInfo;
       }
@@ -101,14 +102,14 @@ export function useProjectAPI() {
         });
 
         if (!response.ok) {
-          const error: unknown = await response.json();
+          const error: unknown = parse(await response.text());
           if (isApiError(error)) {
             throw new Error(error.error || 'Failed to create project');
           }
           throw new Error('Failed to create project');
         }
 
-        const data: unknown = await response.json();
+        const data: unknown = parse(await response.text());
         if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
           return data['project'] as ProjectInfo;
         }
@@ -136,14 +137,14 @@ export function useProjectAPI() {
         });
 
         if (!response.ok) {
-          const error: unknown = await response.json();
+          const error: unknown = parse(await response.text());
           if (isApiError(error)) {
             throw new Error(error.error || 'Failed to update project');
           }
           throw new Error('Failed to update project');
         }
 
-        const data: unknown = await response.json();
+        const data: unknown = parse(await response.text());
         if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
           return data['project'] as ProjectInfo;
         }
@@ -168,14 +169,14 @@ export function useProjectAPI() {
       });
 
       if (!response.ok) {
-        const error: unknown = await response.json();
+        const error: unknown = parse(await response.text());
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to delete project');
         }
         throw new Error('Failed to delete project');
       }
 
-      const data: unknown = await response.json();
+      const data: unknown = parse(await response.text());
       if (isApiSuccess<DeleteProjectResponse>(data) && 'success' in data) {
         return data['success'] as boolean;
       }

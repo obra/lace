@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import type { Task } from '@/types/api';
+import type { Task } from '@/types/core';
 
 interface TaskSidebarItemProps {
   task: Task;

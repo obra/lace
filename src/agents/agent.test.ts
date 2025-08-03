@@ -473,7 +473,7 @@ describe('Enhanced Agent', () => {
 
       const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
-      const toolResult = toolResults[0].data as ToolResult;
+      const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_123');
       expect(toolResult.isError).toBe(false);
       expect(toolResult.content[0].text).toBe('Tool executed successfully');
@@ -610,7 +610,7 @@ describe('Enhanced Agent', () => {
       const toolCallEvents = events.filter((e) => e.type === 'TOOL_CALL');
       expect(toolCallEvents).toHaveLength(1);
 
-      const toolCall = toolCallEvents[0].data as ToolCall;
+      const toolCall = toolCallEvents[0].data;
       expect(toolCall).toEqual({
         id: 'call_1',
         name: 'mock_tool',
@@ -702,7 +702,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'call_1',
-          decision: 'allow_once',
+          decision: ApprovalDecision.ALLOW_ONCE,
         })
       );
 
@@ -717,7 +717,7 @@ describe('Enhanced Agent', () => {
       toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
 
-      const toolResult = toolResults[0].data as ToolResult;
+      const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_1');
       expect(toolResult.isError).toBe(false);
 
@@ -749,7 +749,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'call_1',
-          decision: 'deny',
+          decision: ApprovalDecision.DENY,
         })
       );
 
@@ -763,7 +763,7 @@ describe('Enhanced Agent', () => {
       const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
 
-      const toolResult = toolResults[0].data as ToolResult;
+      const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_1');
       expect(toolResult.isError).toBe(true);
       expect(toolResult.content[0].text).toBe('Tool execution denied by user');
@@ -791,7 +791,7 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Run commands');
 
       // Approve second tool first (out of order) - use agent's proper API
-      agent.handleApprovalResponse('call_2', 'allow_once');
+      agent.handleApprovalResponse('call_2', ApprovalDecision.ALLOW_ONCE);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -799,10 +799,10 @@ describe('Enhanced Agent', () => {
       let events = threadManager.getEvents(agent.threadId);
       let toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
-      expect((toolResults[0].data as ToolResult).id).toBe('call_2');
+      expect(toolResults[0].data.id).toBe('call_2');
 
       // Approve first tool - use agent's proper API
-      agent.handleApprovalResponse('call_1', 'allow_once');
+      agent.handleApprovalResponse('call_1', ApprovalDecision.ALLOW_ONCE);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -812,7 +812,7 @@ describe('Enhanced Agent', () => {
       expect(toolResults).toHaveLength(2);
 
       // Deny third tool - use agent's proper API
-      agent.handleApprovalResponse('call_3', 'deny');
+      agent.handleApprovalResponse('call_3', ApprovalDecision.DENY);
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -821,10 +821,10 @@ describe('Enhanced Agent', () => {
       toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(3);
 
-      const successResults = toolResults.filter((r) => !(r.data as ToolResult).isError);
+      const successResults = toolResults.filter((r) => !r.data.isError);
       expect(successResults).toHaveLength(2);
 
-      const errorResult = toolResults.find((r) => (r.data as ToolResult).id === 'call_3');
+      const errorResult = toolResults.find((r) => r.data.id === 'call_3');
       expect((errorResult?.data as ToolResult).isError).toBe(true);
     });
 
@@ -855,7 +855,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'call_1',
-          decision: 'allow_once',
+          decision: ApprovalDecision.ALLOW_ONCE,
         })
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -1084,7 +1084,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'call_approval',
-          decision: 'allow_once',
+          decision: ApprovalDecision.ALLOW_ONCE,
         })
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -1099,7 +1099,7 @@ describe('Enhanced Agent', () => {
       events = threadManager.getEvents(agent.threadId);
       toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
-      expect((toolResults[0].data as ToolResult).id).toBe('call_approval');
+      expect(toolResults[0].data.id).toBe('call_approval');
 
       executeToolSpy.mockRestore();
     });
@@ -1367,8 +1367,8 @@ describe('Enhanced Agent', () => {
       expect(toolCalls).toHaveLength(2);
       expect(toolResults).toHaveLength(2);
 
-      expect((toolCalls[0].data as ToolCall).name).toBe('tool_1');
-      expect((toolCalls[1].data as ToolCall).name).toBe('tool_2');
+      expect(toolCalls[0].data.name).toBe('tool_1');
+      expect(toolCalls[1].data.name).toBe('tool_2');
     });
   });
 
@@ -1946,7 +1946,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'tool-123',
-          decision: 'allow_once',
+          decision: ApprovalDecision.ALLOW_ONCE,
         })
       );
 
@@ -1998,7 +1998,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'tool-456',
-          decision: 'allow_once',
+          decision: ApprovalDecision.ALLOW_ONCE,
         })
       );
 

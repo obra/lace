@@ -8,7 +8,8 @@ import { faFolder, faComments, faRobot, faCog, faTasks } from '@/lib/fontawesome
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { Session, ThreadId, ProjectInfo } from '@/types/api';
+import type { SessionInfo, ProjectInfo } from '@/types/core';
+import type { ThreadId } from '@/types/core';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 
 interface LaceAppMobileSidebarProps {
@@ -17,8 +18,8 @@ interface LaceAppMobileSidebarProps {
   onSettingsClick: () => void;
   selectedProject: string | null;
   currentProject: ProjectInfo;
-  sessions: Session[];
-  selectedSessionDetails: Session | null;
+  sessions: SessionInfo[];
+  selectedSessionDetails: SessionInfo | null;
   selectedAgent: ThreadId | null;
   taskManager: ReturnType<typeof useTaskManager> | null;
   onProjectSwitch: () => void;
@@ -167,8 +168,7 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
                 collapsible={false}
               >
                 <TaskListSidebar
-                  projectId={selectedProject}
-                  sessionId={selectedSessionDetails.id}
+                  taskManager={taskManager}
                   onTaskClick={() => {
                     // For now, just close mobile nav - could open task detail modal in future
                     onClose();

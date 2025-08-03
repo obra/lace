@@ -2,16 +2,17 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolCall } from '@/lib/server/core-types';
-import { asThreadId } from '@/lib/server/lace-imports';
-import { Session as SessionType, Agent as AgentType, SessionEvent } from '@/types/api';
-import { SSEManager } from '@/lib/sse-manager';
-
-// Active session instances
-const activeSessions = new Map<ThreadId, Session>();
+import type { ThreadEvent, ToolCall, ToolResult } from '@/types/core';
+import { asThreadId } from '@/types/core';
+import type { ThreadId, SessionInfo } from '@/types/core';
+import type { SessionEvent } from '@/types/web-sse';
+import { EventStreamManager } from '@/lib/event-stream-manager';
+import { logger } from '~/utils/logger';
 
 export class SessionService {
+  // Track agents that already have event handlers set up to prevent duplicates
+  private registeredAgents = new WeakSet<Agent>();
+
   constructor() {}
 
   async createSession(
@@ -19,7 +20,7 @@ export class SessionService {
     provider: string,
     model: string,
     projectId: string
-  ): Promise<SessionType> {
+  ): Promise<SessionInfo> {
     // Create project-based session
     const { Project } = await import('@/lib/server/lace-imports');
     const project = Project.getById(projectId);
@@ -47,71 +48,48 @@ export class SessionService {
       this.setupAgentEventHandlers(coordinatorAgent, sessionId);
     }
 
-    // Store the session instance
-    activeSessions.set(sessionId, session);
+    // Register Session with EventStreamManager for TaskManager event forwarding
+    EventStreamManager.getInstance().registerSession(session);
 
+    // Session is automatically stored in Session._sessionRegistry via constructor
     // Return metadata for API response
     return this.sessionToMetadata(session);
   }
 
-  async listSessions(): Promise<SessionType[]> {
+  async listSessions(): Promise<SessionInfo[]> {
     const sessionInfos = Session.getAll();
-
-    // Create a map of persisted sessions
-    const persistedSessions = new Map<string, SessionType>();
+    const sessions: SessionInfo[] = [];
 
     for (const sessionInfo of sessionInfos) {
-      let session = activeSessions.get(sessionInfo.id);
-
-      if (!session) {
-        // Reconstruct session from database
-        session = (await Session.getById(sessionInfo.id)) ?? undefined;
-        if (session) {
-          activeSessions.set(sessionInfo.id, session);
-
-          // Set up event handlers for all agents in the reconstructed session
-          const agents = session.getAgents();
-          for (const agentInfo of agents) {
-            const agent = session.getAgent(agentInfo.threadId);
-            if (agent) {
-              this.setupAgentEventHandlers(agent, sessionInfo.id);
-            }
-          }
-        }
-      }
+      // Try to get from registry first, then reconstruct if needed
+      let session = await Session.getById(sessionInfo.id);
 
       if (session) {
-        persistedSessions.set(sessionInfo.id, this.sessionToMetadata(session));
+        // Set up event handlers for all agents in the session
+        const agents = session.getAgents();
+        for (const agentInfo of agents) {
+          const agent = session.getAgent(agentInfo.threadId);
+          if (agent) {
+            this.setupAgentEventHandlers(agent, sessionInfo.id);
+          }
+        }
+
+        // Register Session with EventStreamManager (WeakSet prevents duplicates)
+        EventStreamManager.getInstance().registerSession(session);
+
+        sessions.push(this.sessionToMetadata(session));
       }
     }
 
-    // Add any active sessions that aren't in the persisted list
-    activeSessions.forEach((session, sessionId) => {
-      if (!persistedSessions.has(sessionId)) {
-        try {
-          persistedSessions.set(sessionId, this.sessionToMetadata(session));
-        } catch (error) {
-          console.error(`Failed to get metadata for session ${sessionId}:`, error);
-        }
-      }
-    });
-
-    return Array.from(persistedSessions.values());
+    return sessions;
   }
 
   async getSession(sessionId: ThreadId): Promise<Session | null> {
-    // Try to get from active sessions first
-    let session = activeSessions.get(sessionId);
+    // Use Session's internal registry - this will reconstruct from database if needed
+    const session = await Session.getById(sessionId);
 
-    if (!session) {
-      // Try to load from database by reconstructing the session
-      session = (await Session.getById(sessionId)) ?? undefined;
-      if (!session) {
-        return null;
-      }
-      activeSessions.set(sessionId, session);
-
-      // Set up approval callbacks and event handlers for all agents in the reconstructed session
+    if (session) {
+      // Set up approval callbacks and event handlers for all agents in the session
       const agents = session.getAgents();
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
@@ -121,23 +99,38 @@ export class SessionService {
           this.setupAgentEventHandlers(agent, sessionId);
         }
       }
+
+      // Register Session with EventStreamManager (WeakSet prevents duplicates)
+      EventStreamManager.getInstance().registerSession(session);
     }
 
     return session;
   }
 
-  private setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
-    const sseManager = SSEManager.getInstance();
+  setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
+    // Prevent duplicate event handler registration
+    if (this.registeredAgents.has(agent)) {
+      return;
+    }
+    this.registeredAgents.add(agent);
+    const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
 
     agent.on('agent_response_complete', ({ content }: { content: string }) => {
+      logger.debug(
+        `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
+      );
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         data: { content },
       };
-      sseManager.broadcast(sessionId, event);
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     // Handle streaming tokens
@@ -149,10 +142,14 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_TOKEN',
         threadId,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         data: { token },
       };
-      sseManager.broadcast(sessionId, event);
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     agent.on(
@@ -161,10 +158,14 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_CALL',
           threadId,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           data: { id: callId, name: toolName, arguments: input },
         };
-        sseManager.broadcast(sessionId, event);
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
       }
     );
 
@@ -174,10 +175,14 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_RESULT',
           threadId,
-          timestamp: new Date(),
-          data: result, // Use direct result to match persistence format
+          timestamp: new Date().toISOString(),
+          data: result as ToolResult, // Cast to ToolResult for type safety
         };
-        sseManager.broadcast(sessionId, event);
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
       }
     );
 
@@ -188,14 +193,18 @@ export class SessionService {
 
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
-      console.error(`Agent ${threadId} error:`, error);
+      logger.error(`Agent ${threadId} error:`, error);
       const event: SessionEvent = {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         data: { content: `Agent error: ${error.message}` },
       };
-      sseManager.broadcast(sessionId, event);
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     // Listen for conversation complete
@@ -238,7 +247,7 @@ export class SessionService {
             const sessionEvent: SessionEvent = {
               type: 'TOOL_APPROVAL_REQUEST',
               threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp),
+              timestamp: new Date(event.timestamp).toISOString(),
               data: {
                 requestId: toolCallData.toolCallId,
                 toolName: toolCall.name,
@@ -254,7 +263,11 @@ export class SessionService {
               },
             };
 
-            sseManager.broadcast(sessionId, sessionEvent);
+            sseManager.broadcast({
+              eventType: 'session',
+              scope: { sessionId },
+              data: sessionEvent,
+            });
           }
         } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
           // Forward approval response events to UI so modal can refresh
@@ -263,14 +276,18 @@ export class SessionService {
           const sessionEvent: SessionEvent = {
             type: 'TOOL_APPROVAL_RESPONSE',
             threadId: asThreadId(eventThreadId),
-            timestamp: new Date(event.timestamp),
+            timestamp: new Date(event.timestamp).toISOString(),
             data: {
               toolCallId: responseData.toolCallId,
               decision: responseData.decision,
             },
           };
 
-          sseManager.broadcast(sessionId, sessionEvent);
+          sseManager.broadcast({
+            eventType: 'session',
+            scope: { sessionId },
+            data: sessionEvent,
+          });
         }
       }
     );
@@ -282,36 +299,40 @@ export class SessionService {
     Session.updateSession(sessionId, updates);
   }
 
-  // Test helper method to stop all agents and clear active sessions
+  // Test helper method to stop all agents and clear sessions
   async stopAllAgents(): Promise<void> {
-    for (const session of activeSessions.values()) {
-      // Stop the coordinator agent
-      const coordinatorAgent = session.getAgent(session.getId());
-      if (coordinatorAgent) {
-        coordinatorAgent.stop();
-      }
+    const sessionInfos = Session.getAll();
+    for (const sessionInfo of sessionInfos) {
+      const session = await Session.getById(sessionInfo.id);
+      if (session) {
+        // Stop the coordinator agent
+        const coordinatorAgent = session.getAgent(session.getId());
+        if (coordinatorAgent) {
+          coordinatorAgent.stop();
+        }
 
-      // Stop all delegate agents
-      const agentMetadata = session.getAgents();
-      for (const agentMeta of agentMetadata) {
-        if (agentMeta.threadId !== session.getId()) {
-          // Skip coordinator (already stopped)
-          const agent = session.getAgent(agentMeta.threadId);
-          if (agent) {
-            agent.stop();
+        // Stop all delegate agents
+        const agentMetadata = session.getAgents();
+        for (const agentMeta of agentMetadata) {
+          if (agentMeta.threadId !== session.getId()) {
+            // Skip coordinator (already stopped)
+            const agent = session.getAgent(agentMeta.threadId);
+            if (agent) {
+              agent.stop();
+            }
           }
         }
       }
     }
   }
 
-  // Test helper method to clear active sessions
+  // Test helper method to clear session registry
   clearActiveSessions(): void {
-    activeSessions.clear();
+    Session.clearRegistry();
   }
 
-  // Helper to convert Session instance to SessionType for API responses
-  private sessionToMetadata(session: Session): SessionType {
+  // Helper to convert Session instance to SessionInfo for API responses
+  private sessionToMetadata(session: Session): SessionInfo {
     const sessionInfo = session.getInfo();
     if (!sessionInfo) {
       throw new Error('Failed to get session info');
@@ -322,14 +343,15 @@ export class SessionService {
     return {
       id: session.getId(),
       name: sessionInfo.name,
-      createdAt: sessionInfo.createdAt.toISOString(),
+      createdAt: sessionInfo.createdAt,
+      provider: sessionInfo.provider,
+      model: sessionInfo.model,
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
-        status: agent.status as AgentType['status'],
-        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+        status: agent.status,
       })),
     };
   }

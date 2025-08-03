@@ -4,11 +4,15 @@
 // TODO: We should refactor to eliminate this conversion layer - either make TimelineEntry match SessionEvent
 // TODO: or standardize on one event format throughout the system to avoid this translation step.
 
-import type { SessionEvent, Agent, ThreadId } from '@/types/api';
+import type { AgentInfo } from '@/types/core';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ToolCallEventData } from '@/types/web-events';
+import type { ThreadId } from '@/types/core';
+import type { ToolResult } from '@/types/core';
 import type { TimelineEntry } from '@/types/design-system';
 
 export interface ConversionContext {
-  agents: Agent[];
+  agents: AgentInfo[];
   selectedAgent?: ThreadId;
 }
 
@@ -49,7 +53,7 @@ function filterEventsByAgent(events: SessionEvent[], selectedAgent?: ThreadId): 
 
 function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
   const processed: SessionEvent[] = [];
-  const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
+  const streamingMessages = new Map<string, { content: string; timestamp: string }>();
 
   for (const event of events) {
     if (event.type === 'AGENT_TOKEN') {
@@ -59,12 +63,11 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
 
       if (existing) {
         existing.content += event.data.token;
-        existing.timestamp =
-          event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
+        existing.timestamp = event.timestamp;
       } else {
         streamingMessages.set(key, {
           content: event.data.token,
-          timestamp: event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp),
+          timestamp: event.timestamp,
         });
       }
 
@@ -90,7 +93,7 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
     const streamingEvent: SessionEvent = {
       type: 'AGENT_STREAMING',
       threadId: threadId as ThreadId,
-      timestamp: timestamp instanceof Date ? timestamp : new Date(timestamp),
+      timestamp: timestamp,
       data: { content },
     };
     processed.push(streamingEvent);
@@ -100,17 +103,9 @@ function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
   if (processed.length <= 1) return processed;
 
   return processed.sort((a, b) => {
-    // Optimize timestamp comparison - avoid repeated Date creation
-    const aTime =
-      a.timestamp instanceof Date
-        ? a.timestamp.getTime()
-        : ((a.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(a.timestamp).getTime());
-    const bTime =
-      b.timestamp instanceof Date
-        ? b.timestamp.getTime()
-        : ((b.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(b.timestamp).getTime());
+    // Optimize timestamp comparison - all timestamps are now strings
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }
@@ -123,13 +118,13 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
   for (const event of events) {
     if (event.type === 'TOOL_CALL') {
       // Extract tool call ID from the event data
-      const eventData = event.data as { id?: string; [key: string]: unknown };
+      const eventData = event.data;
       const toolCallId =
         eventData?.id || `${event.threadId}-${event.timestamp}-${toolCallCounter++}`;
       pendingToolCalls.set(toolCallId, { call: event });
     } else if (event.type === 'TOOL_RESULT') {
       // Find matching tool call by ID or by proximity (most recent call on same thread)
-      const eventData = event.data as { id?: string; toolCallId?: string; [key: string]: unknown };
+      const eventData = event.data as unknown as { id?: string; toolCallId?: string };
       const toolCallId = eventData?.id || eventData?.toolCallId;
 
       let matchingCall = toolCallId ? pendingToolCalls.get(toolCallId) : null;
@@ -139,14 +134,8 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
         const threadCalls = Array.from(pendingToolCalls.entries())
           .filter(([_, data]) => data.call.threadId === event.threadId && !data.result)
           .sort(([_, a], [__, b]) => {
-            const aTime =
-              a.call.timestamp instanceof Date
-                ? a.call.timestamp.getTime()
-                : new Date(a.call.timestamp).getTime();
-            const bTime =
-              b.call.timestamp instanceof Date
-                ? b.call.timestamp.getTime()
-                : new Date(b.call.timestamp).getTime();
+            const aTime = new Date(a.call.timestamp).getTime();
+            const bTime = new Date(b.call.timestamp).getTime();
             return aTime - bTime; // Oldest first (FIFO matching)
           });
 
@@ -181,9 +170,9 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
       threadId: call.threadId,
       timestamp: call.timestamp,
       data: {
-        call: call.data,
-        result: result?.data,
-        toolName: callData?.toolName || callData?.name,
+        call: call.data as ToolCallEventData,
+        result: result?.data as ToolResult | undefined,
+        toolName: callData?.toolName || callData?.name || 'unknown',
         toolId: callData?.id,
         arguments: callData?.arguments || callData?.input,
       },
@@ -196,17 +185,9 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
   if (processed.length <= 1) return processed;
 
   return processed.sort((a, b) => {
-    // Optimize timestamp comparison - avoid repeated Date creation
-    const aTime =
-      a.timestamp instanceof Date
-        ? a.timestamp.getTime()
-        : ((a.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(a.timestamp).getTime());
-    const bTime =
-      b.timestamp instanceof Date
-        ? b.timestamp.getTime()
-        : ((b.timestamp as unknown as { getTime?: () => number }).getTime?.() ??
-          new Date(b.timestamp).getTime());
+    // Optimize timestamp comparison - all timestamps are now strings
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
     return aTime - bTime;
   });
 }
@@ -217,7 +198,7 @@ function convertEvent(
   context: ConversionContext
 ): TimelineEntry {
   const agent = getAgentName(event.threadId, context.agents);
-  const timestamp = event.timestamp instanceof Date ? event.timestamp : new Date(event.timestamp);
+  const timestamp = new Date(event.timestamp);
   const id = `${event.threadId}-${timestamp.getTime()}-${index}`;
 
   switch (event.type) {
@@ -240,20 +221,16 @@ function convertEvent(
       };
 
     case 'TOOL_CALL':
-      const toolCallData = event.data as {
-        toolName?: string;
-        input?: unknown;
-        [key: string]: unknown;
-      };
+      const toolCallData = event.data;
       return {
         id,
         type: 'tool',
-        content: `Tool: ${toolCallData.toolName}`,
-        tool: toolCallData.toolName,
+        content: `Tool: ${toolCallData.name}`,
+        tool: toolCallData.name,
         timestamp,
         agent: agent,
         metadata: {
-          arguments: toolCallData.input,
+          arguments: toolCallData.arguments,
           isToolCall: true,
         },
       };
@@ -275,12 +252,7 @@ function convertEvent(
         toolId?: string;
         arguments?: unknown;
         call?: unknown;
-        result?: {
-          content: Array<{ text?: string }>;
-          isError?: boolean;
-          id?: string;
-          metadata?: unknown;
-        };
+        result?: ToolResult;
       };
       return {
         id,
@@ -290,12 +262,13 @@ function convertEvent(
         result: toolData.result,
         timestamp,
         agent: agent,
-        // Add extra metadata for rich rendering
+        // Add extra metadata for rich rendering - match ToolAggregatedEventData structure
         metadata: {
+          call: toolData.call as ToolCallEventData,
+          result: toolData.result,
+          toolName: toolData.toolName || 'Unknown Tool',
           toolId: toolData.toolId,
           arguments: toolData.arguments,
-          callData: toolData.call,
-          resultData: toolData.result,
         },
       };
 
@@ -339,7 +312,7 @@ function convertEvent(
   }
 }
 
-function getAgentName(threadId: ThreadId, agents: Agent[]): string {
+function getAgentName(threadId: ThreadId, agents: AgentInfo[]): string {
   const agent = agents.find((a) => a.threadId === threadId);
   if (agent) return agent.name;
 

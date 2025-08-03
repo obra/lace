@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { PendingApproval } from '@/types/api';
-import { ApprovalDecision } from '@/types/api';
+import { ApprovalDecision } from '@/types/core';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];

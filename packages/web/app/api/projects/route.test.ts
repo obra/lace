@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/projects/route';
+import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
 interface ProjectsResponse {
@@ -120,7 +121,7 @@ describe('Projects API', () => {
 
       // Act: Call the API endpoint
       const response = await GET();
-      const data = (await response.json()) as ProjectsResponse;
+      const data = await parseResponse<ProjectsResponse>(response);
 
       // Assert: Verify the projects are returned
       expect(response.status).toBe(200);
@@ -149,7 +150,7 @@ describe('Projects API', () => {
     it('should return empty array when no projects exist', async () => {
       // Act: Call API with no projects created
       const response = await GET();
-      const data = (await response.json()) as ProjectsResponse;
+      const data = await parseResponse<ProjectsResponse>(response);
 
       // Assert: Empty array returned
       expect(response.status).toBe(200);
@@ -175,7 +176,7 @@ describe('Projects API', () => {
 
       // Act: Create the project via API
       const response = await POST(request);
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       // Assert: Verify project was created with correct data
       expect(response.status).toBe(201);
@@ -215,7 +216,7 @@ describe('Projects API', () => {
 
       // Act: Create project with minimal data
       const response = await POST(request);
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       // Assert: Verify project created with defaults for optional fields
       expect(response.status).toBe(201);
@@ -240,7 +241,7 @@ describe('Projects API', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request data');
@@ -260,7 +261,7 @@ describe('Projects API', () => {
       });
 
       const response = await POST(request);
-      const data = (await response.json()) as ProjectResponse;
+      const data = await parseResponse<ProjectResponse>(response);
 
       expect(response.status).toBe(201);
       expect(data.project.name).toBeTruthy(); // Auto-generated name should exist
@@ -296,7 +297,7 @@ describe('Projects API', () => {
 
       // Act: Attempt to create project when persistence fails
       const response = await POST(request);
-      const data = (await response.json()) as ErrorResponse;
+      const data = await parseResponse<ErrorResponse>(response);
 
       // Assert: API handles the persistence error gracefully
       expect(response.status).toBe(500);

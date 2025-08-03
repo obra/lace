@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { AppState, getCurrentState, updateHash, onHashChange } from '@/lib/hash-router';
-import { ThreadId } from '@/lib/server/core-types';
+import { ThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 
 export function useHashRouter() {

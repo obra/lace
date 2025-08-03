@@ -19,8 +19,8 @@ export const EVENT_TYPES = [
   'COMPACTION',
 ] as const;
 
-// Derive EventType union from the array
-export type EventType = (typeof EVENT_TYPES)[number];
+// Derive ThreadEventType union from the array
+export type ThreadEventType = (typeof EVENT_TYPES)[number];
 
 // Tool approval event data types
 export interface ToolApprovalRequestData {
@@ -32,20 +32,58 @@ export interface ToolApprovalResponseData {
   decision: ApprovalDecision;
 }
 
-export interface ThreadEvent {
+// Base interface for common properties
+interface BaseThreadEvent {
   id: string;
   threadId: string;
-  type: EventType;
   timestamp: Date;
-  data:
-    | string
-    | ToolCall
-    | ToolResult
-    | CompactionData
-    | ToolApprovalRequestData
-    | ToolApprovalResponseData
-    | Record<string, unknown>;
 }
+
+// Discriminated union for type-safe event handling
+export type ThreadEvent =
+  | (BaseThreadEvent & {
+      type: 'USER_MESSAGE';
+      data: string;
+    })
+  | (BaseThreadEvent & {
+      type: 'AGENT_MESSAGE';
+      data: string;
+    })
+  | (BaseThreadEvent & {
+      type: 'TOOL_CALL';
+      data: ToolCall;
+    })
+  | (BaseThreadEvent & {
+      type: 'TOOL_RESULT';
+      data: ToolResult;
+    })
+  | (BaseThreadEvent & {
+      type: 'TOOL_APPROVAL_REQUEST';
+      data: ToolApprovalRequestData;
+    })
+  | (BaseThreadEvent & {
+      type: 'TOOL_APPROVAL_RESPONSE';
+      data: ToolApprovalResponseData;
+    })
+  | (BaseThreadEvent & {
+      type: 'LOCAL_SYSTEM_MESSAGE';
+      data: string;
+    })
+  | (BaseThreadEvent & {
+      type: 'SYSTEM_PROMPT';
+      data: string;
+    })
+  | (BaseThreadEvent & {
+      type: 'USER_SYSTEM_PROMPT';
+      data: string;
+    })
+  | (BaseThreadEvent & {
+      type: 'COMPACTION';
+      data: CompactionData;
+    });
+
+// Helper type to extract valid data types for addEvent method
+export type ThreadEventData = ThreadEvent['data'];
 
 export interface Thread {
   id: string;

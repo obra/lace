@@ -143,12 +143,17 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Start agent conversation - this creates TOOL_CALL and approval request
       const conversationPromise = agent.sendMessage('Run echo test');
 
-      // Wait for approval request to be created
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Wait for approval request to be created with polling
+      let approvalRequest;
+      let events;
+      for (let i = 0; i < 50; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        events = threadManager.getEvents(agent.threadId);
+        approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+        if (approvalRequest) break;
+      }
 
       // Verify approval request was created
-      let events = threadManager.getEvents(agent.threadId);
-      const approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
       expect(approvalRequest).toBeDefined();
 
       // Send multiple concurrent approval responses (simulating rapid clicking)
@@ -177,10 +182,10 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       expect(executeSpy).toHaveBeenCalledTimes(1);
 
       // Verify end state in database/memory
-      events = threadManager.getEvents(agent.threadId);
+      const finalEvents = threadManager.getEvents(agent.threadId);
 
       // Should have exactly one TOOL_APPROVAL_RESPONSE event (database layer defense)
-      const approvalResponses = events.filter(
+      const approvalResponses = finalEvents.filter(
         (e) =>
           e.type === 'TOOL_APPROVAL_RESPONSE' &&
           (e.data as { toolCallId: string }).toolCallId === 'tool-counter'
@@ -188,7 +193,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       expect(approvalResponses).toHaveLength(1);
 
       // Should have exactly one TOOL_RESULT event (agent layer defense)
-      const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+      const toolResults = finalEvents.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
       expect((toolResults[0].data as { id: string }).id).toBe('tool-counter');
 

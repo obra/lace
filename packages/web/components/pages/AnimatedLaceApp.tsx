@@ -12,8 +12,10 @@ import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
-import { TimelineEntry, Project, Timeline, Task, RecentFile } from '@/types';
-import { asThreadId } from '@/lib/server/core-types';
+import { TimelineEntry, Timeline, RecentFile } from '@/types/design-system';
+import type { Task } from '@/types/core';
+import type { ProjectInfo as Project } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import {
   pageTransition,
@@ -262,7 +264,10 @@ export function AnimatedLaceApp({
         type: 'tool',
         tool: toolName,
         content: `${toolName} executed`,
-        result: `${toolName} completed successfully`,
+        result: {
+          content: [{ type: 'text' as const, text: `${toolName} completed successfully` }],
+          isError: false,
+        },
         timestamp: new Date(),
       };
 

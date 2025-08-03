@@ -9,10 +9,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/history/route';
 import { getSessionService } from '@/lib/server/session-service';
-import type { SessionEvent, ApiErrorResponse } from '@/types/api';
-import { asThreadId } from '@/lib/server/core-types';
+import type { SessionEvent } from '@/types/web-sse';
+import type { ApiErrorResponse } from '@/types/api';
+import { asThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { Project } from '@/lib/server/lace-imports';
+import { parseResponse } from '@/lib/serialization';
 
 interface HistoryResponse {
   events: SessionEvent[];
@@ -59,7 +61,7 @@ describe('Session History API', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = (await response.json()) as HistoryResponse;
+      const data = await parseResponse<HistoryResponse>(response);
 
       // New sessions should have system events but no user messages yet
       expect(Array.isArray(data.events)).toBe(true);
@@ -70,14 +72,14 @@ describe('Session History API', () => {
     });
 
     it('should return 404 for non-existent session', async () => {
-      const nonExistentId = 'lace_20240101_nonexistent'; // Valid format, but non-existent
+      const nonExistentId = 'lace_20240101_fake12'; // Valid format, but non-existent
       const request = new NextRequest(`http://localhost/api/sessions/${nonExistentId}/history`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: nonExistentId }),
       });
 
       expect(response.status).toBe(404);
-      const data = (await response.json()) as ApiErrorResponse;
+      const data = await parseResponse<ApiErrorResponse>(response);
       expect(data.error).toBe('Session not found');
     });
 
@@ -96,7 +98,7 @@ describe('Session History API', () => {
       );
 
       expect(response.status).toBe(500);
-      const data = (await response.json()) as ApiErrorResponse;
+      const data = await parseResponse<ApiErrorResponse>(response);
       expect(data.error).toBe('Params parsing failed');
 
       // Restore console.error
@@ -112,7 +114,7 @@ describe('Session History API', () => {
       });
 
       expect(response.status).toBe(400);
-      const data = (await response.json()) as ApiErrorResponse;
+      const data = await parseResponse<ApiErrorResponse>(response);
       expect(data.error).toBe('Invalid session ID format');
     });
 
@@ -131,7 +133,7 @@ describe('Session History API', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = (await response.json()) as HistoryResponse;
+      const data = await parseResponse<HistoryResponse>(response);
       expect(data.events).toBeDefined();
       expect(Array.isArray(data.events)).toBe(true);
 

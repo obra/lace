@@ -2,7 +2,8 @@
 // ABOUTME: Provides real-time streaming conversation interface with event handling
 
 import { useState, useCallback, useRef } from 'react';
-import type { StreamEvent } from '@/types';
+import type { StreamEvent } from '@/types/design-system';
+import { parse } from '@/lib/serialization';
 
 interface UseConversationStreamOptions {
   onStreamEvent?: (event: StreamEvent) => void;
@@ -139,7 +140,7 @@ export function useConversationStream({
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const event = JSON.parse(line.slice(6)) as StreamEvent;
+              const event = parse(line.slice(6)) as StreamEvent;
               handleStreamEvent(event);
             } catch (parseError) {
               console.warn('Failed to parse SSE event:', parseError);

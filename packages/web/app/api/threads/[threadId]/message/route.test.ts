@@ -10,25 +10,17 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { MessageResponse } from '@/types/api';
 import { Project } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/lib/server/core-types';
+import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];
 let originalConsoleError: typeof console.error;
 
-// Mock SSE manager to capture events
-const mockSSEManager = {
-  broadcast: vi.fn(),
-  getInstance: vi.fn(),
-};
-
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => mockSSEManager,
-  },
-}));
+// Import real EventStreamManager for integration testing
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Thread Messaging API', () => {
   let sessionService: ReturnType<typeof getSessionService>;
@@ -91,7 +83,7 @@ describe('Thread Messaging API', () => {
     });
 
     expect(response.status).toBe(202);
-    const data = (await response.json()) as MessageResponse;
+    const data = await parseResponse<MessageResponse>(response);
     expect(data.status).toBe('accepted');
     expect(data.messageId).toBeDefined();
     expect(data.threadId).toBe(realThreadId);
@@ -119,7 +111,7 @@ describe('Thread Messaging API', () => {
     });
 
     const response = await POST(request, {
-      params: Promise.resolve({ threadId: 'lace_20240101_nonexistent' }),
+      params: Promise.resolve({ threadId: 'lace_20240101_fake12' }),
     });
 
     expect(response.status).toBe(404);
@@ -153,7 +145,10 @@ describe('Thread Messaging API', () => {
     expect(response.status).toBe(400);
   });
 
-  it('should broadcast user message event via SSE', async () => {
+  it('should broadcast user message event via EventStreamManager', async () => {
+    // Set up spy on real EventStreamManager to verify broadcast is called
+    const broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
+
     const request = new NextRequest('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -165,13 +160,16 @@ describe('Thread Messaging API', () => {
     });
 
     // Should broadcast the user message event
-    expect(mockSSEManager.broadcast).toHaveBeenCalledWith(
-      realSessionId,
-      expect.objectContaining({
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: realSessionId },
+      data: expect.objectContaining({
         type: 'USER_MESSAGE',
         data: { content: 'Test message' },
-      })
-    );
+      }),
+    });
+
+    broadcastSpy.mockRestore();
   });
 
   it('should handle malformed JSON gracefully', async () => {
@@ -191,7 +189,7 @@ describe('Thread Messaging API', () => {
     expect(response.status).toBe(400);
 
     // Verify error message in response
-    const responseData = await response.json();
+    const responseData = await parseResponse<{ error: string }>(response);
     expect(responseData.error).toBe('Invalid JSON in request body');
   });
 
@@ -214,7 +212,7 @@ describe('Thread Messaging API', () => {
     });
 
     expect(response.status).toBe(202);
-    const data = (await response.json()) as MessageResponse;
+    const data = await parseResponse<MessageResponse>(response);
     expect(data.status).toBe('accepted');
   });
 

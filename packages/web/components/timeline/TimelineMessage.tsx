@@ -1,6 +1,6 @@
 'use client';
 
-import { TimelineEntry } from '@/types';
+import { TimelineEntry } from '@/types/design-system';
 import { MessageHeader, MessageText, AgentBadge, TimestampDisplay } from '@/components/ui';
 import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
 import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';

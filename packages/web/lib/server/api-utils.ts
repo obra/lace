@@ -2,9 +2,8 @@
 // ABOUTME: Provides validation, serialization, and common patterns for RESTful endpoints
 
 import { z } from 'zod';
-import { NextResponse } from 'next/server';
 import { logger } from '~/utils/logger';
-import type { Task } from '@/types/api';
+import { createSuperjsonResponse } from '@/lib/serialization';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
@@ -72,32 +71,21 @@ export function validateRequestBody<T>(body: unknown, schema: z.ZodSchema<T>): T
   }
 }
 
-// Date serialization utility
-export function serializeDate(date: Date | string | undefined): string | undefined {
-  if (!date) return undefined;
-  return date instanceof Date ? date.toISOString() : date;
-}
-
-// Task serialization utility
-export function serializeTask(task: Task): Task {
-  return {
-    ...task,
-    createdAt: serializeDate(task.createdAt),
-    updatedAt: serializeDate(task.updatedAt),
-    notes: task.notes?.map((note) => ({
-      ...note,
-      timestamp: serializeDate(note.timestamp),
-    })),
-  } as Task;
-}
-
 // Error response helper
-export function createErrorResponse(message: string, status: number = 400, error?: unknown) {
-  logger.error(`API Error: ${message}`, { status, error });
-  return NextResponse.json({ error: message }, { status });
+export function createErrorResponse(
+  message: string,
+  status: number = 400,
+  options?: { code?: string; error?: unknown; details?: unknown }
+) {
+  logger.error(`API Error: ${message}`, { status, code: options?.code, error: options?.error });
+  const response: { error: string; code?: string; details?: unknown } = { error: message };
+  if (options?.code) response.code = options.code;
+  if (options?.details) response.details = options.details;
+
+  return createSuperjsonResponse(response, { status });
 }
 
 // Success response helper
 export function createSuccessResponse<T>(data: T, status: number = 200) {
-  return NextResponse.json(data, { status });
+  return createSuperjsonResponse(data, { status });
 }

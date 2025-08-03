@@ -14,7 +14,7 @@ import {
 import { useOgImage } from '@/hooks/useOgImage';
 import { isGoogleDocsUrl } from '@/lib/urlUtils';
 import { DocumentSkeleton } from '@/components/ui/SkeletonLoader';
-import type { Message } from '@/types';
+import type { Message } from '@/types/design-system';
 
 interface GoogleDocAttachment {
   id: string;

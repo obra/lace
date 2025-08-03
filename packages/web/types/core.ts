@@ -1,0 +1,38 @@
+// ABOUTME: Unified core type imports for web package
+// ABOUTME: Single source of truth for all core types, replaces multiple import files
+
+// Re-export all core types that web package needs
+export type { ThreadId, AssigneeId, ThreadEventType, ThreadEvent, Thread } from '~/threads/types';
+
+export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+
+export type {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+  TaskContext,
+  TaskFilters,
+} from '~/tasks/types';
+
+export type { AgentState, AgentInfo } from '~/agents/agent';
+
+export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
+
+export { ApprovalDecision } from '~/tools/approval-types';
+
+export type { ProjectInfo } from '~/projects/project';
+
+export type { SessionInfo } from '~/sessions/session';
+
+export type { CompactionData } from '~/threads/compaction/types';
+
+// Re-export utility functions
+export {
+  asThreadId,
+  createThreadId,
+  isThreadId,
+  asNewAgentSpec,
+  createNewAgentSpec,
+  EVENT_TYPES,
+} from '~/threads/types';

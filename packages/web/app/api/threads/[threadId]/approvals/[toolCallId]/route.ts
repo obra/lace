@@ -4,8 +4,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId, ApprovalDecision } from '@/types/core';
 import { ThreadIdSchema, ToolCallIdSchema } from '@/lib/validation/schemas';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Validation schemas
 const ParamsSchema = z.object({
@@ -27,55 +29,59 @@ export async function POST(
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(await params);
     if (!paramsResult.success) {
-      return NextResponse.json({ 
-        error: 'Invalid parameters',
-        details: paramsResult.error.format()
-      }, { status: 400 });
+      return createErrorResponse('Invalid parameters', 400, {
+        code: 'VALIDATION_FAILED',
+        details: paramsResult.error.format(),
+      });
     }
-    
+
     const { threadId, toolCallId } = paramsResult.data;
-    
+
     // Parse and validate request body
     let requestBody: unknown;
     try {
       requestBody = await request.json();
     } catch (_error) {
-      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+      return createErrorResponse('Invalid JSON in request body', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
-    
+
     const bodyResult = BodySchema.safeParse(requestBody);
     if (!bodyResult.success) {
-      return NextResponse.json({ 
-        error: 'Invalid request body',
-        details: bodyResult.error.format()
-      }, { status: 400 });
+      return createErrorResponse('Invalid request body', 400, {
+        code: 'VALIDATION_FAILED',
+        details: bodyResult.error.format(),
+      });
     }
-    
+
     const { decision } = bodyResult.data;
-    
+
     // Get session first, then agent (following existing pattern)
     const sessionService = getSessionService();
-    
+
     // Determine session ID (parent thread for agents, or self for sessions)
     const sessionIdStr: string = threadId.includes('.')
       ? (threadId.split('.')[0] ?? threadId)
       : threadId;
-    
+
     const session = await sessionService.getSession(asThreadId(sessionIdStr));
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
-    
+
     const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
-      return NextResponse.json({ error: 'Agent not found for thread' }, { status: 404 });
+      return createErrorResponse('Agent not found for thread', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
-    
+
     // Use Agent interface - no direct ThreadManager access
-    await agent.handleApprovalResponse(toolCallId, decision);
-    
-    return NextResponse.json({ success: true });
+    // Convert string literal to ApprovalDecision enum
+    const approvalDecision = decision as ApprovalDecision;
+    await agent.handleApprovalResponse(toolCallId, approvalDecision);
+
+    return createSuperjsonResponse({ success: true });
   } catch (_error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

@@ -3,8 +3,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId, ApiErrorResponse } from '@/types/api';
+import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 // Type guard for ThreadId using client-safe validation
@@ -26,8 +28,7 @@ export async function GET(
     const { sessionId: sessionIdParam } = await params;
 
     if (!isValidThreadId(sessionIdParam)) {
-      const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = sessionIdParam;
@@ -35,8 +36,7 @@ export async function GET(
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Convert Session instance to metadata for JSON response
@@ -46,24 +46,20 @@ export async function GET(
     const sessionData = {
       id: session.getId(),
       name: sessionInfo?.name ?? 'Unknown',
-      createdAt: sessionInfo?.createdAt.toISOString() ?? new Date().toISOString(),
+      createdAt: sessionInfo?.createdAt ?? new Date(),
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
         status: agent.status,
-        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
       })),
     };
 
-    return NextResponse.json({ session: sessionData });
+    return createSuperjsonResponse({ session: sessionData });
   } catch (error: unknown) {
-    console.error('Error in GET /api/sessions/[sessionId]:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -83,8 +79,7 @@ export async function PATCH(
     const { sessionId: sessionIdParam } = await params;
 
     if (!isValidThreadId(sessionIdParam)) {
-      const errorResponse: ApiErrorResponse = { error: 'Invalid session ID' };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = sessionIdParam;
@@ -92,8 +87,7 @@ export async function PATCH(
     // Check if session exists
     const existingSession = await sessionService.getSession(sessionId);
     if (!existingSession) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Parse and validate request body
@@ -101,11 +95,10 @@ export async function PATCH(
     const bodyResult = UpdateSessionSchema.safeParse(bodyRaw);
 
     if (!bodyResult.success) {
-      const errorResponse: ApiErrorResponse = {
-        error: 'Invalid request data',
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
         details: bodyResult.error.errors,
-      };
-      return NextResponse.json(errorResponse, { status: 400 });
+      });
     }
 
     const updates = bodyResult.data;
@@ -122,16 +115,18 @@ export async function PATCH(
     // Get updated session data
     const updatedSession = await sessionService.getSession(sessionId);
     if (!updatedSession) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
-      return NextResponse.json(errorResponse, { status: 500 });
+      return createErrorResponse('Session not found after update', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
     }
 
     // Get updated session data directly from database to ensure we have the latest values
     const { Session } = await import('@/lib/server/lace-imports');
     const updatedSessionData = Session.getSession(sessionId);
     if (!updatedSessionData) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found after update' };
-      return NextResponse.json(errorResponse, { status: 500 });
+      return createErrorResponse('Session not found after update', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
     }
 
     // Convert to API response format
@@ -142,23 +137,19 @@ export async function PATCH(
       name: (updatedSessionData as { name: string }).name,
       description: (updatedSessionData as { description?: string }).description,
       status: (updatedSessionData as { status?: string }).status,
-      createdAt: (updatedSessionData as { createdAt: Date }).createdAt.toISOString(),
+      createdAt: (updatedSessionData as { createdAt: Date }).createdAt,
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,
         provider: agent.provider,
         model: agent.model,
         status: agent.status,
-        createdAt: (agent as { createdAt?: string }).createdAt ?? new Date().toISOString(),
       })),
     };
 
-    return NextResponse.json({ session: sessionData });
+    return createSuperjsonResponse({ session: sessionData });
   } catch (error: unknown) {
-    console.error('Error in PATCH /api/sessions/[sessionId]:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

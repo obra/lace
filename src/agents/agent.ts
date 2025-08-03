@@ -10,7 +10,7 @@ import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
   ThreadEvent,
-  EventType,
+  ThreadEventType,
   ToolApprovalResponseData,
   ToolApprovalRequestData,
   ThreadId,
@@ -27,6 +27,7 @@ import { ProviderRegistry } from '~/providers/registry';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
+import type { CompactionData } from '~/threads/compaction/types';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -43,6 +44,14 @@ export interface AgentResponse {
 }
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
+
+export interface AgentInfo {
+  threadId: ThreadId;
+  name: string;
+  provider: string;
+  model: string;
+  status: AgentState;
+}
 
 export interface CurrentTurnMetrics {
   startTime: Date;
@@ -399,8 +408,18 @@ export class Agent extends EventEmitter {
     return (metadata?.model as string) || this._provider.modelName || 'unknown-model';
   }
 
-  get status(): string {
+  get status(): AgentState {
     return this._state;
+  }
+
+  getInfo(): AgentInfo {
+    return {
+      threadId: asThreadId(this._threadId),
+      name: this.name,
+      provider: this.provider,
+      model: this.model,
+      status: this.status,
+    };
   }
 
   // Token budget management
@@ -904,14 +923,12 @@ export class Agent extends EventEmitter {
   private _handleToolApprovalResponse(event: ThreadEvent): void {
     if (event.type !== 'TOOL_APPROVAL_RESPONSE') return;
 
-    const responseData = event.data as ToolApprovalResponseData;
+    const responseData = event.data;
     const { toolCallId, decision } = responseData;
 
     // Defense-in-depth: Check if tool has already been executed (duplicate prevention)
     const events = this._threadManager.getEvents(this._threadId);
-    const existingResult = events.find(
-      (e) => e.type === 'TOOL_RESULT' && (e.data as ToolResult).id === toolCallId
-    );
+    const existingResult = events.find((e) => e.type === 'TOOL_RESULT' && e.data.id === toolCallId);
 
     if (existingResult) {
       logger.warn('AGENT: Prevented duplicate tool execution', {
@@ -923,9 +940,7 @@ export class Agent extends EventEmitter {
     }
 
     // Find the corresponding TOOL_CALL event
-    const toolCallEvent = events.find(
-      (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId
-    );
+    const toolCallEvent = events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
 
     if (!toolCallEvent) {
       logger.error('AGENT: No TOOL_CALL event found for approval response', {
@@ -1206,7 +1221,7 @@ export class Agent extends EventEmitter {
       if (event.type === 'USER_MESSAGE') {
         messages.push({
           role: 'user',
-          content: event.data as string,
+          content: event.data,
         });
       } else if (event.type === 'AGENT_MESSAGE') {
         // Look ahead to see if there are immediate tool calls after this message
@@ -1224,7 +1239,7 @@ export class Agent extends EventEmitter {
 
           // If we find a TOOL_CALL, it belongs to this agent message
           if (nextEvent.type === 'TOOL_CALL') {
-            const eventToolCall = nextEvent.data as ToolCall;
+            const eventToolCall = nextEvent.data;
             toolCallsForThisMessage.push({
               id: eventToolCall.id,
               name: eventToolCall.name,
@@ -1240,7 +1255,7 @@ export class Agent extends EventEmitter {
         // IMPORTANT: Keep raw content (including thinking blocks) for model context
         const message: ProviderMessage = {
           role: 'assistant',
-          content: event.data as string,
+          content: event.data,
         };
 
         if (toolCallsForThisMessage.length > 0) {
@@ -1250,7 +1265,7 @@ export class Agent extends EventEmitter {
         messages.push(message);
       } else if (event.type === 'TOOL_CALL') {
         // If we reach here, it's an orphaned tool call (no preceding AGENT_MESSAGE)
-        const toolCall = event.data as ToolCall;
+        const toolCall = event.data;
 
         // Create an assistant message with just the tool call
         messages.push({
@@ -1265,7 +1280,7 @@ export class Agent extends EventEmitter {
           ],
         });
       } else if (event.type === 'TOOL_RESULT') {
-        const toolResult = event.data as ToolResult;
+        const toolResult = event.data;
 
         // Find the most recent assistant message with tool calls that contains this tool result ID
         let targetAssistantMessage: ProviderMessage | undefined;
@@ -1320,7 +1335,7 @@ export class Agent extends EventEmitter {
           // This tool result doesn't correspond to any assistant message with tool calls
           // Try to find the corresponding TOOL_CALL event to create a synthetic assistant message
           const correspondingToolCallEvent = events.find(
-            (e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolResult.id
+            (e) => e.type === 'TOOL_CALL' && e.data.id === toolResult.id
           );
 
           if (correspondingToolCallEvent) {
@@ -1701,7 +1716,13 @@ export class Agent extends EventEmitter {
   private _addEventAndEmit(
     threadId: string,
     type: string,
-    data: string | ToolCall | ToolResult | Record<string, unknown>
+    data:
+      | string
+      | ToolCall
+      | ToolResult
+      | CompactionData
+      | ToolApprovalRequestData
+      | ToolApprovalResponseData
   ): ThreadEvent | null {
     // Safety check: only add events if thread exists
     if (!this._threadManager.getThread(threadId)) {
@@ -1712,7 +1733,7 @@ export class Agent extends EventEmitter {
       return null;
     }
 
-    const event = this._threadManager.addEvent(threadId, type as EventType, data);
+    const event = this._threadManager.addEvent(threadId, type as ThreadEventType, data);
     if (event) {
       this.emit('thread_event_added', { event, threadId });
     }
@@ -1813,7 +1834,7 @@ export class Agent extends EventEmitter {
    * access ThreadManager. This method encapsulates approval response logic with
    * proper error handling for race conditions.
    */
-  handleApprovalResponse(toolCallId: string, decision: string): void {
+  handleApprovalResponse(toolCallId: string, decision: ApprovalDecision): void {
     // Create approval response event with atomic database transaction
     // The persistence layer handles duplicate detection idempotently
     this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
@@ -1844,7 +1865,7 @@ export class Agent extends EventEmitter {
    */
   getToolCallEventById(toolCallId: string): ThreadEvent | undefined {
     const events = this._threadManager.getEvents(this._threadId);
-    return events.find((e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId);
+    return events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
   }
 
   /**
@@ -1855,7 +1876,7 @@ export class Agent extends EventEmitter {
    */
   getToolCallEventByIdForThread(toolCallId: string, threadId: string): ThreadEvent | undefined {
     const events = this._threadManager.getEvents(threadId);
-    return events.find((e) => e.type === 'TOOL_CALL' && (e.data as ToolCall).id === toolCallId);
+    return events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
   }
 
   /**
@@ -1864,9 +1885,7 @@ export class Agent extends EventEmitter {
   checkExistingApprovalRequest(toolCallId: string): boolean {
     const events = this._threadManager.getEvents(this._threadId);
     return events.some(
-      (e) =>
-        e.type === 'TOOL_APPROVAL_REQUEST' &&
-        (e.data as ToolApprovalRequestData).toolCallId === toolCallId
+      (e) => e.type === 'TOOL_APPROVAL_REQUEST' && e.data.toolCallId === toolCallId
     );
   }
 
@@ -1876,9 +1895,7 @@ export class Agent extends EventEmitter {
   checkExistingApprovalResponse(toolCallId: string): ApprovalDecision | null {
     const events = this._threadManager.getEvents(this._threadId);
     const responseEvent = events.find(
-      (e) =>
-        e.type === 'TOOL_APPROVAL_RESPONSE' &&
-        (e.data as ToolApprovalResponseData).toolCallId === toolCallId
+      (e) => e.type === 'TOOL_APPROVAL_RESPONSE' && e.data.toolCallId === toolCallId
     );
     return responseEvent ? (responseEvent.data as ToolApprovalResponseData).decision : null;
   }

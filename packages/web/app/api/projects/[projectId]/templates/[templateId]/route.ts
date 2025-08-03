@@ -3,6 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const RenderTemplateSchema = z.object({
@@ -21,18 +23,18 @@ export async function GET(
     const { projectId, templateId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const template = project.getPromptTemplate(templateId);
     if (!template) {
-      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+      return createErrorResponse('Template not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    return NextResponse.json({ template: template.toJSON() });
+    return createSuperjsonResponse({ template: template.toJSON() });
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to fetch template';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -44,18 +46,18 @@ export async function DELETE(
     const { projectId, templateId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const success = project.deletePromptTemplate(templateId);
     if (!success) {
-      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+      return createErrorResponse('Template not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    return NextResponse.json({ success: true });
+    return createSuperjsonResponse({ success: true });
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to delete template';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }
 
@@ -67,7 +69,7 @@ export async function POST(
     const { projectId, templateId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const body: unknown = await request.json();
@@ -75,16 +77,16 @@ export async function POST(
 
     const renderedContent = project.renderPromptTemplate(templateId, validatedData.variables);
 
-    return NextResponse.json({ renderedContent });
+    return createSuperjsonResponse({ renderedContent });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return createSuperjsonResponse(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
 
     const errorMessage = isError(error) ? error.message : 'Failed to render template';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

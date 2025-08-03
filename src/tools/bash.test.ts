@@ -2,6 +2,7 @@
 // ABOUTME: Tests command execution, error handling, and success/failure distinction
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import fs from 'fs';
 import { BashTool } from '~/tools/implementations/bash';
 
 describe('BashTool', () => {
@@ -414,7 +415,7 @@ describe('BashTool', () => {
       };
 
       expect(output.exitCode).toBe(0);
-      expect(output.stdout.trim()).toBe(process.cwd());
+      expect(fs.realpathSync(output.stdout.trim())).toBe(fs.realpathSync(process.cwd()));
     });
 
     it('should use process.cwd() when context has no workingDirectory', async () => {
@@ -430,7 +431,7 @@ describe('BashTool', () => {
       };
 
       expect(output.exitCode).toBe(0);
-      expect(output.stdout.trim()).toBe(process.cwd());
+      expect(fs.realpathSync(output.stdout.trim())).toBe(fs.realpathSync(process.cwd()));
     });
 
     it('should handle relative paths correctly with working directory', async () => {

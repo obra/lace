@@ -3,7 +3,8 @@
 
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { Project, asThreadId } from '@/lib/server/lace-imports';
+import { asThreadId } from '@/types/core';
+import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import {
   ProjectIdSchema,
@@ -12,7 +13,6 @@ import {
   validateRouteParams,
   validateRequestBody,
   UpdateTaskSchema,
-  serializeTask,
   createErrorResponse,
   createSuccessResponse,
 } from '@/lib/server/api-utils';
@@ -41,13 +41,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404);
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Verify session belongs to this project
     const sessionData = project.getSession(sessionId);
     if (!sessionData) {
-      return createErrorResponse('Session not found in this project', 404);
+      return createErrorResponse('Session not found in this project', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     // Get active session instance
@@ -64,15 +66,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return createErrorResponse('Task not found', 404);
     }
 
-    // Serialize task for JSON response
-    const serializedTask = serializeTask(task);
-
-    return createSuccessResponse({ task: serializedTask });
+    return createSuccessResponse({ task });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch task',
       500,
-      error
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -98,13 +97,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404);
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Verify session belongs to this project
     const sessionData = project.getSession(sessionId);
     if (!sessionData) {
-      return createErrorResponse('Session not found in this project', 404);
+      return createErrorResponse('Session not found in this project', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     // Get active session instance
@@ -127,15 +128,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       isHuman: true,
     });
 
-    // Serialize task for JSON response
-    const serializedTask = serializeTask(task);
-
-    return createSuccessResponse({ task: serializedTask });
+    return createSuccessResponse({ task });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to update task',
       500,
-      error
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -150,13 +148,15 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     // Get project first to verify it exists
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404);
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Verify session belongs to this project
     const sessionData = project.getSession(sessionId);
     if (!sessionData) {
-      return createErrorResponse('Session not found in this project', 404);
+      return createErrorResponse('Session not found in this project', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     // Get active session instance
@@ -185,7 +185,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to delete task',
       500,
-      error
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

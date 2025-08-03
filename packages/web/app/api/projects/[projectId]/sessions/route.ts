@@ -1,9 +1,11 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const CreateSessionSchema = z.object({
@@ -20,7 +22,7 @@ export async function GET(
     const { projectId } = await params;
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const sessionData = project.getSessions();
@@ -29,16 +31,17 @@ export async function GET(
     const sessions = sessionData.map((data) => ({
       id: data.id,
       name: data.name,
-      createdAt: data.createdAt.toISOString(),
+      createdAt: data.createdAt,
       agentCount: data.agentCount,
       // Full agent details will be populated when individual session is selected
     }));
 
-    return NextResponse.json({ sessions });
+    return createSuperjsonResponse({ sessions });
   } catch (error: unknown) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch sessions' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch sessions',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }
@@ -54,7 +57,7 @@ export async function POST(
 
     const project = Project.getById(projectId);
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Use sessionService to create session, which handles both database and in-memory management
@@ -66,18 +69,19 @@ export async function POST(
       projectId
     );
 
-    return NextResponse.json({ session }, { status: 201 });
+    return createSuperjsonResponse({ session }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid request data', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
     }
 
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create session' },
-      { status: 500 }
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to create session',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
 }

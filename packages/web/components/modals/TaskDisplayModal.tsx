@@ -16,7 +16,8 @@ import {
   faPlus
 } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import type { Task, Agent, AssigneeId, TaskPriority, TaskNote } from '@/types/api';
+import type { AgentInfo } from '@/types/core';
+import type { Task, AssigneeId, TaskPriority, TaskNote } from '@/types/core';
 
 interface TaskDisplayModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ interface TaskDisplayModalProps {
   task: Task | null;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onAddNote?: (taskId: string, content: string) => void;
-  agents?: Agent[];
+  agents?: AgentInfo[];
   loading?: boolean;
 }
 

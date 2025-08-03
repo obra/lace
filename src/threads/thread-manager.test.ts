@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { expectEventAdded } from '~/test-utils/event-helpers';
+import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('ThreadManager', () => {
   let threadManager: ThreadManager;
@@ -70,7 +71,7 @@ describe('ThreadManager', () => {
       expectEventAdded(
         threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
           toolCallId: 'tool-123',
-          decision: 'approve',
+          decision: ApprovalDecision.ALLOW_ONCE,
         })
       );
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
@@ -78,7 +79,7 @@ describe('ThreadManager', () => {
       // Second approval should be ignored due to database constraint
       const secondEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
         toolCallId: 'tool-123',
-        decision: 'approve',
+        decision: ApprovalDecision.ALLOW_ONCE,
       });
       expect(secondEvent).toBeNull(); // Returns null for duplicates
 

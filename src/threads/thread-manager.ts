@@ -7,8 +7,7 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, EventType } from '~/threads/types';
-import { ToolCall, ToolResult } from '~/tools/types';
+import { Thread, ThreadEvent, ThreadEventType, ThreadEventData } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { estimateTokens } from '~/utils/token-estimation';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
@@ -297,21 +296,21 @@ export class ThreadManager {
    */
   addEvent(
     threadId: string,
-    type: EventType,
-    eventData: string | ToolCall | ToolResult | CompactionData | Record<string, unknown>
+    type: ThreadEventType,
+    eventData: ThreadEventData
   ): ThreadEvent | null {
     const thread = this.getThread(threadId);
     if (!thread) {
       throw new Error(`Thread ${threadId} not found`);
     }
 
-    const event: ThreadEvent = {
+    const event = {
       id: generateEventId(),
       threadId,
       type,
       timestamp: new Date(),
       data: eventData,
-    };
+    } as ThreadEvent;
 
     // Use database transaction for atomicity
     return this._persistence.transaction(() => {
@@ -543,7 +542,7 @@ export class ThreadManager {
     // Modify the actual events in memory - that's it
     for (const event of thread.events) {
       if (event.type === 'TOOL_RESULT') {
-        const toolResult = event.data as ToolResult;
+        const toolResult = event.data;
         const originalText = toolResult.content?.[0]?.text || '';
         const originalTokens = this._estimateTokens(originalText);
 

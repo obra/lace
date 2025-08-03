@@ -4,11 +4,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
-import { MessageResponse, SessionEvent, ApiErrorResponse } from '@/types/api';
-import { asThreadId, type ThreadId } from '@/lib/server/core-types';
-import { SSEManager } from '@/lib/sse-manager';
+import { MessageResponse } from '@/types/api';
+import type { SessionEvent } from '@/types/web-sse';
+import { asThreadId, type ThreadId } from '@/types/core';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
+import { createSuperjsonResponse } from '@/lib/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -32,10 +35,11 @@ export async function POST(
     // Validate thread ID with Zod
     const threadIdResult = ThreadIdSchema.safeParse(threadIdParam);
     if (!threadIdResult.success) {
-      const errorResponse: ApiErrorResponse = {
-        error: threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
-      };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createErrorResponse(
+        threadIdResult.error.errors[0]?.message || 'Invalid thread ID format',
+        400,
+        { code: 'VALIDATION_FAILED' }
+      );
     }
 
     // TypeScript now knows threadIdResult.success is true, so data is properly typed
@@ -46,19 +50,19 @@ export async function POST(
     try {
       bodyRaw = await request.json();
     } catch (_error) {
-      const errorResponse: ApiErrorResponse = {
-        error: 'Invalid JSON in request body',
-      };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createErrorResponse('Invalid JSON in request body', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
 
     const bodyResult = MessageRequestSchema.safeParse(bodyRaw);
 
     if (!bodyResult.success) {
-      const errorResponse: ApiErrorResponse = {
-        error: bodyResult.error.errors[0]?.message || 'Invalid request body',
-      };
-      return NextResponse.json(errorResponse, { status: 400 });
+      return createErrorResponse(
+        bodyResult.error.errors[0]?.message || 'Invalid request body',
+        400,
+        { code: 'VALIDATION_FAILED' }
+      );
     }
 
     const body = bodyResult.data;
@@ -68,6 +72,7 @@ export async function POST(
     const sessionIdStr: string = threadId.includes('.')
       ? (threadId.split('.')[0] ?? threadId)
       : threadId;
+
     const sessionIdResult = ThreadIdSchema.safeParse(sessionIdStr);
     if (!sessionIdResult.success) {
       throw new Error('Invalid session ID derived from thread ID');
@@ -78,27 +83,29 @@ export async function POST(
     // Get agent instance through session
     const session = await sessionService.getSession(sessionId);
     if (!session) {
-      const errorResponse: ApiErrorResponse = { error: 'Session not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     const agent = session.getAgent(threadId);
 
     if (!agent) {
-      const errorResponse: ApiErrorResponse = { error: 'Agent not found' };
-      return NextResponse.json(errorResponse, { status: 404 });
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
     // Broadcast user message event via SSE
-    const sseManager = SSEManager.getInstance();
+    const sseManager = EventStreamManager.getInstance();
 
     const userMessageEvent: SessionEvent = {
       type: 'USER_MESSAGE' as const,
       threadId,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       data: { content: body.message },
     };
-    sseManager.broadcast(sessionId, userMessageEvent);
+    sseManager.broadcast({
+      eventType: 'session',
+      scope: { sessionId },
+      data: userMessageEvent,
+    });
 
     // Generate message ID
     const messageId = randomUUID();
@@ -111,16 +118,19 @@ export async function POST(
         // Message processing started
       })
       .catch((error: unknown) => {
-        console.error('Error processing message:', error);
         // Emit error event
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorEvent: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE' as const,
           threadId,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           data: { content: `Error: ${errorMessage}` },
         };
-        sseManager.broadcast(sessionId, errorEvent);
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: errorEvent,
+        });
       });
 
     // Return immediate acknowledgment
@@ -130,12 +140,9 @@ export async function POST(
       messageId,
     };
 
-    return NextResponse.json(response, { status: 202 });
+    return createSuperjsonResponse(response, { status: 202 });
   } catch (error: unknown) {
-    console.error('Error in POST /api/threads/[threadId]/message:', error);
-
     const errorMessage = isError(error) ? error.message : 'Internal server error';
-    const errorResponse: ApiErrorResponse = { error: errorMessage };
-    return NextResponse.json(errorResponse, { status: 500 });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

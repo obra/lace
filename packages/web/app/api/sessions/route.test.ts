@@ -4,7 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
-import type { Session } from '@/types/api';
+import type { SessionInfo } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 // Mock only environment variables - avoid requiring real API keys in tests
@@ -53,7 +54,7 @@ describe('Session API Routes', () => {
       // Act: Call API with no sessions created
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = (await response.json()) as { sessions: unknown[] };
+      const data = await parseResponse<{ sessions: unknown[] }>(response);
 
       // Assert: Empty array returned from real service
       expect(response.status).toBe(200);
@@ -88,7 +89,7 @@ describe('Session API Routes', () => {
       // Act: Call the API endpoint
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = (await response.json()) as { sessions: Session[] };
+      const data = await parseResponse<{ sessions: SessionInfo[] }>(response);
 
       // Assert: Verify real HTTP response with real data
       expect(response.status).toBe(200);
@@ -126,7 +127,7 @@ describe('Session API Routes', () => {
       // Act: Call the API when service fails
       const request = new NextRequest('http://localhost:3005/api/sessions');
       const response = await GET(request);
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       // Assert: API handles the persistence error gracefully
       expect(response.status).toBe(500);

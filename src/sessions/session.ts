@@ -1,7 +1,7 @@
 // ABOUTME: Session class for managing collections of agents and session-level operations
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
-import { Agent } from '~/agents/agent';
+import { Agent, type AgentInfo } from '~/agents/agent';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
@@ -39,13 +39,7 @@ export interface SessionInfo {
   createdAt: Date;
   provider: string;
   model: string;
-  agents: Array<{
-    threadId: ThreadId;
-    name: string;
-    provider: string;
-    model: string;
-    status: string;
-  }>;
+  agents: AgentInfo[];
 }
 
 export class Session {
@@ -548,35 +542,15 @@ export class Session {
     return agent;
   }
 
-  getAgents(): Array<{
-    threadId: ThreadId;
-    name: string;
-    provider: string;
-    model: string;
-    status: string;
-  }> {
+  getAgents(): AgentInfo[] {
     const agents = [];
 
     // Add the coordinator agent first
-    const coordinatorMetadata = this._sessionAgent.getThreadMetadata();
-    agents.push({
-      threadId: asThreadId(this._sessionAgent.threadId),
-      name: (coordinatorMetadata?.name as string) || 'Coordinator',
-      provider: this._sessionAgent.providerName,
-      model: (coordinatorMetadata?.model as string) || 'unknown',
-      status: this._sessionAgent.getCurrentState(),
-    });
+    agents.push(this._sessionAgent.getInfo());
 
     // Add delegate agents
     Array.from(this._agents.values()).forEach((agent) => {
-      const metadata = agent.getThreadMetadata();
-      agents.push({
-        threadId: agent.threadId,
-        name: (metadata?.name as string) || 'Agent ' + agent.threadId,
-        provider: (metadata?.provider as string) || agent.providerName,
-        model: (metadata?.model as string) || agent.providerInstance.modelName,
-        status: agent.getCurrentState(),
-      });
+      agents.push(agent.getInfo());
     });
 
     return agents;

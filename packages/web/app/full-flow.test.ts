@@ -12,33 +12,28 @@ vi.mock('server-only', () => ({}));
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
 import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
-import { GET as streamEvents } from '@/app/api/sessions/[sessionId]/events/stream/route';
-import type { ThreadId, Session } from '@/types/api';
+import { GET as streamEvents } from '@/app/api/events/stream/route';
+import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
-// Mock SSE manager
-const mockSSEManager = {
-  addConnection: vi.fn(),
-  removeConnection: vi.fn(),
-  broadcast: vi.fn(),
-  sessionStreams: new Map(),
-};
-
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => mockSSEManager,
-  },
-}));
+// Use real EventStreamManager for integration testing
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Full Conversation Flow', () => {
   let sessionService: ReturnType<typeof getSessionService>;
+  let addConnectionSpy: ReturnType<typeof vi.spyOn>;
+  let broadcastSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     setupTestPersistence();
     vi.clearAllMocks();
-    mockSSEManager.sessionStreams.clear();
+
+    // Set up spies on real EventStreamManager
+    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection');
+    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
@@ -51,6 +46,9 @@ describe('Full Conversation Flow', () => {
     // Stop all agents first to prevent async operations after database closure
     await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
+    // Clean up spies
+    addConnectionSpy?.mockRestore();
+    broadcastSpy?.mockRestore();
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
@@ -89,12 +87,12 @@ describe('Full Conversation Flow', () => {
     });
 
     if (sessionResponse.status !== 201) {
-      const errorData = (await sessionResponse.json()) as { error: string };
+      const errorData = await parseResponse<{ error: string }>(sessionResponse);
       console.error('Session creation failed:', errorData);
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: Session };
+    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
     expect(sessionData.session.name).toBe(sessionName);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
@@ -118,23 +116,21 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(agentResponse.status).toBe(201);
-    const agentData = (await agentResponse.json()) as {
+    const agentData = await parseResponse<{
       agent: { threadId: ThreadId; name: string };
-    };
+    }>(agentResponse);
     expect(agentData.agent.name).toBe(agentName);
     const agentThreadId: ThreadId = agentData.agent.threadId as ThreadId;
 
     // 3. Connect to SSE stream
     const streamRequest = new NextRequest(
-      `http://localhost:3000/api/sessions/${sessionId}/events/stream`
+      `http://localhost:3000/api/events/stream?sessions=${sessionId}`
     );
-    const streamResponse = await streamEvents(streamRequest, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
-    });
+    const streamResponse = await streamEvents(streamRequest);
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
+    expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
 
     // 4. Send message
     const message = 'Hello, assistant!';
@@ -152,11 +148,11 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ threadId: agentThreadId as string }),
     });
     expect(messageResponse.status).toBe(202);
-    const messageData = (await messageResponse.json()) as { status: string };
+    const messageData = await parseResponse<{ status: string }>(messageResponse);
     expect(messageData.status).toBe('accepted');
 
-    // 5. Verify SSE connection was established
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(sessionId, expect.any(Object));
+    // 5. Verify EventStreamManager connection was established
+    expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
   });
 
   it('should handle multi-agent scenario', async () => {
@@ -186,7 +182,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = (await sessionResponse.json()) as { session: Session };
+    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
     const sessionId: ThreadId = sessionData.session.id as ThreadId;
 
     // Spawn first agent
@@ -233,7 +229,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(listResponse.status).toBe(200);
-    const listData = (await listResponse.json()) as { agents: Array<{ name: string }> };
+    const listData = await parseResponse<{ agents: Array<{ name: string }> }>(listResponse);
     const { agents } = listData;
 
     expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
@@ -272,7 +268,7 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId1 }) }
     );
-    const session1Data = (await session1Response.json()) as { session: Session };
+    const session1Data = await parseResponse<{ session: SessionInfo }>(session1Response);
     const session1Id: ThreadId = session1Data.session.id as ThreadId;
 
     const session2Response = await createProjectSession(
@@ -289,23 +285,20 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId2 }) }
     );
-    const session2Data = (await session2Response.json()) as { session: Session };
+    const session2Data = await parseResponse<{ session: SessionInfo }>(session2Response);
     const session2Id: ThreadId = session2Data.session.id as ThreadId;
 
     // Connect to streams
     await streamEvents(
-      new NextRequest(`http://localhost:3000/api/sessions/${session1Id}/events/stream`),
-      { params: Promise.resolve({ sessionId: session1Id as string }) }
+      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session1Id}`)
     );
 
     await streamEvents(
-      new NextRequest(`http://localhost:3000/api/sessions/${session2Id}/events/stream`),
-      { params: Promise.resolve({ sessionId: session2Id as string }) }
+      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session2Id}`)
     );
 
     // Verify each session has its own connection
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(session1Id, expect.any(Object));
-    expect(mockSSEManager.addConnection).toHaveBeenCalledWith(session2Id, expect.any(Object));
-    expect(mockSSEManager.addConnection).toHaveBeenCalledTimes(2);
+    expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
+    expect(addConnectionSpy).toHaveBeenCalledTimes(2);
   });
 });

@@ -3,8 +3,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
 import { GET, type ProviderWithModels } from '@/app/api/providers/route';
-import type { ProviderInfo, ModelInfo } from '@/lib/server/core-types';
+import type { ProviderInfo, ModelInfo } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { parseResponse } from '@/lib/serialization';
 // ProviderRegistry is mocked but not directly used in tests
 
 // Response type for tests
@@ -124,7 +125,7 @@ describe('Provider Discovery API', () => {
       mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
-      const data = (await response.json()) as ProvidersResponse;
+      const data = await parseResponse<ProvidersResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.providers).toHaveLength(2);
@@ -159,7 +160,7 @@ describe('Provider Discovery API', () => {
       mockRegistry.getAvailableProviders.mockReturnValue([]);
 
       const response = await GET();
-      const data = (await response.json()) as ProvidersResponse;
+      const data = await parseResponse<ProvidersResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ providers: [] });
@@ -189,7 +190,7 @@ describe('Provider Discovery API', () => {
       mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
-      const data = (await response.json()) as ProvidersResponse;
+      const data = await parseResponse<ProvidersResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.providers[0]).toMatchObject({
@@ -205,7 +206,7 @@ describe('Provider Discovery API', () => {
       });
 
       const response = await GET();
-      const data = (await response.json()) as { error: string };
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data).toMatchObject({
@@ -244,7 +245,7 @@ describe('Provider Discovery API', () => {
       mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
-      const data = (await response.json()) as ProvidersResponse;
+      const data = await parseResponse<ProvidersResponse>(response);
 
       expect(response.status).toBe(200);
       const provider = data.providers[0];
@@ -278,7 +279,7 @@ describe('Provider Discovery API', () => {
       mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
 
       const response = await GET();
-      const data = (await response.json()) as ProvidersResponse;
+      const data = await parseResponse<ProvidersResponse>(response);
 
       expect(response.status).toBe(200);
       const provider = data.providers[0];

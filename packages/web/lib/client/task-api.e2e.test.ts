@@ -32,14 +32,6 @@ vi.mock('@/lib/server/approval-manager', () => ({
   }),
 }));
 
-vi.mock('@/lib/sse-manager', () => ({
-  SSEManager: {
-    getInstance: () => ({
-      broadcast: vi.fn(),
-    }),
-  },
-}));
-
 describe('TaskAPIClient E2E Tests', () => {
   let client: TaskAPIClient;
   let sessionId: string;
@@ -137,8 +129,8 @@ describe('TaskAPIClient E2E Tests', () => {
                   taskId: taskId!,
                 }),
               });
-              const responseData = (await response.json()) as unknown;
-              return new Response(JSON.stringify(responseData), {
+              const responseText = await response.text();
+              return new Response(responseText, {
                 status: response.status,
                 headers: { 'Content-Type': 'application/json' },
               });
