@@ -14,7 +14,7 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    baseURL: 'http://localhost:3005',
+    baseURL: 'http://localhost:23457', // Playwright will use the actual port the server starts on
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -27,17 +27,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3005',
+    command: 'node scripts/start-test-server.js', // Use our wrapper script
+    port: 23457, // Start checking from this port
     reuseExistingServer: !process.env.CI,
     timeout: 60 * 1000,
-    env: {
-      // Add test environment variables for E2E tests
-      ANTHROPIC_KEY: 'test-anthropic-key-for-e2e-tests',
-      ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e-tests',
-      LACE_DB_PATH: ':memory:', // Use in-memory database for tests
-      NODE_ENV: 'test', // This will enable test mocks
-      VITEST_RUNNING: 'true', // Trigger test environment behavior
-    },
   },
 });
