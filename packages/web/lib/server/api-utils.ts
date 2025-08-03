@@ -99,14 +99,11 @@ export function createErrorResponse(
   options?: { code?: string; error?: unknown; details?: unknown }
 ) {
   logger.error(`API Error: ${message}`, { status, code: options?.code, error: options?.error });
-  return createSuperjsonResponse(
-    {
-      error: message,
-      ...(options?.code && { code: options.code }),
-      ...(options?.details && { details: options.details }),
-    },
-    { status }
-  );
+  const response: { error: string; code?: string; details?: unknown } = { error: message };
+  if (options?.code) response.code = options.code;
+  if (options?.details) response.details = options.details;
+
+  return createSuperjsonResponse(response, { status });
 }
 
 // Success response helper
