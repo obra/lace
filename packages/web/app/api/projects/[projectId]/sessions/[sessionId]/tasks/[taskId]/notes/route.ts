@@ -13,7 +13,6 @@ import {
   AddNoteSchema,
   validateRouteParams,
   validateRequestBody,
-  serializeTask,
   createErrorResponse,
   createSuccessResponse,
 } from '@/lib/server/api-utils';
@@ -86,13 +85,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return createErrorResponse('Task not found', 404, { code: 'RESOURCE_NOT_FOUND' });
       }
 
-      // Get updated task to return (use serializeTask utility)
-      const serializedTask = serializeTask(task);
-
-      return createSuccessResponse(
-        { message: 'Note added successfully', task: serializedTask },
-        201
-      );
+      return createSuccessResponse({ message: 'Note added successfully', task }, 201);
     } catch (error: unknown) {
       if (error instanceof Error && error.message === 'Task not found') {
         return createErrorResponse('Task not found', 404, { code: 'RESOURCE_NOT_FOUND' });

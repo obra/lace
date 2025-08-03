@@ -13,7 +13,6 @@ import {
   validateRouteParams,
   validateRequestBody,
   UpdateTaskSchema,
-  serializeTask,
   createErrorResponse,
   createSuccessResponse,
 } from '@/lib/server/api-utils';
@@ -67,10 +66,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return createErrorResponse('Task not found', 404);
     }
 
-    // Serialize task for JSON response
-    const serializedTask = serializeTask(task);
-
-    return createSuccessResponse({ task: serializedTask });
+    return createSuccessResponse({ task });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch task',
@@ -132,10 +128,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       isHuman: true,
     });
 
-    // Serialize task for JSON response
-    const serializedTask = serializeTask(task);
-
-    return createSuccessResponse({ task: serializedTask });
+    return createSuccessResponse({ task });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to update task',

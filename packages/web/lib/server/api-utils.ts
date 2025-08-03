@@ -3,8 +3,6 @@
 
 import { z } from 'zod';
 import { logger } from '~/utils/logger';
-import type { Task } from '@/types/core';
-import type { SerializedTask } from '@/types/web';
 import { createSuperjsonResponse } from '@/lib/serialization';
 
 // Route parameter validation schemas
@@ -71,25 +69,6 @@ export function validateRequestBody<T>(body: unknown, schema: z.ZodSchema<T>): T
     logger.error('Request body validation failed', { error, body });
     throw new Error('Invalid request body');
   }
-}
-
-// Date serialization utility
-export function serializeDate(date: Date | string | undefined): string | undefined {
-  if (!date) return undefined;
-  return date instanceof Date ? date.toISOString() : date;
-}
-
-// Task serialization utility
-export function serializeTask(task: Task): SerializedTask {
-  return {
-    ...task,
-    createdAt: serializeDate(task.createdAt),
-    updatedAt: serializeDate(task.updatedAt),
-    notes: task.notes?.map((note) => ({
-      ...note,
-      timestamp: serializeDate(note.timestamp),
-    })),
-  };
 }
 
 // Error response helper

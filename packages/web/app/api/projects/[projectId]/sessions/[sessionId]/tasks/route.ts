@@ -12,7 +12,6 @@ import {
   CreateTaskSchema,
   validateRouteParams,
   validateRequestBody,
-  serializeTask,
   createErrorResponse,
   createSuccessResponse,
 } from '@/lib/server/api-utils';
@@ -72,10 +71,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get tasks with filters
     const tasks = taskManager.getTasks(Object.keys(filters).length > 0 ? filters : undefined);
 
-    // Serialize tasks for JSON response
-    const serializedTasks = tasks.map(serializeTask);
-
-    return createSuccessResponse({ tasks: serializedTasks });
+    return createSuccessResponse({ tasks });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch tasks',
@@ -148,10 +144,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       isHuman: true,
     });
 
-    // Serialize task for JSON response
-    const serializedTask = serializeTask(task);
-
-    return createSuccessResponse({ task: serializedTask }, 201);
+    return createSuccessResponse({ task }, 201);
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to create task',

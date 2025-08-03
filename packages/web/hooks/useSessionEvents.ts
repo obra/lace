@@ -1,7 +1,7 @@
 // ABOUTME: Event stream hook for session events and tool approvals
 // ABOUTME: Real-time updates using unified event stream
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { SessionEvent } from '@/types/web-sse';
 import type { PendingApproval } from '@/types/api';
 import type { ToolApprovalRequestData } from '@/types/web-events';
@@ -30,25 +30,49 @@ export function useSessionEvents(
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Add session event to timeline
-  const addSessionEvent = useCallback((sessionEvent: SessionEvent) => {
-    setEvents((prev) => {
-      // Avoid duplicates by checking event content
-      const exists = prev.some(
-        (e) =>
-          e.type === sessionEvent.type &&
-          e.timestamp === sessionEvent.timestamp &&
-          e.threadId === sessionEvent.threadId &&
-          JSON.stringify(e.data) === JSON.stringify(sessionEvent.data)
-      );
+  // Use ref to track seen events for O(1) deduplication
+  const seenEvents = useRef(new Set<string>());
 
-      if (exists) return prev;
-
-      return [...prev, sessionEvent].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
-    });
+  // Generate a composite key for event deduplication
+  const getEventKey = useCallback((event: SessionEvent): string => {
+    return `${event.type}:${event.timestamp}:${event.threadId}:${JSON.stringify(event.data)}`;
   }, []);
+
+  // Add session event to timeline
+  const addSessionEvent = useCallback(
+    (sessionEvent: SessionEvent) => {
+      const eventKey = getEventKey(sessionEvent);
+
+      // O(1) duplicate check
+      if (seenEvents.current.has(eventKey)) {
+        return;
+      }
+
+      seenEvents.current.add(eventKey);
+
+      setEvents((prev) => {
+        // Insert in sorted position to avoid full sort
+        const timestamp = new Date(sessionEvent.timestamp).getTime();
+        let insertIndex = prev.length;
+
+        // Find insertion point (reverse search since newer events are more common)
+        for (let i = prev.length - 1; i >= 0; i--) {
+          if (new Date(prev[i]!.timestamp).getTime() <= timestamp) {
+            insertIndex = i + 1;
+            break;
+          }
+          if (i === 0) {
+            insertIndex = 0;
+          }
+        }
+
+        const newEvents = [...prev];
+        newEvents.splice(insertIndex, 0, sessionEvent);
+        return newEvents;
+      });
+    },
+    [getEventKey]
+  );
 
   // Handle approval requests
   const handleApprovalRequest = useCallback((approval: PendingApproval) => {
@@ -115,7 +139,7 @@ export function useSessionEvents(
       .then((res) => res.json())
       .then((data) => {
         if (data.pendingApprovals?.length > 0) {
-          const approvals = data.pendingApprovals.map((approval: any) => ({
+          const approvals = data.pendingApprovals.map((approval: PendingApproval) => ({
             toolCallId: approval.toolCallId,
             toolCall: approval.toolCall,
             requestedAt: approval.requestedAt, // Keep as string now
