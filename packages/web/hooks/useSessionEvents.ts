@@ -7,6 +7,7 @@ import type { PendingApproval } from '@/types/api';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 import type { ThreadId } from '@/types/core';
 import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
+import { parse } from '@/lib/serialization';
 
 interface UseSessionEventsReturn {
   allEvents: SessionEvent[];
@@ -103,7 +104,10 @@ export function useSessionEvents(
 
     // Load session history
     fetch(`/api/sessions/${sessionId}/history`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        const text = await res.text();
+        return parse(text); // Use superjson to parse the response
+      })
       .then((data) => {
         if (data.events) {
           try {
@@ -122,9 +126,11 @@ export function useSessionEvents(
             setEvents([]); // Fallback to empty array
           }
         }
+        setLoadingHistory(false);
       })
       .catch((error) => {
         console.error('[SESSION_EVENTS] Failed to load history:', error);
+        setLoadingHistory(false);
       });
   }, [sessionId]);
 
@@ -136,7 +142,10 @@ export function useSessionEvents(
     }
 
     fetch(`/api/threads/${selectedAgent}/approvals/pending`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        const text = await res.text();
+        return parse(text);
+      })
       .then((data) => {
         if (data.pendingApprovals?.length > 0) {
           const approvals = data.pendingApprovals.map((approval: PendingApproval) => ({

@@ -8,6 +8,7 @@ import type {
   StreamConnection,
   StreamEventCategory,
 } from '@/types/stream-events';
+import { parse } from '@/lib/serialization';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadId } from '@/types/core';
 import type { ToolApprovalRequestData } from '@/types/web-events';
@@ -512,7 +513,7 @@ export function useEventStream({
 
     eventSource.onmessage = (event) => {
       try {
-        const streamEvent = JSON.parse(event.data) as StreamEvent;
+        const streamEvent = parse(event.data) as StreamEvent;
 
         setLastEvent(streamEvent);
         setSendCount((prev) => prev + 1);
