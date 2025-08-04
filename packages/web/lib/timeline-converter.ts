@@ -280,6 +280,22 @@ function convertEvent(
         timestamp,
       };
 
+    case 'SYSTEM_PROMPT':
+      return {
+        id,
+        type: 'system-prompt',
+        content: event.data.content,
+        timestamp,
+      };
+
+    case 'USER_SYSTEM_PROMPT':
+      return {
+        id,
+        type: 'user-system-prompt',
+        content: event.data.content,
+        timestamp,
+      };
+
     default:
       // Fallback for unknown events - provide rich metadata for proper rendering
       const unknownEvent = event as {
