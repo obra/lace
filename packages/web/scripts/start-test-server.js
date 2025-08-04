@@ -9,8 +9,11 @@ const TEST_PORT_START = 23457;
 const PORT_FILE = join(process.cwd(), '.playwright-server-url');
 
 function startServer() {
+  // Use E2E test server for tool approval tests, regular server otherwise
+  const serverFile = process.env.E2E_TOOL_APPROVAL_MOCK === 'true' ? 'e2e-test-server.ts' : 'server.ts';
+  
   // Start the server with our test port
-  const serverProcess = spawn('npx', ['tsx', 'server.ts', '--port', TEST_PORT_START.toString()], {
+  const serverProcess = spawn('npx', ['tsx', serverFile, '--port', TEST_PORT_START.toString()], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
@@ -20,6 +23,8 @@ function startServer() {
       LACE_DB_PATH: ':memory:',
       NODE_ENV: 'test',
       VITEST_RUNNING: 'true',
+      // Enable tool approval mock provider for E2E tests
+      E2E_TOOL_APPROVAL_MOCK: process.env.E2E_TOOL_APPROVAL_MOCK || 'false',
     }
   });
 
