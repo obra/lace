@@ -40,44 +40,25 @@ export async function GET(): Promise<NextResponse> {
     const catalogManager = new ProviderCatalogManager();
     await catalogManager.loadCatalogs();
     
-    // Group instances by provider type and return one entry per provider type
-    const providerGroups = new Map<string, {
-      catalogProvider: CatalogProvider;
-      instances: ProviderInstance[];
-    }>();
-    
-    for (const instance of configuredInstances) {
+    // Build providers array - one entry per instance as requested
+    const providers: ProviderWithModels[] = configuredInstances.map(instance => {
       const catalogProvider = catalogManager.getProvider(instance.catalogProviderId);
       if (!catalogProvider) {
         throw new Error(`Catalog provider ${instance.catalogProviderId} not found for instance ${instance.id}`);
       }
       
-      if (!providerGroups.has(catalogProvider.id)) {
-        providerGroups.set(catalogProvider.id, {
-          catalogProvider,
-          instances: []
-        });
-      }
-      
-      providerGroups.get(catalogProvider.id)!.instances.push(instance);
-    }
-    
-    // Build providers array - one entry per provider type
-    const providers: ProviderWithModels[] = Array.from(providerGroups.values()).map(group => {
-      const { catalogProvider, instances } = group;
-      const models = catalogManager.getProviderModels(catalogProvider.id);
+      const models = catalogManager.getProviderModels(instance.catalogProviderId);
       
       return {
         id: catalogProvider.id,
         name: catalogProvider.name,
-        displayName: catalogProvider.displayName || catalogProvider.name,
+        displayName: instance.displayName, // Use instance display name, not catalog name
         type: catalogProvider.type,
         requiresApiKey: catalogProvider.requiresApiKey || false,
         configurationHint: catalogProvider.configurationHint,
         models,
-        configured: true, // All returned providers have at least one configured instance
-        // For backward compatibility, include the first instance ID
-        instanceId: instances[0].id,
+        configured: true, // All returned providers are configured by definition
+        instanceId: instance.id,
       };
     });
 

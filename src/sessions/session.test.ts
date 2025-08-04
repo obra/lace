@@ -141,7 +141,7 @@ describe('Session', () => {
         modelId: 'claude-3-5-haiku-20241022',
       });
 
-      const agent = session.spawnAgent(''); // Empty name to trigger default
+      const agent = session.spawnAgent({ name: '' }); // Empty name to trigger default
 
       const agents = session.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
@@ -169,7 +169,7 @@ describe('Session', () => {
         modelId: 'claude-3-5-haiku-20241022',
       });
 
-      const agent = session.spawnAgent('   '); // Whitespace-only
+      const agent = session.spawnAgent({ name: '   ' }); // Whitespace-only
 
       const agents = session.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);

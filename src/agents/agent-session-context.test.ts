@@ -8,6 +8,7 @@ import { Project } from '~/projects/project';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '~/threads/types';
 
@@ -16,9 +17,18 @@ describe('Agent Session Context', () => {
   let session: Session;
   let agent: Agent;
   let project: Project;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
 
     // Create real project
     project = Project.create(
@@ -28,11 +38,11 @@ describe('Agent Session Context', () => {
       {}
     );
 
-    // Create real session
+    // Create real session with provider instance
     session = Session.create({
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -44,7 +54,9 @@ describe('Agent Session Context', () => {
     agent = coordinatorAgent;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up provider instances
+    await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });
 
@@ -84,8 +96,8 @@ describe('Agent Session Context', () => {
       // Create session via Session.create()
       const createdSession = Session.create({
         name: 'Roundtrip Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
       });
 

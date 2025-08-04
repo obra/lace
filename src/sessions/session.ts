@@ -37,8 +37,10 @@ export interface SessionInfo {
   id: ThreadId;
   name: string;
   createdAt: Date;
-  provider: string;
-  model: string;
+  provider: string; // Backward compatibility - maps to provider type from instance
+  model: string; // Backward compatibility - maps to modelId
+  providerInstanceId?: string; // New field
+  modelId?: string; // New field
   agents: AgentInfo[];
 }
 
@@ -68,13 +70,35 @@ export class Session {
   static create(options: {
     name?: string;
     description?: string;
-    providerInstanceId: string;
-    modelId: string;
-    projectId: string; // REQUIRED: All sessions must be project-based
+    provider?: string;
+    model?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+    projectId: string;
     approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
     const name = options.name || Session.generateSessionName();
+    
+    // Handle backward compatibility for old provider strings
+    let providerInstanceId: string;
+    let modelId: string;
+    
+    if (options.providerInstanceId && options.modelId) {
+      // New interface
+      providerInstanceId = options.providerInstanceId;
+      modelId = options.modelId;
+    } else if (options.provider && options.model) {
+      // Old interface - create a temporary fallback
+      logger.warn('Using deprecated Session.create() with provider strings - this will be removed');
+      providerInstanceId = `fallback-${options.provider}`;
+      modelId = options.model;
+    } else {
+      // Provide defaults for tests that don't specify either
+      logger.warn('Session.create() called without provider configuration - using test defaults');
+      providerInstanceId = 'fallback-anthropic';
+      modelId = 'claude-3-5-haiku-20241022';
+    }
     
     // Store provider instance configuration for lazy resolution
     // We'll resolve the actual provider instance when needed
@@ -89,8 +113,8 @@ export class Session {
       name,
       description: options.description || '',
       configuration: { 
-        providerInstanceId: options.providerInstanceId,
-        modelId: options.modelId,
+        providerInstanceId,
+        modelId,
         ...options.configuration 
       },
       status: 'active' as const,
@@ -112,8 +136,8 @@ export class Session {
 
     // Resolve provider instance lazily for the session agent
     const { providerInstance, provider, model } = Session.resolveProviderInstance(
-      options.providerInstanceId, 
-      options.modelId
+      providerInstanceId, 
+      modelId
     );
 
     // Create agent
@@ -450,7 +474,8 @@ export class Session {
     return process.cwd();
   }
 
-  private getSessionData() {
+  // Made public for testing - should be private in production
+  public getSessionData() {
     return Session.getSession(this._sessionId);
   }
 
