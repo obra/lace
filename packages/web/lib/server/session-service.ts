@@ -209,17 +209,26 @@ export class SessionService {
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
       logger.error(`Agent ${threadId} error:`, error);
-      const event: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId,
-        timestamp: new Date().toISOString(),
-        data: { content: `Agent error: ${error.message}` },
-      };
-      sseManager.broadcast({
-        eventType: 'session',
-        scope: { sessionId },
-        data: event,
-      });
+      
+      // Filter out abort-related errors from UI messages to prevent duplicates
+      // (These should already be filtered at the agent level, but this is defense-in-depth)
+      const isAbortError = error.name === 'AbortError' || 
+                          error.message === 'Request was aborted' ||
+                          error.message === 'Aborted';
+      
+      if (!isAbortError) {
+        const event: SessionEvent = {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId,
+          timestamp: new Date().toISOString(),
+          data: { content: `Agent error: ${error.message}` },
+        };
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
+      }
     });
 
     // Listen for conversation complete

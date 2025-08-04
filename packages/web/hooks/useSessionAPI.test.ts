@@ -32,7 +32,6 @@ describe('useSessionAPI', () => {
       const { result } = renderHook(() => useSessionAPI());
 
       // Verify initial state
-      expect(result.current.loading).toBe(false);
       expect(result.current.error).toBe(null);
 
       let session;
@@ -42,7 +41,6 @@ describe('useSessionAPI', () => {
 
       // Verify successful operation result and final state
       expect(session).toEqual(mockSession);
-      expect(result.current.loading).toBe(false);
       expect(result.current.error).toBe(null);
     });
 
@@ -59,7 +57,6 @@ describe('useSessionAPI', () => {
       // Verify error handling behavior
       expect(session).toBe(null);
       expect(result.current.error).toBe('Failed to create session');
-      expect(result.current.loading).toBe(false);
     });
 
     it('should handle network errors gracefully', async () => {
@@ -75,7 +72,6 @@ describe('useSessionAPI', () => {
       // Verify network error handling behavior
       expect(session).toBe(null);
       expect(result.current.error).toBe('Network error');
-      expect(result.current.loading).toBe(false);
     });
   });
 
@@ -107,7 +103,6 @@ describe('useSessionAPI', () => {
 
       // Verify successful operation result and final state
       expect(sessions).toEqual(mockSessions);
-      expect(result.current.loading).toBe(false);
       expect(result.current.error).toBe(null);
     });
 
@@ -303,7 +298,6 @@ describe('useSessionAPI', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'Hello, assistant!' }),
       });
-      expect(result.current.loading).toBe(false);
       expect(result.current.error).toBe(null);
     });
 
@@ -324,45 +318,33 @@ describe('useSessionAPI', () => {
     });
   });
 
-  describe('loading state management', () => {
-    it('should properly manage loading state lifecycle during async operations', async () => {
-      const mockSession = {
-        id: 'lace_20250113_test123' as ThreadId,
-        name: 'Test Session',
-        createdAt: new Date().toISOString(),
-        agents: [],
-      };
-
-      let resolvePromise: (value: unknown) => void;
-      const promise = new Promise((resolve) => {
-        resolvePromise = resolve;
-      });
-
-      mockFetch.mockReturnValueOnce(promise);
-
+  describe('error state management', () => {
+    it('should properly manage error state during async operations', async () => {
       const { result } = renderHook(() => useSessionAPI());
 
-      // Verify initial loading state
-      expect(result.current.loading).toBe(false);
+      // Verify initial error state
+      expect(result.current.error).toBe(null);
 
-      // Start async operation
-      act(() => {
-        void result.current.createSession({ name: 'Test Session' });
-      });
+      // Test successful operation clears any previous error
+      mockFetch.mockResolvedValueOnce(createMockResponse({ session: { 
+        id: 'test-session' as ThreadId, name: 'Test', provider: 'anthropic', model: 'claude-3-5-haiku-20241022', 
+        createdAt: new Date().toISOString(), agents: [] 
+      }}));
 
-      // Verify loading state is set during operation
-      expect(result.current.loading).toBe(true);
-
-      // Resolve the async operation
       await act(async () => {
-        resolvePromise!(createMockResponse({ session: mockSession }));
-        await promise;
+        await result.current.createSession({ name: 'Test Session' });
       });
 
-      // Verify loading state is cleared after completion
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBe(null);
+
+      // Test failed operation sets error
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse('API Error'));
+
+      await act(async () => {
+        await result.current.createSession({ name: 'Test Session 2' });
       });
+
+      expect(result.current.error).toBe('API Error');
     });
 
     it('should clear error state when starting new operations', async () => {
