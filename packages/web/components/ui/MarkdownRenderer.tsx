@@ -3,11 +3,12 @@
 
 'use client';
 
-import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import DOMPurify from 'dompurify';
+import { useFoldableContent } from '@/hooks/useFoldableContent';
 
 interface MarkdownRendererProps {
   content: string;
@@ -18,29 +19,17 @@ interface MarkdownRendererProps {
 
 const MAX_LINES = 4;
 
-function truncateText(text: string, maxLines: number): { truncated: string; isTruncated: boolean } {
-  const lines = text.split('\n');
-  if (lines.length <= maxLines) {
-    return { truncated: text, isTruncated: false };
-  }
-  return {
-    truncated: lines.slice(0, maxLines).join('\n'),
-    isTruncated: true
-  };
-}
-
 export default function MarkdownRenderer({ 
   content, 
   maxLines = MAX_LINES, 
   isRecentMessage = true,
   className = '' 
 }: MarkdownRendererProps) {
-  const [isExpanded, setIsExpanded] = useState(isRecentMessage);
-  
-  const { truncated, isTruncated } = truncateText(content, maxLines);
-  const shouldFold = !isRecentMessage && isTruncated;
-  
-  const displayContent = shouldFold && !isExpanded ? truncated : content;
+  const { displayContent, shouldFold, isExpanded, toggleExpanded, remainingLines } = useFoldableContent(
+    content,
+    maxLines,
+    isRecentMessage
+  );
 
   const components: Components = {
     // Style elements to match our design system
@@ -66,16 +55,20 @@ export default function MarkdownRenderer({
     h3: ({ children }) => <h3 className="text-base font-semibold mt-4 mb-2 text-base-content">{children}</h3>,
     strong: ({ children }) => <strong className="font-semibold text-base-content">{children}</strong>,
     em: ({ children }) => <em className="italic text-base-content">{children}</em>,
-    a: ({ href, children }) => (
-      <a 
-        href={href} 
-        className="text-primary hover:underline" 
-        target="_blank" 
-        rel="noopener noreferrer"
-      >
-        {children}
-      </a>
-    ),
+    a: ({ href, children }) => {
+      // Defense in depth: sanitize href even though react-markdown is generally safe
+      const sanitizedHref = href ? DOMPurify.sanitize(href) : '';
+      return (
+        <a 
+          href={sanitizedHref} 
+          className="text-primary hover:underline" 
+          target="_blank" 
+          rel="noopener noreferrer"
+        >
+          {children}
+        </a>
+      );
+    },
     ul: ({ children }) => <ul className="list-disc list-inside ml-4 space-y-1">{children}</ul>,
     ol: ({ children }) => <ol className="list-decimal list-inside ml-4 space-y-1">{children}</ol>,
     li: ({ children }) => <li className="text-base-content">{children}</li>,
@@ -97,10 +90,10 @@ export default function MarkdownRenderer({
       {shouldFold && !isExpanded && (
         <div className="text-center mt-3 pt-3 border-t border-base-300">
           <button
-            onClick={() => setIsExpanded(true)}
+            onClick={toggleExpanded}
             className="text-xs text-primary hover:underline"
           >
-            Show {content.split('\n').length - maxLines} more lines...
+            {`Show ${remainingLines} more lines...`}
           </button>
         </div>
       )}
