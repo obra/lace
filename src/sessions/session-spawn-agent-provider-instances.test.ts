@@ -139,7 +139,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
         name: 'Partial Config Agent',
         providerInstanceId: testProviderInstances.openaiInstanceId,
         // Note: Missing modelId might be handled by fallback logic
-      } as any);
+      } as Parameters<typeof testSession.spawnAgent>[0]);
 
       expect(agent).toBeDefined();
       expect(agent.threadId).toBeDefined();
@@ -151,7 +151,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
         name: 'Model Only Agent',
         modelId: 'gpt-4o',
         // Missing providerInstanceId - should fall back to session provider
-      } as any);
+      } as Parameters<typeof testSession.spawnAgent>[0]);
 
       expect(agent).toBeDefined();
       const agents = testSession.getAgents();
@@ -271,13 +271,13 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     });
 
     it('should track all spawned agents correctly', () => {
-      const agent1 = testSession.spawnAgent({ name: 'Agent 1' });
-      const agent2 = testSession.spawnAgent({
+      const _agent1 = testSession.spawnAgent({ name: 'Agent 1' });
+      const _agent2 = testSession.spawnAgent({
         name: 'Agent 2',
         providerInstanceId: testProviderInstances.openaiInstanceId,
         modelId: 'gpt-4o',
       });
-      const agent3 = testSession.spawnAgent({ name: 'Agent 3' });
+      const _agent3 = testSession.spawnAgent({ name: 'Agent 3' });
 
       const agents = testSession.getAgents();
       expect(agents).toHaveLength(4); // Coordinator + 3 spawned agents

@@ -7,10 +7,7 @@ import { Project } from '~/projects/project';
 import { ProviderRegistry } from '~/providers/registry';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { DelegationMockProvider } from '~/test-utils/delegation-mock-provider';
-import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+import { setupTestProviderInstances } from '~/test-utils/provider-instances';
 
 export interface DelegationTestSetup {
   session: Session;

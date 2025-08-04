@@ -109,7 +109,7 @@ describe('Session with Provider Instances', () => {
           providerInstanceId: testProviderInstances.anthropicInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
           // Missing projectId
-        } as any);
+        } as Parameters<typeof Session.create>[0]);
       }).toThrow();
     });
   });

@@ -2,6 +2,7 @@
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
 import { Agent, type AgentInfo } from '~/agents/agent';
+import type { AIProvider } from '~/providers/types';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
@@ -51,7 +52,7 @@ export class Session {
   private _taskManager: TaskManager;
   private _destroyed = false;
   private _projectId?: string;
-  private _providerCache?: any; // Cached provider instance
+  private _providerCache?: unknown; // Cached provider instance
 
   constructor(sessionAgent: Agent, projectId?: string) {
     this._sessionAgent = sessionAgent;
@@ -112,14 +113,15 @@ export class Session {
     Session.initializeTools(toolExecutor);
 
     // Resolve provider instance lazily for the session agent
-    const { providerInstance, provider, model } = Session.resolveProviderInstance(
-      providerInstanceId,
-      modelId
-    );
+    const {
+      providerInstance,
+      provider: _provider,
+      model: _model,
+    } = Session.resolveProviderInstance(providerInstanceId, modelId);
 
     // Create agent
     const sessionAgent = new Agent({
-      provider: providerInstance,
+      provider: providerInstance as AIProvider,
       toolExecutor,
       threadManager,
       threadId,
@@ -537,10 +539,11 @@ export class Session {
     }
 
     // Resolve provider instance lazily
-    const { providerInstance, provider, model } = Session.resolveProviderInstance(
-      targetProviderInstanceId,
-      targetModelId
-    );
+    const {
+      providerInstance,
+      provider: _provider,
+      model: _model,
+    } = Session.resolveProviderInstance(targetProviderInstanceId, targetModelId);
 
     // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
@@ -551,7 +554,10 @@ export class Session {
     agentToolExecutor.registerTool('delegate', delegateTool);
 
     // Create delegate agent with the appropriate provider instance and its own toolExecutor
-    const agent = this._sessionAgent.createDelegateAgent(agentToolExecutor, providerInstance);
+    const agent = this._sessionAgent.createDelegateAgent(
+      agentToolExecutor,
+      providerInstance as AIProvider
+    );
 
     // Store the agent metadata
     agent.updateThreadMetadata({
@@ -738,13 +744,13 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Resolve provider instance configuration to actual provider instance (with caching)
    */
-  private static _providerCache = new Map<string, any>();
+  private static _providerCache = new Map<string, unknown>();
 
   static resolveProviderInstance(
     providerInstanceId: string,
     modelId: string
   ): {
-    providerInstance: any;
+    providerInstance: unknown;
     provider: string;
     model: string;
   } {
@@ -753,7 +759,7 @@ Use your task_add_note tool to record important notes as you work and your task_
     // Check cache first
     const cached = Session._providerCache.get(cacheKey);
     if (cached) {
-      return cached;
+      return cached as { providerInstance: unknown; provider: string; model: string };
     }
 
     // For now, fall back to old provider system for session creation

@@ -1,7 +1,7 @@
 // ABOUTME: Tests for custom provider catalog management system
 // ABOUTME: Covers CRUD operations, validation, templates, and import/export functionality
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -288,7 +288,7 @@ describe('CustomProviderCatalogManager', () => {
   });
 
   describe('validation', () => {
-    it('should validate a correct catalog', async () => {
+    it('should validate a correct catalog', () => {
       const validCatalog: CatalogProvider = {
         id: 'valid-test',
         name: 'Valid Test',
@@ -307,13 +307,13 @@ describe('CustomProviderCatalogManager', () => {
         ],
       };
 
-      const result = await customManager.validateCatalog(validCatalog);
+      const result = customManager.validateCatalog(validCatalog);
 
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should detect missing default models', async () => {
+    it('should detect missing default models', () => {
       const invalidCatalog: CatalogProvider = {
         id: 'invalid-test',
         name: 'Invalid Test',
@@ -332,7 +332,7 @@ describe('CustomProviderCatalogManager', () => {
         ],
       };
 
-      const result = await customManager.validateCatalog(invalidCatalog);
+      const result = customManager.validateCatalog(invalidCatalog);
 
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain(
@@ -340,7 +340,7 @@ describe('CustomProviderCatalogManager', () => {
       );
     });
 
-    it('should detect duplicate model IDs', async () => {
+    it('should detect duplicate model IDs', () => {
       const invalidCatalog: CatalogProvider = {
         id: 'duplicate-models-test',
         name: 'Duplicate Models Test',
@@ -367,7 +367,7 @@ describe('CustomProviderCatalogManager', () => {
         ],
       };
 
-      const result = await customManager.validateCatalog(invalidCatalog);
+      const result = customManager.validateCatalog(invalidCatalog);
 
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('Duplicate model IDs found: model1');
@@ -434,8 +434,8 @@ describe('CustomProviderCatalogManager', () => {
         ],
       });
 
-      const exported = await customManager.exportCatalog('export-test');
-      const parsed = JSON.parse(exported);
+      const exported = customManager.exportCatalog('export-test');
+      const parsed = JSON.parse(exported) as CatalogProvider;
 
       expect(parsed.id).toBe('export-test');
       expect(parsed.name).toBe('Export Test');
@@ -506,8 +506,8 @@ describe('CustomProviderCatalogManager', () => {
       });
     });
 
-    it('should calculate catalog statistics', async () => {
-      const stats = await customManager.getCatalogStats('stats-test');
+    it('should calculate catalog statistics', () => {
+      const stats = customManager.getCatalogStats('stats-test');
 
       expect(stats.modelCount).toBe(2);
       expect(stats.avgInputCost).toBe(1.5);

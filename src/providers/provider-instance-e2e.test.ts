@@ -10,9 +10,9 @@ import * as os from 'os';
 import { ProviderRegistry } from '~/providers/registry';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+// import { Session } from '~/sessions/session';
+// import { Project } from '~/projects/project';
+// import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { ProviderInstancesConfig, CatalogProvider } from '~/providers/catalog/types';
 
@@ -153,7 +153,7 @@ describe('Provider Instance E2E Tests', () => {
   let originalLaceDir: string | undefined;
   let registry: ProviderRegistry;
   let instanceManager: ProviderInstanceManager;
-  let catalogManager: ProviderCatalogManager;
+  let _catalogManager: ProviderCatalogManager;
 
   // Mock servers for different provider endpoints
   let openaiServer1: ReturnType<typeof createMockOpenAIServer>;
@@ -185,7 +185,7 @@ describe('Provider Instance E2E Tests', () => {
     ollamaServer.listen();
 
     // Setup provider catalog with test data
-    catalogManager = new ProviderCatalogManager();
+    _catalogManager = new ProviderCatalogManager();
 
     // Create test catalog data in the user-catalog directory
     const testCatalogDir = path.join(tempDir, 'user-catalog');
@@ -480,8 +480,12 @@ describe('Provider Instance E2E Tests', () => {
       );
 
       // Mock the Anthropic provider's getAnthropicClient method to verify baseURL configuration
-      const anthropicProvider = provider as any;
-      const originalGetClient = anthropicProvider.getAnthropicClient.bind(anthropicProvider);
+      const anthropicProvider = provider as {
+        getAnthropicClient: () => { baseURL: string; messages: unknown };
+      };
+      const originalGetClient = anthropicProvider.getAnthropicClient.bind(
+        anthropicProvider
+      ) as () => { baseURL: string; messages: unknown };
       let capturedBaseURL: string | undefined;
 
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => {
@@ -510,8 +514,8 @@ describe('Provider Instance E2E Tests', () => {
           }),
         };
 
-        return client;
-      });
+        return client as { baseURL: string; messages: unknown };
+      }) as () => { baseURL: string; messages: unknown };
 
       const response = await provider.createResponse(
         [{ role: 'user', content: 'Hello Anthropic' }],
@@ -539,7 +543,7 @@ describe('Provider Instance E2E Tests', () => {
       );
 
       // Mock the Anthropic provider to simulate auth failure
-      const anthropicProvider = provider as any;
+      const anthropicProvider = provider as { getAnthropicClient: () => { messages: unknown } };
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => ({
         messages: {
           create: vi.fn().mockRejectedValue(new Error('Authentication failed: Invalid API key')),
@@ -596,8 +600,12 @@ describe('Provider Instance E2E Tests', () => {
       );
 
       // Mock the Anthropic provider to avoid MSW/AbortSignal issues
-      const anthropicProviderAny = anthropicProvider as any;
-      const originalGetClient = anthropicProviderAny.getAnthropicClient.bind(anthropicProviderAny);
+      const anthropicProviderAny = anthropicProvider as {
+        getAnthropicClient: () => { messages: unknown };
+      };
+      const originalGetClient = anthropicProviderAny.getAnthropicClient.bind(
+        anthropicProviderAny
+      ) as () => { messages: unknown };
       anthropicProviderAny.getAnthropicClient = vi.fn().mockImplementation(() => {
         const client = originalGetClient();
         client.messages = {
@@ -620,8 +628,8 @@ describe('Provider Instance E2E Tests', () => {
             },
           }),
         };
-        return client;
-      });
+        return client as { messages: unknown };
+      }) as () => { messages: unknown };
 
       // Make concurrent requests
       const [openaiResponse, anthropicResponse, ollamaResponse] = await Promise.all([
@@ -659,7 +667,7 @@ describe('Provider Instance E2E Tests', () => {
         const provider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
 
         // Mock the OpenAI provider to simulate connection timeout
-        const openaiProvider = provider as any;
+        const openaiProvider = provider as { createResponse: unknown };
         openaiProvider.createResponse = vi
           .fn()
           .mockRejectedValue(new Error('Connection timeout: fetch failed'));
@@ -704,8 +712,8 @@ describe('Provider Instance E2E Tests', () => {
         const provider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
 
         // Mock the OpenAI provider to simulate authentication failure
-        const openaiProvider = provider as any;
-        const originalCreateResponse = openaiProvider.createResponse.bind(openaiProvider);
+        const openaiProvider = provider as { createResponse: unknown };
+        const _originalCreateResponse = openaiProvider.createResponse;
         openaiProvider.createResponse = vi
           .fn()
           .mockRejectedValue(new Error('Authentication failed: Invalid API key'));
@@ -775,12 +783,14 @@ describe('Provider Instance E2E Tests', () => {
     // TODO: These tests require updating Session.spawnAgent to support provider instances
     // Will be implemented after fixing the spawnAgent method
 
-    it('should spawn agent with provider instance via API', async () => {
+    it.skip('should spawn agent with provider instance via API', () => {
       // Test the full flow: UI selection -> API -> Agent creation -> Provider usage
+      expect(true).toBe(true); // Placeholder for when implementation is complete
     });
 
-    it('should send messages through correct provider endpoint', async () => {
+    it.skip('should send messages through correct provider endpoint', () => {
       // Test that agent messages actually go through the provider instance endpoint
+      expect(true).toBe(true); // Placeholder for when implementation is complete
     });
   });
 });

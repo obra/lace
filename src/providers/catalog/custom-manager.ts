@@ -72,7 +72,7 @@ export class CustomProviderCatalogManager {
     };
 
     // Validate the complete catalog
-    const validation = await this.validateCatalog(catalog);
+    const validation = this.validateCatalog(catalog);
     if (!validation.isValid) {
       throw new Error(`Catalog validation failed: ${validation.errors.join(', ')}`);
     }
@@ -121,7 +121,7 @@ export class CustomProviderCatalogManager {
     };
 
     // Validate updated catalog
-    const validation = await this.validateCatalog(updated);
+    const validation = this.validateCatalog(updated);
     if (!validation.isValid) {
       throw new Error(`Catalog validation failed: ${validation.errors.join(', ')}`);
     }
@@ -259,7 +259,7 @@ export class CustomProviderCatalogManager {
   /**
    * Validate a catalog structure
    */
-  async validateCatalog(catalog: CatalogProvider): Promise<CatalogValidationResult> {
+  validateCatalog(catalog: CatalogProvider): CatalogValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -327,10 +327,10 @@ export class CustomProviderCatalogManager {
     const warnings: string[] = [];
 
     try {
-      const catalogData = JSON.parse(catalogJson);
+      const catalogData = JSON.parse(catalogJson) as CatalogProvider;
 
       // Validate structure
-      const validation = await this.validateCatalog(catalogData);
+      const validation = this.validateCatalog(catalogData);
       errors.push(...validation.errors);
       warnings.push(...validation.warnings);
 
@@ -381,7 +381,7 @@ export class CustomProviderCatalogManager {
   /**
    * Export a catalog to JSON
    */
-  async exportCatalog(catalogId: string): Promise<string> {
+  exportCatalog(catalogId: string): string {
     const catalog = this.catalogManager.getProvider(catalogId);
     if (!catalog) {
       throw new Error(`Catalog with ID '${catalogId}' not found`);
@@ -507,7 +507,7 @@ export class CustomProviderCatalogManager {
   /**
    * Get catalog statistics
    */
-  async getCatalogStats(catalogId: string): Promise<{
+  getCatalogStats(catalogId: string): {
     modelCount: number;
     avgInputCost: number;
     avgOutputCost: number;
@@ -515,7 +515,7 @@ export class CustomProviderCatalogManager {
     maxContextWindow: number;
     reasoningModels: number;
     attachmentSupport: number;
-  }> {
+  } {
     const catalog = this.catalogManager.getProvider(catalogId);
     if (!catalog) {
       throw new Error(`Catalog with ID '${catalogId}' not found`);
