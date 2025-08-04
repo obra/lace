@@ -501,8 +501,14 @@ export class Session {
       id: this._sessionId,
       name: sessionData?.name || 'Session ' + this._sessionId,
       createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
-      providerInstanceId: (metadata?.providerInstanceId as string) || (sessionData?.configuration?.providerInstanceId as string) || 'unknown',
-      modelId: (metadata?.modelId as string) || (sessionData?.configuration?.modelId as string) || 'unknown',
+      providerInstanceId:
+        (metadata?.providerInstanceId as string) ||
+        (sessionData?.configuration?.providerInstanceId as string) ||
+        'unknown',
+      modelId:
+        (metadata?.modelId as string) ||
+        (sessionData?.configuration?.modelId as string) ||
+        'unknown',
       agents,
     };
   }

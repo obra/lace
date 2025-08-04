@@ -27,7 +27,7 @@ export async function createDelegationTestSetup(options?: {
 }): Promise<DelegationTestSetup> {
   // Set up test provider instances
   const testProviderInstances = await setupTestProviderInstances();
-  
+
   const mockProvider = new DelegationMockProvider(
     options?.provider || 'anthropic',
     options?.model || 'claude-3-5-haiku-20241022'

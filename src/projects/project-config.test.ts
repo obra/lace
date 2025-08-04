@@ -20,7 +20,7 @@ describe('Project configuration', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Set up provider instances
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.OPENAI_API_KEY = 'test-key';

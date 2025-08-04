@@ -186,7 +186,11 @@ describe('Session configuration', () => {
     });
 
     it('should list all presets', () => {
-      presetManager.savePreset('preset1', { modelId: 'claude-3-5-haiku-20241022' }, { name: 'Preset 1' });
+      presetManager.savePreset(
+        'preset1',
+        { modelId: 'claude-3-5-haiku-20241022' },
+        { name: 'Preset 1' }
+      );
       presetManager.savePreset('preset2', { modelId: 'gpt-4o' }, { name: 'Preset 2' });
 
       const presets = presetManager.getPresets();
@@ -204,7 +208,11 @@ describe('Session configuration', () => {
           isDefault: true,
         }
       );
-      presetManager.savePreset('custom', { modelId: 'claude-3-5-haiku-20241022' }, { name: 'Custom' });
+      presetManager.savePreset(
+        'custom',
+        { modelId: 'claude-3-5-haiku-20241022' },
+        { name: 'Custom' }
+      );
 
       const defaultPreset = presetManager.getDefaultPreset();
       expect(defaultPreset).toBeDefined();
@@ -212,7 +220,11 @@ describe('Session configuration', () => {
     });
 
     it('should delete presets', () => {
-      presetManager.savePreset('temp', { modelId: 'claude-3-5-haiku-20241022' }, { name: 'Temporary' });
+      presetManager.savePreset(
+        'temp',
+        { modelId: 'claude-3-5-haiku-20241022' },
+        { name: 'Temporary' }
+      );
 
       expect(presetManager.getPreset('temp')).toBeDefined();
 

@@ -27,7 +27,7 @@ describe('Project', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Set up provider instances for session creation
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.OPENAI_API_KEY = 'test-key';
