@@ -54,7 +54,9 @@ export default function SendButton({
     }
   };
 
-  const isDisabled = disabled || (!isStreaming && !hasContent);
+  // Button should be enabled when streaming (for stop) or when has content (for send)
+  // Only disable when not streaming AND (disabled prop is true OR no content)
+  const isDisabled = !isStreaming && (disabled || !hasContent);
 
   return (
     <button

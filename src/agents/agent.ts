@@ -697,10 +697,13 @@ export class Agent extends EventEmitter {
     };
 
     const errorListener = ({ error }: { error: Error }) => {
-      this.emit('error', {
-        error,
-        context: { phase: 'streaming_response', threadId: this._threadId },
-      });
+      // Don't re-emit AbortErrors from streaming - they're already handled by main catch block
+      if (error.name !== 'AbortError') {
+        this.emit('error', {
+          error,
+          context: { phase: 'streaming_response', threadId: this._threadId },
+        });
+      }
     };
 
     const retryAttemptListener = ({

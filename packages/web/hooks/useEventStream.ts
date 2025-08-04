@@ -83,6 +83,7 @@ interface EventHandlers {
   onToolCall?: (event: SessionEvent) => void;
   onToolResult?: (event: SessionEvent) => void;
   onSystemMessage?: (event: SessionEvent) => void;
+  onAgentStateChange?: (agentId: string, from: string, to: string) => void;
 
   // Task events
   onTaskEvent?: (event: TaskEvent) => void;
@@ -182,6 +183,7 @@ export function useEventStream({
   onToolCall,
   onToolResult,
   onSystemMessage,
+  onAgentStateChange,
   // Task event handlers
   onTaskEvent,
   onTaskCreated,
@@ -232,6 +234,7 @@ export function useEventStream({
     onToolCall,
     onToolResult,
     onSystemMessage,
+    onAgentStateChange,
     onTaskEvent,
     onTaskCreated,
     onTaskUpdated,
@@ -264,6 +267,7 @@ export function useEventStream({
       onToolCall,
       onToolResult,
       onSystemMessage,
+      onAgentStateChange,
       onTaskEvent,
       onTaskCreated,
       onTaskUpdated,
@@ -297,6 +301,7 @@ export function useEventStream({
     onToolCall,
     onToolResult,
     onSystemMessage,
+    onAgentStateChange,
     onTaskEvent,
     onTaskCreated,
     onTaskUpdated,
@@ -411,6 +416,12 @@ export function useEventStream({
             break;
           case 'LOCAL_SYSTEM_MESSAGE':
             callbackRefs.current.onSystemMessage?.(sessionEvent);
+            break;
+          case 'AGENT_STATE_CHANGE':
+            if (sessionEvent.type === 'AGENT_STATE_CHANGE') {
+              const { agentId, from, to } = sessionEvent.data;
+              callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+            }
             break;
         }
       } else if (isTaskEvent(streamEvent)) {

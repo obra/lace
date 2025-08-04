@@ -186,9 +186,24 @@ export class SessionService {
       }
     );
 
-    // Listen for state changes
-    agent.on('state_change', ({ from: _from, to: _to }: { from: string; to: string }) => {
-      // State change logging can be enabled for debugging if needed
+    // Listen for state changes and broadcast to UI
+    agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
+      // Broadcast agent state change to UI via SSE
+      const event: SessionEvent = {
+        type: 'AGENT_STATE_CHANGE',
+        threadId,
+        timestamp: new Date().toISOString(),
+        data: {
+          agentId: threadId,
+          from,
+          to,
+        },
+      };
+      sseManager.broadcast({
+        eventType: 'session',
+        scope: { sessionId },
+        data: event,
+      });
     });
 
     // Listen for any errors

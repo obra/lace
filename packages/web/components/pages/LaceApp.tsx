@@ -29,7 +29,7 @@ import type {
   MessageResponse,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
+import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
@@ -93,7 +93,23 @@ export const LaceApp = memo(function LaceApp() {
   // Use session API hook for all API calls (HTTP requests only, not streaming state)
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
   
-  // Get current agent's status from the event stream (already tracked by useEventStream)
+  // Handle agent state changes from event stream
+  const handleAgentStateChange = useCallback((agentId: string, from: string, to: string) => {
+    setSelectedSessionDetails(prevSession => {
+      if (!prevSession?.agents) return prevSession;
+      
+      return {
+        ...prevSession,
+        agents: prevSession.agents.map(agent => 
+          agent.threadId === agentId 
+            ? { ...agent, status: to as AgentState }
+            : agent
+        )
+      };
+    });
+  }, []);
+
+  // Get current agent's status from the updated session details
   const currentAgent = selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent);
   const agentBusy = currentAgent?.status === 'thinking' || 
                    currentAgent?.status === 'streaming' || 
@@ -123,6 +139,8 @@ export const LaceApp = memo(function LaceApp() {
     onToolCall: addSessionEvent,
     onToolResult: addSessionEvent,
     onSystemMessage: addSessionEvent,
+    // Agent state change handler
+    onAgentStateChange: handleAgentStateChange,
     // Approval handlers
     onApprovalRequest: handleApprovalRequest,
     onApprovalResponse: handleApprovalResponse,
