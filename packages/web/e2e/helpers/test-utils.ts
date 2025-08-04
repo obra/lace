@@ -5,6 +5,7 @@ import { Page, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Environment setup utilities
 export interface TestEnvironment {
@@ -14,7 +15,8 @@ export interface TestEnvironment {
 }
 
 export async function setupTestEnvironment(): Promise<TestEnvironment> {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-e2e-test-'));
+  // Use the same temp directory pattern as core test utils
+  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-test-'));
   const originalLaceDir = process.env.LACE_DIR;
   process.env.LACE_DIR = tempDir;
   
@@ -93,10 +95,12 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   // Click the button
   await createButton.click();
   
-  // Wait for project to be created and become visible
-  // The project name is derived from the directory path (lowercased with dashes)
-  const displayedProjectName = projectName.replace(/\s+/g, '-').toLowerCase();
-  await expect(page.getByRole('heading', { name: displayedProjectName })).toBeVisible({ timeout: 15000 });
+  // Wait for project to be created and become visible in the sidebar
+  // Use test ID to reliably identify when we're in the project interface
+  await expect(page.locator('[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]').first()).toBeVisible({ timeout: 15000 });
+  
+  // Also verify we're in the chat interface (project creation should dump us there)
+  await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
 }
 
 export async function selectProject(page: Page, projectName: string) {
@@ -198,7 +202,9 @@ export async function waitForSendButton(page: Page, timeout: number = 5000) {
 
 // Verification utilities
 export async function verifyMessageVisible(page: Page, message: string, timeout: number = 10000) {
-  await expect(page.getByText(message)).toBeVisible({ timeout });
+  // Look for the message in the conversation area, not in input fields
+  const messageInConversation = page.getByText(message).and(page.locator('span, div, p')).first();
+  await expect(messageInConversation).toBeVisible({ timeout });
 }
 
 export async function verifyNoMessage(page: Page, message: string) {
@@ -208,4 +214,90 @@ export async function verifyNoMessage(page: Page, message: string) {
 // Wait utilities
 export async function waitForTimeout(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Create project with specific provider for tool approval tests
+export async function createProjectWithProvider(page: Page, projectName: string, tempDir: string, provider: string, model: string) {
+  // Navigate to home page
+  await page.goto('/');
+  
+  // Wait for page to load
+  await page.waitForTimeout(2000);
+  
+  // Click "New Project" button
+  const newProjectButton = page.locator('button:has-text("New Project")')
+    .or(page.locator('[data-testid="new-project-button"]'))
+    .or(page.locator('button').filter({ hasText: 'New Project' }))
+    .first();
+  
+  await newProjectButton.waitFor({ timeout: 10000 });
+  await newProjectButton.click();
+  
+  // Wait for the project creation modal to appear
+  await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({ timeout: 10000 });
+  
+  // Find the directory input field
+  const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
+  await directoryInput.waitFor({ timeout: 5000 });
+  
+  // Create the project directory
+  const projectPath = path.join(tempDir, projectName.replace(/\s+/g, '-').toLowerCase());
+  await fs.promises.mkdir(projectPath, { recursive: true });
+  
+  // Fill in the directory path
+  await directoryInput.fill(projectPath);
+  await directoryInput.blur();
+  
+  // Wait for form validation to complete
+  await page.waitForTimeout(1000);
+  
+  // Click "Advanced Options" to show provider selection
+  await page.click('text=Advanced Options');
+  await page.waitForTimeout(1000);
+  
+  // Wait for provider selection to appear using specific test ID
+  const providerSelect = page.locator('[data-testid="create-project-provider-select"]');
+  await providerSelect.waitFor({ timeout: 5000 });
+  
+  // Debug: log available options to understand what values are expected
+  const providerOptions = await providerSelect.locator('option').allTextContents();
+  console.log('Available provider options:', providerOptions);
+  
+  // Debug: log option values 
+  const providerValues = await providerSelect.locator('option').evaluateAll(
+    options => options.map(opt => (opt as HTMLOptionElement).value)
+  );
+  console.log('Available provider values:', providerValues);
+  
+  await providerSelect.selectOption(provider);
+  
+  // Wait for models to load after provider selection
+  await page.waitForTimeout(1000);
+  
+  // Select the model using specific test ID
+  const modelSelect = page.locator('[data-testid="create-project-model-select"]');
+  await modelSelect.selectOption(model);
+  
+  // Click Create Project button
+  const createButton = page.locator('button:has-text("Create Project")');
+  await createButton.waitFor({ state: 'visible', timeout: 5000 });
+  
+  // Ensure the button is enabled
+  await expect(createButton).toBeEnabled({ timeout: 10000 });
+  
+  // Take a screenshot before clicking to debug
+  await page.screenshot({ path: 'debug-before-create-project.png' });
+  
+  await createButton.click();
+  
+  // Wait for the modal to disappear (indicates project creation completed)
+  // Target the specific modal heading (the one with the X button)
+  await expect(page.locator('.fixed.inset-0 h3:has-text("Create New Project")')).not.toBeVisible({ timeout: 20000 });
+  
+  // Wait for project to be created and become visible in the sidebar
+  // Use test ID to reliably identify when we're in the project interface
+  await expect(page.locator('[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]').first()).toBeVisible({ timeout: 15000 });
+  
+  // Wait for the chat interface to be ready
+  await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
 }
