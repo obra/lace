@@ -2,7 +2,7 @@
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
 import { NextRequest } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
@@ -60,12 +60,40 @@ export async function POST(
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Resolve provider instance to provider/model for backward compatibility
+    let provider = 'anthropic';
+    let model = 'claude-3-5-haiku-20241022';
+
+    if (validatedData.configuration?.providerInstanceId && validatedData.configuration?.modelId) {
+      // New provider instance system
+      const registry = new ProviderRegistry();
+      await registry.initialize();
+      
+      try {
+        const catalogProvider = registry.getCatalogProviders()
+          .find(p => p.models.some(m => m.id === validatedData.configuration?.modelId));
+        
+        if (catalogProvider) {
+          provider = catalogProvider.type; // Use catalog provider type
+          model = validatedData.configuration.modelId as string;
+        }
+      } catch (_error) {
+        // Fallback to old system if provider instance lookup fails
+        provider = (validatedData.configuration?.provider as string) || 'anthropic';
+        model = (validatedData.configuration?.model as string) || 'claude-3-5-haiku-20241022';
+      }
+    } else {
+      // Old provider system for backward compatibility
+      provider = (validatedData.configuration?.provider as string) || 'anthropic';
+      model = (validatedData.configuration?.model as string) || 'claude-3-5-haiku-20241022';
+    }
+
     // Use sessionService to create session, which handles both database and in-memory management
     const sessionService = getSessionService();
     const session = await sessionService.createSession(
       validatedData.name,
-      (validatedData.configuration?.provider as string) || 'anthropic',
-      (validatedData.configuration?.model as string) || 'claude-3-5-haiku-20241022',
+      provider,
+      model,
       projectId
     );
 

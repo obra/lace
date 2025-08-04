@@ -53,6 +53,7 @@ export interface CreateAgentRequest {
   name?: string; // Made optional for default
   provider?: string;
   model?: string;
+  providerInstanceId?: string; // For new provider instance system
 }
 
 // API response types

@@ -33,10 +33,24 @@ export class AnthropicProvider extends AIProvider {
       if (!config.apiKey) {
         throw new Error('Missing required environment variable: ANTHROPIC_KEY');
       }
-      this._anthropic = new Anthropic({
+
+      const anthropicConfig: {
+        apiKey: string;
+        dangerouslyAllowBrowser: boolean;
+        baseURL?: string;
+      } = {
         apiKey: config.apiKey,
         dangerouslyAllowBrowser: true, // Allow in test environments
-      });
+      };
+
+      // Support custom base URL for Anthropic-compatible APIs
+      const configBaseURL = config.baseURL as string | undefined;
+      if (configBaseURL) {
+        anthropicConfig.baseURL = configBaseURL;
+        logger.info('Using custom Anthropic base URL', { baseURL: configBaseURL });
+      }
+
+      this._anthropic = new Anthropic(anthropicConfig);
     }
     return this._anthropic;
   }

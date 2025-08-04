@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
 import { ModelDropdown } from './ModelDropdown';
 import { ProviderDropdown } from './ProviderDropdown';
+import { ModelSelectionForm } from '@/components/providers/ModelSelectionForm';
 import type { 
   ProviderInfo, 
   ModelInfo, 
@@ -81,6 +82,9 @@ export function SessionConfigPanel({
   
   // Agent creation state  
   const [newAgentName, setNewAgentName] = useState('');
+  const [useProviderInstances, setUseProviderInstances] = useState(false);
+  const [selectedInstanceId, setSelectedInstanceId] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState('');
   const [agentProvider, setAgentProvider] = useState('anthropic');
   const [agentModel, setAgentModel] = useState('claude-3-sonnet-20241022');
 
@@ -125,6 +129,9 @@ export function SessionConfigPanel({
     setNewAgentName('');
     setAgentProvider('anthropic');
     setAgentModel('claude-3-sonnet-20241022');
+    setSelectedInstanceId('');
+    setSelectedModelId('');
+    setUseProviderInstances(false);
   };
 
   const resetEditSessionForm = () => {
@@ -133,6 +140,11 @@ export function SessionConfigPanel({
     setEditSessionConfig(DEFAULT_CONFIG);
     setEditNewEnvKey('');
     setEditNewEnvValue('');
+  };
+
+  const handleProviderInstanceSelection = (instanceId: string, modelId: string) => {
+    setSelectedInstanceId(instanceId);
+    setSelectedModelId(modelId);
   };
 
   const handleCreateSession = (e: React.FormEvent) => {
@@ -153,11 +165,21 @@ export function SessionConfigPanel({
     e.preventDefault();
     if (!newAgentName.trim() || !selectedSession) return;
 
-    onAgentCreate(selectedSession.id, {
-      name: newAgentName.trim(),
-      provider: agentProvider,
-      model: agentModel,
-    });
+    // Use provider instance if selected, otherwise fall back to legacy provider/model
+    if (useProviderInstances && selectedInstanceId && selectedModelId) {
+      onAgentCreate(selectedSession.id, {
+        name: newAgentName.trim(),
+        provider: 'anthropic', // Will be resolved from instance
+        model: selectedModelId,
+        providerInstanceId: selectedInstanceId,
+      });
+    } else {
+      onAgentCreate(selectedSession.id, {
+        name: newAgentName.trim(),
+        provider: agentProvider,
+        model: agentModel,
+      });
+    }
 
     resetAgentForm();
     setShowCreateAgent(false);
@@ -745,37 +767,65 @@ export function SessionConfigPanel({
                 />
               </div>
 
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Provider</span>
+              {/* Provider Instance Selection Toggle */}
+              <div className="form-control">
+                <label className="label cursor-pointer">
+                  <span className="label-text">Use Provider Instances</span>
+                  <input
+                    type="checkbox"
+                    checked={useProviderInstances}
+                    onChange={(e) => setUseProviderInstances(e.target.checked)}
+                    className="checkbox checkbox-primary"
+                  />
                 </label>
-                <select
-                  value={agentProvider}
-                  onChange={(e) => {
-                    const newProvider = e.target.value;
-                    const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                    setAgentProvider(newProvider);
-                    setAgentModel(providerModels[0]?.id || agentModel);
-                  }}
-                  className="select select-bordered w-full"
-                >
-                  {availableProviders.map((provider) => (
-                    <option key={provider.name} value={provider.name}>
-                      {provider.displayName}
-                    </option>
-                  ))}
-                </select>
+                <div className="label">
+                  <span className="label-text-alt text-base-content/60">
+                    Use configured provider instances with custom credentials
+                  </span>
+                </div>
               </div>
 
-              <div>
-                <ModelDropdown
-                  providers={providers}
-                  selectedProvider={agentProvider}
-                  selectedModel={agentModel}
-                  onChange={setAgentModel}
-                  label="Model"
+              {useProviderInstances ? (
+                <ModelSelectionForm
+                  onSelectionChange={handleProviderInstanceSelection}
+                  selectedInstanceId={selectedInstanceId}
+                  selectedModelId={selectedModelId}
                 />
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Provider</span>
+                    </label>
+                    <select
+                      value={agentProvider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value;
+                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
+                        setAgentProvider(newProvider);
+                        setAgentModel(providerModels[0]?.id || agentModel);
+                      }}
+                      className="select select-bordered w-full"
+                    >
+                      {availableProviders.map((provider) => (
+                        <option key={provider.name} value={provider.name}>
+                          {provider.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <ModelDropdown
+                      providers={providers}
+                      selectedProvider={agentProvider}
+                      selectedModel={agentModel}
+                      onChange={setAgentModel}
+                      label="Model"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -788,7 +838,8 @@ export function SessionConfigPanel({
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={!newAgentName.trim() || loading}
+                  disabled={!newAgentName.trim() || loading || 
+                    (useProviderInstances && (!selectedInstanceId || !selectedModelId))}
                 >
                   {loading ? (
                     <>

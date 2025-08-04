@@ -47,8 +47,6 @@
     "test:e2e:headed": "cd packages/web && npm run test:e2e:headed",
     "test:all": "npm run test:run && npm run test:web:run && npm run test:e2e",
     "test:all:unit": "npm run test:unit && npm run test:web:unit"
-
-
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
@@ -88,6 +86,7 @@
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "lint-staged": "^16.1.1",
+    "msw": "^2.10.4",
     "playwright": "^1.49.0",
     "prettier": "^3.5.3",
     "tsc-alias": "^1.8.16",
