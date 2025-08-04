@@ -20,7 +20,8 @@ export class SlowMockProvider extends BaseMockProvider {
 
   constructor(config: SlowMockProviderConfig = {}) {
     super(config);
-    this.mockResponse = config.mockResponse || 'This is a slow mock response for testing stop functionality.';
+    this.mockResponse =
+      config.mockResponse || 'This is a slow mock response for testing stop functionality.';
     this.delay = config.delay || 5000; // 5 second default delay
     this.shouldError = config.shouldError || false;
     this.streaming = config.streaming || false;
@@ -77,7 +78,7 @@ export class SlowMockProvider extends BaseMockProvider {
           setTimeout(checkAborted, 100); // Check every 100ms
         }
       };
-      
+
       setTimeout(checkAborted, 100);
     });
 
@@ -139,14 +140,14 @@ export class SlowMockProvider extends BaseMockProvider {
       // Wait between words to simulate streaming delay
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(resolve, this.delay / words.length);
-        
+
         const checkAbort = () => {
           if (signal?.aborted) {
             clearTimeout(timeout);
             reject(new Error('Request was aborted'));
           }
         };
-        
+
         if (signal) {
           signal.addEventListener('abort', checkAbort, { once: true });
         }
