@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { GET, DELETE } from './route';
+import { GET, DELETE, PUT } from './route';
 import { parseResponse } from '@/lib/serialization';
 import type { ProviderInstancesConfig } from '~/providers/catalog/types';
 
@@ -172,6 +172,202 @@ describe('Provider Instance Detail API', () => {
         fs.readFileSync(path.join(tempDir, 'provider-instances.json'), 'utf-8')
       );
       expect(updatedConfig.instances['test-instance']).toBeUndefined();
+    });
+  });
+
+  describe('PUT /api/provider/instances/[instanceId]', () => {
+    it('should update instance configuration only', async () => {
+      // Set up test instance configuration
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'test-instance': {
+            displayName: 'Original Name',
+            catalogProviderId: 'openai',
+            timeout: 30000,
+            endpoint: 'https://api.openai.com/v1',
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const updateData = {
+        displayName: 'Updated Instance Name',
+        timeout: 60000,
+        endpoint: 'https://custom.openai.com/v1',
+      };
+
+      const mockRequest = {
+        json: async () => updateData,
+      } as NextRequest;
+
+      const response = await PUT(mockRequest, { 
+        params: Promise.resolve({ instanceId: 'test-instance' }) 
+      });
+      const data = await parseResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(data.instance).toMatchObject({
+        id: 'test-instance',
+        displayName: 'Updated Instance Name',
+        catalogProviderId: 'openai', // Should remain unchanged
+        timeout: 60000,
+        endpoint: 'https://custom.openai.com/v1',
+      });
+
+      // Verify changes were persisted
+      const updatedConfig = JSON.parse(
+        fs.readFileSync(path.join(tempDir, 'provider-instances.json'), 'utf-8')
+      );
+      expect(updatedConfig.instances['test-instance']).toMatchObject({
+        displayName: 'Updated Instance Name',
+        catalogProviderId: 'openai',
+        timeout: 60000,
+        endpoint: 'https://custom.openai.com/v1',
+      });
+    });
+
+    it('should update credentials when provided', async () => {
+      // Set up test instance configuration
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'test-instance': {
+            displayName: 'Test Instance',
+            catalogProviderId: 'openai',
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      // Set up existing credential
+      const credentialsDir = path.join(tempDir, 'credentials');
+      fs.mkdirSync(credentialsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(credentialsDir, 'test-instance.json'),
+        JSON.stringify({ apiKey: 'old-key' }, null, 2)
+      );
+
+      const updateData = {
+        displayName: 'Updated Name',
+        credential: { apiKey: 'new-api-key' },
+      };
+
+      const mockRequest = {
+        json: async () => updateData,
+      } as NextRequest;
+
+      const response = await PUT(mockRequest, { 
+        params: Promise.resolve({ instanceId: 'test-instance' }) 
+      });
+
+      expect(response.status).toBe(200);
+
+      // Verify credential was updated
+      const updatedCredential = JSON.parse(
+        fs.readFileSync(path.join(credentialsDir, 'test-instance.json'), 'utf-8')
+      );
+      expect(updatedCredential.apiKey).toBe('new-api-key');
+    });
+
+    it('should return 404 for non-existent instance', async () => {
+      const updateData = {
+        displayName: 'Updated Name',
+      };
+
+      const mockRequest = {
+        json: async () => updateData,
+      } as NextRequest;
+
+      const response = await PUT(mockRequest, { 
+        params: Promise.resolve({ instanceId: 'nonexistent' }) 
+      });
+      const data = await parseResponse(response);
+
+      expect(response.status).toBe(404);
+      expect(data.error).toBe('Instance not found: nonexistent');
+    });
+
+    it('should validate required fields', async () => {
+      // Set up test instance
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'test-instance': {
+            displayName: 'Test Instance',
+            catalogProviderId: 'openai',
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const updateData = {
+        displayName: '', // Invalid: empty string
+      };
+
+      const mockRequest = {
+        json: async () => updateData,
+      } as NextRequest;
+
+      const response = await PUT(mockRequest, { 
+        params: Promise.resolve({ instanceId: 'test-instance' }) 
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should not allow changing catalogProviderId', async () => {
+      // Set up test instance
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'test-instance': {
+            displayName: 'Test Instance',
+            catalogProviderId: 'openai',
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const updateData = {
+        displayName: 'Updated Name',
+        catalogProviderId: 'anthropic', // Should be ignored
+      };
+
+      const mockRequest = {
+        json: async () => updateData,
+      } as NextRequest;
+
+      const response = await PUT(mockRequest, { 
+        params: Promise.resolve({ instanceId: 'test-instance' }) 
+      });
+      const data = await parseResponse(response);
+
+      expect(response.status).toBe(200);
+      // catalogProviderId should remain unchanged
+      expect(data.instance.catalogProviderId).toBe('openai');
+
+      // Verify it wasn't changed in persistence
+      const updatedConfig = JSON.parse(
+        fs.readFileSync(path.join(tempDir, 'provider-instances.json'), 'utf-8')
+      );
+      expect(updatedConfig.instances['test-instance'].catalogProviderId).toBe('openai');
     });
   });
 });

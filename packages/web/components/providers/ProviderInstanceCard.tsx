@@ -1,8 +1,10 @@
 // ABOUTME: Individual instance card with status, actions, and details
 // ABOUTME: Uses StatusDot, Badge, and card components from design system
 
+import { useState } from 'react';
 import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
+import { EditInstanceModal } from './EditInstanceModal';
 
 interface ProviderInstanceCardProps {
   instance: {
@@ -18,9 +20,11 @@ interface ProviderInstanceCardProps {
   };
   onTest: () => void;
   onDelete: () => void;
+  onEdit?: () => void; // Optional callback after edit success
 }
 
-export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderInstanceCardProps) {
+export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: ProviderInstanceCardProps) {
+  const [showEditModal, setShowEditModal] = useState(false);
   const getStatusProps = (status?: string) => {
     switch (status) {
       case 'connected': 
@@ -38,6 +42,11 @@ export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderIns
     if (confirm(`Are you sure you want to delete "${instance.displayName}"? This will remove the instance and its credentials.`)) {
       onDelete();
     }
+  };
+
+  const handleEditSuccess = () => {
+    setShowEditModal(false);
+    onEdit?.(); // Call parent callback to refresh data
   };
 
   return (
@@ -93,8 +102,7 @@ export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderIns
             </button>
             <button 
               className="btn btn-outline btn-sm"
-              disabled
-              title="Edit functionality coming soon"
+              onClick={() => setShowEditModal(true)}
             >
               Edit
             </button>
@@ -107,6 +115,13 @@ export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderIns
           </div>
         </div>
       </div>
+
+      <EditInstanceModal
+        isOpen={showEditModal}
+        instance={instance}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

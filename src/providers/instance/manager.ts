@@ -68,6 +68,24 @@ export class ProviderInstanceManager {
     await fs.promises.writeFile(credPath, JSON.stringify(credential, null, 2), { mode: 0o600 });
   }
 
+  async updateInstance(instanceId: string, updates: Partial<Omit<import('~/providers/catalog/types').ProviderInstance, 'catalogProviderId'>>): Promise<void> {
+    const config = await this.loadInstances();
+    const existing = config.instances[instanceId];
+    
+    if (!existing) {
+      throw new Error(`Instance not found: ${instanceId}`);
+    }
+
+    // Merge updates, but preserve catalogProviderId (it cannot be changed)
+    config.instances[instanceId] = {
+      ...existing,
+      ...updates,
+      catalogProviderId: existing.catalogProviderId, // Preserve original
+    };
+
+    await this.saveInstances(config);
+  }
+
   async deleteInstance(instanceId: string): Promise<void> {
     // Remove from instances config
     const config = await this.loadInstances();

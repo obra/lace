@@ -160,6 +160,7 @@ export function ProviderInstanceList() {
                 instance={instance}
                 onTest={() => handleTest(instance.id)}
                 onDelete={() => handleDelete(instance.id)}
+                onEdit={loadInstances} // Refresh list after edit
               />
             ))}
           </>
