@@ -60,31 +60,33 @@ export async function POST(
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Resolve provider instance to provider/model for backward compatibility
-    let provider = body.provider || 'anthropic';
-    let model = body.model || 'claude-3-5-haiku-20241022';
+    let agent;
 
     if (body.providerInstanceId && body.model) {
-      // New provider instance system
+      // New provider instance system - resolve provider instance properly
       const registry = new ProviderRegistry();
       await registry.initialize();
       
-      try {
-        const catalogProvider = registry.getCatalogProviders()
-          .find(p => p.models.some(m => m.id === body.model));
-        
-        if (catalogProvider) {
-          provider = catalogProvider.type; // Use catalog provider type
-          model = body.model;
-        }
-      } catch (_error) {
-        // Fallback to provided values if provider instance lookup fails
-        provider = body.provider || 'anthropic';
-        model = body.model || 'claude-3-5-haiku-20241022';
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(inst => inst.id === body.providerInstanceId);
+      
+      if (!instance) {
+        return createErrorResponse(`Provider instance '${body.providerInstanceId}' not found`, 400, { code: 'VALIDATION_FAILED' });
       }
-    }
 
-    const agent = await session.spawnAgent(body.name || '', provider, model);
+      const catalogProvider = registry.getCatalogProviders().find(p => p.id === instance.catalogProviderId);
+      if (!catalogProvider) {
+        return createErrorResponse(`Catalog provider '${instance.catalogProviderId}' not found`, 400, { code: 'VALIDATION_FAILED' });
+      }
+
+      // Use resolved provider type and model
+      agent = await session.spawnAgent(body.name || '', catalogProvider.type, body.model);
+    } else {
+      // Old provider system for backward compatibility
+      const provider = body.provider || 'anthropic';
+      const model = body.model || 'claude-3-5-haiku-20241022';
+      agent = await session.spawnAgent(body.name || '', provider, model);
+    }
 
     // Setup agent approvals using utility
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');

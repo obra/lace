@@ -247,6 +247,63 @@ describe('Agent Spawning API E2E Tests', () => {
       const data = await parseResponse<ErrorResponse>(response);
       expect(data.error).toBe('Session not found');
     });
+
+    it('should create agent using providerInstanceId and modelId', async () => {
+      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Provider Instance Agent',
+          providerInstanceId: 'test-instance-id',
+          model: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      // Should fail with proper error message when provider instance is not found
+      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      expect(response.status).toBe(400);
+
+      const data = await parseResponse<ErrorResponse>(response);
+      expect(data.error).toBe("Provider instance 'test-instance-id' not found");
+    });
+
+    it('should create agent successfully when provider instance exists', async () => {
+      // Set up a configured provider instance
+      const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+      const registry = new ProviderRegistry();
+      await registry.initialize();
+
+      // Create a test provider instance
+      const instanceManager = registry.instanceManager;
+      const config = await instanceManager.loadInstances();
+      config.instances['working-instance-id'] = {
+        displayName: 'Test Working Instance',
+        catalogProviderId: 'anthropic',
+      };
+      await instanceManager.saveInstances(config);
+      
+      // Save a test credential
+      await instanceManager.saveCredential('working-instance-id', {
+        apiKey: 'test-key-123'
+      });
+
+      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Working Provider Instance Agent',
+          providerInstanceId: 'working-instance-id',
+          model: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      expect(response.status).toBe(201);
+
+      const data = await parseResponse<AgentResponse>(response);
+      expect(data.agent.name).toBe('Working Provider Instance Agent');
+      expect(data.agent.threadId).toBe(`${sessionId}.1`);
+    });
   });
 
   describe('GET /api/sessions/{sessionId}/agents', () => {

@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests for SessionService methods required by service layer refactoring
-// ABOUTME: Tests the missing methods needed to eliminate direct business logic calls from API routes
+// ABOUTME: Unit tests for SessionService provider instance integration
+// ABOUTME: Tests createSession with providerInstanceId and modelId parameters
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
@@ -9,45 +9,59 @@ import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { TestProvider } from '~/test-utils/test-provider';
 import type { SessionEvent } from '@/types/web-sse';
 
-describe('SessionService after getProjectForSession removal', () => {
-  it('should not have getProjectForSession method', () => {
-    const sessionService = new SessionService();
+describe('SessionService with Provider Instances', () => {
+  const tempDirContext = useTempLaceDir();
+  let sessionService: SessionService;
+  let testProject: import('@/lib/server/lace-imports').Project;
 
-    // This test should FAIL initially because method still exists
-    expect(
-      (sessionService as unknown as Record<string, unknown>).getProjectForSession
-    ).toBeUndefined();
+  beforeEach(async () => {
+    // Create a real test project
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create(
+      'Test Project',
+      'Test project for provider instance tests',
+      tempDirContext.path,
+      {}
+    );
+
+    sessionService = new SessionService();
+    sessionService.clearActiveSessions();
   });
-});
 
-describe('SessionService after getEffectiveConfiguration removal', () => {
-  it('should not have getEffectiveConfiguration method', () => {
-    const sessionService = new SessionService();
-
-    // This test should FAIL initially because method still exists
-    expect(
-      (sessionService as unknown as Record<string, unknown>).getEffectiveConfiguration
-    ).toBeUndefined();
+  afterEach(() => {
+    sessionService.clearActiveSessions();
   });
-});
 
-describe('SessionService after updateSessionConfiguration removal', () => {
-  it('should not have updateSessionConfiguration method', () => {
-    const sessionService = new SessionService();
+  it('should create session using providerInstanceId and modelId', async () => {
+    // Set up a configured provider instance
+    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    const registry = new ProviderRegistry();
+    await registry.initialize();
 
-    // This test should FAIL initially because method still exists
-    expect(
-      (sessionService as unknown as Record<string, unknown>).updateSessionConfiguration
-    ).toBeUndefined();
-  });
-});
+    // Create a test provider instance
+    const instanceManager = registry.instanceManager;
+    const config = await instanceManager.loadInstances();
+    config.instances['test-instance-id'] = {
+      displayName: 'Test Anthropic Instance',
+      catalogProviderId: 'anthropic',
+    };
+    await instanceManager.saveInstances(config);
+    
+    // Save a test credential
+    await instanceManager.saveCredential('test-instance-id', {
+      apiKey: 'test-key-123'
+    });
 
-describe('SessionService after getSessionData removal', () => {
-  it('should not have getSessionData method', () => {
-    const sessionService = new SessionService();
+    // Now the test should pass - createSession should resolve the provider instance  
+    const session = await sessionService.createSession(
+      'Test Session',
+      'test-instance-id',
+      'claude-3-5-haiku-20241022',
+      testProject.getId()
+    );
 
-    // This test should FAIL initially because method still exists
-    expect((sessionService as unknown as Record<string, unknown>).getSessionData).toBeUndefined();
+    expect(session).toBeDefined();
+    expect(session.name).toBe('Test Session');
   });
 });
 

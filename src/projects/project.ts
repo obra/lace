@@ -65,29 +65,9 @@ export class Project {
     // Create the project instance
     const project = new Project(projectData.id);
 
-    // Automatically create a default session with coordinator agent for the new project
-    const sessionOptions: {
-      projectId: string;
-      provider?: string;
-      model?: string;
-    } = {
-      projectId: projectData.id,
-    };
-
-    // Let Session.create() handle provider/model defaults unless overridden
-    if (configuration.provider) {
-      sessionOptions.provider = configuration.provider as string;
-    }
-    if (configuration.model) {
-      sessionOptions.model = configuration.model as string;
-    }
-
-    const session = Session.create(sessionOptions);
-
-    logger.info('Default session with coordinator agent created for new project', {
-      projectId: projectData.id,
-      sessionId: session.getId(),
-    });
+    // NOTE: No longer automatically creating a default session since Session.create() 
+    // now requires provider instances. Sessions will be created by the web layer
+    // or CLI with proper provider instance configuration.
 
     return project;
   }

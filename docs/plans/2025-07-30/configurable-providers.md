@@ -1508,22 +1508,58 @@ export function ConnectionTest({ instanceId, onStatusChange }: ConnectionTestPro
 
 **Commit message:** "feat: add provider connection testing with real-time status"
 
-### Task 13: Backend Integration & API Updates
+### ❌ Task 13: Backend Integration & API Updates (INCOMPLETE - CRITICAL GAPS)
 
-**Files to modify:**
-- Update existing session APIs to use instance + model IDs
-- Update agent initialization to resolve provider instances
-- Add catalog loading to provider registry
+**Status: 🔴 PARTIALLY IMPLEMENTED** - Core integration was skipped, causing the provider management UI to be non-functional.
 
-**What to change:**
-- Session creation endpoints accept `providerInstanceId` and `modelId`
-- Provider registry resolves instances from catalog + user config
-- Agent initialization uses resolved provider instances
+**CRITICAL ISSUE:** The configurable provider system was built completely but **NOT CONNECTED** to actual session/agent functionality. Users can configure provider instances but they're never used for AI conversations.
+
+**Files that NEED updating (HIGH PRIORITY):**
+
+#### **1. Session Creation Integration**
+- `packages/web/app/api/projects/[projectId]/sessions/route.ts` - 🔴 **BROKEN** - Has crude fallback, doesn't resolve provider instances
+- `packages/web/lib/server/session-service.ts` - 🔴 **BROKEN** - Still expects old provider/model strings
+- **Required changes:**
+  - Update `createSession()` to accept `providerInstanceId` and `modelId` instead of provider/model strings
+  - Use `ProviderRegistry.createProviderFromInstanceAndModel()` to resolve instances
+  - Update CreateSessionSchema to require new fields
+
+#### **2. Agent Creation Integration**  
+- `packages/web/app/api/sessions/[sessionId]/agents/route.ts` - 🔴 **BROKEN** - Same crude fallback as sessions
+- **Required changes:**
+  - Replace provider instance lookup with proper resolution
+  - Update agent spawning to use resolved provider instances
+  - Update CreateAgentRequest types
+
+#### **3. Provider Discovery Integration**
+- `packages/web/app/api/providers/route.ts` - 🔴 **COMPLETELY WRONG** - Shows old environment-based providers
+- **Required changes:**
+  - Replace entire implementation to return configured provider instances
+  - Use `ProviderRegistry.getConfiguredInstances()` instead of auto-discovery
+
+#### **4. Frontend Component Integration**
+- `packages/web/components/pages/LaceApp.tsx` - 🔴 **USES OLD SYSTEM** - Fetches `/api/providers`
+- `packages/web/components/config/ProviderDropdown.tsx` - 🔴 **USES OLD SYSTEM** - Expects old provider format
+- **Required changes:**
+  - Update to fetch from `/api/provider/instances` instead of `/api/providers`
+  - Adapt to new provider instance data format
+
+#### **5. Missing API Endpoints**
+- `GET /api/provider/instances/[instanceId]/models` - 🔴 **MISSING** - List models for specific instance
+- `POST /api/provider/instances/[instanceId]/test` - ✅ **EXISTS** but may need frontend integration
+- `GET /api/provider/instances/[instanceId]` - ✅ **EXISTS** 
+
+#### **6. Type System Integration**
+- `packages/web/types/api.ts` - 🔴 **OUTDATED** - Missing provider instance fields
+- **Required changes:**
+  - Add `providerInstanceId` and `modelId` to session/agent creation types
+  - Update all related interfaces
+
+**IMPACT:** Without these integrations, the provider management UI is a "ghost feature" - users can configure provider instances that are never actually used for AI conversations.
+
+**ROOT CAUSE:** The new provider system was built alongside the old one without completing the integration bridge between them.
 
 **Commit message:** "feat: integrate provider system with existing session/agent infrastructure"
-```
-
-**Commit message:** "feat: add default provider configurations"
 
 ## Testing Strategy
 
@@ -1579,10 +1615,23 @@ Before starting, read these files to understand the codebase:
 
 ## Success Criteria
 
-The implementation is complete when:
-1. Users can add multiple provider instances via web UI
-2. Credentials are stored securely
-3. Existing env-based providers still work
-4. Sessions can use any configured provider
-5. All tests pass
-6. No TypeScript errors or linting issues
+### ✅ **COMPLETED FEATURES**
+1. ✅ Users can add multiple provider instances via web UI - **WORKING**
+2. ✅ Credentials are stored securely - **WORKING**
+3. ✅ Provider catalog browsing and instance management - **WORKING**
+4. ✅ Backend provider system (catalog + instances) - **WORKING**
+
+### 🔴 **CRITICAL MISSING INTEGRATIONS** 
+5. ❌ **Sessions can use any configured provider** - **BROKEN** - Still uses old provider system
+6. ❌ **Agent creation uses configured providers** - **BROKEN** - Still uses old provider system  
+7. ❌ **Provider discovery shows configured instances** - **BROKEN** - Shows wrong data
+8. ❌ **Frontend components fully integrated** - **MIXED** - Some use old system
+9. ❌ **All API endpoints integrated** - **BROKEN** - Missing key endpoints
+10. ❌ **Type system updated** - **OUTDATED** - Missing provider instance types
+
+### **CURRENT STATE ASSESSMENT**
+**Overall Status: 🟡 60% COMPLETE** - Backend system works, provider management UI works, but **core functionality integration is missing**.
+
+**User Impact:** Users can configure provider instances but they **don't work for actual AI conversations**. This creates a confusing and broken user experience where the UI suggests functionality that doesn't work.
+
+**Next Priority:** Complete the integration tasks in Task 13 to bridge the new provider system with existing session/agent functionality.

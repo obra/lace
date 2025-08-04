@@ -220,8 +220,8 @@ describe('ProviderRegistry', () => {
       await registry.initialize();
     });
 
-    it('should return empty instances when none configured', () => {
-      const instances = registry.getConfiguredInstances();
+    it('should return empty instances when none configured', async () => {
+      const instances = await registry.getConfiguredInstances();
       expect(instances).toEqual([]);
     });
 
@@ -245,7 +245,7 @@ describe('ProviderRegistry', () => {
 
       await registry.initialize();
 
-      const instances = registry.getConfiguredInstances();
+      const instances = await registry.getConfiguredInstances();
       expect(instances).toHaveLength(1);
       expect(instances[0].id).toBe('openai-test');
       expect(instances[0].displayName).toBe('OpenAI Test');

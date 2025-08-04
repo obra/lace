@@ -264,5 +264,44 @@ describe('Session API endpoints under projects', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe('Database error');
     });
+
+    it('should create session using providerInstanceId and modelId', async () => {
+      const mockSession = {
+        id: 'test-session-id',
+        name: 'Provider Instance Session',
+        createdAt: '2023-01-01T00:00:00.000Z',
+        agents: [],
+      };
+
+      mockSessionService.createSession.mockResolvedValue(mockSession);
+
+      const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Provider Instance Session',
+          configuration: {
+            providerInstanceId: 'test-instance-id',
+            modelId: 'claude-3-5-haiku-20241022'
+          }
+        }),
+      });
+
+      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
+      const data = await parseResponse<{
+        session: { id: string; name: string };
+      }>(response);
+
+      expect(response.status).toBe(201);
+      expect(data.session.id).toBe('test-session-id');
+      expect(data.session.name).toBe('Provider Instance Session');
+      
+      // Verify SessionService was called with provider instance parameters
+      expect(mockSessionService.createSession).toHaveBeenCalledWith(
+        'Provider Instance Session',
+        'test-instance-id',
+        'claude-3-5-haiku-20241022',
+        'project1'
+      );
+    });
   });
 });

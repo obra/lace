@@ -17,15 +17,39 @@ export class SessionService {
 
   async createSession(
     name: string,
-    provider: string,
-    model: string,
+    providerInstanceIdOrProvider: string,
+    modelIdOrModel: string,
     projectId: string
   ): Promise<SessionInfo> {
     // Create project-based session
-    const { Project } = await import('@/lib/server/lace-imports');
+    const { Project, ProviderRegistry } = await import('@/lib/server/lace-imports');
     const project = Project.getById(projectId);
     if (!project) {
       throw new Error('Project not found');
+    }
+
+    // Try to resolve provider instance first, fallback to old system
+    let provider = providerInstanceIdOrProvider;
+    let model = modelIdOrModel;
+
+    try {
+      const registry = new ProviderRegistry();
+      await registry.initialize();
+      
+      // Check if first parameter is a provider instance ID
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(inst => inst.id === providerInstanceIdOrProvider);
+      
+      if (instance) {
+        // New provider instance system - resolve to provider type
+        const catalogProvider = registry.getCatalogProviders().find(p => p.id === instance.catalogProviderId);
+        if (catalogProvider) {
+          provider = catalogProvider.type;
+          model = modelIdOrModel; // Keep the modelId as-is
+        }
+      }
+    } catch (error) {
+      // Fall back to old provider/model strings if resolution fails
     }
 
     // Create session using Session.create which handles both database and thread creation

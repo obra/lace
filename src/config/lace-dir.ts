@@ -47,3 +47,17 @@ export function getLaceFilePath(filename: string): string {
 export function getLaceDbPath(): string {
   return getLaceFilePath('lace.db');
 }
+
+/**
+ * The relative path to the builtin provider catalog data directory
+ * Used for require.context() calls to bundle catalog JSON files
+ */
+export const BUILTIN_PROVIDER_CATALOG_PATH = './data';
+
+/**
+ * Get the relative path to the builtin provider catalog data directory
+ * Used for require.context() calls to bundle catalog JSON files
+ */
+export function getBuiltinProviderCatalogPath(): string {
+  return BUILTIN_PROVIDER_CATALOG_PATH;
+}

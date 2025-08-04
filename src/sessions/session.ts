@@ -51,6 +51,7 @@ export class Session {
   private _taskManager: TaskManager;
   private _destroyed = false;
   private _projectId?: string;
+  private _providerCache?: any; // Cached provider instance
 
   constructor(sessionAgent: Agent, projectId?: string) {
     this._sessionAgent = sessionAgent;
@@ -67,19 +68,16 @@ export class Session {
   static create(options: {
     name?: string;
     description?: string;
-    provider?: string;
-    model?: string;
+    providerInstanceId: string;
+    modelId: string;
     projectId: string; // REQUIRED: All sessions must be project-based
     approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
-    // Use existing logic for provider/model detection with intelligent defaults
-    const provider = options.provider || Session.detectDefaultProvider();
-    const model = options.model || Session.getDefaultModel(provider);
     const name = options.name || Session.generateSessionName();
-    // Create provider
-    const registry = ProviderRegistry.createWithAutoDiscovery();
-    const providerInstance = registry.createProvider(provider, { model });
+    
+    // Store provider instance configuration for lazy resolution
+    // We'll resolve the actual provider instance when needed
 
     // Create thread manager
     const threadManager = new ThreadManager();
@@ -90,7 +88,11 @@ export class Session {
       projectId: options.projectId,
       name,
       description: options.description || '',
-      configuration: { provider, model, ...options.configuration },
+      configuration: { 
+        providerInstanceId: options.providerInstanceId,
+        modelId: options.modelId,
+        ...options.configuration 
+      },
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -108,6 +110,12 @@ export class Session {
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor);
 
+    // Resolve provider instance lazily for the session agent
+    const { providerInstance, provider, model } = Session.resolveProviderInstance(
+      options.providerInstanceId, 
+      options.modelId
+    );
+
     // Create agent
     const sessionAgent = new Agent({
       provider: providerInstance,
@@ -123,6 +131,8 @@ export class Session {
       name: 'Lace', // Always name the coordinator agent "Lace"
       provider,
       model,
+      providerInstanceId: options.providerInstanceId,
+      modelId: options.modelId,
     });
 
     const session = new Session(sessionAgent, options.projectId);
@@ -497,20 +507,35 @@ export class Session {
     };
   }
 
-  spawnAgent(name: string, provider?: string, model?: string): Agent {
-    const agentName = name.trim() || 'Lace';
-    const targetProvider = provider || this._sessionAgent.providerName;
-    const targetModel = model || this._sessionAgent.providerInstance.modelName;
-
-    // Create new provider instance if configuration differs from session
-    let providerInstance = this._sessionAgent.providerInstance;
-    if (
-      targetProvider !== this._sessionAgent.providerName ||
-      targetModel !== this._sessionAgent.providerInstance.modelName
-    ) {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      providerInstance = registry.createProvider(targetProvider, { model: targetModel });
+  spawnAgent(config: {
+    name?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+  }): Agent {
+    const agentName = config.name?.trim() || 'Lace';
+    
+    // If no provider instance specified, inherit from session
+    let targetProviderInstanceId = config.providerInstanceId;
+    let targetModelId = config.modelId;
+    
+    if (!targetProviderInstanceId || !targetModelId) {
+      // Get session's provider instance configuration
+      const sessionData = this.getSessionData();
+      const sessionConfig = sessionData?.configuration || {};
+      
+      targetProviderInstanceId = targetProviderInstanceId || (sessionConfig.providerInstanceId as string);
+      targetModelId = targetModelId || (sessionConfig.modelId as string);
+      
+      if (!targetProviderInstanceId || !targetModelId) {
+        throw new Error('No provider instance configuration available - specify providerInstanceId and modelId or ensure session has provider instance configuration');
+      }
     }
+
+    // Resolve provider instance lazily
+    const { providerInstance, provider, model } = Session.resolveProviderInstance(
+      targetProviderInstanceId, 
+      targetModelId
+    );
 
     // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
@@ -528,8 +553,10 @@ export class Session {
       name: agentName, // Use processed name
       isAgent: true,
       parentSessionId: this._sessionId,
-      provider: targetProvider,
-      model: targetModel,
+      provider: provider,
+      model: model,
+      providerInstanceId: targetProviderInstanceId,
+      modelId: targetModelId,
     });
 
     // Set up approval callback for spawned agent (inherit from session agent)
@@ -645,8 +672,12 @@ export class Session {
       // Create a more descriptive agent name based on the task
       const agentName = `task-${task.id.split('_').pop()}`;
 
-      // Use the existing spawnAgent method to create the agent
-      const agent = this.spawnAgent(agentName, provider, model);
+      // Use the new spawnAgent method - convert old provider/model strings to provider instance
+      // TODO: Update TaskManager to use provider instances directly
+      const agent = this.spawnAgent({
+        name: agentName,
+        // For now, inherit from session since task system doesn't have provider instances yet
+      });
 
       // Send initial task notification to the new agent
       await this.sendTaskNotification(agent, task);
@@ -701,6 +732,44 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Clear the session registry - primarily for testing
    */
+  /**
+   * Resolve provider instance configuration to actual provider instance (with caching)
+   */
+  private static _providerCache = new Map<string, any>();
+
+  static resolveProviderInstance(providerInstanceId: string, modelId: string): {
+    providerInstance: any;
+    provider: string;
+    model: string;
+  } {
+    const cacheKey = `${providerInstanceId}:${modelId}`;
+    
+    // Check cache first
+    const cached = Session._providerCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // For now, fall back to old provider system for session creation
+    // TODO: Implement proper provider instance resolution once we have synchronous access
+    // This is a temporary bridge while we transition from old to new provider system
+    
+    // Default to anthropic for now - this will be properly resolved later
+    const provider = 'anthropic';
+    const model = modelId; // Use the exact model requested
+
+    // Create provider using the old registry system
+    const providerRegistry = ProviderRegistry.createWithAutoDiscovery();
+    const providerInstance = providerRegistry.createProvider(provider, { model });
+
+    const result = { providerInstance, provider, model };
+    
+    // Cache the result
+    Session._providerCache.set(cacheKey, result);
+    
+    return result;
+  }
+
   static clearRegistry(): void {
     Session._sessionRegistry.clear();
   }

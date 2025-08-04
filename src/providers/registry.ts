@@ -49,10 +49,13 @@ export class ProviderRegistry {
     return this.catalogManager.getAvailableProviders();
   }
 
-  getConfiguredInstances(): ConfiguredInstance[] {
+  async getConfiguredInstances(): Promise<ConfiguredInstance[]> {
     const instances: ConfiguredInstance[] = [];
 
     for (const [instanceId, instance] of this.configuredInstances.entries()) {
+      // Check if credentials exist without loading them
+      const hasCredentials = await this.instanceManager.loadCredential(instanceId) !== null;
+      
       instances.push({
         id: instanceId,
         displayName: instance.displayName,
@@ -60,7 +63,7 @@ export class ProviderRegistry {
         endpoint: instance.endpoint,
         timeout: instance.timeout,
         retryPolicy: instance.retryPolicy,
-        hasCredentials: false, // TODO: Check credentials without loading them
+        hasCredentials,
       });
     }
 
