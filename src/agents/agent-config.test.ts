@@ -7,56 +7,29 @@ import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { ProviderRegistry } from '~/providers/registry';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { ApprovalDecision } from '~/tools/approval-types';
 
-// Mock provider for testing
-class MockProvider extends BaseMockProvider {
-  constructor() {
-    super({});
-  }
-
-  get providerName(): string {
-    return 'anthropic';
-  }
-
-  get defaultModel(): string {
-    return 'claude-3-5-haiku-20241022';
-  }
-
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return Promise.resolve({
-      content: 'Mock response',
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      toolCalls: [],
-    });
-  }
-}
 
 describe('Agent Configuration', () => {
   const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let testSession: Session;
-  let mockProvider: MockProvider;
   let projectId: string;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
-    mockProvider = new MockProvider();
-
-    // Mock the ProviderRegistry to return our mock provider
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
-      () =>
-        ({
-          createProvider: () => mockProvider,
-          getProvider: () => mockProvider,
-          getProviderNames: () => ['anthropic', 'openai'],
-        }) as unknown as ProviderRegistry
-    );
+    
+    // Set up environment for providers
+    process.env.ANTHROPIC_KEY = 'test-key';
+    process.env.OPENAI_API_KEY = 'test-key';
+    
+    // Set up real provider instances for tests
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for agent config', {
@@ -70,8 +43,8 @@ describe('Agent Configuration', () => {
     // Create test session
     testSession = Session.create({
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId,
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
@@ -79,9 +52,14 @@ describe('Agent Configuration', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     testSession?.destroy();
+    // Clean up provider instances
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId
+    ]);
     teardownTestPersistence();
   });
 
@@ -137,7 +115,7 @@ describe('Agent Configuration', () => {
       });
 
       // Spawn agent with specific configuration
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+      const agent = testSession.spawnAgent({ name: 'Test Agent' });
 
       // Agent should have configuration methods
       expect(agent).toBeDefined();
@@ -162,11 +140,9 @@ describe('Agent Configuration', () => {
       });
 
       // Create agent with role-specific configuration
-      const agent = testSession.spawnAgent(
-        'Code Reviewer',
-        'anthropic',
-        'claude-3-5-haiku-20241022'
-      );
+      const agent = testSession.spawnAgent({
+        name: 'Code Reviewer'
+      });
 
       // Update agent configuration with role-specific settings
       agent.updateConfiguration({
@@ -191,11 +167,9 @@ describe('Agent Configuration', () => {
 
   describe('Role-based configuration', () => {
     it('should support role-based agent configuration', () => {
-      const agent = testSession.spawnAgent(
-        'Code Reviewer',
-        'anthropic',
-        'claude-3-5-haiku-20241022'
-      );
+      const agent = testSession.spawnAgent({
+        name: 'Code Reviewer'
+      });
 
       // Configure agent with role-based settings
       agent.updateConfiguration({
@@ -214,11 +188,9 @@ describe('Agent Configuration', () => {
     });
 
     it('should support capabilities and restrictions', () => {
-      const agent = testSession.spawnAgent(
-        'Security Agent',
-        'anthropic',
-        'claude-3-5-haiku-20241022'
-      );
+      const agent = testSession.spawnAgent({
+        name: 'Security Agent'
+      });
 
       // Configure agent with capabilities and restrictions
       agent.updateConfiguration({
@@ -245,7 +217,7 @@ describe('Agent Configuration', () => {
 
   describe('Agent configuration methods', () => {
     it('should provide method to get agent configuration', () => {
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+      const agent = testSession.spawnAgent({ name: 'Test Agent' });
 
       // Update agent configuration
       agent.updateConfiguration({
@@ -274,7 +246,7 @@ describe('Agent Configuration', () => {
         tools: ['file-read', 'bash'],
       });
 
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+      const agent = testSession.spawnAgent({ name: 'Test Agent' });
 
       // Update agent configuration partially
       agent.updateConfiguration({
@@ -291,7 +263,7 @@ describe('Agent Configuration', () => {
     });
 
     it('should provide method to update agent configuration', () => {
-      const agent = testSession.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+      const agent = testSession.spawnAgent({ name: 'Test Agent' });
 
       // Update configuration multiple times
       agent.updateConfiguration({
@@ -318,11 +290,9 @@ describe('Agent Configuration', () => {
 
   describe('Agent role and capabilities', () => {
     it('should store and retrieve agent role', () => {
-      const agent = testSession.spawnAgent(
-        'Security Analyst',
-        'anthropic',
-        'claude-3-5-haiku-20241022'
-      );
+      const agent = testSession.spawnAgent({
+        name: 'Security Analyst'
+      });
 
       // Configure agent role
       agent.updateConfiguration({
@@ -341,11 +311,9 @@ describe('Agent Configuration', () => {
     });
 
     it('should manage agent capabilities', () => {
-      const agent = testSession.spawnAgent(
-        'Data Analyst',
-        'anthropic',
-        'claude-3-5-haiku-20241022'
-      );
+      const agent = testSession.spawnAgent({
+        name: 'Data Analyst'
+      });
 
       // Configure agent capabilities
       agent.updateConfiguration({
@@ -362,11 +330,9 @@ describe('Agent Configuration', () => {
     });
 
     it('should enforce agent restrictions', () => {
-      const agent = testSession.spawnAgent(
-        'Read-Only Agent',
-        'anthropic',
-        'claude-3-5-haiku-20241022'
-      );
+      const agent = testSession.spawnAgent({
+        name: 'Read-Only Agent'
+      });
 
       // Configure agent restrictions
       agent.updateConfiguration({
