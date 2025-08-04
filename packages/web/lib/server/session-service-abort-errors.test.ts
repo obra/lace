@@ -24,14 +24,14 @@ vi.mock('~/utils/logger', () => ({
 
 import { SessionService } from './session-service';
 import { asThreadId } from '@/types/core';
-import type { SessionEvent } from '@/types/web-sse';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { logger } from '~/utils/logger';
+import type { Agent } from '@/lib/server/lace-imports';
 
 describe('SessionService abort error filtering', () => {
   let sessionService: SessionService;
   let mockAgent: EventEmitter & { threadId: string };
-  let mockSSEManager: any;
+  let mockSSEManager: ReturnType<typeof EventStreamManager.getInstance>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,7 +50,7 @@ describe('SessionService abort error filtering', () => {
     const sessionId = asThreadId('test-session');
 
     // Set up event handlers
-    sessionService.setupAgentEventHandlers(mockAgent as any, sessionId);
+    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
     // Emit an AbortError
     const abortError = new Error('Operation was aborted');
@@ -68,7 +68,7 @@ describe('SessionService abort error filtering', () => {
   it('should filter out generic "Request was aborted" errors', () => {
     const sessionId = asThreadId('test-session');
 
-    sessionService.setupAgentEventHandlers(mockAgent as any, sessionId);
+    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
     // Emit a generic abort error
     const genericAbortError = new Error('Request was aborted');
@@ -82,7 +82,7 @@ describe('SessionService abort error filtering', () => {
   it('should filter out "Aborted" errors', () => {
     const sessionId = asThreadId('test-session');
 
-    sessionService.setupAgentEventHandlers(mockAgent as any, sessionId);
+    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
     // Emit a simple "Aborted" error
     const abortedError = new Error('Aborted');
@@ -96,7 +96,7 @@ describe('SessionService abort error filtering', () => {
   it('should still broadcast non-abort errors to UI', () => {
     const sessionId = asThreadId('test-session');
 
-    sessionService.setupAgentEventHandlers(mockAgent as any, sessionId);
+    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
     // Emit a regular error
     const regularError = new Error('Network connection failed');
@@ -107,7 +107,7 @@ describe('SessionService abort error filtering', () => {
       expect.stringContaining('Agent test-session.1 error:'),
       regularError
     );
-    
+
     // Check that broadcast was called with the correct parameters
     expect(mockSSEManager.broadcast).toHaveBeenCalledWith({
       eventType: 'session',
