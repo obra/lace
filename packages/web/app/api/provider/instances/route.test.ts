@@ -64,12 +64,14 @@ describe('Provider Instances API', () => {
         id: 'openai-prod',
         displayName: 'OpenAI Production',
         catalogProviderId: 'openai',
+        hasCredentials: false, // No credentials set up
       });
       expect(data.instances[1]).toMatchObject({
         id: 'anthropic-dev',
         displayName: 'Anthropic Development',
         catalogProviderId: 'anthropic',
         timeout: 30000,
+        hasCredentials: false, // No credentials set up
       });
     });
 
@@ -96,6 +98,95 @@ describe('Provider Instances API', () => {
       expect(response.status).toBe(200);
       expect(data.instances).toEqual([]);
     });
+
+    it('should correctly detect hasCredentials when credentials exist', async () => {
+      // Set up test instance configuration
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'with-creds': {
+            displayName: 'Instance With Credentials',
+            catalogProviderId: 'openai',
+          },
+          'without-creds': {
+            displayName: 'Instance Without Credentials',
+            catalogProviderId: 'anthropic',
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      // Set up credential for only one instance
+      const credentialsDir = path.join(tempDir, 'credentials');
+      fs.mkdirSync(credentialsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(credentialsDir, 'with-creds.json'),
+        JSON.stringify({ apiKey: 'test-key' }, null, 2)
+      );
+
+      const mockRequest = {} as NextRequest;
+      const response = await GET(mockRequest);
+      const data = await parseResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(data.instances).toHaveLength(2);
+      
+      const withCreds = data.instances.find((i: any) => i.id === 'with-creds');
+      const withoutCreds = data.instances.find((i: any) => i.id === 'without-creds');
+      
+      expect(withCreds).toMatchObject({
+        id: 'with-creds',
+        displayName: 'Instance With Credentials',
+        hasCredentials: true,
+      });
+      
+      expect(withoutCreds).toMatchObject({
+        id: 'without-creds', 
+        displayName: 'Instance Without Credentials',
+        hasCredentials: false,
+      });
+    });
+
+    it('should handle instances with minimal configuration', async () => {
+      // Set up test instance with minimal fields
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'minimal-instance': {
+            displayName: 'Minimal Instance',
+            catalogProviderId: 'openai',
+            // No endpoint, timeout, or retryPolicy
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const mockRequest = {} as NextRequest;
+      const response = await GET(mockRequest);
+      const data = await parseResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(data.instances).toHaveLength(1);
+      expect(data.instances[0]).toMatchObject({
+        id: 'minimal-instance',
+        displayName: 'Minimal Instance',
+        catalogProviderId: 'openai',
+        hasCredentials: false,
+      });
+      
+      // Verify optional fields are undefined (not included in response)
+      expect(data.instances[0].endpoint).toBeUndefined();
+      expect(data.instances[0].retryPolicy).toBeUndefined();
+      // timeout should be undefined if not set (registry might set default, test actual behavior)
+    });
   });
 
   describe('POST /api/provider/instances', () => {
@@ -118,8 +209,10 @@ describe('Provider Instances API', () => {
       const data = await parseResponse(response);
 
       expect(response.status).toBe(201);
-      expect(data.success).toBe(true);
-      expect(data.instanceId).toBe('openai-test');
+      expect(data).toMatchObject({
+        success: true,
+        instanceId: 'openai-test',
+      });
 
       // Verify instance was saved to file
       const configPath = path.join(tempDir, 'provider-instances.json');
@@ -139,6 +232,19 @@ describe('Provider Instances API', () => {
       const savedCredential = JSON.parse(fs.readFileSync(credentialPath, 'utf-8'));
       expect(savedCredential).toMatchObject({
         apiKey: 'sk-test123',
+      });
+
+      // Verify instance appears in GET with correct contract
+      const getResponse = await GET({} as NextRequest);
+      const getData = await parseResponse(getResponse);
+      
+      expect(getData.instances).toHaveLength(1);
+      expect(getData.instances[0]).toMatchObject({
+        id: 'openai-test',
+        displayName: 'OpenAI Test',
+        catalogProviderId: 'openai',
+        timeout: 30000,
+        hasCredentials: true, // Should be true since we saved credentials
       });
     });
 

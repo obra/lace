@@ -68,7 +68,7 @@ export function AddInstanceModal({
       setSelectedProvider(preselectedProvider);
       setFormData(prev => ({
         ...prev,
-        displayName: `${preselectedProvider.name} Instance`
+        displayName: preselectedProvider.name
       }));
       setStep('configure');
       setLoading(false);
@@ -98,9 +98,23 @@ export function AddInstanceModal({
     setSelectedProvider(provider);
     setFormData(prev => ({
       ...prev,
-      displayName: `${provider.name} Instance`
+      displayName: provider.name, // Use provider name directly
     }));
     setStep('configure');
+  };
+
+  const generateInstanceId = (displayName: string, providerId: string): string => {
+    // Create a valid instanceId from displayName and providerId
+    const baseName = `${displayName.toLowerCase()}-${providerId}`;
+    const cleanName = baseName
+      .replace(/[^a-z0-9\s]/g, '') // Remove special chars except spaces
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single
+      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+    
+    // Add timestamp suffix to ensure uniqueness
+    const timestamp = Date.now().toString().slice(-4);
+    return `${cleanName}-${timestamp}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,10 +126,13 @@ export function AddInstanceModal({
       setSubmitting(true);
       setError(null);
       
+      const instanceId = generateInstanceId(formData.displayName, selectedProvider.id);
+      
       const response = await fetch('/api/provider/instances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          instanceId,
           displayName: formData.displayName,
           catalogProviderId: selectedProvider.id,
           endpoint: formData.endpoint || undefined,
@@ -240,6 +257,23 @@ export function AddInstanceModal({
 
           <div>
             <label className="label">
+              <span className="label-text">API Key *</span>
+            </label>
+            <input
+              type="password"
+              className="input input-bordered w-full"
+              value={formData.apiKey}
+              onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+              placeholder="sk-..."
+              required
+            />
+            <div className="label">
+              <span className="label-text-alt">Your API key will be stored securely</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">
               <span className="label-text">Provider</span>
             </label>
             <div className="flex items-center space-x-2">
@@ -276,23 +310,6 @@ export function AddInstanceModal({
               min={5}
               max={300}
             />
-          </div>
-
-          <div>
-            <label className="label">
-              <span className="label-text">API Key *</span>
-            </label>
-            <input
-              type="password"
-              className="input input-bordered w-full"
-              value={formData.apiKey}
-              onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
-              placeholder="sk-..."
-              required
-            />
-            <div className="label">
-              <span className="label-text-alt">Your API key will be stored securely</span>
-            </div>
           </div>
 
           {selectedProvider && (

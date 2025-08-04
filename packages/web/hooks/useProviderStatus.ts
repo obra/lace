@@ -23,17 +23,23 @@ export function useProviderStatus(instanceId: string) {
         method: 'POST'
       });
 
-      if (response.ok) {
+      const responseData = await parseResponse<{
+        success: boolean;
+        status: 'connected' | 'error';
+        message?: string;
+        testedAt: string;
+      }>(response);
+
+      if (response.ok && responseData.success) {
         setStatus({
-          status: 'connected',
-          lastTested: new Date().toISOString()
+          status: responseData.status,
+          lastTested: responseData.testedAt,
         });
       } else {
-        const errorData = await parseResponse<{ error: string }>(response).catch(() => ({ error: 'Connection failed' }));
         setStatus({
           status: 'error',
-          lastTested: new Date().toISOString(),
-          error: errorData.error
+          lastTested: responseData.testedAt,
+          error: responseData.message || 'Connection failed'
         });
       }
     } catch (error) {

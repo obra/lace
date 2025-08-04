@@ -4,7 +4,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState } from 'react';
 import { UISettingsPanel } from './UISettingsPanel';
-import { SettingsModal } from '@/components/settings/SettingsModal';
+import { Modal } from '@/components/ui/Modal';
 
 const meta: Meta<typeof UISettingsPanel> = {
   title: 'Organisms/UISettingsPanel',
@@ -182,21 +182,20 @@ export const InModal: Story = {
           Open UI Settings
         </button>
         
-        <SettingsModal
+        <Modal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
+          title="UI Settings"
         >
-          <div className="p-6">
-            <UISettingsPanel
-              {...args}
-              currentTheme={theme}
-              onThemeChange={(newTheme) => {
-                setTheme(newTheme);
-                args.onThemeChange?.(newTheme);
-              }}
-            />
-          </div>
-        </SettingsModal>
+          <UISettingsPanel
+            {...args}
+            currentTheme={theme}
+            onThemeChange={(newTheme) => {
+              setTheme(newTheme);
+              args.onThemeChange?.(newTheme);
+            }}
+          />
+        </Modal>
       </div>
     );
   },

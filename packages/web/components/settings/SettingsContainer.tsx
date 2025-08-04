@@ -4,13 +4,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { SettingsModal } from './SettingsModal';
+import { Modal } from '@/components/ui/Modal';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';
 import { ProvidersPanel } from './panels/ProvidersPanel';
-import { SystemPanel } from './panels/SystemPanel';
-import { AboutPanel } from './panels/AboutPanel';
 
 interface SettingsContainerProps {
   children: (props: { onOpenSettings: () => void }) => React.ReactNode;
@@ -61,46 +59,39 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
     <ProvidersPanel />
   ), []);
 
-  const systemPanel = useMemo(() => (
-    <SystemPanel />
-  ), []);
-
-  const aboutPanel = useMemo(() => (
-    <AboutPanel />
-  ), []);
 
   // Tab configuration with icons
   const tabConfig = [
     { id: 'providers', label: 'Providers', icon: '🔗' },
     { id: 'ui', label: 'UI', icon: '🎨' },
     { id: 'user', label: 'User', icon: '👤' },
-    { id: 'system', label: 'System', icon: '⚙️' },
-    { id: 'about', label: 'About', icon: 'ℹ️' },
   ];
 
   return (
     <>
       {children(childrenProps)}
       
-      <SettingsModal isOpen={isOpen} onClose={handleCloseSettings}>
-        <SettingsTabs defaultTab="providers" tabs={tabConfig}>
-          <div data-tab="providers">
-            {providersPanel}
-          </div>
-          <div data-tab="ui">
-            {uiSettingsPanel}
-          </div>
-          <div data-tab="user">
-            {userSettingsPanel}
-          </div>
-          <div data-tab="system">
-            {systemPanel}
-          </div>
-          <div data-tab="about">
-            {aboutPanel}
-          </div>
-        </SettingsTabs>
-      </SettingsModal>
+      <Modal 
+        isOpen={isOpen} 
+        onClose={handleCloseSettings}
+        title="Configuration"
+        size="full"
+        className="w-[80vw] h-[80vh] max-w-none max-h-none lg:w-[80vw] lg:h-[80vh] md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh]"
+      >
+        <div className="h-[calc(80vh-8rem)] -m-4 flex flex-col">
+          <SettingsTabs defaultTab="providers" tabs={tabConfig}>
+            <div data-tab="providers" className="flex-1 overflow-y-auto p-4">
+              {providersPanel}
+            </div>
+            <div data-tab="ui" className="flex-1 overflow-y-auto p-4">
+              {uiSettingsPanel}
+            </div>
+            <div data-tab="user" className="flex-1 overflow-y-auto p-4">
+              {userSettingsPanel}
+            </div>
+          </SettingsTabs>
+        </div>
+      </Modal>
     </>
   );
 }

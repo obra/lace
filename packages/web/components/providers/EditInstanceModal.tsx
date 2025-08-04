@@ -127,6 +127,27 @@ export function EditInstanceModal({
 
         <div>
           <label className="label">
+            <span className="label-text">API Key</span>
+          </label>
+          <input
+            type="password"
+            className="input input-bordered w-full"
+            value={formData.apiKey}
+            onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+            placeholder="Leave empty to keep current key"
+          />
+          <div className="label">
+            <span className="label-text-alt">
+              {instance.hasCredentials 
+                ? 'Leave empty to keep existing key' 
+                : 'No API key currently configured'
+              }
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">
             <span className="label-text">Provider</span>
           </label>
           <div className="flex items-center space-x-2">
@@ -163,27 +184,6 @@ export function EditInstanceModal({
             min={5}
             max={300}
           />
-        </div>
-
-        <div>
-          <label className="label">
-            <span className="label-text">API Key</span>
-          </label>
-          <input
-            type="password"
-            className="input input-bordered w-full"
-            value={formData.apiKey}
-            onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
-            placeholder="Leave empty to keep current key"
-          />
-          <div className="label">
-            <span className="label-text-alt">
-              {instance.hasCredentials 
-                ? 'Leave empty to keep existing key' 
-                : 'No API key currently configured'
-              }
-            </span>
-          </div>
         </div>
 
         <div className="flex justify-end space-x-3 pt-4">

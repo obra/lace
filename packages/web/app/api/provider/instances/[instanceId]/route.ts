@@ -30,7 +30,7 @@ export async function GET(
     const registry = new ProviderRegistry();
     await registry.initialize();
 
-    const instances = registry.getConfiguredInstances();
+    const instances = await registry.getConfiguredInstances();
     const instance = instances.find(inst => inst.id === instanceId);
 
     if (!instance) {
@@ -136,7 +136,7 @@ export async function PUT(
     // Return updated instance from registry
     const registry = new ProviderRegistry();
     await registry.initialize();
-    const instances = registry.getConfiguredInstances();
+    const instances = await registry.getConfiguredInstances();
     const updatedInstance = instances.find(inst => inst.id === instanceId);
 
     if (!updatedInstance) {

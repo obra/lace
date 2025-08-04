@@ -64,6 +64,7 @@ describe('Provider Instance Detail API', () => {
         catalogProviderId: 'openai',
         timeout: 30000,
         endpoint: 'https://api.openai.com/v1',
+        hasCredentials: false, // No credentials in this test
       });
     });
 
@@ -217,6 +218,7 @@ describe('Provider Instance Detail API', () => {
         catalogProviderId: 'openai', // Should remain unchanged
         timeout: 60000,
         endpoint: 'https://custom.openai.com/v1',
+        hasCredentials: false, // No credentials in this test
       });
 
       // Verify changes were persisted
@@ -268,8 +270,15 @@ describe('Provider Instance Detail API', () => {
       const response = await PUT(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
+      const data = await parseResponse(response);
 
       expect(response.status).toBe(200);
+      expect(data.instance).toMatchObject({
+        id: 'test-instance',
+        displayName: 'Updated Name',
+        catalogProviderId: 'openai',
+        hasCredentials: true, // Should be true after credential update
+      });
 
       // Verify credential was updated
       const updatedCredential = JSON.parse(

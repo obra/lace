@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest) {
     const registry = new ProviderRegistry();
     await registry.initialize();
 
-    const instances = registry.getConfiguredInstances();
+    const instances = await registry.getConfiguredInstances();
 
     return createSuperjsonResponse({ instances } as InstancesResponse);
   } catch (error: unknown) {

@@ -25,6 +25,11 @@ export function ProviderInstanceList() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, {
+    status: 'connected' | 'error' | 'testing';
+    lastTested?: string;
+    message?: string;
+  }>>({});
 
   useEffect(() => {
     loadInstances();
@@ -66,21 +71,42 @@ export function ProviderInstanceList() {
   };
 
   const handleTest = async (instanceId: string) => {
+    // Set testing state
+    setTestResults(prev => ({
+      ...prev,
+      [instanceId]: { status: 'testing' }
+    }));
+
     try {
       const response = await fetch(`/api/provider/instances/${instanceId}/test`, {
         method: 'POST'
       });
       
-      if (response.ok) {
-        const result = await parseResponse<{ success: boolean; message?: string }>(response);
-        // TODO: Show success/error feedback to user
-        // For now, just reload instances to refresh status
-        await loadInstances();
-      } else {
-        setError('Connection test failed');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection test failed');
+      const result = await parseResponse<{ 
+        success: boolean; 
+        status: 'connected' | 'error';
+        message?: string;
+        testedAt: string;
+      }>(response);
+      
+      // Update test results
+      setTestResults(prev => ({
+        ...prev,
+        [instanceId]: {
+          status: result.status,
+          lastTested: result.testedAt,
+          message: result.message
+        }
+      }));
+    } catch (error) {
+      setTestResults(prev => ({
+        ...prev,
+        [instanceId]: {
+          status: 'error',
+          lastTested: new Date().toISOString(),
+          message: error instanceof Error ? error.message : 'Test failed'
+        }
+      }));
     }
   };
 
@@ -154,15 +180,24 @@ export function ProviderInstanceList() {
               </button>
             </div>
             
-            {instances.map((instance) => (
-              <ProviderInstanceCard
-                key={instance.id}
-                instance={instance}
-                onTest={() => handleTest(instance.id)}
-                onDelete={() => handleDelete(instance.id)}
-                onEdit={loadInstances} // Refresh list after edit
-              />
-            ))}
+            {instances.map((instance) => {
+              const testResult = testResults[instance.id];
+              const instanceWithStatus = {
+                ...instance,
+                status: testResult?.status || 'untested',
+                lastTested: testResult?.lastTested,
+              };
+              
+              return (
+                <ProviderInstanceCard
+                  key={instance.id}
+                  instance={instanceWithStatus}
+                  onTest={() => handleTest(instance.id)}
+                  onDelete={() => handleDelete(instance.id)}
+                  onEdit={loadInstances} // Refresh list after edit
+                />
+              );
+            })}
           </>
         )}
       </div>

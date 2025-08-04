@@ -14,10 +14,10 @@ export interface TestConnectionResponse {
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { instanceId: string } }
+  { params }: { params: Promise<{ instanceId: string }> }
 ) {
   try {
-    const { instanceId } = params;
+    const { instanceId } = await params;
     
     const registry = new ProviderRegistry();
     await registry.initialize();

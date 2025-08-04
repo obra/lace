@@ -14,7 +14,7 @@ interface ProviderInstanceCardProps {
     hasCredentials: boolean;
     endpoint?: string;
     timeout?: number;
-    status?: 'connected' | 'error' | 'untested';
+    status?: 'connected' | 'error' | 'untested' | 'testing';
     modelCount?: number;
     lastTested?: string;
   };
@@ -31,6 +31,8 @@ export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: Pro
         return { status: 'success' as const, text: 'Connected' };
       case 'error': 
         return { status: 'error' as const, text: 'Connection Error' };
+      case 'testing':
+        return { status: 'info' as const, text: 'Testing...' };
       default: 
         return { status: 'warning' as const, text: instance.hasCredentials ? 'Untested' : 'No Credentials' };
     }
@@ -95,10 +97,17 @@ export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: Pro
             <button 
               className="btn btn-ghost btn-sm"
               onClick={onTest}
-              disabled={!instance.hasCredentials}
+              disabled={!instance.hasCredentials || instance.status === 'testing'}
               title={!instance.hasCredentials ? 'Add credentials to test connection' : 'Test connection'}
             >
-              Test
+              {instance.status === 'testing' ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Testing
+                </>
+              ) : (
+                'Test'
+              )}
             </button>
             <button 
               className="btn btn-outline btn-sm"
