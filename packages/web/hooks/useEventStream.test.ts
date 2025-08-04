@@ -8,6 +8,16 @@ import type { SessionEvent } from '@/types/web-sse';
 import type { StreamEvent } from '@/types/stream-events';
 import { stringify } from '@/lib/serialization';
 
+// Mock logger to suppress intentional error messages during testing
+vi.mock('~/utils/logger', () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 // Mock EventSource since it's not available in Node.js test environment
 class MockEventSource {
   url: string;
@@ -60,9 +70,12 @@ Object.defineProperty(global, 'EventSource', {
 
 describe('useEventStream agent state change handling', () => {
   let mockEventSource: MockEventSource;
+  const originalConsoleError = console.error;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock console.error to suppress intentional error logging during error handling tests
+    console.error = vi.fn();
     
     // Intercept EventSource creation to get reference to mock
     const OriginalEventSource = global.EventSource;
@@ -76,6 +89,8 @@ describe('useEventStream agent state change handling', () => {
     if (mockEventSource) {
       mockEventSource.close();
     }
+    // Restore console.error
+    console.error = originalConsoleError;
     vi.restoreAllMocks();
   });
 

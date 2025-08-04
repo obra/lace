@@ -11,9 +11,16 @@ import { render, screen, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { LaceApp } from '@/components/pages/LaceApp';
 import type { SessionInfo, AgentInfo, AgentState } from '@/types/core';
+import { stringify } from '@/lib/serialization';
 
 // Use real theme provider instead of mocking internal business logic  
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+
+// Use vi.hoisted to ensure mock functions are available during hoisting
+const mockUseHashRouter = vi.hoisted(() => vi.fn());
+const mockChatInput = vi.hoisted(() => vi.fn());
+const mockUseEventStream = vi.hoisted(() => vi.fn());
+const mockFetch = vi.hoisted(() => vi.fn());
 
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
@@ -41,7 +48,6 @@ vi.mock('@/components/timeline/TimelineView', () => ({
 }));
 
 // Mock EnhancedChatInput with stop button simulation
-const mockChatInput = vi.fn();
 vi.mock('@/components/chat/EnhancedChatInput', () => ({
   EnhancedChatInput: (props: { showStopButton?: boolean }) => {
     mockChatInput(props);
@@ -72,7 +78,6 @@ vi.mock('@/lib/timeline-converter', () => ({
 }));
 
 // Mock useHashRouter hook to control selected project/session/agent
-const mockUseHashRouter = vi.fn();
 vi.mock('@/hooks/useHashRouter', () => ({
   useHashRouter: mockUseHashRouter,
 }));
@@ -102,13 +107,11 @@ vi.mock('@/hooks/useSessionAPI', () => ({
 }));
 
 // Mock useEventStream hook - this is the key hook we need to control
-const mockUseEventStream = vi.fn();
 vi.mock('@/hooks/useEventStream', () => ({
   useEventStream: mockUseEventStream,
 }));
 
 // Mock fetch for API calls 
-const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 // Helper to render with real theme provider
@@ -118,6 +121,16 @@ const renderWithProviders = (component: React.ReactElement) => {
       {component}
     </ThemeProvider>
   );
+};
+
+// Helper to render with proper act() wrapping to avoid warnings
+const renderWithProvidersAsync = async (component: React.ReactElement) => {
+  let result: any;
+  await act(async () => {
+    result = renderWithProviders(component);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  });
+  return result;
 };
 
 describe('LaceApp agent state handling', () => {
@@ -146,30 +159,24 @@ describe('LaceApp agent state handling', () => {
       };
     });
 
-    // Mock fetch to return projects and sessions
+    // Mock fetch to return projects and sessions with proper superjson serialization
     mockFetch.mockImplementation((url: string) => {
+      const mockResponse = (data: unknown) => ({
+        ok: true,
+        json: () => Promise.resolve(data),
+        text: () => Promise.resolve(stringify(data)),
+      });
+      
       if (url.includes('/api/projects')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ projects: [] }),
-        });
+        return Promise.resolve(mockResponse({ projects: [] }));
       }
       if (url.includes('/api/sessions')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ sessions: [] }),
-        });
+        return Promise.resolve(mockResponse({ sessions: [] }));
       }
       if (url.includes('/api/providers')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: [] }),
-        });
+        return Promise.resolve(mockResponse({ providers: [] }));
       }
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
+      return Promise.resolve(mockResponse({}));
     });
   });
 
@@ -178,9 +185,9 @@ describe('LaceApp agent state handling', () => {
     onAgentStateChangeCallback = undefined;
   });
 
-  it('should register onAgentStateChange callback with useEventStream', () => {
+  it('should register onAgentStateChange callback with useEventStream', async () => {
     // Act: Render the component
-    renderWithProviders(<LaceApp />);
+    await renderWithProvidersAsync(<LaceApp />);
 
     // Assert: Verify useEventStream was called with onAgentStateChange callback
     expect(mockUseEventStream).toHaveBeenCalledWith(
@@ -193,12 +200,7 @@ describe('LaceApp agent state handling', () => {
 
   it('should show stop button when agent is thinking', async () => {
     // Arrange: Render component and set up initial session state
-    const { rerender } = renderWithProviders(<LaceApp />);
-
-    // Wait for initial setup
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
-    });
+    const { rerender } = await renderWithProvidersAsync(<LaceApp />);
 
     // Set up session details with an agent in idle state initially
     const mockSessionInfo: SessionInfo = {

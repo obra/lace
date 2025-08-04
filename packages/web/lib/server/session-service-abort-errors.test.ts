@@ -4,11 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'events';
 
-// Mock must be hoisted
+// Mock must be hoisted - create a shared broadcast mock
+const mockBroadcast = vi.fn();
 vi.mock('@/lib/event-stream-manager', () => ({
   EventStreamManager: {
     getInstance: () => ({
-      broadcast: vi.fn(),
+      broadcast: mockBroadcast,
     }),
   },
 }));
@@ -31,7 +32,6 @@ import type { Agent } from '@/lib/server/lace-imports';
 describe('SessionService abort error filtering', () => {
   let sessionService: SessionService;
   let mockAgent: EventEmitter & { threadId: string };
-  let mockSSEManager: ReturnType<typeof EventStreamManager.getInstance>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,7 +39,6 @@ describe('SessionService abort error filtering', () => {
     mockAgent = Object.assign(new EventEmitter(), {
       threadId: 'test-session.1',
     });
-    mockSSEManager = EventStreamManager.getInstance();
   });
 
   afterEach(() => {
@@ -62,7 +61,7 @@ describe('SessionService abort error filtering', () => {
       expect.stringContaining('Agent test-session.1 error:'),
       abortError
     );
-    expect(mockSSEManager.broadcast).not.toHaveBeenCalled();
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
   it('should filter out generic "Request was aborted" errors', () => {
@@ -76,7 +75,7 @@ describe('SessionService abort error filtering', () => {
 
     // Should log the error but not broadcast to UI
     expect(logger.error).toHaveBeenCalled();
-    expect(mockSSEManager.broadcast).not.toHaveBeenCalled();
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
   it('should filter out "Aborted" errors', () => {
@@ -90,7 +89,7 @@ describe('SessionService abort error filtering', () => {
 
     // Should log the error but not broadcast to UI
     expect(logger.error).toHaveBeenCalled();
-    expect(mockSSEManager.broadcast).not.toHaveBeenCalled();
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
   it('should still broadcast non-abort errors to UI', () => {
@@ -109,7 +108,7 @@ describe('SessionService abort error filtering', () => {
     );
 
     // Check that broadcast was called with the correct parameters
-    expect(mockSSEManager.broadcast).toHaveBeenCalledWith({
+    expect(mockBroadcast).toHaveBeenCalledWith({
       eventType: 'session',
       scope: { sessionId },
       data: {
