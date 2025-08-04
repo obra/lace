@@ -65,7 +65,7 @@ export class Project {
     // Create the project instance
     const project = new Project(projectData.id);
 
-    // NOTE: No longer automatically creating a default session since Session.create() 
+    // NOTE: No longer automatically creating a default session since Session.create()
     // now requires provider instances. Sessions will be created by the web layer
     // or CLI with proper provider instance configuration.
 

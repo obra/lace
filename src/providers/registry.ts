@@ -54,8 +54,8 @@ export class ProviderRegistry {
 
     for (const [instanceId, instance] of this.configuredInstances.entries()) {
       // Check if credentials exist without loading them
-      const hasCredentials = await this.instanceManager.loadCredential(instanceId) !== null;
-      
+      const hasCredentials = (await this.instanceManager.loadCredential(instanceId)) !== null;
+
       instances.push({
         id: instanceId,
         displayName: instance.displayName,

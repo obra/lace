@@ -1,4 +1,4 @@
-// ABOUTME: Test utilities for creating real provider instances for tests  
+// ABOUTME: Test utilities for creating real provider instances for tests
 // ABOUTME: Provides factory functions to set up actual provider instances instead of mocks
 
 import { ProviderInstanceManager } from '~/providers/instance/manager';
@@ -19,26 +19,29 @@ interface TestProviderConfig {
 /**
  * Creates an actual provider instance in the registry and returns its ID
  * Tests use these real instance IDs instead of provider strings
- * 
+ *
  * @param config - Configuration for the test provider instance
  * @returns Promise that resolves to the created instance ID
  */
 export async function createTestProviderInstance(config: TestProviderConfig): Promise<string> {
-  logger.debug('Creating test provider instance', { catalogId: config.catalogId, models: config.models });
-  
+  logger.debug('Creating test provider instance', {
+    catalogId: config.catalogId,
+    models: config.models,
+  });
+
   const instanceManager = new ProviderInstanceManager();
   const catalogManager = new ProviderCatalogManager();
-  
+
   // Load catalogs to find the appropriate catalog provider
   await catalogManager.loadCatalogs();
-  
+
   const catalogProviders = catalogManager.getAvailableProviders();
-  const catalogProvider = catalogProviders.find(p => p.id === config.catalogId);
-  
+  const catalogProvider = catalogProviders.find((p) => p.id === config.catalogId);
+
   if (!catalogProvider) {
     throw new Error(`No catalog provider found for id: ${config.catalogId}`);
   }
-  
+
   // Verify all requested models exist in the catalog
   for (const modelId of config.models) {
     const model = catalogManager.getModel(catalogProvider.id, modelId);
@@ -46,41 +49,41 @@ export async function createTestProviderInstance(config: TestProviderConfig): Pr
       throw new Error(`Model ${modelId} not found in catalog for provider ${catalogProvider.id}`);
     }
   }
-  
+
   // Generate unique instance ID
   const instanceId = `test-${config.catalogId}-${randomUUID().split('-')[0]}`;
-  
+
   // Create provider instance configuration
   const instance: ProviderInstance = {
     displayName: config.displayName || `Test ${catalogProvider.name}`,
     catalogProviderId: catalogProvider.id,
     ...(config.endpoint && { endpoint: config.endpoint }),
   };
-  
+
   // Create credentials
   const credential: Credential = {
     apiKey: config.apiKey || getTestApiKey(config.catalogId),
   };
-  
+
   // Save instance and credentials
   const instancesConfig = await instanceManager.loadInstances();
   instancesConfig.instances[instanceId] = instance;
   await instanceManager.saveInstances(instancesConfig);
   await instanceManager.saveCredential(instanceId, credential);
-  
-  logger.debug('Test provider instance created', { 
-    instanceId, 
-    catalogId: config.catalogId, 
-    displayName: instance.displayName 
+
+  logger.debug('Test provider instance created', {
+    instanceId,
+    catalogId: config.catalogId,
+    displayName: instance.displayName,
   });
-  
+
   return instanceId;
 }
 
 /**
  * Sets up common test provider instances that tests can use
  * Creates standard Anthropic and OpenAI instances with common models
- * 
+ *
  * @returns Promise that resolves to instance IDs for common providers
  */
 export async function setupTestProviderInstances(): Promise<{
@@ -88,7 +91,7 @@ export async function setupTestProviderInstances(): Promise<{
   openaiInstanceId: string;
 }> {
   logger.debug('Setting up common test provider instances');
-  
+
   const [anthropicInstanceId, openaiInstanceId] = await Promise.all([
     createTestProviderInstance({
       catalogId: 'anthropic',
@@ -96,23 +99,23 @@ export async function setupTestProviderInstances(): Promise<{
       displayName: 'Test Anthropic',
     }),
     createTestProviderInstance({
-      catalogId: 'openai', 
+      catalogId: 'openai',
       models: ['gpt-4o', 'gpt-4o-mini'],
       displayName: 'Test OpenAI',
     }),
   ]);
-  
-  logger.debug('Common test provider instances created', { 
-    anthropicInstanceId, 
-    openaiInstanceId 
+
+  logger.debug('Common test provider instances created', {
+    anthropicInstanceId,
+    openaiInstanceId,
   });
-  
+
   return { anthropicInstanceId, openaiInstanceId };
 }
 
 /**
  * Creates a test provider instance for LMStudio with local endpoint
- * 
+ *
  * @param models - Models to configure for the instance
  * @param endpoint - Custom endpoint (defaults to localhost:1234)
  * @returns Promise that resolves to the created instance ID
@@ -131,7 +134,7 @@ export async function createTestLMStudioInstance(
 
 /**
  * Creates a test provider instance for Ollama with local endpoint
- * 
+ *
  * @param models - Models to configure for the instance
  * @param endpoint - Custom endpoint (defaults to localhost:11434)
  * @returns Promise that resolves to the created instance ID
@@ -151,14 +154,14 @@ export async function createTestOllamaInstance(
 /**
  * Cleans up test provider instances by removing them from storage
  * Call this in test teardown to avoid polluting other tests
- * 
+ *
  * @param instanceIds - Array of instance IDs to remove
  */
 export async function cleanupTestProviderInstances(instanceIds: string[]): Promise<void> {
   logger.debug('Cleaning up test provider instances', { instanceIds });
-  
+
   const instanceManager = new ProviderInstanceManager();
-  
+
   await Promise.all(
     instanceIds.map(async (instanceId) => {
       try {
@@ -168,24 +171,24 @@ export async function cleanupTestProviderInstances(instanceIds: string[]): Promi
       }
     })
   );
-  
+
   logger.debug('Test provider instances cleaned up', { instanceIds });
 }
 
 /**
  * Gets all test provider instances currently configured
  * Useful for debugging test setup
- * 
+ *
  * @returns Promise that resolves to array of test instance IDs
  */
 export async function getTestProviderInstances(): Promise<string[]> {
   const registry = new ProviderRegistry();
   await registry.initialize();
-  
+
   const instances = await registry.getConfiguredInstances();
   return instances
-    .filter(instance => instance.id.startsWith('test-'))
-    .map(instance => instance.id);
+    .filter((instance) => instance.id.startsWith('test-'))
+    .map((instance) => instance.id);
 }
 
 /**

@@ -6,7 +6,10 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { asThreadId } from '~/threads/types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 // Mock external dependencies that don't affect core functionality
 vi.mock('server-only', () => ({}));
@@ -66,7 +69,7 @@ describe('Session', () => {
     // Clean up provider instances
     await cleanupTestProviderInstances([
       testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId
+      testProviderInstances.openaiInstanceId,
     ]);
     teardownTestPersistence();
   });
@@ -291,7 +294,7 @@ describe('Session', () => {
       session.spawnAgent({
         name: 'Claude Sonnet Agent',
         providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-sonnet-20241022'
+        modelId: 'claude-3-5-sonnet-20241022',
       });
 
       const agents = session.getAgents();
@@ -320,7 +323,7 @@ describe('Session', () => {
       session.spawnAgent({
         name: 'GPT Agent',
         providerInstanceId: testProviderInstances.openaiInstanceId,
-        modelId: 'gpt-4o'
+        modelId: 'gpt-4o',
       });
 
       const agents = session.getAgents();

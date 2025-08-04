@@ -63,8 +63,8 @@ describe('CustomProviderCatalogManager', () => {
             cost_per_1m_out: 1.0,
             context_window: 4096,
             default_max_tokens: 2048,
-          }
-        ]
+          },
+        ],
       };
 
       const created = await customManager.createCatalog(catalogData);
@@ -81,13 +81,13 @@ describe('CustomProviderCatalogManager', () => {
 
     it('should reject catalog with missing required fields', async () => {
       const invalidCatalog = {
-        name: 'Invalid Catalog'
+        name: 'Invalid Catalog',
         // Missing id and type
       };
 
-      await expect(
-        customManager.createCatalog(invalidCatalog)
-      ).rejects.toThrow('Missing required fields: id, name, and type are required');
+      await expect(customManager.createCatalog(invalidCatalog)).rejects.toThrow(
+        'Missing required fields: id, name, and type are required'
+      );
     });
 
     it('should reject catalog with duplicate ID', async () => {
@@ -97,14 +97,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       };
 
       await customManager.createCatalog(catalogData);
@@ -112,7 +114,7 @@ describe('CustomProviderCatalogManager', () => {
       // Try to create another with same ID
       await expect(
         customManager.createCatalog({ ...catalogData, name: 'Second Catalog' })
-      ).rejects.toThrow('Catalog with ID \'duplicate-test\' already exists');
+      ).rejects.toThrow("Catalog with ID 'duplicate-test' already exists");
     });
   });
 
@@ -125,21 +127,23 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       });
     });
 
     it('should update an existing catalog', async () => {
       const updates = {
         name: 'Updated Test Catalog',
-        api_endpoint: 'https://updated.example.com'
+        api_endpoint: 'https://updated.example.com',
       };
 
       const updated = await customManager.updateCatalog('update-test', updates);
@@ -152,7 +156,7 @@ describe('CustomProviderCatalogManager', () => {
     it('should reject update for non-existent catalog', async () => {
       await expect(
         customManager.updateCatalog('non-existent', { name: 'New Name' })
-      ).rejects.toThrow('Catalog with ID \'non-existent\' not found');
+      ).rejects.toThrow("Catalog with ID 'non-existent' not found");
     });
   });
 
@@ -164,14 +168,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       });
     });
 
@@ -186,9 +192,9 @@ describe('CustomProviderCatalogManager', () => {
     });
 
     it('should reject delete for non-existent catalog', async () => {
-      await expect(
-        customManager.deleteCatalog('non-existent')
-      ).rejects.toThrow('Catalog with ID \'non-existent\' not found');
+      await expect(customManager.deleteCatalog('non-existent')).rejects.toThrow(
+        "Catalog with ID 'non-existent' not found"
+      );
     });
   });
 
@@ -200,14 +206,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'existing-model',
         default_small_model_id: 'existing-model',
-        models: [{
-          id: 'existing-model',
-          name: 'Existing Model',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'existing-model',
+            name: 'Existing Model',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       });
     });
 
@@ -224,7 +232,7 @@ describe('CustomProviderCatalogManager', () => {
       const updated = await customManager.addModel('model-test', newModel);
 
       expect(updated.models).toHaveLength(2);
-      expect(updated.models.find(m => m.id === 'new-model')).toBeTruthy();
+      expect(updated.models.find((m) => m.id === 'new-model')).toBeTruthy();
     });
 
     it('should reject adding duplicate model', async () => {
@@ -237,20 +245,20 @@ describe('CustomProviderCatalogManager', () => {
         default_max_tokens: 4096,
       };
 
-      await expect(
-        customManager.addModel('model-test', duplicateModel)
-      ).rejects.toThrow('Model with ID \'existing-model\' already exists');
+      await expect(customManager.addModel('model-test', duplicateModel)).rejects.toThrow(
+        "Model with ID 'existing-model' already exists"
+      );
     });
 
     it('should update a model in a catalog', async () => {
       const updates = {
         name: 'Updated Model Name',
-        cost_per_1m_in: 1.5
+        cost_per_1m_in: 1.5,
       };
 
       const updated = await customManager.updateModel('model-test', 'existing-model', updates);
 
-      const updatedModel = updated.models.find(m => m.id === 'existing-model');
+      const updatedModel = updated.models.find((m) => m.id === 'existing-model');
       expect(updatedModel!.name).toBe('Updated Model Name');
       expect(updatedModel!.cost_per_1m_in).toBe(1.5);
     });
@@ -269,13 +277,13 @@ describe('CustomProviderCatalogManager', () => {
       const updated = await customManager.removeModel('model-test', 'removable-model');
 
       expect(updated.models).toHaveLength(1);
-      expect(updated.models.find(m => m.id === 'removable-model')).toBeFalsy();
+      expect(updated.models.find((m) => m.id === 'removable-model')).toBeFalsy();
     });
 
     it('should reject removing default model', async () => {
-      await expect(
-        customManager.removeModel('model-test', 'existing-model')
-      ).rejects.toThrow('Cannot remove model \'existing-model\' as it is set as a default model');
+      await expect(customManager.removeModel('model-test', 'existing-model')).rejects.toThrow(
+        "Cannot remove model 'existing-model' as it is set as a default model"
+      );
     });
   });
 
@@ -287,14 +295,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       };
 
       const result = await customManager.validateCatalog(validCatalog);
@@ -310,20 +320,24 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'non-existent-model',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       };
 
       const result = await customManager.validateCatalog(invalidCatalog);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Default large model \'non-existent-model\' not found in models');
+      expect(result.errors).toContain(
+        "Default large model 'non-existent-model' not found in models"
+      );
     });
 
     it('should detect duplicate model IDs', async () => {
@@ -349,8 +363,8 @@ describe('CustomProviderCatalogManager', () => {
             cost_per_1m_out: 2.0,
             context_window: 4096,
             default_max_tokens: 2048,
-          }
-        ]
+          },
+        ],
       };
 
       const result = await customManager.validateCatalog(invalidCatalog);
@@ -368,14 +382,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       });
 
       const result = await customManager.importCatalog(catalogJson);
@@ -406,14 +422,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       });
 
       const exported = await customManager.exportCatalog('export-test');
@@ -430,9 +448,9 @@ describe('CustomProviderCatalogManager', () => {
       const templates = customManager.getTemplates();
 
       expect(templates).toHaveLength(3);
-      expect(templates.map(t => t.id)).toContain('openai-compatible');
-      expect(templates.map(t => t.id)).toContain('anthropic-compatible');
-      expect(templates.map(t => t.id)).toContain('local-server');
+      expect(templates.map((t) => t.id)).toContain('openai-compatible');
+      expect(templates.map((t) => t.id)).toContain('anthropic-compatible');
+      expect(templates.map((t) => t.id)).toContain('local-server');
     });
 
     it('should create catalog from template', async () => {
@@ -451,7 +469,7 @@ describe('CustomProviderCatalogManager', () => {
     it('should reject unknown template', async () => {
       await expect(
         customManager.createFromTemplate('unknown-template', 'test', 'Test')
-      ).rejects.toThrow('Template with ID \'unknown-template\' not found');
+      ).rejects.toThrow("Template with ID 'unknown-template' not found");
     });
   });
 
@@ -483,8 +501,8 @@ describe('CustomProviderCatalogManager', () => {
             default_max_tokens: 4096,
             can_reason: false,
             supports_attachments: false,
-          }
-        ]
+          },
+        ],
       });
     });
 
@@ -510,14 +528,16 @@ describe('CustomProviderCatalogManager', () => {
         type: 'openai',
         default_large_model_id: 'model1',
         default_small_model_id: 'model1',
-        models: [{
-          id: 'model1',
-          name: 'Model 1',
-          cost_per_1m_in: 1.0,
-          cost_per_1m_out: 2.0,
-          context_window: 4096,
-          default_max_tokens: 2048,
-        }]
+        models: [
+          {
+            id: 'model1',
+            name: 'Model 1',
+            cost_per_1m_in: 1.0,
+            cost_per_1m_out: 2.0,
+            context_window: 4096,
+            default_max_tokens: 2048,
+          },
+        ],
       });
 
       await customManager.createCatalog({
@@ -526,21 +546,23 @@ describe('CustomProviderCatalogManager', () => {
         type: 'anthropic',
         default_large_model_id: 'model2',
         default_small_model_id: 'model2',
-        models: [{
-          id: 'model2',
-          name: 'Model 2',
-          cost_per_1m_in: 3.0,
-          cost_per_1m_out: 15.0,
-          context_window: 200000,
-          default_max_tokens: 8192,
-        }]
+        models: [
+          {
+            id: 'model2',
+            name: 'Model 2',
+            cost_per_1m_in: 3.0,
+            cost_per_1m_out: 15.0,
+            context_window: 200000,
+            default_max_tokens: 8192,
+          },
+        ],
       });
 
       const userCatalogs = await customManager.getUserCatalogs();
 
       expect(userCatalogs).toHaveLength(2);
-      expect(userCatalogs.map(c => c.id)).toContain('user-catalog-1');
-      expect(userCatalogs.map(c => c.id)).toContain('user-catalog-2');
+      expect(userCatalogs.map((c) => c.id)).toContain('user-catalog-1');
+      expect(userCatalogs.map((c) => c.id)).toContain('user-catalog-2');
     });
   });
 });

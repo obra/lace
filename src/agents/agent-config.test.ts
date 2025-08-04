@@ -7,9 +7,11 @@ import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { ApprovalDecision } from '~/tools/approval-types';
-
 
 describe('Agent Configuration', () => {
   const _tempDirContext = useTempLaceDir();
@@ -23,11 +25,11 @@ describe('Agent Configuration', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Set up environment for providers
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.OPENAI_API_KEY = 'test-key';
-    
+
     // Set up real provider instances for tests
     testProviderInstances = await setupTestProviderInstances();
 
@@ -58,7 +60,7 @@ describe('Agent Configuration', () => {
     // Clean up provider instances
     await cleanupTestProviderInstances([
       testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId
+      testProviderInstances.openaiInstanceId,
     ]);
     teardownTestPersistence();
   });
@@ -141,7 +143,7 @@ describe('Agent Configuration', () => {
 
       // Create agent with role-specific configuration
       const agent = testSession.spawnAgent({
-        name: 'Code Reviewer'
+        name: 'Code Reviewer',
       });
 
       // Update agent configuration with role-specific settings
@@ -168,7 +170,7 @@ describe('Agent Configuration', () => {
   describe('Role-based configuration', () => {
     it('should support role-based agent configuration', () => {
       const agent = testSession.spawnAgent({
-        name: 'Code Reviewer'
+        name: 'Code Reviewer',
       });
 
       // Configure agent with role-based settings
@@ -189,7 +191,7 @@ describe('Agent Configuration', () => {
 
     it('should support capabilities and restrictions', () => {
       const agent = testSession.spawnAgent({
-        name: 'Security Agent'
+        name: 'Security Agent',
       });
 
       // Configure agent with capabilities and restrictions
@@ -291,7 +293,7 @@ describe('Agent Configuration', () => {
   describe('Agent role and capabilities', () => {
     it('should store and retrieve agent role', () => {
       const agent = testSession.spawnAgent({
-        name: 'Security Analyst'
+        name: 'Security Analyst',
       });
 
       // Configure agent role
@@ -312,7 +314,7 @@ describe('Agent Configuration', () => {
 
     it('should manage agent capabilities', () => {
       const agent = testSession.spawnAgent({
-        name: 'Data Analyst'
+        name: 'Data Analyst',
       });
 
       // Configure agent capabilities
@@ -331,7 +333,7 @@ describe('Agent Configuration', () => {
 
     it('should enforce agent restrictions', () => {
       const agent = testSession.spawnAgent({
-        name: 'Read-Only Agent'
+        name: 'Read-Only Agent',
       });
 
       // Configure agent restrictions

@@ -21,7 +21,7 @@ function createMockOpenAIServer(baseUrl: string, expectedApiKey: string) {
   return setupServer(
     http.post(`${baseUrl}/chat/completions`, ({ request }: { request: Request }) => {
       const authHeader = request.headers.get('authorization');
-      
+
       if (authHeader !== `Bearer ${expectedApiKey}`) {
         return HttpResponse.json(
           { error: { message: 'Invalid API key', type: 'invalid_request_error' } },
@@ -35,30 +35,32 @@ function createMockOpenAIServer(baseUrl: string, expectedApiKey: string) {
         object: 'chat.completion',
         created: Date.now(),
         model: 'gpt-4',
-        choices: [{
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: `OpenAI response from ${baseUrl} with key ${expectedApiKey}`
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: `OpenAI response from ${baseUrl} with key ${expectedApiKey}`,
+            },
+            finish_reason: 'stop',
           },
-          finish_reason: 'stop'
-        }],
+        ],
         usage: {
           prompt_tokens: 10,
           completion_tokens: 20,
-          total_tokens: 30
-        }
+          total_tokens: 30,
+        },
       });
     })
   );
 }
 
-// Mock Anthropic-compatible server factory  
+// Mock Anthropic-compatible server factory
 function createMockAnthropicServer(baseUrl: string, expectedApiKey: string) {
   return setupServer(
     http.post(`${baseUrl}/messages`, ({ request }: { request: Request }) => {
       const authHeader = request.headers.get('x-api-key');
-      
+
       if (authHeader !== expectedApiKey) {
         return HttpResponse.json(
           { type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } },
@@ -71,17 +73,19 @@ function createMockAnthropicServer(baseUrl: string, expectedApiKey: string) {
         id: 'msg_test',
         type: 'message',
         role: 'assistant',
-        content: [{
-          type: 'text',
-          text: `Anthropic response from ${baseUrl} with key ${expectedApiKey}`
-        }],
+        content: [
+          {
+            type: 'text',
+            text: `Anthropic response from ${baseUrl} with key ${expectedApiKey}`,
+          },
+        ],
         model: 'claude-3-sonnet-20241022',
         stop_reason: 'end_turn',
         stop_sequence: null,
         usage: {
           input_tokens: 10,
-          output_tokens: 20
-        }
+          output_tokens: 20,
+        },
       });
     })
   );
@@ -95,12 +99,14 @@ function createMockLMStudioServer(baseUrl: string) {
     http.get(`${baseUrl.replace('ws://', 'http://')}/v1/models`, () => {
       return HttpResponse.json({
         object: 'list',
-        data: [{
-          id: 'local-model',
-          object: 'model',
-          created: Date.now(),
-          owned_by: 'lmstudio'
-        }]
+        data: [
+          {
+            id: 'local-model',
+            object: 'model',
+            created: Date.now(),
+            owned_by: 'lmstudio',
+          },
+        ],
       });
     })
   );
@@ -112,13 +118,15 @@ function createMockOllamaServer(baseUrl: string) {
     // Mock the model list endpoint for diagnostics
     http.get(`${baseUrl}/api/tags`, () => {
       return HttpResponse.json({
-        models: [{
-          name: 'llama2',
-          model: 'llama2',
-          modified_at: new Date().toISOString(),
-          size: 3826793677,
-          digest: 'fe938a131f40e6f6d40083c9f0f430a515233eb2edaa6d72eb85c50d64f2300e'
-        }]
+        models: [
+          {
+            name: 'llama2',
+            model: 'llama2',
+            modified_at: new Date().toISOString(),
+            size: 3826793677,
+            digest: 'fe938a131f40e6f6d40083c9f0f430a515233eb2edaa6d72eb85c50d64f2300e',
+          },
+        ],
       });
     }),
     // Mock the chat endpoint
@@ -128,13 +136,13 @@ function createMockOllamaServer(baseUrl: string) {
         created_at: new Date().toISOString(),
         message: {
           role: 'assistant',
-          content: `Ollama response from ${baseUrl}`
+          content: `Ollama response from ${baseUrl}`,
         },
         done: true,
         total_duration: 1000000,
         load_duration: 500000,
         prompt_eval_count: 10,
-        eval_count: 20
+        eval_count: 20,
       });
     })
   );
@@ -169,7 +177,7 @@ describe('Provider Instance E2E Tests', () => {
     anthropicServer = createMockAnthropicServer('http://mock-anthropic.test', 'test-anthropic-key');
     lmstudioServer = createMockLMStudioServer('ws://mock-lmstudio.test:1234');
     ollamaServer = createMockOllamaServer('http://mock-ollama.test:11434');
-    
+
     openaiServer1.listen();
     openaiServer2.listen();
     anthropicServer.listen();
@@ -178,11 +186,11 @@ describe('Provider Instance E2E Tests', () => {
 
     // Setup provider catalog with test data
     catalogManager = new ProviderCatalogManager();
-    
+
     // Create test catalog data in the user-catalog directory
     const testCatalogDir = path.join(tempDir, 'user-catalog');
     fs.mkdirSync(testCatalogDir, { recursive: true });
-    
+
     // OpenAI catalog
     const openaiCatalog: CatalogProvider = {
       id: 'openai',
@@ -190,21 +198,24 @@ describe('Provider Instance E2E Tests', () => {
       type: 'openai',
       default_large_model_id: 'gpt-4',
       default_small_model_id: 'gpt-3.5-turbo',
-      models: [{
-        id: 'gpt-4',
-        name: 'GPT-4',
-        cost_per_1m_in: 30.0,
-        cost_per_1m_out: 60.0,
-        context_window: 8192,
-        default_max_tokens: 4096
-      }, {
-        id: 'gpt-3.5-turbo',
-        name: 'GPT-3.5 Turbo',
-        cost_per_1m_in: 1.5,
-        cost_per_1m_out: 2.0,
-        context_window: 4096,
-        default_max_tokens: 4096
-      }]
+      models: [
+        {
+          id: 'gpt-4',
+          name: 'GPT-4',
+          cost_per_1m_in: 30.0,
+          cost_per_1m_out: 60.0,
+          context_window: 8192,
+          default_max_tokens: 4096,
+        },
+        {
+          id: 'gpt-3.5-turbo',
+          name: 'GPT-3.5 Turbo',
+          cost_per_1m_in: 1.5,
+          cost_per_1m_out: 2.0,
+          context_window: 4096,
+          default_max_tokens: 4096,
+        },
+      ],
     };
 
     // Anthropic catalog
@@ -214,21 +225,24 @@ describe('Provider Instance E2E Tests', () => {
       type: 'anthropic',
       default_large_model_id: 'claude-3-opus-20240229',
       default_small_model_id: 'claude-3-haiku-20240307',
-      models: [{
-        id: 'claude-3-opus-20240229',
-        name: 'Claude 3 Opus',
-        cost_per_1m_in: 15.0,
-        cost_per_1m_out: 75.0,
-        context_window: 200000,
-        default_max_tokens: 4096
-      }, {
-        id: 'claude-3-sonnet-20241022',
-        name: 'Claude 3.5 Sonnet',
-        cost_per_1m_in: 3.0,
-        cost_per_1m_out: 15.0,
-        context_window: 200000,
-        default_max_tokens: 8192
-      }]
+      models: [
+        {
+          id: 'claude-3-opus-20240229',
+          name: 'Claude 3 Opus',
+          cost_per_1m_in: 15.0,
+          cost_per_1m_out: 75.0,
+          context_window: 200000,
+          default_max_tokens: 4096,
+        },
+        {
+          id: 'claude-3-sonnet-20241022',
+          name: 'Claude 3.5 Sonnet',
+          cost_per_1m_in: 3.0,
+          cost_per_1m_out: 15.0,
+          context_window: 200000,
+          default_max_tokens: 8192,
+        },
+      ],
     };
 
     // LMStudio catalog
@@ -238,14 +252,16 @@ describe('Provider Instance E2E Tests', () => {
       type: 'lmstudio',
       default_large_model_id: 'local-large-model',
       default_small_model_id: 'local-small-model',
-      models: [{
-        id: 'local-large-model',
-        name: 'Local Large Model',
-        cost_per_1m_in: 0.0,
-        cost_per_1m_out: 0.0,
-        context_window: 4096,
-        default_max_tokens: 2048
-      }]
+      models: [
+        {
+          id: 'local-large-model',
+          name: 'Local Large Model',
+          cost_per_1m_in: 0.0,
+          cost_per_1m_out: 0.0,
+          context_window: 4096,
+          default_max_tokens: 2048,
+        },
+      ],
     };
 
     // Ollama catalog
@@ -255,14 +271,16 @@ describe('Provider Instance E2E Tests', () => {
       type: 'ollama',
       default_large_model_id: 'llama2',
       default_small_model_id: 'llama2',
-      models: [{
-        id: 'llama2',
-        name: 'Llama 2',
-        cost_per_1m_in: 0.0,
-        cost_per_1m_out: 0.0,
-        context_window: 4096,
-        default_max_tokens: 2048
-      }]
+      models: [
+        {
+          id: 'llama2',
+          name: 'Llama 2',
+          cost_per_1m_in: 0.0,
+          cost_per_1m_out: 0.0,
+          context_window: 4096,
+          default_max_tokens: 2048,
+        },
+      ],
     };
 
     // Write all catalogs
@@ -285,7 +303,7 @@ describe('Provider Instance E2E Tests', () => {
 
     // Setup provider instances configuration
     instanceManager = new ProviderInstanceManager();
-    
+
     const testInstanceConfig: ProviderInstancesConfig = {
       version: '1.0',
       instances: {
@@ -297,7 +315,7 @@ describe('Provider Instance E2E Tests', () => {
         },
         'openai-dev': {
           displayName: 'OpenAI Development',
-          catalogProviderId: 'openai', 
+          catalogProviderId: 'openai',
           endpoint: 'http://mock-openai-2.test',
           timeout: 30000,
         },
@@ -318,8 +336,8 @@ describe('Provider Instance E2E Tests', () => {
           catalogProviderId: 'ollama',
           endpoint: 'http://mock-ollama.test:11434',
           timeout: 30000,
-        }
-      }
+        },
+      },
     };
 
     // Save instance configuration
@@ -348,7 +366,7 @@ describe('Provider Instance E2E Tests', () => {
 
     // Cleanup
     teardownTestPersistence();
-    
+
     if (originalLaceDir) {
       process.env.LACE_DIR = originalLaceDir;
     } else {
@@ -363,12 +381,12 @@ describe('Provider Instance E2E Tests', () => {
       const provider1 = await registry.createProviderFromInstance('openai-prod');
       expect(provider1).toBeDefined();
       expect(provider1.providerName).toBe('openai');
-      
+
       // Test resolving second instance
       const provider2 = await registry.createProviderFromInstance('openai-dev');
       expect(provider2).toBeDefined();
       expect(provider2.providerName).toBe('openai');
-      
+
       // Providers should be different instances
       expect(provider1).not.toBe(provider2);
     });
@@ -381,9 +399,9 @@ describe('Provider Instance E2E Tests', () => {
     });
 
     it('should throw error for non-existent provider instance', async () => {
-      await expect(
-        registry.createProviderFromInstance('non-existent')
-      ).rejects.toThrow('Provider instance not found: non-existent');
+      await expect(registry.createProviderFromInstance('non-existent')).rejects.toThrow(
+        'Provider instance not found: non-existent'
+      );
     });
 
     it('should throw error for instance without credentials', async () => {
@@ -394,19 +412,19 @@ describe('Provider Instance E2E Tests', () => {
           'no-creds': {
             displayName: 'No Credentials',
             catalogProviderId: 'openai',
-          }
-        }
+          },
+        },
       };
 
       const configPath = path.join(tempDir, 'provider-instances.json');
       fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-      
+
       // Reinitialize registry to pick up new config
       await registry.initialize();
 
-      await expect(
-        registry.createProviderFromInstance('no-creds')
-      ).rejects.toThrow('No credentials found for instance: no-creds');
+      await expect(registry.createProviderFromInstance('no-creds')).rejects.toThrow(
+        'No credentials found for instance: no-creds'
+      );
     });
   });
 
@@ -414,24 +432,26 @@ describe('Provider Instance E2E Tests', () => {
     it('should route requests to correct endpoints based on instance', async () => {
       // This test verifies that different provider instances actually
       // make requests to different endpoints with different credentials
-      
+
       // Create providers from different instances
       const provider1 = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
       const provider2 = await registry.createProviderFromInstanceAndModel('openai-dev', 'gpt-4');
 
       // Make requests with both providers
-      const response1 = await provider1.createResponse([
-        { role: 'user', content: 'Hello from prod' }
-      ], []);
+      const response1 = await provider1.createResponse(
+        [{ role: 'user', content: 'Hello from prod' }],
+        []
+      );
 
-      const response2 = await provider2.createResponse([
-        { role: 'user', content: 'Hello from dev' }
-      ], []);
+      const response2 = await provider2.createResponse(
+        [{ role: 'user', content: 'Hello from dev' }],
+        []
+      );
 
       // Verify responses contain endpoint-specific information
       expect(response1.content).toContain('http://mock-openai-1.test');
       expect(response1.content).toContain('test-key-1');
-      
+
       expect(response2.content).toContain('http://mock-openai-2.test');
       expect(response2.content).toContain('test-key-2');
     });
@@ -439,12 +459,12 @@ describe('Provider Instance E2E Tests', () => {
     it('should handle authentication failures correctly', async () => {
       // Create instance with wrong credentials
       await instanceManager.saveCredential('openai-prod', { apiKey: 'wrong-key' });
-      
+
       // Reinitialize registry
       await registry.initialize();
-      
+
       const provider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
-      
+
       // This should fail with authentication error
       await expect(
         provider.createResponse([{ role: 'user', content: 'Hello' }], [])
@@ -454,47 +474,53 @@ describe('Provider Instance E2E Tests', () => {
 
   describe('Anthropic Provider Instance Integration', () => {
     it('should route Anthropic requests to custom endpoint', async () => {
-      const provider = await registry.createProviderFromInstanceAndModel('anthropic-test', 'claude-3-sonnet-20241022');
-      
+      const provider = await registry.createProviderFromInstanceAndModel(
+        'anthropic-test',
+        'claude-3-sonnet-20241022'
+      );
+
       // Mock the Anthropic provider's getAnthropicClient method to verify baseURL configuration
       const anthropicProvider = provider as any;
       const originalGetClient = anthropicProvider.getAnthropicClient.bind(anthropicProvider);
       let capturedBaseURL: string | undefined;
-      
+
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => {
         const client = originalGetClient();
         capturedBaseURL = client.baseURL;
-        
+
         // Mock the messages.create method to return a test response
         client.messages = {
           create: vi.fn().mockResolvedValue({
             id: 'msg_test',
             type: 'message',
             role: 'assistant',
-            content: [{
-              type: 'text',
-              text: `Anthropic response from ${capturedBaseURL} with key test-anthropic-key`
-            }],
+            content: [
+              {
+                type: 'text',
+                text: `Anthropic response from ${capturedBaseURL} with key test-anthropic-key`,
+              },
+            ],
             model: 'claude-3-sonnet-20241022',
             stop_reason: 'end_turn',
             stop_sequence: null,
             usage: {
               input_tokens: 10,
-              output_tokens: 20
-            }
-          })
+              output_tokens: 20,
+            },
+          }),
         };
-        
+
         return client;
       });
-      
-      const response = await provider.createResponse([
-        { role: 'user', content: 'Hello Anthropic' }
-      ], []);
+
+      const response = await provider.createResponse(
+        [{ role: 'user', content: 'Hello Anthropic' }],
+        []
+      );
 
       // Verify the provider was configured with the correct baseURL
       expect(capturedBaseURL).toBe('http://mock-anthropic.test');
-      
+
       // Verify response contains endpoint-specific information
       expect(response.content).toContain('Anthropic response from http://mock-anthropic.test');
       expect(response.content).toContain('test-anthropic-key');
@@ -503,20 +529,23 @@ describe('Provider Instance E2E Tests', () => {
     it('should handle Anthropic authentication failures', async () => {
       // Create instance with wrong credentials
       await instanceManager.saveCredential('anthropic-test', { apiKey: 'wrong-anthropic-key' });
-      
+
       // Reinitialize registry
       await registry.initialize();
-      
-      const provider = await registry.createProviderFromInstanceAndModel('anthropic-test', 'claude-3-sonnet-20241022');
-      
+
+      const provider = await registry.createProviderFromInstanceAndModel(
+        'anthropic-test',
+        'claude-3-sonnet-20241022'
+      );
+
       // Mock the Anthropic provider to simulate auth failure
       const anthropicProvider = provider as any;
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => ({
         messages: {
-          create: vi.fn().mockRejectedValue(new Error('Authentication failed: Invalid API key'))
-        }
+          create: vi.fn().mockRejectedValue(new Error('Authentication failed: Invalid API key')),
+        },
       }));
-      
+
       // This should fail with authentication error
       await expect(
         provider.createResponse([{ role: 'user', content: 'Hello' }], [])
@@ -526,8 +555,11 @@ describe('Provider Instance E2E Tests', () => {
 
   describe('Local Provider Instance Integration', () => {
     it('should configure LMStudio with custom endpoint', async () => {
-      const provider = await registry.createProviderFromInstanceAndModel('lmstudio-local', 'local-large-model');
-      
+      const provider = await registry.createProviderFromInstanceAndModel(
+        'lmstudio-local',
+        'local-large-model'
+      );
+
       // Verify provider is configured correctly
       expect(provider.providerName).toBe('lmstudio');
       // LMStudio uses WebSocket connections which are harder to test end-to-end
@@ -536,10 +568,11 @@ describe('Provider Instance E2E Tests', () => {
 
     it('should configure Ollama with custom endpoint', async () => {
       const provider = await registry.createProviderFromInstanceAndModel('ollama-local', 'llama2');
-      
-      const response = await provider.createResponse([
-        { role: 'user', content: 'Hello Ollama' }
-      ], []);
+
+      const response = await provider.createResponse(
+        [{ role: 'user', content: 'Hello Ollama' }],
+        []
+      );
 
       // Verify response contains endpoint-specific information
       expect(response.content).toContain('Ollama response from http://mock-ollama.test:11434');
@@ -549,9 +582,18 @@ describe('Provider Instance E2E Tests', () => {
   describe('Cross-Provider Instance Testing', () => {
     it('should handle multiple different provider types simultaneously', async () => {
       // Create providers from different provider types
-      const openaiProvider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
-      const anthropicProvider = await registry.createProviderFromInstanceAndModel('anthropic-test', 'claude-3-sonnet-20241022');
-      const ollamaProvider = await registry.createProviderFromInstanceAndModel('ollama-local', 'llama2');
+      const openaiProvider = await registry.createProviderFromInstanceAndModel(
+        'openai-prod',
+        'gpt-4'
+      );
+      const anthropicProvider = await registry.createProviderFromInstanceAndModel(
+        'anthropic-test',
+        'claude-3-sonnet-20241022'
+      );
+      const ollamaProvider = await registry.createProviderFromInstanceAndModel(
+        'ollama-local',
+        'llama2'
+      );
 
       // Mock the Anthropic provider to avoid MSW/AbortSignal issues
       const anthropicProviderAny = anthropicProvider as any;
@@ -563,18 +605,20 @@ describe('Provider Instance E2E Tests', () => {
             id: 'msg_test',
             type: 'message',
             role: 'assistant',
-            content: [{
-              type: 'text',
-              text: 'Anthropic response from http://mock-anthropic.test with key test-anthropic-key'
-            }],
+            content: [
+              {
+                type: 'text',
+                text: 'Anthropic response from http://mock-anthropic.test with key test-anthropic-key',
+              },
+            ],
             model: 'claude-3-sonnet-20241022',
             stop_reason: 'end_turn',
             stop_sequence: null,
             usage: {
               input_tokens: 10,
-              output_tokens: 20
-            }
-          })
+              output_tokens: 20,
+            },
+          }),
         };
         return client;
       });
@@ -583,13 +627,17 @@ describe('Provider Instance E2E Tests', () => {
       const [openaiResponse, anthropicResponse, ollamaResponse] = await Promise.all([
         openaiProvider.createResponse([{ role: 'user', content: 'Hello OpenAI' }], []),
         anthropicProvider.createResponse([{ role: 'user', content: 'Hello Anthropic' }], []),
-        ollamaProvider.createResponse([{ role: 'user', content: 'Hello Ollama' }], [])
+        ollamaProvider.createResponse([{ role: 'user', content: 'Hello Ollama' }], []),
       ]);
 
       // Verify each provider used the correct endpoint
       expect(openaiResponse.content).toContain('OpenAI response from http://mock-openai-1.test');
-      expect(anthropicResponse.content).toContain('Anthropic response from http://mock-anthropic.test');
-      expect(ollamaResponse.content).toContain('Ollama response from http://mock-ollama.test:11434');
+      expect(anthropicResponse.content).toContain(
+        'Anthropic response from http://mock-anthropic.test'
+      );
+      expect(ollamaResponse.content).toContain(
+        'Ollama response from http://mock-ollama.test:11434'
+      );
     });
 
     it('should validate models exist in respective catalogs', async () => {
@@ -609,13 +657,13 @@ describe('Provider Instance E2E Tests', () => {
       it('should handle connection timeouts gracefully', async () => {
         // Use a simple mock approach instead of real network timeouts to make tests faster
         const provider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
-        
+
         // Mock the OpenAI provider to simulate connection timeout
         const openaiProvider = provider as any;
-        openaiProvider.createResponse = vi.fn().mockRejectedValue(
-          new Error('Connection timeout: fetch failed')
-        );
-        
+        openaiProvider.createResponse = vi
+          .fn()
+          .mockRejectedValue(new Error('Connection timeout: fetch failed'));
+
         await expect(
           provider.createResponse([{ role: 'user', content: 'Hello' }], [])
         ).rejects.toThrow(/timeout|fetch failed/i);
@@ -628,10 +676,10 @@ describe('Provider Instance E2E Tests', () => {
             'dns-fail-test': {
               displayName: 'DNS Fail Test',
               catalogProviderId: 'openai',
-              endpoint: 'http://definitely-not-a-real-domain-12345.example', 
+              endpoint: 'http://definitely-not-a-real-domain-12345.example',
               timeout: 2000, // Shorter timeout for faster test
-            }
-          }
+            },
+          },
         };
 
         const configPath = path.join(tempDir, 'provider-instances.json');
@@ -639,8 +687,11 @@ describe('Provider Instance E2E Tests', () => {
         await instanceManager.saveCredential('dns-fail-test', { apiKey: 'test-key' });
         await registry.initialize();
 
-        const provider = await registry.createProviderFromInstanceAndModel('dns-fail-test', 'gpt-4');
-        
+        const provider = await registry.createProviderFromInstanceAndModel(
+          'dns-fail-test',
+          'gpt-4'
+        );
+
         await expect(
           provider.createResponse([{ role: 'user', content: 'Hello' }], [])
         ).rejects.toThrow(/getaddrinfo ENOTFOUND|fetch failed|Connection error/i);
@@ -651,14 +702,14 @@ describe('Provider Instance E2E Tests', () => {
       it('should handle authentication failures with mock', async () => {
         // Use the existing OpenAI mock approach to avoid MSW conflicts
         const provider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
-        
+
         // Mock the OpenAI provider to simulate authentication failure
         const openaiProvider = provider as any;
         const originalCreateResponse = openaiProvider.createResponse.bind(openaiProvider);
-        openaiProvider.createResponse = vi.fn().mockRejectedValue(
-          new Error('Authentication failed: Invalid API key')
-        );
-        
+        openaiProvider.createResponse = vi
+          .fn()
+          .mockRejectedValue(new Error('Authentication failed: Invalid API key'));
+
         await expect(
           provider.createResponse([{ role: 'user', content: 'Hello' }], [])
         ).rejects.toThrow(/Authentication failed: Invalid API key/i);
@@ -676,8 +727,8 @@ describe('Provider Instance E2E Tests', () => {
               catalogProviderId: 'openai',
               endpoint: 'http://invalid-domain-does-not-exist.test',
               timeout: 2000, // Short timeout for faster test
-            }
-          }
+            },
+          },
         };
 
         const configPath = path.join(tempDir, 'provider-instances.json');
@@ -685,8 +736,11 @@ describe('Provider Instance E2E Tests', () => {
         await instanceManager.saveCredential('invalid-url-test', { apiKey: 'test-key' });
         await registry.initialize();
 
-        const provider = await registry.createProviderFromInstanceAndModel('invalid-url-test', 'gpt-4');
-        
+        const provider = await registry.createProviderFromInstanceAndModel(
+          'invalid-url-test',
+          'gpt-4'
+        );
+
         await expect(
           provider.createResponse([{ role: 'user', content: 'Hello' }], [])
         ).rejects.toThrow(/fetch failed|ENOTFOUND|Connection error/i);
@@ -701,8 +755,8 @@ describe('Provider Instance E2E Tests', () => {
               catalogProviderId: 'non-existent-provider',
               endpoint: 'http://test.example',
               timeout: 5000,
-            }
-          }
+            },
+          },
         };
 
         const configPath = path.join(tempDir, 'provider-instances.json');
@@ -720,7 +774,7 @@ describe('Provider Instance E2E Tests', () => {
   describe.skip('Real Agent Integration', () => {
     // TODO: These tests require updating Session.spawnAgent to support provider instances
     // Will be implemented after fixing the spawnAgent method
-    
+
     it('should spawn agent with provider instance via API', async () => {
       // Test the full flow: UI selection -> API -> Agent creation -> Provider usage
     });

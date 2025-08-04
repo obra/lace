@@ -2,10 +2,13 @@
 // ABOUTME: Verifies Session.create() accepts providerInstanceId and modelId, inheritance, and edge cases
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Session } from './session';
+import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('Session with Provider Instances', () => {
   let testProject: Project;
@@ -16,23 +19,28 @@ describe('Session with Provider Instances', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Set up environment for providers
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.OPENAI_API_KEY = 'test-key';
-    
+
     // Set up real provider instances for tests
     testProviderInstances = await setupTestProviderInstances();
-    
+
     // Create a test project for all tests
-    testProject = Project.create('Test Project', '/test/path', 'Test project for provider instance tests', {});
+    testProject = Project.create(
+      'Test Project',
+      '/test/path',
+      'Test project for provider instance tests',
+      {}
+    );
   });
 
   afterEach(async () => {
     // Clean up provider instances
     await cleanupTestProviderInstances([
       testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId
+      testProviderInstances.openaiInstanceId,
     ]);
     teardownTestPersistence();
   });
@@ -43,15 +51,17 @@ describe('Session with Provider Instances', () => {
         name: 'Test Session',
         providerInstanceId: testProviderInstances.anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       expect(session).toBeDefined();
       expect(session.getId()).toBeDefined();
-      
+
       // Verify that the session was created with the correct provider instance configuration
       const sessionData = session.getSessionData();
-      expect(sessionData?.configuration?.providerInstanceId).toBe(testProviderInstances.anthropicInstanceId);
+      expect(sessionData?.configuration?.providerInstanceId).toBe(
+        testProviderInstances.anthropicInstanceId
+      );
       expect(sessionData?.configuration?.modelId).toBe('claude-3-5-haiku-20241022');
     });
 
@@ -60,14 +70,16 @@ describe('Session with Provider Instances', () => {
         name: 'OpenAI Session',
         providerInstanceId: testProviderInstances.openaiInstanceId,
         modelId: 'gpt-4o',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       expect(session).toBeDefined();
-      
+
       // Verify session configuration
       const sessionData = session.getSessionData();
-      expect(sessionData?.configuration?.providerInstanceId).toBe(testProviderInstances.openaiInstanceId);
+      expect(sessionData?.configuration?.providerInstanceId).toBe(
+        testProviderInstances.openaiInstanceId
+      );
       expect(sessionData?.configuration?.modelId).toBe('gpt-4o');
     });
 
@@ -78,13 +90,15 @@ describe('Session with Provider Instances', () => {
         name: 'Test Session',
         providerInstanceId: testProviderInstances.anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
-      
+
       expect(session).toBeDefined();
       // Configuration should be stored even if resolution falls back
       const sessionData = session.getSessionData();
-      expect(sessionData?.configuration?.providerInstanceId).toBe(testProviderInstances.anthropicInstanceId);
+      expect(sessionData?.configuration?.providerInstanceId).toBe(
+        testProviderInstances.anthropicInstanceId
+      );
       expect(sessionData?.configuration?.modelId).toBe('claude-3-5-haiku-20241022');
     });
 
@@ -93,7 +107,7 @@ describe('Session with Provider Instances', () => {
         Session.create({
           name: 'No Project Session',
           providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022'
+          modelId: 'claude-3-5-haiku-20241022',
           // Missing projectId
         } as any);
       }).toThrow();
@@ -106,7 +120,7 @@ describe('Session with Provider Instances', () => {
         name: 'Anthropic Session',
         providerInstanceId: testProviderInstances.anthropicInstanceId,
         modelId: 'claude-3-5-sonnet-20241022',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       const info = session.getInfo();
@@ -123,14 +137,16 @@ describe('Session with Provider Instances', () => {
         name: 'OpenAI Session',
         providerInstanceId: testProviderInstances.openaiInstanceId,
         modelId: 'gpt-4o-mini',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       // Verify configuration is stored correctly even if resolution falls back to anthropic
       const sessionData = session.getSessionData();
-      expect(sessionData?.configuration?.providerInstanceId).toBe(testProviderInstances.openaiInstanceId);
+      expect(sessionData?.configuration?.providerInstanceId).toBe(
+        testProviderInstances.openaiInstanceId
+      );
       expect(sessionData?.configuration?.modelId).toBe('gpt-4o-mini');
-      
+
       // Note: During transition period, provider resolution falls back to 'anthropic'
       // This will be fixed when full provider instance resolution is implemented
       const info = session.getInfo();
@@ -145,12 +161,12 @@ describe('Session with Provider Instances', () => {
         name: 'Test Session',
         providerInstanceId: testProviderInstances.anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       const agents = session.getAgents();
       expect(agents).toHaveLength(1);
-      
+
       const coordinatorAgent = agents[0];
       expect(coordinatorAgent?.provider).toBe('anthropic');
       expect(coordinatorAgent?.model).toBe('claude-3-5-haiku-20241022');
@@ -161,12 +177,14 @@ describe('Session with Provider Instances', () => {
         name: 'Configuration Test',
         providerInstanceId: testProviderInstances.openaiInstanceId,
         modelId: 'gpt-4o',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       const sessionData = session.getSessionData();
       expect(sessionData).toBeDefined();
-      expect(sessionData?.configuration?.providerInstanceId).toBe(testProviderInstances.openaiInstanceId);
+      expect(sessionData?.configuration?.providerInstanceId).toBe(
+        testProviderInstances.openaiInstanceId
+      );
       expect(sessionData?.configuration?.modelId).toBe('gpt-4o');
     });
   });
@@ -180,12 +198,14 @@ describe('Session with Provider Instances', () => {
         projectId: testProject.getId(),
         configuration: {
           temperature: 0.8,
-          customSetting: 'test-value'
-        }
+          customSetting: 'test-value',
+        },
       });
 
       const sessionData = session.getSessionData();
-      expect(sessionData?.configuration?.providerInstanceId).toBe(testProviderInstances.anthropicInstanceId);
+      expect(sessionData?.configuration?.providerInstanceId).toBe(
+        testProviderInstances.anthropicInstanceId
+      );
       expect(sessionData?.configuration?.modelId).toBe('claude-3-5-haiku-20241022');
       expect(sessionData?.configuration?.temperature).toBe(0.8);
       expect(sessionData?.configuration?.customSetting).toBe('test-value');
@@ -195,7 +215,7 @@ describe('Session with Provider Instances', () => {
       const session = Session.create({
         providerInstanceId: testProviderInstances.anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
-        projectId: testProject.getId()
+        projectId: testProject.getId(),
       });
 
       const info = session.getInfo();

@@ -68,10 +68,15 @@ export class ProviderInstanceManager {
     await fs.promises.writeFile(credPath, JSON.stringify(credential, null, 2), { mode: 0o600 });
   }
 
-  async updateInstance(instanceId: string, updates: Partial<Omit<import('~/providers/catalog/types').ProviderInstance, 'catalogProviderId'>>): Promise<void> {
+  async updateInstance(
+    instanceId: string,
+    updates: Partial<
+      Omit<import('~/providers/catalog/types').ProviderInstance, 'catalogProviderId'>
+    >
+  ): Promise<void> {
     const config = await this.loadInstances();
     const existing = config.instances[instanceId];
-    
+
     if (!existing) {
       throw new Error(`Instance not found: ${instanceId}`);
     }

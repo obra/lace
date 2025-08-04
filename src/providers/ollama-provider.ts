@@ -42,11 +42,14 @@ export class OllamaProvider extends AIProvider {
 
   constructor(config: OllamaProviderConfig = {}) {
     super(config);
-    // Support custom host for Ollama instances  
+    // Support custom host for Ollama instances
     // Prefer config.host over config.baseURL, but accept either
     const configHost = config.host || (config.baseURL as string | undefined);
     this._host = configHost || 'http://localhost:11434';
-    logger.info('Using Ollama host', { host: this._host, source: configHost ? 'config' : 'default' });
+    logger.info('Using Ollama host', {
+      host: this._host,
+      source: configHost ? 'config' : 'default',
+    });
     this._ollama = new Ollama({ host: this._host });
   }
 

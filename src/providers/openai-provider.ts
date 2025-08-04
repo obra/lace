@@ -45,10 +45,13 @@ export class OpenAIProvider extends AIProvider {
       const configBaseURL = config.baseURL as string | undefined;
       const envBaseURL = getEnvVar('OPENAI_BASE_URL');
       const baseURL = configBaseURL || envBaseURL;
-      
+
       if (baseURL) {
         openaiConfig.baseURL = baseURL;
-        logger.info('Using custom OpenAI base URL', { baseURL, source: configBaseURL ? 'config' : 'env' });
+        logger.info('Using custom OpenAI base URL', {
+          baseURL,
+          source: configBaseURL ? 'config' : 'env',
+        });
       }
 
       this._openai = new OpenAI(openaiConfig);

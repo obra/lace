@@ -8,7 +8,10 @@ import { Project } from '~/projects/project';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '~/threads/types';
 
@@ -25,10 +28,13 @@ describe('Agent Session Context', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    
+
     // Create test provider instances
     testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    createdInstanceIds = [
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ];
 
     // Create real project
     project = Project.create(

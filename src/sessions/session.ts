@@ -79,11 +79,11 @@ export class Session {
     configuration?: Record<string, unknown>;
   }): Session {
     const name = options.name || Session.generateSessionName();
-    
+
     // Handle backward compatibility for old provider strings
     let providerInstanceId: string;
     let modelId: string;
-    
+
     if (options.providerInstanceId && options.modelId) {
       // New interface
       providerInstanceId = options.providerInstanceId;
@@ -99,7 +99,7 @@ export class Session {
       providerInstanceId = 'fallback-anthropic';
       modelId = 'claude-3-5-haiku-20241022';
     }
-    
+
     // Store provider instance configuration for lazy resolution
     // We'll resolve the actual provider instance when needed
 
@@ -112,10 +112,10 @@ export class Session {
       projectId: options.projectId,
       name,
       description: options.description || '',
-      configuration: { 
+      configuration: {
         providerInstanceId,
         modelId,
-        ...options.configuration 
+        ...options.configuration,
       },
       status: 'active' as const,
       createdAt: new Date(),
@@ -136,7 +136,7 @@ export class Session {
 
     // Resolve provider instance lazily for the session agent
     const { providerInstance, provider, model } = Session.resolveProviderInstance(
-      providerInstanceId, 
+      providerInstanceId,
       modelId
     );
 
@@ -532,33 +532,32 @@ export class Session {
     };
   }
 
-  spawnAgent(config: {
-    name?: string;
-    providerInstanceId?: string;
-    modelId?: string;
-  }): Agent {
+  spawnAgent(config: { name?: string; providerInstanceId?: string; modelId?: string }): Agent {
     const agentName = config.name?.trim() || 'Lace';
-    
+
     // If no provider instance specified, inherit from session
     let targetProviderInstanceId = config.providerInstanceId;
     let targetModelId = config.modelId;
-    
+
     if (!targetProviderInstanceId || !targetModelId) {
       // Get session's provider instance configuration
       const sessionData = this.getSessionData();
       const sessionConfig = sessionData?.configuration || {};
-      
-      targetProviderInstanceId = targetProviderInstanceId || (sessionConfig.providerInstanceId as string);
+
+      targetProviderInstanceId =
+        targetProviderInstanceId || (sessionConfig.providerInstanceId as string);
       targetModelId = targetModelId || (sessionConfig.modelId as string);
-      
+
       if (!targetProviderInstanceId || !targetModelId) {
-        throw new Error('No provider instance configuration available - specify providerInstanceId and modelId or ensure session has provider instance configuration');
+        throw new Error(
+          'No provider instance configuration available - specify providerInstanceId and modelId or ensure session has provider instance configuration'
+        );
       }
     }
 
     // Resolve provider instance lazily
     const { providerInstance, provider, model } = Session.resolveProviderInstance(
-      targetProviderInstanceId, 
+      targetProviderInstanceId,
       targetModelId
     );
 
@@ -762,13 +761,16 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private static _providerCache = new Map<string, any>();
 
-  static resolveProviderInstance(providerInstanceId: string, modelId: string): {
+  static resolveProviderInstance(
+    providerInstanceId: string,
+    modelId: string
+  ): {
     providerInstance: any;
     provider: string;
     model: string;
   } {
     const cacheKey = `${providerInstanceId}:${modelId}`;
-    
+
     // Check cache first
     const cached = Session._providerCache.get(cacheKey);
     if (cached) {
@@ -778,7 +780,7 @@ Use your task_add_note tool to record important notes as you work and your task_
     // For now, fall back to old provider system for session creation
     // TODO: Implement proper provider instance resolution once we have synchronous access
     // This is a temporary bridge while we transition from old to new provider system
-    
+
     // Default to anthropic for now - this will be properly resolved later
     const provider = 'anthropic';
     const model = modelId; // Use the exact model requested
@@ -788,10 +790,10 @@ Use your task_add_note tool to record important notes as you work and your task_
     const providerInstance = providerRegistry.createProvider(provider, { model });
 
     const result = { providerInstance, provider, model };
-    
+
     // Cache the result
     Session._providerCache.set(cacheKey, result);
-    
+
     return result;
   }
 

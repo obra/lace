@@ -4,11 +4,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
-import { 
-  CatalogProvider, 
-  CatalogProviderSchema, 
-  CatalogModel, 
-  CatalogModelSchema 
+import {
+  CatalogProvider,
+  CatalogProviderSchema,
+  CatalogModel,
+  CatalogModelSchema,
 } from '~/providers/catalog/types';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { logger } from '~/utils/logger';
@@ -68,7 +68,7 @@ export class CustomProviderCatalogManager {
       default_large_model_id: catalogData.default_large_model_id || '',
       default_small_model_id: catalogData.default_small_model_id || '',
       models: catalogData.models || [],
-      ...catalogData
+      ...catalogData,
     };
 
     // Validate the complete catalog
@@ -79,12 +79,12 @@ export class CustomProviderCatalogManager {
 
     // Save to filesystem
     await this.saveCatalog(catalog);
-    
-    logger.info('Created custom provider catalog', { 
-      catalogId: catalog.id, 
+
+    logger.info('Created custom provider catalog', {
+      catalogId: catalog.id,
       name: catalog.name,
       type: catalog.type,
-      modelCount: catalog.models.length 
+      modelCount: catalog.models.length,
     });
 
     return catalog;
@@ -93,7 +93,10 @@ export class CustomProviderCatalogManager {
   /**
    * Update an existing custom catalog
    */
-  async updateCatalog(catalogId: string, updates: Partial<CatalogProvider>): Promise<CatalogProvider> {
+  async updateCatalog(
+    catalogId: string,
+    updates: Partial<CatalogProvider>
+  ): Promise<CatalogProvider> {
     const existing = this.catalogManager.getProvider(catalogId);
     if (!existing) {
       throw new Error(`Catalog with ID '${catalogId}' not found`);
@@ -102,7 +105,9 @@ export class CustomProviderCatalogManager {
     // Check if this is a user catalog (can be modified)
     const isUserCatalog = await this.isUserCatalog(catalogId);
     if (!isUserCatalog) {
-      throw new Error(`Cannot modify built-in catalog '${catalogId}'. Create a custom catalog instead.`);
+      throw new Error(
+        `Cannot modify built-in catalog '${catalogId}'. Create a custom catalog instead.`
+      );
     }
 
     // Create backup before updating
@@ -124,9 +129,9 @@ export class CustomProviderCatalogManager {
     // Save updated catalog
     await this.saveCatalog(updated);
 
-    logger.info('Updated custom provider catalog', { 
+    logger.info('Updated custom provider catalog', {
       catalogId: updated.id,
-      changes: Object.keys(updates) 
+      changes: Object.keys(updates),
     });
 
     return updated;
@@ -170,7 +175,7 @@ export class CustomProviderCatalogManager {
     }
 
     // Check if model already exists
-    const existingModel = catalog.models.find(m => m.id === model.id);
+    const existingModel = catalog.models.find((m) => m.id === model.id);
     if (existingModel) {
       throw new Error(`Model with ID '${model.id}' already exists in catalog '${catalogId}'`);
     }
@@ -181,7 +186,7 @@ export class CustomProviderCatalogManager {
     // Add model to catalog
     const updatedCatalog = {
       ...catalog,
-      models: [...catalog.models, validatedModel]
+      models: [...catalog.models, validatedModel],
     };
 
     return this.updateCatalog(catalogId, updatedCatalog);
@@ -190,13 +195,17 @@ export class CustomProviderCatalogManager {
   /**
    * Update a model in an existing catalog
    */
-  async updateModel(catalogId: string, modelId: string, updates: Partial<CatalogModel>): Promise<CatalogProvider> {
+  async updateModel(
+    catalogId: string,
+    modelId: string,
+    updates: Partial<CatalogModel>
+  ): Promise<CatalogProvider> {
     const catalog = this.catalogManager.getProvider(catalogId);
     if (!catalog) {
       throw new Error(`Catalog with ID '${catalogId}' not found`);
     }
 
-    const modelIndex = catalog.models.findIndex(m => m.id === modelId);
+    const modelIndex = catalog.models.findIndex((m) => m.id === modelId);
     if (modelIndex === -1) {
       throw new Error(`Model with ID '${modelId}' not found in catalog '${catalogId}'`);
     }
@@ -214,7 +223,7 @@ export class CustomProviderCatalogManager {
 
     const updatedCatalog = {
       ...catalog,
-      models: updatedModels
+      models: updatedModels,
     };
 
     return this.updateCatalog(catalogId, updatedCatalog);
@@ -229,7 +238,7 @@ export class CustomProviderCatalogManager {
       throw new Error(`Catalog with ID '${catalogId}' not found`);
     }
 
-    const modelExists = catalog.models.some(m => m.id === modelId);
+    const modelExists = catalog.models.some((m) => m.id === modelId);
     if (!modelExists) {
       throw new Error(`Model with ID '${modelId}' not found in catalog '${catalogId}'`);
     }
@@ -241,7 +250,7 @@ export class CustomProviderCatalogManager {
 
     const updatedCatalog = {
       ...catalog,
-      models: catalog.models.filter(m => m.id !== modelId)
+      models: catalog.models.filter((m) => m.id !== modelId),
     };
 
     return this.updateCatalog(catalogId, updatedCatalog);
@@ -269,16 +278,22 @@ export class CustomProviderCatalogManager {
     }
 
     // Check default models exist
-    if (catalog.default_large_model_id && !catalog.models.some(m => m.id === catalog.default_large_model_id)) {
+    if (
+      catalog.default_large_model_id &&
+      !catalog.models.some((m) => m.id === catalog.default_large_model_id)
+    ) {
       errors.push(`Default large model '${catalog.default_large_model_id}' not found in models`);
     }
 
-    if (catalog.default_small_model_id && !catalog.models.some(m => m.id === catalog.default_small_model_id)) {
+    if (
+      catalog.default_small_model_id &&
+      !catalog.models.some((m) => m.id === catalog.default_small_model_id)
+    ) {
       errors.push(`Default small model '${catalog.default_small_model_id}' not found in models`);
     }
 
     // Check for duplicate model IDs
-    const modelIds = catalog.models.map(m => m.id);
+    const modelIds = catalog.models.map((m) => m.id);
     const duplicateIds = modelIds.filter((id, index) => modelIds.indexOf(id) !== index);
     if (duplicateIds.length > 0) {
       errors.push(`Duplicate model IDs found: ${duplicateIds.join(', ')}`);
@@ -297,20 +312,23 @@ export class CustomProviderCatalogManager {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
   /**
    * Import a catalog from JSON
    */
-  async importCatalog(catalogJson: string, options: { overwrite?: boolean } = {}): Promise<CatalogImportResult> {
+  async importCatalog(
+    catalogJson: string,
+    options: { overwrite?: boolean } = {}
+  ): Promise<CatalogImportResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     try {
       const catalogData = JSON.parse(catalogJson);
-      
+
       // Validate structure
       const validation = await this.validateCatalog(catalogData);
       errors.push(...validation.errors);
@@ -320,7 +338,9 @@ export class CustomProviderCatalogManager {
         // Check if catalog exists
         const exists = this.catalogManager.getProvider(catalogData.id);
         if (exists && !options.overwrite) {
-          errors.push(`Catalog '${catalogData.id}' already exists. Use overwrite option to replace it.`);
+          errors.push(
+            `Catalog '${catalogData.id}' already exists. Use overwrite option to replace it.`
+          );
         }
 
         if (errors.length === 0) {
@@ -335,7 +355,7 @@ export class CustomProviderCatalogManager {
             success: true,
             catalogId: catalogData.id,
             errors,
-            warnings
+            warnings,
           };
         }
       }
@@ -344,15 +364,16 @@ export class CustomProviderCatalogManager {
         success: false,
         catalogId: catalogData.id || 'unknown',
         errors,
-        warnings
+        warnings,
       };
-
     } catch (error) {
       return {
         success: false,
         catalogId: 'unknown',
-        errors: [`JSON parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
-        warnings
+        errors: [
+          `JSON parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ],
+        warnings,
       };
     }
   }
@@ -391,10 +412,10 @@ export class CustomProviderCatalogManager {
               context_window: 8192,
               default_max_tokens: 4096,
               can_reason: false,
-              supports_attachments: false
-            }
-          ]
-        }
+              supports_attachments: false,
+            },
+          ],
+        },
       },
       {
         id: 'anthropic-compatible',
@@ -413,10 +434,10 @@ export class CustomProviderCatalogManager {
               context_window: 200000,
               default_max_tokens: 8192,
               can_reason: false,
-              supports_attachments: true
-            }
-          ]
-        }
+              supports_attachments: true,
+            },
+          ],
+        },
       },
       {
         id: 'local-server',
@@ -435,19 +456,23 @@ export class CustomProviderCatalogManager {
               context_window: 4096,
               default_max_tokens: 2048,
               can_reason: false,
-              supports_attachments: false
-            }
-          ]
-        }
-      }
+              supports_attachments: false,
+            },
+          ],
+        },
+      },
     ];
   }
 
   /**
    * Create catalog from template
    */
-  async createFromTemplate(templateId: string, catalogId: string, catalogName: string): Promise<CatalogProvider> {
-    const template = this.getTemplates().find(t => t.id === templateId);
+  async createFromTemplate(
+    templateId: string,
+    catalogId: string,
+    catalogName: string
+  ): Promise<CatalogProvider> {
+    const template = this.getTemplates().find((t) => t.id === templateId);
     if (!template) {
       throw new Error(`Template with ID '${templateId}' not found`);
     }
@@ -497,9 +522,9 @@ export class CustomProviderCatalogManager {
     }
 
     const models = catalog.models;
-    const inputCosts = models.map(m => m.cost_per_1m_in);
-    const outputCosts = models.map(m => m.cost_per_1m_out);
-    const contextWindows = models.map(m => m.context_window);
+    const inputCosts = models.map((m) => m.cost_per_1m_in);
+    const outputCosts = models.map((m) => m.cost_per_1m_out);
+    const contextWindows = models.map((m) => m.context_window);
 
     return {
       modelCount: models.length,
@@ -507,8 +532,8 @@ export class CustomProviderCatalogManager {
       avgOutputCost: outputCosts.reduce((a, b) => a + b, 0) / outputCosts.length || 0,
       minContextWindow: Math.min(...contextWindows),
       maxContextWindow: Math.max(...contextWindows),
-      reasoningModels: models.filter(m => m.can_reason).length,
-      attachmentSupport: models.filter(m => m.supports_attachments).length,
+      reasoningModels: models.filter((m) => m.can_reason).length,
+      attachmentSupport: models.filter((m) => m.supports_attachments).length,
     };
   }
 
@@ -519,7 +544,7 @@ export class CustomProviderCatalogManager {
     await fs.promises.mkdir(this.userCatalogDir, { recursive: true });
     const filePath = path.join(this.userCatalogDir, `${catalog.id}.json`);
     await fs.promises.writeFile(filePath, JSON.stringify(catalog, null, 2));
-    
+
     // Update the main catalog manager cache
     await this.catalogManager.loadCatalogs();
   }
@@ -542,7 +567,7 @@ export class CustomProviderCatalogManager {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = path.join(this.backupDir, `${catalogId}-${timestamp}.json`);
     await fs.promises.writeFile(backupPath, JSON.stringify(catalog, null, 2));
-    
+
     logger.info('Created catalog backup', { catalogId, backupPath });
   }
 }

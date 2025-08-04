@@ -10,15 +10,15 @@ import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/provider
 // Load builtin provider catalogs from filesystem (server-side)
 async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
-  
+
   // Use the same pattern as prompt templates - get current module directory + data
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const catalogDir = path.join(currentDir, 'data');
-  
+
   try {
     const files = await fs.promises.readdir(catalogDir);
-    
-    for (const file of files.filter(f => f.endsWith('.json'))) {
+
+    for (const file of files.filter((f) => f.endsWith('.json'))) {
       try {
         const filePath = path.join(catalogDir, file);
         const content = await fs.promises.readFile(filePath, 'utf-8');
@@ -31,7 +31,7 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   } catch (error) {
     console.warn('Failed to read catalog directory:', error);
   }
-  
+
   return catalogs;
 }
 
