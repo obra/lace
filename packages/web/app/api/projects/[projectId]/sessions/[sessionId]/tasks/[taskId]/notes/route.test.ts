@@ -30,9 +30,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     prompt: 'Test prompt',
     status: 'pending',
     priority: 'medium',
-    assignedTo: 'user1',
-    createdBy: 'human',
-    threadId: 'session1',
+    assignedTo: 'human',
+    createdBy: asThreadId('lace_20250804_abc123'),
+    threadId: asThreadId('lace_20250804_def456'),
     notes: [],
   };
 

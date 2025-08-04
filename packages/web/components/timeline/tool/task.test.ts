@@ -10,7 +10,7 @@ import {
   faStickyNote,
   faEye,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ToolResult } from '@/lib/server/lace-imports';
+import type { ToolResult } from '@/types/core';
 import { taskRenderers } from './task';
 
 describe('Task Tool Renderers', () => {

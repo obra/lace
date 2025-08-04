@@ -14,3 +14,6 @@ export { EventApprovalCallback } from '~/tools/event-approval-callback';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
 export { ThreadManager } from '~/threads/thread-manager';
+
+// Test utilities
+export { setupTestProviderInstances, createTestProviderInstance } from '~/test-utils/provider-instances';

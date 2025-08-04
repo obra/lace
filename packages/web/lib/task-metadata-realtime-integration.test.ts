@@ -22,7 +22,7 @@ describe('Task Metadata Event Format Bug', () => {
     };
 
     const toolResult: ToolResult = {
-      content: [{ text: 'Task created successfully' }],
+      content: [{ type: 'text', text: 'Task created successfully' }],
       metadata: taskMetadata,
       isError: false,
     };
@@ -108,7 +108,7 @@ describe('Task Metadata Event Format Bug', () => {
     };
 
     const toolResult: ToolResult = {
-      content: [{ text: 'Task created successfully' }],
+      content: [{ type: 'text', text: 'Task created successfully' }],
       metadata: taskMetadata,
       isError: false,
     };

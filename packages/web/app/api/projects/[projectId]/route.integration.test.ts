@@ -21,7 +21,7 @@ vi.mock('server-only', () => ({}));
 
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
 import { parseResponse } from '@/lib/serialization';
-import { Session } from '@/lib/server/lace-imports';
+import { Session, setupTestProviderInstances } from '@/lib/server/lace-imports';
 
 // Type interfaces for API responses
 interface ProjectResponse {
@@ -48,9 +48,11 @@ interface SuccessResponse {
 
 describe('Individual Project API Integration Tests', () => {
   let testProject: import('~/projects/project').Project;
+  let testProviderInstances: { anthropicInstanceId: string; openaiInstanceId: string };
 
   beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create a test project for each test
     const { Project } = await import('~/projects/project');
@@ -82,8 +84,18 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should return project with correct session count', async () => {
       // Add some sessions to the project
-      Session.create({ name: 'Session 1', projectId: testProject.getId() });
-      Session.create({ name: 'Session 2', projectId: testProject.getId() });
+      Session.create({ 
+        name: 'Session 1', 
+        projectId: testProject.getId(),
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      });
+      Session.create({ 
+        name: 'Session 2', 
+        projectId: testProject.getId(),
+        providerInstanceId: testProviderInstances.openaiInstanceId,
+        modelId: 'gpt-4o-mini'
+      });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await GET(request, {
@@ -338,8 +350,18 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should delete project with sessions', async () => {
       // Add sessions to the project
-      Session.create({ name: 'Session 1', projectId: testProject.getId() });
-      Session.create({ name: 'Session 2', projectId: testProject.getId() });
+      Session.create({ 
+        name: 'Session 1', 
+        projectId: testProject.getId(),
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      });
+      Session.create({ 
+        name: 'Session 2', 
+        projectId: testProject.getId(),
+        providerInstanceId: testProviderInstances.openaiInstanceId,
+        modelId: 'gpt-4o-mini'
+      });
 
       const projectId = testProject.getId();
       const request = new NextRequest(`http://localhost/api/projects/${projectId}`);

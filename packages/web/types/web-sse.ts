@@ -47,79 +47,79 @@ export type SessionEvent =
   | {
       type: 'USER_MESSAGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: UserMessageEventData;
     }
   | {
       type: 'AGENT_MESSAGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: AgentMessageEventData;
     }
   | {
       type: 'TOOL_CALL';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolCallEventData;
     }
   | {
       type: 'TOOL_RESULT';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolResult;
     }
   | {
       type: 'TOOL_AGGREGATED';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolAggregatedEventData;
     }
   | {
       type: 'LOCAL_SYSTEM_MESSAGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: LocalSystemMessageEventData;
     }
   | {
       type: 'AGENT_TOKEN';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: AgentTokenData;
     }
   | {
       type: 'AGENT_STREAMING';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: AgentStreamingData;
     }
   | {
       type: 'TOOL_APPROVAL_REQUEST';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolApprovalRequestData;
     }
   | {
       type: 'SYSTEM_PROMPT';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: SystemPromptEventData;
     }
   | {
       type: 'USER_SYSTEM_PROMPT';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: UserSystemPromptEventData;
     }
   | {
       type: 'COMPACTION';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: CompactionEventData;
     }
   | {
       type: 'TOOL_APPROVAL_RESPONSE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: ToolApprovalResponseData;
     }
   | {

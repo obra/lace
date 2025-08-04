@@ -50,8 +50,8 @@ export interface CreateSessionRequest {
 
 export interface CreateAgentRequest {
   name?: string; // Made optional for default
-  provider?: string;
-  model?: string;
+  providerInstanceId: string;
+  modelId: string;
 }
 
 // API response types

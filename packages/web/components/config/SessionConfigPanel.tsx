@@ -6,8 +6,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
-import { ModelDropdown } from './ModelDropdown';
-import { ProviderDropdown } from './ProviderDropdown';
 import { ModelSelectionForm } from '@/components/providers/ModelSelectionForm';
 import type { 
   ProviderInfo, 
@@ -17,8 +15,8 @@ import type {
 import type { SessionInfo, ProjectInfo } from '@/types/core';
 
 interface SessionConfiguration {
-  provider?: string;
-  model?: string;
+  providerInstanceId?: string;
+  modelId?: string;
   maxTokens?: number;
   tools?: string[];
   toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
@@ -48,8 +46,7 @@ const AVAILABLE_TOOLS = [
 ];
 
 const DEFAULT_CONFIG: SessionConfiguration = {
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  // Note: providerInstanceId and modelId should be set by user selection, not defaults
   maxTokens: 4096,
   tools: AVAILABLE_TOOLS,
   toolPolicies: {},
@@ -82,11 +79,8 @@ export function SessionConfigPanel({
   
   // Agent creation state  
   const [newAgentName, setNewAgentName] = useState('');
-  const [useProviderInstances, setUseProviderInstances] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
-  const [agentProvider, setAgentProvider] = useState('anthropic');
-  const [agentModel, setAgentModel] = useState('claude-3-sonnet-20241022');
 
   // Environment variables helper state
   const [newEnvKey, setNewEnvKey] = useState('');
@@ -165,21 +159,18 @@ export function SessionConfigPanel({
     e.preventDefault();
     if (!newAgentName.trim() || !selectedSession) return;
 
-    // Use provider instance if selected, otherwise fall back to legacy provider/model
-    if (useProviderInstances && selectedInstanceId && selectedModelId) {
-      onAgentCreate(selectedSession.id, {
-        name: newAgentName.trim(),
-        provider: 'anthropic', // Will be resolved from instance
-        model: selectedModelId,
-        providerInstanceId: selectedInstanceId,
-      });
-    } else {
-      onAgentCreate(selectedSession.id, {
-        name: newAgentName.trim(),
-        provider: agentProvider,
-        model: agentModel,
-      });
+    // All agents now require provider instances - no fallback to legacy system
+    if (!selectedInstanceId || !selectedModelId) {
+      // Should not happen with proper UI validation
+      console.error('Cannot create agent without provider instance and model selection');
+      return;
     }
+
+    onAgentCreate(selectedSession.id, {
+      name: newAgentName.trim(),
+      providerInstanceId: selectedInstanceId,
+      modelId: selectedModelId,
+    });
 
     resetAgentForm();
     setShowCreateAgent(false);
@@ -768,64 +759,12 @@ export function SessionConfigPanel({
               </div>
 
               {/* Provider Instance Selection Toggle */}
-              <div className="form-control">
-                <label className="label cursor-pointer">
-                  <span className="label-text">Use Provider Instances</span>
-                  <input
-                    type="checkbox"
-                    checked={useProviderInstances}
-                    onChange={(e) => setUseProviderInstances(e.target.checked)}
-                    className="checkbox checkbox-primary"
-                  />
-                </label>
-                <div className="label">
-                  <span className="label-text-alt text-base-content/60">
-                    Use configured provider instances with custom credentials
-                  </span>
-                </div>
-              </div>
-
-              {useProviderInstances ? (
-                <ModelSelectionForm
-                  onSelectionChange={handleProviderInstanceSelection}
-                  selectedInstanceId={selectedInstanceId}
-                  selectedModelId={selectedModelId}
-                />
-              ) : (
-                <>
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Provider</span>
-                    </label>
-                    <select
-                      value={agentProvider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                        setAgentProvider(newProvider);
-                        setAgentModel(providerModels[0]?.id || agentModel);
-                      }}
-                      className="select select-bordered w-full"
-                    >
-                      {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
-                          {provider.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <ModelDropdown
-                      providers={providers}
-                      selectedProvider={agentProvider}
-                      selectedModel={agentModel}
-                      onChange={setAgentModel}
-                      label="Model"
-                    />
-                  </div>
-                </>
-              )}
+              <ModelSelectionForm
+                onSelectionChange={handleProviderInstanceSelection}
+                selectedInstanceId={selectedInstanceId}
+                selectedModelId={selectedModelId}
+                className="mb-4"
+              />
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -838,8 +777,7 @@ export function SessionConfigPanel({
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={!newAgentName.trim() || loading || 
-                    (useProviderInstances && (!selectedInstanceId || !selectedModelId))}
+                  disabled={!newAgentName.trim() || loading || !selectedInstanceId || !selectedModelId}
                 >
                   {loading ? (
                     <>
