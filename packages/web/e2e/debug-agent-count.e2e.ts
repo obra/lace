@@ -1,9 +1,35 @@
 // ABOUTME: Playwright test script to debug agent count display issues
-// ABOUTME: Investigates network requests and UI behavior for agent counts showing as 0
+// ABOUTME: Investigates network requests and UI behavior for agent counts using reusable utilities
 
 import { test, expect } from '@playwright/test';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  createProject,
+  type TestEnvironment
+} from './helpers/test-utils';
 
 test.describe('Agent Count Investigation', () => {
+  let testEnv: TestEnvironment;
+
+  test.beforeEach(async ({ page }) => {
+    testEnv = await setupTestEnvironment();
+    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
+
+    await page.addInitScript((tempDir) => {
+      window.testEnv = {
+        ANTHROPIC_KEY: 'test-key',
+        LACE_DB_PATH: `${tempDir}/lace.db`,
+      };
+    }, testEnv.tempDir);
+
+    await createProject(page, testEnv.projectName, testEnv.tempDir);
+  });
+
+  test.afterEach(async () => {
+    await cleanupTestEnvironment(testEnv);
+  });
+
   test('should investigate agent count API and UI display', async ({ page }) => {
     // Set up network request monitoring
     const networkRequests: Array<{
@@ -54,9 +80,7 @@ test.describe('Agent Count Investigation', () => {
       }
     });
 
-    // Navigate to the specific session URL
-    await page.goto('http://localhost:3005/#/project/historical/session/lace_20250722_zsj197');
-
+    // We're already in the created project with auto-created session and agent
     // Wait for page to load and initial API calls to complete
     await page.waitForTimeout(3000);
 
@@ -65,10 +89,10 @@ test.describe('Agent Count Investigation', () => {
     // Page title captured for debugging
 
     // Look for elements that should display agent count
-    const agentCountElements = page.locator(
-      '[data-testid*="agent"], [class*="agent"], text=/agent/i'
-    );
+    const agentCountElements = page.locator('[data-testid*="agent"], [class*="agent"]');
+    const agentTextElements = page.getByText(/agent/i);
     const _agentElementCount = await agentCountElements.count();
+    const _agentTextCount = await agentTextElements.count();
     // Agent-related elements count captured for analysis
 
     // Try to find specific session/agent information
@@ -137,20 +161,20 @@ test.describe('Agent Count Investigation', () => {
       // No console errors found
     }
 
-    // Try to find the specific session in the UI
-    const sessionElement = page.locator(`text=/lace_20250722_zsj197/i`);
-    const sessionFound = (await sessionElement.count()) > 0;
-    // Session UI analysis - element presence captured
+    // Check for agent count in the current project/session UI
+    const agentCountText = page.getByText(/\d+ agents?/);
+    const agentCountFound = (await agentCountText.count()) > 0;
+    // Agent count UI analysis - element presence captured
 
-    if (sessionFound) {
-      // Look for agent count near the session element
+    if (agentCountFound) {
+      // Look for context around agent count
       const nearbyText = await page.locator('body').textContent();
-      const sessionIndex = nearbyText?.indexOf('lace_20250722_zsj197') ?? -1;
-      if (sessionIndex !== -1) {
-        const contextStart = Math.max(0, sessionIndex - 200);
-        const contextEnd = Math.min(nearbyText?.length ?? 0, sessionIndex + 200);
+      const agentIndex = nearbyText?.search(/\d+ agents?/) ?? -1;
+      if (agentIndex !== -1) {
+        const contextStart = Math.max(0, agentIndex - 200);
+        const contextEnd = Math.min(nearbyText?.length ?? 0, agentIndex + 200);
         const _context = nearbyText?.slice(contextStart, contextEnd);
-        // Context around session captured for analysis
+        // Context around agent count captured for analysis
       }
     }
 
@@ -175,8 +199,8 @@ test.describe('Agent Count Investigation', () => {
 
     // Final summary: total network requests, relevant API requests, console errors, and agent-related UI elements captured
 
-    // This test is for investigation, so we don't need assertions
-    // Just ensure the page loaded
-    expect(currentUrl).toContain('localhost:3005');
+    // This test is for investigation, so we don't need strict assertions
+    // Just ensure the page loaded on localhost (any port)
+    expect(currentUrl).toContain('localhost');
   });
 });
