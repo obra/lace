@@ -484,6 +484,7 @@ export function ProjectSelectorPanel({
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/60">Show:</span>
                 <select
+                  data-testid="project-timeframe-filter"
                   value={timeFrame}
                   onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
                   className="select select-bordered select-sm"
@@ -1041,6 +1042,7 @@ export function ProjectSelectorPanel({
                       <span className="label-text font-medium">Default Provider</span>
                     </label>
                     <select
+                      data-testid="create-project-provider-select"
                       value={createConfig.provider}
                       onChange={(e) => {
                         const newProvider = e.target.value;
@@ -1066,6 +1068,7 @@ export function ProjectSelectorPanel({
                       <span className="label-text font-medium">Default Model</span>
                     </label>
                     <select
+                      data-testid="create-project-model-select"
                       value={createConfig.model}
                       onChange={(e) => setCreateConfig(prev => ({ ...prev, model: e.target.value }))}
                       className="select select-bordered w-full"

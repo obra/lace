@@ -32,6 +32,7 @@ export const UI_EVENT_TYPES = [
   'TOOL_APPROVAL_RESPONSE',
   'AGENT_TOKEN',
   'AGENT_STREAMING',
+  'AGENT_STATE_CHANGE',
   'COMPACTION',
 ] as const;
 
@@ -120,6 +121,16 @@ export type SessionEvent =
       threadId: ThreadId;
       timestamp: string;
       data: ToolApprovalResponseData;
+    }
+  | {
+      type: 'AGENT_STATE_CHANGE';
+      threadId: ThreadId;
+      timestamp: string;
+      data: {
+        agentId: ThreadId;
+        from: string;
+        to: string;
+      };
     };
 
 // Utility functions

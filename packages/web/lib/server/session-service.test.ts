@@ -7,6 +7,7 @@ import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { TestProvider } from '~/test-utils/test-provider';
+import type { SessionEvent } from '@/types/web-sse';
 
 describe('SessionService after getProjectForSession removal', () => {
   it('should not have getProjectForSession method', () => {
@@ -188,8 +189,8 @@ describe('SessionService approval event forwarding', () => {
 
   afterEach(async () => {
     if (agent) {
-      agent.stop();
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      agent.removeAllListeners();
+      agent.abort(); // Use abort() instead of stop() for proper cleanup
     }
     sessionService.clearActiveSessions();
     vi.restoreAllMocks();
@@ -274,5 +275,227 @@ describe('SessionService approval event forwarding', () => {
     // For now, let's skip this test since it requires complex setup coordination
     // TODO: Refactor tests to share setup properly
     expect(true).toBe(true); // Placeholder - test needs proper setup
+  });
+});
+
+describe('SessionService agent state change broadcasting', () => {
+  const tempDirContext = useTempLaceDir();
+  let sessionService: SessionService;
+  let session: Session;
+  let agent: Agent;
+  let testProject: import('@/lib/server/lace-imports').Project;
+  let broadcastSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    // Set up test environment
+    process.env.ANTHROPIC_KEY = 'test-key';
+
+    // Create a real test project using temp directory
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create(
+      'Test Project',
+      'Test project for agent state change testing',
+      tempDirContext.path,
+      {}
+    );
+
+    // Ensure project is saved (Project.create should handle this, but let's be explicit)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Instrument real EventStreamManager to capture broadcasts
+    const { EventStreamManager } = await import('@/lib/event-stream-manager');
+    const realEventStreamManager = EventStreamManager.getInstance();
+    broadcastSpy = vi.spyOn(realEventStreamManager, 'broadcast');
+
+    sessionService = getSessionService();
+
+    // Create a real session with real agent
+    const sessionData = await sessionService.createSession(
+      'Test Session',
+      'anthropic',
+      'claude-3-5-haiku-20241022',
+      testProject.getId()
+    );
+
+    session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
+    agent = session.getAgent(asThreadId(sessionData.id))!;
+  });
+
+  afterEach(async () => {
+    if (agent) {
+      agent.removeAllListeners();
+      agent.abort(); // Use abort() instead of stop() for proper cleanup
+    }
+    sessionService.clearActiveSessions();
+    vi.restoreAllMocks();
+  });
+
+  it('should broadcast AGENT_STATE_CHANGE events when agent transitions from idle to thinking', async () => {
+    // Arrange: Agent should start in idle state
+    expect(agent.status).toBe('idle');
+
+    // Clear any initial broadcasts from setup
+    broadcastSpy.mockClear();
+
+    // Act: Trigger state change by calling the agent's private transition method
+    // Since we can't easily trigger natural state transitions in tests, we'll simulate the event
+    agent.emit('state_change', { from: 'idle', to: 'thinking' });
+
+    // Wait for event processing
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Assert: Verify SessionService broadcast the state change event
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: session.getId() },
+      data: expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: agent.threadId,
+        data: {
+          agentId: agent.threadId,
+          from: 'idle',
+          to: 'thinking',
+        },
+      }) satisfies Partial<SessionEvent>,
+    });
+  });
+
+  it('should broadcast AGENT_STATE_CHANGE events when agent transitions from thinking to streaming', async () => {
+    // Arrange: Clear any initial broadcasts
+    broadcastSpy.mockClear();
+
+    // Act: Simulate thinking → streaming transition
+    agent.emit('state_change', { from: 'thinking', to: 'streaming' });
+
+    // Wait for event processing
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Assert: Verify the broadcast
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: session.getId() },
+      data: expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: agent.threadId,
+        data: {
+          agentId: agent.threadId,
+          from: 'thinking',
+          to: 'streaming',
+        },
+      }) satisfies Partial<SessionEvent>,
+    });
+  });
+
+  it('should broadcast AGENT_STATE_CHANGE events when agent transitions from streaming to tool_execution', async () => {
+    // Arrange: Clear any initial broadcasts
+    broadcastSpy.mockClear();
+
+    // Act: Simulate streaming → tool_execution transition
+    agent.emit('state_change', { from: 'streaming', to: 'tool_execution' });
+
+    // Wait for event processing  
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Assert: Verify the broadcast
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: session.getId() },
+      data: expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: agent.threadId,
+        data: {
+          agentId: agent.threadId,
+          from: 'streaming',
+          to: 'tool_execution',
+        },
+      }) satisfies Partial<SessionEvent>,
+    });
+  });
+
+  it('should broadcast AGENT_STATE_CHANGE events when agent transitions back to idle', async () => {
+    // Arrange: Clear any initial broadcasts
+    broadcastSpy.mockClear();
+
+    // Act: Simulate tool_execution → idle transition
+    agent.emit('state_change', { from: 'tool_execution', to: 'idle' });
+
+    // Wait for event processing
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Assert: Verify the broadcast
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: session.getId() },
+      data: expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: agent.threadId,
+        data: {
+          agentId: agent.threadId,
+          from: 'tool_execution',
+          to: 'idle',
+        },
+      }) satisfies Partial<SessionEvent>,
+    });
+  });
+
+  it('should include proper timestamp and thread information in state change events', async () => {
+    // Arrange: Clear any initial broadcasts
+    broadcastSpy.mockClear();
+    const beforeTime = new Date();
+
+    // Act: Trigger a state change
+    agent.emit('state_change', { from: 'idle', to: 'thinking' });
+
+    // Wait for event processing
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const afterTime = new Date();
+
+    // Assert: Verify the broadcast includes proper metadata
+    expect(broadcastSpy).toHaveBeenCalledWith({
+      eventType: 'session',
+      scope: { sessionId: session.getId() },
+      data: expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: agent.threadId,
+        timestamp: expect.any(String),
+        data: expect.objectContaining({
+          agentId: agent.threadId,
+          from: 'idle', 
+          to: 'thinking',
+        }),
+      }),
+    });
+
+    // Verify timestamp is reasonable
+    const broadcastCall = broadcastSpy.mock.calls[0][0];
+    const eventData = broadcastCall.data as SessionEvent;
+    const timestamp = new Date(eventData.timestamp);
+    expect(timestamp.getTime()).toBeGreaterThanOrEqual(beforeTime.getTime());
+    expect(timestamp.getTime()).toBeLessThanOrEqual(afterTime.getTime());
+  });
+
+  it('should only register event handlers once per agent to prevent duplicate broadcasts', async () => {
+    // Arrange: Clear any initial broadcasts
+    broadcastSpy.mockClear();
+
+    // Act: Call setupAgentEventHandlers multiple times (simulating multiple getSession calls)
+    sessionService.setupAgentEventHandlers(agent, session.getId());
+    sessionService.setupAgentEventHandlers(agent, session.getId());
+    sessionService.setupAgentEventHandlers(agent, session.getId());
+
+    // Trigger a state change
+    agent.emit('state_change', { from: 'idle', to: 'thinking' });
+
+    // Wait for event processing
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Assert: Should only see ONE broadcast despite multiple handler registrations
+    const stateChangeCalls = broadcastSpy.mock.calls.filter(
+      call => (call[0].data as SessionEvent).type === 'AGENT_STATE_CHANGE'
+    );
+    expect(stateChangeCalls).toHaveLength(1);
   });
 });

@@ -170,6 +170,16 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     timestamp: DateTimeSchema,
     data: CompactionEventDataSchema,
   }),
+  z.object({
+    type: z.literal('AGENT_STATE_CHANGE'),
+    threadId: ThreadIdSchema,
+    timestamp: DateTimeSchema,
+    data: z.object({
+      agentId: ThreadIdSchema,
+      from: z.string(),
+      to: z.string(),
+    }),
+  }),
 ]);
 
 // StreamEvent timestamp schema (for the outer StreamEvent wrapper)

@@ -29,7 +29,7 @@ import type {
   MessageResponse,
 } from '@/types/api';
 import { isApiError } from '@/types/api';
-import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
+import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
@@ -90,8 +90,30 @@ export const LaceApp = memo(function LaceApp() {
     handleApprovalResponse,
   } = useSessionEvents(selectedSession, selectedAgent, false); // Connection state will be passed to component that needs it
 
-  // Use session API hook for all API calls
-  const { sendMessage: sendMessageAPI, loading: sendingMessage } = useSessionAPI();
+  // Use session API hook for all API calls (HTTP requests only, not streaming state)
+  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
+  
+  // Handle agent state changes from event stream
+  const handleAgentStateChange = useCallback((agentId: string, from: string, to: string) => {
+    setSelectedSessionDetails(prevSession => {
+      if (!prevSession?.agents) return prevSession;
+      
+      return {
+        ...prevSession,
+        agents: prevSession.agents.map(agent => 
+          agent.threadId === agentId 
+            ? { ...agent, status: to as AgentState }
+            : agent
+        )
+      };
+    });
+  }, []);
+
+  // Get current agent's status from the updated session details
+  const currentAgent = selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent);
+  const agentBusy = currentAgent?.status === 'thinking' || 
+                   currentAgent?.status === 'streaming' || 
+                   currentAgent?.status === 'tool_execution';
 
   // Task manager - only create when we have a project and session
   const taskManager = useTaskManager(
@@ -117,6 +139,8 @@ export const LaceApp = memo(function LaceApp() {
     onToolCall: addSessionEvent,
     onToolResult: addSessionEvent,
     onSystemMessage: addSessionEvent,
+    // Agent state change handler
+    onAgentStateChange: handleAgentStateChange,
     // Approval handlers
     onApprovalRequest: handleApprovalRequest,
     onApprovalResponse: handleApprovalResponse,
@@ -272,6 +296,11 @@ export const LaceApp = memo(function LaceApp() {
     }
     return await sendMessageAPI(selectedAgent, message);
   }, [selectedAgent, sendMessageAPI]);
+
+  const stopGeneration = useCallback(async () => {
+    if (!selectedAgent) return false;
+    return await stopAgentAPI(selectedAgent);
+  }, [selectedAgent, stopAgentAPI]);
 
   // Handle tool approval decision
   const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
@@ -580,7 +609,10 @@ export const LaceApp = memo(function LaceApp() {
                   <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
                     <div className="flex items-center gap-2 mb-1">
                       <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                      <span className="font-medium text-base-content truncate">
+                      <span 
+                        data-testid="current-project-name"
+                        className="font-medium text-base-content truncate"
+                      >
                         {currentProject.name}
                       </span>
                     </div>
@@ -721,7 +753,10 @@ export const LaceApp = memo(function LaceApp() {
               <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
                 <div className="flex items-center gap-2 mb-1">
                   <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-base-content truncate">
+                  <span 
+                    data-testid="current-project-name-desktop"
+                    className="font-medium text-base-content truncate"
+                  >
                     {currentProject.name}
                   </span>
                 </div>
@@ -870,7 +905,7 @@ export const LaceApp = memo(function LaceApp() {
                 <div style={{ height: 'calc(100% - 80px)' }}>
                   <TimelineView
                     entries={timelineEntries}
-                    isTyping={sendingMessage}
+                    isTyping={agentBusy}
                     currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
                   />
                 </div>
@@ -878,7 +913,9 @@ export const LaceApp = memo(function LaceApp() {
                 {/* Chat Input */}
                 <MemoizedChatInput
                   onSubmit={sendMessage}
-                  disabled={sendingMessage}
+                  onInterrupt={stopGeneration}
+                  disabled={agentBusy}
+                  isStreaming={agentBusy}
                   placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
                 />
               </div>
@@ -972,11 +1009,15 @@ export const LaceApp = memo(function LaceApp() {
 // Memoized chat input component to prevent parent re-renders
 const MemoizedChatInput = memo(function MemoizedChatInput({ 
   onSubmit, 
-  disabled, 
+  onInterrupt,
+  disabled,
+  isStreaming,
   placeholder 
 }: { 
   onSubmit: (message: string) => Promise<boolean | void>;
+  onInterrupt?: () => Promise<boolean | void>;
   disabled: boolean;
+  isStreaming?: boolean;
   placeholder: string;
 }) {
   const [message, setMessage] = useState('');
@@ -998,8 +1039,10 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
         value={message}
         onChange={setMessage}
         onSubmit={handleSubmit}
+        onInterrupt={onInterrupt}
         disabled={disabled}
         isListening={false}
+        isStreaming={isStreaming}
         onStartVoice={() => {}}
         onStopVoice={() => {}}
         placeholder={placeholder}

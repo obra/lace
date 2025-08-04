@@ -96,7 +96,8 @@ export interface SessionEventData {
     | 'TOOL_RESULT'
     | 'TOOL_APPROVAL_REQUEST'
     | 'TOOL_APPROVAL_RESPONSE'
-    | 'LOCAL_SYSTEM_MESSAGE';
+    | 'LOCAL_SYSTEM_MESSAGE'
+    | 'AGENT_STATE_CHANGE';
   threadId: ThreadId;
   timestamp: string; // ISO string - CONSISTENT with all other events
   data: unknown; // Legacy - specific to session system

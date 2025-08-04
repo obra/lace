@@ -186,25 +186,49 @@ export class SessionService {
       }
     );
 
-    // Listen for state changes
-    agent.on('state_change', ({ from: _from, to: _to }: { from: string; to: string }) => {
-      // State change logging can be enabled for debugging if needed
-    });
-
-    // Listen for any errors
-    agent.on('error', ({ error }: { error: Error }) => {
-      logger.error(`Agent ${threadId} error:`, error);
+    // Listen for state changes and broadcast to UI
+    agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
+      // Broadcast agent state change to UI via SSE
       const event: SessionEvent = {
-        type: 'LOCAL_SYSTEM_MESSAGE',
+        type: 'AGENT_STATE_CHANGE',
         threadId,
         timestamp: new Date().toISOString(),
-        data: { content: `Agent error: ${error.message}` },
+        data: {
+          agentId: threadId,
+          from,
+          to,
+        },
       };
       sseManager.broadcast({
         eventType: 'session',
         scope: { sessionId },
         data: event,
       });
+    });
+
+    // Listen for any errors
+    agent.on('error', ({ error }: { error: Error }) => {
+      logger.error(`Agent ${threadId} error:`, error);
+      
+      // Filter out abort-related errors from UI messages to prevent duplicates
+      // (These should already be filtered at the agent level, but this is defense-in-depth)
+      const isAbortError = error.name === 'AbortError' || 
+                          error.message === 'Request was aborted' ||
+                          error.message === 'Aborted';
+      
+      if (!isAbortError) {
+        const event: SessionEvent = {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId,
+          timestamp: new Date().toISOString(),
+          data: { content: `Agent error: ${error.message}` },
+        };
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
+      }
     });
 
     // Listen for conversation complete
