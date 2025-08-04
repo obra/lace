@@ -25,7 +25,6 @@ vi.mock('~/utils/logger', () => ({
 
 import { SessionService } from './session-service';
 import { asThreadId } from '@/types/core';
-import { EventStreamManager } from '@/lib/event-stream-manager';
 import { logger } from '~/utils/logger';
 import type { Agent } from '@/lib/server/lace-imports';
 

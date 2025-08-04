@@ -125,7 +125,7 @@ const renderWithProviders = (component: React.ReactElement) => {
 
 // Helper to render with proper act() wrapping to avoid warnings
 const renderWithProvidersAsync = async (component: React.ReactElement) => {
-  let result: any;
+  let result: ReturnType<typeof renderWithProviders>;
   await act(async () => {
     result = renderWithProviders(component);
     await new Promise(resolve => setTimeout(resolve, 10));
