@@ -4,7 +4,6 @@
 import { NextResponse } from 'next/server';
 import { ProviderRegistry, ProviderCatalogManager } from '@/lib/server/lace-imports';
 import type { ProviderInfo, ModelInfo } from '@/types/core';
-import type { CatalogProvider, ProviderInstance } from '~/providers/catalog/types';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 
@@ -54,8 +53,8 @@ export async function GET(): Promise<NextResponse> {
         name: catalogProvider.name,
         displayName: instance.displayName, // Use instance display name, not catalog name
         type: catalogProvider.type,
-        requiresApiKey: catalogProvider.requiresApiKey || false,
-        configurationHint: catalogProvider.configurationHint,
+        requiresApiKey: Boolean(catalogProvider.requiresApiKey),
+        configurationHint: catalogProvider.configurationHint as string | undefined,
         models,
         configured: true, // All returned providers are configured by definition
         instanceId: instance.id,

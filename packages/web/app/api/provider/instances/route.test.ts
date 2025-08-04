@@ -135,8 +135,8 @@ describe('Provider Instances API', () => {
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(2);
       
-      const withCreds = data.instances.find((i: any) => i.id === 'with-creds');
-      const withoutCreds = data.instances.find((i: any) => i.id === 'without-creds');
+      const withCreds = data.instances.find((i: { id: string }) => i.id === 'with-creds');
+      const withoutCreds = data.instances.find((i: { id: string }) => i.id === 'without-creds');
       
       expect(withCreds).toMatchObject({
         id: 'with-creds',

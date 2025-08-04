@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/Badge';
 import StatusDot from '@/components/ui/StatusDot';
 import { parseResponse } from '@/lib/serialization';
@@ -59,7 +59,7 @@ export function ModelSelectionForm({
     } else {
       setAvailableModels([]);
     }
-  }, [selectedInstanceId, instances]);
+  }, [selectedInstanceId, instances, loadModelsForInstance]);
 
   const loadInstances = async () => {
     try {
@@ -82,7 +82,7 @@ export function ModelSelectionForm({
     }
   };
 
-  const loadModelsForInstance = async (instanceId: string) => {
+  const loadModelsForInstance = useCallback(async (instanceId: string) => {
     try {
       setModelsLoading(true);
       setError(null);
@@ -106,7 +106,7 @@ export function ModelSelectionForm({
     } finally {
       setModelsLoading(false);
     }
-  };
+  }, [instances]);
 
   const handleInstanceChange = (instanceId: string) => {
     setAvailableModels([]);
