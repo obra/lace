@@ -31,8 +31,10 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 ### Technology Stack
 
 - **Frontend**: Next.js 15, React 19, TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS with DaisyUI component library
 - **Real-time**: Server-Sent Events (SSE)
+- **Markdown**: react-markdown with remark-gfm and rehype-highlight
+- **Security**: DOMPurify for content sanitization
 - **Backend Integration**: Direct use of Lace Agent class
 - **State Management**: Event sourcing with SSE updates
 - **Testing**: Vitest with React Testing Library
@@ -50,21 +52,31 @@ packages/web/
 │   ├── page.tsx           # Main UI page
 │   └── layout.tsx         # Root layout
 ├── components/            # React components
+│   ├── timeline/          # Timeline event renderers
+│   │   ├── SystemPromptEntry.tsx
+│   │   ├── UserSystemPromptEntry.tsx
+│   │   ├── UnknownEventEntry.tsx
+│   │   └── TimelineMessage.tsx
+│   ├── ui/               # Reusable UI components
+│   │   └── MarkdownRenderer.tsx
 │   ├── AgentSpawner.tsx  # Dynamic agent creation
 │   ├── ConversationDisplay.tsx
 │   └── ToolApprovalModal.tsx
 ├── hooks/                 # Custom React hooks
 │   ├── useSSEStream.ts   # SSE connection management
-│   └── useSessionAPI.ts  # API client hooks
-├── lib/                   # Server-side utilities
+│   ├── useSessionAPI.ts  # API client hooks
+│   └── useFoldableContent.ts # Content folding logic
+├── lib/                   # Utilities
 │   ├── server/           # Server-only code
 │   │   ├── session-service.ts
 │   │   ├── approval-manager.ts
 │   │   └── lace-imports.ts
-│   └── sse-manager.ts    # SSE broadcasting
+│   ├── sse-manager.ts    # SSE broadcasting
+│   └── timeline-converter.ts # Event → timeline mapping
 └── types/                 # TypeScript types
     ├── api.ts            # API interfaces
-    └── events.ts         # Event type mappings
+    ├── events.ts         # Event type mappings
+    └── web-events.ts     # Timeline entry types
 ```
 
 ## API Design
@@ -275,7 +287,7 @@ Dynamic provider/model discovery:
    - Tool execution visibility
    - Agent status indicators
    - Color-coded by message type
-   - Markdown support for formatting
+   - Timeline-based event rendering
 
 4. **ToolApprovalModal**
    - Risk level indicators (safe/moderate/destructive)
@@ -284,6 +296,43 @@ Dynamic provider/model discovery:
    - Keyboard shortcuts (Y/A/S/N/D/ESC)
    - 30-second timeout countdown
    - Session-wide approval option
+
+### Timeline System
+
+The web UI uses a timeline-based approach for rendering conversation events:
+
+1. **Timeline Architecture**
+   - Events flow from backend → timeline converter → timeline renderers
+   - Discriminated union pattern for type-safe event handling
+   - Each event type has a dedicated renderer component
+
+2. **Timeline Components**
+   - Follow `*Entry.tsx` naming convention
+   - Use FontAwesome icons for visual identity
+   - Consistent DaisyUI styling and layout patterns
+   - Support for content folding/truncation
+
+3. **Event Type Mapping**
+   ```typescript
+   // Backend events → Timeline entries
+   SYSTEM_PROMPT → 'system-prompt' → SystemPromptEntry
+   USER_SYSTEM_PROMPT → 'user-system-prompt' → UserSystemPromptEntry
+   USER_MESSAGE → 'user-message' → UserMessageEntry
+   AGENT_MESSAGE → 'agent-message' → AgentMessageEntry
+   ```
+
+4. **Markdown Rendering**
+   - `MarkdownRenderer` component with security and performance optimizations
+   - Uses `react-markdown` with `remark-gfm` and `rehype-highlight`
+   - Automatic syntax highlighting for code blocks
+   - DOMPurify sanitization for security defense-in-depth
+   - Folding functionality for long content (4-line default)
+
+5. **Folding Pattern**
+   - Consistent 4-line truncation across components
+   - `useFoldableContent` hook for reusable folding logic
+   - Performance optimized with memoized calculations
+   - Recent messages always expanded, older messages folded
 
 ### Custom Hooks
 
@@ -298,6 +347,12 @@ Dynamic provider/model discovery:
    - Loading/error state management
    - Type-safe request/response handling
    - Optimistic updates
+
+3. **useFoldableContent**
+   - Reusable content folding logic
+   - Memoized truncation calculations
+   - State management for expand/collapse
+   - Consistent behavior across timeline components
 
 ## Testing Strategy
 
@@ -370,7 +425,6 @@ Dynamic provider/model discovery:
 
 3. **UI Polish**
    - Basic styling only
-   - No syntax highlighting
    - Limited error handling UI
 
 ## Development Workflow
@@ -503,6 +557,89 @@ npm test -- --run     # Single run
    - Shared sessions
    - Real-time presence
    - Commenting system
+
+## Component Architecture Patterns
+
+### Timeline Component Design
+
+Timeline components follow consistent patterns for maintainability and user experience:
+
+1. **Naming Convention**
+   - Components named `*Entry.tsx` (e.g., `SystemPromptEntry`, `UserMessageEntry`)
+   - Exported function matches filename without `.tsx`
+
+2. **Props Interface**
+   ```typescript
+   interface ComponentEntryProps {
+     content: string;
+     timestamp: Date;
+     isRecentMessage?: boolean;
+     // Additional props specific to component
+   }
+   ```
+
+3. **Layout Structure**
+   ```tsx
+   <div className="flex gap-3">
+     <Icon /> {/* 8x8 icon in rounded background */}
+     <div className="flex-1 min-w-0">
+       <Header />
+       <Content />
+     </div>
+   </div>
+   ```
+
+4. **Icon Standards**
+   - FontAwesome icons from `@/lib/fontawesome`
+   - Consistent 8x8 pixel size with rounded background
+   - Semantic colors (warning for unknown, primary for system, etc.)
+
+5. **Content Handling**
+   - Use `MarkdownRenderer` for rich text content
+   - Apply folding pattern with `useFoldableContent`
+   - Consistent 4-line truncation across components
+
+### Reusable Component Patterns
+
+1. **MarkdownRenderer Usage**
+   ```tsx
+   <MarkdownRenderer 
+     content={content} 
+     maxLines={4} 
+     isRecentMessage={isRecentMessage} 
+   />
+   ```
+
+2. **Folding Hook Pattern**
+   ```tsx
+   const { displayContent, shouldFold, isExpanded, toggleExpanded, remainingLines } = 
+     useFoldableContent(content, maxLines, isRecentMessage);
+   ```
+
+3. **DaisyUI Styling Conventions**
+   - Use `bg-base-100`, `text-base-content` for theme compatibility
+   - `border-base-300` for subtle borders
+   - `text-primary` for interactive elements
+   - `badge-ghost` for subtle labels
+
+### Type Safety Patterns
+
+1. **Discriminated Unions**
+   ```typescript
+   type TimelineEntry = 
+     | { type: 'system-prompt'; content: string; timestamp: Date }
+     | { type: 'user-message'; content: string; timestamp: Date }
+     | { type: 'agent-message'; content: string; timestamp: Date };
+   ```
+
+2. **Event Type Mapping**
+   - Backend `EventType` → Frontend timeline entry type
+   - Centralized in `timeline-converter.ts`
+   - Type-safe exhaustive switching
+
+3. **Branded Types**
+   - Import `ThreadId` from backend for type safety
+   - Prevents mixing regular strings with thread identifiers
 
 ## Migration Notes
 
