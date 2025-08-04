@@ -587,7 +587,10 @@ export const LaceApp = memo(function LaceApp() {
                   <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
                     <div className="flex items-center gap-2 mb-1">
                       <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                      <span className="font-medium text-base-content truncate">
+                      <span 
+                        data-testid="current-project-name"
+                        className="font-medium text-base-content truncate"
+                      >
                         {currentProject.name}
                       </span>
                     </div>
@@ -728,7 +731,10 @@ export const LaceApp = memo(function LaceApp() {
               <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
                 <div className="flex items-center gap-2 mb-1">
                   <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-base-content truncate">
+                  <span 
+                    data-testid="current-project-name-desktop"
+                    className="font-medium text-base-content truncate"
+                  >
                     {currentProject.name}
                   </span>
                 </div>
