@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
 import { parseResponse } from '@/lib/serialization';

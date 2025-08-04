@@ -8,6 +8,9 @@ import { SettingsModal } from './SettingsModal';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';
+import { ProvidersPanel } from './panels/ProvidersPanel';
+import { SystemPanel } from './panels/SystemPanel';
+import { AboutPanel } from './panels/AboutPanel';
 
 interface SettingsContainerProps {
   children: (props: { onOpenSettings: () => void }) => React.ReactNode;
@@ -54,17 +57,47 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
     <UserSettingsPanel />
   ), []);
 
+  const providersPanel = useMemo(() => (
+    <ProvidersPanel />
+  ), []);
+
+  const systemPanel = useMemo(() => (
+    <SystemPanel />
+  ), []);
+
+  const aboutPanel = useMemo(() => (
+    <AboutPanel />
+  ), []);
+
+  // Tab configuration with icons
+  const tabConfig = [
+    { id: 'providers', label: 'Providers', icon: '🔗' },
+    { id: 'ui', label: 'UI', icon: '🎨' },
+    { id: 'user', label: 'User', icon: '👤' },
+    { id: 'system', label: 'System', icon: '⚙️' },
+    { id: 'about', label: 'About', icon: 'ℹ️' },
+  ];
+
   return (
     <>
       {children(childrenProps)}
       
       <SettingsModal isOpen={isOpen} onClose={handleCloseSettings}>
-        <SettingsTabs defaultTab="ui">
+        <SettingsTabs defaultTab="providers" tabs={tabConfig}>
+          <div data-tab="providers">
+            {providersPanel}
+          </div>
           <div data-tab="ui">
             {uiSettingsPanel}
           </div>
           <div data-tab="user">
             {userSettingsPanel}
+          </div>
+          <div data-tab="system">
+            {systemPanel}
+          </div>
+          <div data-tab="about">
+            {aboutPanel}
           </div>
         </SettingsTabs>
       </SettingsModal>

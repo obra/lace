@@ -87,7 +87,7 @@ export async function PUT(
 ) {
   try {
     const { instanceId } = await params;
-    const requestBody = await request.json();
+    const requestBody = await request.json() as Record<string, unknown>;
     
     const instanceManager = new ProviderInstanceManager();
     const config = await instanceManager.loadInstances();
@@ -102,7 +102,7 @@ export async function PUT(
     }
 
     // Extract credential from request body if provided
-    const { credential, ...instanceUpdates } = requestBody;
+    const { credential, ...instanceUpdates } = requestBody as { credential?: unknown };
 
     // Validate instance updates using Zod schema (partial validation)
     const updateSchema = ProviderInstanceSchema.partial();
@@ -117,7 +117,7 @@ export async function PUT(
     }
 
     // Update instance configuration (excluding catalogProviderId)
-    const { catalogProviderId, ...safeUpdates } = validationResult.data;
+    const { catalogProviderId: _catalogProviderId, ...safeUpdates } = validationResult.data;
     await instanceManager.updateInstance(instanceId, safeUpdates);
 
     // Update credential if provided

@@ -38,7 +38,7 @@ export function SettingsModal({ isOpen, onClose, children }: SettingsModalProps)
         className="relative bg-base-100 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
       >
         <div className="flex items-center justify-between p-6 border-b border-base-300">
-          <h2 className="text-xl font-semibold text-base-content">Settings</h2>
+          <h2 className="text-xl font-semibold text-base-content">Configuration</h2>
           <button
             onClick={onClose}
             className="btn btn-ghost btn-sm btn-circle"

@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProviderInstanceCard } from './ProviderInstanceCard';
 import { AddInstanceModal } from './AddInstanceModal';
 import { parseResponse } from '@/lib/serialization';
