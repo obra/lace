@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { TimelineEntry } from '@/types/design-system';
+import { TimelineEntry } from '@/types/web-events';
 import { TimelineMessage } from '@/components/timeline/TimelineMessage';
 import { TypingIndicator } from '@/components/timeline/TypingIndicator';
 

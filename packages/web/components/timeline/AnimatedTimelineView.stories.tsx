@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnimatedTimelineView } from './AnimatedTimelineView';
-import { TimelineEntry } from '@/types/design-system';
+import { TimelineEntry } from '@/types/web-events';
 
 const meta: Meta<typeof AnimatedTimelineView> = {
   title: 'Organisms/AnimatedTimelineView',

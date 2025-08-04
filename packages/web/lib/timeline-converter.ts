@@ -9,7 +9,7 @@ import type { SessionEvent } from '@/types/web-sse';
 import type { ToolCallEventData } from '@/types/web-events';
 import type { ThreadId } from '@/types/core';
 import type { ToolResult } from '@/types/core';
-import type { TimelineEntry } from '@/types/design-system';
+import type { TimelineEntry } from '@/types/web-events';
 
 export interface ConversionContext {
   agents: AgentInfo[];
@@ -276,6 +276,22 @@ function convertEvent(
       return {
         id,
         type: 'admin',
+        content: event.data.content,
+        timestamp,
+      };
+
+    case 'SYSTEM_PROMPT':
+      return {
+        id,
+        type: 'system-prompt',
+        content: event.data.content,
+        timestamp,
+      };
+
+    case 'USER_SYSTEM_PROMPT':
+      return {
+        id,
+        type: 'user-system-prompt',
         content: event.data.content,
         timestamp,
       };

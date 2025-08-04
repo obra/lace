@@ -4,7 +4,7 @@
 import { describe, test, expect } from 'vitest';
 import type { SessionEvent } from '@/types/web-sse';
 import type { AgentInfo } from '@/types/core';
-import type { TimelineEntry } from '@/types/design-system';
+import type { TimelineEntry } from '@/types/web-events';
 import { asThreadId } from '@/types/core';
 import { convertSessionEventsToTimeline, type ConversionContext } from '@/lib/timeline-converter';
 
