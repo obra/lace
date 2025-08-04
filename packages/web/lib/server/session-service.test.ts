@@ -189,8 +189,8 @@ describe('SessionService approval event forwarding', () => {
 
   afterEach(async () => {
     if (agent) {
-      agent.stop();
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      agent.removeAllListeners();
+      agent.abort(); // Use abort() instead of stop() for proper cleanup
     }
     sessionService.clearActiveSessions();
     vi.restoreAllMocks();
@@ -325,8 +325,8 @@ describe('SessionService agent state change broadcasting', () => {
 
   afterEach(async () => {
     if (agent) {
-      agent.stop();
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      agent.removeAllListeners();
+      agent.abort(); // Use abort() instead of stop() for proper cleanup
     }
     sessionService.clearActiveSessions();
     vi.restoreAllMocks();
