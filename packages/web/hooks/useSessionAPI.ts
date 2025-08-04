@@ -15,19 +15,13 @@ import type { ThreadId, SessionInfo, AgentInfo } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
 interface APIState {
-  loading: boolean;
   error: string | null;
 }
 
 export function useSessionAPI() {
   const [state, setState] = useState<APIState>({
-    loading: false,
     error: null,
   });
-
-  const setLoading = (loading: boolean) => {
-    setState((prev) => ({ ...prev, loading }));
-  };
 
   const setError = (error: string | null) => {
     setState((prev) => ({ ...prev, error }));
@@ -35,7 +29,6 @@ export function useSessionAPI() {
 
   const createSession = useCallback(
     async (request: CreateSessionRequest): Promise<SessionInfo | null> => {
-      setLoading(true);
       setError(null);
 
       try {
@@ -61,15 +54,12 @@ export function useSessionAPI() {
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     []
   );
 
   const listSessions = useCallback(async (): Promise<SessionInfo[]> => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -91,13 +81,10 @@ export function useSessionAPI() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return [];
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const getSession = useCallback(async (sessionId: ThreadId): Promise<SessionInfo | null> => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -119,14 +106,11 @@ export function useSessionAPI() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return null;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const spawnAgent = useCallback(
     async (sessionId: ThreadId, request: CreateAgentRequest): Promise<AgentInfo | null> => {
-      setLoading(true);
       setError(null);
 
       try {
@@ -152,15 +136,12 @@ export function useSessionAPI() {
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     []
   );
 
   const listAgents = useCallback(async (sessionId: ThreadId): Promise<AgentInfo[]> => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -182,13 +163,10 @@ export function useSessionAPI() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return [];
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const sendMessage = useCallback(async (threadId: ThreadId, message: string): Promise<boolean> => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -214,13 +192,10 @@ export function useSessionAPI() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return false;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   const stopAgent = useCallback(async (agentId: ThreadId): Promise<boolean> => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -245,13 +220,10 @@ export function useSessionAPI() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return false;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   return {
-    loading: state.loading,
     error: state.error,
     createSession,
     listSessions,

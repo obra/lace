@@ -67,7 +67,7 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
         const data = await result.json();
         return { status: result.status, data };
       } catch (error) {
-        return { error: error.message };
+        return { error: error instanceof Error ? error.message : 'Unknown error' };
       }
     });
 

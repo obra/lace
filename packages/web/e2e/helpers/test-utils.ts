@@ -146,7 +146,8 @@ export async function createAgent(page: Page, agentName: string, provider?: stri
   }
   
   // Submit agent creation
-  await page.click('button:has-text("Create Agent")').or(page.click('[data-testid="confirm-spawn-agent"]'));
+  const createAgentButton = page.locator('button:has-text("Create Agent")').or(page.locator('[data-testid="confirm-spawn-agent"]'));
+  await createAgentButton.click();
   
   // Wait for agent to appear
   await expect(page.getByText(agentName)).toBeVisible({ timeout: 10000 });

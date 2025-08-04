@@ -40,6 +40,7 @@ import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
+import { useConversationStream } from '@/hooks/useConversationStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 export const LaceApp = memo(function LaceApp() {
@@ -90,8 +91,16 @@ export const LaceApp = memo(function LaceApp() {
     handleApprovalResponse,
   } = useSessionEvents(selectedSession, selectedAgent, false); // Connection state will be passed to component that needs it
 
-  // Use session API hook for all API calls
-  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI, loading: sendingMessage } = useSessionAPI();
+  // Use session API hook for all API calls (HTTP requests only, not streaming state)
+  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
+  
+  // Use conversation stream hook for real-time agent state tracking
+  const { isStreaming, isThinking } = useConversationStream({
+    onError: (error) => console.error('Conversation stream error:', error)
+  });
+  
+  // Agent is considered "busy" when thinking or streaming
+  const agentBusy = isStreaming || isThinking;
 
   // Task manager - only create when we have a project and session
   const taskManager = useTaskManager(
@@ -883,7 +892,7 @@ export const LaceApp = memo(function LaceApp() {
                 <div style={{ height: 'calc(100% - 80px)' }}>
                   <TimelineView
                     entries={timelineEntries}
-                    isTyping={sendingMessage}
+                    isTyping={agentBusy}
                     currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
                   />
                 </div>
@@ -892,8 +901,8 @@ export const LaceApp = memo(function LaceApp() {
                 <MemoizedChatInput
                   onSubmit={sendMessage}
                   onInterrupt={stopGeneration}
-                  disabled={sendingMessage}
-                  isStreaming={sendingMessage}
+                  disabled={agentBusy}
+                  isStreaming={agentBusy}
                   placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
                 />
               </div>

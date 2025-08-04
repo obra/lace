@@ -55,7 +55,7 @@ export class ToolApprovalMockProvider extends TestProvider {
     // Default behavior - always return a file-read tool call on first user message
     const [messages] = args;
     const hasUserMessage = messages.some((m) => m.role === 'user');
-    const hasToolResult = messages.some((m) => m.role === 'tool');
+    const hasToolResult = messages.some((m) => m.toolResults && m.toolResults.length > 0);
 
     if (hasUserMessage && !hasToolResult && !this.hasReturnedToolCalls) {
       this.hasReturnedToolCalls = true;
