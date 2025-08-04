@@ -480,7 +480,7 @@ describe('Provider Instance E2E Tests', () => {
       );
 
       // Mock the Anthropic provider's getAnthropicClient method to verify baseURL configuration
-      const anthropicProvider = provider as {
+      const anthropicProvider = provider as unknown as {
         getAnthropicClient: () => { baseURL: string; messages: unknown };
       };
       const originalGetClient = anthropicProvider.getAnthropicClient.bind(
@@ -543,7 +543,9 @@ describe('Provider Instance E2E Tests', () => {
       );
 
       // Mock the Anthropic provider to simulate auth failure
-      const anthropicProvider = provider as { getAnthropicClient: () => { messages: unknown } };
+      const anthropicProvider = provider as unknown as {
+        getAnthropicClient: () => { messages: unknown };
+      };
       anthropicProvider.getAnthropicClient = vi.fn().mockImplementation(() => ({
         messages: {
           create: vi.fn().mockRejectedValue(new Error('Authentication failed: Invalid API key')),
@@ -600,7 +602,7 @@ describe('Provider Instance E2E Tests', () => {
       );
 
       // Mock the Anthropic provider to avoid MSW/AbortSignal issues
-      const anthropicProviderAny = anthropicProvider as {
+      const anthropicProviderAny = anthropicProvider as unknown as {
         getAnthropicClient: () => { messages: unknown };
       };
       const originalGetClient = anthropicProviderAny.getAnthropicClient.bind(

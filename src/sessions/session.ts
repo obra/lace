@@ -2,7 +2,7 @@
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
 import { Agent, type AgentInfo } from '~/agents/agent';
-import type { AIProvider } from '~/providers/types';
+import type { AIProvider } from '~/providers/base-provider';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
