@@ -59,25 +59,6 @@ export interface GoogleDocAttachment {
   preview?: string;
 }
 
-export interface TimelineEntry {
-  id: string | number;
-  type: 'admin' | 'human' | 'ai' | 'tool' | 'integration' | 'carousel' | 'google-doc' | 'unknown';
-  content?: string;
-  timestamp: Date;
-  agent?: string;
-  tool?: string;
-  result?: ToolResult;
-  action?: string;
-  title?: string;
-  description?: string;
-  link?: string;
-  items?: CarouselItem[];
-  document?: GoogleDocAttachment;
-  // Unknown event specific fields
-  eventType?: string;
-  metadata?: Record<string, unknown>;
-}
-
 export interface CarouselItem {
   title: string;
   description: string;

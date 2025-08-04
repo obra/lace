@@ -33,7 +33,7 @@ import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo } from '@/type
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
-import type { ToolApprovalRequestData } from '@/types/web-events';
+import type { ToolApprovalRequestData, TimelineEntry } from '@/types/web-events';
 import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
@@ -130,13 +130,11 @@ export const LaceApp = memo(function LaceApp() {
   const connected = connection.connected;
 
   // Convert SessionEvents to TimelineEntries for the design system
-  const timelineEntries = useMemo(() => {
-    const entries = convertSessionEventsToTimeline(events, {
+  const timelineEntries = useMemo((): TimelineEntry[] => {
+    return convertSessionEventsToTimeline(events, {
       agents: selectedSessionDetails?.agents || [],
       selectedAgent: selectedAgent || undefined,
     });
-    
-    return entries;
   }, [events, selectedSessionDetails?.agents, selectedAgent]);
 
   // Project loading function

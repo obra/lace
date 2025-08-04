@@ -1,10 +1,12 @@
 'use client';
 
-import { TimelineEntry } from '@/types/design-system';
+import { TimelineEntry } from '@/types/web-events';
 import { MessageHeader, MessageText, AgentBadge, TimestampDisplay } from '@/components/ui';
 import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
 import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
 import { UnknownEventEntry } from '@/components/timeline/UnknownEventEntry';
+import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
+import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
 import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faImages, faExternalLinkAlt, faUser, faRobot } from '@/lib/fontawesome';
@@ -118,6 +120,28 @@ export function TimelineMessage({ entry }: TimelineMessageProps) {
           <MessageText content={entry.content || ''} />
         </div>
       </div>
+    );
+  }
+
+  // System Prompt
+  if (entry.type === 'system-prompt') {
+    return (
+      <SystemPromptEntry
+        content={entry.content || ''}
+        timestamp={entry.timestamp}
+        isRecentMessage={false} // System prompts are typically not recent
+      />
+    );
+  }
+
+  // User System Prompt
+  if (entry.type === 'user-system-prompt') {
+    return (
+      <UserSystemPromptEntry
+        content={entry.content || ''}
+        timestamp={entry.timestamp}
+        isRecentMessage={false} // User system prompts are typically not recent
+      />
     );
   }
 

@@ -2,6 +2,7 @@
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
 import type { ThreadEventType, ToolResult } from '@/types/core';
+import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
 // Event data structures shared between API and SSE streaming
 // These are the payloads contained within events, not the events themselves
@@ -79,4 +80,34 @@ export interface AgentTokenData {
 
 export interface AgentStreamingData {
   content: string;
+}
+
+// Timeline UI data structures
+export interface TimelineEntry {
+  id: string | number;
+  type:
+    | 'admin'
+    | 'human'
+    | 'ai'
+    | 'tool'
+    | 'integration'
+    | 'carousel'
+    | 'google-doc'
+    | 'unknown'
+    | 'system-prompt'
+    | 'user-system-prompt';
+  content?: string;
+  timestamp: Date;
+  agent?: string;
+  tool?: string;
+  result?: ToolResult;
+  action?: string;
+  title?: string;
+  description?: string;
+  link?: string;
+  items?: CarouselItem[];
+  document?: GoogleDocAttachment;
+  // Unknown event specific fields
+  eventType?: string;
+  metadata?: Record<string, unknown>;
 }

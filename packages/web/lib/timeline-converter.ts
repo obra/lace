@@ -9,7 +9,7 @@ import type { SessionEvent } from '@/types/web-sse';
 import type { ToolCallEventData } from '@/types/web-events';
 import type { ThreadId } from '@/types/core';
 import type { ToolResult } from '@/types/core';
-import type { TimelineEntry } from '@/types/design-system';
+import type { TimelineEntry } from '@/types/web-events';
 
 export interface ConversionContext {
   agents: AgentInfo[];

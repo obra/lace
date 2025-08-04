@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { TimelineEntry } from '@/types/design-system';
+import { TimelineEntry } from '@/types/web-events';
 import { formatTime } from '@/lib/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
