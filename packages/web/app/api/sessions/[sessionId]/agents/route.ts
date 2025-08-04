@@ -20,7 +20,11 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   return (
     typeof body === 'object' &&
     body !== null &&
-    (!('name' in body) || typeof (body as { name: unknown }).name === 'string')
+    (!('name' in body) || typeof (body as { name: unknown }).name === 'string') &&
+    'providerInstanceId' in body &&
+    typeof (body as { providerInstanceId: unknown }).providerInstanceId === 'string' &&
+    'modelId' in body &&
+    typeof (body as { modelId: unknown }).modelId === 'string'
   );
 }
 
@@ -52,41 +56,34 @@ export async function POST(
 
     const body: CreateAgentRequest = bodyData;
 
-    // Allow empty names - spawnAgent will provide default
-
     // Get session and spawn agent directly
     const session = await sessionService.getSession(sessionId);
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    let agent;
-
-    if (body.providerInstanceId && body.model) {
-      // New provider instance system - resolve provider instance properly
-      const registry = new ProviderRegistry();
-      await registry.initialize();
-      
-      const configuredInstances = await registry.getConfiguredInstances();
-      const instance = configuredInstances.find(inst => inst.id === body.providerInstanceId);
-      
-      if (!instance) {
-        return createErrorResponse(`Provider instance '${body.providerInstanceId}' not found`, 400, { code: 'VALIDATION_FAILED' });
-      }
-
-      const catalogProvider = registry.getCatalogProviders().find(p => p.id === instance.catalogProviderId);
-      if (!catalogProvider) {
-        return createErrorResponse(`Catalog provider '${instance.catalogProviderId}' not found`, 400, { code: 'VALIDATION_FAILED' });
-      }
-
-      // Use resolved provider type and model
-      agent = await session.spawnAgent(body.name || '', catalogProvider.type, body.model);
-    } else {
-      // Old provider system for backward compatibility
-      const provider = body.provider || 'anthropic';
-      const model = body.model || 'claude-3-5-haiku-20241022';
-      agent = await session.spawnAgent(body.name || '', provider, model);
+    // Verify provider instance exists
+    const registry = new ProviderRegistry();
+    await registry.initialize();
+    
+    const configuredInstances = await registry.getConfiguredInstances();
+    const instance = configuredInstances.find(inst => inst.id === body.providerInstanceId);
+    
+    if (!instance) {
+      return createErrorResponse(`Provider instance '${body.providerInstanceId}' not found`, 400, { code: 'VALIDATION_FAILED' });
     }
+
+    const catalogProvider = registry.getCatalogProviders().find(p => p.id === instance.catalogProviderId);
+    if (!catalogProvider) {
+      return createErrorResponse(`Catalog provider '${instance.catalogProviderId}' not found`, 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    // Spawn agent using provider instance configuration
+    const agent = session.spawnAgent({
+      name: body.name || '',
+      providerInstanceId: body.providerInstanceId,
+      modelId: body.modelId
+    });
 
     // Setup agent approvals using utility
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
@@ -100,8 +97,8 @@ export async function POST(
     const agentResponse = {
       threadId: agent.threadId,
       name: agent.name,
-      provider: agent.provider,
-      model: agent.model,
+      provider: catalogProvider.type,
+      model: body.modelId,
       status: agent.status,
       createdAt: new Date(),
     };

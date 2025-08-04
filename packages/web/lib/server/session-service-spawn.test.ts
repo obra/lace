@@ -10,6 +10,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -37,6 +38,11 @@ describe('SessionService.spawnAgent Method', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -44,6 +50,10 @@ describe('SessionService.spawnAgent Method', () => {
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
 
     // Create session service
     sessionService = getSessionService();
@@ -55,15 +65,16 @@ describe('SessionService.spawnAgent Method', () => {
     // Create session
     const session = await sessionService.createSession(
       'Test Session',
-      'anthropic',
+      testProviderInstances.anthropicInstanceId,
       'claude-3-5-haiku-20241022',
       projectId
     );
     sessionId = session.id as string;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });
 
@@ -71,7 +82,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent via service
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Service Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session!.spawnAgent({
+      name: 'Service Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Verify agent properties
     expect(agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
@@ -97,11 +112,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent(
-      'Retrievable Agent',
-      'anthropic',
-      'claude-3-5-haiku-20241022'
-    );
+    const agent = session!.spawnAgent({
+      name: 'Retrievable Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId as ThreadId;
 
     // Test immediate retrieval
@@ -124,8 +139,16 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn multiple agents
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent1 = session!.spawnAgent('Agent 1', 'anthropic', 'claude-3-5-haiku-20241022');
-    const agent2 = session!.spawnAgent('Agent 2', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent1 = session!.spawnAgent({
+      name: 'Agent 1',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
+    const agent2 = session!.spawnAgent({
+      name: 'Agent 2',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Verify both agents are retrievable
     const retrievedAgent1 = session!.getAgent(agent1.threadId as ThreadId);
@@ -151,11 +174,11 @@ describe('SessionService.spawnAgent Method', () => {
     expect(session).toBeDefined();
 
     // Spawn agent in reconstructed session
-    const agent = session!.spawnAgent(
-      'Reconstructed Agent',
-      'anthropic',
-      'claude-3-5-haiku-20241022'
-    );
+    const agent = session!.spawnAgent({
+      name: 'Reconstructed Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Verify agent was spawned correctly
     expect(agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
@@ -176,7 +199,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session!.spawnAgent({
+      name: 'Persistent Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId as ThreadId;
 
     // Get the agent to ensure it's started
@@ -207,7 +234,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent via service
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Cache Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session!.spawnAgent({
+      name: 'Cache Test Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId as ThreadId;
 
     // Verify agent is retrievable via session
@@ -260,7 +291,11 @@ describe('SessionService.spawnAgent Method', () => {
     // This should not be possible since getSession returns null
     // but we can test the error by trying to call on null
     expect(() => {
-      session?.spawnAgent('Orphan Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+      session?.spawnAgent({
+        name: 'Orphan Agent',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      });
     }).not.toThrow(); // This won't throw because session is null
   });
 });

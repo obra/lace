@@ -13,6 +13,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
@@ -27,6 +28,11 @@ describe('Thread Messaging API', () => {
   let testProjectId: string;
   let realSessionId: string;
   let realThreadId: string;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -43,6 +49,10 @@ describe('Thread Messaging API', () => {
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+
     sessionService = getSessionService();
 
     // Create a real test project
@@ -53,7 +63,7 @@ describe('Thread Messaging API', () => {
     // Create a real session
     const session = await sessionService.createSession(
       'Test Session',
-      'anthropic',
+      testProviderInstances.anthropicInstanceId,
       'claude-3-5-haiku-20241022',
       testProjectId
     );
@@ -66,6 +76,8 @@ describe('Thread Messaging API', () => {
     // Stop all agents first to prevent async operations after database closure
     await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
+    // Clean up provider instances
+    await cleanupTestProviderInstances(createdInstanceIds);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
@@ -198,7 +210,11 @@ describe('Thread Messaging API', () => {
     const session = await sessionService.getSession(asThreadId(realSessionId));
     expect(session).toBeDefined();
 
-    const delegateAgent = session!.spawnAgent('Test Delegate');
+    const delegateAgent = session!.spawnAgent({
+      name: 'Test Delegate',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const delegateThreadId = delegateAgent.threadId;
 
     const request = new NextRequest('http://localhost/api/threads/test/message', {

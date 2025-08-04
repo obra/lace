@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -16,13 +17,22 @@ vi.mock('server-only', () => ({}));
 describe('Session.spawnAgent Method', () => {
   let session: Session;
   let projectId: string;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
 
     // Create a test project
     const project = Project.create('Test Project', '/test/path', 'Test project', {});
@@ -31,20 +41,25 @@ describe('Session.spawnAgent Method', () => {
     // Create session
     session = Session.create({
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId,
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     session.destroy();
+    await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });
 
   it('should spawn agent and create delegate thread', () => {
     // Spawn agent
-    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Test Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Verify agent properties
     expect(agent.threadId).toMatch(new RegExp(`^${session.getId()}\\.\\d+$`));
@@ -61,7 +76,11 @@ describe('Session.spawnAgent Method', () => {
 
   it('should allow retrieving spawned agent from session', () => {
     // Spawn agent
-    const agent = session.spawnAgent('Retrievable Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Retrievable Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Retrieve agent from session
@@ -75,7 +94,11 @@ describe('Session.spawnAgent Method', () => {
 
   it('should create delegate thread that persists across ThreadManager instances', async () => {
     // Spawn agent
-    const agent = session.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Persistent Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Import ThreadManager and create new instance to test persistence
@@ -92,9 +115,21 @@ describe('Session.spawnAgent Method', () => {
 
   it('should handle multiple spawned agents correctly', () => {
     // Spawn multiple agents
-    const agent1 = session.spawnAgent('Agent 1', 'anthropic', 'claude-3-5-haiku-20241022');
-    const agent2 = session.spawnAgent('Agent 2', 'anthropic', 'claude-3-5-haiku-20241022');
-    const agent3 = session.spawnAgent('Agent 3', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent1 = session.spawnAgent({
+      name: 'Agent 1',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
+    const agent2 = session.spawnAgent({
+      name: 'Agent 2',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
+    const agent3 = session.spawnAgent({
+      name: 'Agent 3',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Verify unique thread IDs
     expect(agent1.threadId).toBe(`${session.getId()}.1`);
@@ -113,7 +148,11 @@ describe('Session.spawnAgent Method', () => {
 
   it('should start spawned agent and allow event addition', async () => {
     // Spawn agent
-    const agent = session.spawnAgent('Eventful Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Eventful Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Agent will auto-start when needed
@@ -133,7 +172,11 @@ describe('Session.spawnAgent Method', () => {
 
   it('should handle caching issues between ThreadManager instances', async () => {
     // Spawn agent
-    const agent = session.spawnAgent('Cached Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Cached Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Get the session agent and its ThreadManager
@@ -182,11 +225,11 @@ describe('Session.spawnAgent Method', () => {
 
   it('should handle thread persistence with multiple threads', () => {
     // Spawn agent
-    const agent = session.spawnAgent(
-      'Thread Switch Agent',
-      'anthropic',
-      'claude-3-5-haiku-20241022'
-    );
+    const agent = session.spawnAgent({
+      name: 'Thread Switch Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Get the session agent and its ThreadManager
@@ -226,11 +269,11 @@ describe('Session.spawnAgent Method', () => {
     // For now, let's simplify it to just verify the agent is accessible within the session
 
     // Spawn agent
-    const agent = session.spawnAgent(
-      'Reconstructable Agent',
-      'anthropic',
-      'claude-3-5-haiku-20241022'
-    );
+    const agent = session.spawnAgent({
+      name: 'Reconstructable Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Verify agent is accessible in the current session

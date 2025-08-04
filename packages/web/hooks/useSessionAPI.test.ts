@@ -192,8 +192,8 @@ describe('useSessionAPI', () => {
       await act(async () => {
         agent = await result.current.spawnAgent(sessionId, {
           name: 'architect',
-          provider: 'anthropic',
-          model: 'claude-3-opus',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-opus',
         });
       });
 
@@ -206,8 +206,8 @@ describe('useSessionAPI', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'architect',
-          provider: 'anthropic',
-          model: 'claude-3-opus',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-opus',
         }),
       });
     });
@@ -223,6 +223,8 @@ describe('useSessionAPI', () => {
       await act(async () => {
         agent = await result.current.spawnAgent(sessionId, {
           name: 'test',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-5-haiku-20241022',
         });
       });
 

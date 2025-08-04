@@ -15,6 +15,7 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
 import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
@@ -26,8 +27,13 @@ describe('Full Conversation Flow', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let addConnectionSpy: ReturnType<typeof vi.spyOn>;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
     vi.clearAllMocks();
 
@@ -39,6 +45,10 @@ describe('Full Conversation Flow', () => {
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+
     sessionService = getSessionService();
   });
 
@@ -49,6 +59,8 @@ describe('Full Conversation Flow', () => {
     // Clean up spies
     addConnectionSpy?.mockRestore();
     broadcastSpy?.mockRestore();
+    // Clean up provider instances
+    await cleanupTestProviderInstances(createdInstanceIds);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
@@ -74,8 +86,8 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: sessionName,
           configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -105,8 +117,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: agentName,
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -171,8 +183,8 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: 'Multi-Agent Session',
           configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -192,8 +204,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'pm',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -210,8 +222,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'architect',
-          provider: 'anthropic',
-          model: 'claude-sonnet-4-20250514',
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-sonnet-4-20250514',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -260,8 +272,8 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: 'Session 1',
           configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },
@@ -277,8 +289,8 @@ describe('Full Conversation Flow', () => {
         body: JSON.stringify({
           name: 'Session 2',
           configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           },
         }),
         headers: { 'Content-Type': 'application/json' },

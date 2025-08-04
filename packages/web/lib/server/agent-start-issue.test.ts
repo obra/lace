@@ -11,6 +11,7 @@ import type { ToolExecutor } from '@/lib/server/lace-imports';
 import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -18,13 +19,22 @@ vi.mock('server-only', () => ({}));
 describe('Agent Spawning and Thread Creation', () => {
   let session: Session;
   let projectId: string;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
 
     // Create a test project
     const project = Project.create('Test Project', '/test/path', 'Test project', {});
@@ -33,14 +43,15 @@ describe('Agent Spawning and Thread Creation', () => {
     // Create session
     session = Session.create({
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId,
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     session.destroy();
+    await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });
 
@@ -54,7 +65,11 @@ describe('Agent Spawning and Thread Creation', () => {
     expect(threadManager).toBeDefined();
 
     // Spawn agent (this is what SessionService.spawnAgent does)
-    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Test Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
     const agentThreadId = agent.threadId;
 
     // Check if the agent's thread exists in ThreadManager

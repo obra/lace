@@ -10,6 +10,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -23,20 +24,30 @@ vi.mock('@/lib/server/approval-manager', () => ({
 
 describe('SessionService Singleton E2E Reproduction', () => {
   let sessionService: ReturnType<typeof getSessionService>;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
 
     // Set up environment exactly like E2E test
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+
     // Get the global SessionService instance
     sessionService = getSessionService();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });
 
@@ -53,7 +64,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     // Step 2: Create session via SessionService (same as E2E test)
     const session = await sessionService.createSession(
       'Message Test Session',
-      'anthropic',
+      testProviderInstances.anthropicInstanceId,
       'claude-3-5-haiku-20241022',
       projectId
     );
@@ -63,7 +74,11 @@ describe('SessionService Singleton E2E Reproduction', () => {
     try {
       const session = await sessionService.getSession(sessionId as ThreadId);
       expect(session).toBeDefined();
-      const agent = session!.spawnAgent('Message Agent', 'anthropic');
+      const agent = session!.spawnAgent({
+        name: 'Message Agent',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      });
 
       // Step 4: Verify agent is retrievable from the session
       const _retrievedAgent = session!.getAgent(agent.threadId as ThreadId);
@@ -91,7 +106,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
       const session = await sessionService.createSession(
         `Test Session ${i}`,
-        'anthropic',
+        testProviderInstances.anthropicInstanceId,
         'claude-3-5-haiku-20241022',
         projectId
       );
@@ -99,7 +114,11 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
       const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);
       expect(sessionForAgent).toBeDefined();
-      const _agent = sessionForAgent!.spawnAgent(`Test Agent ${i}`, 'anthropic');
+      const _agent = sessionForAgent!.spawnAgent({
+        name: `Test Agent ${i}`,
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      });
       expect(_agent).toBeDefined();
     }
   });
@@ -111,7 +130,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
     const session = await sessionService.createSession(
       'Test Session',
-      'anthropic',
+      testProviderInstances.anthropicInstanceId,
       'claude-3-5-haiku-20241022',
       projectId
     );
@@ -119,7 +138,11 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
     const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);
     expect(sessionForAgent).toBeDefined();
-    const _agent = sessionForAgent!.spawnAgent('Test Agent', 'anthropic');
+    const _agent = sessionForAgent!.spawnAgent({
+      name: 'Test Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Clear active sessions
     sessionService.clearActiveSessions();
@@ -127,7 +150,11 @@ describe('SessionService Singleton E2E Reproduction', () => {
     // Try to spawn another agent (should work since session can be reconstructed)
     const sessionForSecondAgent = await sessionService.getSession(sessionId as ThreadId);
     expect(sessionForSecondAgent).toBeDefined();
-    const _secondAgent = sessionForSecondAgent!.spawnAgent('Another Agent', 'anthropic');
+    const _secondAgent = sessionForSecondAgent!.spawnAgent({
+      name: 'Another Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
   });
 
   it('should test session reconstruction after clearing', async () => {
@@ -137,7 +164,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
     const session = await sessionService.createSession(
       'Test Session',
-      'anthropic',
+      testProviderInstances.anthropicInstanceId,
       'claude-3-5-haiku-20241022',
       projectId
     );
@@ -145,7 +172,11 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
     const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);
     expect(sessionForAgent).toBeDefined();
-    const _agent = sessionForAgent!.spawnAgent('Test Agent', 'anthropic');
+    const _agent = sessionForAgent!.spawnAgent({
+      name: 'Test Agent',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022'
+    });
 
     // Clear active sessions
     sessionService.clearActiveSessions();
@@ -158,7 +189,11 @@ describe('SessionService Singleton E2E Reproduction', () => {
       expect(_agents).toBeDefined();
 
       // Try to spawn another agent
-      const _newAgent = reconstructedSession.spawnAgent('New Agent', 'anthropic');
+      const _newAgent = reconstructedSession.spawnAgent({
+        name: 'New Agent',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      });
       expect(_newAgent).toBeDefined();
     } else {
       expect(reconstructedSession).toBeDefined();

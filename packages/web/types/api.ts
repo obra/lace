@@ -50,10 +50,9 @@ export interface CreateSessionRequest {
 }
 
 export interface CreateAgentRequest {
-  name?: string; // Made optional for default
-  provider?: string;
-  model?: string;
-  providerInstanceId?: string; // For new provider instance system
+  name?: string;
+  providerInstanceId: string; // REQUIRED - no fallback to old system
+  modelId: string;           // REQUIRED - no fallback to old system
 }
 
 // API response types
