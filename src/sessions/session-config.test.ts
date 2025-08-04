@@ -20,8 +20,8 @@ describe('Session configuration', () => {
   describe('Configuration schemas', () => {
     it('should validate valid session configuration', () => {
       const config = {
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
+        providerInstanceId: 'test-anthropic-instance',
+        modelId: 'claude-3-5-sonnet-20241022',
         maxTokens: 4000,
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
@@ -34,8 +34,8 @@ describe('Session configuration', () => {
       const result = SessionConfigurationSchema.safeParse(config);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.provider).toBe('anthropic');
-        expect(result.data.model).toBe('claude-3-sonnet');
+        expect(result.data.providerInstanceId).toBe('test-anthropic-instance');
+        expect(result.data.modelId).toBe('claude-3-5-sonnet-20241022');
         expect(result.data.maxTokens).toBe(4000);
         expect(result.data.temperature).toBe(0.7);
       }
@@ -43,7 +43,7 @@ describe('Session configuration', () => {
 
     it('should reject invalid session configuration', () => {
       const config = {
-        provider: 'invalid-provider',
+        providerInstanceId: '', // Invalid empty string
         maxTokens: -100,
         temperature: 3.0,
       };
@@ -55,8 +55,8 @@ describe('Session configuration', () => {
     it('should validate valid agent configuration', () => {
       const config = {
         role: 'code-reviewer',
-        provider: 'anthropic',
-        model: 'claude-3-haiku',
+        providerInstanceId: 'test-anthropic-instance',
+        modelId: 'claude-3-5-haiku-20241022',
         temperature: 0.1,
         capabilities: ['code-analysis', 'security-review'],
         restrictions: ['no-file-write'],
@@ -86,15 +86,15 @@ describe('Session configuration', () => {
   describe('Configuration validator', () => {
     it('should validate session configuration', () => {
       const config = {
-        provider: 'openai',
-        model: 'gpt-4',
+        providerInstanceId: 'test-openai-instance',
+        modelId: 'gpt-4o',
         maxTokens: 8000,
         temperature: 0.5,
       };
 
       const validated = ConfigurationValidator.validateSessionConfiguration(config);
-      expect(validated.provider).toBe('openai');
-      expect(validated.model).toBe('gpt-4');
+      expect(validated.providerInstanceId).toBe('test-openai-instance');
+      expect(validated.modelId).toBe('gpt-4o');
       expect(validated.maxTokens).toBe(8000);
       expect(validated.temperature).toBe(0.5);
     });
@@ -112,8 +112,8 @@ describe('Session configuration', () => {
 
     it('should merge configurations correctly', () => {
       const base: SessionConfiguration = {
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
+        providerInstanceId: 'test-anthropic-instance',
+        modelId: 'claude-3-5-sonnet-20241022',
         maxTokens: 4000,
         toolPolicies: {
           'file-read': 'allow',
@@ -126,7 +126,7 @@ describe('Session configuration', () => {
       };
 
       const override: Partial<SessionConfiguration> = {
-        model: 'claude-3-haiku',
+        modelId: 'claude-3-5-haiku-20241022',
         temperature: 0.8,
         toolPolicies: {
           bash: 'allow',
@@ -140,8 +140,8 @@ describe('Session configuration', () => {
 
       const merged = ConfigurationValidator.mergeConfigurations(base, override);
 
-      expect(merged.provider).toBe('anthropic'); // From base
-      expect(merged.model).toBe('claude-3-haiku'); // Overridden
+      expect(merged.providerInstanceId).toBe('test-anthropic-instance'); // From base
+      expect(merged.modelId).toBe('claude-3-5-haiku-20241022'); // Overridden
       expect(merged.maxTokens).toBe(4000); // From base
       expect(merged.temperature).toBe(0.8); // Overridden
       expect(merged.toolPolicies).toEqual({
@@ -160,7 +160,7 @@ describe('Session configuration', () => {
   describe('Configuration presets', () => {
     it('should save and retrieve configuration presets', () => {
       const presetConfig = {
-        model: 'claude-3-sonnet',
+        modelId: 'claude-3-5-sonnet-20241022',
         temperature: 0.2,
         maxTokens: 8000,
         systemPrompt: 'You are a senior software engineer conducting code reviews.',
@@ -180,14 +180,14 @@ describe('Session configuration', () => {
       expect(preset).toBeDefined();
       expect(preset?.name).toBe('Code Review');
       expect(preset?.description).toBe('Configuration optimized for code review tasks');
-      expect(preset?.configuration.model).toBe('claude-3-sonnet');
+      expect(preset?.configuration.modelId).toBe('claude-3-5-sonnet-20241022');
       expect(preset?.configuration.temperature).toBe(0.2);
       expect(preset?.configuration.tools).toEqual(['file-read', 'file-write', 'bash']);
     });
 
     it('should list all presets', () => {
-      presetManager.savePreset('preset1', { model: 'claude-3-haiku' }, { name: 'Preset 1' });
-      presetManager.savePreset('preset2', { model: 'gpt-4' }, { name: 'Preset 2' });
+      presetManager.savePreset('preset1', { modelId: 'claude-3-5-haiku-20241022' }, { name: 'Preset 1' });
+      presetManager.savePreset('preset2', { modelId: 'gpt-4o' }, { name: 'Preset 2' });
 
       const presets = presetManager.getPresets();
       expect(presets).toHaveLength(2);
@@ -198,13 +198,13 @@ describe('Session configuration', () => {
     it('should manage default presets', () => {
       presetManager.savePreset(
         'default',
-        { model: 'claude-3-sonnet' },
+        { modelId: 'claude-3-5-sonnet-20241022' },
         {
           name: 'Default',
           isDefault: true,
         }
       );
-      presetManager.savePreset('custom', { model: 'claude-3-haiku' }, { name: 'Custom' });
+      presetManager.savePreset('custom', { modelId: 'claude-3-5-haiku-20241022' }, { name: 'Custom' });
 
       const defaultPreset = presetManager.getDefaultPreset();
       expect(defaultPreset).toBeDefined();
@@ -212,7 +212,7 @@ describe('Session configuration', () => {
     });
 
     it('should delete presets', () => {
-      presetManager.savePreset('temp', { model: 'claude-3-haiku' }, { name: 'Temporary' });
+      presetManager.savePreset('temp', { modelId: 'claude-3-5-haiku-20241022' }, { name: 'Temporary' });
 
       expect(presetManager.getPreset('temp')).toBeDefined();
 

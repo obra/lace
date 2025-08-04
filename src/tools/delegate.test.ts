@@ -19,11 +19,11 @@ describe('DelegateTool', () => {
   let tool: DelegateTool;
   let context: ToolContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
 
     // Use shared delegation test setup
-    testSetup = createDelegationTestSetup({
+    testSetup = await createDelegationTestSetup({
       sessionName: 'Delegate Test Session',
       projectName: 'Delegate Test Project',
       model: 'claude-sonnet-4-20250514',

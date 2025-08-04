@@ -15,6 +15,10 @@ import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import type { Task } from '~/tasks/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -58,13 +62,18 @@ describe('Enhanced Task Manager Tools', () => {
   let taskAddNoteTool: TaskAddNoteTool;
   let taskViewTool: TaskViewTool;
   let mockProvider: MockProvider;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
   const parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -90,8 +99,8 @@ describe('Enhanced Task Manager Tools', () => {
     // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Tool Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 
@@ -118,10 +127,14 @@ describe('Enhanced Task Manager Tools', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   describe('Context Integration', () => {

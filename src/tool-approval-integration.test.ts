@@ -13,6 +13,10 @@ import { ToolCall, ToolContext } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ThreadId } from '~/threads/types';
 
@@ -64,9 +68,14 @@ describe('Tool Approval System Integration', () => {
   let session: Session;
   let project: Project;
   let toolContext: ToolContext;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create real project and session for proper tool execution context
     project = Project.create(
@@ -86,8 +95,8 @@ describe('Tool Approval System Integration', () => {
 
     session = Session.create({
       name: 'Tool Approval Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -107,9 +116,13 @@ describe('Tool Approval System Integration', () => {
     mockInterface = new MockApprovalInterface();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     mockInterface.reset();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   describe('complete approval flow without policies', () => {

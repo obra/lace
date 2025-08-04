@@ -125,8 +125,8 @@ describe('Session with Provider Instances', () => {
 
       const info = session.getInfo();
       expect(info).toBeDefined();
-      expect(info?.provider).toBe('anthropic');
-      expect(info?.model).toBe('claude-3-5-sonnet-20241022');
+      expect(info?.providerInstanceId).toBe(testProviderInstances.anthropicInstanceId);
+      expect(info?.modelId).toBe('claude-3-5-sonnet-20241022');
       expect(info?.agents).toHaveLength(1); // Coordinator agent
       expect(info?.agents[0]?.provider).toBe('anthropic');
       expect(info?.agents[0]?.model).toBe('claude-3-5-sonnet-20241022');
@@ -151,7 +151,7 @@ describe('Session with Provider Instances', () => {
       // This will be fixed when full provider instance resolution is implemented
       const info = session.getInfo();
       expect(info).toBeDefined();
-      expect(info?.model).toBe('gpt-4o-mini'); // Model should be preserved
+      expect(info?.modelId).toBe('gpt-4o-mini'); // Model should be preserved
     });
   });
 

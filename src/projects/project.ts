@@ -7,7 +7,7 @@ import { getPersistence, ProjectData, SessionData } from '~/persistence/database
 import { logger } from '~/utils/logger';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
-import { Session } from '~/sessions/session';
+import type { Session } from '~/sessions/session';
 import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';

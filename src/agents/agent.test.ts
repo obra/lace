@@ -22,6 +22,10 @@ import { BashTool } from '~/tools/implementations/bash';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -79,9 +83,14 @@ describe('Enhanced Agent', () => {
   let agent: Agent;
   let session: Session;
   let project: Project;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create real project and session for proper context
     project = Project.create(
@@ -93,8 +102,8 @@ describe('Enhanced Agent', () => {
 
     session = Session.create({
       name: 'Agent Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -144,13 +153,17 @@ describe('Enhanced Agent', () => {
     return provider;
   }
 
-  afterEach(() => {
+  afterEach(async () => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
       agent.stop();
     }
     threadManager.close();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
     // Clear mock references to prevent circular references
     mockProvider = null as unknown as MockProvider;
     toolExecutor = null as unknown as ToolExecutor;

@@ -13,6 +13,10 @@ import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -48,6 +52,10 @@ describe('Multi-Agent Task Manager Integration', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
   let createTool: TaskCreateTool;
   let listTool: TaskListTool;
   let updateTool: TaskUpdateTool;
@@ -60,8 +68,9 @@ describe('Multi-Agent Task Manager Integration', () => {
   let agent2Context: ToolContext;
   let agent3Context: ToolContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -87,8 +96,8 @@ describe('Multi-Agent Task Manager Integration', () => {
     // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Integration Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 
@@ -119,9 +128,14 @@ describe('Multi-Agent Task Manager Integration', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
+    // Clean up provider instances
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
     teardownTestPersistence();
   });
 
@@ -354,8 +368,8 @@ describe('Multi-Agent Task Manager Integration', () => {
       const project2 = Project.create('Session 2 Project', '/tmp/test-session2');
       const session2 = Session.create({
         name: 'Session 2 Test',
-        provider: 'anthropic',
-        model: 'claude-sonnet-4-20250514',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-sonnet-4-20250514',
         projectId: project2.getId(),
       });
 

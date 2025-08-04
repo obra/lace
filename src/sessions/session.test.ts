@@ -232,8 +232,8 @@ describe('Session', () => {
         id: session.getId(),
         name: 'Test Session',
         createdAt: expect.any(Date) as Date,
-        provider: expect.any(String) as string,
-        model: 'claude-3-5-haiku-20241022',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         agents: expect.arrayContaining([
           expect.objectContaining({
             threadId: session.getId(),

@@ -2,7 +2,7 @@
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
 import { NextRequest } from 'next/server';
-import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
@@ -11,6 +11,8 @@ import { z } from 'zod';
 const CreateSessionSchema = z.object({
   name: z.string().min(1, 'Session name is required'),
   description: z.string().optional(),
+  providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
+  modelId: z.string().min(1, 'Model ID is required'),
   configuration: z.record(z.unknown()).optional(),
 });
 
@@ -62,28 +64,12 @@ export async function POST(
 
     // Use sessionService to create session, which handles both database and in-memory management
     const sessionService = getSessionService();
-    let session;
-
-    if (validatedData.configuration?.providerInstanceId && validatedData.configuration?.modelId) {
-      // New provider instance system - pass instance ID and model ID directly
-      session = await sessionService.createSession(
-        validatedData.name,
-        validatedData.configuration.providerInstanceId as string,
-        validatedData.configuration.modelId as string,
-        projectId
-      );
-    } else {
-      // Old provider system for backward compatibility
-      const provider = (validatedData.configuration?.provider as string) || 'anthropic';
-      const model = (validatedData.configuration?.model as string) || 'claude-3-5-haiku-20241022';
-      
-      session = await sessionService.createSession(
-        validatedData.name,
-        provider,
-        model,
-        projectId
-      );
-    }
+    const session = await sessionService.createSession(
+      validatedData.name,
+      validatedData.providerInstanceId,
+      validatedData.modelId,
+      projectId
+    );
 
     return createSuperjsonResponse({ session }, { status: 201 });
   } catch (error: unknown) {

@@ -16,6 +16,10 @@ import { Tool } from '~/tools/tool';
 import { type ToolResult } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Enhanced test provider that can return tool calls once, then regular responses
@@ -70,9 +74,14 @@ describe('EventApprovalCallback Integration Tests', () => {
   let mockProvider: MockProviderWithToolCalls;
   let session: Session;
   let project: Project;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create real project
     project = Project.create(
@@ -90,8 +99,8 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Create real session with anthropic provider
     session = Session.create({
       name: 'Approval Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -132,6 +141,10 @@ describe('EventApprovalCallback Integration Tests', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   it('should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring approval', async () => {

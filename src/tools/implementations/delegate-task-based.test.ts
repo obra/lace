@@ -21,11 +21,11 @@ describe('Task-Based DelegateTool Integration', () => {
   let delegateTool: DelegateTool;
   let context: ToolContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
 
     // Use shared delegation test setup
-    testSetup = createDelegationTestSetup({
+    testSetup = await createDelegationTestSetup({
       sessionName: 'Task-Based Delegate Test Session',
       projectName: 'Task-Based Test Project',
       model: 'claude-sonnet-4-20250514',

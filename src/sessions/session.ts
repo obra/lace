@@ -37,10 +37,8 @@ export interface SessionInfo {
   id: ThreadId;
   name: string;
   createdAt: Date;
-  provider: string; // Backward compatibility - maps to provider type from instance
-  model: string; // Backward compatibility - maps to modelId
-  providerInstanceId?: string; // New field
-  modelId?: string; // New field
+  providerInstanceId: string;
+  modelId: string;
   agents: AgentInfo[];
 }
 
@@ -70,35 +68,14 @@ export class Session {
   static create(options: {
     name?: string;
     description?: string;
-    provider?: string;
-    model?: string;
-    providerInstanceId?: string;
-    modelId?: string;
+    providerInstanceId: string;
+    modelId: string;
     projectId: string;
     approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
     const name = options.name || Session.generateSessionName();
-
-    // Handle backward compatibility for old provider strings
-    let providerInstanceId: string;
-    let modelId: string;
-
-    if (options.providerInstanceId && options.modelId) {
-      // New interface
-      providerInstanceId = options.providerInstanceId;
-      modelId = options.modelId;
-    } else if (options.provider && options.model) {
-      // Old interface - create a temporary fallback
-      logger.warn('Using deprecated Session.create() with provider strings - this will be removed');
-      providerInstanceId = `fallback-${options.provider}`;
-      modelId = options.model;
-    } else {
-      // Provide defaults for tests that don't specify either
-      logger.warn('Session.create() called without provider configuration - using test defaults');
-      providerInstanceId = 'fallback-anthropic';
-      modelId = 'claude-3-5-haiku-20241022';
-    }
+    const { providerInstanceId, modelId } = options;
 
     // Store provider instance configuration for lazy resolution
     // We'll resolve the actual provider instance when needed
@@ -153,8 +130,6 @@ export class Session {
     sessionAgent.updateThreadMetadata({
       isSession: true,
       name: 'Lace', // Always name the coordinator agent "Lace"
-      provider,
-      model,
       providerInstanceId: options.providerInstanceId,
       modelId: options.modelId,
     });
@@ -186,8 +161,8 @@ export class Session {
       id: asThreadId(session.id),
       name: session.name,
       createdAt: session.createdAt,
-      provider: (session.configuration?.provider as string) || 'unknown',
-      model: (session.configuration?.model as string) || 'unknown',
+      providerInstanceId: (session.configuration?.providerInstanceId as string) || 'unknown',
+      modelId: (session.configuration?.modelId as string) || 'unknown',
       agents: [], // Will be populated later if needed
     }));
   }
@@ -526,8 +501,8 @@ export class Session {
       id: this._sessionId,
       name: sessionData?.name || 'Session ' + this._sessionId,
       createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
-      provider: this._sessionAgent.providerName,
-      model: (metadata?.model as string) || 'unknown',
+      providerInstanceId: (metadata?.providerInstanceId as string) || (sessionData?.configuration?.providerInstanceId as string) || 'unknown',
+      modelId: (metadata?.modelId as string) || (sessionData?.configuration?.modelId as string) || 'unknown',
       agents,
     };
   }
@@ -577,8 +552,6 @@ export class Session {
       name: agentName, // Use processed name
       isAgent: true,
       parentSessionId: this._sessionId,
-      provider: provider,
-      model: model,
       providerInstanceId: targetProviderInstanceId,
       modelId: targetModelId,
     });

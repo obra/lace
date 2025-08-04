@@ -35,8 +35,8 @@ describe('Agent Configuration', () => {
 
     // Create test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for agent config', {
-      provider: 'anthropic',
-      model: 'claude-3-sonnet',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-sonnet',
       maxTokens: 4000,
       temperature: 0.5,
     });
@@ -69,8 +69,8 @@ describe('Agent Configuration', () => {
     it('should validate valid agent configuration', () => {
       const config: AgentConfiguration = {
         role: 'code-reviewer',
-        provider: 'anthropic',
-        model: 'claude-3-haiku',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-haiku',
         temperature: 0.1,
         capabilities: ['code-analysis', 'security-review'],
         restrictions: ['no-file-write'],

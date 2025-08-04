@@ -5,6 +5,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 // Mock env-loader to control default provider detection
 vi.mock('~/config/env-loader', () => ({
@@ -16,11 +20,25 @@ vi.mock('~/config/env-loader', () => ({
 }));
 
 describe('Project', () => {
-  beforeEach(() => {
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+
+  beforeEach(async () => {
     setupTestPersistence();
+    
+    // Set up provider instances for session creation
+    process.env.ANTHROPIC_KEY = 'test-key';
+    process.env.OPENAI_API_KEY = 'test-key';
+    testProviderInstances = await setupTestProviderInstances();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
     teardownTestPersistence();
   });
 
@@ -149,7 +167,7 @@ describe('Project', () => {
           isArchived: false,
           createdAt: expect.any(Date) as Date,
           lastUsedAt: expect.any(Date) as Date,
-          sessionCount: 1,
+          sessionCount: 0,
         });
       });
 
@@ -269,22 +287,23 @@ describe('Project', () => {
 
     describe('session management', () => {
       describe('getSessions', () => {
-        it('should return auto-created session', () => {
+        it('should return empty sessions list when no sessions created', () => {
           const sessions = project.getSessions();
-          expect(sessions).toHaveLength(1);
-          expect(sessions[0].projectId).toBe(project.getId());
+          expect(sessions).toHaveLength(0);
         });
 
         it('should return sessions for the project', () => {
-          // Create a session (in addition to auto-created one)
+          // Create a session with provider instance
           const session = Session.create({
             name: 'Test Session',
             projectId: project.getId(),
             description: 'A test session',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const sessions = project.getSessions();
-          expect(sessions).toHaveLength(2);
+          expect(sessions).toHaveLength(1);
           expect(sessions.find((s) => s.id === session.getId())).toBeDefined();
           expect(sessions.find((s) => s.name === 'Test Session')).toBeDefined();
           expect(sessions.every((s) => s.projectId === project.getId())).toBe(true);
@@ -293,12 +312,22 @@ describe('Project', () => {
         it('should not return sessions from other projects', () => {
           const otherProject = Project.create('Other Project', '/other/path');
 
-          // Create sessions in both projects (in addition to auto-created ones)
-          Session.create({ name: 'Project 1 Session', projectId: project.getId() });
-          Session.create({ name: 'Project 2 Session', projectId: otherProject.getId() });
+          // Create sessions in both projects
+          Session.create({
+            name: 'Project 1 Session',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
+          Session.create({
+            name: 'Project 2 Session',
+            projectId: otherProject.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
 
           const sessions = project.getSessions();
-          expect(sessions).toHaveLength(2); // Auto-created + manually created
+          expect(sessions).toHaveLength(1); // Only the one created for this project
           expect(sessions.find((s) => s.name === 'Project 1 Session')).toBeDefined();
           expect(sessions.find((s) => s.name === 'Project 2 Session')).toBeUndefined();
           expect(sessions.every((s) => s.projectId === project.getId())).toBe(true);
@@ -311,6 +340,8 @@ describe('Project', () => {
             name: 'Test Session',
             projectId: project.getId(),
             description: 'A test session',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
             configuration: { key: 'value' },
           });
 
@@ -321,8 +352,8 @@ describe('Project', () => {
           expect(sessionData?.description).toBe('A test session');
           expect(sessionData?.configuration).toEqual({
             key: 'value',
-            provider: 'anthropic',
-            model: 'claude-sonnet-4-20250514',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
           expect(sessionData?.status).toBe('active');
           expect(sessionData?.createdAt).toBeInstanceOf(Date);
@@ -330,13 +361,18 @@ describe('Project', () => {
         });
 
         it('should create session with default values', () => {
-          const session = Session.create({ name: 'Test Session', projectId: project.getId() });
+          const session = Session.create({
+            name: 'Test Session',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
 
           const sessionData = Session.getSession(session.getId());
           expect(sessionData?.description).toBe('');
           expect(sessionData?.configuration).toEqual({
-            provider: 'anthropic',
-            model: 'claude-sonnet-4-20250514',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
           expect(sessionData?.status).toBe('active');
         });
@@ -347,6 +383,8 @@ describe('Project', () => {
           const createdSession = Session.create({
             name: 'Test Session',
             projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const session = project.getSession(createdSession.getId());
@@ -365,6 +403,8 @@ describe('Project', () => {
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const session = project.getSession(otherSession.getId());
@@ -380,6 +420,8 @@ describe('Project', () => {
             name: 'Test Session',
             projectId: project.getId(),
             description: 'Original description',
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
         });
 
@@ -408,6 +450,8 @@ describe('Project', () => {
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const updatedSession = project.updateSession(otherSession.getId(), { name: 'Updated' });
@@ -432,7 +476,12 @@ describe('Project', () => {
         let session: ReturnType<typeof Session.create>;
 
         beforeEach(() => {
-          session = Session.create({ name: 'Test Session', projectId: project.getId() });
+          session = Session.create({
+            name: 'Test Session',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
         });
 
         it('should delete session successfully', () => {
@@ -452,6 +501,8 @@ describe('Project', () => {
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const result = project.deleteSession(otherSession.getId());
@@ -460,28 +511,48 @@ describe('Project', () => {
       });
 
       describe('getSessionCount', () => {
-        it('should return 1 for auto-created session', () => {
-          expect(project.getSessionCount()).toBe(1);
+        it('should return 0 when no sessions created', () => {
+          expect(project.getSessionCount()).toBe(0);
         });
 
         it('should return correct count', () => {
-          Session.create({ name: 'Session 1', projectId: project.getId() });
-          Session.create({ name: 'Session 2', projectId: project.getId() });
+          Session.create({
+            name: 'Session 1',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
+          Session.create({
+            name: 'Session 2',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
 
-          expect(project.getSessionCount()).toBe(3); // Auto-created + 2 manual
+          expect(project.getSessionCount()).toBe(2); // 2 manual sessions
         });
 
         it('should update when sessions are deleted', () => {
-          const session1 = Session.create({ name: 'Session 1', projectId: project.getId() });
-          const session2 = Session.create({ name: 'Session 2', projectId: project.getId() });
+          const session1 = Session.create({
+            name: 'Session 1',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
+          const session2 = Session.create({
+            name: 'Session 2',
+            projectId: project.getId(),
+            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          });
 
-          expect(project.getSessionCount()).toBe(3); // Auto-created + 2 manual
+          expect(project.getSessionCount()).toBe(2); // 2 manual sessions
 
           project.deleteSession(session1.getId());
-          expect(project.getSessionCount()).toBe(2);
+          expect(project.getSessionCount()).toBe(1);
 
           project.deleteSession(session2.getId());
-          expect(project.getSessionCount()).toBe(1); // Auto-created session remains
+          expect(project.getSessionCount()).toBe(0); // No sessions remain
         });
       });
     });

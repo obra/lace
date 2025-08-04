@@ -6,22 +6,31 @@ import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('Bulk Task Creation', () => {
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create session with TaskManager like real usage
     project = Project.create('Test Project', '/tmp/test-bulk-tasks');
 
     session = Session.create({
       name: 'Bulk Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 
@@ -29,9 +38,13 @@ describe('Bulk Task Creation', () => {
     tool = new TaskCreateTool();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     session?.destroy();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   it('should create multiple tasks from tasks array', async () => {

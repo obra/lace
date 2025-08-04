@@ -13,6 +13,10 @@ import {
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ProviderRegistry } from '~/providers/registry';
@@ -85,6 +89,10 @@ describe('Task Management Workflow Integration', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
   // Tool instances
   let taskCreateTool: TaskCreateTool;
@@ -95,8 +103,9 @@ describe('Task Management Workflow Integration', () => {
   let taskViewTool: TaskViewTool;
   let delegateTool: DelegateTool;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -114,8 +123,8 @@ describe('Task Management Workflow Integration', () => {
     project = Project.create('Task Workflow Integration Test Project', '/tmp/test-workflow');
     session = Session.create({
       name: 'Task Workflow Integration Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
@@ -134,10 +143,14 @@ describe('Task Management Workflow Integration', () => {
     delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   describe('Basic Task Lifecycle', () => {

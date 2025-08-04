@@ -10,6 +10,10 @@ import { Agent } from '~/agents/agent';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ToolCall, ToolContext } from '~/tools/types';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('ToolExecutor Security with Real Session Context', () => {
   const tempDirContext = useTempLaceDir();
@@ -17,9 +21,16 @@ describe('ToolExecutor Security with Real Session Context', () => {
   let session: Session;
   let agent: Agent;
   let project: Project;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+
+    // Set up test provider instances
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create real project
     project = Project.create(
@@ -32,8 +43,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
     // Create real session
     session = Session.create({
       name: 'Security Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -57,7 +68,12 @@ describe('ToolExecutor Security with Real Session Context', () => {
     toolExecutor.setApprovalCallback(approvalCallback);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up provider instances
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
     teardownTestPersistence();
   });
 
@@ -129,8 +145,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       // Create session with explicit allow policy for file-read
       const permissiveSession = Session.create({
         name: 'Permissive Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
           toolPolicies: {
@@ -160,8 +176,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       // Create session with explicit deny policy for bash
       const restrictiveSession = Session.create({
         name: 'Restrictive Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
           toolPolicies: {

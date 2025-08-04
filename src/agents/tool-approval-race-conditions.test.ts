@@ -13,6 +13,10 @@ import { ApprovalDecision } from '~/tools/approval-types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import type { ProviderResponse } from '~/providers/base-provider';
 
 // Mock provider that can return tool calls once then regular responses
@@ -64,9 +68,14 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   let bashTool: BashTool;
   let session: Session;
   let project: Project;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
 
     // Create real project and session for proper context
     project = Project.create(
@@ -78,8 +87,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
 
     session = Session.create({
       name: 'Race Condition Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -108,8 +117,12 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   describe('defense-in-depth integration', () => {

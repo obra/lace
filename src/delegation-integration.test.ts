@@ -7,6 +7,10 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -83,9 +87,14 @@ describe('Delegation Integration Tests', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    testProviderInstances = await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -110,8 +119,8 @@ describe('Delegation Integration Tests', () => {
     project = Project.create('Test Project', '/tmp/test-delegation');
     session = Session.create({
       name: 'Delegation Integration Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
@@ -119,11 +128,15 @@ describe('Delegation Integration Tests', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
     threadManager.close();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ]);
   });
 
   it('should create hierarchical delegate thread IDs', () => {

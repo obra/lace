@@ -7,6 +7,10 @@ import { Project } from '~/projects/project';
 import { ProviderRegistry } from '~/providers/registry';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { DelegationMockProvider } from '~/test-utils/delegation-mock-provider';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 export interface DelegationTestSetup {
   session: Session;
@@ -14,13 +18,16 @@ export interface DelegationTestSetup {
   mockProvider: DelegationMockProvider;
 }
 
-export function createDelegationTestSetup(options?: {
+export async function createDelegationTestSetup(options?: {
   sessionName?: string;
   projectName?: string;
   projectPath?: string;
   provider?: string;
   model?: string;
-}): DelegationTestSetup {
+}): Promise<DelegationTestSetup> {
+  // Set up test provider instances
+  const testProviderInstances = await setupTestProviderInstances();
+  
   const mockProvider = new DelegationMockProvider(
     options?.provider || 'anthropic',
     options?.model || 'claude-3-5-haiku-20241022'
@@ -45,8 +52,8 @@ export function createDelegationTestSetup(options?: {
 
   const session = Session.create({
     name: options?.sessionName || 'Delegation Test Session',
-    provider: options?.provider || 'anthropic',
-    model: options?.model || 'claude-3-5-haiku-20241022',
+    providerInstanceId: testProviderInstances.anthropicInstanceId,
+    modelId: options?.model || 'claude-3-5-haiku-20241022',
     projectId: project.getId(),
     approvalCallback: {
       requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
