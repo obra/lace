@@ -84,18 +84,29 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       // Click the entire project card (entire card is clickable)
       await existingProject.click();
     } else {
-      // Create a new project for testing
-      await page.click('text="Create New Project"');
+      // Create a new project for testing - check for auto-opened modal first
+      const modalHeading = page
+        .getByRole('heading', { name: 'Welcome to Lace' })
+        .or(page.getByRole('heading', { name: 'Create New Project' }));
 
-      // Fill both required form fields using actual placeholder text
-      await page.fill('input[placeholder="Enter project name"]', 'E2E Test Project');
-      await page.fill('input[placeholder="/path/to/project"]', '/tmp/e2e-test-project');
+      try {
+        // Wait a bit to see if modal auto-opens
+        await expect(modalHeading).toBeVisible({ timeout: 5000 });
+        // Modal is already open, proceed directly
+      } catch {
+        // Modal not visible, click the New Project button
+        await page.getByTestId('new-project-button').click();
+        // Now wait for modal to appear after clicking
+        await expect(modalHeading).toBeVisible({ timeout: 15000 });
+      }
+
+      // Fill both required form fields using test IDs
+      await page.getByTestId('project-path-input').fill('/tmp/e2e-test-project');
 
       // Wait for the button to be enabled (only enabled after both fields filled)
-      await page.waitForSelector('button:text("Create Project"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Project")');
+      const createButton = page.getByTestId('create-project-submit-button');
+      await expect(createButton).toBeEnabled({ timeout: 5000 });
+      await createButton.click();
     }
 
     // Verify URL contains project hash
@@ -116,7 +127,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should persist session selection across page reloads', async ({ page }) => {
     // Start at the base URL
-    await page.goto('http://localhost:3005');
+    await page.goto(testServer.baseURL);
 
     // Navigate through project → session selection - wait for page to load
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
@@ -127,14 +138,26 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       // Click the project heading (entire project card is clickable)
       await existingProject.click();
     } else {
-      // Create project if none exists
-      await page.click('text="Create New Project"');
-      await page.fill('input[placeholder="Enter project name"]', 'E2E Hash Test Project');
-      await page.fill('input[placeholder="/path/to/project"]', '/tmp/e2e-hash-test-project');
-      await page.waitForSelector('button:text("Create Project"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Project")');
+      // Create project if none exists - check for auto-opened modal first
+      const modalHeading = page
+        .getByRole('heading', { name: 'Welcome to Lace' })
+        .or(page.getByRole('heading', { name: 'Create New Project' }));
+
+      try {
+        // Wait a bit to see if modal auto-opens
+        await expect(modalHeading).toBeVisible({ timeout: 5000 });
+        // Modal is already open, proceed directly
+      } catch {
+        // Modal not visible, click the New Project button
+        await page.getByTestId('new-project-button').click();
+        // Now wait for modal to appear after clicking
+        await expect(modalHeading).toBeVisible({ timeout: 15000 });
+      }
+
+      await page.getByTestId('project-path-input').fill('/tmp/e2e-hash-test-project');
+      const createButton = page.getByTestId('create-project-submit-button');
+      await expect(createButton).toBeEnabled({ timeout: 5000 });
+      await createButton.click();
     }
 
     // Wait for project page to load and look for sessions
@@ -193,7 +216,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     page,
   }) => {
     // Navigate to the app
-    await page.goto('http://localhost:3005');
+    await page.goto(testServer.baseURL);
 
     // Navigate through the full hierarchy: project → session → agent
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
@@ -206,13 +229,26 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       // Click the project heading (entire project card is clickable)
       await existingProject.click();
     } else {
-      await page.click('text="Create New Project"');
-      await page.fill('input[placeholder="Enter project name"]', 'E2E Full Hierarchy Test');
-      await page.fill('input[placeholder="/path/to/project"]', '/tmp/e2e-full-hierarchy-test');
-      await page.waitForSelector('button:text("Create Project"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Project")');
+      // Check for auto-opened modal first
+      const modalHeading = page
+        .getByRole('heading', { name: 'Welcome to Lace' })
+        .or(page.getByRole('heading', { name: 'Create New Project' }));
+
+      try {
+        // Wait a bit to see if modal auto-opens
+        await expect(modalHeading).toBeVisible({ timeout: 5000 });
+        // Modal is already open, proceed directly
+      } catch {
+        // Modal not visible, click the New Project button
+        await page.getByTestId('new-project-button').click();
+        // Now wait for modal to appear after clicking
+        await expect(modalHeading).toBeVisible({ timeout: 15000 });
+      }
+
+      await page.getByTestId('project-path-input').fill('/tmp/e2e-full-hierarchy-test');
+      const createButton = page.getByTestId('create-project-submit-button');
+      await expect(createButton).toBeEnabled({ timeout: 5000 });
+      await createButton.click();
     }
 
     // Select or create a session
@@ -293,7 +329,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test.skip('should handle browser back/forward navigation correctly', async ({ page }) => {
     // Navigate to the app
-    await page.goto('http://localhost:3005');
+    await page.goto(testServer.baseURL);
 
     // Navigate through the hierarchy step by step to test back navigation
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
@@ -306,13 +342,26 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       // Click the project heading (entire project card is clickable)
       await existingProject.click();
     } else {
-      await page.click('text="Create New Project"');
-      await page.fill('input[placeholder="Enter project name"]', 'E2E Navigation Test');
-      await page.fill('input[placeholder="/path/to/project"]', '/tmp/e2e-navigation-test');
-      await page.waitForSelector('button:text("Create Project"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Project")');
+      // Check for auto-opened modal first
+      const modalHeading = page
+        .getByRole('heading', { name: 'Welcome to Lace' })
+        .or(page.getByRole('heading', { name: 'Create New Project' }));
+
+      try {
+        // Wait a bit to see if modal auto-opens
+        await expect(modalHeading).toBeVisible({ timeout: 5000 });
+        // Modal is already open, proceed directly
+      } catch {
+        // Modal not visible, click the New Project button
+        await page.getByTestId('new-project-button').click();
+        // Now wait for modal to appear after clicking
+        await expect(modalHeading).toBeVisible({ timeout: 15000 });
+      }
+
+      await page.getByTestId('project-path-input').fill('/tmp/e2e-navigation-test');
+      const createButton = page.getByTestId('create-project-submit-button');
+      await expect(createButton).toBeEnabled({ timeout: 5000 });
+      await createButton.click();
     }
 
     const projectUrl = page.url();
@@ -381,7 +430,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should handle invalid URLs gracefully', async ({ page }) => {
     // Test with invalid project ID
-    await page.goto('http://localhost:3005/#/project/invalid-project-id');
+    await page.goto(`${testServer.baseURL}/#/project/invalid-project-id`);
 
     // Should fallback to project selection view
     await expect(
@@ -389,7 +438,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     ).toBeVisible();
 
     // Test with malformed URL
-    await page.goto('http://localhost:3005/#/invalid/path/structure');
+    await page.goto(`${testServer.baseURL}/#/invalid/path/structure`);
 
     // Should fallback to project selection
     await expect(
@@ -397,7 +446,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     ).toBeVisible();
 
     // Test with partial hierarchy (agent without session)
-    await page.goto('http://localhost:3005/#/project/test/agent/invalid');
+    await page.goto(`${testServer.baseURL}/#/project/test/agent/invalid`);
 
     // Should fallback appropriately (likely to project view since session is missing)
     await expect(
@@ -431,7 +480,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
         // Verify we have a valid session URL
         if (deepLinkUrl.includes('/session/')) {
           // Open new page/tab simulation by navigating away and back
-          await page.goto('http://localhost:3005');
+          await page.goto(testServer.baseURL);
 
           // Now use the deep link
           await page.goto(deepLinkUrl);
