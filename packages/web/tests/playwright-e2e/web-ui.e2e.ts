@@ -16,12 +16,19 @@ test.describe('Web UI End-to-End Tests', () => {
   let testEnv: TestEnvironment;
   let testServer: TestServer;
 
+  test.beforeAll(async () => {
+    // Start one server for the entire test file
+    testServer = await startTestServer();
+  });
+
+  test.afterAll(async () => {
+    // Clean up server after all tests in this file complete
+    await testServer.cleanup();
+  });
+
   test.beforeEach(async ({ page }) => {
     // Set up test environment using reusable utilities
     testEnv = await setupTestEnvironment();
-
-    // Start a test server for this test
-    testServer = await startTestServer();
 
     // Set up environment with test key
     process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
@@ -41,8 +48,8 @@ test.describe('Web UI End-to-End Tests', () => {
   });
 
   test.afterEach(async () => {
+    // Clean up test environment after each test
     await cleanupTestEnvironment(testEnv);
-    await testServer.cleanup();
   });
 
   test.describe('Project and Session Management', () => {

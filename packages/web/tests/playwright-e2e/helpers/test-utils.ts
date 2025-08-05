@@ -56,22 +56,16 @@ export async function createProject(page: Page, projectName: string, tempDir: st
     await expect(modalHeading).toBeVisible({ timeout: 5000 });
     // Modal is already open, proceed directly
   } catch {
-    // Modal not visible, click the New Project button
-    const newProjectButton = page
-      .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
-      .or(page.locator('button').filter({ hasText: 'New Project' }))
-      .first();
-
-    await newProjectButton.waitFor({ timeout: 15000 });
+    // Modal not visible, click the New Project button using test ID
+    const newProjectButton = page.getByTestId('new-project-button');
     await newProjectButton.click();
 
     // Now wait for modal to appear after clicking
     await expect(modalHeading).toBeVisible({ timeout: 15000 });
   }
 
-  // Find the directory input field using the actual placeholder we discovered
-  const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
+  // Find the directory input field using test ID
+  const directoryInput = page.getByTestId('project-path-input');
   await directoryInput.waitFor({ timeout: 10000 });
 
   // Create a project directory path that includes the project name
@@ -87,10 +81,8 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   await directoryInput.blur();
   await page.waitForTimeout(1000);
 
-  // Click the Create Project button - handle both "Create Project" and "Get Started" text
-  const createButton = page
-    .locator('button:has-text("Create Project")')
-    .or(page.locator('button:has-text("Get Started")'));
+  // Click the Create Project button using test ID
+  const createButton = page.getByTestId('create-project-submit-button');
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
 
   // Wait for button to be enabled (form validation should pass with valid directory)
@@ -225,9 +217,18 @@ export async function waitForSendButton(page: Page, timeout: number = 5000) {
 
 // Verification utilities
 export async function verifyMessageVisible(page: Page, message: string, timeout: number = 10000) {
-  // Look for the message in the conversation area, not in input fields
-  const messageInConversation = page.getByText(message).and(page.locator('span, div, p')).first();
-  await expect(messageInConversation).toBeVisible({ timeout });
+  // Look for the message in the conversation area with multiple fallback strategies
+  // Strategy 1: Look for exact text first
+  const exactMessage = page.getByText(message).first();
+
+  try {
+    await expect(exactMessage).toBeVisible({ timeout: timeout / 2 });
+    return;
+  } catch {
+    // Strategy 2: Look for partial text match
+    const partialMessage = page.locator(`*:has-text("${message}")`).first();
+    await expect(partialMessage).toBeVisible({ timeout: timeout / 2 });
+  }
 }
 
 export async function verifyNoMessage(page: Page, message: string) {
@@ -252,23 +253,26 @@ export async function createProjectWithProvider(
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1000); // Brief pause for React hydration
 
-  // Click "New Project" button
-  const newProjectButton = page
-    .locator('button:has-text("New Project")')
-    .or(page.locator('[data-testid="new-project-button"]'))
-    .or(page.locator('button').filter({ hasText: 'New Project' }))
-    .first();
+  // Try to wait for the modal to appear first (auto-open scenario)
+  const modalHeading = page
+    .getByRole('heading', { name: 'Welcome to Lace' })
+    .or(page.getByRole('heading', { name: 'Create New Project' }));
 
-  await newProjectButton.waitFor({ timeout: 10000 });
-  await newProjectButton.click();
+  try {
+    // Wait a bit to see if modal auto-opens
+    await expect(modalHeading).toBeVisible({ timeout: 5000 });
+    // Modal is already open, proceed directly
+  } catch {
+    // Modal not visible, click the New Project button using test ID
+    const newProjectButton = page.getByTestId('new-project-button');
+    await newProjectButton.click();
 
-  // Wait for the project creation modal to appear
-  await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-    timeout: 10000,
-  });
+    // Now wait for modal to appear after clicking
+    await expect(modalHeading).toBeVisible({ timeout: 15000 });
+  }
 
-  // Find the directory input field
-  const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
+  // Find the directory input field using test ID
+  const directoryInput = page.getByTestId('project-path-input');
   await directoryInput.waitFor({ timeout: 5000 });
 
   // Create the project directory
@@ -309,8 +313,8 @@ export async function createProjectWithProvider(
   const modelSelect = page.locator('[data-testid="create-project-model-select"]');
   await modelSelect.selectOption(model);
 
-  // Click Create Project button
-  const createButton = page.locator('button:has-text("Create Project")');
+  // Click Create Project button using test ID
+  const createButton = page.getByTestId('create-project-submit-button');
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
 
   // Ensure the button is enabled

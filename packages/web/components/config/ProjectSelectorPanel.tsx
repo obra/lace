@@ -502,6 +502,7 @@ export function ProjectSelectorPanel({
           onClick={() => setShowCreateProject(true)}
           className="btn btn-primary"
           disabled={loading}
+          data-testid="new-project-button"
         >
           <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
           New Project
@@ -716,6 +717,7 @@ export function ProjectSelectorPanel({
                       placeholder="Enter project name"
                       required
                       autoFocus
+                      data-testid="project-name-input"
                     />
                   </div>
                   
@@ -745,6 +747,7 @@ export function ProjectSelectorPanel({
                     className="input input-bordered w-full"
                     placeholder="/path/to/project"
                     required
+                    data-testid="project-path-input"
                   />
                 </div>
 
@@ -973,6 +976,7 @@ export function ProjectSelectorPanel({
                         placeholder="/path/to/your/project"
                         required
                         autoFocus
+                        data-testid="project-path-input"
                       />
                     </div>
 
@@ -1017,6 +1021,7 @@ export function ProjectSelectorPanel({
                       placeholder="Enter project name"
                       required
                       autoFocus
+                      data-testid="project-name-input"
                     />
                   </div>
                   
@@ -1207,6 +1212,7 @@ export function ProjectSelectorPanel({
                   type="submit"
                   className="btn btn-primary"
                   disabled={!createName.trim() || !createWorkingDirectory.trim() || loading}
+                  data-testid="create-project-submit-button"
                 >
                   {loading ? (
                     <>

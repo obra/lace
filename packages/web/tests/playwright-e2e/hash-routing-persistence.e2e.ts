@@ -17,15 +17,22 @@ test.describe('Hash-Based URL Persistence E2E', () => {
   let originalAnthropicKey: string | undefined;
   let testServer: TestServer;
 
+  test.beforeAll(async () => {
+    // Start one server for the entire test file
+    testServer = await startTestServer();
+  });
+
+  test.afterAll(async () => {
+    // Clean up server after all tests in this file complete
+    await testServer.cleanup();
+  });
+
   test.beforeEach(async () => {
     // Create fresh temp directory for each test
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lace-hash-e2e-test-'));
     originalLaceDir = process.env.LACE_DIR;
     originalAnthropicKey = process.env.ANTHROPIC_KEY;
     process.env.LACE_DIR = tempDir;
-
-    // Start test server
-    testServer = await startTestServer();
 
     // Set test environment variables
     // Use real ANTHROPIC_KEY if available, otherwise use a placeholder that may cause expected server errors
@@ -36,8 +43,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
   });
 
   test.afterEach(async () => {
-    // Clean up server
-    await testServer.cleanup();
+    // Clean up test environment
 
     // Clean up after each test
     if (originalLaceDir !== undefined) {

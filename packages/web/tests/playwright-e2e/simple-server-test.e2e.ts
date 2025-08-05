@@ -1,4 +1,4 @@
-// ABOUTME: Simple test to verify server-per-test works without complex UI interactions
+// ABOUTME: Simple test to verify server-per-file works without complex UI interactions
 // ABOUTME: Tests basic server startup and navigation without project creation
 
 import { test, expect } from '@playwright/test';
@@ -7,11 +7,13 @@ import { startTestServer, type TestServer } from './helpers/test-server';
 test.describe('Simple Server Test', () => {
   let testServer: TestServer;
 
-  test.beforeEach(async () => {
+  test.beforeAll(async () => {
+    // Start one server for the entire test file
     testServer = await startTestServer();
   });
 
-  test.afterEach(async () => {
+  test.afterAll(async () => {
+    // Clean up server after all tests in this file complete
     await testServer.cleanup();
   });
 
@@ -34,11 +36,11 @@ test.describe('Simple Server Test', () => {
     expect(response.ok()).toBeTruthy();
   });
 
-  test('should handle multiple test servers independently', async ({ page }) => {
-    // This test verifies that each test gets its own isolated server
+  test('should share server across tests in same file', async ({ page }) => {
+    // This test verifies that tests in the same file share one server instance
     await page.goto(testServer.baseURL);
 
-    // The server port should be unique for this test
+    // The server port should be consistent across tests in this file
     expect(testServer.port).toBeGreaterThan(1024);
     expect(testServer.baseURL).toContain(`localhost:${testServer.port}`);
 

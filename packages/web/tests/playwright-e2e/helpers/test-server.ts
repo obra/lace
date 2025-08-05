@@ -42,12 +42,12 @@ export async function startTestServer(): Promise<TestServer> {
   // Get a random available port
   const port = await getAvailablePort();
 
-  // Create Next.js app in development mode for easier debugging
+  // Create Next.js app with minimal dev features for test stability
   const app = next({
-    dev: true, // Use dev mode for easier debugging
+    dev: true, // Keep dev mode but disable problematic features
     dir: process.cwd(),
     quiet: true, // Reduce noise in test output
-    turbo: false, // Disable turbo mode for more stable testing
+    turbo: false, // Disable turbo mode
   });
 
   const handle = app.getRequestHandler();
@@ -91,33 +91,45 @@ export async function startTestServer(): Promise<TestServer> {
     baseURL,
     cleanup: async () => {
       try {
-        // Force close any remaining connections first (Node.js 18.2+)
+        // Close Next.js app first to stop accepting new requests
+        if (app.close) {
+          await Promise.race([
+            app.close(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Next.js app close timeout')), 3000)
+            ),
+          ]);
+        }
+
+        // Give a moment for in-flight requests to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Force close all connections (Node.js 18.2+)
         if (typeof server.closeAllConnections === 'function') {
           server.closeAllConnections();
         }
 
-        // Close the HTTP server with timeout
+        // Close the HTTP server with shorter timeout
         await Promise.race([
           new Promise<void>((resolve) => {
             server.close(() => resolve());
           }),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Server close timeout')), 5000)
+            setTimeout(() => reject(new Error('Server close timeout')), 2000)
           ),
         ]);
-
-        // Close the Next.js app with timeout
-        if (app.close) {
-          await Promise.race([
-            app.close(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Next.js app close timeout')), 5000)
-            ),
-          ]);
-        }
       } catch (error) {
+        // Log but don't fail tests due to cleanup issues
         console.warn('Warning: Error during server cleanup:', error);
-        // Continue cleanup even if there are errors
+
+        // Force destroy as last resort
+        try {
+          if (typeof server.destroy === 'function') {
+            server.destroy();
+          }
+        } catch (destroyError) {
+          // Ignore destroy errors - best effort cleanup
+        }
       }
     },
   };

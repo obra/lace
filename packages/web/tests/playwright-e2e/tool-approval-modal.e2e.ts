@@ -17,9 +17,18 @@ test.describe('Tool Approval Modal E2E Tests', () => {
   let testEnv: TestEnvironment;
   let testServer: TestServer;
 
+  test.beforeAll(async () => {
+    // Start one server for the entire test file
+    testServer = await startTestServer();
+  });
+
+  test.afterAll(async () => {
+    // Clean up server after all tests in this file complete
+    await testServer.cleanup();
+  });
+
   test.beforeEach(async ({ page }) => {
     testEnv = await setupTestEnvironment();
-    testServer = await startTestServer();
     process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
 
     // Add console and error listeners for debugging
@@ -51,8 +60,8 @@ test.describe('Tool Approval Modal E2E Tests', () => {
   });
 
   test.afterEach(async () => {
+    // Clean up test environment after each test
     await cleanupTestEnvironment(testEnv);
-    await testServer.cleanup();
   });
 
   test('should display basic UI elements', async ({ page }) => {
