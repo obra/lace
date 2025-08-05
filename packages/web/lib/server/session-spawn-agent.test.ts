@@ -10,11 +10,13 @@ import { Session, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir as _useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Session.spawnAgent Method', () => {
+  const _tempDirContext = _useTempLaceDir();
   let session: Session;
   let projectId: string;
   let testProviderInstances: {

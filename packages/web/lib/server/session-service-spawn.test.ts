@@ -11,6 +11,7 @@ import { Project } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -35,6 +36,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('SessionService.spawnAgent Method', () => {
+  const _tempDirContext = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;

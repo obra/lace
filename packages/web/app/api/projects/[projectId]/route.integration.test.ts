@@ -85,6 +85,25 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return project with correct session count', async () => {
+      // Debug: Check what instances exist
+      
+      // Check what files exist in LACE_DIR
+      const fs = require('fs');
+      const path = require('path');
+      const laceDir = process.env.LACE_DIR;
+      if (laceDir && fs.existsSync(laceDir)) {
+        console.log('Files in LACE_DIR:', fs.readdirSync(laceDir));
+        const instancesFile = path.join(laceDir, 'provider-instances.json');
+        if (fs.existsSync(instancesFile)) {
+          const content = fs.readFileSync(instancesFile, 'utf-8');
+          console.log('provider-instances.json content:', content);
+        } else {
+          console.log('provider-instances.json does not exist');
+        }
+      } else {
+        console.log('LACE_DIR does not exist or is not set');
+      }
+      
       // Add some sessions to the project
       Session.create({ 
         name: 'Session 1', 

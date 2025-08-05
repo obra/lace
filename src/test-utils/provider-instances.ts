@@ -91,7 +91,7 @@ export async function setupTestProviderInstances(): Promise<{
 }> {
   logger.debug('Setting up common test provider instances');
 
-  const [anthropicInstanceId, openaiInstanceId] = await Promise.all([
+  const [_anthropicInstanceId, _openaiInstanceId] = await Promise.all([
     createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],

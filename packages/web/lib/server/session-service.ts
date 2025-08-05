@@ -17,8 +17,6 @@ export class SessionService {
 
   async createSession(
     name: string,
-    providerInstanceId: string,
-    modelId: string,
     projectId: string
   ): Promise<SessionInfo> {
     // Create project-based session

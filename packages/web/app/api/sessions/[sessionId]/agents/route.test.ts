@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
@@ -44,6 +45,7 @@ interface ErrorResponse {
 // Note: parseResponse is imported from @/lib/serialization
 
 describe('Agent Spawning API E2E Tests', () => {
+  const _tempDirContext = useTempLaceDir();
   let sessionService: SessionService;
   let testProject: Project;
   let sessionId: string;

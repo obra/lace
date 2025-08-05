@@ -12,11 +12,13 @@ import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Agent Spawning and Thread Creation', () => {
+  const _tempDirContext = useTempLaceDir();
   let session: Session;
   let projectId: string;
   let testProviderInstances: {

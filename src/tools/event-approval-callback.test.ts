@@ -388,7 +388,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     let approvalRequestCalls: unknown[] = [];
     let attempts = 0;
     const maxAttempts = 20; // 200ms total timeout
-    
+
     while (attempts < maxAttempts && approvalRequestCalls.length === 0) {
       await new Promise((resolve) => setTimeout(resolve, 10));
       approvalRequestCalls = eventSpy.mock.calls.filter(
@@ -399,7 +399,11 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Should have emitted the TOOL_APPROVAL_REQUEST event
     expect(approvalRequestCalls).toHaveLength(1);
-    expect((approvalRequestCalls[0][0] as { event: { data: unknown } }).event.data).toEqual({
+    const approvalRequestCall = approvalRequestCalls[0] as unknown[];
+    const approvalRequestEvent = approvalRequestCall[0] as {
+      event: { data: { toolCallId: string } };
+    };
+    expect(approvalRequestEvent.event.data).toEqual({
       toolCallId: 'call_emit_test',
     });
 

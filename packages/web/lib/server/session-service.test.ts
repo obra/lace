@@ -58,8 +58,6 @@ describe('SessionService with Provider Instances', () => {
     // Now the test should pass - createSession should resolve the provider instance  
     const session = await sessionService.createSession(
       'Test Session',
-      'test-instance-id',
-      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
 

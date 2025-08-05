@@ -14,6 +14,7 @@ import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
@@ -24,6 +25,7 @@ let originalConsoleError: typeof console.error;
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Thread Messaging API', () => {
+  const _tempDirContext = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let realSessionId: string;

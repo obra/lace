@@ -10,7 +10,7 @@ import {
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import { ProviderRegistry } from '~/providers/registry';
-import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from '~/providers/base-provider';
+import { AIProvider, ProviderInfo, ModelInfo } from '~/providers/base-provider';
 
 export interface DelegationTestSetup {
   session: Session;
@@ -81,7 +81,7 @@ export async function createDelegationTestSetup(options?: {
       return this._config.model || 'claude-3-5-haiku-20241022';
     }
 
-    async createResponse(messages: any, tools: any) {
+    async createResponse(messages: any, _tools: any) {
       // Look for task assignment patterns (delegation-specific logic)
       const taskMessage = messages.find(
         (m: any) =>
@@ -190,7 +190,7 @@ export async function createDelegationTestSetup(options?: {
 
   // Mock the createProvider method to return our AIProvider-based mock provider
   vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-    (providerType: string, config: any) => {
+    (providerType: string, _config: any) => {
       return new MockProvider(providerType, model);
     }
   );

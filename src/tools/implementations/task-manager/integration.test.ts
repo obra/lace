@@ -14,7 +14,6 @@ import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
   cleanupTestProviderInstances,
   createTestProviderInstance,
 } from '~/test-utils/provider-instances';
