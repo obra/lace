@@ -7,6 +7,29 @@ import { beforeAll, afterAll, afterEach } from 'vitest';
 
 export type SupportedProvider = 'anthropic' | 'openai' | 'ollama' | 'lmstudio';
 
+// Anthropic API types for proper response structure
+type AnthropicContent = Array<{
+  type: 'text' | 'tool_use';
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+}>;
+
+// OpenAI API types for proper response structure
+type OpenAIMessage = {
+  role: 'assistant';
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: 'function';
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
+};
+
 export interface ProviderMockConfig {
   provider: SupportedProvider;
   baseUrl: string;
@@ -69,14 +92,16 @@ export class MswProviderHelper {
         return this.createOllamaServer();
       case 'lmstudio':
         return this.createLMStudioServer();
-      default:
-        throw new Error(`Unsupported provider: ${this.config.provider}`);
+      default: {
+        const _exhaustiveCheck: never = this.config.provider;
+        throw new Error(`Unsupported provider: ${this.config.provider as string}`);
+      }
     }
   }
 
   private createAnthropicServer() {
     return setupServer(
-      http.post(`${this.config.baseUrl}/v1/messages`, async ({ request }) => {
+      http.post(`${this.config.baseUrl}/v1/messages`, ({ request }) => {
         // Validate API key if provided
         if (this.config.apiKey) {
           const authHeader = request.headers.get('x-api-key');
@@ -92,13 +117,13 @@ export class MswProviderHelper {
         }
 
         const response = this.getNextResponse();
-        const content: any[] = [{ type: 'text', text: response.text }];
+        const content: AnthropicContent = [{ type: 'text', text: response.text }];
 
         // Add tool calls if specified
         if (response.toolCalls?.length) {
           content.push(
             ...response.toolCalls.map((tool) => ({
-              type: 'tool_use',
+              type: 'tool_use' as const,
               id: tool.id,
               name: tool.name,
               input: tool.input,
@@ -125,7 +150,7 @@ export class MswProviderHelper {
 
   private createOpenAIServer() {
     return setupServer(
-      http.post(`${this.config.baseUrl}/v1/chat/completions`, async ({ request }) => {
+      http.post(`${this.config.baseUrl}/v1/chat/completions`, ({ request }) => {
         // Validate API key if provided
         if (this.config.apiKey) {
           const authHeader = request.headers.get('authorization');
@@ -138,7 +163,7 @@ export class MswProviderHelper {
         }
 
         const response = this.getNextResponse();
-        const message: any = {
+        const message: OpenAIMessage = {
           role: 'assistant',
           content: response.text,
         };
@@ -163,7 +188,7 @@ export class MswProviderHelper {
           choices: [
             {
               index: 0,
-              message,
+              message: message,
               finish_reason: response.toolCalls?.length ? 'tool_calls' : 'stop',
             },
           ],
@@ -179,7 +204,7 @@ export class MswProviderHelper {
 
   private createOllamaServer() {
     return setupServer(
-      http.post(`${this.config.baseUrl}/api/chat`, async () => {
+      http.post(`${this.config.baseUrl}/api/chat`, () => {
         const response = this.getNextResponse();
         return HttpResponse.json({
           model: 'llama2',
@@ -215,7 +240,7 @@ export class MswProviderHelper {
     // LMStudio uses OpenAI-compatible API
     const baseUrl = this.config.baseUrl.replace('ws://', 'http://');
     return setupServer(
-      http.post(`${baseUrl}/v1/chat/completions`, async () => {
+      http.post(`${baseUrl}/v1/chat/completions`, () => {
         const response = this.getNextResponse();
         return HttpResponse.json({
           id: 'chatcmpl_lmstudio',

@@ -4,6 +4,7 @@
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import { beforeAll, afterAll, afterEach } from 'vitest';
+import type Anthropic from '@anthropic-ai/sdk';
 
 export interface DelegationMswOptions {
   baseUrl?: string;
@@ -51,29 +52,59 @@ export class DelegationMswHelper {
         }
 
         // Parse request to detect task assignment
-        const body = (await request.json()) as any;
-        const messages = body.messages || [];
+        const body = (await request.json()) as Anthropic.Messages.MessageCreateParams;
+        const messages = body.messages;
 
         // Look for task assignment in messages
-        const hasTaskAssignment = messages.some(
-          (msg: any) =>
-            msg.content &&
-            typeof msg.content === 'string' &&
-            (msg.content.includes('You have been assigned task') ||
+        const hasTaskAssignment = messages.some((msg) => {
+          if (typeof msg.content === 'string') {
+            return (
+              msg.content.includes('You have been assigned task') ||
               msg.content.includes('LACE TASK SYSTEM') ||
-              msg.content.includes('TASK DETAILS'))
-        );
+              msg.content.includes('TASK DETAILS')
+            );
+          }
+          if (Array.isArray(msg.content)) {
+            return msg.content.some(
+              (block) =>
+                block.type === 'text' &&
+                (block.text.includes('You have been assigned task') ||
+                  block.text.includes('LACE TASK SYSTEM') ||
+                  block.text.includes('TASK DETAILS'))
+            );
+          }
+          return false;
+        });
 
         if (hasTaskAssignment) {
           // Extract task ID from messages if possible
-          const taskMessage = messages.find(
-            (msg: any) =>
-              msg.content &&
-              typeof msg.content === 'string' &&
-              msg.content.includes('You have been assigned task')
-          );
+          const taskMessage = messages.find((msg) => {
+            if (typeof msg.content === 'string') {
+              return msg.content.includes('You have been assigned task');
+            }
+            if (Array.isArray(msg.content)) {
+              return msg.content.some(
+                (block) =>
+                  block.type === 'text' && block.text.includes('You have been assigned task')
+              );
+            }
+            return false;
+          });
 
-          const taskId = taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+          let taskId = 'unknown';
+          if (taskMessage) {
+            if (typeof taskMessage.content === 'string') {
+              taskId = taskMessage.content.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+            } else if (Array.isArray(taskMessage.content)) {
+              const textBlock = taskMessage.content.find(
+                (block) =>
+                  block.type === 'text' && block.text.includes('You have been assigned task')
+              );
+              if (textBlock && textBlock.type === 'text') {
+                taskId = textBlock.text.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+              }
+            }
+          }
 
           // Get response for this task
           const response = this.getNextResponse();
@@ -144,15 +175,34 @@ export class DelegationMswHelper {
           );
         }
 
-        // Parse request to detect task assignment
-        const body = (await request.json()) as any;
-        const messages = body.messages || [];
+        // Parse request to detect task assignment - OpenAI format
+        interface OpenAIRequestBody {
+          model: string;
+          messages: Array<{
+            role: 'system' | 'user' | 'assistant' | 'tool';
+            content: string | null;
+            tool_calls?: Array<{
+              id: string;
+              type: 'function';
+              function: { name: string; arguments: string };
+            }>;
+            tool_call_id?: string;
+          }>;
+          tools?: Array<{
+            type: 'function';
+            function: { name: string; description?: string; parameters?: unknown };
+          }>;
+          temperature?: number;
+          max_tokens?: number;
+        }
+
+        const body = (await request.json()) as OpenAIRequestBody;
+        const messages = body.messages;
 
         // Look for task assignment in messages
         const hasTaskAssignment = messages.some(
-          (msg: any) =>
+          (msg) =>
             msg.content &&
-            typeof msg.content === 'string' &&
             (msg.content.includes('You have been assigned task') ||
               msg.content.includes('LACE TASK SYSTEM') ||
               msg.content.includes('TASK DETAILS'))
@@ -161,13 +211,12 @@ export class DelegationMswHelper {
         if (hasTaskAssignment) {
           // Extract task ID from messages if possible
           const taskMessage = messages.find(
-            (msg: any) =>
-              msg.content &&
-              typeof msg.content === 'string' &&
-              msg.content.includes('You have been assigned task')
+            (msg) => msg.content && msg.content.includes('You have been assigned task')
           );
 
-          const taskId = taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+          const taskId = taskMessage?.content
+            ? taskMessage.content.match(/assigned task '([^']+)'/)?.at(1) || 'unknown'
+            : 'unknown';
 
           // Get response for this task
           const response = this.getNextResponse();
@@ -295,19 +344,35 @@ export class DelegationMswHelper {
             );
           }
 
-          const body = (await request.json()) as any;
+          const body = (await request.json()) as Anthropic.Messages.MessageCreateParams;
           const messages = body.messages || [];
 
-          const taskMessage = messages.find(
-            (msg: any) =>
-              msg.content &&
-              typeof msg.content === 'string' &&
-              msg.content.includes('You have been assigned task')
-          );
+          const taskMessage = messages.find((msg) => {
+            if (typeof msg.content === 'string') {
+              return msg.content.includes('You have been assigned task');
+            }
+            if (Array.isArray(msg.content)) {
+              return msg.content.some(
+                (block) =>
+                  block.type === 'text' && block.text.includes('You have been assigned task')
+              );
+            }
+            return false;
+          });
 
           if (taskMessage) {
-            const taskId =
-              taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+            let taskId = 'unknown';
+            if (typeof taskMessage.content === 'string') {
+              taskId = taskMessage.content.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+            } else if (Array.isArray(taskMessage.content)) {
+              const textBlock = taskMessage.content.find(
+                (block) =>
+                  block.type === 'text' && block.text.includes('You have been assigned task')
+              );
+              if (textBlock && textBlock.type === 'text') {
+                taskId = textBlock.text.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+              }
+            }
 
             // Call callback if provided (for test integration)
             if (taskUpdateCallback) {

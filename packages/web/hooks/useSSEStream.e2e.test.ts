@@ -16,8 +16,10 @@ import { Project } from '@/lib/server/lace-imports';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('SSE Stream E2E Tests', () => {
+  const _tempDirContext = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;

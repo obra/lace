@@ -8,8 +8,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 
 // Import API routes to test against
 import {
@@ -33,35 +36,44 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('TaskAPIClient E2E Tests', () => {
+  const _tempLaceDir = useTempLaceDir();
   let client: TaskAPIClient;
   let sessionId: string;
   let projectId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
+    // Set up test provider defaults and create instance
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+    
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+
     setupTestPersistence();
 
-    // Set up environment for session service
-    process.env = {
-      ...process.env,
-      ANTHROPIC_KEY: 'test-key',
-      LACE_DB_PATH: ':memory:',
-    };
-
     // Create a real session using the session service
-    const sessionService = getSessionService();
+    const _sessionService = getSessionService();
     const testProject = Project.create(
       'TaskAPIClient E2E Test Project',
       '/test/path',
       'Test project for TaskAPIClient E2E testing',
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     projectId = testProject.getId();
-    const session = await sessionService.createSession(
-      'TaskAPIClient E2E Test Session',
-      projectId
-    );
+    
+    const session = Session.create({
+      name: 'TaskAPIClient E2E Test Session',
+      projectId,
+    });
     // Extract string value from ThreadId branded type
-    sessionId = session.id as string;
+    sessionId = session.getId() as string;
 
     // Mock fetch to route requests to real API handlers (same pattern as useTaskManager.e2e.test.tsx)
     global.fetch = vi
@@ -186,7 +198,9 @@ describe('TaskAPIClient E2E Tests', () => {
     client = new TaskAPIClient();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
     teardownTestPersistence();
     vi.clearAllMocks();
     if (global.sessionService) {

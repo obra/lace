@@ -6,21 +6,33 @@ import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
 import { TestProvider } from '~/test-utils/test-provider';
 
 describe('Event-Based Approval Callback', () => {
+  const _tempLaceDir = useTempLaceDir();
   let agent: Agent;
   let session: Session;
   let threadId: ThreadId;
   let threadManager: ThreadManager;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
+    // Set up test provider defaults and create instance
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+    
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+
     // Set up test persistence
     setupTestPersistence();
-
-    // Set up test environment
-    process.env.ANTHROPIC_KEY = 'test-key';
 
     // Create real instances
     threadManager = new ThreadManager();
@@ -30,15 +42,19 @@ describe('Event-Based Approval Callback', () => {
 
     const provider = new TestProvider();
 
-    // Create project and session
-    const project = Project.create('Test Project', process.cwd(), 'Test project');
-    session = Session.create({
-      projectId: project.getId(),
-      name: 'Test Session',
-      configuration: {
-        provider: 'anthropic',
-        model: 'claude-3-haiku-20240307'
+    // Create project and session with provider configuration
+    const project = Project.create(
+      'Test Project',
+      process.cwd(),
+      'Test project',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
       }
+    );
+    session = Session.create({
+      name: 'Test Session',
+      projectId: project.getId(),
     });
     threadId = asThreadId(session.getId());
 
@@ -56,7 +72,9 @@ describe('Event-Based Approval Callback', () => {
     setupAgentApprovals(agent, threadId);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
     teardownTestPersistence();
   });
 

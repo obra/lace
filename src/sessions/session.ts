@@ -2,7 +2,7 @@
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
 import { Agent, type AgentInfo } from '~/agents/agent';
-import type { AIProvider } from '~/providers/base-provider';
+import type { AIProvider, ProviderConfig } from '~/providers/base-provider';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
@@ -858,14 +858,30 @@ Use your task_add_note tool to record important notes as you work and your task_
       }
 
       // Load credentials synchronously by reading the credential file directly
+      interface ProviderCredentials {
+        apiKey: string;
+        additionalAuth?: Record<string, unknown>;
+      }
 
       const credentialsDir = path.join(getLaceDir(), 'credentials');
       const credentialPath = path.join(credentialsDir, `${providerInstanceId}.json`);
-      let credentials: any = null;
+      let credentials: ProviderCredentials;
 
       try {
         const credentialContent = fs.readFileSync(credentialPath, 'utf-8');
-        credentials = JSON.parse(credentialContent);
+        const parsedCredentials = JSON.parse(credentialContent) as unknown;
+
+        // Type guard to ensure we have valid credentials
+        if (
+          !parsedCredentials ||
+          typeof parsedCredentials !== 'object' ||
+          !('apiKey' in parsedCredentials) ||
+          typeof parsedCredentials.apiKey !== 'string'
+        ) {
+          throw new Error('Invalid credential format');
+        }
+
+        credentials = parsedCredentials as ProviderCredentials;
       } catch (_credentialError) {
         throw new Error(`No credentials found for instance: ${providerInstanceId}`);
       }
@@ -874,7 +890,7 @@ Use your task_add_note tool to record important notes as you work and your task_
       const providerType = instance.catalogProviderId; // anthropic, openai, etc.
 
       // Build provider config from instance and credentials
-      const providerConfig = {
+      const providerConfig: ProviderConfig = {
         model: modelId,
         apiKey: credentials.apiKey,
         ...(credentials.additionalAuth || {}),

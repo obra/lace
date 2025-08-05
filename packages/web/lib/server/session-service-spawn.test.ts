@@ -7,10 +7,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
@@ -47,33 +48,54 @@ describe('SessionService.spawnAgent Method', () => {
   let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
+    // Set up test provider defaults and create instances
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+    
     setupTestPersistence();
 
-    // Set up environment
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.LACE_DB_PATH = ':memory:';
-
-    // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    // Create test provider instances individually for more control
+    const { createTestProviderInstance } = await import('~/test-utils/provider-instances');
+    const anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+    const openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      apiKey: 'test-openai-key',
+    });
+    
+    testProviderInstances = { anthropicInstanceId, openaiInstanceId };
+    createdInstanceIds = [anthropicInstanceId, openaiInstanceId];
 
     // Create session service
     sessionService = getSessionService();
 
-    // Create a test project
-    const project = Project.create('Test Project', '/test/path', 'Test project', {});
+    // Create a test project with provider configuration
+    const project = Project.create(
+      'Test Project',
+      '/test/path',
+      'Test project',
+      {
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
     projectId = project.getId();
 
-    // Create session
-    const session = await sessionService.createSession(
-      'Test Session',
-      projectId
-    );
-    sessionId = session.id as string;
+    // Create session that inherits from project
+    const session = Session.create({
+      name: 'Test Session',
+      projectId,
+    });
+    sessionId = session.getId() as string;
   });
 
   afterEach(async () => {
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
     await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });

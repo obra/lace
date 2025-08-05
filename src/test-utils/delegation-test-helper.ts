@@ -10,7 +10,16 @@ import {
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import { ProviderRegistry } from '~/providers/registry';
-import { AIProvider, ProviderInfo, ModelInfo } from '~/providers/base-provider';
+import {
+  AIProvider,
+  ProviderInfo,
+  ModelInfo,
+  ProviderMessage,
+  ProviderResponse,
+  ProviderToolCall,
+  ProviderConfig,
+} from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
 
 export interface DelegationTestSetup {
   session: Session;
@@ -65,12 +74,13 @@ export async function createDelegationTestSetup(options?: {
   // Create a proper mock provider class that extends AIProvider
   class MockProvider extends AIProvider {
     constructor(providerType: string, modelId: string) {
-      super({
+      const config: ProviderConfig = {
         model: modelId,
         maxTokens: 4096,
         systemPrompt: '',
         streaming: false,
-      });
+      };
+      super(config);
     }
 
     get providerName(): string {
@@ -81,10 +91,14 @@ export async function createDelegationTestSetup(options?: {
       return this._config.model || 'claude-3-5-haiku-20241022';
     }
 
-    async createResponse(messages: any, _tools: any) {
+    createResponse(
+      messages: ProviderMessage[],
+      _tools: Tool[],
+      _signal?: AbortSignal
+    ): Promise<ProviderResponse> {
       // Look for task assignment patterns (delegation-specific logic)
       const taskMessage = messages.find(
-        (m: any) =>
+        (m: ProviderMessage) =>
           m.content &&
           typeof m.content === 'string' &&
           (m.content.includes('You have been assigned task') ||
@@ -101,42 +115,40 @@ export async function createDelegationTestSetup(options?: {
 
         // Check if we're in blocked mode
         if (globalMockState.isBlockedMode) {
-          return {
+          const toolCall: ProviderToolCall = {
+            id: 'task_update_call',
+            name: 'task_update',
+            input: { taskId, status: 'blocked' },
+          };
+          return Promise.resolve({
             content: 'I encountered an issue and cannot complete this task.',
             usage: { promptTokens: 50, completionTokens: 25, totalTokens: 75 },
-            toolCalls: [
-              {
-                id: 'task_update_call',
-                name: 'task_update',
-                input: { taskId, status: 'blocked' },
-              },
-            ],
-          };
+            toolCalls: [toolCall],
+          });
         }
 
         const response = this.getNextResponse();
 
-        return {
+        const toolCall: ProviderToolCall = {
+          id: 'delegation_task_complete',
+          name: 'task_complete',
+          input: { id: taskId, message: response },
+        };
+        return Promise.resolve({
           content: `I'll complete this task: ${response}`,
           usage: { promptTokens: 50, completionTokens: 30, totalTokens: 80 },
-          toolCalls: [
-            {
-              id: 'delegation_task_complete',
-              name: 'task_complete',
-              input: { id: taskId, message: response },
-            },
-          ],
-        };
+          toolCalls: [toolCall],
+        });
       }
 
       // Non-delegation response
       const response = this.getNextResponse();
 
-      return {
+      return Promise.resolve({
         content: response,
         usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
         toolCalls: [],
-      };
+      });
     }
 
     private getNextResponse(): string {
@@ -175,22 +187,22 @@ export async function createDelegationTestSetup(options?: {
       ];
     }
 
-    cleanup(): Promise<void> {
-      return Promise.resolve();
+    cleanup(): void {
+      // No cleanup needed for mock provider
     }
 
     setSystemPrompt(prompt: string): void {
       this._systemPrompt = prompt;
     }
 
-    countTokens(messages: any[], _tools: any[] = []): number {
+    countTokens(messages: ProviderMessage[], _tools: Tool[] = []): number {
       return messages.length * 10; // Simple mock calculation
     }
   }
 
   // Mock the createProvider method to return our AIProvider-based mock provider
   vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-    (providerType: string, _config: any) => {
+    (providerType: string, _config?: ProviderConfig) => {
       return new MockProvider(providerType, model);
     }
   );

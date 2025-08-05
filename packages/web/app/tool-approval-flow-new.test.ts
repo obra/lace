@@ -3,9 +3,12 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Agent, Project } from '@/lib/server/lace-imports';
+import { Agent, Project, Session } from '@/lib/server/lace-imports';
 import { type ThreadId, ApprovalDecision } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -14,17 +17,29 @@ import { tmpdir } from 'os';
 import { FileReadTool } from '~/tools/implementations/file-read';
 
 describe('Event-Based Tool Approval Integration', () => {
+  const _tempLaceDir = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
   let projectId: string;
   let sessionId: ThreadId;
   let agent: Agent;
   let tempDir: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
+    // Set up test provider defaults and create instance
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+    
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+
     // Set up test persistence
     setupTestPersistence();
 
-    // Create temp directory
+    // Create temp directory for test files
     tempDir = await mkdtemp(join(tmpdir(), 'lace-approval-test-'));
 
     // Create a test file for reading
@@ -33,27 +48,27 @@ describe('Event-Based Tool Approval Integration', () => {
       'This is test content for approval flow testing'
     );
 
-    // Set up environment
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.LACE_DB_PATH = ':memory:';
-
     // Initialize services
     sessionService = getSessionService();
 
-    // Create a test project
+    // Create a test project with provider configuration
     const project = Project.create(
       'Tool Approval Test Project',
+      tempDir,
       'Project for testing tool approval flow',
-      tempDir
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     projectId = project.getId();
 
-    // Create a test session
-    const session = await sessionService.createSession(
-      'Tool Approval Test Session',
-      projectId
-    );
-    sessionId = session.id;
+    // Create a test session that inherits from project
+    const session = Session.create({
+      name: 'Tool Approval Test Session',
+      projectId,
+    });
+    sessionId = session.getId();
 
     // Get the session and its coordinator agent
     const sessionInstance = await sessionService.getSession(sessionId);
@@ -74,6 +89,8 @@ describe('Event-Based Tool Approval Integration', () => {
   });
 
   afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
     if (tempDir) {
       await rm(tempDir, { recursive: true });
     }
