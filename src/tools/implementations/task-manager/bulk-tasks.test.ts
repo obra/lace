@@ -24,7 +24,7 @@ describe('Bulk Task Creation', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    
+
     // Create real provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
@@ -34,15 +34,10 @@ describe('Bulk Task Creation', () => {
     });
 
     // Create session with TaskManager like real usage
-    project = Project.create(
-      'Test Project',
-      'Test project description',
-      '/tmp/test-bulk-tasks',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    project = Project.create('Test Project', 'Test project description', '/tmp/test-bulk-tasks', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     session = Session.create({
       name: 'Bulk Test Session',

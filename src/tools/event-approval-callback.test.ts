@@ -83,7 +83,7 @@ describe('EventApprovalCallback Integration Tests', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    
+
     // Create real provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

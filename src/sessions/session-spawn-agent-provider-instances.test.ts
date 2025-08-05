@@ -65,7 +65,9 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     teardownTestPersistence();
     cleanupTestProviderDefaults();
     if (providerInstanceId || openaiProviderInstanceId) {
-      await cleanupTestProviderInstances([providerInstanceId, openaiProviderInstanceId].filter(Boolean));
+      await cleanupTestProviderInstances(
+        [providerInstanceId, openaiProviderInstanceId].filter(Boolean)
+      );
     }
   });
 

@@ -419,17 +419,29 @@ export class Session {
       sessionData: sessionData,
     });
 
-    // If session not found, let's see what sessions DO exist
+    // If session not found, let's see what sessions DO exist (only if database is still available)
     if (!sessionData) {
-      const allSessions =
-        (getPersistence()
-          .database?.prepare('SELECT id, name, project_id FROM sessions')
-          .all() as Array<{ id: string; name: string; project_id: string }>) || [];
-      logger.debug('Session.getSession() - session not found, showing all sessions', {
-        requestedSessionId: sessionId,
-        allSessionIds: allSessions.map((s) => s.id),
-        allSessions: allSessions,
-      });
+      try {
+        const persistence = getPersistence();
+        // Only query if database is available and not closed
+        if (persistence.database && !persistence['_closed'] && !persistence['_disabled']) {
+          const allSessions = persistence.database.prepare('SELECT id, name, project_id FROM sessions').all() as Array<{ id: string; name: string; project_id: string }>;
+          logger.debug('Session.getSession() - session not found, showing all sessions', {
+            requestedSessionId: sessionId,
+            allSessionIds: allSessions.map((s) => s.id),
+            allSessions: allSessions,
+          });
+        } else {
+          logger.debug('Session.getSession() - session not found, database unavailable for debugging', {
+            requestedSessionId: sessionId,
+          });
+        }
+      } catch (error) {
+        logger.debug('Session.getSession() - session not found, error querying sessions for debug', {
+          requestedSessionId: sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     return sessionData;
@@ -846,7 +858,7 @@ Use your task_add_note tool to record important notes as you work and your task_
       try {
         const credentialContent = fs.readFileSync(credentialPath, 'utf-8');
         credentials = JSON.parse(credentialContent);
-      } catch (credentialError) {
+      } catch (_credentialError) {
         throw new Error(`No credentials found for instance: ${providerInstanceId}`);
       }
 

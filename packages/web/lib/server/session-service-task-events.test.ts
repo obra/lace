@@ -230,7 +230,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
         name: 'Delete Test Session',
         projectId: testProject.getId(),
       });
-      const sessionInfo = { id: session.getId(), name: 'Delete Test Session' };
 
       // Register session with EventStreamManager for event forwarding
       EventStreamManager.getInstance().registerSession(session);
@@ -282,7 +281,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
         name: 'Note Test Session',
         projectId: testProject.getId(),
       });
-      const sessionInfo = { id: session.getId(), name: 'Note Test Session' };
 
       // Register session with EventStreamManager for event forwarding
       EventStreamManager.getInstance().registerSession(session);
@@ -343,7 +341,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
         name: 'Type Test Session',
         projectId: testProject.getId(),
       });
-      const sessionInfo = { id: session.getId(), name: 'Type Test Session' };
 
       // Register session with EventStreamManager for event forwarding
       EventStreamManager.getInstance().registerSession(session);
@@ -415,7 +412,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
         name: 'Fail Fast Test Session',
         projectId: testProject.getId(),
       });
-      const sessionInfo = { id: session.getId(), name: 'Fail Fast Test Session' };
 
       // Register session with EventStreamManager for event forwarding
       EventStreamManager.getInstance().registerSession(session);

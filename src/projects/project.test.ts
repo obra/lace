@@ -1,7 +1,7 @@
 // ABOUTME: Tests for Project class functionality including CRUD operations and session management
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';

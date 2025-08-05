@@ -3,7 +3,7 @@
 
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { beforeAll, afterAll, afterEach } from 'vitest';
 
 export interface DelegationMswOptions {
   baseUrl?: string;

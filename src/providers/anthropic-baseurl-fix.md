@@ -1,9 +1,11 @@
 # Critical Bug: Anthropic Provider Missing baseURL Support
 
 ## Problem
+
 The AnthropicProvider ignores the `baseURL` config parameter from provider instances, just like OpenAI did.
 
 ## Current Code (lines 36-39):
+
 ```typescript
 this._anthropic = new Anthropic({
   apiKey: config.apiKey,
@@ -12,6 +14,7 @@ this._anthropic = new Anthropic({
 ```
 
 ## Required Fix:
+
 ```typescript
 const anthropicConfig: Anthropic.ClientOptions = {
   apiKey: config.apiKey,
@@ -29,7 +32,9 @@ this._anthropic = new Anthropic(anthropicConfig);
 ```
 
 ## Impact
+
 Without this fix, Anthropic provider instances will:
+
 - Appear to work in the UI
 - Fail silently by calling the wrong endpoint
 - Use wrong credentials

@@ -92,7 +92,7 @@ describe('Enhanced Agent', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    
+
     // Create a real provider instance for testing
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

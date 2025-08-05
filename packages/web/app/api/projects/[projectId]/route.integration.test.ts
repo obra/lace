@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock environment variables to provide test API keys
 vi.mock('~/config/env-loader', () => ({
@@ -47,6 +48,7 @@ interface SuccessResponse {
 }
 
 describe('Individual Project API Integration Tests', () => {
+  const _tempDirContext = useTempLaceDir();
   let testProject: import('~/projects/project').Project;
   let testProviderInstances: { anthropicInstanceId: string; openaiInstanceId: string };
 

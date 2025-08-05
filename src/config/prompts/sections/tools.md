@@ -35,7 +35,8 @@
 
 You MUST use task tools to track all work. Follow this workflow:
 
-#### Planning Phase  
+#### Planning Phase
+
 - **task_add**: Break complex requests into specific, actionable tasks
   - Use bulk creation for efficient planning: `task_add({ tasks: [...] })`
   - Set clear priorities based on user needs and dependencies
@@ -43,13 +44,15 @@ You MUST use task tools to track all work. Follow this workflow:
   - Use assignedTo for delegation: `"new:provider:model"`
 
 #### Execution Phase
-- **task_list**: Check current tasks before starting new work  
+
+- **task_list**: Check current tasks before starting new work
 - **task_update**: Mark tasks in-progress when you begin work
 - **task_add**: Create new tasks as you discover additional work
 - **task_add_note**: Provide progress updates and communicate findings
 - **delegate**: Assign focused, well-scoped tasks to subagents
 
 #### Completion Phase
+
 - **task_complete**: Always include results, findings, or outputs
 - **task_add**: Create follow-up tasks based on your findings
 
@@ -58,12 +61,14 @@ You MUST use task tools to track all work. Follow this workflow:
 **delegate** is for creating focused, independent work assignments with complete context. Think of it like writing an implementation plan for a colleague who knows nothing about your project.
 
 DELEGATION STRATEGY:
+
 - Each delegation = complete work package (problem + context + constraints + expected output)
 - Include enough background for independent execution
 - Specify exact success criteria and output format
 - Choose appropriate model based on complexity
 
 WHEN TO DELEGATE:
+
 - Task can be completed independently with clear instructions
 - Specialized expertise needed (analysis, research, data extraction)
 - Work can be parallelized while you focus on other tasks
@@ -71,16 +76,19 @@ WHEN TO DELEGATE:
 
 DELEGATION CHECKLIST:
 Before delegating, ensure you can answer:
+
 - What exactly needs to be done? (specific, actionable task)
 - What context/background does the agent need? (files, requirements, constraints)
 - What does success look like? (specific deliverable format)
 - What model complexity is needed? (simple extraction vs complex analysis)
 
 MODEL SELECTION GUIDE:
+
 - `claude-3-5-haiku-20241022`: Data extraction, log analysis, simple code changes, straightforward research
 - `claude-sonnet-4-20250514`: Complex analysis, architecture decisions, detailed code reviews, multi-step reasoning
 
 EFFECTIVE DELEGATION PATTERNS:
+
 - Analysis: "Review error logs from last 24 hours. Context: users report slow logins. Output: list of specific error patterns with frequency counts and proposed fixes"
 - Research: "Find React testing libraries that support component snapshots. Context: migrating from Jest to Vitest. Output: comparison table with pros/cons and migration effort estimates"
 - Implementation: "Add input validation to user registration form. Context: currently accepts any input, need email/password validation. Files: src/forms/register.js. Output: working validation with error messages"
@@ -89,21 +97,23 @@ BAD DELEGATION (too vague):
 ❌ delegate({ title: "Fix the auth issue", prompt: "Something's wrong with login", expected_response: "Fix it" })
 
 GOOD DELEGATION (complete context):
-✅ delegate({ 
-  title: "Debug authentication timeout errors", 
-  prompt: "Users report getting logged out after 5 minutes instead of expected 30 minutes. Check token expiration logic in src/auth/jwt.js and session management in src/middleware/auth.js. Look for hardcoded timeouts or misconfigured constants. Context: this started after yesterday's deployment of commit abc123.",
-  expected_response: "Root cause analysis with specific code locations and recommended fix. Include before/after configuration values.",
-  model: "anthropic:claude-sonnet-4-20250514"
+✅ delegate({
+title: "Debug authentication timeout errors",
+prompt: "Users report getting logged out after 5 minutes instead of expected 30 minutes. Check token expiration logic in src/auth/jwt.js and session management in src/middleware/auth.js. Look for hardcoded timeouts or misconfigured constants. Context: this started after yesterday's deployment of commit abc123.",
+expected_response: "Root cause analysis with specific code locations and recommended fix. Include before/after configuration values.",
+model: "anthropic:claude-sonnet-4-20250514"
 })
 
 #### Integration Pattern
+
 ```
 User Request → task_add (break down) → delegate (parallel work) → task_complete (with results)
 ```
 
 **Critical Rules:**
+
 - Never abandon tasks without completing them
-- If blocked, use task_update with blocker details and ask for guidance  
+- If blocked, use task_update with blocker details and ask for guidance
 - Use task_list regularly to stay aware of your workload
 - Include meaningful results in task_complete messages
 

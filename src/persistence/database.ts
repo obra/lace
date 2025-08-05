@@ -295,7 +295,7 @@ export class DatabasePersistence {
   }
 
   loadThread(threadId: string): Thread | null {
-    if (this._disabled || !this.db) return null;
+    if (this._disabled || !this.db || this._closed) return null;
 
     const actualThreadId = threadId;
 
@@ -386,7 +386,7 @@ export class DatabasePersistence {
   }
 
   loadEvents(threadId: string): ThreadEvent[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT * FROM events 
@@ -422,7 +422,7 @@ export class DatabasePersistence {
   }
 
   getLatestThreadId(): string | null {
-    if (this._disabled || !this.db) return null;
+    if (this._disabled || !this.db || this._closed) return null;
 
     const stmt = this.db.prepare(`
       SELECT id FROM threads 
@@ -435,7 +435,7 @@ export class DatabasePersistence {
   }
 
   getDelegateThreadsFor(parentThreadId: string): string[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT DISTINCT id FROM threads 
@@ -453,7 +453,7 @@ export class DatabasePersistence {
   }
 
   private executeThreadQuery(whereClause: string, param: string): Thread[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT id, session_id, project_id, created_at, updated_at, metadata FROM threads
@@ -527,7 +527,7 @@ export class DatabasePersistence {
   }
 
   loadTask(taskId: string): Task | null {
-    if (this._disabled || !this.db) return null;
+    if (this._disabled || !this.db || this._closed) return null;
 
     const stmt = this.db.prepare(`
       SELECT * FROM tasks WHERE id = ?
@@ -588,7 +588,7 @@ export class DatabasePersistence {
   }
 
   loadTasksByThread(threadId: ThreadId): Task[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT * FROM tasks 
@@ -631,7 +631,7 @@ export class DatabasePersistence {
   }
 
   loadTasksByAssignee(assignee: AssigneeId): Task[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT * FROM tasks 
@@ -756,7 +756,7 @@ export class DatabasePersistence {
 
   // Batch load notes for multiple tasks to avoid N+1 queries
   private loadNotesBatch(taskIds: string[]): Map<string, TaskNote[]> {
-    if (this._disabled || !this.db || taskIds.length === 0) return new Map();
+    if (this._disabled || !this.db || this._closed || taskIds.length === 0) return new Map();
 
     const placeholders = taskIds.map(() => '?').join(',');
     const stmt = this.db.prepare(`
@@ -853,7 +853,7 @@ export class DatabasePersistence {
   }
 
   loadSession(sessionId: string): SessionData | null {
-    if (this._disabled || !this.db) return null;
+    if (this._disabled || !this.db || this._closed) return null;
 
     const stmt = this.db.prepare(`
       SELECT * FROM sessions WHERE id = ?
@@ -887,7 +887,7 @@ export class DatabasePersistence {
   }
 
   loadSessionsByProject(projectId: string): SessionData[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT * FROM sessions 
@@ -994,7 +994,7 @@ export class DatabasePersistence {
   }
 
   loadProject(projectId: string): ProjectData | null {
-    if (this._disabled || !this.db) return null;
+    if (this._disabled || !this.db || this._closed) return null;
 
     const stmt = this.db.prepare(`
       SELECT * FROM projects WHERE id = ?
@@ -1028,7 +1028,7 @@ export class DatabasePersistence {
   }
 
   loadAllProjects(): ProjectData[] {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT * FROM projects ORDER BY last_used_at DESC
@@ -1124,7 +1124,7 @@ export class DatabasePersistence {
     toolCall: unknown;
     requestedAt: Date;
   }> {
-    if (this._disabled || !this.db) return [];
+    if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
       SELECT 
@@ -1158,7 +1158,7 @@ export class DatabasePersistence {
   }
 
   getApprovalDecision(toolCallId: string): string | null {
-    if (this._disabled || !this.db) return null;
+    if (this._disabled || !this.db || this._closed) return null;
 
     const stmt = this.db.prepare(`
       SELECT resp.data->>'decision' as decision

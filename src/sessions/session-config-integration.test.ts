@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for Session class with new configuration system
 // ABOUTME: Tests session creation with configuration and preset integration
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';

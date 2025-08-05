@@ -88,7 +88,9 @@ describe('Session', () => {
     cleanupTestProviderDefaults();
     teardownTestPersistence();
     if (providerInstanceId || openaiProviderInstanceId) {
-      await cleanupTestProviderInstances([providerInstanceId, openaiProviderInstanceId].filter(Boolean));
+      await cleanupTestProviderInstances(
+        [providerInstanceId, openaiProviderInstanceId].filter(Boolean)
+      );
     }
   });
 
