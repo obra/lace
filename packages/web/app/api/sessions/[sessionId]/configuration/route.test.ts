@@ -1,19 +1,34 @@
 // ABOUTME: Integration tests for session configuration API endpoints - GET, PUT for configuration management
 // ABOUTME: Tests real functionality with actual sessions, no mocking
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
+
+// Mock environment variables to provide test API keys
+vi.mock('~/config/env-loader', () => ({
+  getEnvVar: vi.fn((key: string) => {
+    const envVars: Record<string, string> = {
+      ANTHROPIC_KEY: 'test-anthropic-key',
+      OPENAI_API_KEY: 'test-openai-key',
+    };
+    return envVars[key] || '';
+  }),
+}));
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
   configuration: {
     provider?: string;
     model?: string;
+    providerInstanceId?: string;
+    modelId?: string;
     maxTokens?: number;
     tools?: string[];
     toolPolicies?: Record<string, string>;
@@ -31,20 +46,30 @@ describe('Session Configuration API', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let testProject: ReturnType<typeof Project.create>;
   let sessionId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     // Set up environment
-    process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
     sessionService = getSessionService();
 
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-sonnet-4-20250514'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Create a real project and session for testing
     testProject = Project.create('Test Project', '/test/path', 'Test project', {
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
     });
 
@@ -55,9 +80,11 @@ describe('Session Configuration API', () => {
     sessionId = session.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([providerInstanceId]);
   });
 
   describe('GET /api/sessions/:sessionId/configuration', () => {
@@ -68,9 +95,15 @@ describe('Session Configuration API', () => {
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
-      expect(data.configuration.provider).toBe('anthropic');
-      expect(data.configuration.model).toBe('claude-3-5-haiku-20241022');
-      expect(data.configuration.maxTokens).toBe(4000);
+      
+      // With the new provider instance system, configuration format might be different
+      
+      // Basic expectations - the exact field names might differ with new provider system
+      expect(data.configuration).toEqual(expect.objectContaining({
+        providerInstanceId: providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+        maxTokens: 4000,
+      }));
     });
 
     it('should return 404 when session not found', async () => {
@@ -103,8 +136,7 @@ describe('Session Configuration API', () => {
   describe('PUT /api/sessions/:sessionId/configuration', () => {
     it('should update session configuration successfully', async () => {
       const updates = {
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
+        modelId: 'claude-sonnet-4-20250514',
         maxTokens: 8000,
         toolPolicies: {
           'file-read': 'allow',
@@ -123,8 +155,8 @@ describe('Session Configuration API', () => {
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
-      expect(data.configuration.provider).toBe('anthropic');
-      expect(data.configuration.model).toBe('claude-3-sonnet');
+      expect(data.configuration.providerInstanceId).toBe(providerInstanceId);
+      expect(data.configuration.modelId).toBe('claude-sonnet-4-20250514');
       expect(data.configuration.maxTokens).toBe(8000);
     });
 
@@ -184,16 +216,30 @@ describe('Session Configuration API', () => {
 describe('TDD: Direct Session Usage', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let testSessionId: string;
+  let tddProviderInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
-    process.env.ANTHROPIC_KEY = 'test-key';
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
     process.env.LACE_DB_PATH = ':memory:';
 
     sessionService = getSessionService();
 
+    // Create test provider instance for TDD tests
+    tddProviderInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'TDD Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Create a real session to test with
-    const testProject = Project.create('TDD Test Project', '/test/path', 'Test project', {});
+    const testProject = Project.create('TDD Test Project', '/test/path', 'Test project', {
+      providerInstanceId: tddProviderInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const session = await sessionService.createSession(
       'TDD Test Session',
       testProject.getId()
@@ -201,9 +247,11 @@ describe('TDD: Direct Session Usage', () => {
     testSessionId = session.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([tddProviderInstanceId]);
   });
 
   it('should use SessionService.getSession() which calls session.getEffectiveConfiguration() directly', async () => {
@@ -221,16 +269,30 @@ describe('TDD: Direct Session Usage', () => {
 describe('TDD: Direct Session Configuration Update', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let testSessionId: string;
+  let updateProviderInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
-    process.env.ANTHROPIC_KEY = 'test-key';
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
     process.env.LACE_DB_PATH = ':memory:';
 
     sessionService = getSessionService();
 
+    // Create test provider instance for update tests
+    updateProviderInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-sonnet-4-20250514'],
+      displayName: 'Update Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Create a real session to test with
-    const testProject = Project.create('TDD Update Test Project', '/test/path', 'Test project', {});
+    const testProject = Project.create('TDD Update Test Project', '/test/path', 'Test project', {
+      providerInstanceId: updateProviderInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const session = await sessionService.createSession(
       'TDD Update Test Session',
       testProject.getId()
@@ -238,15 +300,16 @@ describe('TDD: Direct Session Configuration Update', () => {
     testSessionId = session.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([updateProviderInstanceId]);
   });
 
   it('should use SessionService.getSession() which calls session.updateConfiguration() directly', async () => {
     const configUpdate = {
-      provider: 'anthropic',
-      model: 'claude-3-sonnet',
+      modelId: 'claude-sonnet-4-20250514',
       maxTokens: 8000,
       toolPolicies: {
         'file-read': 'allow',
@@ -270,7 +333,7 @@ describe('TDD: Direct Session Configuration Update', () => {
     expect(response.status).toBe(200);
     const data = await parseResponse<ConfigurationResponse>(response);
     expect(data.configuration).toBeDefined();
-    expect(data.configuration.provider).toBe('anthropic');
-    expect(data.configuration.model).toBe('claude-3-sonnet');
+    expect(data.configuration.providerInstanceId).toBe(updateProviderInstanceId);
+    expect(data.configuration.modelId).toBe('claude-sonnet-4-20250514');
   });
 });

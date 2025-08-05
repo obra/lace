@@ -13,7 +13,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
@@ -30,11 +30,7 @@ describe('Thread Messaging API', () => {
   let testProjectId: string;
   let realSessionId: string;
   let realThreadId: string;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
-  let createdInstanceIds: string[] = [];
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -51,9 +47,13 @@ describe('Thread Messaging API', () => {
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
-    // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     sessionService = getSessionService();
 
@@ -63,7 +63,7 @@ describe('Thread Messaging API', () => {
       process.cwd(), 
       'Project for testing',
       {
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
@@ -84,7 +84,7 @@ describe('Thread Messaging API', () => {
     await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
     // Clean up provider instances
-    await cleanupTestProviderInstances(createdInstanceIds);
+    await cleanupTestProviderInstances([providerInstanceId]);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
@@ -219,7 +219,7 @@ describe('Thread Messaging API', () => {
 
     const delegateAgent = session!.spawnAgent({
       name: 'Test Delegate',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const delegateThreadId = delegateAgent.threadId;

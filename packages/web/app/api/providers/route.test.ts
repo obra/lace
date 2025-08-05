@@ -99,7 +99,7 @@ describe('Provider Discovery API', () => {
       expect(response.status).toBe(200);
       
       const data = await parseResponse<{ providers: Array<{ 
-        models: Array<{ id: string; name: string }>;
+        models: Array<{ id: string; displayName: string }>;
       }> }>(response);
       
       // Each provider should have its models listed
@@ -109,7 +109,7 @@ describe('Provider Discovery API', () => {
         
         provider.models.forEach(model => {
           expect(model.id).toEqual(expect.any(String));
-          expect(model.name).toEqual(expect.any(String));
+          expect(model.displayName).toEqual(expect.any(String));
         });
       });
     });

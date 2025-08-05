@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir as _useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
@@ -19,11 +19,8 @@ describe('Session.spawnAgent Method', () => {
   const _tempDirContext = _useTempLaceDir();
   let session: Session;
   let projectId: string;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
-  let createdInstanceIds: string[] = [];
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -33,8 +30,19 @@ describe('Session.spawnAgent Method', () => {
     process.env.LACE_DB_PATH = ':memory:';
 
     // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+    
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create a test project
     const project = Project.create('Test Project', '/test/path', 'Test project', {});
@@ -45,15 +53,17 @@ describe('Session.spawnAgent Method', () => {
       name: 'Test Session',
       projectId,
       configuration: {
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022'
       }
     });
   });
 
   afterEach(async () => {
-    session.destroy();
-    await cleanupTestProviderInstances(createdInstanceIds);
+    if (session) {
+      session.destroy();
+    }
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     teardownTestPersistence();
   });
 
@@ -61,7 +71,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Test Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
 
@@ -82,7 +92,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Retrievable Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;
@@ -100,7 +110,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Persistent Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;
@@ -121,17 +131,17 @@ describe('Session.spawnAgent Method', () => {
     // Spawn multiple agents
     const agent1 = session.spawnAgent({
       name: 'Agent 1',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agent2 = session.spawnAgent({
       name: 'Agent 2',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agent3 = session.spawnAgent({
       name: 'Agent 3',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
 
@@ -154,7 +164,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Eventful Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;
@@ -179,7 +189,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Cached Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;
@@ -233,7 +243,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Thread Switch Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;
@@ -277,7 +287,7 @@ describe('Session.spawnAgent Method', () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Reconstructable Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;

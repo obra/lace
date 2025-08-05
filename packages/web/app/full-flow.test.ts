@@ -15,7 +15,7 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';

@@ -91,23 +91,23 @@ export async function setupTestProviderInstances(): Promise<{
 }> {
   logger.debug('Setting up common test provider instances');
 
-  const [_anthropicInstanceId, _openaiInstanceId] = await Promise.all([
-    createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic',
-    }),
-    createTestProviderInstance({
-      catalogId: 'openai',
-      models: ['gpt-4o', 'gpt-4o-mini'],
-      displayName: 'Test OpenAI',
-    }),
-  ]);
+  // Create instances sequentially to avoid race conditions
+  const anthropicInstanceId = await createTestProviderInstance({
+    catalogId: 'anthropic',
+    models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+    displayName: 'Test Anthropic',
+  });
+  
+  const openaiInstanceId = await createTestProviderInstance({
+    catalogId: 'openai',
+    models: ['gpt-4o', 'gpt-4o-mini'],
+    displayName: 'Test OpenAI',
+  });
 
-  // Ensure predictable IDs are returned
+  // Ensure predictable IDs are returned  
   const predictableIds = {
-    anthropicInstanceId: 'test-anthropic',
-    openaiInstanceId: 'test-openai',
+    anthropicInstanceId,
+    openaiInstanceId,
   };
 
   logger.debug('Common test provider instances created', predictableIds);
@@ -164,15 +164,17 @@ export async function cleanupTestProviderInstances(instanceIds: string[]): Promi
 
   const instanceManager = new ProviderInstanceManager();
 
-  await Promise.all(
-    instanceIds.map(async (instanceId) => {
-      try {
-        await instanceManager.deleteInstance(instanceId);
-      } catch (error) {
-        logger.warn('Failed to cleanup test provider instance', { instanceId, error });
-      }
-    })
-  );
+  // Process sequentially to avoid race conditions that could cause partial failures
+  for (const instanceId of instanceIds) {
+    try {
+      logger.debug('Deleting provider instance', { instanceId });
+      await instanceManager.deleteInstance(instanceId);
+      logger.debug('Successfully deleted provider instance', { instanceId });
+    } catch (error) {
+      logger.warn('Failed to cleanup test provider instance', { instanceId, error });
+      // Continue processing other instances even if one fails
+    }
+  }
 
   logger.debug('Test provider instances cleaned up', { instanceIds });
 }
