@@ -17,7 +17,7 @@ export type {
 
 export type { AgentState, AgentInfo } from '~/agents/agent';
 
-export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
+export type { ProviderInfo, ModelInfo, ProviderResponse } from '~/providers/base-provider';
 
 export { ApprovalDecision } from '~/tools/approval-types';
 

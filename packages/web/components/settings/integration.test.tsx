@@ -9,7 +9,8 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { Modal, SettingsTabs, SettingsPanel, SettingField } from './index';
+import { SettingsTabs, SettingsPanel, SettingField } from './index';
+import { Modal } from '@/components/ui/Modal';
 
 describe('Settings Components Integration', () => {
   it('renders complete settings modal with tabs and panels', () => {

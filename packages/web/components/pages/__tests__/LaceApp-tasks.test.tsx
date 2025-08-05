@@ -11,7 +11,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { createFetchMock } from '@/test-utils/mock-fetch';
-import { asThreadId } from '@/types/core';
+import { asThreadId, asAssigneeId } from '@/types/core';
 
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
@@ -199,7 +199,7 @@ describe('LaceApp Task Sidebar Integration', () => {
           prompt: 'Test',
           status: 'pending' as const,
           priority: 'high' as const,
-          assignedTo: 'human',
+          assignedTo: asAssigneeId('human'),
           createdBy: asThreadId('test-user'),
           threadId: asThreadId('test-session'),
           createdAt: new Date(),

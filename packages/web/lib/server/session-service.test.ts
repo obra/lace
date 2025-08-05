@@ -34,12 +34,12 @@ describe('SessionService with Provider Instances', () => {
 
   it('should create session using providerInstanceId and modelId', async () => {
     // Set up a configured provider instance
-    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    const { ProviderRegistry, ProviderInstanceManager } = await import('@/lib/server/lace-imports');
     const registry = new ProviderRegistry();
     await registry.initialize();
 
     // Create a test provider instance
-    const instanceManager = registry.instanceManager;
+    const instanceManager = new ProviderInstanceManager();
     const config = await instanceManager.loadInstances();
     config.instances['test-instance-id'] = {
       displayName: 'Test Anthropic Instance',

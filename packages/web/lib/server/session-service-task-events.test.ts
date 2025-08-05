@@ -7,6 +7,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { StreamEvent } from '@/types/stream-events';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { asThreadId } from '@/types/core';
 
 // Import real EventStreamManager for integration testing
 import { EventStreamManager } from '@/lib/event-stream-manager';
@@ -277,7 +278,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
       // Find the task:note_added event (not the task:updated event)
       const noteAddedCalls = broadcastSpy.mock.calls.filter(
-        (call) => call[0].data.type === 'task:note_added'
+        (call) => (call[0] as StreamEvent).data.type === 'task:note_added'
       );
       expect(noteAddedCalls).toHaveLength(1);
 
@@ -355,7 +356,20 @@ describe('SessionService TaskManager Event Forwarding', () => {
         scope: { sessionId: 'test-session', taskId: 'test-task' },
         data: {
           type: 'task:created',
-          task: { id: 'test-task', title: 'Test' },
+          taskId: 'test-task',
+          task: {
+            id: 'test-task',
+            title: 'Test',
+            description: 'Test task description',
+            prompt: 'Test task prompt',
+            status: 'pending' as const,
+            priority: 'medium' as const,
+            createdBy: asThreadId('test-creator'),
+            threadId: asThreadId('test-session'),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            notes: []
+          },
           context: { actor: 'human' },
           timestamp: new Date()
         },

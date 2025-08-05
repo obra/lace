@@ -25,8 +25,8 @@ import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Full Conversation Flow', () => {
   let sessionService: ReturnType<typeof getSessionService>;
-  let addConnectionSpy: ReturnType<typeof vi.spyOn<EventStreamManager, 'addConnection'>>;
-  let broadcastSpy: ReturnType<typeof vi.spyOn<EventStreamManager, 'broadcast'>>;
+  let addConnectionSpy: any;
+  let broadcastSpy: any;
   let testProviderInstances: {
     anthropicInstanceId: string;
     openaiInstanceId: string;

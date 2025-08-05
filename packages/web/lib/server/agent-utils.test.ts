@@ -7,7 +7,7 @@ import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/serv
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
-import { createProvider } from '~/app';
+import { TestProvider } from '~/test-utils/test-provider';
 
 describe('Event-Based Approval Callback', () => {
   let agent: Agent;
@@ -28,7 +28,7 @@ describe('Event-Based Approval Callback', () => {
     const toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
-    const provider = createProvider('anthropic', 'claude-3-haiku-20240307');
+    const provider = new TestProvider();
 
     // Create project and session
     const project = Project.create('Test Project', process.cwd(), 'Test project');

@@ -11,69 +11,37 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { 
+  createTestProviderInstance, 
+  cleanupTestProviderInstances 
+} from '~/test-utils/provider-instances';
 
-// Mock external dependencies
-vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: vi.fn().mockImplementation(() => ({
-    createProvider: vi.fn().mockReturnValue({
-      type: 'anthropic',
-      modelId: 'claude-3-5-haiku-20241022',
-      providerName: 'anthropic',
-      defaultModel: 'claude-3-5-haiku-20241022',
-      setSystemPrompt: vi.fn(),
-      createResponse: vi.fn().mockResolvedValue({
-        content: 'Mock response',
-        toolCalls: [],
-        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      }),
-    }),
-    initialize: vi.fn().mockResolvedValue(undefined),
-  })),
-}));
-
-// Mock external dependencies that require system calls or network access
-// - File system operations are mocked to avoid disk I/O during tests
-vi.mock('fs/promises', () => ({
-  default: {
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
-    mkdir: vi.fn(),
-    readdir: vi.fn(),
-  },
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-  mkdir: vi.fn(),
-  readdir: vi.fn(),
-}));
-
-// - Process operations are mocked to avoid spawning real processes
-vi.mock('child_process', () => ({
-  default: {
-    spawn: vi.fn(),
-    exec: vi.fn(),
-  },
-  spawn: vi.fn(),
-  exec: vi.fn(),
-}));
-
-// - Network operations are mocked to avoid external requests
-vi.mock('node-fetch', () => vi.fn());
+// No mocking for integration tests - use real filesystem access
 
 describe('Session Configuration Integration', () => {
   const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let projectId: string;
   let presetManager: ConfigurationPresetManager;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
-    // Create a test project
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create a test project with the real provider instance
     testProject = Project.create('Test Project', '/test/path', 'Test project for configuration', {
-      providerInstanceId: 'anthropic-default',
-      modelId: 'claude-3-sonnet',
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
     });
     projectId = testProject.getId();
@@ -84,6 +52,7 @@ describe('Session Configuration Integration', () => {
   afterEach(async () => {
     cleanupTestProviderDefaults();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([providerInstanceId]);
   });
 
   describe('Session configuration validation', () => {
@@ -130,7 +99,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -138,7 +107,7 @@ describe('Session Configuration Integration', () => {
       const effectiveConfig = session.getEffectiveConfiguration();
 
       // Should inherit from project
-      expect(effectiveConfig.providerInstanceId).toBe('anthropic-default');
+      expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId);
       // Note: Session creation modelId parameter overrides project modelId
       expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // From session creation
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
@@ -151,7 +120,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -187,7 +156,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -242,7 +211,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -272,7 +241,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -301,7 +270,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -321,7 +290,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -339,7 +308,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
