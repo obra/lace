@@ -9,11 +9,15 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('Project', () => {
+  const _tempDirContext = useTempLaceDir();
+
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+    Session.clearProviderCache();
   });
 
   afterEach(async () => {

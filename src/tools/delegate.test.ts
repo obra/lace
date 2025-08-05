@@ -3,6 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
+import { Session } from '~/sessions/session';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
   setupTestProviderDefaults,
@@ -26,6 +27,7 @@ describe('DelegateTool', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     // Use shared delegation test setup
     testSetup = await createDelegationTestSetup({

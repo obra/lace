@@ -864,6 +864,10 @@ Use your task_add_note tool to record important notes as you work and your task_
     Session._sessionRegistry.clear();
   }
 
+  static clearProviderCache(): void {
+    Session._providerCache.clear();
+  }
+
   /**
    * Get registry size - primarily for testing
    */

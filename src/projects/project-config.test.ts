@@ -9,14 +9,17 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('Project configuration', () => {
+  const _tempDirContext = useTempLaceDir();
   let project: Project;
   let projectId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     project = Project.create('Test Project', '/project/path', 'A test project', {
       providerInstanceId: 'anthropic-default',

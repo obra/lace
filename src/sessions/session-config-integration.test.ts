@@ -10,6 +10,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies
 vi.mock('~/providers/registry', () => ({
@@ -60,6 +61,7 @@ vi.mock('child_process', () => ({
 vi.mock('node-fetch', () => vi.fn());
 
 describe('Session Configuration Integration', () => {
+  const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let projectId: string;
   let presetManager: ConfigurationPresetManager;
@@ -67,6 +69,7 @@ describe('Session Configuration Integration', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     // Create a test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for configuration', {

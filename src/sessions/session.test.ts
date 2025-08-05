@@ -10,6 +10,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies that don't affect core functionality
 vi.mock('server-only', () => ({}));
@@ -43,6 +44,7 @@ vi.mock('child_process', () => ({
 vi.mock('node-fetch', () => vi.fn());
 
 describe('Session', () => {
+  const _tempDirContext = useTempLaceDir();
   let testProject: Project;
 
   beforeEach(async () => {
@@ -50,6 +52,9 @@ describe('Session', () => {
     setupTestProviderDefaults();
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
+    
+    // Clear provider cache to avoid race conditions between tests
+    Session.clearProviderCache();
 
     // Create a test project for all tests with default provider configuration
     testProject = Project.create('Test Project', '/test/path', 'Test project', {

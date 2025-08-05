@@ -13,14 +13,17 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('Session.spawnAgent() with Provider Instances', () => {
+  const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let testSession: Session;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+    Session.clearProviderCache();
     // Don't use setupTestProviderInstances - use the simpler defaults approach
 
     // Create a test project with provider configuration using defaults
