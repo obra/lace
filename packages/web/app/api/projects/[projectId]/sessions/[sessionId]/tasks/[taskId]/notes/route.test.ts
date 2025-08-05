@@ -64,12 +64,12 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
     testProjectId = project.getId();
 
-    // Create session using Session.create (inherits provider from project)
-    const newSession = Session.create({
-      name: 'Test Session',
-      projectId: testProjectId,
-    });
-    testSessionId = newSession.getId();
+    // Create session using sessionService (inherits provider from project)
+    const newSession = await sessionService.createSession(
+      'Test Session',
+      testProjectId
+    );
+    testSessionId = newSession.id;
 
     // Get the active session instance to access task manager
     const session = await sessionService.getSession(asThreadId(testSessionId));
@@ -98,9 +98,12 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
     await cleanupTestProviderInstances([providerInstanceId]);
+    teardownTestPersistence();
     vi.clearAllMocks();
+    if (global.sessionService) {
+      global.sessionService = undefined;
+    }
   });
 
   describe('POST', () => {

@@ -260,7 +260,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           eventType: 'task',
           scope: {
             projectId: testProject.getId(),
-            sessionId: session.id,
+            sessionId: session.getId(),
             taskId: task.id, // taskId should be in scope for deletion events
           },
           data: expect.objectContaining({
@@ -316,7 +316,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         eventType: 'task',
         scope: {
           projectId: testProject.getId(),
-          sessionId: session.id,
+          sessionId: session.getId(),
           taskId: task.id,
         },
         data: expect.objectContaining({

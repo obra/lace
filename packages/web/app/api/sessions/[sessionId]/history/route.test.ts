@@ -14,7 +14,7 @@ import type { ApiErrorResponse } from '@/types/api';
 import { asThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
@@ -26,7 +26,11 @@ describe('Session History API', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let realSessionId: string;
-  let providerInstanceId: string;
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -38,17 +42,13 @@ describe('Session History API', () => {
 
     sessionService = getSessionService();
 
-    // Create a real provider instance for testing
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
+    // Create test provider instances
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
 
     // Create a test project with the real provider instance
     const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
-      providerInstanceId,
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
     testProjectId = project.getId();
@@ -65,7 +65,7 @@ describe('Session History API', () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([providerInstanceId]);
+    await cleanupTestProviderInstances(createdInstanceIds);
   });
 
   describe('GET /api/sessions/[sessionId]/history', () => {

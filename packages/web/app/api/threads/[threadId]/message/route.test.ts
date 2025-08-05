@@ -57,12 +57,19 @@ describe('Thread Messaging API', () => {
 
     sessionService = getSessionService();
 
-    // Create a real test project
-    testProjectId = 'test-project-1';
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    // Create a real test project with provider configuration
+    const project = Project.create(
+      'Test Project', 
+      process.cwd(), 
+      'Project for testing',
+      {
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
     testProjectId = project.getId();
 
-    // Create a real session
+    // Create a real session (will inherit provider config from project)
     const session = await sessionService.createSession(
       'Test Session',
       testProjectId

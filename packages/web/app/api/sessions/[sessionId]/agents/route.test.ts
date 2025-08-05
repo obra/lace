@@ -75,7 +75,10 @@ describe('Agent Spawning API E2E Tests', () => {
       'Agent Spawning E2E Test Project',
       '/test/path',
       'Test project for agent spawning E2E testing',
-      {}
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     sessionService = getSessionService();
