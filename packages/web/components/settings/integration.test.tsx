@@ -18,7 +18,7 @@ describe('Settings Components Integration', () => {
     const mockOnThemeChange = vi.fn();
     
     render(
-      <Modal isOpen={true} onClose={mockOnClose}>
+      <Modal isOpen={true} onClose={mockOnClose} title="Settings">
         <SettingsTabs defaultTab="ui">
           <div data-tab="ui">
             <SettingsPanel title="UI Settings" description="Customize your interface">
