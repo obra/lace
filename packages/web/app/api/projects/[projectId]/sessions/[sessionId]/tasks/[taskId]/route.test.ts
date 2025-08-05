@@ -15,7 +15,7 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -25,11 +25,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
   let testProjectId: string;
   let testSessionId: string;
   let testTaskId: string;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
-  let createdInstanceIds: string[] = [];
+  let providerInstanceId: string;
 
   const mockTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
     title: 'Test Task',
@@ -50,9 +46,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
-    // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     sessionService = getSessionService();
 
@@ -62,7 +62,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       process.cwd(),
       'Project for testing',
       {
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
@@ -102,7 +102,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(createdInstanceIds);
+    await cleanupTestProviderInstances([providerInstanceId]);
     teardownTestPersistence();
     vi.clearAllMocks();
   });

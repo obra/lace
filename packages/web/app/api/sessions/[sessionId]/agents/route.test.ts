@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
@@ -51,7 +51,6 @@ describe('Agent Spawning API E2E Tests', () => {
   let sessionId: string;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
-  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -65,10 +64,19 @@ describe('Agent Spawning API E2E Tests', () => {
     };
 
     // Create test provider instances
-    const instances = await setupTestProviderInstances();
-    anthropicInstanceId = instances.anthropicInstanceId;
-    openaiInstanceId = instances.openaiInstanceId;
-    createdInstanceIds = [anthropicInstanceId, openaiInstanceId];
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+    
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create real project and session using the session service
     testProject = Project.create(
@@ -97,9 +105,7 @@ describe('Agent Spawning API E2E Tests', () => {
     }
     
     // Cleanup test provider instances
-    if (createdInstanceIds.length > 0) {
-      await cleanupTestProviderInstances(createdInstanceIds);
-    }
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     
     teardownTestPersistence();
   });
