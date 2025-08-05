@@ -95,7 +95,7 @@ describe('Delegation Integration Tests', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -117,7 +117,15 @@ describe('Delegation Integration Tests', () => {
 
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
-    project = Project.create('Test Project', '/tmp/test-delegation');
+    project = Project.create(
+      'Test Project', 
+      '/tmp/test-delegation',
+      'Test project for delegation integration',
+      {
+        providerInstanceId: 'anthropic-default', // Use environment-based default
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
     session = Session.create({
       name: 'Delegation Integration Test Session',
       projectId: project.getId(),
@@ -133,7 +141,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.close();
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    // Using simpler provider defaults approach, no complex cleanup needed
   });
 
   it('should create hierarchical delegate thread IDs', () => {
