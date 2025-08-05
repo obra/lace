@@ -21,7 +21,6 @@ export async function createDelegationTestSetup(options?: {
   provider?: string;
   model?: string;
 }): Promise<DelegationTestSetup> {
-
   const mockProvider = new DelegationMockProvider(
     options?.provider || 'anthropic',
     options?.model || 'claude-3-5-haiku-20241022'

@@ -37,7 +37,7 @@ export interface TaskEventData {
   taskId: string;
   task?: Task; // Use actual Task type - JSON.stringify handles conversion
   context: TaskContext; // Use actual TaskContext
-  timestamp: string; // Keep as string since we set this explicitly
+  timestamp: Date; // Date object, SuperJSON handles serialization
 }
 
 // =============================================================================
@@ -51,7 +51,7 @@ export interface AgentEventData {
   provider: string;
   model: string;
   context: EventContext;
-  timestamp: string; // ISO string
+  timestamp: Date; // Date object, SuperJSON handles serialization
 }
 
 // =============================================================================
@@ -68,7 +68,7 @@ export interface ProjectEventData {
     path: string;
   };
   context: EventContext;
-  timestamp: string; // ISO string
+  timestamp: Date; // Date object, SuperJSON handles serialization
 }
 
 // =============================================================================
@@ -80,7 +80,7 @@ export interface GlobalEventData {
   message: string;
   severity: 'info' | 'warning' | 'error';
   context: EventContext;
-  timestamp: string; // ISO string
+  timestamp: Date; // Date object, SuperJSON handles serialization
 }
 
 // =============================================================================
@@ -99,7 +99,7 @@ export interface SessionEventData {
     | 'LOCAL_SYSTEM_MESSAGE'
     | 'AGENT_STATE_CHANGE';
   threadId: ThreadId;
-  timestamp: string; // ISO string - CONSISTENT with all other events
+  timestamp: Date; // Date object - CONSISTENT with SessionEvent interface, SuperJSON handles serialization
   data: unknown; // Legacy - specific to session system
 }
 
@@ -110,7 +110,7 @@ export interface SessionEventData {
 // Unified stream event wrapper - the canonical event format
 export interface StreamEvent {
   id: string; // Unique event identifier
-  timestamp: string; // ISO string - CONSISTENT across all events
+  timestamp: Date; // Date object - CONSISTENT across all events, SuperJSON handles serialization
   eventType: StreamEventCategory; // Primary categorization
   scope: EventScope; // Hierarchical routing information
   data: SessionEventData | TaskEventData | AgentEventData | ProjectEventData | GlobalEventData;
@@ -144,7 +144,7 @@ export function createTaskEvent(
       taskId,
       task,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     },
   };
 }
@@ -167,7 +167,7 @@ export function createAgentEvent(
       provider,
       model,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       ...(taskId && { taskId }),
     },
   };
@@ -188,7 +188,7 @@ export function createProjectEvent(
       projectId,
       project,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     },
   };
 }
@@ -208,7 +208,7 @@ export function createGlobalEvent(
       message,
       severity,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     },
   };
 }
@@ -226,7 +226,7 @@ export function createSessionEvent(
       type,
       threadId,
       data,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     },
   };
 }

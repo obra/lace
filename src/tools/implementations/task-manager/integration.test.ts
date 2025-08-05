@@ -93,7 +93,7 @@ describe('Multi-Agent Task Manager Integration', () => {
 
     // Create project first with provider configuration
     project = Project.create(
-      'Integration Test Project', 
+      'Integration Test Project',
       '/tmp/test-integration',
       'Test project for task manager integration',
       {
@@ -370,7 +370,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     it('should isolate tasks between different sessions', async () => {
       // Create a second session with different project (with provider config)
       const project2 = Project.create(
-        'Session 2 Project', 
+        'Session 2 Project',
         '/tmp/test-session2',
         'Second test project for session isolation',
         {

@@ -28,7 +28,7 @@ export interface TaskEvent {
     actor: string;
     isHuman?: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // Project event types
@@ -45,7 +45,7 @@ export interface ProjectEvent {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // Agent event types
@@ -59,7 +59,7 @@ export interface AgentEvent {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // Global event types
@@ -71,7 +71,7 @@ export interface GlobalEvent {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 interface EventHandlers {
@@ -382,7 +382,7 @@ export function useEventStream({
               name: approvalData.toolName,
               arguments: approvalData.input,
             },
-            requestedAt: streamTimestamp, // Now a string
+            requestedAt: streamTimestamp, // Date object, SuperJSON handles serialization
             requestData: approvalData,
           };
           callbackRefs.current.onApprovalRequest?.(pendingApproval);

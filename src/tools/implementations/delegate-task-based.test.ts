@@ -10,9 +10,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import {
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
@@ -82,7 +80,7 @@ describe('Task-Based DelegateTool Integration', () => {
       // Use the existing mock provider from testSetup and configure responses
       testSetup.mockProvider.setMockResponses([
         'First parallel task completed',
-        'Second parallel task completed', 
+        'Second parallel task completed',
         'Third parallel task completed',
       ]);
 
@@ -128,17 +126,13 @@ describe('Task-Based DelegateTool Integration', () => {
       expect(result3.isError).toBe(false);
 
       // Verify each got a different response (showing proper cycling)
-      const responses = [
-        result1.content[0].text,
-        result2.content[0].text,
-        result3.content[0].text,
-      ];
-      
+      const responses = [result1.content[0].text, result2.content[0].text, result3.content[0].text];
+
       // All should contain "parallel task" but be different
-      responses.forEach(response => {
+      responses.forEach((response) => {
         expect(response).toContain('parallel task');
       });
-      
+
       // At least some should be different (not all identical)
       const uniqueResponses = new Set(responses);
       expect(uniqueResponses.size).toBeGreaterThan(1);
@@ -146,8 +140,10 @@ describe('Task-Based DelegateTool Integration', () => {
 
     it('should handle task failures gracefully', async () => {
       // Override the mock provider to trigger a task update to "blocked" status
-      const originalCreateResponse = testSetup.mockProvider.createResponse.bind(testSetup.mockProvider);
-      
+      const originalCreateResponse = testSetup.mockProvider.createResponse.bind(
+        testSetup.mockProvider
+      );
+
       testSetup.mockProvider.createResponse = async (
         messages: ProviderMessage[],
         tools: Tool[]

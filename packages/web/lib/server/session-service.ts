@@ -31,8 +31,6 @@ export class SessionService {
     // Create session using Session.create which handles both database and thread creation
     const session = Session.create({
       name,
-      providerInstanceId,
-      modelId,
       projectId,
     });
 
@@ -123,7 +121,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content },
       };
       sseManager.broadcast({
@@ -142,7 +140,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_TOKEN',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { token },
       };
       sseManager.broadcast({
@@ -158,7 +156,7 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_CALL',
           threadId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: { id: callId, name: toolName, arguments: input },
         };
         sseManager.broadcast({
@@ -175,7 +173,7 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_RESULT',
           threadId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: result as ToolResult, // Cast to ToolResult for type safety
         };
         sseManager.broadcast({
@@ -192,7 +190,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_STATE_CHANGE',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: {
           agentId: threadId,
           from,
@@ -271,7 +269,7 @@ export class SessionService {
             const sessionEvent: SessionEvent = {
               type: 'TOOL_APPROVAL_REQUEST',
               threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp).toISOString(),
+              timestamp: new Date(event.timestamp),
               data: {
                 requestId: toolCallData.toolCallId,
                 toolName: toolCall.name,
@@ -300,7 +298,7 @@ export class SessionService {
           const sessionEvent: SessionEvent = {
             type: 'TOOL_APPROVAL_RESPONSE',
             threadId: asThreadId(eventThreadId),
-            timestamp: new Date(event.timestamp).toISOString(),
+            timestamp: new Date(event.timestamp),
             data: {
               toolCallId: responseData.toolCallId,
               decision: responseData.decision,

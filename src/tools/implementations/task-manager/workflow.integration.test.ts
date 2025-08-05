@@ -106,7 +106,7 @@ describe('Task Management Workflow Integration', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    // Use simpler provider defaults approach instead of setupTestProviderInstances  
+    // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -122,7 +122,7 @@ describe('Task Management Workflow Integration', () => {
 
     // Create project and session with provider configuration
     project = Project.create(
-      'Task Workflow Integration Test Project', 
+      'Task Workflow Integration Test Project',
       '/tmp/test-workflow',
       'Test project for task workflow integration',
       {

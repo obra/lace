@@ -549,43 +549,9 @@ export function SessionConfigPanel({
                   </div>
                 </div>
 
-                {/* Provider and Model Configuration */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Provider</span>
-                    </label>
-                    <select
-                      value={sessionConfig.provider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                        setSessionConfig(prev => ({
-                          ...prev,
-                          provider: newProvider,
-                          model: providerModels[0]?.id || prev.model,
-                        }));
-                      }}
-                      className="select select-bordered w-full"
-                    >
-                      {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
-                          {provider.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <ModelDropdown
-                      providers={providers}
-                      selectedProvider={sessionConfig.provider || ''}
-                      selectedModel={sessionConfig.model || ''}
-                      onChange={(model) => setSessionConfig(prev => ({ ...prev, model }))}
-                      label="Default Model"
-                    />
-                  </div>
-
+                {/* Legacy provider/model configuration removed - now using provider instances via ModelSelectionForm */}
+                
+                <div className="grid md:grid-cols-1 gap-4">
                   <div>
                     <label className="label">
                       <span className="label-text font-medium">Max Tokens</span>
@@ -839,42 +805,9 @@ export function SessionConfigPanel({
                   </div>
                 </div>
 
-                {/* Provider and Model Configuration */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Provider</span>
-                    </label>
-                    <select
-                      value={editSessionConfig.provider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                        setEditSessionConfig(prev => ({
-                          ...prev,
-                          provider: newProvider,
-                          model: providerModels[0]?.id || prev.model,
-                        }));
-                      }}
-                      className="select select-bordered w-full"
-                    >
-                      {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
-                          {provider.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <ModelDropdown
-                      providers={providers}
-                      selectedProvider={editSessionConfig.provider || ''}
-                      selectedModel={editSessionConfig.model || ''}
-                      onChange={(model) => setEditSessionConfig(prev => ({ ...prev, model }))}
-                      label="Default Model"
-                    />
-                  </div>
+                {/* Legacy provider/model configuration removed - now using provider instances via ModelSelectionForm */}
+                
+                <div className="grid md:grid-cols-1 gap-4">
 
                   <div>
                     <label className="label">

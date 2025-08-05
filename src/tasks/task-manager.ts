@@ -69,7 +69,7 @@ export class TaskManager extends EventEmitter {
       type: 'task:created',
       task,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     });
 
     return task;
@@ -158,7 +158,7 @@ export class TaskManager extends EventEmitter {
       type: 'task:updated',
       task: updatedTask,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     });
 
     return updatedTask;
@@ -189,7 +189,7 @@ export class TaskManager extends EventEmitter {
         type: 'task:note_added',
         task: updatedTask,
         context,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
     }
 
@@ -213,7 +213,7 @@ export class TaskManager extends EventEmitter {
       taskId,
       task,
       context,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     });
   }
 
@@ -329,7 +329,7 @@ export class TaskManager extends EventEmitter {
         agentThreadId,
         provider,
         model,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
     } catch (error) {
       // If agent creation fails, keep task as pending with original assignment

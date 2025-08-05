@@ -52,7 +52,7 @@ describe('Session', () => {
     setupTestProviderDefaults();
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
-    
+
     // Clear provider cache to avoid race conditions between tests
     Session.clearProviderCache();
 

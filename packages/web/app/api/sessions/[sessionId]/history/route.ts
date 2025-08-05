@@ -58,8 +58,8 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     threadId,
     timestamp:
       threadEvent.timestamp instanceof Date
-        ? threadEvent.timestamp.toISOString()
-        : String(threadEvent.timestamp),
+        ? threadEvent.timestamp
+        : new Date(threadEvent.timestamp),
   };
 
   switch (threadEvent.type) {

@@ -91,10 +91,15 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     // Create project with provider configuration
-    project = Project.create('Test Project', '/tmp/test-tools', 'Test project for task manager tests', {
-      providerInstanceId: 'anthropic-default',
-      modelId: 'claude-3-5-haiku-20241022',
-    });
+    project = Project.create(
+      'Test Project',
+      '/tmp/test-tools',
+      'Test project for task manager tests',
+      {
+        providerInstanceId: 'anthropic-default',
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
 
     // Create session with anthropic - the provider will be mocked
     session = Session.create({

@@ -53,6 +53,32 @@ export function ModelSelectionForm({
     loadInstances();
   }, []);
 
+  const loadModelsForInstance = useCallback(async (instanceId: string) => {
+    try {
+      setModelsLoading(true);
+      setError(null);
+      const response = await fetch(`/api/provider/catalog`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load models: ${response.status}`);
+      }
+      
+      const data = await parseResponse<{ providers: Array<{ id: string; models: Model[] }> }>(response);
+      
+      // Find the instance and get its catalog provider
+      const instance = instances.find(inst => inst.id === instanceId);
+      if (instance) {
+        const catalogProvider = data.providers.find(p => p.id === instance.catalogProviderId);
+        setAvailableModels(catalogProvider?.models || []);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load models');
+      setAvailableModels([]);
+    } finally {
+      setModelsLoading(false);
+    }
+  }, [instances]);
+
   useEffect(() => {
     if (selectedInstanceId) {
       loadModelsForInstance(selectedInstanceId);
@@ -81,32 +107,6 @@ export function ModelSelectionForm({
       setLoading(false);
     }
   };
-
-  const loadModelsForInstance = useCallback(async (instanceId: string) => {
-    try {
-      setModelsLoading(true);
-      setError(null);
-      const response = await fetch(`/api/provider/catalog`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load models: ${response.status}`);
-      }
-      
-      const data = await parseResponse<{ providers: Array<{ id: string; models: Model[] }> }>(response);
-      
-      // Find the instance and get its catalog provider
-      const instance = instances.find(inst => inst.id === instanceId);
-      if (instance) {
-        const catalogProvider = data.providers.find(p => p.id === instance.catalogProviderId);
-        setAvailableModels(catalogProvider?.models || []);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load models');
-      setAvailableModels([]);
-    } finally {
-      setModelsLoading(false);
-    }
-  }, [instances]);
 
   const handleInstanceChange = (instanceId: string) => {
     setAvailableModels([]);

@@ -36,7 +36,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
-    
+
     // Create session WITHOUT provider configuration - it inherits from project
     testSession = Session.create({
       name: 'Test Session',

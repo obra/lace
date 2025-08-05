@@ -28,7 +28,7 @@ export interface PendingApproval {
     name: string;
     arguments: unknown;
   };
-  requestedAt: string;
+  requestedAt: Date;
   requestData: ToolApprovalRequestData;
 }
 

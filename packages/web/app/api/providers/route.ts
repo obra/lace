@@ -46,15 +46,28 @@ export async function GET(): Promise<NextResponse> {
         throw new Error(`Catalog provider ${instance.catalogProviderId} not found for instance ${instance.id}`);
       }
       
-      const models = catalogManager.getProviderModels(instance.catalogProviderId);
+      const catalogModels = catalogManager.getProviderModels(instance.catalogProviderId);
+      
+      // Transform catalog models to ModelInfo format
+      const models: ModelInfo[] = catalogModels.map(catalogModel => ({
+        id: catalogModel.id,
+        displayName: catalogModel.name,
+        description: undefined, // Not available in catalog format
+        contextWindow: catalogModel.context_window,
+        maxOutputTokens: catalogModel.default_max_tokens,
+        capabilities: catalogModel.supports_attachments ? ['attachments'] : undefined,
+        isDefault: false, // Would need to check against catalog provider defaults
+      }));
       
       return {
         id: catalogProvider.id,
         name: catalogProvider.name,
         displayName: instance.displayName, // Use instance display name, not catalog name
         type: catalogProvider.type,
-        requiresApiKey: Boolean(catalogProvider.requiresApiKey),
-        configurationHint: catalogProvider.configurationHint as string | undefined,
+        // Infer requiresApiKey from provider type - local providers don't need API keys
+        requiresApiKey: catalogProvider.type !== 'local',
+        // Configuration hint not available in catalog format
+        configurationHint: undefined,
         models,
         configured: true, // All returned providers are configured by definition
         instanceId: instance.id,

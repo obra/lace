@@ -9,10 +9,10 @@ import type { ToolResult } from '@/types/core';
 // ThreadId schema (assumes string validation exists elsewhere)
 const ThreadIdSchema = z.string() as unknown as z.ZodType<ThreadId>;
 
-// Timestamp schema - preserves ISO strings for JSON serialization compatibility
+// Timestamp schema - converts ISO strings to Date objects for internal consistency  
 const DateTimeSchema = z.union([
-  z.date().transform((date) => date.toISOString()), // Convert Date to ISO string
-  z.string().datetime(), // Keep ISO string as-is
+  z.date(), // Keep Date as-is
+  z.string().datetime().transform((str) => new Date(str)), // Convert ISO string to Date
 ]);
 
 // Event data schemas

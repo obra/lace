@@ -24,14 +24,14 @@ interface TaskCreatedEvent {
   type: 'task:created';
   task: Task;
   context: TaskContext;
-  timestamp: string;
+  timestamp: Date;
 }
 
 interface TaskUpdatedEvent {
   type: 'task:updated';
   task: Task;
   context: TaskContext;
-  timestamp: string;
+  timestamp: Date;
 }
 
 interface TaskDeletedEvent {
@@ -39,14 +39,14 @@ interface TaskDeletedEvent {
   taskId: string;
   task?: Task;
   context: TaskContext;
-  timestamp: string;
+  timestamp: Date;
 }
 
 interface TaskNoteAddedEvent {
   type: 'task:note_added';
   task: Task;
   context: TaskContext;
-  timestamp: string;
+  timestamp: Date;
 }
 
 interface AgentSpawnedEvent {
@@ -59,7 +59,7 @@ interface AgentSpawnedEvent {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // NOTE: These events come from our own TaskManager, so the types are known and safe.
@@ -206,7 +206,7 @@ export class EventStreamManager {
     // Send connection confirmation
     this.sendToConnection(connection, {
       id: this.generateEventId(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       eventType: 'global',
       scope: { global: true },
       data: {
@@ -214,7 +214,7 @@ export class EventStreamManager {
         message: 'Connected to unified event stream',
         severity: 'info',
         context: { actor: 'system', isHuman: false },
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       },
     });
 
@@ -245,7 +245,7 @@ export class EventStreamManager {
     const fullEvent: StreamEvent = {
       ...event,
       id: this.generateEventId(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
     };
 
     const deadConnections: string[] = [];

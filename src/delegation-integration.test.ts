@@ -118,7 +118,7 @@ describe('Delegation Integration Tests', () => {
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
     project = Project.create(
-      'Test Project', 
+      'Test Project',
       '/tmp/test-delegation',
       'Test project for delegation integration',
       {
