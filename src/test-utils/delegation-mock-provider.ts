@@ -40,21 +40,27 @@ export class DelegationMockProvider extends BaseMockProvider {
   }
 
   async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    const response = this.responses[this.responseIndex] || 'Mock delegation response';
-    // Always increment and wrap around for proper cycling
-    this.responseIndex = (this.responseIndex + 1) % Math.max(this.responses.length, 1);
+    const response = this.responses.length > 0 ? this.responses[this.responseIndex] : 'Mock delegation response';
+    
+    // Only increment for actual responses, not fallback
+    if (this.responses.length > 0) {
+      this.responseIndex = (this.responseIndex + 1) % this.responses.length;
+    }
 
-    // Look for task assignment message - consistent pattern across all delegation tests
+    // Look for task assignment message - support multiple patterns
     const taskMessage = messages.find(
       (m) =>
         m.content &&
         typeof m.content === 'string' &&
-        m.content.includes('You have been assigned task')
+        (m.content.includes('You have been assigned task') ||
+         m.content.includes('LACE TASK SYSTEM') ||
+         m.content.includes('TASK DETAILS'))
     );
 
     if (taskMessage) {
-      // Extract task ID from task assignment message
-      const match = taskMessage.content.match(/assigned task '([^']+)'/);
+      // Extract task ID from task assignment message - try multiple patterns
+      const match = taskMessage.content.match(/assigned task '([^']+)'/) || 
+                   taskMessage.content.match(/task[:\s]+([a-zA-Z0-9_-]+)/);
       const taskId = match ? match[1] : 'unknown';
 
       // Immediately complete the task with the mock response

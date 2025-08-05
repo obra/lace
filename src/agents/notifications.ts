@@ -8,14 +8,15 @@ export class NotificationFormatter {
     priority: string;
     createdBy: string;
   }): string {
-    return `[LACE TASK SYSTEM] You have been assigned a new task:
+    return `[LACE TASK SYSTEM] You have been assigned task:
 Title: "${task.title}"
 Created by: ${task.createdBy}
 Priority: ${task.priority}
 
 --- TASK DETAILS ---
 ${task.prompt}
---- END TASK DETAILS ---`;
+--- END TASK DETAILS ---
+Use your task_add_note tool to record important notes as you work and your task_complete tool when you are done.`;
   }
 
   static formatTaskCompletion(task: {

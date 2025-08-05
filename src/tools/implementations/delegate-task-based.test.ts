@@ -79,24 +79,12 @@ describe('Task-Based DelegateTool Integration', () => {
     }, 15000); // Increase timeout to 15 seconds
 
     it('should handle parallel delegations without conflicts', async () => {
-      // Create a fresh mock provider for this test to avoid state contamination
-      const freshMockProvider = new DelegationMockProvider('anthropic', 'claude-3-5-haiku-20241022');
-      freshMockProvider.setMockResponses([
+      // Use the existing mock provider from testSetup and configure responses
+      testSetup.mockProvider.setMockResponses([
         'First parallel task completed',
         'Second parallel task completed', 
         'Third parallel task completed',
       ]);
-
-      // Override the registry to use our fresh provider
-      vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => freshMockProvider);
-      vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
-        () =>
-          ({
-            createProvider: () => freshMockProvider,
-            getProvider: () => freshMockProvider,
-            getProviderNames: () => ['anthropic', 'openai'],
-          }) as unknown as ProviderRegistry
-      );
 
       // Create three separate delegate tool instances with same TaskManager
       const tool1 = new DelegateTool();
@@ -110,7 +98,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 1',
             prompt: 'First task',
             expected_response: 'Task result',
-            model: 'anthropic:claude-3-5-haiku-20241022',
+            model: 'anthropic:claude-sonnet-4-20250514',
           },
           context
         ),
@@ -119,7 +107,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 2',
             prompt: 'Second task',
             expected_response: 'Task result',
-            model: 'anthropic:claude-3-5-haiku-20241022',
+            model: 'anthropic:claude-sonnet-4-20250514',
           },
           context
         ),
@@ -128,7 +116,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 3',
             prompt: 'Third task',
             expected_response: 'Task result',
-            model: 'anthropic:claude-3-5-haiku-20241022',
+            model: 'anthropic:claude-sonnet-4-20250514',
           },
           context
         ),
