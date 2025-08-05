@@ -16,10 +16,6 @@ import type { Task } from '~/tasks/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
@@ -27,8 +23,8 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
+import { Tool } from '~/tools/tool';
 
 // Mock provider for testing agent spawning
 class MockProvider extends BaseMockProvider {
@@ -74,7 +70,7 @@ describe('Enhanced Task Manager Tools', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    Session.clearProviderCache();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -94,8 +90,11 @@ describe('Enhanced Task Manager Tools', () => {
       return mockRegistry;
     });
 
-    // Create project first
-    project = Project.create('Test Project', '/tmp/test-tools');
+    // Create project with provider configuration
+    project = Project.create('Test Project', '/tmp/test-tools', 'Test project for task manager tests', {
+      providerInstanceId: 'anthropic-default',
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     // Create session with anthropic - the provider will be mocked
     session = Session.create({
@@ -131,7 +130,6 @@ describe('Enhanced Task Manager Tools', () => {
     session?.destroy();
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   describe('Context Integration', () => {
