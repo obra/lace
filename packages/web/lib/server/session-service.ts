@@ -368,8 +368,6 @@ export class SessionService {
       id: session.getId(),
       name: sessionInfo.name,
       createdAt: sessionInfo.createdAt,
-      providerInstanceId: sessionInfo.providerInstanceId,
-      modelId: sessionInfo.modelId,
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,

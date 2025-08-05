@@ -7,7 +7,6 @@ import { Project } from '~/projects/project';
 import { ProviderRegistry } from '~/providers/registry';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { DelegationMockProvider } from '~/test-utils/delegation-mock-provider';
-import { setupTestProviderInstances } from '~/test-utils/provider-instances';
 
 export interface DelegationTestSetup {
   session: Session;
@@ -22,8 +21,6 @@ export async function createDelegationTestSetup(options?: {
   provider?: string;
   model?: string;
 }): Promise<DelegationTestSetup> {
-  // Set up test provider instances with predictable IDs
-  await setupTestProviderInstances();
 
   const mockProvider = new DelegationMockProvider(
     options?.provider || 'anthropic',
@@ -47,7 +44,7 @@ export async function createDelegationTestSetup(options?: {
     options?.projectPath || '/tmp/test-delegation',
     'Test project for delegation',
     {
-      providerInstanceId: 'test-anthropic', // Use predictable test provider instance ID
+      providerInstanceId: 'anthropic-default', // Use default provider instance from environment
       modelId: options?.model || 'claude-3-5-haiku-20241022',
     }
   );
