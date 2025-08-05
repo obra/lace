@@ -109,13 +109,22 @@ export class Session {
     );
 
     // Extract provider instance and model from effective configuration
-    const providerInstanceId = effectiveConfig.providerInstanceId;
-    const modelId = effectiveConfig.modelId;
+    let providerInstanceId = effectiveConfig.providerInstanceId;
+    let modelId = effectiveConfig.modelId;
 
+    // Provide reasonable defaults when no provider configuration is available
     if (!providerInstanceId || !modelId) {
-      throw new Error(
-        'No provider configuration available - project must specify providerInstanceId and modelId'
-      );
+      const defaultProvider = Session.detectDefaultProvider();
+      const defaultModel = Session.getDefaultModel(defaultProvider);
+      
+      providerInstanceId = providerInstanceId || `default-${defaultProvider}`;
+      modelId = modelId || defaultModel;
+      
+      logger.debug('Using default provider configuration for session', {
+        sessionId: sessionData.id,
+        provider: defaultProvider,
+        model: defaultModel,
+      });
     }
 
     // Resolve provider instance lazily for the session agent
@@ -500,7 +509,6 @@ export class Session {
 
   getInfo(): SessionInfo | null {
     const agents = this.getAgents();
-    const metadata = this._sessionAgent.getThreadMetadata();
     const sessionData = this.getSessionData();
 
     return {

@@ -49,9 +49,11 @@ export async function createDelegationTestSetup(options?: {
 
   const session = Session.create({
     name: options?.sessionName || 'Delegation Test Session',
-    providerInstanceId: testProviderInstances.anthropicInstanceId,
-    modelId: options?.model || 'claude-3-5-haiku-20241022',
     projectId: project.getId(),
+    configuration: {
+      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      modelId: options?.model || 'claude-3-5-haiku-20241022',
+    },
     approvalCallback: {
       requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
     },

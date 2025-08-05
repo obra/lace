@@ -72,12 +72,12 @@ export class Project {
         description: 'Default session for project',
         projectId: projectData.id,
       });
-      
+
       logger.debug('Auto-created default session for project', { projectId: projectData.id });
     } catch (error) {
-      logger.warn('Failed to create default session for project', { 
-        projectId: projectData.id, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      logger.warn('Failed to create default session for project', {
+        projectId: projectData.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
 

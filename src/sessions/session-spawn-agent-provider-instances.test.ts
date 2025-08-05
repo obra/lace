@@ -244,9 +244,11 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Create session with OpenAI provider configuration
       const openaiSession = Session.create({
         name: 'OpenAI Session',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
-        modelId: 'gpt-4o',
         projectId: testProject.getId(),
+        configuration: {
+          providerInstanceId: testProviderInstances.openaiInstanceId,
+          modelId: 'gpt-4o',
+        },
       });
 
       // Spawn agent with different model configuration

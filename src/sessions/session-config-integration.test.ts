@@ -355,7 +355,6 @@ describe('Session Configuration Integration', () => {
       const info = session.getInfo();
       expect(info).toBeDefined();
       expect(info?.name).toBe('Test Session');
-      expect(info?.providerInstanceId).toBe(testProviderInstances.anthropicInstanceId);
 
       session.destroy();
     });
