@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Agent, Project } from '@/lib/server/lace-imports';
-import { type ThreadId } from '@/types/core';
+import { type ThreadId, ApprovalDecision } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -95,20 +95,16 @@ describe('Event-Based Tool Approval Integration', () => {
     agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
 
     // Get the approval callback that was set up
-    const toolExecutor = agent.toolExecutor as unknown as {
-      approvalCallback?: {
-        requestApproval: (toolName: string, input: unknown) => Promise<string>;
-      };
-    };
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
 
-    expect(toolExecutor.approvalCallback).toBeDefined();
-    if (!toolExecutor.approvalCallback) {
+    expect(approvalCallback).toBeDefined();
+    if (!approvalCallback) {
       throw new Error('Approval callback not found');
     }
 
     // Start approval request (this should create TOOL_APPROVAL_REQUEST event and throw ApprovalPendingError)
     try {
-      await toolExecutor.approvalCallback.requestApproval({
+      await approvalCallback.requestApproval({
         id: 'test-call-123',
         name: 'file-read',
         arguments: {
@@ -142,23 +138,19 @@ describe('Event-Based Tool Approval Integration', () => {
     agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
     agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'existing-call-456',
-      decision: 'allow_session',
+      decision: ApprovalDecision.ALLOW_SESSION,
     });
 
     // Get the approval callback
-    const toolExecutor = agent.toolExecutor as unknown as {
-      approvalCallback?: {
-        requestApproval: (toolName: string, input: unknown) => Promise<string>;
-      };
-    };
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
 
-    expect(toolExecutor.approvalCallback).toBeDefined();
-    if (!toolExecutor.approvalCallback) {
+    expect(approvalCallback).toBeDefined();
+    if (!approvalCallback) {
       throw new Error('Approval callback not found');
     }
 
     // Request approval - should return existing decision immediately
-    const decision = await toolExecutor.approvalCallback.requestApproval({
+    const decision = await approvalCallback.requestApproval({
       id: 'existing-call-456',
       name: 'file-read',
       arguments: {
@@ -199,7 +191,7 @@ describe('Event-Based Tool Approval Integration', () => {
     // Add approval response
     agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'pending-call-789',
-      decision: 'deny',
+      decision: ApprovalDecision.DENY,
     });
 
     // Now should have no pending approvals

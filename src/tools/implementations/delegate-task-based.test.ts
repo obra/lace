@@ -1,6 +1,10 @@
 // ABOUTME: Integration tests for task-based delegate tool implementation
 // ABOUTME: Tests real delegation flow using Session, Project, and TaskManager integration
 
+/**
+ * @vitest-environment node
+ */
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { ToolContext } from '~/tools/types';
@@ -10,15 +14,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
 } from '~/test-utils/delegation-test-helper';
-import { DelegationMockProvider } from '~/test-utils/delegation-mock-provider';
-import { ProviderRegistry } from '~/providers/registry';
-import { ProviderMessage, ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
 
 // Using shared delegation test utilities
 
@@ -32,11 +31,12 @@ describe('Task-Based DelegateTool Integration', () => {
     setupTestPersistence();
     setupTestProviderDefaults();
 
-    // Use shared delegation test setup
+    // Use shared delegation test setup with MSW
     testSetup = await createDelegationTestSetup({
       sessionName: 'Task-Based Delegate Test Session',
       projectName: 'Task-Based Test Project',
       model: 'claude-sonnet-4-20250514',
+      provider: 'anthropic',
     });
 
     // Create delegate tool and inject TaskManager
@@ -51,15 +51,20 @@ describe('Task-Based DelegateTool Integration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     testSetup?.session?.destroy();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    
+    // Use the cleanup function from test setup
+    if (testSetup?.cleanup) {
+      await testSetup.cleanup();
+    }
+    
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });
 
   describe('Integration Tests', () => {
     it('should create task and wait for completion via real delegation', async () => {
-      // Set up mock provider to respond with task completion
-      testSetup.mockProvider.setMockResponses(['Integration test completed successfully']);
+      // Set up mock to respond with task completion
+      testSetup.setMockResponses(['Integration test completed successfully']);
 
       const result = await delegateTool.execute(
         {
@@ -77,10 +82,10 @@ describe('Task-Based DelegateTool Integration', () => {
     }, 15000); // Increase timeout to 15 seconds
 
     it('should handle parallel delegations without conflicts', async () => {
-      // Use the existing mock provider from testSetup and configure responses
-      testSetup.mockProvider.setMockResponses([
+      // Set up mock to cycle through different responses for parallel tasks
+      testSetup.setMockResponses([
         'First parallel task completed',
-        'Second parallel task completed',
+        'Second parallel task completed', 
         'Third parallel task completed',
       ]);
 
@@ -94,16 +99,16 @@ describe('Task-Based DelegateTool Integration', () => {
         tool1.execute(
           {
             title: 'Task 1',
-            prompt: 'First task',
-            expected_response: 'Task result',
+            prompt: 'First parallel task',
+            expected_response: 'Task result',  
             model: 'anthropic:claude-sonnet-4-20250514',
           },
           context
         ),
         tool2.execute(
           {
-            title: 'Task 2',
-            prompt: 'Second task',
+            title: 'Task 2', 
+            prompt: 'Second parallel task',
             expected_response: 'Task result',
             model: 'anthropic:claude-sonnet-4-20250514',
           },
@@ -112,7 +117,7 @@ describe('Task-Based DelegateTool Integration', () => {
         tool3.execute(
           {
             title: 'Task 3',
-            prompt: 'Third task',
+            prompt: 'Third parallel task', 
             expected_response: 'Task result',
             model: 'anthropic:claude-sonnet-4-20250514',
           },
@@ -128,7 +133,7 @@ describe('Task-Based DelegateTool Integration', () => {
       // Verify each got a different response (showing proper cycling)
       const responses = [result1.content[0].text, result2.content[0].text, result3.content[0].text];
 
-      // All should contain "parallel task" but be different
+      // All should contain "parallel task" or similar pattern from responses
       responses.forEach((response) => {
         expect(response).toContain('parallel task');
       });
@@ -139,47 +144,8 @@ describe('Task-Based DelegateTool Integration', () => {
     });
 
     it('should handle task failures gracefully', async () => {
-      // Override the mock provider to trigger a task update to "blocked" status
-      const originalCreateResponse = testSetup.mockProvider.createResponse.bind(
-        testSetup.mockProvider
-      );
-
-      testSetup.mockProvider.createResponse = async (
-        messages: ProviderMessage[],
-        tools: Tool[]
-      ): Promise<ProviderResponse> => {
-        // Look for task assignment message to extract task ID
-        const taskAssignmentMessage = messages.find(
-          (m) =>
-            m.content &&
-            typeof m.content === 'string' &&
-            m.content.includes('You have been assigned task')
-        );
-
-        if (taskAssignmentMessage && typeof taskAssignmentMessage.content === 'string') {
-          const match = taskAssignmentMessage.content.match(/assigned task '([^']+)'/);
-          const taskId = match ? match[1] : 'unknown';
-
-          // Create a tool call to update task to blocked status instead of completing it
-          const toolCall: ProviderToolCall = {
-            id: 'task_update_call',
-            name: 'task_update',
-            input: {
-              taskId: taskId,
-              status: 'blocked',
-            },
-          };
-
-          return Promise.resolve({
-            content: `I encountered an issue and cannot complete this task.`,
-            usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-            toolCalls: [toolCall],
-          });
-        }
-
-        // Fall back to original behavior for non-task messages
-        return originalCreateResponse(messages, tools);
-      };
+      // Use built-in blocked task response setup
+      testSetup.setupBlockedTaskResponse();
 
       const result = await delegateTool.execute(
         {

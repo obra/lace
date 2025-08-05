@@ -1,6 +1,7 @@
 // ABOUTME: Tests for superjson serialization of branded types and Date objects
 // ABOUTME: Verifies core types survive serialization/deserialization round trips
 
+import { describe, it, expect } from 'vitest';
 import { serialize, deserialize } from './serialization';
 import type { ThreadId } from '@/types/core';
 

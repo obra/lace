@@ -2,6 +2,7 @@
 // ABOUTME: Prevents regressions during type cleanup refactoring
 
 import { describe, it, expect } from 'vitest';
+import type { SessionInfo, AgentInfo } from '@/types/core';
 
 // Test that all key types can be imported from current paths
 describe('Type Integrity - Current State', () => {
@@ -12,8 +13,7 @@ describe('Type Integrity - Current State', () => {
 
       // But we can test that the type exists by using it
       const testId = 'lace_20250731_abc123';
-      const threadIdTyped: typeof coreTypes.ThreadId =
-        testId as unknown as typeof coreTypes.ThreadId;
+      const threadIdTyped: string = testId; // ThreadId is just a string type
       expect(threadIdTyped).toBe(testId);
     });
 
@@ -75,35 +75,33 @@ describe('Type Integrity - Current State', () => {
       expect(isValidThreadId('550e8400-e29b-41d4-a716-446655440000')).toBe(false); // UUIDs not valid
     });
 
-    it('should create Session types correctly', async () => {
+    it('should create SessionInfo types correctly', async () => {
       const { asThreadId } = await import('@/types/core');
-      const _apiTypes = await import('@/types/api');
 
-      // Test Session creation with proper ThreadId
+      // Test SessionInfo creation with proper ThreadId
       const sessionId = asThreadId('lace_20250731_abc123');
-      const session: (typeof _apiTypes)['Session'] = {
+      const session: SessionInfo = {
         id: sessionId,
         name: 'Test Session',
-        createdAt: '2025-07-31T10:00:00Z',
+        createdAt: new Date('2025-07-31T10:00:00Z'),
+        agents: [],
       };
 
       expect(session.id).toBe(sessionId);
       expect(session.name).toBe('Test Session');
     });
 
-    it('should create Agent types correctly', async () => {
+    it('should create AgentInfo types correctly', async () => {
       const { asThreadId } = await import('@/types/core');
-      const _apiTypes = await import('@/types/api');
 
-      // Test Agent creation with proper ThreadId
+      // Test AgentInfo creation with proper ThreadId
       const agentThreadId = asThreadId('lace_20250731_abc123.1');
-      const agent: (typeof _apiTypes)['Agent'] = {
+      const agent: AgentInfo = {
         threadId: agentThreadId,
         name: 'Test Agent',
         provider: 'anthropic',
         model: 'claude-3-sonnet',
         status: 'idle',
-        createdAt: '2025-07-31T10:00:00Z',
       };
 
       expect(agent.threadId).toBe(agentThreadId);

@@ -9,6 +9,8 @@ import * as os from 'os';
 import { GET, POST } from './route';
 import { parseResponse } from '@/lib/serialization';
 import type { ProviderInstancesConfig } from '~/providers/catalog/types';
+import type { ConfiguredInstance } from '~/providers/registry';
+import type { InstancesResponse, CreateInstanceResponse } from './route';
 
 describe('Provider Instances API', () => {
   let tempDir: string;
@@ -56,7 +58,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(2);
@@ -78,7 +80,7 @@ describe('Provider Instances API', () => {
     it('should handle empty instances list when no config file exists', async () => {
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instances).toEqual([]);
@@ -93,7 +95,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instances).toEqual([]);
@@ -130,13 +132,13 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(2);
       
-      const withCreds = data.instances.find((i: { id: string }) => i.id === 'with-creds');
-      const withoutCreds = data.instances.find((i: { id: string }) => i.id === 'without-creds');
+      const withCreds = data.instances.find((i: ConfiguredInstance) => i.id === 'with-creds');
+      const withoutCreds = data.instances.find((i: ConfiguredInstance) => i.id === 'without-creds');
       
       expect(withCreds).toMatchObject({
         id: 'with-creds',
@@ -171,7 +173,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(1);
@@ -206,7 +208,7 @@ describe('Provider Instances API', () => {
       } as NextRequest;
 
       const response = await POST(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<CreateInstanceResponse>(response);
 
       expect(response.status).toBe(201);
       expect(data).toMatchObject({
@@ -236,7 +238,7 @@ describe('Provider Instances API', () => {
 
       // Verify instance appears in GET with correct contract
       const getResponse = await GET({} as NextRequest);
-      const getData = await parseResponse(getResponse);
+      const getData = await parseResponse<InstancesResponse>(getResponse);
       
       expect(getData.instances).toHaveLength(1);
       expect(getData.instances[0]).toMatchObject({
@@ -260,7 +262,7 @@ describe('Provider Instances API', () => {
       } as NextRequest;
 
       const response = await POST(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toContain('Invalid request body');
@@ -279,7 +281,7 @@ describe('Provider Instances API', () => {
       } as NextRequest;
 
       const response = await POST(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Provider not found in catalog: nonexistent');
@@ -314,7 +316,7 @@ describe('Provider Instances API', () => {
       } as NextRequest;
 
       const response = await POST(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Instance ID already exists: existing-instance');

@@ -78,14 +78,15 @@ describe('ThreadManager Delegate Thread Creation', () => {
     const event = threadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello delegate');
 
     // Verify event was added
-    expect(event.threadId).toBe(delegateThreadId);
-    expect(event.type).toBe('USER_MESSAGE');
-    expect(event.data).toBe('Hello delegate');
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(delegateThreadId);
+    expect(event?.type).toBe('USER_MESSAGE');
+    expect(event?.data).toBe('Hello delegate');
 
     // Verify event persists
     const events = threadManager.getEvents(delegateThreadId);
     expect(events).toHaveLength(1);
-    expect(events[0]?.id).toBe(event.id);
+    expect(events[0]?.id).toBe(event?.id);
   });
 
   it('should generate unique delegate thread IDs', () => {

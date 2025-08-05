@@ -6,7 +6,7 @@ import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
 import { createProvider } from '~/app';
 
 describe('Event-Based Approval Callback', () => {
@@ -35,8 +35,10 @@ describe('Event-Based Approval Callback', () => {
     session = Session.create({
       projectId: project.getId(),
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      configuration: {
+        provider: 'anthropic',
+        model: 'claude-3-haiku-20240307'
+      }
     });
     threadId = asThreadId(session.getId());
 
@@ -59,7 +61,7 @@ describe('Event-Based Approval Callback', () => {
   });
 
   it('should create TOOL_APPROVAL_REQUEST event when approval is requested', async () => {
-    const approvalCallback = agent.toolExecutor.approvalCallback;
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
     // Request approval for a tool that requires approval
@@ -88,13 +90,13 @@ describe('Event-Based Approval Callback', () => {
       toolPolicies: { bash: 'allow' },
     });
 
-    const approvalCallback = agent.toolExecutor.approvalCallback;
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
     const toolCall = { id: 'call_456', name: 'bash', arguments: { command: 'pwd' } };
 
     const decision = await approvalCallback!.requestApproval(toolCall);
-    expect(decision).toBe('allow_session');
+    expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
 
     // Should not create approval request event since tool is pre-approved
     const events = threadManager.getEvents(threadId);
@@ -105,7 +107,7 @@ describe('Event-Based Approval Callback', () => {
   });
 
   it('should return existing approval if response already exists', async () => {
-    const approvalCallback = agent.toolExecutor.approvalCallback;
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
     const toolCall = { id: 'call_789', name: 'read', arguments: { file_path: '/test.txt' } };
@@ -120,11 +122,11 @@ describe('Event-Based Approval Callback', () => {
     // Now simulate an approval response
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_789',
-      decision: 'allow_once',
+      decision: ApprovalDecision.ALLOW_ONCE,
     });
 
     // Second request should return the existing approval
     const decision = await approvalCallback!.requestApproval(toolCall);
-    expect(decision).toBe('allow_once');
+    expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
   });
 });

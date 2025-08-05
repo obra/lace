@@ -55,7 +55,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       getSession: vi.fn().mockReturnValue(mockSession),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService as any);
   });
 
   afterEach(() => {
@@ -114,7 +114,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -135,7 +135,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -155,7 +155,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -256,7 +256,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -276,7 +276,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 

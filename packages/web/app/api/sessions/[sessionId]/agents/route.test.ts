@@ -25,16 +25,16 @@ vi.mock('@/lib/server/approval-manager', () => ({
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { ApiAgent } from '@/types/api';
+import type { AgentInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 
 // Response types
 interface AgentResponse {
-  agent: ApiAgent;
+  agent: AgentInfo;
 }
 
 interface AgentsListResponse {
-  agents: ApiAgent[];
+  agents: AgentInfo[];
 }
 
 interface ErrorResponse {
@@ -128,7 +128,6 @@ describe('Agent Spawning API E2E Tests', () => {
 
       // ThreadId should follow sessionId.N pattern
       expect(data.agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
-      expect(data.agent.createdAt).toBeDefined();
     });
 
     it('should support different provider instances and models', async () => {
@@ -371,7 +370,6 @@ describe('Agent Spawning API E2E Tests', () => {
         expect(agent.provider).toBeDefined();
         expect(agent.model).toBeDefined();
         expect(agent.status).toBeDefined();
-        expect(agent.createdAt).toBeDefined();
       });
     });
 

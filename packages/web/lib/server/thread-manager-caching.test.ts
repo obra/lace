@@ -66,9 +66,10 @@ describe('ThreadManager Caching Issues', () => {
     const event = threadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello');
 
     // This should work
-    expect(event.threadId).toBe(delegateThreadId);
-    expect(event.type).toBe('USER_MESSAGE');
-    expect(event.data).toBe('Hello');
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(delegateThreadId);
+    expect(event?.type).toBe('USER_MESSAGE');
+    expect(event?.data).toBe('Hello');
   });
 
   it('should add event to delegate thread from different ThreadManager instance', () => {
@@ -87,9 +88,10 @@ describe('ThreadManager Caching Issues', () => {
     );
 
     // This should work
-    expect(event.threadId).toBe(delegateThreadId);
-    expect(event.type).toBe('USER_MESSAGE');
-    expect(event.data).toBe('Hello from new manager');
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(delegateThreadId);
+    expect(event?.type).toBe('USER_MESSAGE');
+    expect(event?.data).toBe('Hello from new manager');
   });
 
   it('should handle multiple delegate threads correctly', () => {
@@ -110,8 +112,10 @@ describe('ThreadManager Caching Issues', () => {
     const event1 = threadManager.addEvent(delegate1.id, 'USER_MESSAGE', 'Hello 1');
     const event2 = threadManager.addEvent(delegate2.id, 'USER_MESSAGE', 'Hello 2');
 
-    expect(event1.threadId).toBe(delegate1.id);
-    expect(event2.threadId).toBe(delegate2.id);
+    expect(event1).not.toBeNull();
+    expect(event2).not.toBeNull();
+    expect(event1?.threadId).toBe(delegate1.id);
+    expect(event2?.threadId).toBe(delegate2.id);
   });
 
   it('should handle delegate thread when parent exists', () => {
@@ -129,6 +133,7 @@ describe('ThreadManager Caching Issues', () => {
 
     // Should be able to add event
     const event = threadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello delegate');
-    expect(event.threadId).toBe(delegateThreadId);
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(delegateThreadId);
   });
 });

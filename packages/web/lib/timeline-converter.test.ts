@@ -15,7 +15,6 @@ const mockAgents: AgentInfo[] = [
     provider: 'anthropic',
     model: 'claude-3-sonnet',
     status: 'idle',
-    createdAt: '2025-07-21T10:00:00Z',
   },
   {
     threadId: asThreadId('session-123.agent-2'),
@@ -23,7 +22,6 @@ const mockAgents: AgentInfo[] = [
     provider: 'openai',
     model: 'gpt-4',
     status: 'idle',
-    createdAt: '2025-07-21T10:05:00Z',
   },
 ];
 
@@ -45,8 +43,9 @@ const mockSessionEvents: SessionEvent[] = [
     threadId: asThreadId('session-123.agent-1'),
     timestamp: new Date('2025-07-21T10:31:00Z'),
     data: {
-      toolName: 'file_read',
-      input: { path: '/src/types.ts', limit: 100 },
+      id: 'call-123',
+      name: 'file_read',
+      arguments: { path: '/src/types.ts', limit: 100 },
     },
   },
   {

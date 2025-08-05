@@ -43,9 +43,11 @@ describe('Agent Spawning and Thread Creation', () => {
     // Create session
     session = Session.create({
       name: 'Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId,
+      configuration: {
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      }
     });
   });
 

@@ -9,6 +9,7 @@ import * as os from 'os';
 import { GET, DELETE, PUT } from './route';
 import { parseResponse } from '@/lib/serialization';
 import type { ProviderInstancesConfig } from '~/providers/catalog/types';
+import type { InstanceDetailResponse, DeleteInstanceResponse, UpdateInstanceResponse } from './route';
 
 describe('Provider Instance Detail API', () => {
   let tempDir: string;
@@ -55,7 +56,7 @@ describe('Provider Instance Detail API', () => {
       const response = await GET(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<InstanceDetailResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instance).toMatchObject({
@@ -73,7 +74,7 @@ describe('Provider Instance Detail API', () => {
       const response = await GET(mockRequest, { 
         params: Promise.resolve({ instanceId: 'nonexistent' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Instance not found: nonexistent');
@@ -114,7 +115,7 @@ describe('Provider Instance Detail API', () => {
       const response = await DELETE(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<DeleteInstanceResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -136,7 +137,7 @@ describe('Provider Instance Detail API', () => {
       const response = await DELETE(mockRequest, { 
         params: Promise.resolve({ instanceId: 'nonexistent' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Instance not found: nonexistent');
@@ -163,7 +164,7 @@ describe('Provider Instance Detail API', () => {
       const response = await DELETE(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<DeleteInstanceResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -209,7 +210,7 @@ describe('Provider Instance Detail API', () => {
       const response = await PUT(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<UpdateInstanceResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instance).toMatchObject({
@@ -270,7 +271,7 @@ describe('Provider Instance Detail API', () => {
       const response = await PUT(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<UpdateInstanceResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.instance).toMatchObject({
@@ -299,7 +300,7 @@ describe('Provider Instance Detail API', () => {
       const response = await PUT(mockRequest, { 
         params: Promise.resolve({ instanceId: 'nonexistent' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
       expect(data.error).toBe('Instance not found: nonexistent');
@@ -366,7 +367,7 @@ describe('Provider Instance Detail API', () => {
       const response = await PUT(mockRequest, { 
         params: Promise.resolve({ instanceId: 'test-instance' }) 
       });
-      const data = await parseResponse(response);
+      const data = await parseResponse<UpdateInstanceResponse>(response);
 
       expect(response.status).toBe(200);
       // catalogProviderId should remain unchanged

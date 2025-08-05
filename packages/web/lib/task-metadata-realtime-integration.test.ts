@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { convertSessionEventsToTimeline } from './timeline-converter';
 import type { SessionEvent } from '@/types/web-sse';
-import type { ApiAgent as AgentType } from '@/types/api';
+import type { AgentInfo as AgentType } from '@/types/core';
 import type { ToolResult, ThreadId } from '@/types/core';
 
 describe('Task Metadata Event Format Bug', () => {
@@ -128,8 +128,8 @@ describe('Task Metadata Event Format Bug', () => {
         timestamp: new Date(),
         data: {
           toolName: 'task_add',
-          result: toolResult, // Wrapped format (the bug)
-        } as { toolName: string; result: unknown },
+          result: toolResult, // Wrapped format (the bug) - this would not be handled correctly
+        } as unknown as ToolResult, // Cast to bypass TypeScript - this is intentionally broken
       },
     ];
 

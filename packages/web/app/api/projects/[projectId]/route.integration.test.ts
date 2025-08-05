@@ -87,14 +87,18 @@ describe('Individual Project API Integration Tests', () => {
       Session.create({ 
         name: 'Session 1', 
         projectId: testProject.getId(),
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        configuration: {
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022'
+        }
       });
       Session.create({ 
         name: 'Session 2', 
         projectId: testProject.getId(),
-        providerInstanceId: testProviderInstances.openaiInstanceId,
-        modelId: 'gpt-4o-mini'
+        configuration: {
+          providerInstanceId: testProviderInstances.openaiInstanceId,
+          modelId: 'gpt-4o-mini'
+        }
       });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
@@ -353,14 +357,18 @@ describe('Individual Project API Integration Tests', () => {
       Session.create({ 
         name: 'Session 1', 
         projectId: testProject.getId(),
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        configuration: {
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022'
+        }
       });
       Session.create({ 
         name: 'Session 2', 
         projectId: testProject.getId(),
-        providerInstanceId: testProviderInstances.openaiInstanceId,
-        modelId: 'gpt-4o-mini'
+        configuration: {
+          providerInstanceId: testProviderInstances.openaiInstanceId,
+          modelId: 'gpt-4o-mini'
+        }
       });
 
       const projectId = testProject.getId();

@@ -224,7 +224,7 @@ describe('SessionService.spawnAgent Method', () => {
     const events = threadManager.getEvents(agentThreadId);
     expect(events.length).toBeGreaterThan(0);
     // Find our specific event among the events (agent may add startup events)
-    const ourEvent = events.find((e) => e.id === event.id);
+    const ourEvent = events.find((e) => e.id === event?.id);
     expect(ourEvent).toBeDefined();
     expect(ourEvent?.type).toBe('USER_MESSAGE');
     expect(ourEvent?.data).toBe('Hello persistent agent');
@@ -260,7 +260,8 @@ describe('SessionService.spawnAgent Method', () => {
       'USER_MESSAGE',
       'Hello from fresh manager'
     );
-    expect(event.threadId).toBe(agentThreadId);
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(agentThreadId);
 
     // Verify event is visible from service's agent
     if (serviceAgent) {
@@ -275,7 +276,7 @@ describe('SessionService.spawnAgent Method', () => {
 
       // Find our specific event among the events (agent may add startup events)
       const ourEvent = eventsFromService.find(
-        (e: unknown) => (e as { id: string }).id === event.id
+        (e: unknown) => (e as { id: string }).id === event?.id
       );
       expect(ourEvent).toBeDefined();
       expect((ourEvent as { type: string } | undefined)?.type).toBe('USER_MESSAGE');

@@ -97,7 +97,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
               actor: 'human',
               isHuman: true,
             }),
-            timestamp: expect.any(String),
+            timestamp: expect.any(Date),
           }),
         })
       );
@@ -357,7 +357,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           type: 'task:created',
           task: { id: 'test-task', title: 'Test' },
           context: { actor: 'human' },
-          timestamp: new Date().toISOString(),
+          timestamp: new Date()
         },
       };
 

@@ -41,9 +41,11 @@ describe('Session.spawnAgent Method', () => {
     // Create session
     session = Session.create({
       name: 'Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId,
+      configuration: {
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022'
+      }
     });
   });
 
@@ -165,9 +167,10 @@ describe('Session.spawnAgent Method', () => {
 
     // This should NOT throw an error
     const event = threadManager.addEvent(agentThreadId, 'USER_MESSAGE', 'Hello agent');
-    expect(event.threadId).toBe(agentThreadId);
-    expect(event.type).toBe('USER_MESSAGE');
-    expect(event.data).toBe('Hello agent');
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(agentThreadId);
+    expect(event?.type).toBe('USER_MESSAGE');
+    expect(event?.data).toBe('Hello agent');
   });
 
   it('should handle caching issues between ThreadManager instances', async () => {
@@ -211,7 +214,8 @@ describe('Session.spawnAgent Method', () => {
       'USER_MESSAGE',
       'Hello from new manager'
     );
-    expect(event.threadId).toBe(agentThreadId);
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(agentThreadId);
 
     // Verify the event is visible from both ThreadManager instances
     const eventsFromSession = sessionThreadManager.getEvents(asThreadId(agentThreadId));
@@ -219,8 +223,8 @@ describe('Session.spawnAgent Method', () => {
 
     expect(eventsFromSession).toHaveLength(1);
     expect(eventsFromNew).toHaveLength(1);
-    expect((eventsFromSession[0] as { id: string } | undefined)?.id).toBe(event.id);
-    expect((eventsFromNew[0] as { id: string } | undefined)?.id).toBe(event.id);
+    expect((eventsFromSession[0] as { id: string } | undefined)?.id).toBe(event?.id);
+    expect((eventsFromNew[0] as { id: string } | undefined)?.id).toBe(event?.id);
   });
 
   it('should handle thread persistence with multiple threads', () => {

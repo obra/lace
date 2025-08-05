@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 import { GET } from './route';
 import { parseResponse } from '@/lib/serialization';
 import type { CatalogProvider } from '~/providers/catalog/types';
+import type { CatalogResponse } from './route';
 
 // Mock the ProviderRegistry
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -91,7 +92,7 @@ describe('Provider Catalog API', () => {
       // Create a mock request object (required parameter)
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<CatalogResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.providers).toHaveLength(2);
@@ -127,7 +128,7 @@ describe('Provider Catalog API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<CatalogResponse>(response);
 
       expect(response.status).toBe(200);
       expect(data.providers).toEqual([]);
@@ -138,7 +139,7 @@ describe('Provider Catalog API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to load catalog');
@@ -151,7 +152,7 @@ describe('Provider Catalog API', () => {
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
-      const data = await parseResponse(response);
+      const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Catalog access failed');
