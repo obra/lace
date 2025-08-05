@@ -7,7 +7,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -19,18 +19,38 @@ describe('Bulk Task Creation', () => {
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create session with TaskManager like real usage
-    project = Project.create('Test Project', '/tmp/test-bulk-tasks');
+    project = Project.create(
+      'Test Project',
+      'Test project description',
+      '/tmp/test-bulk-tasks',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
 
     session = Session.create({
       name: 'Bulk Test Session',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
 
     // Create tool that gets TaskManager from context
@@ -39,9 +59,11 @@ describe('Bulk Task Creation', () => {
 
   afterEach(async () => {
     session?.destroy();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   it('should create multiple tasks from tasks array', async () => {

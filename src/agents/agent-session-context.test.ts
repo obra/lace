@@ -9,7 +9,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -24,22 +24,29 @@ describe('Agent Session Context', () => {
   let session: Session;
   let agent: Agent;
   let project: Project;
-  let createdInstanceIds: string[] = [];
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
 
-    // Create test provider instances
-    await setupTestProviderInstances();
-    createdInstanceIds = ['test-anthropic', 'test-openai'];
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Agent Session Context Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project
     project = Project.create(
       'Test Project',
       'Project for session context testing',
       tempDirContext.tempDir,
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     // Create real session with provider instance
@@ -58,7 +65,9 @@ describe('Agent Session Context', () => {
 
   afterEach(async () => {
     // Clean up provider instances
-    await cleanupTestProviderInstances(createdInstanceIds);
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });

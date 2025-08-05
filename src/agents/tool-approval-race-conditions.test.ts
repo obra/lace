@@ -14,7 +14,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -72,18 +72,29 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   let bashTool: BashTool;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Race Condition Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper context
     project = Project.create(
       'Race Condition Test Project',
       'Project for race condition testing',
       tempDirContext.tempDir,
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     session = Session.create({
@@ -119,7 +130,9 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   afterEach(async () => {
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('defense-in-depth integration', () => {

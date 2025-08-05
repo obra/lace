@@ -248,7 +248,6 @@ export class ProviderRegistry {
     }
   }
 
-
   static isProviderClass(value: unknown): boolean {
     // Check if it's a constructor function/class
     if (typeof value !== 'function') return false;

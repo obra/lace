@@ -17,7 +17,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -100,18 +100,29 @@ describe('Tool Batch Completion Behavior', () => {
   let configurableTool: ConfigurableTool;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Batch Completion Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper context
     project = Project.create(
       'Batch Completion Test Project',
       'Project for batch completion testing',
       tempDirContext.tempDir,
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     session = Session.create({
@@ -145,7 +156,9 @@ describe('Tool Batch Completion Behavior', () => {
   afterEach(async () => {
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   it('should continue conversation when tool execution fails', async () => {

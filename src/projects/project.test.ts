@@ -9,20 +9,36 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('Project', () => {
   const _tempDirContext = useTempLaceDir();
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Project Instance',
+      apiKey: 'test-anthropic-key',
+    });
   });
 
   afterEach(async () => {
     cleanupTestProviderDefaults();
     teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('create', () => {
@@ -136,7 +152,7 @@ describe('Project', () => {
 
     beforeEach(() => {
       project = Project.create('Test Project', '/test/path', 'A test project', {
-        providerInstanceId: 'anthropic-default',
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
         key: 'value',
       });
@@ -182,7 +198,7 @@ describe('Project', () => {
       it('should return configuration', () => {
         const config = project.getConfiguration();
         expect(config).toEqual({
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
           key: 'value',
         });
@@ -302,7 +318,7 @@ describe('Project', () => {
 
         it('should not return sessions from other projects', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-            providerInstanceId: 'anthropic-default',
+            providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
 
@@ -380,7 +396,7 @@ describe('Project', () => {
 
         it('should return null when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-            providerInstanceId: 'anthropic-default',
+            providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
           const otherSession = Session.create({
@@ -426,7 +442,7 @@ describe('Project', () => {
 
         it('should return null when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-            providerInstanceId: 'anthropic-default',
+            providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
           const otherSession = Session.create({
@@ -476,7 +492,7 @@ describe('Project', () => {
 
         it('should return false when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-            providerInstanceId: 'anthropic-default',
+            providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
           const otherSession = Session.create({

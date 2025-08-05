@@ -14,7 +14,7 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -93,6 +93,7 @@ describe('Task Management Workflow Integration', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
 
   // Tool instances
   let taskCreateTool: TaskCreateTool;
@@ -106,6 +107,15 @@ describe('Task Management Workflow Integration', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Task Workflow Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
@@ -118,7 +128,7 @@ describe('Task Management Workflow Integration', () => {
       '/tmp/test-workflow',
       'Test project for task workflow integration',
       {
-        providerInstanceId: 'anthropic-default', // Use environment-based default
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
@@ -147,7 +157,9 @@ describe('Task Management Workflow Integration', () => {
     session?.destroy();
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    // Using simpler provider defaults approach, no complex cleanup needed
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('Basic Task Lifecycle', () => {

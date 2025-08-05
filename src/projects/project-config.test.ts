@@ -9,20 +9,33 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('Project configuration', () => {
   const _tempDirContext = useTempLaceDir();
   let project: Project;
   let projectId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+      displayName: 'Test Project Config Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     project = Project.create('Test Project', '/project/path', 'A test project', {
-      providerInstanceId: 'anthropic-default',
+      providerInstanceId,
       modelId: 'claude-3-5-sonnet-20241022',
       maxTokens: 4000,
       tools: ['file-read', 'file-write', 'bash'],
@@ -37,6 +50,9 @@ describe('Project configuration', () => {
   afterEach(async () => {
     cleanupTestProviderDefaults();
     teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   it('should inherit project configuration in sessions', () => {
@@ -47,14 +63,14 @@ describe('Project configuration', () => {
 
     // Test configuration inheritance at project level
     const projectConfig = project.getConfiguration();
-    expect(projectConfig.providerInstanceId).toBe('anthropic-default');
+    expect(projectConfig.providerInstanceId).toBe(providerInstanceId);
     expect(projectConfig.modelId).toBe('claude-3-5-sonnet-20241022');
     expect(projectConfig.maxTokens).toBe(4000);
     expect(projectConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
 
     // Test that session can calculate effective configuration (runtime-evaluated)
     const effectiveConfig = session.getEffectiveConfiguration();
-    expect(effectiveConfig.providerInstanceId).toBe('anthropic-default'); // Inherited from project
+    expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId); // Inherited from project
     expect(effectiveConfig.modelId).toBe('claude-3-5-sonnet-20241022'); // Inherited from project
     expect(effectiveConfig.maxTokens).toBe(4000); // Inherited from project
     expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // Inherited from project
@@ -77,7 +93,7 @@ describe('Project configuration', () => {
 
     // Verify the project configuration remains unchanged
     const projectConfig = project.getConfiguration();
-    expect(projectConfig.providerInstanceId).toBe('anthropic-default');
+    expect(projectConfig.providerInstanceId).toBe(providerInstanceId);
     expect(projectConfig.modelId).toBe('claude-3-5-sonnet-20241022');
     expect(projectConfig.maxTokens).toBe(4000); // Original project value
     expect(projectConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
@@ -89,7 +105,7 @@ describe('Project configuration', () => {
 
     // Verify the effective configuration merges project + session
     const effectiveConfig = session.getEffectiveConfiguration();
-    expect(effectiveConfig.providerInstanceId).toBe('anthropic-default'); // From project
+    expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId); // From project
     expect(effectiveConfig.modelId).toBe('claude-3-5-sonnet-20241022'); // From project
     expect(effectiveConfig.maxTokens).toBe(2000); // Overridden by session
     expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // From project
@@ -139,7 +155,7 @@ describe('Project configuration', () => {
 
     const effectiveConfig = Session.getEffectiveConfiguration(projectId, sessionConfig);
 
-    expect(effectiveConfig.providerInstanceId).toBe('anthropic-default'); // From project
+    expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId); // From project
     expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // Overridden by session
     expect(effectiveConfig.maxTokens).toBe(2000); // Overridden by session
     expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // From project

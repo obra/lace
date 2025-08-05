@@ -116,7 +116,7 @@ describe('ProviderRegistry', () => {
     it('should start with empty registry and support manual registration', () => {
       const registry = new ProviderRegistry();
       expect(registry.getProviderNames()).toEqual([]);
-      
+
       // Manual registration should work
       const provider = new AnthropicProvider({ apiKey: 'test-key' });
       registry.registerProvider(provider);
@@ -126,7 +126,7 @@ describe('ProviderRegistry', () => {
 
     it('should support registering multiple providers manually', () => {
       const registry = new ProviderRegistry();
-      
+
       registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
       registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
       registry.registerProvider(new LMStudioProvider({ baseUrl: 'http://localhost:1234' }));
@@ -142,7 +142,7 @@ describe('ProviderRegistry', () => {
 
     it('should maintain provider identity after registration', () => {
       const registry = new ProviderRegistry();
-      
+
       registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
       registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
       registry.registerProvider(new LMStudioProvider({ baseUrl: 'http://localhost:1234' }));
@@ -165,7 +165,7 @@ describe('ProviderRegistry', () => {
     });
 
     it('should properly initialize without auto-discovery', () => {
-      // Verify that constructor doesn't throw and creates empty registry  
+      // Verify that constructor doesn't throw and creates empty registry
       expect(() => new ProviderRegistry()).not.toThrow();
       const registry = new ProviderRegistry();
       expect(registry.getProviderNames()).toEqual([]);

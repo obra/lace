@@ -17,7 +17,7 @@ import { type ToolResult } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -78,11 +78,19 @@ describe('EventApprovalCallback Integration Tests', () => {
   let mockProvider: MockProviderWithToolCalls;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project
     project = Project.create(
@@ -90,6 +98,8 @@ describe('EventApprovalCallback Integration Tests', () => {
       'Project for approval testing',
       tempDirContext.tempDir,
       {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         tools: ['bash'], // Enable bash tool
         toolPolicies: {
           bash: 'require-approval',
@@ -101,6 +111,10 @@ describe('EventApprovalCallback Integration Tests', () => {
     session = Session.create({
       name: 'Approval Test Session',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
 
     // Create manual components for controlled testing
@@ -139,9 +153,11 @@ describe('EventApprovalCallback Integration Tests', () => {
       // Wait a moment for any pending operations to abort
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   it('should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring approval', async () => {

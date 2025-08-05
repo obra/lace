@@ -19,6 +19,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -62,6 +66,7 @@ describe('Enhanced Task Manager Tools', () => {
   let taskAddNoteTool: TaskAddNoteTool;
   let taskViewTool: TaskViewTool;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
 
   const parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
@@ -71,6 +76,15 @@ describe('Enhanced Task Manager Tools', () => {
     setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Task Manager Tools Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -80,7 +94,7 @@ describe('Enhanced Task Manager Tools', () => {
       }
     );
 
-    // Mock the ProviderRegistry createProvider method  
+    // Mock the ProviderRegistry createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
     // Create project with provider configuration
@@ -89,7 +103,7 @@ describe('Enhanced Task Manager Tools', () => {
       '/tmp/test-tools',
       'Test project for task manager tests',
       {
-        providerInstanceId: 'anthropic-default',
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
@@ -128,6 +142,9 @@ describe('Enhanced Task Manager Tools', () => {
     session?.destroy();
     teardownTestPersistence();
     cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('Context Integration', () => {

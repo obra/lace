@@ -7,10 +7,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -24,22 +25,23 @@ vi.mock('@/lib/server/approval-manager', () => ({
 
 describe('SessionService Singleton E2E Reproduction', () => {
   let sessionService: ReturnType<typeof getSessionService>;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
-  let createdInstanceIds: string[] = [];
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Set up environment exactly like E2E test
-    process.env.ANTHROPIC_KEY = 'test-key';
+    // Set up environment
     process.env.LACE_DB_PATH = ':memory:';
 
-    // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Get the global SessionService instance
     sessionService = getSessionService();
@@ -47,28 +49,30 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
   afterEach(async () => {
     sessionService.clearActiveSessions();
-    await cleanupTestProviderInstances(createdInstanceIds);
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([providerInstanceId]);
   });
 
   it('should reproduce the exact E2E test scenario step by step', async () => {
-    // Step 1: Create project (same as E2E test)
+    // Step 1: Create project with provider instance
     const testProject = Project.create(
       'Test Project',
       '/test/path',
       'Test project for API test',
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     const projectId = testProject.getId();
 
-    // Step 2: Create session via SessionService (same as E2E test)
-    const session = await sessionService.createSession(
-      'Message Test Session',
-      testProviderInstances.anthropicInstanceId,
-      'claude-3-5-haiku-20241022',
-      projectId
-    );
-    const sessionId = session.id as string;
+    // Step 2: Create session using Session.create (inherits provider from project)
+    const session = Session.create({
+      name: 'Message Test Session',
+      projectId,
+    });
+    const sessionId = session.getId();
 
     // Step 3: Spawn agent via SessionService (this is where E2E test fails)
     try {
@@ -76,7 +80,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
       expect(session).toBeDefined();
       const agent = session!.spawnAgent({
         name: 'Message Agent',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022'
       });
 
@@ -101,22 +105,23 @@ describe('SessionService Singleton E2E Reproduction', () => {
   it('should test multiple session creation cycles', async () => {
     // Create multiple sessions in sequence to test state pollution
     for (let i = 0; i < 3; i++) {
-      const testProject = Project.create(`Test Project ${i}`, '/test/path', 'Test project', {});
+      const testProject = Project.create(`Test Project ${i}`, '/test/path', 'Test project', {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
       const projectId = testProject.getId();
 
-      const session = await sessionService.createSession(
-        `Test Session ${i}`,
-        testProviderInstances.anthropicInstanceId,
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
-      const sessionId = session.id as string;
+      const sessionData = Session.create({
+        name: `Test Session ${i}`,
+        projectId,
+      });
+      const sessionId = sessionData.getId() as string;
 
       const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);
       expect(sessionForAgent).toBeDefined();
       const _agent = sessionForAgent!.spawnAgent({
         name: `Test Agent ${i}`,
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022'
       });
       expect(_agent).toBeDefined();
@@ -125,22 +130,23 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
   it('should test session service state after clearing', async () => {
     // Create session and agent
-    const testProject = Project.create('Test Project', '/test/path', 'Test project', {});
+    const testProject = Project.create('Test Project', '/test/path', 'Test project', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const projectId = testProject.getId();
 
-    const session = await sessionService.createSession(
-      'Test Session',
-      testProviderInstances.anthropicInstanceId,
-      'claude-3-5-haiku-20241022',
-      projectId
-    );
-    const sessionId = session.id as string;
+    const sessionData = Session.create({
+      name: 'Test Session',
+      projectId,
+    });
+    const sessionId = sessionData.getId() as string;
 
     const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);
     expect(sessionForAgent).toBeDefined();
     const _agent = sessionForAgent!.spawnAgent({
       name: 'Test Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
 
@@ -152,29 +158,30 @@ describe('SessionService Singleton E2E Reproduction', () => {
     expect(sessionForSecondAgent).toBeDefined();
     const _secondAgent = sessionForSecondAgent!.spawnAgent({
       name: 'Another Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
   });
 
   it('should test session reconstruction after clearing', async () => {
     // Create session and agent
-    const testProject = Project.create('Test Project', '/test/path', 'Test project', {});
+    const testProject = Project.create('Test Project', '/test/path', 'Test project', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const projectId = testProject.getId();
 
-    const session = await sessionService.createSession(
-      'Test Session',
-      testProviderInstances.anthropicInstanceId,
-      'claude-3-5-haiku-20241022',
-      projectId
-    );
-    const sessionId = session.id as string;
+    const sessionData = Session.create({
+      name: 'Test Session',
+      projectId,
+    });
+    const sessionId = sessionData.getId() as string;
 
     const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);
     expect(sessionForAgent).toBeDefined();
     const _agent = sessionForAgent!.spawnAgent({
       name: 'Test Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
 
@@ -191,7 +198,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
       // Try to spawn another agent
       const _newAgent = reconstructedSession.spawnAgent({
         name: 'New Agent',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022'
       });
       expect(_newAgent).toBeDefined();

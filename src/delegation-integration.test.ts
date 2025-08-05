@@ -8,7 +8,7 @@ import { logger } from '~/utils/logger';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -91,10 +91,20 @@ describe('Delegation Integration Tests', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Delegation Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
@@ -115,7 +125,7 @@ describe('Delegation Integration Tests', () => {
       '/tmp/test-delegation',
       'Test project for delegation integration',
       {
-        providerInstanceId: 'anthropic-default', // Use environment-based default
+        providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
@@ -134,7 +144,9 @@ describe('Delegation Integration Tests', () => {
     threadManager.close();
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    // Using simpler provider defaults approach, no complex cleanup needed
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   it('should create hierarchical delegate thread IDs', () => {

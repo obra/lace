@@ -3,11 +3,13 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionService, getSessionService } from './session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import type { StreamEvent } from '@/types/stream-events';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '@/types/core';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
 // Import real EventStreamManager for integration testing
 import { EventStreamManager } from '@/lib/event-stream-manager';
@@ -17,20 +19,38 @@ describe('SessionService TaskManager Event Forwarding', () => {
   let sessionService: SessionService;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
   let testProject: ReturnType<typeof Project.create>;
+  let testProviderInstanceId: string;
+  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
     vi.clearAllMocks();
+
+    // Clear provider cache to ensure fresh instances
+    Session.clearProviderCache();
 
     // Set up spy on real EventStreamManager
     broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
 
-    // Create a real project for testing
+    // Create test provider instance
+    testProviderInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-sonnet-4-20250514'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+    createdInstanceIds = [testProviderInstanceId];
+
+    // Create a real project with provider config
     testProject = Project.create(
       'Test Project',
       process.cwd(),
       'Test project for event forwarding tests',
-      {}
+      {
+        providerInstanceId: testProviderInstanceId,
+        modelId: 'claude-sonnet-4-20250514',
+      }
     );
 
     sessionService = getSessionService();
@@ -45,24 +65,28 @@ describe('SessionService TaskManager Event Forwarding', () => {
       });
       sessionService.clearActiveSessions();
     }
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
   });
 
   describe('task:created event forwarding', () => {
     it('should forward task:created events with correct eventType and scope', async () => {
-      // Create a session
-      const session = await sessionService.createSession(
-        'Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      // Create a session that inherits provider config from project
+      const session = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Test Session' };
 
-      // Get the session instance to access TaskManager
-      const sessionInstance = await sessionService.getSession(session.id);
-      expect(sessionInstance).toBeTruthy();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
 
-      const taskManager = sessionInstance!.getTaskManager();
+      // Get the TaskManager from the session
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       // Create a task which should trigger task:created event
       const task = await taskManager.createTask(
@@ -83,7 +107,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           eventType: 'task', // Critical: Must be 'task', not 'session'
           scope: expect.objectContaining({
             projectId: testProject.getId(),
-            sessionId: session.id,
+            sessionId: sessionInfo.id,
             taskId: task.id,
           }),
           data: expect.objectContaining({
@@ -105,15 +129,19 @@ describe('SessionService TaskManager Event Forwarding', () => {
     });
 
     it('should include complete scope information in task events', async () => {
-      const session = await sessionService.createSession(
-        'Scope Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Scope Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Scope Test Session' };
 
-      const sessionInstance = await sessionService.getSession(session.id);
-      const taskManager = sessionInstance!.getTaskManager();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       await taskManager.createTask(
         {
@@ -132,7 +160,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(broadcastCall.scope).toEqual(
         expect.objectContaining({
           projectId: testProject.getId(),
-          sessionId: session.id,
+          sessionId: sessionInfo.id,
           taskId: expect.any(String),
         })
       );
@@ -146,15 +174,16 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
   describe('task:updated event forwarding', () => {
     it('should forward task:updated events with correct eventType', async () => {
-      const session = await sessionService.createSession(
-        'Update Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Update Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Update Test Session' };
 
-      const sessionInstance = await sessionService.getSession(session.id);
-      const taskManager = sessionInstance!.getTaskManager();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       // Create task first
       const task = await taskManager.createTask(
@@ -180,7 +209,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           eventType: 'task', // Must be 'task'
           scope: expect.objectContaining({
             projectId: testProject.getId(),
-            sessionId: session.id,
+            sessionId: sessionInfo.id,
             taskId: task.id,
           }),
           data: expect.objectContaining({
@@ -197,15 +226,16 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
   describe('task:deleted event forwarding', () => {
     it('should forward task:deleted events with taskId in data and scope', async () => {
-      const session = await sessionService.createSession(
-        'Delete Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Delete Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Delete Test Session' };
 
-      const sessionInstance = await sessionService.getSession(session.id);
-      const taskManager = sessionInstance!.getTaskManager();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       // Create task first
       const task = await taskManager.createTask(
@@ -229,11 +259,11 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: 'task',
-          scope: expect.objectContaining({
+          scope: {
             projectId: testProject.getId(),
             sessionId: session.id,
             taskId: task.id, // taskId should be in scope for deletion events
-          }),
+          },
           data: expect.objectContaining({
             type: 'task:deleted',
             taskId: task.id, // taskId should also be in data for delete events
@@ -248,15 +278,16 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
   describe('task:note_added event forwarding', () => {
     it('should forward task:note_added events correctly', async () => {
-      const session = await sessionService.createSession(
-        'Note Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Note Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Note Test Session' };
 
-      const sessionInstance = await sessionService.getSession(session.id);
-      const taskManager = sessionInstance!.getTaskManager();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       // Create task first
       const task = await taskManager.createTask(
@@ -285,11 +316,11 @@ describe('SessionService TaskManager Event Forwarding', () => {
       const noteAddedEvent = noteAddedCalls[0][0];
       expect(noteAddedEvent).toMatchObject({
         eventType: 'task',
-        scope: expect.objectContaining({
+        scope: {
           projectId: testProject.getId(),
           sessionId: session.id,
           taskId: task.id,
-        }),
+        },
         data: expect.objectContaining({
           type: 'task:note_added',
           task: expect.objectContaining({
@@ -308,15 +339,16 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
   describe('event type enforcement', () => {
     it('should never use eventType "session" for task events', async () => {
-      const session = await sessionService.createSession(
-        'Type Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Type Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Type Test Session' };
 
-      const sessionInstance = await sessionService.getSession(session.id);
-      const taskManager = sessionInstance!.getTaskManager();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       // Create, update, and delete a task
       const task = await taskManager.createTask(
@@ -379,15 +411,16 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // TaskManager events MUST be broadcast as eventType: 'task'
       // If wrong event types are used, the frontend will silently ignore them (fail fast)
 
-      const session = await sessionService.createSession(
-        'Fail Fast Test Session',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Fail Fast Test Session',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Fail Fast Test Session' };
 
-      const sessionInstance = await sessionService.getSession(session.id);
-      const taskManager = sessionInstance!.getTaskManager();
+      // Register session with EventStreamManager for event forwarding
+      EventStreamManager.getInstance().registerSession(session);
+
+      const taskManager = session.getTaskManager();
 
       await taskManager.createTask(
         {
@@ -416,19 +449,18 @@ describe('SessionService TaskManager Event Forwarding', () => {
   describe('session reconstruction', () => {
     it('should set up task event forwarding for reconstructed sessions', async () => {
       // Create a session
-      const session = await sessionService.createSession(
-        'Reconstruction Test',
-        'anthropic',
-        'claude-sonnet-4-20250514',
-        testProject.getId()
-      );
+      const session = Session.create({
+        name: 'Reconstruction Test',
+        projectId: testProject.getId(),
+      });
+      const sessionInfo = { id: session.getId(), name: 'Reconstruction Test' };
 
       // Clear active sessions to simulate reconstruction
       sessionService.clearActiveSessions();
       broadcastSpy.mockClear();
 
       // Get the session again (should trigger reconstruction)
-      const reconstructedSession = await sessionService.getSession(session.id);
+      const reconstructedSession = await sessionService.getSession(sessionInfo.id);
       expect(reconstructedSession).toBeTruthy();
 
       // Create a task in the reconstructed session
@@ -450,7 +482,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           eventType: 'task',
           scope: expect.objectContaining({
             projectId: testProject.getId(),
-            sessionId: session.id,
+            sessionId: sessionInfo.id,
           }),
           data: expect.objectContaining({
             type: 'task:created',

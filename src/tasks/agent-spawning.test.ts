@@ -65,7 +65,11 @@ describe('Agent Spawning', () => {
 
     it('should handle multiple provider/model formats', async () => {
       const testCases = [
-        { assignedTo: asNewAgentSpec('new:openai/gpt-4'), expectedProvider: 'openai', expectedModel: 'gpt-4' },
+        {
+          assignedTo: asNewAgentSpec('new:openai/gpt-4'),
+          expectedProvider: 'openai',
+          expectedModel: 'gpt-4',
+        },
         {
           assignedTo: asNewAgentSpec('new:anthropic/claude-3-haiku'),
           expectedProvider: 'anthropic',

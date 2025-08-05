@@ -27,7 +27,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -85,11 +85,19 @@ describe('Tool Approval System Integration', () => {
   let session: Session;
   let project: Project;
   let toolContext: ToolContext;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Tool Approval Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper tool execution context
     project = Project.create(
@@ -97,6 +105,8 @@ describe('Tool Approval System Integration', () => {
       'Project for tool approval integration testing',
       tempDirContext.tempDir,
       {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         tools: ['bash', 'file_read', 'file_write'], // Enable tools for testing
         toolPolicies: {
           // All tools require approval by default
@@ -129,10 +139,14 @@ describe('Tool Approval System Integration', () => {
   });
 
   afterEach(async () => {
-    mockInterface.reset();
+    if (mockInterface) {
+      mockInterface.reset();
+    }
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('complete approval flow without policies', () => {

@@ -11,6 +11,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('Agent Configuration', () => {
@@ -18,15 +22,24 @@ describe('Agent Configuration', () => {
   let testProject: Project;
   let testSession: Session;
   let projectId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
 
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Agent Config Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Create test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for agent config', {
-      providerInstanceId: 'anthropic-default',
-      modelId: 'claude-3-sonnet',
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
       temperature: 0.5,
     });
@@ -47,14 +60,17 @@ describe('Agent Configuration', () => {
     testSession?.destroy();
     cleanupTestProviderDefaults();
     teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('Agent configuration validation', () => {
     it('should validate valid agent configuration', () => {
       const config: AgentConfiguration = {
         role: 'code-reviewer',
-        providerInstanceId: 'anthropic-default',
-        modelId: 'claude-3-haiku',
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         temperature: 0.1,
         capabilities: ['code-analysis', 'security-review'],
         restrictions: ['no-file-write'],

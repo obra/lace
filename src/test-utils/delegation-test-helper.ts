@@ -61,7 +61,7 @@ export async function createDelegationTestSetup(options?: {
     index: 0,
     isBlockedMode: false,
   };
-  
+
   // Create a proper mock provider class that extends AIProvider
   class MockProvider extends AIProvider {
     constructor(providerType: string, modelId: string) {
@@ -80,7 +80,7 @@ export async function createDelegationTestSetup(options?: {
     get defaultModel(): string {
       return this._config.model || 'claude-3-5-haiku-20241022';
     }
-    
+
     async createResponse(messages: any, tools: any) {
       // Look for task assignment patterns (delegation-specific logic)
       const taskMessage = messages.find(
@@ -143,44 +143,47 @@ export async function createDelegationTestSetup(options?: {
       if (globalMockState.responses.length === 0) {
         return 'Mock delegation response';
       }
-      const response = globalMockState.responses[globalMockState.index % globalMockState.responses.length];
+      const response =
+        globalMockState.responses[globalMockState.index % globalMockState.responses.length];
       globalMockState.index++;
       return response;
     }
 
-    isConfigured(): boolean { 
-      return true; 
+    isConfigured(): boolean {
+      return true;
     }
-    
-    getProviderInfo(): ProviderInfo { 
-      return { 
-        name: this.providerName, 
+
+    getProviderInfo(): ProviderInfo {
+      return {
+        name: this.providerName,
         displayName: 'Test Provider',
         requiresApiKey: false,
-        configurationHint: 'No configuration needed for testing'
-      }; 
+        configurationHint: 'No configuration needed for testing',
+      };
     }
-    
-    getAvailableModels(): ModelInfo[] { 
-      return [{ 
-        id: this.defaultModel, 
-        displayName: 'Test Model',
-        description: 'Mock model for testing',
-        contextWindow: 200000,
-        maxOutputTokens: 4096,
-        isDefault: true
-      }]; 
+
+    getAvailableModels(): ModelInfo[] {
+      return [
+        {
+          id: this.defaultModel,
+          displayName: 'Test Model',
+          description: 'Mock model for testing',
+          contextWindow: 200000,
+          maxOutputTokens: 4096,
+          isDefault: true,
+        },
+      ];
     }
-    
-    cleanup(): Promise<void> { 
-      return Promise.resolve(); 
+
+    cleanup(): Promise<void> {
+      return Promise.resolve();
     }
-    
+
     setSystemPrompt(prompt: string): void {
       this._systemPrompt = prompt;
     }
-    
-    countTokens(messages: any[], _tools: any[] = []): number { 
+
+    countTokens(messages: any[], _tools: any[] = []): number {
       return messages.length * 10; // Simple mock calculation
     }
   }
@@ -225,9 +228,9 @@ export async function createDelegationTestSetup(options?: {
   const setupBlockedTaskResponse = () => {
     // Instead of creating a new spy, just update the response state to use blocked responses
     // This is simpler and matches the old behavior better
-    globalMockState.responses = ['blocked task response']; // This will be ignored since we handle task blocking specially  
+    globalMockState.responses = ['blocked task response']; // This will be ignored since we handle task blocking specially
     globalMockState.index = 0;
-    
+
     // Set a flag to indicate we want blocked responses
     globalMockState.isBlockedMode = true;
   };

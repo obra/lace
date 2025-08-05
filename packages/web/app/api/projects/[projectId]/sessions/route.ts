@@ -2,7 +2,7 @@
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
 import { NextRequest } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
@@ -62,16 +62,27 @@ export async function POST(
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Use sessionService to create session, which handles both database and in-memory management
-    const sessionService = getSessionService();
-    const session = await sessionService.createSession(
-      validatedData.name,
-      validatedData.providerInstanceId,
-      validatedData.modelId,
-      projectId
-    );
+    // Create session using Session.create with project inheritance
+    const session = Session.create({
+      name: validatedData.name,
+      description: validatedData.description,
+      projectId,
+      configuration: {
+        providerInstanceId: validatedData.providerInstanceId,
+        modelId: validatedData.modelId,
+        ...validatedData.configuration,
+      },
+    });
 
-    return createSuperjsonResponse({ session }, { status: 201 });
+    // Convert to API format
+    const sessionInfo = session.getInfo();
+    const sessionData = {
+      id: session.getId(),
+      name: sessionInfo?.name || validatedData.name,
+      createdAt: sessionInfo?.createdAt || new Date(),
+    };
+
+    return createSuperjsonResponse({ session: sessionData }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid request data', 400, {

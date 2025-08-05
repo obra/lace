@@ -11,9 +11,9 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { 
-  createTestProviderInstance, 
-  cleanupTestProviderInstances 
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 
 // No mocking for integration tests - use real filesystem access

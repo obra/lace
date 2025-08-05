@@ -13,7 +13,9 @@ import type { SessionEvent } from '@/types/web-sse';
 import type { ApiErrorResponse } from '@/types/api';
 import { asThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { Project } from '@/lib/server/lace-imports';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 interface HistoryResponse {
@@ -24,33 +26,46 @@ describe('Session History API', () => {
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let realSessionId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     // Set up environment
-    process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
     sessionService = getSessionService();
 
-    // Create a real test project
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create a test project with the real provider instance
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
-    // Create a real session for testing
-    const session = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProjectId
-    );
-    realSessionId = session.id;
+    // Create session using Session.create (inherits provider from project)
+    const session = Session.create({
+      name: 'Test Session',
+      projectId: testProjectId,
+    });
+    realSessionId = session.getId();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
+    await cleanupTestProviderInstances([providerInstanceId]);
   });
 
   describe('GET /api/sessions/[sessionId]/history', () => {

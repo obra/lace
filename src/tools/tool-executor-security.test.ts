@@ -11,7 +11,7 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ToolCall, ToolContext } from '~/tools/types';
 import {
-  setupTestProviderInstances,
+  createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import {
@@ -25,26 +25,39 @@ describe('ToolExecutor Security with Real Session Context', () => {
   let session: Session;
   let agent: Agent;
   let project: Project;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
 
-    // Set up test provider instances
-    await setupTestProviderInstances();
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project
     project = Project.create(
       'Security Test Project',
       'Project for security testing',
       tempDirContext.tempDir,
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     // Create real session
     session = Session.create({
       name: 'Security Test Session',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
 
     // Get coordinator agent and set up tool executor
@@ -68,8 +81,9 @@ describe('ToolExecutor Security with Real Session Context', () => {
   });
 
   afterEach(async () => {
-    // Clean up provider instances
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });
@@ -144,6 +158,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
         name: 'Permissive Session',
         projectId: project.getId(),
         configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
           toolPolicies: {
             file_read: 'allow' as const,
           },
@@ -173,6 +189,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
         name: 'Restrictive Session',
         projectId: project.getId(),
         configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
           toolPolicies: {
             bash: 'deny' as const,
           },

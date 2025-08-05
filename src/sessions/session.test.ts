@@ -10,6 +10,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies that don't affect core functionality
@@ -46,6 +50,8 @@ vi.mock('node-fetch', () => vi.fn());
 describe('Session', () => {
   const _tempDirContext = useTempLaceDir();
   let testProject: Project;
+  let providerInstanceId: string;
+  let openaiProviderInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -53,12 +59,27 @@ describe('Session', () => {
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
 
+    // Create real provider instances for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      displayName: 'Test Session Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiProviderInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      displayName: 'Test OpenAI Session Instance',
+      apiKey: 'test-openai-key',
+    });
+
     // Clear provider cache to avoid race conditions between tests
     Session.clearProviderCache();
 
     // Create a test project for all tests with default provider configuration
     testProject = Project.create('Test Project', '/test/path', 'Test project', {
-      providerInstanceId: 'anthropic-default',
+      providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
   });
@@ -66,6 +87,9 @@ describe('Session', () => {
   afterEach(async () => {
     cleanupTestProviderDefaults();
     teardownTestPersistence();
+    if (providerInstanceId || openaiProviderInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId, openaiProviderInstanceId].filter(Boolean));
+    }
   });
 
   describe('generateSessionName', () => {
@@ -106,7 +130,7 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
@@ -120,7 +144,7 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: 'openai-default',
+          providerInstanceId: openaiProviderInstanceId,
           modelId: 'gpt-4o',
         },
       });
@@ -268,7 +292,7 @@ describe('Session', () => {
       // Spawn agent with custom model
       session.spawnAgent({
         name: 'Claude Sonnet Agent',
-        providerInstanceId: 'anthropic-default',
+        providerInstanceId,
         modelId: 'claude-3-5-sonnet-20241022',
       });
 
@@ -295,7 +319,7 @@ describe('Session', () => {
       // Spawn agent with custom provider and model
       session.spawnAgent({
         name: 'GPT Agent',
-        providerInstanceId: 'openai-default',
+        providerInstanceId: openaiProviderInstanceId,
         modelId: 'gpt-4o',
       });
 
@@ -501,7 +525,7 @@ describe('Session', () => {
         '/project/path',
         'Test project for session tests',
         {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         }
       );
@@ -578,7 +602,7 @@ describe('Session', () => {
           '/test/path',
           'Test project for getAll test',
           {
-            providerInstanceId: 'anthropic-default',
+            providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           }
         );

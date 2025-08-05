@@ -16,8 +16,9 @@ import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { parseResponse } from '@/lib/serialization';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
 // Use real EventStreamManager for integration testing
@@ -35,7 +36,11 @@ describe('Full Conversation Flow', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
     vi.clearAllMocks();
+
+    // Clear caches to ensure fresh state
+    Session.clearProviderCache();
 
     // Set up spies on real EventStreamManager
     addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection');
@@ -61,6 +66,7 @@ describe('Full Conversation Flow', () => {
     broadcastSpy?.mockRestore();
     // Clean up provider instances
     await cleanupTestProviderInstances(createdInstanceIds);
+    cleanupTestProviderDefaults();
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
     teardownTestPersistence();
@@ -85,10 +91,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: sessionName,
-          configuration: {
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -182,10 +186,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Multi-Agent Session',
-          configuration: {
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -271,10 +273,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 1',
-          configuration: {
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -288,10 +288,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 2',
-          configuration: {
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }),

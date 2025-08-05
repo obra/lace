@@ -16,6 +16,7 @@ import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/pers
 import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
+  createTestProviderInstance,
 } from '~/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
@@ -56,6 +57,7 @@ describe('Multi-Agent Task Manager Integration', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
   let createTool: TaskCreateTool;
   let listTool: TaskListTool;
   let updateTool: TaskUpdateTool;
@@ -71,6 +73,15 @@ describe('Multi-Agent Task Manager Integration', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Task Manager Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
@@ -81,7 +92,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       }
     );
 
-    // Mock the ProviderRegistry createProvider method  
+    // Mock the ProviderRegistry createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
     // Create project first with provider configuration
@@ -90,7 +101,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       '/tmp/test-integration',
       'Test project for task manager integration',
       {
-        providerInstanceId: 'anthropic-default', // Use environment-based default
+        providerInstanceId, // Use real provider instance
         modelId: 'claude-3-5-haiku-20241022',
       }
     );
@@ -131,7 +142,10 @@ describe('Multi-Agent Task Manager Integration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    // Using simpler provider defaults approach, no complex cleanup needed
+    // Clean up provider instance
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });
@@ -367,7 +381,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         '/tmp/test-session2',
         'Second test project for session isolation',
         {
-          providerInstanceId: 'anthropic-default',
+          providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
         }
       );

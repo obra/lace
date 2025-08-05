@@ -838,11 +838,11 @@ Use your task_add_note tool to record important notes as you work and your task_
       }
 
       // Load credentials synchronously by reading the credential file directly
-      
+
       const credentialsDir = path.join(getLaceDir(), 'credentials');
       const credentialPath = path.join(credentialsDir, `${providerInstanceId}.json`);
       let credentials: any = null;
-      
+
       try {
         const credentialContent = fs.readFileSync(credentialPath, 'utf-8');
         credentials = JSON.parse(credentialContent);
