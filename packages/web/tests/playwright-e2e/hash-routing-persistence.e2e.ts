@@ -109,8 +109,8 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       await createButton.click();
     }
 
-    // Verify URL contains project hash
-    await expect(page).toHaveURL(/.*#\/project\/[^\/]+$/);
+    // Verify URL contains project hash (may include session/agent due to auto-creation)
+    await expect(page).toHaveURL(/.*#\/project\/[^\/]+(?:\/session\/[^\/]+(?:\/agent\/[^\/]+)?)?$/);
 
     // Get the current URL with project selection
     const projectUrl = page.url();
@@ -160,34 +160,28 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       await createButton.click();
     }
 
-    // Wait for project page to load and look for sessions
-    await page.waitForSelector('button:text("New Session")', { timeout: 3000 });
+    // Project creation auto-creates session and navigates to session view
+    // Wait for session to be created and loaded (this happens automatically)
+    await page.waitForTimeout(3000); // Give time for auto-session creation
 
-    // Select or create a session
-    const sessionCard = page.locator('h4:has-text("E2E Test Session")').first();
+    // Verify we're in a session view (project creation should auto-create session)
+    const currentUrl = page.url();
+    console.log('Current URL after project creation:', currentUrl);
 
-    if ((await sessionCard.count()) > 0) {
-      // Click the session heading (entire session card is clickable)
-      await sessionCard.click();
-    } else {
-      // Create a session if none exists
-      await page.click('button:text("New Session")');
-      await page.fill('input[placeholder="e.g., Backend API Development"]', 'E2E Test Session');
-      await page.waitForSelector('button:text("Create Session"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Session")');
-
-      // Wait to see if session was created (might fail with server error)
+    // The system now auto-creates sessions, so we should be in session view
+    if (!currentUrl.includes('/session/')) {
+      // If somehow we're still on project page, this indicates an issue with auto-session creation
+      // Try to wait a bit more for the redirect
       await page.waitForTimeout(2000);
-      const createdSession = page.locator('h4:has-text("E2E Test Session")');
-      if ((await createdSession.count()) > 0) {
-        await createdSession.click();
+      const updatedUrl = page.url();
+
+      if (!updatedUrl.includes('/session/')) {
+        throw new Error('Expected auto-session creation but still on project page: ' + updatedUrl);
       }
     }
 
-    // Verify URL contains project and session
-    await expect(page).toHaveURL(/.*#\/project\/[^\/]+\/session\/[^\/]+$/);
+    // Verify URL contains project and session (may include agent due to auto-creation)
+    await expect(page).toHaveURL(/.*#\/project\/[^\/]+\/session\/[^\/]+(?:\/agent\/[^\/]+)?$/);
 
     const sessionUrl = page.url();
 
@@ -198,18 +192,16 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     await expect(page).toHaveURL(sessionUrl);
 
     // Verify we navigated to session view or stayed at project view (due to potential server errors)
-    const currentUrl = page.url();
-    // Should have either session URL or project URL
-    expect(currentUrl).toMatch(/#\/project\/[^\/]+(?:\/session\/[^\/]+)?$/);
+    const urlAfterReload = page.url();
+    // Should have session URL (including agent if auto-created)
+    expect(urlAfterReload).toMatch(/#\/project\/[^\/]+\/session\/[^\/]+(?:\/agent\/[^\/]+)?$/);
 
-    // Check for session heading or project view elements
-    const sessionHeading = page.locator('h4:has-text("E2E Test Session")');
-    const newSessionButton = page.locator('button:text("New Session")');
-
-    const hasSession = (await sessionHeading.count()) > 0;
-    const hasProjectView = (await newSessionButton.count()) > 0;
-
-    expect(hasSession || hasProjectView).toBeTruthy();
+    // Since we're in a session view (with auto-created session/agent),
+    // just verify that basic session UI elements are present
+    // Look for message input which indicates we're in the chat interface
+    await expect(
+      page.locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('should persist full project/session/agent hierarchy across page reloads', async ({
@@ -251,33 +243,27 @@ test.describe('Hash-Based URL Persistence E2E', () => {
       await createButton.click();
     }
 
-    // Select or create a session
-    await page.waitForSelector('button:text("New Session")', { timeout: 3000 });
+    // Project creation auto-creates session, so we should already be in session view
+    await page.waitForTimeout(3000); // Give time for auto-session creation
 
-    const sessionCard = page.locator('h4').first();
-    if ((await sessionCard.count()) > 0) {
-      // Click the session heading (entire session card is clickable)
-      await sessionCard.click();
-    } else {
-      await page.click('text="New Session"');
-      await page.fill('input[placeholder="e.g., Backend API Development"]', 'Agent Session');
-      await page.waitForSelector('button:text("Create Session"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Session")');
+    const currentUrl = page.url();
+    console.log('Current URL after project creation:', currentUrl);
 
-      // Wait to see if session was created (might fail with server error)
+    // Verify we're in session view (auto-created)
+    if (!currentUrl.includes('/session/')) {
+      // Wait a bit more for auto-session creation
       await page.waitForTimeout(2000);
-      const sessionHeading = page.locator('h4').first();
-      if ((await sessionHeading.count()) > 0) {
-        await sessionHeading.click();
+      const updatedUrl = page.url();
+
+      if (!updatedUrl.includes('/session/')) {
+        throw new Error('Expected auto-session creation but still on project page: ' + updatedUrl);
       }
     }
 
     // Agent testing may not be possible due to server errors with missing ANTHROPIC_KEY
     // Skip agent creation/selection if session fails to load properly
-    const currentUrl = page.url();
-    if (currentUrl.includes('/session/')) {
+    const sessionUrl = page.url();
+    if (sessionUrl.includes('/session/')) {
       // We're in a session, try to wait for agents or accept that content may not load
       try {
         await page.waitForSelector(
@@ -314,16 +300,14 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     // Verify the project hierarchy is restored
     await expect(page.locator('button:has-text("Current Project")')).toBeVisible();
 
-    // Session heading should be visible if we're in a session
+    // Since we're in a session view (with auto-created session/agent),
+    // verify that basic session UI elements are present
     const pageUrl = page.url();
     if (pageUrl.includes('/session/')) {
-      const sessionHeading = page.locator('h4').first();
-      const newSessionButton = page.locator('button:text("New Session")');
-
-      const hasSession = (await sessionHeading.count()) > 0;
-      const hasProjectView = (await newSessionButton.count()) > 0;
-
-      expect(hasSession || hasProjectView).toBeTruthy();
+      // Look for message input which indicates we're in the chat interface
+      await expect(
+        page.locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
+      ).toBeVisible({ timeout: 10000 });
     }
   });
 
@@ -365,7 +349,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     }
 
     const projectUrl = page.url();
-    expect(projectUrl).toMatch(/#\/project\/[^\/]+$/);
+    expect(projectUrl).toMatch(/#\/project\/[^\/]+(?:\/session\/[^\/]+(?:\/agent\/[^\/]+)?)?$/);
 
     // Step 2: Select a session
     await page.waitForSelector('button:text("New Session"), h3:has-text("Sessions")', {
@@ -397,8 +381,8 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     }
 
     const sessionUrl = page.url();
-    // Accept either project-level URL or session-level URL
-    expect(sessionUrl).toMatch(/#\/project\/[^\/]+(?:\/session\/[^\/]+)?$/);
+    // Accept either project-level URL or session-level URL (may include agent)
+    expect(sessionUrl).toMatch(/#\/project\/[^\/]+(?:\/session\/[^\/]+(?:\/agent\/[^\/]+)?)?$/);
 
     // Test browser back navigation even if we're still at project level
     const beforeBackUrl = page.url();
@@ -456,7 +440,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should support deep linking to specific conversations', async ({ page }) => {
     // First, create the full hierarchy through normal navigation
-    await page.goto('http://localhost:3005');
+    await page.goto(testServer.baseURL);
 
     // Navigate to create a testable URL
     await page.waitForSelector('h1:has-text("Select a Project"), [data-testid="project-card"]', {
