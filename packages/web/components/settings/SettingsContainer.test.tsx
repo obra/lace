@@ -61,6 +61,7 @@ describe('SettingsContainer', () => {
     mockFetch.mockImplementation(() => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ instances: [] }),
+      text: () => Promise.resolve(JSON.stringify({ instances: [] })),
     } as Response));
   });
 
@@ -90,7 +91,7 @@ describe('SettingsContainer', () => {
     });
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByText('Configuration')).toBeInTheDocument();
   });
 
   it('closes settings modal when close button clicked', async () => {
@@ -108,7 +109,7 @@ describe('SettingsContainer', () => {
 
     // Close modal
     await act(async () => {
-      const closeButton = screen.getByRole('button', { name: /✕/ });
+      const closeButton = screen.getByRole('button', { name: /close modal/i });
       fireEvent.click(closeButton);
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -159,6 +160,12 @@ describe('SettingsContainer', () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
     
+    // Switch to UI tab to access theme controls
+    await act(async () => {
+      const uiTab = screen.getByRole('tab', { name: /ui/i });
+      fireEvent.click(uiTab);
+    });
+    
     // Find and click light theme button
     await act(async () => {
       const lightButton = screen.getByRole('button', { name: /light/i });
@@ -185,9 +192,8 @@ describe('SettingsContainer', () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
     
-    // Should show UI Settings panel
-    expect(screen.getByText('UI Settings')).toBeInTheDocument();
-    expect(screen.getByText('Theme')).toBeInTheDocument();
+    // Should show Providers panel by default
+    expect(screen.getByText('AI Provider Configuration')).toBeInTheDocument();
   });
 
   it('handles keyboard navigation (Escape key)', async () => {
@@ -221,6 +227,13 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
+    
+    // Switch to UI tab to access theme controls
+    await act(async () => {
+      const uiTab = screen.getByRole('tab', { name: /ui/i });
+      fireEvent.click(uiTab);
+    });
+    
     await act(async () => {
       const lightButton = screen.getByRole('button', { name: /light/i });
       fireEvent.click(lightButton);
@@ -228,13 +241,19 @@ describe('SettingsContainer', () => {
 
     // Close modal
     await act(async () => {
-      const closeButton = screen.getByRole('button', { name: /✕/ });
+      const closeButton = screen.getByRole('button', { name: /close modal/i });
       fireEvent.click(closeButton);
     });
 
     // Reopen modal
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
+    });
+    
+    // Switch to UI tab to access theme controls
+    await act(async () => {
+      const uiTab = screen.getByRole('tab', { name: /ui/i });
+      fireEvent.click(uiTab);
     });
 
     // Verify light theme is still selected
@@ -253,8 +272,10 @@ describe('SettingsContainer', () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
     
-    // Should show tabs (even if just one for now)
-    expect(screen.getByText('Ui')).toBeInTheDocument(); // Tab name gets capitalized
+    // Should show tabs
+    expect(screen.getByText('Providers')).toBeInTheDocument();
+    expect(screen.getByText('UI')).toBeInTheDocument();
+    expect(screen.getByText('User')).toBeInTheDocument();
   });
 
   it('provides render prop pattern for flexible integration', () => {
