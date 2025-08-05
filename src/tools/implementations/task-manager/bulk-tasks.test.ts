@@ -10,19 +10,20 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('Bulk Task Creation', () => {
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
 
     // Create session with TaskManager like real usage
     project = Project.create('Test Project', '/tmp/test-bulk-tasks');
@@ -39,10 +40,8 @@ describe('Bulk Task Creation', () => {
   afterEach(async () => {
     session?.destroy();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   it('should create multiple tasks from tasks array', async () => {

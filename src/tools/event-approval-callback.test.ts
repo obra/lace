@@ -20,6 +20,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Enhanced test provider that can return tool calls once, then regular responses
@@ -74,14 +78,11 @@ describe('EventApprovalCallback Integration Tests', () => {
   let mockProvider: MockProviderWithToolCalls;
   let session: Session;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
 
     // Create real project
     project = Project.create(
@@ -139,10 +140,8 @@ describe('EventApprovalCallback Integration Tests', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   it('should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring approval', async () => {

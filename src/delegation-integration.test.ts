@@ -11,6 +11,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -87,14 +91,11 @@ describe('Delegation Integration Tests', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -131,10 +132,8 @@ describe('Delegation Integration Tests', () => {
     session?.destroy();
     threadManager.close();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   it('should create hierarchical delegate thread IDs', () => {

@@ -136,12 +136,7 @@ export class ProviderInstanceManager {
     // Auto-create Anthropic provider instance if API key is available
     const hasAnthropicKey = getEnvVar('ANTHROPIC_KEY') || getEnvVar('ANTHROPIC_API_KEY');
     const hasOpenaiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-    
-    console.debug('ProviderInstanceManager.getDefaultConfig() checking environment', {
-      hasAnthropicKey: !!hasAnthropicKey,
-      hasOpenaiKey: !!hasOpenaiKey,
-    });
-    
+
     if (hasAnthropicKey) {
       instances['anthropic-default'] = {
         displayName: 'Anthropic (Default)',
@@ -185,7 +180,7 @@ export class ProviderInstanceManager {
       : instanceIds[0];
 
     const instance = config.instances[defaultInstanceId];
-    
+
     // Determine default model based on catalog provider
     let defaultModelId: string;
     if (instance.catalogProviderId === 'anthropic') {

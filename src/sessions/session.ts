@@ -124,28 +124,28 @@ export class Session {
     // Provide reasonable defaults when no provider configuration is available
     if (!providerInstanceId || !modelId) {
       const instanceManager = new ProviderInstanceManager();
-      
+
       // Load existing provider instances first (including any created by tests)
       const existingConfig = instanceManager.loadInstancesSync();
       const existingInstanceIds = Object.keys(existingConfig.instances);
-      
+
       logger.debug('Checking for existing provider instances', {
         sessionId: sessionData.id,
         existingInstanceIds,
         existingConfig: existingConfig,
         configPath: instanceManager.constructor.name,
       });
-      
+
       if (existingInstanceIds.length > 0) {
         // Use existing configured instances
-        const defaultInstanceId = existingInstanceIds.includes('anthropic-default') 
-          ? 'anthropic-default' 
+        const defaultInstanceId = existingInstanceIds.includes('anthropic-default')
+          ? 'anthropic-default'
           : existingInstanceIds[0];
-        
+
         const instance = existingConfig.instances[defaultInstanceId];
-        
+
         providerInstanceId = providerInstanceId || defaultInstanceId;
-        
+
         // Determine default model based on catalog provider
         if (!modelId) {
           if (instance.catalogProviderId === 'anthropic') {
@@ -156,7 +156,7 @@ export class Session {
             modelId = 'default-model';
           }
         }
-        
+
         logger.debug('Using existing provider configuration for session', {
           sessionId: sessionData.id,
           providerInstanceId,
@@ -166,17 +166,17 @@ export class Session {
         // No existing instances, try to auto-create defaults from environment
         const defaultConfig = instanceManager.getDefaultConfig();
         const autoInstanceIds = Object.keys(defaultConfig.instances);
-        
+
         if (autoInstanceIds.length > 0) {
           // Auto-created defaults are available
-          const defaultInstanceId = autoInstanceIds.includes('anthropic-default') 
-            ? 'anthropic-default' 
+          const defaultInstanceId = autoInstanceIds.includes('anthropic-default')
+            ? 'anthropic-default'
             : autoInstanceIds[0];
-          
+
           const instance = defaultConfig.instances[defaultInstanceId];
-          
+
           providerInstanceId = providerInstanceId || defaultInstanceId;
-          
+
           // Determine default model based on catalog provider
           if (!modelId) {
             if (instance.catalogProviderId === 'anthropic') {
@@ -187,7 +187,7 @@ export class Session {
               modelId = 'default-model';
             }
           }
-          
+
           logger.debug('Using auto-created default provider configuration for session', {
             sessionId: sessionData.id,
             providerInstanceId,
@@ -206,7 +206,7 @@ export class Session {
 
     // Create agent
     const sessionAgent = new Agent({
-      provider: providerInstance as AIProvider,
+      provider: providerInstance,
       toolExecutor,
       threadManager,
       threadId,
@@ -612,11 +612,10 @@ export class Session {
     }
 
     // Resolve provider instance lazily
-    const {
-      providerInstance,
-      provider: _provider,
-      model: _model,
-    } = Session.resolveProviderInstance(targetProviderInstanceId, targetModelId);
+    const providerInstance = Session.resolveProviderInstance(
+      targetProviderInstanceId,
+      targetModelId
+    );
 
     // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
@@ -627,10 +626,7 @@ export class Session {
     agentToolExecutor.registerTool('delegate', delegateTool);
 
     // Create delegate agent with the appropriate provider instance and its own toolExecutor
-    const agent = this._sessionAgent.createDelegateAgent(
-      agentToolExecutor,
-      providerInstance as AIProvider
-    );
+    const agent = this._sessionAgent.createDelegateAgent(agentToolExecutor, providerInstance);
 
     // Store the agent metadata
     agent.updateThreadMetadata({
@@ -819,10 +815,7 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private static _providerCache = new Map<string, AIProvider>();
 
-  static resolveProviderInstance(
-    providerInstanceId: string,
-    modelId: string
-  ): AIProvider {
+  static resolveProviderInstance(providerInstanceId: string, modelId: string): AIProvider {
     const cacheKey = `${providerInstanceId}:${modelId}`;
 
     // Check cache first
@@ -837,17 +830,17 @@ Use your task_add_note tool to record important notes as you work and your task_
       const instanceManager = new ProviderInstanceManager();
       const config = instanceManager.loadInstancesSync();
       const instance = config.instances[providerInstanceId];
-      
+
       if (!instance) {
         throw new Error(`Provider instance not found: ${providerInstanceId}`);
       }
-      
+
       // Map catalog provider ID to actual provider type
       const providerType = instance.catalogProviderId; // anthropic, openai, etc.
-      
+
       // Create provider using the old registry system but with proper configuration
       const providerRegistry = ProviderRegistry.createWithAutoDiscovery();
-      const providerInstance = providerRegistry.createProvider(providerType, { 
+      const providerInstance = providerRegistry.createProvider(providerType, {
         model: modelId,
         // Additional config from instance if needed
         ...(instance.endpoint && { baseURL: instance.endpoint }),

@@ -4,6 +4,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { ToolContext } from '~/tools/types';
 import {
@@ -21,6 +25,7 @@ describe('DelegateTool', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
 
     // Use shared delegation test setup
     testSetup = await createDelegationTestSetup({
@@ -44,6 +49,7 @@ describe('DelegateTool', () => {
     vi.clearAllMocks();
     testSetup.session?.destroy();
     teardownTestPersistence();
+    cleanupTestProviderDefaults();
   });
 
   it('should have correct metadata', () => {

@@ -14,6 +14,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('ToolExecutor Security with Real Session Context', () => {
   const tempDirContext = useTempLaceDir();
@@ -21,16 +25,13 @@ describe('ToolExecutor Security with Real Session Context', () => {
   let session: Session;
   let agent: Agent;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
 
     // Set up test provider instances
-    testProviderInstances = await setupTestProviderInstances();
+    await setupTestProviderInstances();
 
     // Create real project
     project = Project.create(
@@ -68,11 +69,9 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
   afterEach(async () => {
     // Clean up provider instances
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
     teardownTestPersistence();
+    cleanupTestProviderDefaults();
   });
 
   describe('Security Policy Enforcement', () => {

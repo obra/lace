@@ -17,6 +17,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ProviderRegistry } from '~/providers/registry';
@@ -89,10 +93,6 @@ describe('Task Management Workflow Integration', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   // Tool instances
   let taskCreateTool: TaskCreateTool;
@@ -105,7 +105,8 @@ describe('Task Management Workflow Integration', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -145,10 +146,8 @@ describe('Task Management Workflow Integration', () => {
     vi.clearAllMocks();
     session?.destroy();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   describe('Basic Task Lifecycle', () => {

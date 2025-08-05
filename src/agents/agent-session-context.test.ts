@@ -12,6 +12,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '~/threads/types';
 
@@ -20,21 +24,15 @@ describe('Agent Session Context', () => {
   let session: Session;
   let agent: Agent;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
   let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
 
     // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ];
+    await setupTestProviderInstances();
+    createdInstanceIds = ['test-anthropic', 'test-openai'];
 
     // Create real project
     project = Project.create(
@@ -62,6 +60,7 @@ describe('Agent Session Context', () => {
     // Clean up provider instances
     await cleanupTestProviderInstances(createdInstanceIds);
     teardownTestPersistence();
+    cleanupTestProviderDefaults();
   });
 
   describe('getFullSession', () => {

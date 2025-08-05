@@ -8,9 +8,9 @@ import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-c
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('Agent Configuration', () => {
@@ -18,24 +18,14 @@ describe('Agent Configuration', () => {
   let testProject: Project;
   let testSession: Session;
   let projectId: string;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-
-    // Set up environment for providers
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.OPENAI_API_KEY = 'test-key';
-
-    // Set up real provider instances for tests
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
 
     // Create test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for agent config', {
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: 'anthropic-default',
       modelId: 'claude-3-sonnet',
       maxTokens: 4000,
       temperature: 0.5,
@@ -55,11 +45,7 @@ describe('Agent Configuration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     testSession?.destroy();
-    // Clean up provider instances
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
   });
 
@@ -67,7 +53,7 @@ describe('Agent Configuration', () => {
     it('should validate valid agent configuration', () => {
       const config: AgentConfiguration = {
         role: 'code-reviewer',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: 'anthropic-default',
         modelId: 'claude-3-haiku',
         temperature: 0.1,
         capabilities: ['code-analysis', 'security-review'],

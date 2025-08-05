@@ -7,9 +7,9 @@ import { Project } from '~/projects/project';
 import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 // Mock external dependencies
 vi.mock('~/providers/registry', () => ({
@@ -63,20 +63,14 @@ describe('Session Configuration Integration', () => {
   let testProject: Project;
   let projectId: string;
   let presetManager: ConfigurationPresetManager;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-
-    // Set up test provider instances
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
 
     // Create a test project
     testProject = Project.create('Test Project', '/test/path', 'Test project for configuration', {
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: 'anthropic-default',
       modelId: 'claude-3-sonnet',
       maxTokens: 4000,
     });
@@ -86,18 +80,14 @@ describe('Session Configuration Integration', () => {
   });
 
   afterEach(async () => {
-    // Clean up provider instances
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
   });
 
   describe('Session configuration validation', () => {
     it('should validate session configuration during creation', () => {
       const validConfig: SessionConfiguration = {
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4',
         maxTokens: 8000,
         temperature: 0.7,
@@ -109,7 +99,7 @@ describe('Session Configuration Integration', () => {
       };
 
       const validated = Session.validateConfiguration(validConfig);
-      expect(validated.providerInstanceId).toBe(testProviderInstances.openaiInstanceId);
+      expect(validated.providerInstanceId).toBe('openai-default');
       expect(validated.modelId).toBe('gpt-4');
       expect(validated.maxTokens).toBe(8000);
       expect(validated.temperature).toBe(0.7);
@@ -138,7 +128,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -146,7 +136,7 @@ describe('Session Configuration Integration', () => {
       const effectiveConfig = session.getEffectiveConfiguration();
 
       // Should inherit from project
-      expect(effectiveConfig.providerInstanceId).toBe(testProviderInstances.anthropicInstanceId);
+      expect(effectiveConfig.providerInstanceId).toBe('anthropic-default');
       // Note: Session creation modelId parameter overrides project modelId
       expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // From session creation
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
@@ -159,7 +149,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -195,7 +185,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -250,7 +240,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -280,7 +270,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -309,7 +299,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -329,7 +319,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });
@@ -347,7 +337,7 @@ describe('Session Configuration Integration', () => {
         name: 'Test Session',
         projectId,
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         },
       });

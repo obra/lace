@@ -7,6 +7,10 @@ import { ToolContext } from '~/tools/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
   createDelegationTestSetup,
   DelegationTestSetup,
 } from '~/test-utils/delegation-test-helper';
@@ -23,6 +27,7 @@ describe('Task-Based DelegateTool Integration', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
 
     // Use shared delegation test setup
     testSetup = await createDelegationTestSetup({
@@ -44,6 +49,7 @@ describe('Task-Based DelegateTool Integration', () => {
     vi.clearAllMocks();
     testSetup.session?.destroy();
     teardownTestPersistence();
+    cleanupTestProviderDefaults();
   });
 
   describe('Integration Tests', () => {

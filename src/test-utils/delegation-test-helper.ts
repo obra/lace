@@ -23,7 +23,7 @@ export async function createDelegationTestSetup(options?: {
   model?: string;
 }): Promise<DelegationTestSetup> {
   // Set up test provider instances
-  const testProviderInstances = await setupTestProviderInstances();
+  await setupTestProviderInstances();
 
   const mockProvider = new DelegationMockProvider(
     options?.provider || 'anthropic',
@@ -51,7 +51,7 @@ export async function createDelegationTestSetup(options?: {
     name: options?.sessionName || 'Delegation Test Session',
     projectId: project.getId(),
     configuration: {
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: 'test-anthropic',
       modelId: options?.model || 'claude-3-5-haiku-20241022',
     },
     approvalCallback: {

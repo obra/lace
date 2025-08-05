@@ -19,6 +19,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -62,10 +66,6 @@ describe('Enhanced Task Manager Tools', () => {
   let taskAddNoteTool: TaskAddNoteTool;
   let taskViewTool: TaskViewTool;
   let mockProvider: MockProvider;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   const parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
@@ -73,7 +73,8 @@ describe('Enhanced Task Manager Tools', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -129,10 +130,8 @@ describe('Enhanced Task Manager Tools', () => {
     vi.clearAllMocks();
     session?.destroy();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   describe('Context Integration', () => {

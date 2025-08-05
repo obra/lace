@@ -6,27 +6,17 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('Session.spawnAgent() with Provider Instances', () => {
   let testProject: Project;
   let testSession: Session;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-
-    // Set up environment for providers
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.OPENAI_API_KEY = 'test-key';
-
-    // Set up real provider instances for tests
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
 
     // Create a test project and session for all tests
     testProject = Project.create(
@@ -43,12 +33,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
 
   afterEach(async () => {
     testSession?.destroy();
-    // Clean up provider instances
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
     teardownTestPersistence();
+    cleanupTestProviderDefaults();
   });
 
   describe('Basic agent spawning with provider instances', () => {
@@ -69,7 +55,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     it('should spawn agent with explicit provider instance parameters', () => {
       const agent = testSession.spawnAgent({
         name: 'OpenAI Agent',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4o',
       });
 
@@ -87,7 +73,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     it('should spawn agent with custom model on same provider instance', () => {
       const agent = testSession.spawnAgent({
         name: 'Sonnet Agent',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: 'anthropic-default',
         modelId: 'claude-3-5-sonnet-20241022',
       });
 
@@ -117,7 +103,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     it('should accept explicit provider instance parameters', () => {
       const agent = testSession.spawnAgent({
         name: 'Override Agent',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4o-mini',
       });
 
@@ -135,7 +121,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // This test verifies the interface accepts the parameters
       const agent = testSession.spawnAgent({
         name: 'Partial Config Agent',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         // Note: Missing modelId might be handled by fallback logic
       } as Parameters<typeof testSession.spawnAgent>[0]);
 
@@ -162,13 +148,13 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     it('should spawn multiple agents with different model configurations', () => {
       const anthropicAgent = testSession.spawnAgent({
         name: 'Anthropic Agent',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: 'anthropic-default',
         modelId: 'claude-3-5-sonnet-20241022',
       });
 
       const openaiAgent = testSession.spawnAgent({
         name: 'OpenAI Agent',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4o',
       });
 
@@ -188,7 +174,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const defaultAgent = testSession.spawnAgent({ name: 'Default Agent' });
       const explicitAgent = testSession.spawnAgent({
         name: 'Explicit Agent',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4o-mini',
       });
 
@@ -246,7 +232,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
         name: 'OpenAI Session',
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: testProviderInstances.openaiInstanceId,
+          providerInstanceId: 'openai-default',
           modelId: 'gpt-4o',
         },
       });
@@ -254,7 +240,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Spawn agent with different model configuration
       const agent = openaiSession.spawnAgent({
         name: 'Cross Provider Agent',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: 'anthropic-default',
         modelId: 'claude-3-5-haiku-20241022',
       });
 
@@ -274,7 +260,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const _agent1 = testSession.spawnAgent({ name: 'Agent 1' });
       const _agent2 = testSession.spawnAgent({
         name: 'Agent 2',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4o',
       });
       const _agent3 = testSession.spawnAgent({ name: 'Agent 3' });

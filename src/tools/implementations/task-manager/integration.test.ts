@@ -17,6 +17,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -52,10 +56,6 @@ describe('Multi-Agent Task Manager Integration', () => {
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
   let createTool: TaskCreateTool;
   let listTool: TaskListTool;
   let updateTool: TaskUpdateTool;
@@ -70,7 +70,8 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -130,11 +131,9 @@ describe('Multi-Agent Task Manager Integration', () => {
     vi.clearAllMocks();
     session?.destroy();
     // Clean up provider instances
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
     teardownTestPersistence();
+    cleanupTestProviderDefaults();
   });
 
   describe('Multi-agent task workflow', () => {

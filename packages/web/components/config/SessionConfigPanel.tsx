@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
 import { ModelSelectionForm } from '@/components/providers/ModelSelectionForm';
+import { ModelDropdown } from '@/components/config/ModelDropdown';
 import type { 
   ProviderInfo, 
   ModelInfo, 
@@ -121,11 +122,8 @@ export function SessionConfigPanel({
 
   const resetAgentForm = () => {
     setNewAgentName('');
-    setAgentProvider('anthropic');
-    setAgentModel('claude-3-sonnet-20241022');
     setSelectedInstanceId('');
     setSelectedModelId('');
-    setUseProviderInstances(false);
   };
 
   const resetEditSessionForm = () => {
@@ -1078,7 +1076,7 @@ export function SessionConfigPanel({
                   providers={providers}
                   selectedProvider={editingAgent.provider}
                   selectedModel={editingAgent.model}
-                  onChange={(model) => setEditingAgent(prev => prev ? { ...prev, model } : null)}
+                  onChange={(model: string) => setEditingAgent(prev => prev ? { ...prev, model } : null)}
                   label="Model"
                 />
               </div>

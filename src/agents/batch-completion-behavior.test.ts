@@ -20,6 +20,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { z } from 'zod';
 
 // Test tool that can be configured to fail or succeed
@@ -96,19 +100,11 @@ describe('Tool Batch Completion Behavior', () => {
   let configurableTool: ConfigurableTool;
   let session: Session;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    
-    // Ensure test environment has provider credentials for defaults
-    process.env.ANTHROPIC_KEY = 'test-anthropic-key';
-    process.env.OPENAI_API_KEY = 'test-openai-key';
-    
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
 
     // Create real project and session for proper context
     project = Project.create(
@@ -148,10 +144,8 @@ describe('Tool Batch Completion Behavior', () => {
 
   afterEach(async () => {
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   it('should continue conversation when tool execution fails', async () => {

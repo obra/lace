@@ -17,6 +17,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import type { ProviderResponse } from '~/providers/base-provider';
 
 // Mock provider that can return tool calls once then regular responses
@@ -68,14 +72,11 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   let bashTool: BashTool;
   let session: Session;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
 
     // Create real project and session for proper context
     project = Project.create(
@@ -117,10 +118,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
 
   afterEach(async () => {
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   describe('defense-in-depth integration', () => {

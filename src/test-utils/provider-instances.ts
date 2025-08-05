@@ -6,7 +6,6 @@ import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderRegistry } from '~/providers/registry';
 import type { ProviderInstance, Credential } from '~/providers/catalog/types';
 import { logger } from '~/utils/logger';
-import { randomUUID } from 'crypto';
 
 interface TestProviderConfig {
   catalogId: string; // Use specific catalog ID instead of type
@@ -50,8 +49,8 @@ export async function createTestProviderInstance(config: TestProviderConfig): Pr
     }
   }
 
-  // Generate unique instance ID
-  const instanceId = `test-${config.catalogId}-${randomUUID().split('-')[0]}`;
+  // Generate predictable instance ID for tests
+  const instanceId = `test-${config.catalogId}`;
 
   // Create provider instance configuration
   const instance: ProviderInstance = {
@@ -82,9 +81,9 @@ export async function createTestProviderInstance(config: TestProviderConfig): Pr
 
 /**
  * Sets up common test provider instances that tests can use
- * Creates standard Anthropic and OpenAI instances with common models
+ * Creates standard Anthropic and OpenAI instances with predictable IDs
  *
- * @returns Promise that resolves to instance IDs for common providers
+ * @returns Promise that resolves to predictable instance IDs for common providers
  */
 export async function setupTestProviderInstances(): Promise<{
   anthropicInstanceId: string;
@@ -105,12 +104,15 @@ export async function setupTestProviderInstances(): Promise<{
     }),
   ]);
 
-  logger.debug('Common test provider instances created', {
-    anthropicInstanceId,
-    openaiInstanceId,
-  });
+  // Ensure predictable IDs are returned
+  const predictableIds = {
+    anthropicInstanceId: 'test-anthropic',
+    openaiInstanceId: 'test-openai',
+  };
 
-  return { anthropicInstanceId, openaiInstanceId };
+  logger.debug('Common test provider instances created', predictableIds);
+
+  return predictableIds;
 }
 
 /**

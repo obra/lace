@@ -17,6 +17,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ThreadId } from '~/threads/types';
 
@@ -68,14 +72,11 @@ describe('Tool Approval System Integration', () => {
   let session: Session;
   let project: Project;
   let toolContext: ToolContext;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
 
     // Create real project and session for proper tool execution context
     project = Project.create(
@@ -117,10 +118,8 @@ describe('Tool Approval System Integration', () => {
   afterEach(async () => {
     mockInterface.reset();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
   });
 
   describe('complete approval flow without policies', () => {

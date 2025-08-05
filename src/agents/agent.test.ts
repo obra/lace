@@ -26,6 +26,10 @@ import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -83,14 +87,11 @@ describe('Enhanced Agent', () => {
   let agent: Agent;
   let session: Session;
   let project: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
+    await setupTestProviderInstances();
 
     // Create real project and session for proper context
     project = Project.create(
@@ -158,10 +159,8 @@ describe('Enhanced Agent', () => {
     }
     threadManager.close();
     teardownTestPersistence();
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
     // Clear mock references to prevent circular references
     mockProvider = null as unknown as MockProvider;
     toolExecutor = null as unknown as ToolExecutor;

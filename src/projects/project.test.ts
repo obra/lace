@@ -6,39 +6,18 @@ import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-
-// Mock env-loader to control default provider detection
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    // Mock ANTHROPIC_KEY as present so it defaults to anthropic
-    if (key === 'ANTHROPIC_KEY') return 'mock-anthropic-key';
-    return undefined;
-  }),
-}));
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('Project', () => {
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
-
   beforeEach(async () => {
     setupTestPersistence();
-
-    // Set up provider instances for session creation
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.OPENAI_API_KEY = 'test-key';
-    testProviderInstances = await setupTestProviderInstances();
+    setupTestProviderDefaults();
   });
 
   afterEach(async () => {
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
   });
 
@@ -153,7 +132,7 @@ describe('Project', () => {
 
     beforeEach(() => {
       project = Project.create('Test Project', '/test/path', 'A test project', {
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: 'anthropic-default',
         modelId: 'claude-3-5-haiku-20241022',
         key: 'value',
       });
@@ -199,7 +178,7 @@ describe('Project', () => {
       it('should return configuration', () => {
         const config = project.getConfiguration();
         expect(config).toEqual({
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
           key: 'value',
         });
@@ -319,9 +298,9 @@ describe('Project', () => {
 
         it('should not return sessions from other projects', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        });
+            providerInstanceId: 'anthropic-default',
+            modelId: 'claude-3-5-haiku-20241022',
+          });
 
           // Create sessions in both projects
           Session.create({
@@ -397,9 +376,9 @@ describe('Project', () => {
 
         it('should return null when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        });
+            providerInstanceId: 'anthropic-default',
+            modelId: 'claude-3-5-haiku-20241022',
+          });
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
@@ -443,9 +422,9 @@ describe('Project', () => {
 
         it('should return null when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        });
+            providerInstanceId: 'anthropic-default',
+            modelId: 'claude-3-5-haiku-20241022',
+          });
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
@@ -493,9 +472,9 @@ describe('Project', () => {
 
         it('should return false when session belongs to different project', () => {
           const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        });
+            providerInstanceId: 'anthropic-default',
+            modelId: 'claude-3-5-haiku-20241022',
+          });
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),

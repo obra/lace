@@ -7,9 +7,9 @@ import { Project } from '~/projects/project';
 import { asThreadId } from '~/threads/types';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import {
-  setupTestProviderInstances,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 // Mock external dependencies that don't affect core functionality
 vi.mock('server-only', () => ({}));
@@ -44,36 +44,22 @@ vi.mock('node-fetch', () => vi.fn());
 
 describe('Session', () => {
   let testProject: Project;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
 
   beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
     vi.clearAllMocks();
-
-    // Set up environment for providers
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.OPENAI_API_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
-
-    // Set up real provider instances for tests
-    testProviderInstances = await setupTestProviderInstances();
 
     // Create a test project for all tests with default provider configuration
     testProject = Project.create('Test Project', '/test/path', 'Test project', {
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: 'anthropic-default',
       modelId: 'claude-3-5-haiku-20241022',
     });
   });
 
   afterEach(async () => {
-    // Clean up provider instances
-    await cleanupTestProviderInstances([
-      testProviderInstances.anthropicInstanceId,
-      testProviderInstances.openaiInstanceId,
-    ]);
+    cleanupTestProviderDefaults();
     teardownTestPersistence();
   });
 
@@ -115,7 +101,7 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
@@ -129,7 +115,7 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: testProviderInstances.openaiInstanceId,
+          providerInstanceId: 'openai-default',
           modelId: 'gpt-4o',
         },
       });
@@ -277,7 +263,7 @@ describe('Session', () => {
       // Spawn agent with custom model
       session.spawnAgent({
         name: 'Claude Sonnet Agent',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: 'anthropic-default',
         modelId: 'claude-3-5-sonnet-20241022',
       });
 
@@ -304,7 +290,7 @@ describe('Session', () => {
       // Spawn agent with custom provider and model
       session.spawnAgent({
         name: 'GPT Agent',
-        providerInstanceId: testProviderInstances.openaiInstanceId,
+        providerInstanceId: 'openai-default',
         modelId: 'gpt-4o',
       });
 
@@ -510,7 +496,7 @@ describe('Session', () => {
         '/project/path',
         'Test project for session tests',
         {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-haiku-20241022',
         }
       );
@@ -587,7 +573,7 @@ describe('Session', () => {
           '/test/path',
           'Test project for getAll test',
           {
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
+            providerInstanceId: 'anthropic-default',
             modelId: 'claude-3-5-haiku-20241022',
           }
         );
