@@ -47,18 +47,49 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   await page.waitForTimeout(2000); // Longer pause for React hydration and auto-modal logic
 
   // Try to wait for the modal to appear first (auto-open scenario)
+  // Look for modal specifically - must be in a modal container, not just text on page
   const modalHeading = page
+    .locator('[role="dialog"], .modal, .fixed.inset-0')
     .getByRole('heading', { name: 'Welcome to Lace' })
-    .or(page.getByRole('heading', { name: 'Create New Project' }));
+    .or(
+      page
+        .locator('[role="dialog"], .modal, .fixed.inset-0')
+        .getByRole('heading', { name: 'Create New Project' })
+    );
 
   try {
     // Wait a bit to see if modal auto-opens
     await expect(modalHeading).toBeVisible({ timeout: 5000 });
     // Modal is already open, proceed directly
   } catch {
-    // Modal not visible, click the New Project button using test ID
-    const newProjectButton = page.getByTestId('new-project-button');
-    await newProjectButton.click();
+    // Modal not visible, need to click the New Project button
+    // Try multiple button selection strategies for robustness
+    let buttonClicked = false;
+
+    // Strategy 1: Try test ID first
+    const newProjectButtonTestId = page.getByTestId('new-project-button');
+    if ((await newProjectButtonTestId.count()) > 0) {
+      await newProjectButtonTestId.click();
+      buttonClicked = true;
+    } else {
+      // Strategy 2: Try the blue "New Project" button in top right
+      const newProjectButtonText = page.getByRole('button', { name: /new project/i });
+      if ((await newProjectButtonText.count()) > 0) {
+        await newProjectButtonText.click();
+        buttonClicked = true;
+      } else {
+        // Strategy 3: Try the "Create New Project" card/button
+        const createNewProjectCard = page.getByText('Create New Project').first();
+        if ((await createNewProjectCard.count()) > 0) {
+          await createNewProjectCard.click();
+          buttonClicked = true;
+        }
+      }
+    }
+
+    if (!buttonClicked) {
+      throw new Error('Could not find any New Project button to click');
+    }
 
     // Now wait for modal to appear after clicking
     await expect(modalHeading).toBeVisible({ timeout: 15000 });
@@ -254,18 +285,49 @@ export async function createProjectWithProvider(
   await page.waitForTimeout(1000); // Brief pause for React hydration
 
   // Try to wait for the modal to appear first (auto-open scenario)
+  // Look for modal specifically - must be in a modal container, not just text on page
   const modalHeading = page
+    .locator('[role="dialog"], .modal, .fixed.inset-0')
     .getByRole('heading', { name: 'Welcome to Lace' })
-    .or(page.getByRole('heading', { name: 'Create New Project' }));
+    .or(
+      page
+        .locator('[role="dialog"], .modal, .fixed.inset-0')
+        .getByRole('heading', { name: 'Create New Project' })
+    );
 
   try {
     // Wait a bit to see if modal auto-opens
     await expect(modalHeading).toBeVisible({ timeout: 5000 });
     // Modal is already open, proceed directly
   } catch {
-    // Modal not visible, click the New Project button using test ID
-    const newProjectButton = page.getByTestId('new-project-button');
-    await newProjectButton.click();
+    // Modal not visible, need to click the New Project button
+    // Try multiple button selection strategies for robustness
+    let buttonClicked = false;
+
+    // Strategy 1: Try test ID first
+    const newProjectButtonTestId = page.getByTestId('new-project-button');
+    if ((await newProjectButtonTestId.count()) > 0) {
+      await newProjectButtonTestId.click();
+      buttonClicked = true;
+    } else {
+      // Strategy 2: Try the blue "New Project" button in top right
+      const newProjectButtonText = page.getByRole('button', { name: /new project/i });
+      if ((await newProjectButtonText.count()) > 0) {
+        await newProjectButtonText.click();
+        buttonClicked = true;
+      } else {
+        // Strategy 3: Try the "Create New Project" card/button
+        const createNewProjectCard = page.getByText('Create New Project').first();
+        if ((await createNewProjectCard.count()) > 0) {
+          await createNewProjectCard.click();
+          buttonClicked = true;
+        }
+      }
+    }
+
+    if (!buttonClicked) {
+      throw new Error('Could not find any New Project button to click');
+    }
 
     // Now wait for modal to appear after clicking
     await expect(modalHeading).toBeVisible({ timeout: 15000 });
