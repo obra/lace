@@ -3,57 +3,44 @@
 
 import { test, expect } from '@playwright/test';
 import {
+  createProjectWithProvider,
   setupTestEnvironment,
   cleanupTestEnvironment,
-  createProjectWithProvider,
-  type TestEnvironment,
 } from './helpers/test-utils';
-import { startTestServer, type TestServer } from './helpers/test-server';
-
-// Test environment setup
-test.describe.configure({ mode: 'serial' }); // Run tests sequentially to avoid session conflicts
+import { setupE2ETestSuite } from './helpers/test-setup';
 
 test.describe('Tool Approval Modal E2E Tests', () => {
-  let testEnv: TestEnvironment;
-  let testServer: TestServer;
-
-  test.beforeAll(async () => {
-    // Start one server for the entire test file
-    testServer = await startTestServer();
+  const setup = setupE2ETestSuite({
+    customEnvSetup: true,
+    skipProjectCreation: true,
+    enableDebugLogging: true,
   });
 
-  test.afterAll(async () => {
-    // Clean up server after all tests in this file complete
-    await testServer.cleanup();
-  });
+  setup.configureSequential();
+
+  test.beforeAll(setup.beforeAll);
+  test.afterAll(setup.afterAll);
 
   test.beforeEach(async ({ page }) => {
-    testEnv = await setupTestEnvironment();
-    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
+    await setup.beforeEach(page);
 
-    // Add console and error listeners for debugging
-    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
-    page.on('pageerror', (error) => console.log('PAGE ERROR:', error.message));
-    page.on('requestfailed', (request) =>
-      console.log('REQUEST FAILED:', request.url(), request.failure()?.errorText)
-    );
+    // Custom environment setup for tool approval testing
+    setup.context.testEnv = await setupTestEnvironment();
+    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
 
     await page.addInitScript((tempDir) => {
       window.testEnv = {
         ANTHROPIC_KEY: 'test-key',
         LACE_DB_PATH: `${tempDir}/lace.db`,
       };
-    }, testEnv.tempDir);
-
-    // Navigate to test server
-    await page.goto(testServer.baseURL);
+    }, setup.context.testEnv.tempDir);
 
     // Create project with a real provider for now - just test the UI flow
     // We'll use anthropic provider which is always available
     await createProjectWithProvider(
       page,
-      testEnv.projectName,
-      testEnv.tempDir,
+      setup.context.testEnv.projectName,
+      setup.context.testEnv.tempDir,
       'anthropic',
       'claude-sonnet-4-20250514'
     );
@@ -61,7 +48,9 @@ test.describe('Tool Approval Modal E2E Tests', () => {
 
   test.afterEach(async () => {
     // Clean up test environment after each test
-    await cleanupTestEnvironment(testEnv);
+    if (setup.context.testEnv) {
+      await cleanupTestEnvironment(setup.context.testEnv);
+    }
   });
 
   test('should display basic UI elements', async ({ page }) => {

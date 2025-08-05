@@ -2,27 +2,14 @@
 // ABOUTME: Tests basic server startup and navigation without project creation
 
 import { test, expect } from '@playwright/test';
-import { startTestServer, type TestServer } from './helpers/test-server';
+import { useCustomE2ESetup } from './helpers/test-setup';
 
 test.describe('Simple Server Test', () => {
-  // Run tests sequentially to avoid resource conflicts
-  test.describe.configure({ mode: 'serial' });
-
-  let testServer: TestServer;
-
-  test.beforeAll(async () => {
-    // Start one server for the entire test file
-    testServer = await startTestServer();
-  });
-
-  test.afterAll(async () => {
-    // Clean up server after all tests in this file complete
-    await testServer.cleanup();
-  });
+  const { context: testContext } = useCustomE2ESetup();
 
   test('should start server and load home page', async ({ page }) => {
     // Navigate to the test server
-    await page.goto(testServer.baseURL);
+    await page.goto(testContext.testServer.baseURL);
 
     // Wait for DOM to be ready (not network idle due to SSE streams)
     await page.waitForLoadState('domcontentloaded');
@@ -35,17 +22,17 @@ test.describe('Simple Server Test', () => {
     expect(hasLaceContent).toBeTruthy();
 
     // Verify API endpoints are working
-    const response = await page.request.get(`${testServer.baseURL}/api/projects`);
+    const response = await page.request.get(`${testContext.testServer.baseURL}/api/projects`);
     expect(response.ok()).toBeTruthy();
   });
 
   test('should share server across tests in same file', async ({ page }) => {
     // This test verifies that tests in the same file share one server instance
-    await page.goto(testServer.baseURL);
+    await page.goto(testContext.testServer.baseURL);
 
     // The server port should be consistent across tests in this file
-    expect(testServer.port).toBeGreaterThan(1024);
-    expect(testServer.baseURL).toContain(`localhost:${testServer.port}`);
+    expect(testContext.testServer.port).toBeGreaterThan(1024);
+    expect(testContext.testServer.baseURL).toContain(`localhost:${testContext.testServer.port}`);
 
     // Basic navigation should work
     await page.waitForLoadState('domcontentloaded');

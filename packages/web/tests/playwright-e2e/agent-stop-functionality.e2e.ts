@@ -3,9 +3,6 @@
 
 import { test, expect } from '@playwright/test';
 import {
-  setupTestEnvironment,
-  cleanupTestEnvironment,
-  createProject,
   createSession,
   createAgent,
   selectAgent,
@@ -15,52 +12,11 @@ import {
   waitForSendButton,
   verifyMessageVisible,
   verifyNoMessage,
-  type TestEnvironment,
 } from './helpers/test-utils';
-import { startTestServer, type TestServer } from './helpers/test-server';
+import { useStandardE2ESetup } from './helpers/test-setup';
 
 test.describe('Agent Stop Functionality E2E Tests', () => {
-  // Run tests sequentially to avoid resource conflicts
-  test.describe.configure({ mode: 'serial' });
-
-  let testEnv: TestEnvironment;
-  let testServer: TestServer;
-
-  test.beforeAll(async () => {
-    // Start one server for the entire test file
-    testServer = await startTestServer();
-  });
-
-  test.afterAll(async () => {
-    // Clean up server after all tests in this file complete
-    await testServer.cleanup();
-  });
-
-  test.beforeEach(async ({ page }) => {
-    // Set up test environment
-    testEnv = await setupTestEnvironment();
-
-    // Set up environment with test key
-    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e-stop';
-
-    await page.addInitScript((tempDir) => {
-      window.testEnv = {
-        ANTHROPIC_KEY: 'test-key',
-        LACE_DB_PATH: `${tempDir}/lace.db`,
-      };
-    }, testEnv.tempDir);
-
-    // Navigate to test server
-    await page.goto(testServer.baseURL);
-
-    // Create project using reusable utility
-    await createProject(page, testEnv.projectName, testEnv.tempDir);
-  });
-
-  test.afterEach(async () => {
-    // Clean up test environment after each test
-    await cleanupTestEnvironment(testEnv);
-  });
+  const testContext = useStandardE2ESetup('test-anthropic-key-for-e2e-stop');
 
   test('should have working chat interface and stop API endpoint', async ({ page }) => {
     // Project creation automatically creates a session and agent, and dumps user into chat

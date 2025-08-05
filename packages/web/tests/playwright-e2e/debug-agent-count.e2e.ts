@@ -2,51 +2,10 @@
 // ABOUTME: Investigates network requests and UI behavior for agent counts using reusable utilities
 
 import { test, expect } from '@playwright/test';
-import {
-  setupTestEnvironment,
-  cleanupTestEnvironment,
-  createProject,
-  type TestEnvironment,
-} from './helpers/test-utils';
-import { startTestServer, type TestServer } from './helpers/test-server';
+import { useStandardE2ESetup } from './helpers/test-setup';
 
 test.describe('Agent Count Investigation', () => {
-  // Run tests sequentially to avoid resource conflicts
-  test.describe.configure({ mode: 'serial' });
-
-  let testEnv: TestEnvironment;
-  let testServer: TestServer;
-
-  test.beforeAll(async () => {
-    // Start one server for the entire test file
-    testServer = await startTestServer();
-  });
-
-  test.afterAll(async () => {
-    // Clean up server after all tests in this file complete
-    await testServer.cleanup();
-  });
-
-  test.beforeEach(async ({ page }) => {
-    // Set up test environment for each test
-    testEnv = await setupTestEnvironment();
-    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
-
-    await page.addInitScript((tempDir) => {
-      window.testEnv = {
-        ANTHROPIC_KEY: 'test-key',
-        LACE_DB_PATH: `${tempDir}/lace.db`,
-      };
-    }, testEnv.tempDir);
-
-    await page.goto(testServer.baseURL);
-    await createProject(page, testEnv.projectName, testEnv.tempDir);
-  });
-
-  test.afterEach(async () => {
-    // Clean up test environment after each test
-    await cleanupTestEnvironment(testEnv);
-  });
+  const testContext = useStandardE2ESetup();
 
   test('should investigate agent count API and UI display', async ({ page }) => {
     // Set up network request monitoring
