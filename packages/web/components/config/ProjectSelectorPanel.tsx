@@ -920,10 +920,24 @@ export function ProjectSelectorPanel({
 
       {/* Create Project Modal */}
       {showCreateProject && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+            onClick={handleCancelCreateProject}
+            aria-hidden="true"
+          />
+          
+          {/* Modal container */}
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div 
+              className="relative bg-base-100 rounded-lg shadow-xl border border-base-300 p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col transform transition-all duration-200 ease-out"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-project-title"
+            >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">
+              <h3 id="create-project-title" className="text-xl font-semibold">
                 {autoOpenCreate && isSimplifiedMode ? 'Welcome to Lace' : 'Create New Project'}
               </h3>
               <button
@@ -1205,6 +1219,7 @@ export function ProjectSelectorPanel({
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
