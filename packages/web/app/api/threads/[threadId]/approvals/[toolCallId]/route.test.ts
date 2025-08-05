@@ -56,7 +56,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       clearActiveSessions: vi.fn(),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService as MockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService as unknown as ReturnType<typeof getSessionService>);
   });
 
   afterEach(() => {
@@ -119,7 +119,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
       // Clear mocks between iterations
       vi.clearAllMocks();
-      mockGetSessionService.mockReturnValue(mockSessionService as MockSessionService);
+      mockGetSessionService.mockReturnValue(mockSessionService as unknown as ReturnType<typeof getSessionService>);
       mockSessionService.getSession.mockReturnValue(mockSession);
       mockSession.getAgent.mockReturnValue(mockAgent);
     }
