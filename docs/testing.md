@@ -99,27 +99,24 @@ describe('Multi-Provider Test', () => {
 });
 ```
 
-### Standard Test Environment Setup
+## Test Environment Setup
 
-Most integration tests should include these standard setup patterns:
+### Core Tests (src/)
+
+For core Lace tests, use the unified setup that handles both temp LACE_DIR and persistence automatically:
 
 ```typescript
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
-describe('Integration Test', () => {
-  const _tempDirContext = useTempLaceDir();
+describe('Core Integration Test', () => {
+  const _tempLaceDir = setupCoreTest(); // Handles temp LACE_DIR + persistence automatically
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache(); // Important for test isolation
-
-    // Set up environment
-    process.env.LACE_DB_PATH = ':memory:';
 
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -134,10 +131,43 @@ describe('Integration Test', () => {
     // Clean up in correct order
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
-    teardownTestPersistence();
     vi.clearAllMocks();
   });
 });
+```
+
+### Web Tests (packages/web/)
+
+For web package tests, use the web-specific setup:
+
+```typescript
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('Web Integration Test', () => {
+  const _tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+  });
+
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
+  });
+});
+```
 ```
 
 ### Session and Project Creation
@@ -181,9 +211,9 @@ afterEach(async () => {
   cleanupTestProviderDefaults();
   await cleanupTestProviderInstances([providerInstanceId]);
   
-  // Tear down infrastructure last
-  teardownTestPersistence();
+  // Clear mocks last
   vi.clearAllMocks();
+  // Note: Persistence cleanup is handled automatically by setupCoreTest/setupWebTest
 });
 ```
 
@@ -192,7 +222,7 @@ Always set required environment variables in test setup:
 ```typescript
 beforeEach(() => {
   process.env.ANTHROPIC_KEY = 'test-key';
-  process.env.LACE_DB_PATH = ':memory:';
+  // Note: LACE_DIR is handled automatically by setupCoreTest/setupWebTest
 });
 ```
 
@@ -202,8 +232,17 @@ If you see errors like "Failed to resolve provider instance" or "Provider instan
 
 1. **Check Pattern**: Verify you're using `createTestProviderInstance()` not `setupTestProviderInstances()`
 2. **Verify Creation**: Ensure the provider instance is created before being used
-3. **Check Cleanup Order**: Ensure cleanup happens in the correct order
-4. **Test Isolation**: Run the failing test individually to check for shared state issues
+3. **Check Setup**: Ensure you're using `setupCoreTest()` or `setupWebTest()` for proper test isolation
+4. **Check Cleanup Order**: Ensure cleanup happens in the correct order
+5. **Test Isolation**: Run the failing test individually to check for shared state issues
+
+### Key Benefits of New Test Setup
+
+- **Race Condition Prevention**: Database and provider instances use the same isolated temp directory
+- **Simplified Setup**: One function call handles both LACE_DIR and persistence
+- **Automatic Cleanup**: Temp directories are cleaned up automatically
+- **No Manual DB Paths**: Persistence auto-initializes to the correct location
+- **Impossible to Do Wrong**: Unified setup prevents configuration mistakes
 
 ## Philosophy: Test Behavior, Not Implementation
 
@@ -425,17 +464,19 @@ const highPriorityTask = createMockTask({ priority: 'high' });
 ```
 
 ### Database Testing
-Use real database with test data:
+The unified test setup handles database isolation automatically:
 
 ```typescript
-beforeEach(async () => {
-  // Use real database operations
-  await setupTestDatabase();
-  await seedTestData();
-});
-
-afterEach(async () => {
-  await cleanupTestDatabase();
+describe('Database Test', () => {
+  const _tempLaceDir = setupCoreTest(); // Database auto-initializes to temp directory
+  
+  beforeEach(async () => {
+    // Database is already isolated and ready to use
+    const persistence = getPersistence(); // Auto-initializes to ${LACE_DIR}/lace.db
+    await seedTestData(persistence);
+  });
+  
+  // No manual cleanup needed - temp directory handles it
 });
 ```
 
