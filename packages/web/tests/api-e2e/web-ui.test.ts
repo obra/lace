@@ -6,57 +6,33 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-
-// Mock server-only module
-vi.mock('server-only', () => ({}));
-
-// Mock only essential external dependencies
-
-vi.mock('@/lib/server/approval-manager', () => ({
-  getApprovalManager: () => ({
-    requestApproval: async () => Promise.resolve('allow_once'),
-  }),
-}));
-
-import { getSessionService } from '@/lib/server/session-service';
+import {
+  setupAPITestEnvironment,
+  cleanupAPITestEnvironment,
+  setupStandardMocks,
+  createTestProject,
+} from '../shared/api-test-helpers';
 import { asThreadId } from '@/types/core';
-import { Project } from '@/lib/server/lace-imports';
+import { getSessionService, type SessionService } from '@/lib/server/session-service';
 import type { SessionInfo as SessionType } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+
+// Set up standard mocks for external dependencies
+setupStandardMocks();
 
 describe('Web UI E2E Tests', () => {
-  let sessionService: ReturnType<typeof getSessionService>;
+  let sessionService: SessionService;
 
-  // Mock environment variables and external dependencies
-  const originalEnv = process.env;
   beforeEach(() => {
-    setupTestPersistence();
-
-    process.env = {
-      ...originalEnv,
-      ANTHROPIC_KEY: 'test-key',
-      LACE_DB_PATH: ':memory:',
-    };
-    sessionService = getSessionService();
+    sessionService = setupAPITestEnvironment();
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-    teardownTestPersistence();
-    // Clear active sessions to ensure test isolation
-    sessionService.clearActiveSessions();
-    // Clear global singleton
-    global.sessionService = undefined;
+  afterEach(async () => {
+    await cleanupAPITestEnvironment(sessionService);
   });
 
   describe('Session Management Workflow', () => {
     it('should create a new session and persist it', async () => {
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       const session = await sessionService.createSession(
         'Test Session',
@@ -71,12 +47,7 @@ describe('Web UI E2E Tests', () => {
     });
 
     it('should list created sessions', async () => {
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       await sessionService.createSession(
         'Session 1',
@@ -99,12 +70,7 @@ describe('Web UI E2E Tests', () => {
 
     it('should retrieve a specific session', async () => {
       // Create a session
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       const created = await sessionService.createSession(
         'Retrieve Test',
@@ -127,12 +93,7 @@ describe('Web UI E2E Tests', () => {
     let session: SessionType;
 
     beforeEach(async () => {
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       session = await sessionService.createSession(
         'Agent Test Session',
@@ -192,12 +153,7 @@ describe('Web UI E2E Tests', () => {
   describe('Session Persistence', () => {
     it('should persist session data across service instances', async () => {
       // Create session with first service instance
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       const session1 = await sessionService.createSession(
         'Persistence Test',
@@ -225,12 +181,7 @@ describe('Web UI E2E Tests', () => {
 
     it('should list persisted sessions after restart', async () => {
       // Create some sessions
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       await sessionService.createSession(
         'Session A',

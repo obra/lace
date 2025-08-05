@@ -5,20 +5,17 @@
  * @vitest-environment node
  */
 
-import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import {
+  setupAPITestEnvironment,
+  cleanupAPITestEnvironment,
+  setupStandardMocks,
+  createTestProject,
+} from '../shared/api-test-helpers';
 
-// Mock server-only module
-vi.mock('server-only', () => ({}));
-
-// Mock only external dependencies, not core functionality
-
-vi.mock('@/lib/server/approval-manager', () => ({
-  getApprovalManager: () => ({
-    requestApproval: vi.fn().mockResolvedValue('allow_once'),
-  }),
-}));
+// Set up standard mocks for external dependencies
+setupStandardMocks();
 
 // Import the real API route handlers after mocks
 import { GET as listSessions } from '@/app/api/sessions/route';
@@ -26,8 +23,7 @@ import { GET as getSession } from '@/app/api/sessions/[sessionId]/route';
 import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
-import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import type { SessionService } from '@/lib/server/session-service';
 import type { SessionInfo as SessionType } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
@@ -37,42 +33,17 @@ describe('API Endpoints E2E Tests', () => {
   let sessionService: SessionService;
 
   beforeEach(() => {
-    setupTestPersistence();
-
-    // Set up environment for session service
-    process.env = {
-      ...process.env,
-      ANTHROPIC_KEY: 'test-key',
-      LACE_DB_PATH: ':memory:',
-    };
-
-    sessionService = getSessionService();
+    sessionService = setupAPITestEnvironment();
   });
 
   afterEach(async () => {
-    // CRITICAL: Stop agents BEFORE closing database in teardownTestPersistence
-    if (sessionService) {
-      await sessionService.stopAllAgents();
-      sessionService.clearActiveSessions();
-    }
-    // Clear persistence to reset database state
-    teardownTestPersistence();
-  });
-
-  afterAll(async () => {
-    // No need to stop agents again - they were already stopped in afterEach
-    global.sessionService = undefined;
+    await cleanupAPITestEnvironment(sessionService);
   });
 
   describe('Session Management API Flow', () => {
     it('should create session via API', async () => {
       // First create a project
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
 
       const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
@@ -105,12 +76,7 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should list sessions via API', async () => {
       // Create a project and session first
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       await sessionService.createSession(
         'Listable Session',
@@ -134,12 +100,7 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should get specific session via API', async () => {
       // Create a project and session first
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       const session = await sessionService.createSession(
         'Specific Session',
@@ -170,12 +131,7 @@ describe('API Endpoints E2E Tests', () => {
 
     beforeEach(async () => {
       // Create a session for agent tests using real service
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       const session = await sessionService.createSession(
         'Agent Test Session',
@@ -244,12 +200,7 @@ describe('API Endpoints E2E Tests', () => {
 
     beforeEach(async () => {
       // Create session and agent fresh for each test to avoid state pollution
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
       const session = await sessionService.createSession(
         'Message Test Session',
@@ -333,12 +284,7 @@ describe('API Endpoints E2E Tests', () => {
 
     it('should handle malformed JSON in createSession', async () => {
       // Test the project-based session creation with malformed JSON
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {}
-      );
+      const testProject = createTestProject('Test Project');
       const projectId = testProject.getId();
 
       const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {

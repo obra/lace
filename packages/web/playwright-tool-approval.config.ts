@@ -8,16 +8,16 @@ import path from 'path';
 const PORT_FILE = path.join(process.cwd(), '.playwright-server-url-tool-approval');
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './tests/playwright-e2e',
   testMatch: '**/tool-approval-modal.e2e.ts',
   fullyParallel: false, // Run tests sequentially to avoid conflicts
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1, // Single worker for tool approval tests
   timeout: 60000, // 60 second timeout for tool approval interactions
-  
+
   reporter: 'html',
-  
+
   use: {
     baseURL: (() => {
       try {

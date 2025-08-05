@@ -9,11 +9,13 @@ import { test, expect } from '@playwright/test';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
+import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Hash-Based URL Persistence E2E', () => {
   let tempDir: string;
   let originalLaceDir: string | undefined;
   let originalAnthropicKey: string | undefined;
+  let testServer: TestServer;
 
   test.beforeEach(async () => {
     // Create fresh temp directory for each test
@@ -21,6 +23,9 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     originalLaceDir = process.env.LACE_DIR;
     originalAnthropicKey = process.env.ANTHROPIC_KEY;
     process.env.LACE_DIR = tempDir;
+
+    // Start test server
+    testServer = await startTestServer();
 
     // Set test environment variables
     // Use real ANTHROPIC_KEY if available, otherwise use a placeholder that may cause expected server errors
@@ -31,6 +36,9 @@ test.describe('Hash-Based URL Persistence E2E', () => {
   });
 
   test.afterEach(async () => {
+    // Clean up server
+    await testServer.cleanup();
+
     // Clean up after each test
     if (originalLaceDir !== undefined) {
       process.env.LACE_DIR = originalLaceDir;
@@ -57,8 +65,8 @@ test.describe('Hash-Based URL Persistence E2E', () => {
   });
 
   test('should persist project selection across page reloads', async ({ page }) => {
-    // Navigate to the app
-    await page.goto('http://localhost:3005');
+    // Navigate to the test server
+    await page.goto(testServer.baseURL);
 
     // Wait for projects to load (h1 with "Select a Project" or existing project cards)
     await page.locator('h1:has-text("Select a Project"), h3').first().waitFor({ timeout: 5000 });

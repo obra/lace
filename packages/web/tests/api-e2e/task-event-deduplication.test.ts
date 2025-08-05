@@ -4,10 +4,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { logger } from '~/utils/logger';
 
-// Mock server-only module
-vi.mock('server-only', () => ({}));
 import { NextRequest } from 'next/server';
-import { SessionService, getSessionService } from '@/lib/server/session-service';
+import { setupAPITestEnvironment, cleanupAPITestEnvironment } from '../shared/api-test-helpers';
+import type { SessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { Project } from '@/lib/server/lace-imports';
 import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
@@ -17,11 +16,12 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
 import { asThreadId } from '~/threads/types';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { parseResponse } from '@/lib/serialization';
 import type { StreamEvent } from '@/types/stream-events';
 import type { ThreadId } from '@/types/core';
+
+// Mock server-only module
+vi.mock('server-only', () => ({}));
 
 // Mock provider that responds with task_add tool calls ONLY ONCE per conversation
 class TaskCreatingMockProvider extends BaseMockProvider {
@@ -93,7 +93,6 @@ class TaskCreatingMockProvider extends BaseMockProvider {
 }
 
 describe('Task Event Deduplication E2E', () => {
-  const _tempDir = useTempLaceDir();
   let sessionService: SessionService;
   let testProject: Project;
   let mockProvider: TaskCreatingMockProvider;
@@ -104,15 +103,8 @@ describe('Task Event Deduplication E2E', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Set up environment
-    process.env = {
-      ...process.env,
-      ANTHROPIC_KEY: 'test-key',
-      LACE_DB_PATH: ':memory:',
-    };
-
-    // Set up test persistence
-    setupTestPersistence();
+    // Set up standard API test environment
+    sessionService = setupAPITestEnvironment();
 
     // Track event broadcast calls with simpler spy approach
     eventCounts = new Map();
@@ -167,18 +159,12 @@ describe('Task Event Deduplication E2E', () => {
       return mockRegistry;
     });
 
-    sessionService = getSessionService();
+    // Clear any existing sessions
     sessionService.clearActiveSessions();
   });
 
   afterEach(async () => {
-    // CRITICAL: Stop agents BEFORE closing database in teardownTestPersistence
-    // Just clear sessions without trying to stop agents that may be stuck
-    if (sessionService) {
-      sessionService.clearActiveSessions();
-    }
-
-    teardownTestPersistence();
+    await cleanupAPITestEnvironment(sessionService);
     vi.restoreAllMocks();
   });
 

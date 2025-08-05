@@ -6,14 +6,17 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   createProject,
-  type TestEnvironment
+  type TestEnvironment,
 } from './helpers/test-utils';
+import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Agent Count Investigation', () => {
   let testEnv: TestEnvironment;
+  let testServer: TestServer;
 
   test.beforeEach(async ({ page }) => {
     testEnv = await setupTestEnvironment();
+    testServer = await startTestServer();
     process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
 
     await page.addInitScript((tempDir) => {
@@ -23,11 +26,13 @@ test.describe('Agent Count Investigation', () => {
       };
     }, testEnv.tempDir);
 
+    await page.goto(testServer.baseURL);
     await createProject(page, testEnv.projectName, testEnv.tempDir);
   });
 
   test.afterEach(async () => {
     await cleanupTestEnvironment(testEnv);
+    await testServer.cleanup();
   });
 
   test('should investigate agent count API and UI display', async ({ page }) => {

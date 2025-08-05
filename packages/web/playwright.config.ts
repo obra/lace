@@ -4,7 +4,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './tests/playwright-e2e',
   testMatch: '**/*.e2e.ts',
 
   fullyParallel: false, // Disable parallel execution to avoid state conflicts
@@ -14,7 +14,7 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    baseURL: 'http://localhost:23457', // Playwright will use the actual port the server starts on
+    // No global baseURL - each test will start its own server
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -26,10 +26,5 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: 'node scripts/start-test-server.js', // Use our wrapper script
-    port: 23457, // Start checking from this port
-    reuseExistingServer: !process.env.CI,
-    timeout: 60 * 1000,
-  },
+  // No global webServer - each test file starts its own server
 });

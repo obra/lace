@@ -15,15 +15,18 @@ import {
   waitForSendButton,
   verifyMessageVisible,
   verifyNoMessage,
-  type TestEnvironment
+  type TestEnvironment,
 } from './helpers/test-utils';
+import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Agent Stop Functionality E2E Tests', () => {
   let testEnv: TestEnvironment;
+  let testServer: TestServer;
 
   test.beforeEach(async ({ page }) => {
     // Set up test environment
     testEnv = await setupTestEnvironment();
+    testServer = await startTestServer();
 
     // Set up environment with test key
     process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e-stop';
@@ -35,18 +38,24 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
       };
     }, testEnv.tempDir);
 
+    // Navigate to test server
+    await page.goto(testServer.baseURL);
+
     // Create project using reusable utility
     await createProject(page, testEnv.projectName, testEnv.tempDir);
   });
 
   test.afterEach(async () => {
     await cleanupTestEnvironment(testEnv);
+    await testServer.cleanup();
   });
 
   test('should have working chat interface and stop API endpoint', async ({ page }) => {
     // Project creation automatically creates a session and agent, and dumps user into chat
     // Verify we're in the chat interface by looking for the message input
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
+      timeout: 10000,
+    });
 
     // Send a message to verify the chat interface works
     await sendMessage(page, 'Hello, test message');
@@ -62,7 +71,7 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
         // Try to call the stop endpoint with a test agent ID
         const result = await fetch('/api/agents/lace_20250801_abc123.1/stop', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         });
         const data = await result.json();
         return { status: result.status, data };
@@ -80,7 +89,9 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
 
   test('should handle ESC key press in chat interface', async ({ page }) => {
     // Project creation automatically creates session and agent, puts us in chat
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
+      timeout: 10000,
+    });
 
     // Send a message
     await sendMessage(page, 'Test ESC key functionality');
@@ -94,7 +105,9 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
 
   test('should maintain stable interface during rapid interactions', async ({ page }) => {
     // Project creation automatically creates session and agent, puts us in chat
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
+      timeout: 10000,
+    });
 
     // Send a message
     await sendMessage(page, 'Test rapid interactions');
@@ -105,7 +118,7 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
 
     // Verify system handles multiple interactions gracefully
     await verifyMessageVisible(page, 'Test rapid interactions');
-    
+
     // Verify interface is still responsive
     await sendMessage(page, 'Second message');
     await verifyMessageVisible(page, 'Second message');

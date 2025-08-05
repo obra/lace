@@ -8,15 +8,20 @@ import {
   createProject,
   sendMessage,
   verifyMessageVisible,
-  type TestEnvironment
+  type TestEnvironment,
 } from './helpers/test-utils';
+import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Web UI End-to-End Tests', () => {
   let testEnv: TestEnvironment;
+  let testServer: TestServer;
 
   test.beforeEach(async ({ page }) => {
     // Set up test environment using reusable utilities
     testEnv = await setupTestEnvironment();
+
+    // Start a test server for this test
+    testServer = await startTestServer();
 
     // Set up environment with test key
     process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e';
@@ -28,25 +33,34 @@ test.describe('Web UI End-to-End Tests', () => {
       };
     }, testEnv.tempDir);
 
+    // Navigate to test server before creating project
+    await page.goto(testServer.baseURL);
+
     // Create project using reusable utility - this auto-creates session and agent
     await createProject(page, testEnv.projectName, testEnv.tempDir);
   });
 
   test.afterEach(async () => {
     await cleanupTestEnvironment(testEnv);
+    await testServer.cleanup();
   });
 
   test.describe('Project and Session Management', () => {
     test('should auto-create session and agent when project is created', async ({ page }) => {
       // Project creation (in beforeEach) should auto-create a session and agent
       // We should be in the chat interface now
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // Verify we can see session information - look for "1 sessions" or similar
       await expect(page.getByText(/\d+ sessions?/)).toBeVisible();
 
       // Verify we're in the chat interface (auto-created agent should be selected)
-      const messageInput = page.locator('input[placeholder*="Message"], textarea[placeholder*="Message"]');
+      const messageInput = page.locator(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]'
+      );
       await expect(messageInput).toBeVisible();
     });
 
@@ -66,7 +80,10 @@ test.describe('Web UI End-to-End Tests', () => {
       await expect(page.getByText(displayedProjectName).first()).toBeVisible({ timeout: 10000 });
 
       // Verify we're back in the chat interface (project should auto-load session/agent)
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // Note: Full conversation history persistence after page reload may not be expected behavior
       // The important thing is that the project and interface state persists
@@ -76,9 +93,12 @@ test.describe('Web UI End-to-End Tests', () => {
       // We should be in the project view with auto-created session/agent
       // Look for session and agent count indicators
       await expect(page.getByText(/\d+ sessions?/)).toBeVisible();
-      
+
       // We should also be able to see that we're in an active session
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 5000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 5000 }
+      );
     });
   });
 
@@ -86,18 +106,26 @@ test.describe('Web UI End-to-End Tests', () => {
     test('should display auto-created agent and chat interface', async ({ page }) => {
       // Project creation auto-creates an agent and puts us in chat
       // Verify we're in the chat interface
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // The agent should be automatically created and selected
       // We can verify this by checking that the message input is available and functional
-      const messageInput = page.locator('input[placeholder*="Message"], textarea[placeholder*="Message"]');
+      const messageInput = page.locator(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]'
+      );
       await expect(messageInput).toBeVisible();
       await expect(messageInput).toBeEnabled();
     });
 
     test('should handle agent interactions correctly', async ({ page }) => {
       // We should be in the chat interface with auto-created agent
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // Test that we can interact with the agent via chat
       await sendMessage(page, 'Test agent interaction');
@@ -112,7 +140,10 @@ test.describe('Web UI End-to-End Tests', () => {
   test.describe('Conversation Flow', () => {
     test('should send messages and receive responses', async ({ page }) => {
       // Project creation puts us directly in chat with auto-created agent
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // Send a message using our utility
       await sendMessage(page, 'Hello, how are you?');
@@ -127,7 +158,10 @@ test.describe('Web UI End-to-End Tests', () => {
 
     test('should display conversation history correctly', async ({ page }) => {
       // We're already in the chat interface with auto-created agent
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // Send multiple messages
       const messages = ['First message', 'Second message', 'Third message'];
@@ -147,7 +181,10 @@ test.describe('Web UI End-to-End Tests', () => {
   test.describe('Interface Stability', () => {
     test('should handle rapid interactions gracefully', async ({ page }) => {
       // We're in the chat interface with auto-created agent
-      await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', { timeout: 10000 });
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        { timeout: 10000 }
+      );
 
       // Send rapid messages to test interface stability
       await sendMessage(page, 'Test message 1');
@@ -160,7 +197,9 @@ test.describe('Web UI End-to-End Tests', () => {
       await verifyMessageVisible(page, 'Test message 3');
 
       // Verify interface is still responsive
-      const messageInput = page.locator('input[placeholder*="Message"], textarea[placeholder*="Message"]');
+      const messageInput = page.locator(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]'
+      );
       await expect(messageInput).toBeEnabled();
     });
   });
