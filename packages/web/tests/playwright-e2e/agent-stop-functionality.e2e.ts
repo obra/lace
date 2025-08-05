@@ -20,6 +20,9 @@ import {
 import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Agent Stop Functionality E2E Tests', () => {
+  // Run tests sequentially to avoid resource conflicts
+  test.describe.configure({ mode: 'serial' });
+
   let testEnv: TestEnvironment;
   let testServer: TestServer;
 

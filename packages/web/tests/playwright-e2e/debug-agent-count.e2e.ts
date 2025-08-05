@@ -11,6 +11,9 @@ import {
 import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Agent Count Investigation', () => {
+  // Run tests sequentially to avoid resource conflicts
+  test.describe.configure({ mode: 'serial' });
+
   let testEnv: TestEnvironment;
   let testServer: TestServer;
 

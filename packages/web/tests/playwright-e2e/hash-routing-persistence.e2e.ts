@@ -12,6 +12,9 @@ import os from 'os';
 import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Hash-Based URL Persistence E2E', () => {
+  // Run tests sequentially to avoid resource conflicts
+  test.describe.configure({ mode: 'serial' });
+
   let tempDir: string;
   let originalLaceDir: string | undefined;
   let originalAnthropicKey: string | undefined;

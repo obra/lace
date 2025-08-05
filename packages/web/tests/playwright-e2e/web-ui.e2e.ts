@@ -13,6 +13,9 @@ import {
 import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Web UI End-to-End Tests', () => {
+  // Run tests sequentially to avoid resource conflicts
+  test.describe.configure({ mode: 'serial' });
+
   let testEnv: TestEnvironment;
   let testServer: TestServer;
 

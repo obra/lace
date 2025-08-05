@@ -5,6 +5,9 @@ import { test, expect } from '@playwright/test';
 import { startTestServer, type TestServer } from './helpers/test-server';
 
 test.describe('Simple Server Test', () => {
+  // Run tests sequentially to avoid resource conflicts
+  test.describe.configure({ mode: 'serial' });
+
   let testServer: TestServer;
 
   test.beforeAll(async () => {
