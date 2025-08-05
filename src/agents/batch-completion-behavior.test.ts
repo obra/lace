@@ -6,7 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
@@ -93,6 +93,7 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('Tool Batch Completion Behavior', () => {
+  const _tempLaceDir = setupCoreTest();
   const tempDirContext = useTempLaceDir();
   let agent: Agent;
   let threadManager: ThreadManager;
@@ -103,7 +104,7 @@ describe('Tool Batch Completion Behavior', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create real provider instance
@@ -154,7 +155,7 @@ describe('Tool Batch Completion Behavior', () => {
   });
 
   afterEach(async () => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

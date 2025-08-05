@@ -13,7 +13,7 @@ import { ProviderCatalogManager } from '~/providers/catalog/manager';
 // import { Session } from '~/sessions/session';
 // import { Project } from '~/projects/project';
 // import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import type { ProviderInstancesConfig, CatalogProvider } from '~/providers/catalog/types';
 
 // Mock OpenAI-compatible server factory
@@ -169,7 +169,7 @@ describe('Provider Instance E2E Tests', () => {
     process.env.LACE_DIR = tempDir;
 
     // Setup test persistence
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
 
     // Create mock servers
     openaiServer1 = createMockOpenAIServer('http://mock-openai-1.test', 'test-key-1');
@@ -365,7 +365,7 @@ describe('Provider Instance E2E Tests', () => {
     ollamaServer.close();
 
     // Cleanup
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
 
     if (originalLaceDir) {
       process.env.LACE_DIR = originalLaceDir;

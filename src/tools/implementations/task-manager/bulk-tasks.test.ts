@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -22,7 +22,7 @@ describe('Bulk Task Creation', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create real provider instance
@@ -57,7 +57,7 @@ describe('Bulk Task Creation', () => {
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

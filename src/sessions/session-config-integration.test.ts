@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -26,7 +26,7 @@ describe('Session Configuration Integration', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -51,7 +51,7 @@ describe('Session Configuration Integration', () => {
 
   afterEach(async () => {
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     await cleanupTestProviderInstances([providerInstanceId]);
   });
 

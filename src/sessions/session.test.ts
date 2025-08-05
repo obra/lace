@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { asThreadId } from '~/threads/types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -54,7 +54,7 @@ describe('Session', () => {
   let openaiProviderInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
@@ -86,7 +86,7 @@ describe('Session', () => {
 
   afterEach(async () => {
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     if (providerInstanceId || openaiProviderInstanceId) {
       await cleanupTestProviderInstances(
         [providerInstanceId, openaiProviderInstanceId].filter(Boolean)

@@ -9,8 +9,12 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
+  // Support both old and new provider field names for backward compatibility
   provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
+  providerInstanceId: z.string().optional(),
+  // Support both old and new model field names
   model: z.string().optional(),
+  modelId: z.string().optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
   toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),

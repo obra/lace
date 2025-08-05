@@ -7,7 +7,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { Agent } from '~/agents/agent';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ToolCall, ToolContext } from '~/tools/types';
 import {
@@ -28,7 +28,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create real provider instance
@@ -84,7 +84,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

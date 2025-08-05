@@ -7,9 +7,12 @@ import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
 import { asThreadId } from '@/types/core';
+import { Session } from '@/lib/server/lace-imports';
 
 // ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
 // Required for Next.js framework compatibility during testing
@@ -68,13 +71,38 @@ vi.mock('~/tools/implementations/bash', () => ({
 }));
 
 describe('Session Detail API Route', () => {
+  const _tempDirContext = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let anthropicInstanceId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
     vi.clearAllMocks();
+
+    // Create anthropic-default instance manually
+    const { ProviderInstanceManager } = await import('~/providers/instance/manager');
+    const { ProviderCatalogManager } = await import('~/providers/catalog/manager');
+    
+    const instanceManager = new ProviderInstanceManager();
+    const catalogManager = new ProviderCatalogManager();
+    await catalogManager.loadCatalogs();
+    
+    const instancesConfig = await instanceManager.loadInstances();
+    instancesConfig.instances['anthropic-default'] = {
+      displayName: 'Test Anthropic Default',
+      catalogProviderId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'], // Add supported models
+    };
+    await instanceManager.saveInstances(instancesConfig);
+    await instanceManager.saveCredential('anthropic-default', {
+      apiKey: 'test-anthropic-key',
+    });
+    
+    anthropicInstanceId = 'anthropic-default';
 
     // Set up environment for session service
     process.env = {
@@ -90,12 +118,22 @@ describe('Session Detail API Route', () => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
     // Clear global singleton
     global.sessionService = undefined;
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    
+    // Clean up provider defaults
+    cleanupTestProviderDefaults();
+    
+    // Clean up provider instance
+    if (anthropicInstanceId) {
+      const { cleanupTestProviderInstances } = await import('~/test-utils/provider-instances');
+      await cleanupTestProviderInstances([anthropicInstanceId]);
+    }
+    
     teardownTestPersistence();
   });
 

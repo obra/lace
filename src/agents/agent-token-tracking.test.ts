@@ -10,7 +10,7 @@ import { Tool } from '~/tools/tool';
 import { ToolResult } from '~/tools/types';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 // Mock provider with configurable token usage
@@ -77,6 +77,7 @@ class MockTokenProvider extends BaseMockProvider {
 }
 
 describe('Agent Token Tracking Integration', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let provider: MockTokenProvider;
   let toolExecutor: ToolExecutor;
@@ -84,7 +85,7 @@ describe('Agent Token Tracking Integration', () => {
   let threadId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     // Create mock response with token usage
     const mockResponse: ProviderResponse = {
       content: 'Test response with tokens',
@@ -122,7 +123,7 @@ describe('Agent Token Tracking Integration', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.clearAllTimers();
     vi.useRealTimers();
   });

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import type { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 // Mock dependencies
 
@@ -15,7 +15,7 @@ describe('NonInteractiveInterface', () => {
   let mockEventEmitter: EventEmitter;
 
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     // Mock stdout before creating NonInteractiveInterface to prevent "Test response" output
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
@@ -47,7 +47,7 @@ describe('NonInteractiveInterface', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 

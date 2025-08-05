@@ -9,7 +9,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { BudgetStatus, BudgetRecommendations } from '~/token-management/types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 // Mock provider for testing token budget integration
 class MockProvider extends BaseMockProvider {
@@ -49,6 +49,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Agent Token Budget Integration', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let mockProvider: MockProvider;
   let toolExecutor: ToolExecutor;
@@ -56,7 +57,7 @@ describe('Agent Token Budget Integration', () => {
   const threadId = 'test-thread-budget';
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     mockProvider = new MockProvider();
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
@@ -81,7 +82,7 @@ describe('Agent Token Budget Integration', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should track token usage from provider responses', async () => {

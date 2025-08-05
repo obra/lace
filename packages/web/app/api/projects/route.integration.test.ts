@@ -4,6 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock environment variables to provide test API keys
@@ -55,11 +57,24 @@ interface ErrorResponse {
 }
 
 describe('Projects API Integration Tests', () => {
-  beforeEach(() => {
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
     setupTestPersistence();
+    setupTestProviderDefaults();
+
+    // Create test provider instance  
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
     teardownTestPersistence();
   });
 
@@ -68,8 +83,14 @@ describe('Projects API Integration Tests', () => {
       // Create some test projects directly using the real Project class
       const { Project } = await import('~/projects/project');
 
-      const project1 = Project.create('Project 1', '/path/1', 'First project');
-      Project.create('Project 2', '/path/2', 'Second project');
+      const project1 = Project.create('Project 1', '/path/1', 'First project', {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
+      Project.create('Project 2', '/path/2', 'Second project', {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
 
       // Create sessions in project1 to test session counting
       const { Session } = await import('~/sessions/session');

@@ -9,7 +9,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 // Mock provider with configurable delay for testing long operations
 class LongOperationProvider extends BaseMockProvider {
@@ -37,13 +37,13 @@ class LongOperationProvider extends BaseMockProvider {
 }
 
 describe('Agent Queue End-to-End Scenarios', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let longProvider: LongOperationProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
 
   beforeEach(async () => {
-    setupTestPersistence();
     longProvider = new LongOperationProvider(200); // 200ms delay
 
     mockToolExecutor = {
@@ -78,7 +78,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
       agent.removeAllListeners();
       agent.stop();
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('Scenario 1: Multiple messages during long operation', () => {

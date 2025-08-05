@@ -14,7 +14,7 @@ import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import type { Task } from '~/tasks/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -73,7 +73,7 @@ describe('Enhanced Task Manager Tools', () => {
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -140,7 +140,7 @@ describe('Enhanced Task Manager Tools', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

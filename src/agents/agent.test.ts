@@ -16,7 +16,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { BashTool } from '~/tools/implementations/bash';
 import { Session } from '~/sessions/session';
@@ -80,6 +80,7 @@ class MockTool extends Tool {
 }
 
 describe('Enhanced Agent', () => {
+  const _tempLaceDir = setupCoreTest();
   const tempDirContext = useTempLaceDir();
   let mockProvider: MockProvider;
   let toolExecutor: ToolExecutor;
@@ -90,7 +91,6 @@ describe('Enhanced Agent', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -171,7 +171,6 @@ describe('Enhanced Agent', () => {
     if (threadManager) {
       threadManager.close();
     }
-    teardownTestPersistence();
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

@@ -12,7 +12,7 @@ import {
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -105,7 +105,7 @@ describe('Task Management Workflow Integration', () => {
   let delegateTool: DelegateTool;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -155,7 +155,7 @@ describe('Task Management Workflow Integration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

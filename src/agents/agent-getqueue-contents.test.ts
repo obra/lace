@@ -9,7 +9,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 class MockProvider extends BaseMockProvider {
   constructor() {
@@ -35,13 +35,13 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Agent getQueueContents', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
 
   beforeEach(async () => {
-    setupTestPersistence();
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -67,7 +67,7 @@ describe('Agent getQueueContents', () => {
     if (agent) {
       agent.stop();
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should return empty array for empty queue', () => {

@@ -9,15 +9,16 @@ import { TestProvider } from '~/test-utils/test-provider';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Agent ThreadManager Encapsulation', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let testDir: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     testDir = await mkdtemp(join(tmpdir(), 'lace-encapsulation-test-'));
     threadManager = new ThreadManager();
 
@@ -40,7 +41,7 @@ describe('Agent ThreadManager Encapsulation', () => {
   afterEach(async () => {
     threadManager.close();
     await rm(testDir, { recursive: true, force: true });
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('ThreadManager encapsulation', () => {

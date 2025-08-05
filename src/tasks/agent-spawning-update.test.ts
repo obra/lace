@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { asThreadId, asNewAgentSpec } from '~/threads/types';
 import type { DatabasePersistence } from '~/persistence/database';
 
@@ -14,7 +14,7 @@ describe('Agent Spawning on Assignment', () => {
   let mockAgentCreator: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    persistence = setupTestPersistence();
+    persistence = // setupTestPersistence replaced by setupCoreTest
     sessionId = 'lace_20250727_test456';
 
     // Mock agent creation callback
@@ -29,7 +29,7 @@ describe('Agent Spawning on Assignment', () => {
 
   afterEach(() => {
     persistence.close();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 

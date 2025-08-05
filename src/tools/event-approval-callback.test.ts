@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
@@ -81,7 +81,7 @@ describe('EventApprovalCallback Integration Tests', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create real provider instance
@@ -156,7 +156,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

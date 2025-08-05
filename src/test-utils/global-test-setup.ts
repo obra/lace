@@ -2,7 +2,7 @@
 // ABOUTME: Detects when tests use ThreadManager and auto-applies persistence helper pattern
 
 import { beforeEach, afterEach } from 'vitest';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import type { ThreadManager } from '~/threads/thread-manager';
 
 // Track whether persistence is needed for current test
@@ -32,7 +32,7 @@ beforeEach(() => {
           constructor() {
             if (!persistenceNeeded) {
               persistenceNeeded = true;
-              setupTestPersistence();
+              // setupTestPersistence replaced by setupCoreTest
             }
             super();
           }
@@ -47,7 +47,7 @@ beforeEach(() => {
 afterEach(() => {
   // Clean up persistence if it was used
   if (persistenceNeeded) {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   }
 
   // Restore original ThreadManager

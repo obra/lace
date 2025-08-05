@@ -7,30 +7,52 @@ import { GET } from '@/app/api/sessions/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { Session } from '@/lib/server/lace-imports';
 
-// Mock only environment variables - avoid requiring real API keys in tests
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
+// No mocking of env-loader needed - setupTestProviderDefaults() handles env vars
 
 // Using real SessionService with isolated temporary database
 // Minimal mocking - only env vars. Tests validate real HTTP behavior
 
 describe('Session API Routes', () => {
+  const _tempDirContext = useTempLaceDir();
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let anthropicInstanceId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Set up isolated test persistence
     setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create test provider instance with the ID that Session.create() prefers
+    // Session.create() looks for 'anthropic-default' first, so we need to create it with that ID
+    const { ProviderInstanceManager } = await import('~/providers/instance/manager');
+    const { ProviderCatalogManager } = await import('~/providers/catalog/manager');
+    
+    const instanceManager = new ProviderInstanceManager();
+    const catalogManager = new ProviderCatalogManager();
+    await catalogManager.loadCatalogs();
+    
+    // Create anthropic-default instance manually
+    const instancesConfig = await instanceManager.loadInstances();
+    instancesConfig.instances['anthropic-default'] = {
+      displayName: 'Test Anthropic Default',
+      catalogProviderId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'], // Add supported models
+    };
+    await instanceManager.saveInstances(instancesConfig);
+    await instanceManager.saveCredential('anthropic-default', {
+      apiKey: 'test-anthropic-key',
+    });
+    
+    anthropicInstanceId = 'anthropic-default';
 
     // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
     // These mocks are necessary for clean test output and error handling verification
@@ -38,9 +60,17 @@ describe('Session API Routes', () => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+
+    // Clean up provider defaults
+    cleanupTestProviderDefaults();
+
+    // Clean up test provider instances
+    if (anthropicInstanceId) {
+      await cleanupTestProviderInstances([anthropicInstanceId]);
+    }
 
     // Clean up test persistence
     teardownTestPersistence();

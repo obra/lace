@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { Session } from '~/sessions/session';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -25,7 +25,7 @@ describe('DelegateTool', () => {
   let context: ToolContext;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -50,7 +50,7 @@ describe('DelegateTool', () => {
   afterEach(() => {
     vi.clearAllMocks();
     testSetup.session?.destroy();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

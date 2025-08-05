@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { expectEventAdded } from '~/test-utils/event-helpers';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('ThreadManager - Stateless Behavior', () => {
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should share data across instances via shared cache', () => {

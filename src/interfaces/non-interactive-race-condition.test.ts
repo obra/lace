@@ -5,15 +5,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
 import { Agent } from '~/agents/agent';
 import { EventEmitter } from 'events';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('NonInteractiveInterface Race Condition', () => {
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should handle errors from sendMessage without hanging', async () => {

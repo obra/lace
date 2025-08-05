@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 // Mock provider for testing that can simulate abort behavior
 class MockAbortableProvider extends BaseMockProvider {
@@ -67,6 +67,7 @@ class MockAbortableProvider extends BaseMockProvider {
 }
 
 describe('Agent Abort Functionality', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let provider: MockAbortableProvider;
   let toolExecutor: ToolExecutor;
@@ -74,7 +75,6 @@ describe('Agent Abort Functionality', () => {
   let threadId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
 
     // Create mock response
     const mockResponse: ProviderResponse = {
@@ -106,7 +106,7 @@ describe('Agent Abort Functionality', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.clearAllTimers();
     vi.useRealTimers();
   });

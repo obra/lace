@@ -3,17 +3,17 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 
@@ -83,7 +83,7 @@ describe('Session persistence', () => {
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = setupTestPersistence();
+    db = // setupTestPersistence replaced by setupCoreTest
 
     // Create projects first to satisfy foreign key constraints
     db.database!.prepare(
@@ -102,7 +102,7 @@ describe('Session persistence', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 
@@ -240,11 +240,11 @@ describe('tool approval unique constraint', () => {
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = setupTestPersistence();
+    db = // setupTestPersistence replaced by setupCoreTest
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 

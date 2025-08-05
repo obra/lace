@@ -8,7 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 // Helper function to wait for agent to return to idle state
@@ -157,6 +157,7 @@ class MockConversationProvider extends BaseMockProvider {
 
 // Mock-based tests for stable, fast execution
 describe('Conversation State Management with Enhanced Agent', () => {
+  const _tempLaceDir = setupCoreTest();
   let provider: MockConversationProvider;
   let agent: Agent;
   let threadManager: ThreadManager;
@@ -164,7 +165,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
   let threadId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
 
     provider = new MockConversationProvider();
     threadManager = new ThreadManager();
@@ -202,7 +203,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       }
       threadManager.close();
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     // Clear provider references
     provider = null as unknown as MockConversationProvider;
     toolExecutor = null as unknown as ToolExecutor;

@@ -2,6 +2,209 @@
 
 This document outlines testing patterns and best practices for the Lace codebase.
 
+## ⚠️ CRITICAL: Provider Instance Management in Tests
+
+### Always Use `createTestProviderInstance()` for Test Isolation
+
+**Race Condition Warning**: Using `setupTestProviderInstances()` causes race conditions when tests run in parallel. This leads to "Provider instance not found" errors and flaky tests.
+
+### Correct Pattern ✅
+
+```typescript
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('My Test Suite', () => {
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    // Create individual provider instance for this test
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Use the instance in your test setup
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId, // Direct usage
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+  });
+
+  afterEach(async () => {
+    // Clean up the instance
+    await cleanupTestProviderInstances([providerInstanceId]);
+  });
+});
+```
+
+### Incorrect Pattern ❌ (Causes Race Conditions)
+
+```typescript
+// DON'T DO THIS - Creates shared instances that cause race conditions
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('My Test Suite', () => {
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
+
+  beforeEach(async () => {
+    // This creates shared instances that can conflict when tests run in parallel
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+  });
+});
+```
+
+### Why This Pattern Is Critical
+
+- **Test Isolation**: Each test gets its own provider instances, preventing conflicts
+- **Parallel Execution**: Tests can run in parallel without race conditions
+- **Reliability**: Eliminates "Provider instance not found" errors
+- **Debugging**: Easier to debug when tests don't interfere with each other
+
+### Multiple Provider Types
+
+If you need multiple provider types in a single test:
+
+```typescript
+describe('Multi-Provider Test', () => {
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
+
+  beforeEach(async () => {
+    // Create each provider type individually
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o-mini'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
+  });
+
+  afterEach(async () => {
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+  });
+});
+```
+
+### Standard Test Environment Setup
+
+Most integration tests should include these standard setup patterns:
+
+```typescript
+import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+
+describe('Integration Test', () => {
+  const _tempDirContext = useTempLaceDir();
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache(); // Important for test isolation
+
+    // Set up environment
+    process.env.LACE_DB_PATH = ':memory:';
+
+    // Create provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+  });
+
+  afterEach(async () => {
+    // Clean up in correct order
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    teardownTestPersistence();
+    vi.clearAllMocks();
+  });
+});
+```
+
+### Session and Project Creation
+
+When creating sessions and projects in tests, ensure proper provider inheritance:
+
+```typescript
+// Create project with provider configuration
+const project = Project.create(
+  'Test Project',
+  '/test/path',
+  'Test project description',
+  {
+    providerInstanceId, // Use the test instance
+    modelId: 'claude-3-5-haiku-20241022',
+  }
+);
+
+// Create session - will inherit provider from project
+const session = await sessionService.createSession(
+  'Test Session',
+  project.getId()
+);
+```
+
+### Common Pitfalls
+
+#### 1. Shared State Between Tests
+- Always use individual provider instances
+- Clear caches with `Session.clearProviderCache()`
+- Use `:memory:` database for isolation
+
+#### 2. Cleanup Order
+```typescript
+afterEach(async () => {
+  // Stop services first
+  await sessionService.stopAllAgents();
+  sessionService.clearActiveSessions();
+  
+  // Clean up test utilities
+  cleanupTestProviderDefaults();
+  await cleanupTestProviderInstances([providerInstanceId]);
+  
+  // Tear down infrastructure last
+  teardownTestPersistence();
+  vi.clearAllMocks();
+});
+```
+
+#### 3. Environment Variables
+Always set required environment variables in test setup:
+```typescript
+beforeEach(() => {
+  process.env.ANTHROPIC_KEY = 'test-key';
+  process.env.LACE_DB_PATH = ':memory:';
+});
+```
+
+### Debugging Provider Instance Errors
+
+If you see errors like "Failed to resolve provider instance" or "Provider instance not found":
+
+1. **Check Pattern**: Verify you're using `createTestProviderInstance()` not `setupTestProviderInstances()`
+2. **Verify Creation**: Ensure the provider instance is created before being used
+3. **Check Cleanup Order**: Ensure cleanup happens in the correct order
+4. **Test Isolation**: Run the failing test individually to check for shared state issues
+
 ## Philosophy: Test Behavior, Not Implementation
 
 **Golden Rule**: Test what the system does, not how it does it.

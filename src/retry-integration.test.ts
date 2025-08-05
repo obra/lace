@@ -6,7 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { AIProvider } from '~/providers/base-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Retry System Integration Tests', () => {
   let agent: Agent;
@@ -15,7 +15,7 @@ describe('Retry System Integration Tests', () => {
   let threadId: string;
 
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
 
     toolExecutor = new ToolExecutor();
     threadManager = new ThreadManager();
@@ -27,7 +27,7 @@ describe('Retry System Integration Tests', () => {
     if (agent) {
       agent.stop();
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.clearAllTimers();
     vi.useRealTimers();
   });

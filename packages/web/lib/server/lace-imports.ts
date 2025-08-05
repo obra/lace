@@ -19,4 +19,4 @@ export { ThreadManager } from '~/threads/thread-manager';
 export type { ToolResult, ToolCall, ToolContext, ToolAnnotations } from '~/tools/types';
 
 // Test utilities
-export { setupTestProviderInstances, createTestProviderInstance } from '~/test-utils/provider-instances';
+export { createTestProviderInstance } from '~/test-utils/provider-instances';

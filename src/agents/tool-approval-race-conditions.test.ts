@@ -6,7 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { BashTool } from '~/tools/implementations/bash';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ApprovalDecision } from '~/tools/approval-types';
@@ -64,6 +64,7 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('Tool Approval Race Condition Integration Tests', () => {
+  const _tempLaceDir = setupCoreTest();
   const tempDirContext = useTempLaceDir();
   let agent: Agent;
   let threadManager: ThreadManager;
@@ -75,7 +76,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -128,7 +129,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   });
 
   afterEach(async () => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

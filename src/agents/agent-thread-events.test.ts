@@ -7,19 +7,20 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { ThreadEvent } from '~/threads/types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 describe('Agent Thread Events', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let testDir: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     testDir = await mkdtemp(join(tmpdir(), 'lace-agent-test-'));
     threadManager = new ThreadManager();
 
@@ -41,7 +42,7 @@ describe('Agent Thread Events', () => {
 
   afterEach(async () => {
     threadManager.close();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     await rm(testDir, { recursive: true, force: true });
   });
 

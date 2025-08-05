@@ -12,7 +12,7 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   cleanupTestProviderInstances,
   createTestProviderInstance,
@@ -70,7 +70,7 @@ describe('Multi-Agent Task Manager Integration', () => {
   let agent3Context: ToolContext;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -145,7 +145,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

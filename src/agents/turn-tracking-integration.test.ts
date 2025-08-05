@@ -10,7 +10,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 // Mock provider for controlled testing
@@ -144,12 +144,13 @@ class MockIntegrationProvider extends BaseMockProvider {
 }
 
 describe('Turn Tracking Provider Integration Tests', () => {
+  const _tempLaceDir = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     toolExecutor = new ToolExecutor();
 
     // Set up auto-approval callback so tools actually execute and emit turn_complete
@@ -166,7 +167,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('Complete turn lifecycle tests', () => {

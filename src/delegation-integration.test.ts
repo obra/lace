@@ -6,7 +6,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -86,6 +86,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Delegation Integration Tests', () => {
+  const _tempLaceDir = setupCoreTest();
   const _tempDirContext = useTempLaceDir();
   let threadManager: ThreadManager;
   let session: Session;
@@ -94,7 +95,7 @@ describe('Delegation Integration Tests', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -142,7 +143,7 @@ describe('Delegation Integration Tests', () => {
     vi.clearAllMocks();
     session?.destroy();
     threadManager.close();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

@@ -7,20 +7,21 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { NonInteractiveInterface } from '~/interfaces/non-interactive-interface';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { asThreadId } from '~/threads/types';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 describe('NonInteractiveInterface Agent API Usage', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let nonInteractiveInterface: NonInteractiveInterface;
   let testDir: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     testDir = await mkdtemp(join(tmpdir(), 'lace-non-interactive-test-'));
     threadManager = new ThreadManager();
 
@@ -42,7 +43,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
 
   afterEach(async () => {
     threadManager.close();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     await rm(testDir, { recursive: true, force: true });
   });
 

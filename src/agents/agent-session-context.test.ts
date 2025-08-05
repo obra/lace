@@ -7,7 +7,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -20,6 +20,7 @@ import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '~/threads/types';
 
 describe('Agent Session Context', () => {
+  const _tempLaceDir = setupCoreTest();
   const tempDirContext = useTempLaceDir();
   let session: Session;
   let agent: Agent;
@@ -27,7 +28,7 @@ describe('Agent Session Context', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -68,7 +69,7 @@ describe('Agent Session Context', () => {
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

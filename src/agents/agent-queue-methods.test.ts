@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Mock provider for testing
@@ -36,13 +36,13 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Agent Queue Methods', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
 
   beforeEach(() => {
-    setupTestPersistence();
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -65,7 +65,7 @@ describe('Agent Queue Methods', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('queueMessage', () => {

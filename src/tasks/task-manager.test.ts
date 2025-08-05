@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { Task, CreateTaskRequest, TaskContext } from '~/tasks/types';
 import { asThreadId } from '~/threads/types';
 
@@ -14,13 +14,13 @@ describe('TaskManager', () => {
   const sessionId = asThreadId('lace_20250714_abc123');
 
   beforeEach(() => {
-    persistence = setupTestPersistence();
+    persistence = // setupTestPersistence replaced by setupCoreTest
     manager = new TaskManager(sessionId, persistence);
   });
 
   afterEach(() => {
     persistence.close();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 

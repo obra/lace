@@ -6,7 +6,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -18,6 +18,7 @@ import {
 import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('Agent Configuration', () => {
+  const _tempLaceDir = setupCoreTest();
   const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let testSession: Session;
@@ -25,7 +26,6 @@ describe('Agent Configuration', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -59,7 +59,7 @@ describe('Agent Configuration', () => {
     vi.clearAllMocks();
     testSession?.destroy();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }

@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { ToolContext } from '~/tools/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -28,7 +28,7 @@ describe('Task-Based DelegateTool Integration', () => {
   let context: ToolContext;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Use shared delegation test setup with MSW
@@ -57,7 +57,7 @@ describe('Task-Based DelegateTool Integration', () => {
       await testSetup.cleanup();
     }
 
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
 import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Enhanced Task Data Model', () => {
   let testTask: Task;
@@ -12,7 +12,7 @@ describe('Enhanced Task Data Model', () => {
   const parentThreadId = createThreadId('lace_20250703_abc123');
 
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     testTask = {
       id: 'task_20250703_test01',
       title: 'Implement authentication',
@@ -30,7 +30,7 @@ describe('Enhanced Task Data Model', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('Task creation', () => {

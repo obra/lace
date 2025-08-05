@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock environment variables to provide test API keys
@@ -22,7 +23,7 @@ vi.mock('server-only', () => ({}));
 
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
 import { parseResponse } from '@/lib/serialization';
-import { Session, setupTestProviderInstances } from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
 
 // Type interfaces for API responses
 interface ProjectResponse {
@@ -50,18 +51,38 @@ interface SuccessResponse {
 describe('Individual Project API Integration Tests', () => {
   const _tempDirContext = useTempLaceDir();
   let testProject: import('~/projects/project').Project;
-  let testProviderInstances: { anthropicInstanceId: string; openaiInstanceId: string };
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
+    
+    // Create test provider instances
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o-mini', 'gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create a test project for each test
     const { Project } = await import('~/projects/project');
-    testProject = Project.create('Test Project', '/test/path', 'A test project', { key: 'value' });
+    testProject = Project.create('Test Project', '/test/path', 'A test project', {
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up provider instances
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     teardownTestPersistence();
   });
 
@@ -85,22 +106,14 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return project with correct session count', async () => {
-      // Add some sessions to the project
+      // Add some sessions to the project (they inherit provider config from project)
       Session.create({ 
         name: 'Session 1', 
-        projectId: testProject.getId(),
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022'
-        }
+        projectId: testProject.getId()
       });
       Session.create({ 
         name: 'Session 2', 
-        projectId: testProject.getId(),
-        configuration: {
-          providerInstanceId: testProviderInstances.openaiInstanceId,
-          modelId: 'gpt-4o-mini'
-        }
+        projectId: testProject.getId()
       });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
@@ -360,7 +373,7 @@ describe('Individual Project API Integration Tests', () => {
         name: 'Session 1', 
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
+          providerInstanceId: anthropicInstanceId,
           modelId: 'claude-3-5-haiku-20241022'
         }
       });
@@ -368,7 +381,7 @@ describe('Individual Project API Integration Tests', () => {
         name: 'Session 2', 
         projectId: testProject.getId(),
         configuration: {
-          providerInstanceId: testProviderInstances.openaiInstanceId,
+          providerInstanceId: openaiInstanceId,
           modelId: 'gpt-4o-mini'
         }
       });

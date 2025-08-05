@@ -11,7 +11,7 @@ import type { ToolExecutor } from '@/lib/server/lace-imports';
 import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
@@ -21,11 +21,8 @@ describe('Agent Spawning and Thread Creation', () => {
   const _tempDirContext = useTempLaceDir();
   let session: Session;
   let projectId: string;
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
-  let createdInstanceIds: string[] = [];
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
   beforeEach(async () => {
     setupTestPersistence();
@@ -35,8 +32,19 @@ describe('Agent Spawning and Thread Creation', () => {
     process.env.LACE_DB_PATH = ':memory:';
 
     // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+    
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create a test project
     const project = Project.create('Test Project', '/test/path', 'Test project', {});
@@ -47,15 +55,17 @@ describe('Agent Spawning and Thread Creation', () => {
       name: 'Test Session',
       projectId,
       configuration: {
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        providerInstanceId: anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022'
       }
     });
   });
 
   afterEach(async () => {
-    session.destroy();
-    await cleanupTestProviderInstances(createdInstanceIds);
+    if (session) {
+      session.destroy();
+    }
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     teardownTestPersistence();
   });
 
@@ -71,7 +81,7 @@ describe('Agent Spawning and Thread Creation', () => {
     // Spawn agent (this is what SessionService.spawnAgent does)
     const agent = session.spawnAgent({
       name: 'Test Agent',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
+      providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022'
     });
     const agentThreadId = agent.threadId;
