@@ -81,8 +81,6 @@ describe('Agent Spawning API E2E Tests', () => {
     sessionService = getSessionService();
     const session = await sessionService.createSession(
       'Agent Test Session',
-      anthropicInstanceId,
-      'claude-3-5-sonnet-20241022',
       testProject.getId()
     );
     sessionId = session.id as string;

@@ -51,8 +51,6 @@ describe('Event-Based Tool Approval Integration', () => {
     // Create a test session
     const session = await sessionService.createSession(
       'Tool Approval Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
       projectId
     );
     sessionId = session.id;

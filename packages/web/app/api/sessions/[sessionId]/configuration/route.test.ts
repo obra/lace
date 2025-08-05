@@ -50,8 +50,6 @@ describe('Session Configuration API', () => {
 
     const session = await sessionService.createSession(
       'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
     sessionId = session.id;
@@ -198,8 +196,6 @@ describe('TDD: Direct Session Usage', () => {
     const testProject = Project.create('TDD Test Project', '/test/path', 'Test project', {});
     const session = await sessionService.createSession(
       'TDD Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
     testSessionId = session.id;
@@ -237,8 +233,6 @@ describe('TDD: Direct Session Configuration Update', () => {
     const testProject = Project.create('TDD Update Test Project', '/test/path', 'Test project', {});
     const session = await sessionService.createSession(
       'TDD Update Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
       testProject.getId()
     );
     testSessionId = session.id;

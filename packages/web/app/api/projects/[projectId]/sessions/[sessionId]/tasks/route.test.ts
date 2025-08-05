@@ -52,8 +52,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     // Create a real session
     const newSession = await sessionService.createSession(
       'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
       testProjectId
     );
     testSessionId = newSession.id;
@@ -195,8 +193,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       // Create a new session without any tasks
       const newSession = await sessionService.createSession(
         'Empty Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         testProjectId
       );
 

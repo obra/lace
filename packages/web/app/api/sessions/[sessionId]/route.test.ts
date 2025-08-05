@@ -113,8 +113,6 @@ describe('Session Detail API Route', () => {
       // Create a real session using the session service
       const session = await sessionService.createSession(
         'Test Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -186,8 +184,6 @@ describe('Session Detail API Route', () => {
       // Create a real session using the session service
       const session = await sessionService.createSession(
         'Original Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -258,8 +254,6 @@ describe('Session Detail API Route', () => {
       // Create a real session using the session service
       const session = await sessionService.createSession(
         'Test Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -298,8 +292,6 @@ describe('Session Detail API Route', () => {
       // Create a real session using the session service
       const session = await sessionService.createSession(
         'Original Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         projectId
       );
       const sessionId = session.id;
@@ -376,8 +368,6 @@ describe('Session Detail API Route', () => {
       const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {});
       const session = await sessionService.createSession(
         'Test Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 

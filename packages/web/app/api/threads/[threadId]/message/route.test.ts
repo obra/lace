@@ -65,8 +65,6 @@ describe('Thread Messaging API', () => {
     // Create a real session
     const session = await sessionService.createSession(
       'Test Session',
-      testProviderInstances.anthropicInstanceId,
-      'claude-3-5-haiku-20241022',
       testProjectId
     );
     realSessionId = session.id;

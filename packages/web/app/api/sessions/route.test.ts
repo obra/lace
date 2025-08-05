@@ -74,15 +74,11 @@ describe('Session API Routes', () => {
 
       const session1 = await sessionService.createSession(
         'Test Session 1',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         projectId
       );
 
       const session2 = await sessionService.createSession(
         'Test Session 2',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         projectId
       );
 
