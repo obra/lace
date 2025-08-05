@@ -45,8 +45,8 @@ describe('Full Conversation Flow', () => {
     Session.clearProviderCache();
 
     // Set up spies on real EventStreamManager
-    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection');
-    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
+    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection') as ReturnType<typeof vi.spyOn>;
+    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast') as ReturnType<typeof vi.spyOn>;
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
