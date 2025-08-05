@@ -9,6 +9,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('Session.spawnAgent() with Provider Instances', () => {
   let testProject: Project;
@@ -17,14 +21,20 @@ describe('Session.spawnAgent() with Provider Instances', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
+    // Don't use setupTestProviderInstances - use the simpler defaults approach
 
-    // Create a test project and session for all tests
+    // Create a test project with provider configuration using defaults
     testProject = Project.create(
       'Test Project',
       '/test/path',
       'Test project for spawn agent tests',
-      {}
+      {
+        providerInstanceId: 'anthropic-default', // Use default provider instance from environment
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
+    
+    // Create session WITHOUT provider configuration - it inherits from project
     testSession = Session.create({
       name: 'Test Session',
       projectId: testProject.getId(),
@@ -133,14 +143,14 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // During transition period, specifying only model should work
       const agent = testSession.spawnAgent({
         name: 'Model Only Agent',
-        modelId: 'gpt-4o',
-        // Missing providerInstanceId - should fall back to session provider
+        modelId: 'claude-3-5-sonnet-20241022', // Use compatible Anthropic model with test-anthropic provider
+        // Missing providerInstanceId - should fall back to session provider (test-anthropic)
       } as Parameters<typeof testSession.spawnAgent>[0]);
 
       expect(agent).toBeDefined();
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.model).toBe('gpt-4o');
+      expect(spawnedAgent?.model).toBe('claude-3-5-sonnet-20241022');
     });
   });
 
