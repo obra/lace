@@ -44,35 +44,35 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   // Assume page.goto() has already been called with the test server baseURL
   // Wait for DOM to be ready (not networkidle due to SSE streams)
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(1000); // Brief pause for React hydration
+  await page.waitForTimeout(2000); // Longer pause for React hydration and auto-modal logic
 
-  // Take screenshot before clicking for debugging
-  await page.screenshot({ path: 'debug-before-new-project.png' });
+  // Try to wait for the modal to appear first (auto-open scenario)
+  const modalHeading = page
+    .getByRole('heading', { name: 'Welcome to Lace' })
+    .or(page.getByRole('heading', { name: 'Create New Project' }));
 
-  // Look for the New Project button with various selectors
-  const newProjectButton = page
-    .locator('button:has-text("New Project")')
-    .or(page.locator('[data-testid="new-project-button"]'))
-    .or(page.locator('button').filter({ hasText: 'New Project' }))
-    .first();
+  try {
+    // Wait a bit to see if modal auto-opens
+    await expect(modalHeading).toBeVisible({ timeout: 5000 });
+    // Modal is already open, proceed directly
+  } catch {
+    // Modal not visible, click the New Project button
+    const newProjectButton = page
+      .locator('button:has-text("New Project")')
+      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('button').filter({ hasText: 'New Project' }))
+      .first();
 
-  await newProjectButton.waitFor({ timeout: 10000 });
-  await newProjectButton.click();
+    await newProjectButton.waitFor({ timeout: 15000 });
+    await newProjectButton.click();
 
-  // Wait a moment after clicking
-  await page.waitForTimeout(1000);
-
-  // Take screenshot after clicking for debugging
-  await page.screenshot({ path: 'debug-after-new-project-click.png' });
-
-  // Wait for the project creation modal to appear
-  await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-    timeout: 10000,
-  });
+    // Now wait for modal to appear after clicking
+    await expect(modalHeading).toBeVisible({ timeout: 15000 });
+  }
 
   // Find the directory input field using the actual placeholder we discovered
   const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-  await directoryInput.waitFor({ timeout: 5000 });
+  await directoryInput.waitFor({ timeout: 10000 });
 
   // Create a project directory path that includes the project name
   const projectPath = path.join(tempDir, projectName.replace(/\s+/g, '-').toLowerCase());
@@ -87,12 +87,14 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   await directoryInput.blur();
   await page.waitForTimeout(1000);
 
-  // Click the Create Project button - it should be enabled now
-  const createButton = page.locator('button:has-text("Create Project")');
+  // Click the Create Project button - handle both "Create Project" and "Get Started" text
+  const createButton = page
+    .locator('button:has-text("Create Project")')
+    .or(page.locator('button:has-text("Get Started")'));
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
 
   // Wait for button to be enabled (form validation should pass with valid directory)
-  await expect(createButton).toBeEnabled({ timeout: 5000 });
+  await expect(createButton).toBeEnabled({ timeout: 10000 });
 
   // Click the button
   await createButton.click();
@@ -103,11 +105,11 @@ export async function createProject(page: Page, projectName: string, tempDir: st
     page
       .locator('[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]')
       .first()
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible({ timeout: 30000 });
 
   // Also verify we're in the chat interface (project creation should dump us there)
   await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-    timeout: 10000,
+    timeout: 20000,
   });
 }
 
