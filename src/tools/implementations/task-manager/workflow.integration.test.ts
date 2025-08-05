@@ -106,7 +106,7 @@ describe('Task Management Workflow Integration', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    // Use simpler provider defaults approach instead of setupTestProviderInstances  
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -120,8 +120,16 @@ describe('Task Management Workflow Integration', () => {
         }) as unknown as ProviderRegistry
     );
 
-    // Create project and session
-    project = Project.create('Task Workflow Integration Test Project', '/tmp/test-workflow');
+    // Create project and session with provider configuration
+    project = Project.create(
+      'Task Workflow Integration Test Project', 
+      '/tmp/test-workflow',
+      'Test project for task workflow integration',
+      {
+        providerInstanceId: 'anthropic-default', // Use environment-based default
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
     session = Session.create({
       name: 'Task Workflow Integration Test Session',
       projectId: project.getId(),
@@ -147,7 +155,7 @@ describe('Task Management Workflow Integration', () => {
     session?.destroy();
     teardownTestPersistence();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    // Using simpler provider defaults approach, no complex cleanup needed
   });
 
   describe('Basic Task Lifecycle', () => {
