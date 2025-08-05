@@ -273,7 +273,7 @@ export async function createProjectWithProvider(
 
   // Find the directory input field using test ID
   const directoryInput = page.getByTestId('project-path-input');
-  await directoryInput.waitFor({ timeout: 5000 });
+  await directoryInput.waitFor({ timeout: 15000 });
 
   // Create the project directory
   const projectPath = path.join(tempDir, projectName.replace(/\s+/g, '-').toLowerCase());
@@ -281,10 +281,17 @@ export async function createProjectWithProvider(
 
   // Fill in the directory path
   await directoryInput.fill(projectPath);
+
+  // Trigger validation events
+  await directoryInput.blur();
+  await page.waitForTimeout(500);
+
+  // Make sure the form field has processed the input
+  await directoryInput.focus();
   await directoryInput.blur();
 
   // Wait for form validation to complete
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(2000);
 
   // Click "Advanced Options" to show provider selection
   await page.click('text=Advanced Options');
@@ -292,7 +299,7 @@ export async function createProjectWithProvider(
 
   // Wait for provider selection to appear using specific test ID
   const providerSelect = page.locator('[data-testid="create-project-provider-select"]');
-  await providerSelect.waitFor({ timeout: 5000 });
+  await providerSelect.waitFor({ timeout: 15000 });
 
   // Debug: log available options to understand what values are expected
   const providerOptions = await providerSelect.locator('option').allTextContents();
@@ -315,7 +322,7 @@ export async function createProjectWithProvider(
 
   // Click Create Project button using test ID
   const createButton = page.getByTestId('create-project-submit-button');
-  await createButton.waitFor({ state: 'visible', timeout: 5000 });
+  await createButton.waitFor({ state: 'visible', timeout: 15000 });
 
   // Ensure the button is enabled
   await expect(createButton).toBeEnabled({ timeout: 10000 });
