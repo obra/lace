@@ -6,6 +6,7 @@ import type { AIProvider } from '~/providers/base-provider';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
+import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
 import { Task } from '~/tasks/types';
@@ -112,27 +113,96 @@ export class Session {
     let providerInstanceId = effectiveConfig.providerInstanceId;
     let modelId = effectiveConfig.modelId;
 
+    logger.debug('Session.create() provider configuration check', {
+      sessionId: sessionData.id,
+      providerInstanceId,
+      modelId,
+      effectiveConfig,
+      needsDefaults: !providerInstanceId || !modelId,
+    });
+
     // Provide reasonable defaults when no provider configuration is available
     if (!providerInstanceId || !modelId) {
-      const defaultProvider = Session.detectDefaultProvider();
-      const defaultModel = Session.getDefaultModel(defaultProvider);
+      const instanceManager = new ProviderInstanceManager();
       
-      providerInstanceId = providerInstanceId || `default-${defaultProvider}`;
-      modelId = modelId || defaultModel;
+      // Load existing provider instances first (including any created by tests)
+      const existingConfig = instanceManager.loadInstancesSync();
+      const existingInstanceIds = Object.keys(existingConfig.instances);
       
-      logger.debug('Using default provider configuration for session', {
+      logger.debug('Checking for existing provider instances', {
         sessionId: sessionData.id,
-        provider: defaultProvider,
-        model: defaultModel,
+        existingInstanceIds,
+        existingConfig: existingConfig,
+        configPath: instanceManager.constructor.name,
       });
+      
+      if (existingInstanceIds.length > 0) {
+        // Use existing configured instances
+        const defaultInstanceId = existingInstanceIds.includes('anthropic-default') 
+          ? 'anthropic-default' 
+          : existingInstanceIds[0];
+        
+        const instance = existingConfig.instances[defaultInstanceId];
+        
+        providerInstanceId = providerInstanceId || defaultInstanceId;
+        
+        // Determine default model based on catalog provider
+        if (!modelId) {
+          if (instance.catalogProviderId === 'anthropic') {
+            modelId = 'claude-3-5-haiku-20241022';
+          } else if (instance.catalogProviderId === 'openai') {
+            modelId = 'gpt-4o';
+          } else {
+            modelId = 'default-model';
+          }
+        }
+        
+        logger.debug('Using existing provider configuration for session', {
+          sessionId: sessionData.id,
+          providerInstanceId,
+          modelId,
+        });
+      } else {
+        // No existing instances, try to auto-create defaults from environment
+        const defaultConfig = instanceManager.getDefaultConfig();
+        const autoInstanceIds = Object.keys(defaultConfig.instances);
+        
+        if (autoInstanceIds.length > 0) {
+          // Auto-created defaults are available
+          const defaultInstanceId = autoInstanceIds.includes('anthropic-default') 
+            ? 'anthropic-default' 
+            : autoInstanceIds[0];
+          
+          const instance = defaultConfig.instances[defaultInstanceId];
+          
+          providerInstanceId = providerInstanceId || defaultInstanceId;
+          
+          // Determine default model based on catalog provider
+          if (!modelId) {
+            if (instance.catalogProviderId === 'anthropic') {
+              modelId = 'claude-3-5-haiku-20241022';
+            } else if (instance.catalogProviderId === 'openai') {
+              modelId = 'gpt-4o';
+            } else {
+              modelId = 'default-model';
+            }
+          }
+          
+          logger.debug('Using auto-created default provider configuration for session', {
+            sessionId: sessionData.id,
+            providerInstanceId,
+            modelId,
+          });
+        } else {
+          throw new Error(
+            'No provider instances configured and no environment variables found. Please set ANTHROPIC_KEY or OPENAI_API_KEY, or configure provider instances in Lace settings.'
+          );
+        }
+      }
     }
 
-    // Resolve provider instance lazily for the session agent
-    const {
-      providerInstance,
-      provider: _provider,
-      model: _model,
-    } = Session.resolveProviderInstance(providerInstanceId, modelId);
+    // Resolve provider instance for the session agent
+    const providerInstance = Session.resolveProviderInstance(providerInstanceId, modelId);
 
     // Create agent
     const sessionAgent = new Agent({
@@ -747,42 +817,54 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Resolve provider instance configuration to actual provider instance (with caching)
    */
-  private static _providerCache = new Map<string, unknown>();
+  private static _providerCache = new Map<string, AIProvider>();
 
   static resolveProviderInstance(
     providerInstanceId: string,
     modelId: string
-  ): {
-    providerInstance: unknown;
-    provider: string;
-    model: string;
-  } {
+  ): AIProvider {
     const cacheKey = `${providerInstanceId}:${modelId}`;
 
     // Check cache first
     const cached = Session._providerCache.get(cacheKey);
     if (cached) {
-      return cached as { providerInstance: unknown; provider: string; model: string };
+      return cached;
     }
 
-    // For now, fall back to old provider system for session creation
-    // TODO: Implement proper provider instance resolution once we have synchronous access
-    // This is a temporary bridge while we transition from old to new provider system
+    // For now, use a synchronous approach by resolving provider type from instance
+    // and creating with the old registry system, but with proper configuration from instances
+    try {
+      const instanceManager = new ProviderInstanceManager();
+      const config = instanceManager.loadInstancesSync();
+      const instance = config.instances[providerInstanceId];
+      
+      if (!instance) {
+        throw new Error(`Provider instance not found: ${providerInstanceId}`);
+      }
+      
+      // Map catalog provider ID to actual provider type
+      const providerType = instance.catalogProviderId; // anthropic, openai, etc.
+      
+      // Create provider using the old registry system but with proper configuration
+      const providerRegistry = ProviderRegistry.createWithAutoDiscovery();
+      const providerInstance = providerRegistry.createProvider(providerType, { 
+        model: modelId,
+        // Additional config from instance if needed
+        ...(instance.endpoint && { baseURL: instance.endpoint }),
+        ...(instance.timeout && { timeout: instance.timeout }),
+      });
 
-    // Default to anthropic for now - this will be properly resolved later
-    const provider = 'anthropic';
-    const model = modelId; // Use the exact model requested
+      // Cache the result
+      Session._providerCache.set(cacheKey, providerInstance);
 
-    // Create provider using the old registry system
-    const providerRegistry = ProviderRegistry.createWithAutoDiscovery();
-    const providerInstance = providerRegistry.createProvider(provider, { model });
-
-    const result = { providerInstance, provider, model };
-
-    // Cache the result
-    Session._providerCache.set(cacheKey, result);
-
-    return result;
+      return providerInstance;
+    } catch (error) {
+      throw new Error(
+        `Failed to resolve provider instance ${providerInstanceId} with model ${modelId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 
   static clearRegistry(): void {

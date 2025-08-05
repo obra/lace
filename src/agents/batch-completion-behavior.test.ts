@@ -103,6 +103,11 @@ describe('Tool Batch Completion Behavior', () => {
 
   beforeEach(async () => {
     setupTestPersistence();
+    
+    // Ensure test environment has provider credentials for defaults
+    process.env.ANTHROPIC_KEY = 'test-anthropic-key';
+    process.env.OPENAI_API_KEY = 'test-openai-key';
+    
     testProviderInstances = await setupTestProviderInstances();
 
     // Create real project and session for proper context

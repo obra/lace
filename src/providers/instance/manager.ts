@@ -4,11 +4,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
+import { getEnvVar } from '~/config/env-loader';
 import {
   ProviderInstancesConfig,
   ProviderInstancesConfigSchema,
   Credential,
   CredentialSchema,
+  ProviderInstance,
 } from '~/providers/catalog/types';
 
 export class ProviderInstanceManager {
@@ -24,6 +26,28 @@ export class ProviderInstanceManager {
   async loadInstances(): Promise<ProviderInstancesConfig> {
     try {
       const content = await fs.promises.readFile(this.configPath, 'utf-8');
+      const parsed = JSON.parse(content) as unknown;
+      const result = ProviderInstancesConfigSchema.safeParse(parsed);
+
+      if (result.success) {
+        return result.data;
+      } else {
+        console.warn('Invalid provider instances config, using default:', result.error);
+        return this.getDefaultConfig();
+      }
+    } catch (_error) {
+      // File doesn't exist or can't be read, return default
+      return this.getDefaultConfig();
+    }
+  }
+
+  /**
+   * Synchronous version of loadInstances for cases where we need immediate access
+   * This will return defaults if the file doesn't exist, but won't auto-save them
+   */
+  loadInstancesSync(): ProviderInstancesConfig {
+    try {
+      const content = fs.readFileSync(this.configPath, 'utf-8');
       const parsed = JSON.parse(content) as unknown;
       const result = ProviderInstancesConfigSchema.safeParse(parsed);
 
@@ -106,10 +130,76 @@ export class ProviderInstanceManager {
     }
   }
 
-  private getDefaultConfig(): ProviderInstancesConfig {
+  getDefaultConfig(): ProviderInstancesConfig {
+    const instances: Record<string, ProviderInstance> = {};
+
+    // Auto-create Anthropic provider instance if API key is available
+    const hasAnthropicKey = getEnvVar('ANTHROPIC_KEY') || getEnvVar('ANTHROPIC_API_KEY');
+    const hasOpenaiKey = getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
+    
+    console.debug('ProviderInstanceManager.getDefaultConfig() checking environment', {
+      hasAnthropicKey: !!hasAnthropicKey,
+      hasOpenaiKey: !!hasOpenaiKey,
+    });
+    
+    if (hasAnthropicKey) {
+      instances['anthropic-default'] = {
+        displayName: 'Anthropic (Default)',
+        catalogProviderId: 'anthropic',
+        // Use defaults from catalog - no need to override endpoint
+      };
+    }
+
+    // Auto-create OpenAI provider instance if API key is available
+    if (hasOpenaiKey) {
+      instances['openai-default'] = {
+        displayName: 'OpenAI (Default)',
+        catalogProviderId: 'openai',
+        // Use defaults from catalog - no need to override endpoint
+      };
+    }
+
     return {
       version: '1.0',
-      instances: {},
+      instances,
+    };
+  }
+
+  /**
+   * Get the default provider instance ID and model for sessions when no configuration is specified
+   */
+  async getDefaultProviderInstance(): Promise<{
+    providerInstanceId: string;
+    modelId: string;
+  } | null> {
+    const config = await this.loadInstances();
+    const instanceIds = Object.keys(config.instances);
+
+    if (instanceIds.length === 0) {
+      return null;
+    }
+
+    // Prefer anthropic-default if available, otherwise use first available
+    const defaultInstanceId = instanceIds.includes('anthropic-default')
+      ? 'anthropic-default'
+      : instanceIds[0];
+
+    const instance = config.instances[defaultInstanceId];
+    
+    // Determine default model based on catalog provider
+    let defaultModelId: string;
+    if (instance.catalogProviderId === 'anthropic') {
+      defaultModelId = 'claude-3-5-haiku-20241022'; // Default small model
+    } else if (instance.catalogProviderId === 'openai') {
+      defaultModelId = 'gpt-4o'; // Default model
+    } else {
+      // For other providers, we'd need to look up the catalog
+      defaultModelId = 'default-model';
+    }
+
+    return {
+      providerInstanceId: defaultInstanceId,
+      modelId: defaultModelId,
     };
   }
 }
