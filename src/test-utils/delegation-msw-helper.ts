@@ -51,31 +51,33 @@ export class DelegationMswHelper {
         }
 
         // Parse request to detect task assignment
-        const body = await request.json() as any;
+        const body = (await request.json()) as any;
         const messages = body.messages || [];
-        
+
         // Look for task assignment in messages
-        const hasTaskAssignment = messages.some((msg: any) => 
-          msg.content && 
-          typeof msg.content === 'string' && 
-          (msg.content.includes('You have been assigned task') ||
-           msg.content.includes('LACE TASK SYSTEM') ||
-           msg.content.includes('TASK DETAILS'))
+        const hasTaskAssignment = messages.some(
+          (msg: any) =>
+            msg.content &&
+            typeof msg.content === 'string' &&
+            (msg.content.includes('You have been assigned task') ||
+              msg.content.includes('LACE TASK SYSTEM') ||
+              msg.content.includes('TASK DETAILS'))
         );
 
         if (hasTaskAssignment) {
           // Extract task ID from messages if possible
-          const taskMessage = messages.find((msg: any) => 
-            msg.content && 
-            typeof msg.content === 'string' && 
-            msg.content.includes('You have been assigned task')
+          const taskMessage = messages.find(
+            (msg: any) =>
+              msg.content &&
+              typeof msg.content === 'string' &&
+              msg.content.includes('You have been assigned task')
           );
-          
+
           const taskId = taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
-          
+
           // Get response for this task
           const response = this.getNextResponse();
-          
+
           // Return response with tool call to complete task
           return HttpResponse.json({
             id: 'msg_delegation_test',
@@ -143,31 +145,33 @@ export class DelegationMswHelper {
         }
 
         // Parse request to detect task assignment
-        const body = await request.json() as any;
+        const body = (await request.json()) as any;
         const messages = body.messages || [];
-        
+
         // Look for task assignment in messages
-        const hasTaskAssignment = messages.some((msg: any) => 
-          msg.content && 
-          typeof msg.content === 'string' && 
-          (msg.content.includes('You have been assigned task') ||
-           msg.content.includes('LACE TASK SYSTEM') ||
-           msg.content.includes('TASK DETAILS'))
+        const hasTaskAssignment = messages.some(
+          (msg: any) =>
+            msg.content &&
+            typeof msg.content === 'string' &&
+            (msg.content.includes('You have been assigned task') ||
+              msg.content.includes('LACE TASK SYSTEM') ||
+              msg.content.includes('TASK DETAILS'))
         );
 
         if (hasTaskAssignment) {
           // Extract task ID from messages if possible
-          const taskMessage = messages.find((msg: any) => 
-            msg.content && 
-            typeof msg.content === 'string' && 
-            msg.content.includes('You have been assigned task')
+          const taskMessage = messages.find(
+            (msg: any) =>
+              msg.content &&
+              typeof msg.content === 'string' &&
+              msg.content.includes('You have been assigned task')
           );
-          
+
           const taskId = taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
-          
+
           // Get response for this task
           const response = this.getNextResponse();
-          
+
           // Return response with tool call to complete task
           return HttpResponse.json({
             id: 'chatcmpl_delegation_test',
@@ -248,16 +252,18 @@ export class DelegationMswHelper {
   }
 
   setupServerLifecycle(): void {
-    beforeAll(() => this.server.listen({ 
-      onUnhandledRequest: 'warn',
-    }));
+    beforeAll(() =>
+      this.server.listen({
+        onUnhandledRequest: 'warn',
+      })
+    );
     afterAll(() => this.server.close());
     afterEach(() => this.server.resetHandlers());
   }
 
   start(): void {
     // Use bypass option to avoid AbortSignal compatibility issues in Node.js test environment
-    this.server.listen({ 
+    this.server.listen({
       onUnhandledRequest: 'bypass',
     });
   }
@@ -281,23 +287,28 @@ export class DelegationMswHelper {
 
           if (authHeader !== this.apiKey) {
             return HttpResponse.json(
-              { type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } },
+              {
+                type: 'error',
+                error: { type: 'authentication_error', message: 'Invalid API key' },
+              },
               { status: 401 }
             );
           }
 
-          const body = await request.json() as any;
+          const body = (await request.json()) as any;
           const messages = body.messages || [];
-          
-          const taskMessage = messages.find((msg: any) => 
-            msg.content && 
-            typeof msg.content === 'string' && 
-            msg.content.includes('You have been assigned task')
+
+          const taskMessage = messages.find(
+            (msg: any) =>
+              msg.content &&
+              typeof msg.content === 'string' &&
+              msg.content.includes('You have been assigned task')
           );
 
           if (taskMessage) {
-            const taskId = taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
-            
+            const taskId =
+              taskMessage?.content?.match(/assigned task '([^']+)'/)?.at(1) || 'unknown';
+
             // Call callback if provided (for test integration)
             if (taskUpdateCallback) {
               taskUpdateCallback(taskId);

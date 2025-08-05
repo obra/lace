@@ -18,27 +18,26 @@ vi.mock('server-only', () => ({}));
 // ✅ ESSENTIAL MOCK - Provider registry to avoid real AI API calls during testing
 // Prevents external network dependencies while testing API route behavior
 vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn().mockReturnValue({
-      createProvider: vi.fn().mockReturnValue({
-        type: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
-        providerName: 'anthropic',
-        defaultModel: 'claude-3-5-haiku-20241022',
-        setSystemPrompt: vi.fn(),
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-        }),
-        createStreamingResponse: vi.fn().mockReturnValue({
-          *[Symbol.asyncIterator]() {
-            yield { type: 'content', content: 'Mock streaming response' };
-          },
-        }),
+  ProviderRegistry: vi.fn().mockImplementation(() => ({
+    createProvider: vi.fn().mockReturnValue({
+      type: 'anthropic',
+      model: 'claude-3-5-haiku-20241022',
+      providerName: 'anthropic',
+      defaultModel: 'claude-3-5-haiku-20241022',
+      setSystemPrompt: vi.fn(),
+      createResponse: vi.fn().mockResolvedValue({
+        content: 'Mock response',
+        toolCalls: [],
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      }),
+      createStreamingResponse: vi.fn().mockReturnValue({
+        *[Symbol.asyncIterator]() {
+          yield { type: 'content', content: 'Mock streaming response' };
+        },
       }),
     }),
-  },
+    initialize: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 // Mock only external dependencies while using real tools

@@ -3,7 +3,18 @@
 
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
 import { ToolCall } from '~/tools/types';
-import { CLIOptions } from '~/cli/args';
+// Note: CLIOptions type removed with CLI refactor, defining minimal type here for policy wrapper
+type CLIOptions = {
+  approveAll?: boolean;
+  denyAll?: boolean;
+  autoApprove?: string[];
+  disableAllTools?: boolean;
+  disableTools?: string[];
+  disableToolGuardrails?: boolean;
+  autoApproveTools?: string[];
+  allowNonDestructiveTools?: boolean;
+  help?: boolean;
+};
 import { ToolExecutor } from '~/tools/executor';
 
 export function createGlobalPolicyCallback(
@@ -34,7 +45,7 @@ export function createGlobalPolicyCallback(
       }
 
       // 3. Check if specific tool is disabled
-      if (cliOptions.disableTools.includes(toolName)) {
+      if (cliOptions.disableTools && cliOptions.disableTools.includes(toolName)) {
         return ApprovalDecision.DENY;
       }
 
@@ -44,7 +55,7 @@ export function createGlobalPolicyCallback(
       }
 
       // 5. Check auto-approve list
-      if (cliOptions.autoApproveTools.includes(toolName)) {
+      if (cliOptions.autoApproveTools && cliOptions.autoApproveTools.includes(toolName)) {
         return ApprovalDecision.ALLOW_ONCE;
       }
 

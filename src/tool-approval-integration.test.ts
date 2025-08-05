@@ -5,7 +5,20 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
-import { CLIOptions } from '~/cli/args';
+// Note: CLIOptions type removed with CLI refactor, defining minimal type here for approval tests
+type CLIOptions = {
+  approveAll?: boolean;
+  denyAll?: boolean;
+  autoApprove?: string[];
+  provider?: string;
+  model?: string;
+  help?: boolean;
+  logLevel?: string;
+  logFile?: string;
+  prompt?: string;
+  ui?: string;
+  [key: string]: any; // Allow any additional properties for test flexibility
+};
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';

@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi } from 'vitest';
+import { vi , beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
 

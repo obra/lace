@@ -51,12 +51,12 @@ describe('Task-Based DelegateTool Integration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     testSetup?.session?.destroy();
-    
+
     // Use the cleanup function from test setup
     if (testSetup?.cleanup) {
       await testSetup.cleanup();
     }
-    
+
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });
@@ -85,7 +85,7 @@ describe('Task-Based DelegateTool Integration', () => {
       // Set up mock to cycle through different responses for parallel tasks
       testSetup.setMockResponses([
         'First parallel task completed',
-        'Second parallel task completed', 
+        'Second parallel task completed',
         'Third parallel task completed',
       ]);
 
@@ -100,14 +100,14 @@ describe('Task-Based DelegateTool Integration', () => {
           {
             title: 'Task 1',
             prompt: 'First parallel task',
-            expected_response: 'Task result',  
+            expected_response: 'Task result',
             model: 'anthropic:claude-sonnet-4-20250514',
           },
           context
         ),
         tool2.execute(
           {
-            title: 'Task 2', 
+            title: 'Task 2',
             prompt: 'Second parallel task',
             expected_response: 'Task result',
             model: 'anthropic:claude-sonnet-4-20250514',
@@ -117,7 +117,7 @@ describe('Task-Based DelegateTool Integration', () => {
         tool3.execute(
           {
             title: 'Task 3',
-            prompt: 'Third parallel task', 
+            prompt: 'Third parallel task',
             expected_response: 'Task result',
             model: 'anthropic:claude-sonnet-4-20250514',
           },

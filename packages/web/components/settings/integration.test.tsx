@@ -7,9 +7,9 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
+import { vi, describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { SettingsModal, SettingsTabs, SettingsPanel, SettingField } from './index';
+import { Modal, SettingsTabs, SettingsPanel, SettingField } from './index';
 
 describe('Settings Components Integration', () => {
   it('renders complete settings modal with tabs and panels', () => {
@@ -17,7 +17,7 @@ describe('Settings Components Integration', () => {
     const mockOnThemeChange = vi.fn();
     
     render(
-      <SettingsModal isOpen={true} onClose={mockOnClose}>
+      <Modal isOpen={true} onClose={mockOnClose}>
         <SettingsTabs defaultTab="ui">
           <div data-tab="ui">
             <SettingsPanel title="UI Settings" description="Customize your interface">
@@ -40,7 +40,7 @@ describe('Settings Components Integration', () => {
             </SettingsPanel>
           </div>
         </SettingsTabs>
-      </SettingsModal>
+      </Modal>
     );
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe('Settings Components Integration', () => {
 
   it('switches between tabs and shows different panels', () => {
     render(
-      <SettingsModal isOpen={true} onClose={() => {}}>
+      <Modal isOpen={true} onClose={() => {}}>
         <SettingsTabs defaultTab="ui">
           <div data-tab="ui">
             <SettingsPanel title="UI Settings">
@@ -74,7 +74,7 @@ describe('Settings Components Integration', () => {
             </SettingsPanel>
           </div>
         </SettingsTabs>
-      </SettingsModal>
+      </Modal>
     );
 
     expect(screen.getByText('UI Settings')).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('Settings Components Integration', () => {
     const mockOnThemeChange = vi.fn();
     
     render(
-      <SettingsModal isOpen={true} onClose={() => {}}>
+      <Modal isOpen={true} onClose={() => {}}>
         <SettingsTabs defaultTab="ui">
           <div data-tab="ui">
             <SettingsPanel title="UI Settings">
@@ -103,7 +103,7 @@ describe('Settings Components Integration', () => {
             </SettingsPanel>
           </div>
         </SettingsTabs>
-      </SettingsModal>
+      </Modal>
     );
 
     const select = screen.getByRole('combobox');
@@ -114,7 +114,7 @@ describe('Settings Components Integration', () => {
 
   it('shows required indicators properly', () => {
     render(
-      <SettingsModal isOpen={true} onClose={() => {}}>
+      <Modal isOpen={true} onClose={() => {}}>
         <SettingsTabs defaultTab="account">
           <div data-tab="account">
             <SettingsPanel title="Account Settings">
@@ -127,7 +127,7 @@ describe('Settings Components Integration', () => {
             </SettingsPanel>
           </div>
         </SettingsTabs>
-      </SettingsModal>
+      </Modal>
     );
 
     expect(screen.getByText('API Key')).toBeInTheDocument();

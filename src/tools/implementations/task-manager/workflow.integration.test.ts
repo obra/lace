@@ -111,14 +111,6 @@ describe('Task Management Workflow Integration', () => {
 
     // Mock the ProviderRegistry to return our mock provider
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
-      () =>
-        ({
-          createProvider: () => mockProvider,
-          getProvider: () => mockProvider,
-          getProviderNames: () => ['anthropic', 'openai'],
-        }) as unknown as ProviderRegistry
-    );
 
     // Create project and session with provider configuration
     project = Project.create(

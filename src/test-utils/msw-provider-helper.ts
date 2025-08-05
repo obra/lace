@@ -25,9 +25,9 @@ export interface MockResponse {
 
 /**
  * Creates MSW server for mocking AI provider HTTP APIs
- * 
+ *
  * RECOMMENDED USAGE PATTERN:
- * 
+ *
  * ```typescript
  * describe('MyTest', () => {
  *   const providerMock = new MswProviderHelper({
@@ -36,10 +36,10 @@ export interface MockResponse {
  *     apiKey: 'test-key',
  *     defaultResponses: ['Test response']
  *   });
- * 
+ *
  *   // Use built-in lifecycle management
  *   providerMock.setupTestLifecycle();
- * 
+ *
  *   it('should work with provider', async () => {
  *     providerMock.setResponses(['Custom response']);
  *     // ... run your test
@@ -55,7 +55,7 @@ export class MswProviderHelper {
 
   constructor(config: ProviderMockConfig) {
     this.config = config;
-    this.responses = (config.defaultResponses || []).map(text => ({ text }));
+    this.responses = (config.defaultResponses || []).map((text) => ({ text }));
     this.server = this.createServer();
   }
 
@@ -82,7 +82,10 @@ export class MswProviderHelper {
           const authHeader = request.headers.get('x-api-key');
           if (authHeader !== this.config.apiKey) {
             return HttpResponse.json(
-              { type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } },
+              {
+                type: 'error',
+                error: { type: 'authentication_error', message: 'Invalid API key' },
+              },
               { status: 401 }
             );
           }
@@ -93,12 +96,14 @@ export class MswProviderHelper {
 
         // Add tool calls if specified
         if (response.toolCalls?.length) {
-          content.push(...response.toolCalls.map(tool => ({
-            type: 'tool_use',
-            id: tool.id,
-            name: tool.name,
-            input: tool.input,
-          })));
+          content.push(
+            ...response.toolCalls.map((tool) => ({
+              type: 'tool_use',
+              id: tool.id,
+              name: tool.name,
+              input: tool.input,
+            }))
+          );
         }
 
         return HttpResponse.json({
@@ -140,7 +145,7 @@ export class MswProviderHelper {
 
         // Add tool calls if specified
         if (response.toolCalls?.length) {
-          message.tool_calls = response.toolCalls.map(tool => ({
+          message.tool_calls = response.toolCalls.map((tool) => ({
             id: tool.id,
             type: 'function',
             function: {
@@ -155,11 +160,13 @@ export class MswProviderHelper {
           object: 'chat.completion',
           created: Date.now(),
           model: 'gpt-4',
-          choices: [{
-            index: 0,
-            message,
-            finish_reason: response.toolCalls?.length ? 'tool_calls' : 'stop',
-          }],
+          choices: [
+            {
+              index: 0,
+              message,
+              finish_reason: response.toolCalls?.length ? 'tool_calls' : 'stop',
+            },
+          ],
           usage: {
             prompt_tokens: 10,
             completion_tokens: 20,
@@ -215,14 +222,16 @@ export class MswProviderHelper {
           object: 'chat.completion',
           created: Date.now(),
           model: 'local-model',
-          choices: [{
-            index: 0,
-            message: {
-              role: 'assistant',
-              content: response.text,
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content: response.text,
+              },
+              finish_reason: 'stop',
             },
-            finish_reason: 'stop',
-          }],
+          ],
           usage: {
             prompt_tokens: 10,
             completion_tokens: 20,
@@ -260,7 +269,7 @@ export class MswProviderHelper {
    * Set simple text responses that will be cycled through
    */
   setResponses(responses: string[]): void {
-    this.responses = responses.map(text => ({ text }));
+    this.responses = responses.map((text) => ({ text }));
     this.responseIndex = 0;
   }
 
@@ -347,11 +356,13 @@ export class MswProviderHelper {
   static createTaskCompletionResponse(taskId: string, message: string): MockResponse {
     return {
       text: `I'll complete this task: ${message}`,
-      toolCalls: [{
-        id: 'task_complete_call',
-        name: 'task_complete',
-        input: { id: taskId, message },
-      }],
+      toolCalls: [
+        {
+          id: 'task_complete_call',
+          name: 'task_complete',
+          input: { id: taskId, message },
+        },
+      ],
     };
   }
 
@@ -361,11 +372,13 @@ export class MswProviderHelper {
   static createTaskBlockedResponse(taskId: string): MockResponse {
     return {
       text: 'I encountered an issue and cannot complete this task.',
-      toolCalls: [{
-        id: 'task_update_call',
-        name: 'task_update',
-        input: { taskId, status: 'blocked' },
-      }],
+      toolCalls: [
+        {
+          id: 'task_update_call',
+          name: 'task_update',
+          input: { taskId, status: 'blocked' },
+        },
+      ],
     };
   }
 }

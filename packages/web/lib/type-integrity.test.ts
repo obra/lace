@@ -9,7 +9,7 @@ describe('Type Integrity - Current State', () => {
   describe('ThreadId imports', () => {
     it('should import ThreadId from @/types/core', async () => {
       const coreTypes = await import('@/types/core');
-      expect(coreTypes.ThreadId).toBeUndefined(); // ThreadId is a type, not a value
+      expect(coreTypes.asThreadId).toBeDefined(); // asThreadId is a function, not ThreadId type
 
       // But we can test that the type exists by using it
       const testId = 'lace_20250731_abc123';

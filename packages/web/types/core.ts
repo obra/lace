@@ -34,5 +34,7 @@ export {
   isThreadId,
   asNewAgentSpec,
   createNewAgentSpec,
+  asAssigneeId,
+  isAssigneeId,
   EVENT_TYPES,
 } from '~/threads/types';

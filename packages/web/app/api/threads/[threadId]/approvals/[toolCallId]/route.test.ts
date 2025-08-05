@@ -20,7 +20,13 @@ interface MockSession {
 }
 
 interface MockSessionService {
+  createSession: ReturnType<typeof vi.fn>;
+  listSessions: ReturnType<typeof vi.fn>;
   getSession: ReturnType<typeof vi.fn>;
+  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
+  updateSession: ReturnType<typeof vi.fn>;
+  stopAllAgents: ReturnType<typeof vi.fn>;
+  clearActiveSessions: ReturnType<typeof vi.fn>;
 }
 
 describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
@@ -41,10 +47,16 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
     // Create mock SessionService
     mockSessionService = {
+      createSession: vi.fn(),
+      listSessions: vi.fn(),
       getSession: vi.fn().mockReturnValue(mockSession),
+      setupAgentEventHandlers: vi.fn(),
+      updateSession: vi.fn(),
+      stopAllAgents: vi.fn(),
+      clearActiveSessions: vi.fn(),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService as any);
   });
 
   afterEach(() => {
@@ -107,7 +119,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
       // Clear mocks between iterations
       vi.clearAllMocks();
-      mockGetSessionService.mockReturnValue(mockSessionService);
+      mockGetSessionService.mockReturnValue(mockSessionService as any);
       mockSessionService.getSession.mockReturnValue(mockSession);
       mockSession.getAgent.mockReturnValue(mockAgent);
     }

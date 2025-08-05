@@ -34,6 +34,9 @@ import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
+import { getLaceDir } from '~/config/lace-dir';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -304,14 +307,14 @@ export class Session {
       model = sessionConfig.model as string;
     } else {
       // Get provider default by creating temporary instance
-      const registry = ProviderRegistry.createWithAutoDiscovery();
+      const registry = new ProviderRegistry();
       const tempProvider = registry.createProvider(provider);
       model = tempProvider.defaultModel;
       tempProvider.cleanup();
     }
 
     // Create provider and tool executor
-    const registry = ProviderRegistry.createWithAutoDiscovery();
+    const registry = new ProviderRegistry();
     const providerInstance = registry.createProvider(provider, { model });
 
     // Create TaskManager using global persistence
@@ -824,8 +827,7 @@ Use your task_add_note tool to record important notes as you work and your task_
       return cached;
     }
 
-    // For now, use a synchronous approach by resolving provider type from instance
-    // and creating with the old registry system, but with proper configuration from instances
+    // Use new provider instance system with synchronous credential loading
     try {
       const instanceManager = new ProviderInstanceManager();
       const config = instanceManager.loadInstancesSync();
@@ -835,17 +837,34 @@ Use your task_add_note tool to record important notes as you work and your task_
         throw new Error(`Provider instance not found: ${providerInstanceId}`);
       }
 
+      // Load credentials synchronously by reading the credential file directly
+      
+      const credentialsDir = path.join(getLaceDir(), 'credentials');
+      const credentialPath = path.join(credentialsDir, `${providerInstanceId}.json`);
+      let credentials: any = null;
+      
+      try {
+        const credentialContent = fs.readFileSync(credentialPath, 'utf-8');
+        credentials = JSON.parse(credentialContent);
+      } catch (credentialError) {
+        throw new Error(`No credentials found for instance: ${providerInstanceId}`);
+      }
+
       // Map catalog provider ID to actual provider type
       const providerType = instance.catalogProviderId; // anthropic, openai, etc.
 
-      // Create provider using the old registry system but with proper configuration
-      const providerRegistry = ProviderRegistry.createWithAutoDiscovery();
-      const providerInstance = providerRegistry.createProvider(providerType, {
+      // Build provider config from instance and credentials
+      const providerConfig = {
         model: modelId,
-        // Additional config from instance if needed
+        apiKey: credentials.apiKey,
+        ...(credentials.additionalAuth || {}),
         ...(instance.endpoint && { baseURL: instance.endpoint }),
         ...(instance.timeout && { timeout: instance.timeout }),
-      });
+      };
+
+      // Create provider using the new registry system
+      const providerRegistry = new ProviderRegistry();
+      const providerInstance = providerRegistry.createProvider(providerType, providerConfig);
 
       // Cache the result
       Session._providerCache.set(cacheKey, providerInstance);

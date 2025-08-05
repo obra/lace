@@ -248,49 +248,6 @@ export class ProviderRegistry {
     }
   }
 
-  static createWithAutoDiscovery(): ProviderRegistry {
-    const registry = new ProviderRegistry();
-
-    // Static list of known providers - no dynamic imports needed
-    const providerClasses = [AnthropicProvider, OpenAIProvider, LMStudioProvider, OllamaProvider];
-
-    for (const ProviderClass of providerClasses) {
-      try {
-        // Create instance with minimal config for discovery
-        let provider: AIProvider;
-        try {
-          // Try with minimal config for each provider type
-          if (ProviderClass === AnthropicProvider) {
-            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
-          } else if (ProviderClass === OpenAIProvider) {
-            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
-          } else if (ProviderClass === LMStudioProvider) {
-            provider = new ProviderClass({ baseURL: 'http://localhost:1234' });
-          } else if (ProviderClass === OllamaProvider) {
-            provider = new ProviderClass({ baseURL: 'http://localhost:11434' });
-          } else {
-            // Fallback for unknown providers
-            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
-          }
-        } catch {
-          // Skip providers that can't be instantiated
-          try {
-            // Last resort fallback
-            provider = new ProviderClass({ apiKey: 'discovery-mode-placeholder' });
-          } catch {
-            // Skip providers that can't be instantiated even with placeholder config
-            continue;
-          }
-        }
-
-        registry.registerProvider(provider);
-      } catch {
-        // Skip providers that can't be registered
-      }
-    }
-
-    return registry;
-  }
 
   static isProviderClass(value: unknown): boolean {
     // Check if it's a constructor function/class

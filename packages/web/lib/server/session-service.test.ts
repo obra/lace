@@ -20,7 +20,7 @@ describe('SessionService with Provider Instances', () => {
     testProject = Project.create(
       'Test Project',
       'Test project for provider instance tests',
-      tempDirContext.path,
+      tempDirContext.tempDir,
       {}
     );
 
@@ -92,7 +92,7 @@ describe('SessionService Missing Methods', () => {
     testProject = Project.create(
       'Test Project',
       'Test project for session service tests',
-      tempDirContext.path,
+      tempDirContext.tempDir,
       {}
     );
 
@@ -221,7 +221,7 @@ describe('SessionService approval event forwarding', () => {
     testProject = Project.create(
       'Test Project',
       'Test project for approval flow testing',
-      tempDirContext.path,
+      tempDirContext.tempDir,
       {}
     );
 
@@ -233,10 +233,9 @@ describe('SessionService approval event forwarding', () => {
 
     // Mock ProviderRegistry to return our mock provider
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockReturnValue({
-      createProvider: vi.fn().mockReturnValue(mockProvider),
-      getProvider: vi.fn().mockReturnValue(mockProvider),
-    } as unknown as ReturnType<typeof ProviderRegistry.createWithAutoDiscovery>);
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockReturnValue(mockProvider);
+    vi.spyOn(ProviderRegistry.prototype, 'getProvider').mockReturnValue(mockProvider);
+    vi.spyOn(ProviderRegistry.prototype, 'initialize').mockResolvedValue(undefined);
 
     sessionService = getSessionService();
 

@@ -112,11 +112,27 @@ describe('ProviderRegistry', () => {
     });
   });
 
-  describe('createWithAutoDiscovery', () => {
-    it('should discover and register all existing provider files', () => {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      const providerNames = registry.getProviderNames();
+  describe('Provider Registration', () => {
+    it('should start with empty registry and support manual registration', () => {
+      const registry = new ProviderRegistry();
+      expect(registry.getProviderNames()).toEqual([]);
+      
+      // Manual registration should work
+      const provider = new AnthropicProvider({ apiKey: 'test-key' });
+      registry.registerProvider(provider);
+      expect(registry.getProviderNames()).toContain('anthropic');
+      expect(registry.getProvider('anthropic')).toBeDefined();
+    });
 
+    it('should support registering multiple providers manually', () => {
+      const registry = new ProviderRegistry();
+      
+      registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new LMStudioProvider({ baseUrl: 'http://localhost:1234' }));
+      registry.registerProvider(new OllamaProvider({ baseUrl: 'http://localhost:11434' }));
+
+      const providerNames = registry.getProviderNames();
       expect(providerNames).toContain('anthropic');
       expect(providerNames).toContain('openai');
       expect(providerNames).toContain('lmstudio');
@@ -124,8 +140,13 @@ describe('ProviderRegistry', () => {
       expect(providerNames).toHaveLength(4);
     });
 
-    it('should register providers with correct instances', () => {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
+    it('should maintain provider identity after registration', () => {
+      const registry = new ProviderRegistry();
+      
+      registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new LMStudioProvider({ baseUrl: 'http://localhost:1234' }));
+      registry.registerProvider(new OllamaProvider({ baseUrl: 'http://localhost:11434' }));
 
       const anthropicProvider = registry.getProvider('anthropic');
       const openaiProvider = registry.getProvider('openai');
@@ -143,20 +164,11 @@ describe('ProviderRegistry', () => {
       expect(ollamaProvider!.providerName).toBe('ollama');
     });
 
-    it('should only discover files matching *-provider.ts pattern', () => {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      const providerNames = registry.getProviderNames();
-
-      // Should not include non-provider files like types.ts, registry.ts, etc.
-      expect(providerNames).not.toContain('types');
-      expect(providerNames).not.toContain('registry');
-      expect(providerNames).not.toContain('format-converters');
-    });
-
-    it('should handle provider files with missing exports gracefully', () => {
-      // This test ensures auto-discovery doesn't crash on malformed files
-      // We don't need to create malformed files - just verify it doesn't throw
-      expect(ProviderRegistry.createWithAutoDiscovery()).toBeDefined();
+    it('should properly initialize without auto-discovery', () => {
+      // Verify that constructor doesn't throw and creates empty registry  
+      expect(() => new ProviderRegistry()).not.toThrow();
+      const registry = new ProviderRegistry();
+      expect(registry.getProviderNames()).toEqual([]);
     });
   });
 

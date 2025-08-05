@@ -14,22 +14,21 @@ import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies
 vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn().mockReturnValue({
-      createProvider: vi.fn().mockReturnValue({
-        type: 'anthropic',
-        modelId: 'claude-3-5-haiku-20241022',
-        providerName: 'anthropic',
-        defaultModel: 'claude-3-5-haiku-20241022',
-        setSystemPrompt: vi.fn(),
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-        }),
+  ProviderRegistry: vi.fn().mockImplementation(() => ({
+    createProvider: vi.fn().mockReturnValue({
+      type: 'anthropic',
+      modelId: 'claude-3-5-haiku-20241022',
+      providerName: 'anthropic',
+      defaultModel: 'claude-3-5-haiku-20241022',
+      setSystemPrompt: vi.fn(),
+      createResponse: vi.fn().mockResolvedValue({
+        content: 'Mock response',
+        toolCalls: [],
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
       }),
     }),
-  },
+    initialize: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 // Mock external dependencies that require system calls or network access

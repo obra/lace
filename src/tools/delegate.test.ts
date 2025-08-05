@@ -61,7 +61,7 @@ describe('DelegateTool', () => {
   });
 
   it('should delegate a simple task with default model', async () => {
-    testSetup.mockProvider.setMockResponses(['Analysis complete: 3 test failures identified']);
+    testSetup.setMockResponses(['Analysis complete: 3 test failures identified']);
 
     const result = await tool.execute(
       {
@@ -80,7 +80,7 @@ describe('DelegateTool', () => {
   });
 
   it('should handle custom provider:model format', async () => {
-    testSetup.mockProvider.setMockResponses(['Custom model response']);
+    testSetup.setMockResponses(['Custom model response']);
 
     const result = await tool.execute(
       {
@@ -98,7 +98,7 @@ describe('DelegateTool', () => {
   });
 
   it('should create delegate thread and execute subagent', async () => {
-    testSetup.mockProvider.setMockResponses(['Directory listed successfully']);
+    testSetup.setMockResponses(['Directory listed successfully']);
 
     const result = await tool.execute(
       {
@@ -117,7 +117,7 @@ describe('DelegateTool', () => {
   });
 
   it('should format the subagent system prompt correctly', async () => {
-    testSetup.mockProvider.setMockResponses(['Task completed']);
+    testSetup.setMockResponses(['Task completed']);
 
     const result = await tool.execute(
       {
@@ -150,7 +150,7 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    testSetup.mockProvider.setMockResponses(['Task completed with combined responses']);
+    testSetup.setMockResponses(['Task completed with combined responses']);
 
     const result = await tool.execute(
       {
@@ -167,7 +167,7 @@ describe('DelegateTool', () => {
   });
 
   it('should include delegate thread ID in result metadata', async () => {
-    testSetup.mockProvider.setMockResponses(['Task completed with metadata']);
+    testSetup.setMockResponses(['Task completed with metadata']);
 
     const result = await tool.execute(
       {
@@ -192,7 +192,7 @@ describe('DelegateTool', () => {
     ];
 
     for (const model of validModels) {
-      testSetup.mockProvider.setMockResponses(['Valid model response']);
+      testSetup.setMockResponses(['Valid model response']);
 
       const result = await tool.execute(
         {

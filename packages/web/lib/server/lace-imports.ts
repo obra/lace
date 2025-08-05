@@ -15,5 +15,8 @@ export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
 export { ThreadManager } from '~/threads/thread-manager';
 
+// Tool types
+export type { ToolResult, ToolCall, ToolContext, ToolAnnotations } from '~/tools/types';
+
 // Test utilities
 export { setupTestProviderInstances, createTestProviderInstance } from '~/test-utils/provider-instances';

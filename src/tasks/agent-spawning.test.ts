@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
-import { asThreadId, createNewAgentSpec } from '~/threads/types';
+import { asThreadId, asNewAgentSpec, asAssigneeId, createNewAgentSpec } from '~/threads/types';
 import { TaskContext, CreateTaskRequest } from '~/tasks/types';
 
 describe('Agent Spawning', () => {
@@ -39,7 +39,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'Please complete this test task',
-        assignedTo: 'new:anthropic/claude-3-sonnet',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-3-sonnet'),
         priority: 'medium',
       };
 
@@ -65,14 +65,14 @@ describe('Agent Spawning', () => {
 
     it('should handle multiple provider/model formats', async () => {
       const testCases = [
-        { assignedTo: 'new:openai/gpt-4', expectedProvider: 'openai', expectedModel: 'gpt-4' },
+        { assignedTo: asNewAgentSpec('new:openai/gpt-4'), expectedProvider: 'openai', expectedModel: 'gpt-4' },
         {
-          assignedTo: 'new:anthropic/claude-3-haiku',
+          assignedTo: asNewAgentSpec('new:anthropic/claude-3-haiku'),
           expectedProvider: 'anthropic',
           expectedModel: 'claude-3-haiku',
         },
         {
-          assignedTo: 'new:lmstudio/local-model',
+          assignedTo: asNewAgentSpec('new:lmstudio/local-model'),
           expectedProvider: 'lmstudio',
           expectedModel: 'local-model',
         },
@@ -101,7 +101,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Invalid Test',
         prompt: 'This should not spawn an agent',
-        assignedTo: 'new:invalid-format', // Missing model - treated as regular assignment
+        assignedTo: asAssigneeId('new:invalid-format'), // Missing model - treated as regular assignment
       };
 
       const task = await taskManager.createTask(taskRequest, context);
@@ -121,7 +121,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'This should fail',
-        assignedTo: 'new:anthropic/claude-3-sonnet',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-3-sonnet'),
       };
 
       await expect(taskManagerWithoutCallback.createTask(taskRequest, context)).rejects.toThrow(
@@ -136,7 +136,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'This will fail',
-        assignedTo: 'new:anthropic/claude-3-sonnet',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-3-sonnet'),
       };
 
       await expect(taskManager.createTask(taskRequest, context)).rejects.toThrow(
@@ -148,7 +148,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Regular Task',
         prompt: 'Assigned to existing agent',
-        assignedTo: 'lace_20250726_test01.2', // Regular thread ID
+        assignedTo: asAssigneeId('lace_20250726_test01.2'), // Regular thread ID
       };
 
       const task = await taskManager.createTask(taskRequest, context);
@@ -168,7 +168,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Event Test',
         prompt: 'Testing events',
-        assignedTo: 'new:anthropic/claude-3-sonnet',
+        assignedTo: asNewAgentSpec('new:anthropic/claude-3-sonnet'),
       };
 
       await taskManager.createTask(taskRequest, context);

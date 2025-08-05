@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import type { Task } from '@/types/core';
+import { asThreadId, asAssigneeId } from '@/types/core';
 
 // Mock the useTaskManager hook
 vi.mock('@/hooks/useTaskManager', () => ({
@@ -61,8 +62,8 @@ const mockTasks: Task[] = [
     status: 'in_progress',
     priority: 'high',
     assignedTo: 'human',
-    createdBy: 'test-user',
-    threadId: 'test-session',
+    createdBy: asThreadId('test-user'),
+    threadId: asThreadId('test-session'),
     createdAt: new Date('2024-01-15T10:00:00Z'),
     updatedAt: new Date('2024-01-15T10:00:00Z'),
     notes: [],
@@ -75,8 +76,8 @@ const mockTasks: Task[] = [
     status: 'pending',
     priority: 'medium',
     assignedTo: undefined,
-    createdBy: 'test-user',
-    threadId: 'test-session',
+    createdBy: asThreadId('test-user'),
+    threadId: asThreadId('test-session'),
     createdAt: new Date('2024-01-15T09:00:00Z'),
     updatedAt: new Date('2024-01-15T09:00:00Z'),
     notes: [],
@@ -88,9 +89,9 @@ const mockTasks: Task[] = [
     prompt: 'Wait for dependency',
     status: 'blocked',
     priority: 'low',
-    assignedTo: 'agent-123',
-    createdBy: 'test-user',
-    threadId: 'test-session',
+    assignedTo: asAssigneeId('agent-123'),
+    createdBy: asThreadId('test-user'),
+    threadId: asThreadId('test-session'),
     createdAt: new Date('2024-01-15T08:00:00Z'),
     updatedAt: new Date('2024-01-15T08:00:00Z'),
     notes: [],
@@ -114,11 +115,15 @@ describe('TaskListSidebar', () => {
       deleteTask: vi.fn(),
       addNote: vi.fn(),
       refetch: vi.fn(),
+      handleTaskCreated: vi.fn(),
+      handleTaskUpdated: vi.fn(),
+      handleTaskDeleted: vi.fn(),
+      handleTaskNoteAdded: vi.fn(),
     });
   });
 
   it('should render task summary', () => {
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -129,7 +134,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show in progress tasks first', () => {
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -141,7 +146,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show pending tasks', () => {
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -153,7 +158,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show blocked tasks', () => {
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -168,7 +173,7 @@ describe('TaskListSidebar', () => {
     const mockOnOpenTaskBoard = vi.fn();
     const user = userEvent.setup();
 
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -189,7 +194,7 @@ describe('TaskListSidebar', () => {
     const mockOnCreateTask = vi.fn();
     const user = userEvent.setup();
 
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -216,9 +221,13 @@ describe('TaskListSidebar', () => {
       deleteTask: vi.fn(),
       addNote: vi.fn(),
       refetch: vi.fn(),
+      handleTaskCreated: vi.fn(),
+      handleTaskUpdated: vi.fn(),
+      handleTaskDeleted: vi.fn(),
+      handleTaskNoteAdded: vi.fn(),
     });
 
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -241,9 +250,13 @@ describe('TaskListSidebar', () => {
       deleteTask: vi.fn(),
       addNote: vi.fn(),
       refetch: vi.fn(),
+      handleTaskCreated: vi.fn(),
+      handleTaskUpdated: vi.fn(),
+      handleTaskDeleted: vi.fn(),
+      handleTaskNoteAdded: vi.fn(),
     });
 
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -264,8 +277,8 @@ describe('TaskListSidebar', () => {
         status: 'in_progress' as const,
         priority: 'medium' as const,
         assignedTo: 'human',
-        createdBy: 'test-user',
-        threadId: 'test-session',
+        createdBy: asThreadId('test-user'),
+        threadId: asThreadId('test-session'),
         createdAt: new Date('2024-01-15T10:00:00Z'),
         updatedAt: new Date('2024-01-15T10:00:00Z'),
         notes: [],
@@ -278,8 +291,8 @@ describe('TaskListSidebar', () => {
         status: 'pending' as const,
         priority: 'medium' as const,
         assignedTo: undefined,
-        createdBy: 'test-user',
-        threadId: 'test-session',
+        createdBy: asThreadId('test-user'),
+        threadId: asThreadId('test-session'),
         createdAt: new Date('2024-01-15T09:00:00Z'),
         updatedAt: new Date('2024-01-15T09:00:00Z'),
         notes: [],
@@ -298,9 +311,13 @@ describe('TaskListSidebar', () => {
       deleteTask: vi.fn(),
       addNote: vi.fn(),
       refetch: vi.fn(),
+      handleTaskCreated: vi.fn(),
+      handleTaskUpdated: vi.fn(),
+      handleTaskDeleted: vi.fn(),
+      handleTaskNoteAdded: vi.fn(),
     });
 
-    const mockTaskManager = mockUseTaskManager();
+    const mockTaskManager = useTaskManager('test-project', 'test-session');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
