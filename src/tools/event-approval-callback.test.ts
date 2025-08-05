@@ -383,13 +383,21 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     const conversationPromise = agent.sendMessage('Please run echo test');
 
-    // Wait for event emission
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for the TOOL_APPROVAL_REQUEST event to be emitted
+    // Poll for the event with a reasonable timeout
+    let approvalRequestCalls: unknown[] = [];
+    let attempts = 0;
+    const maxAttempts = 20; // 200ms total timeout
+    
+    while (attempts < maxAttempts && approvalRequestCalls.length === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      approvalRequestCalls = eventSpy.mock.calls.filter(
+        (call) => (call[0] as { event: { type: string } }).event.type === 'TOOL_APPROVAL_REQUEST'
+      );
+      attempts++;
+    }
 
     // Should have emitted the TOOL_APPROVAL_REQUEST event
-    const approvalRequestCalls = eventSpy.mock.calls.filter(
-      (call) => (call[0] as { event: { type: string } }).event.type === 'TOOL_APPROVAL_REQUEST'
-    );
     expect(approvalRequestCalls).toHaveLength(1);
     expect((approvalRequestCalls[0][0] as { event: { data: unknown } }).event.data).toEqual({
       toolCallId: 'call_emit_test',

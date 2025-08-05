@@ -5,12 +5,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET } from './route';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Provider Discovery API', () => {
+  const _tempDirContext = useTempLaceDir();
   let testProviderInstances: {
     anthropicInstanceId: string;
     openaiInstanceId: string;

@@ -17,6 +17,7 @@ import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
@@ -25,9 +26,10 @@ import { getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Full Conversation Flow', () => {
+  const _tempDirContext = useTempLaceDir();
   let sessionService: ReturnType<typeof getSessionService>;
-  let addConnectionSpy: any;
-  let broadcastSpy: any;
+  let addConnectionSpy: ReturnType<typeof vi.spyOn>;
+  let broadcastSpy: ReturnType<typeof vi.spyOn>;
   let testProviderInstances: {
     anthropicInstanceId: string;
     openaiInstanceId: string;
