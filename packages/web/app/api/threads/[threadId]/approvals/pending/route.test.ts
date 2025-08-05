@@ -55,7 +55,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       getSession: vi.fn().mockReturnValue(mockSession),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService as any);
+    mockGetSessionService.mockReturnValue(mockSessionService);
   });
 
   afterEach(() => {

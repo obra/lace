@@ -48,9 +48,21 @@ export async function createDelegationTestSetup(options?: {
   let mockResponses = options?.responses || ['Integration test completed successfully'];
   let responseIndex = 0;
 
-  // Create a mock registry that returns our mock provider
-  const mockRegistry = {
-    createProvider: (providerType: string, config: any) => {
+  // Mock the ProviderInstanceManager.loadInstancesSync to return our test instance
+  // This makes Session.resolveProviderInstance find the instance and proceed to createProvider
+  const originalLoadInstancesSync = require('~/providers/instance/manager').ProviderInstanceManager.prototype.loadInstancesSync;
+  vi.spyOn(require('~/providers/instance/manager').ProviderInstanceManager.prototype, 'loadInstancesSync').mockReturnValue({
+    version: '1.0',
+    instances: {
+      [providerInstanceId]: {
+        displayName: `Test ${provider.charAt(0).toUpperCase() + provider.slice(1)} Delegation`,
+        catalogProviderId: provider, // anthropic, openai, etc.
+      }
+    }
+  });
+
+  // Mock the createProvider method that gets called after instance resolution
+  vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation((providerType: string, config: any) => {
     // Create a mock provider that responds according to our test setup
     return {
       providerName: 'test-anthropic',
