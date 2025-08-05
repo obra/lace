@@ -119,8 +119,6 @@ describe('Delegation Integration Tests', () => {
     project = Project.create('Test Project', '/tmp/test-delegation');
     session = Session.create({
       name: 'Delegation Integration Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing

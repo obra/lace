@@ -47,8 +47,6 @@ describe('Agent Session Context', () => {
     // Create real session with provider instance
     session = Session.create({
       name: 'Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -102,8 +100,6 @@ describe('Agent Session Context', () => {
       // Create session via Session.create()
       const createdSession = Session.create({
         name: 'Roundtrip Test Session',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
       });
 

@@ -123,8 +123,6 @@ describe('Task Management Workflow Integration', () => {
     project = Project.create('Task Workflow Integration Test Project', '/tmp/test-workflow');
     session = Session.create({
       name: 'Task Workflow Integration Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),

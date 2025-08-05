@@ -99,8 +99,6 @@ describe('Enhanced Task Manager Tools', () => {
     // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Tool Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 

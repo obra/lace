@@ -87,8 +87,6 @@ describe('Tool Approval Race Condition Integration Tests', () => {
 
     session = Session.create({
       name: 'Race Condition Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 

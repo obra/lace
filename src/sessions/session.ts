@@ -38,8 +38,6 @@ export interface SessionInfo {
   id: ThreadId;
   name: string;
   createdAt: Date;
-  providerInstanceId: string;
-  modelId: string;
   agents: AgentInfo[];
 }
 
@@ -69,17 +67,11 @@ export class Session {
   static create(options: {
     name?: string;
     description?: string;
-    providerInstanceId: string;
-    modelId: string;
     projectId: string;
     approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
     const name = options.name || Session.generateSessionName();
-    const { providerInstanceId, modelId } = options;
-
-    // Store provider instance configuration for lazy resolution
-    // We'll resolve the actual provider instance when needed
 
     // Create thread manager
     const threadManager = new ThreadManager();
@@ -91,8 +83,6 @@ export class Session {
       name,
       description: options.description || '',
       configuration: {
-        providerInstanceId,
-        modelId,
         ...options.configuration,
       },
       status: 'active' as const,
@@ -111,6 +101,22 @@ export class Session {
     // Create tool executor
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor);
+
+    // Get effective configuration by merging project and session configs
+    const effectiveConfig = Session.getEffectiveConfiguration(
+      options.projectId,
+      options.configuration
+    );
+
+    // Extract provider instance and model from effective configuration
+    const providerInstanceId = effectiveConfig.providerInstanceId;
+    const modelId = effectiveConfig.modelId;
+
+    if (!providerInstanceId || !modelId) {
+      throw new Error(
+        'No provider configuration available - project must specify providerInstanceId and modelId'
+      );
+    }
 
     // Resolve provider instance lazily for the session agent
     const {
@@ -132,8 +138,8 @@ export class Session {
     sessionAgent.updateThreadMetadata({
       isSession: true,
       name: 'Lace', // Always name the coordinator agent "Lace"
-      providerInstanceId: options.providerInstanceId,
-      modelId: options.modelId,
+      providerInstanceId: providerInstanceId,
+      modelId: modelId,
     });
 
     const session = new Session(sessionAgent, options.projectId);
@@ -163,8 +169,6 @@ export class Session {
       id: asThreadId(session.id),
       name: session.name,
       createdAt: session.createdAt,
-      providerInstanceId: (session.configuration?.providerInstanceId as string) || 'unknown',
-      modelId: (session.configuration?.modelId as string) || 'unknown',
       agents: [], // Will be populated later if needed
     }));
   }
@@ -503,14 +507,6 @@ export class Session {
       id: this._sessionId,
       name: sessionData?.name || 'Session ' + this._sessionId,
       createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
-      providerInstanceId:
-        (metadata?.providerInstanceId as string) ||
-        (sessionData?.configuration?.providerInstanceId as string) ||
-        'unknown',
-      modelId:
-        (metadata?.modelId as string) ||
-        (sessionData?.configuration?.modelId as string) ||
-        'unknown',
       agents,
     };
   }
@@ -523,13 +519,12 @@ export class Session {
     let targetModelId = config.modelId;
 
     if (!targetProviderInstanceId || !targetModelId) {
-      // Get session's provider instance configuration
-      const sessionData = this.getSessionData();
-      const sessionConfig = sessionData?.configuration || {};
+      // Get effective configuration (merges project and session configs)
+      const effectiveConfig = this.getEffectiveConfiguration();
 
       targetProviderInstanceId =
-        targetProviderInstanceId || (sessionConfig.providerInstanceId as string);
-      targetModelId = targetModelId || (sessionConfig.modelId as string);
+        targetProviderInstanceId || (effectiveConfig.providerInstanceId as string);
+      targetModelId = targetModelId || (effectiveConfig.modelId as string);
 
       if (!targetProviderInstanceId || !targetModelId) {
         throw new Error(

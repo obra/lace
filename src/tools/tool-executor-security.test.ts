@@ -43,8 +43,6 @@ describe('ToolExecutor Security with Real Session Context', () => {
     // Create real session
     session = Session.create({
       name: 'Security Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -145,8 +143,6 @@ describe('ToolExecutor Security with Real Session Context', () => {
       // Create session with explicit allow policy for file-read
       const permissiveSession = Session.create({
         name: 'Permissive Session',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
           toolPolicies: {
@@ -176,8 +172,6 @@ describe('ToolExecutor Security with Real Session Context', () => {
       // Create session with explicit deny policy for bash
       const restrictiveSession = Session.create({
         name: 'Restrictive Session',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
           toolPolicies: {

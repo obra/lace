@@ -29,8 +29,6 @@ describe('Bulk Task Creation', () => {
 
     session = Session.create({
       name: 'Bulk Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 

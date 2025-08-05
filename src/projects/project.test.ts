@@ -298,8 +298,6 @@ describe('Project', () => {
             name: 'Test Session',
             projectId: project.getId(),
             description: 'A test session',
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const sessions = project.getSessions();
@@ -316,14 +314,10 @@ describe('Project', () => {
           Session.create({
             name: 'Project 1 Session',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
           Session.create({
             name: 'Project 2 Session',
             projectId: otherProject.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const sessions = project.getSessions();
@@ -340,8 +334,6 @@ describe('Project', () => {
             name: 'Test Session',
             projectId: project.getId(),
             description: 'A test session',
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
             configuration: { key: 'value' },
           });
 
@@ -364,8 +356,6 @@ describe('Project', () => {
           const session = Session.create({
             name: 'Test Session',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const sessionData = Session.getSession(session.getId());
@@ -383,8 +373,6 @@ describe('Project', () => {
           const createdSession = Session.create({
             name: 'Test Session',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const session = project.getSession(createdSession.getId());
@@ -403,8 +391,6 @@ describe('Project', () => {
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const session = project.getSession(otherSession.getId());
@@ -420,8 +406,6 @@ describe('Project', () => {
             name: 'Test Session',
             projectId: project.getId(),
             description: 'Original description',
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
         });
 
@@ -450,8 +434,6 @@ describe('Project', () => {
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const updatedSession = project.updateSession(otherSession.getId(), { name: 'Updated' });
@@ -479,8 +461,6 @@ describe('Project', () => {
           session = Session.create({
             name: 'Test Session',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
         });
 
@@ -501,8 +481,6 @@ describe('Project', () => {
           const otherSession = Session.create({
             name: 'Other Session',
             projectId: otherProject.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           const result = project.deleteSession(otherSession.getId());
@@ -519,14 +497,10 @@ describe('Project', () => {
           Session.create({
             name: 'Session 1',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
           Session.create({
             name: 'Session 2',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           expect(project.getSessionCount()).toBe(2); // 2 manual sessions
@@ -536,14 +510,10 @@ describe('Project', () => {
           const session1 = Session.create({
             name: 'Session 1',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
           const session2 = Session.create({
             name: 'Session 2',
             projectId: project.getId(),
-            providerInstanceId: testProviderInstances.anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
           });
 
           expect(project.getSessionCount()).toBe(2); // 2 manual sessions

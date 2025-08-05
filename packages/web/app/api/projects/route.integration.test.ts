@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestProviderInstances } from '@/lib/server/lace-imports';
 
 // Mock environment variables to provide test API keys
 vi.mock('~/config/env-loader', () => ({
@@ -56,11 +55,8 @@ interface ErrorResponse {
 }
 
 describe('Projects API Integration Tests', () => {
-  let testProviderInstances: { anthropicInstanceId: string; openaiInstanceId: string };
-
-  beforeEach(async () => {
+  beforeEach(() => {
     setupTestPersistence();
-    testProviderInstances = await setupTestProviderInstances();
   });
 
   afterEach(() => {
@@ -79,15 +75,11 @@ describe('Projects API Integration Tests', () => {
       const { Session } = await import('~/sessions/session');
       Session.create({ 
         name: 'Session 1', 
-        projectId: project1.getId(),
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        projectId: project1.getId()
       });
       Session.create({ 
         name: 'Session 2', 
-        projectId: project1.getId(),
-        providerInstanceId: testProviderInstances.openaiInstanceId,
-        modelId: 'gpt-4o-mini'
+        projectId: project1.getId()
       });
 
       const response = await GET();

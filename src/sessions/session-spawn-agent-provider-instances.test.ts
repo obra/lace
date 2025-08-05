@@ -37,8 +37,6 @@ describe('Session.spawnAgent() with Provider Instances', () => {
     );
     testSession = Session.create({
       name: 'Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: testProject.getId(),
     });
   });

@@ -115,8 +115,6 @@ describe('Tool Batch Completion Behavior', () => {
 
     session = Session.create({
       name: 'Batch Completion Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 

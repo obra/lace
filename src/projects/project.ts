@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { basename } from 'path';
 import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
+import { Session } from '~/sessions/session';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
 import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
@@ -64,9 +65,21 @@ export class Project {
     // Create the project instance
     const project = new Project(projectData.id);
 
-    // NOTE: No longer automatically creating a default session since Session.create()
-    // now requires provider instances. Sessions will be created by the web layer
-    // or CLI with proper provider instance configuration.
+    // Auto-create a default session (no provider info needed at session level)
+    try {
+      Session.create({
+        name: 'Main Session',
+        description: 'Default session for project',
+        projectId: projectData.id,
+      });
+      
+      logger.debug('Auto-created default session for project', { projectId: projectData.id });
+    } catch (error) {
+      logger.warn('Failed to create default session for project', { 
+        projectId: projectData.id, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
 
     return project;
   }

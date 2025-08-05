@@ -51,8 +51,6 @@ describe('Project configuration', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId,
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Test configuration inheritance - this will be implemented
@@ -74,8 +72,6 @@ describe('Project configuration', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId,
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Update configuration with maxTokens
@@ -97,8 +93,6 @@ describe('Project configuration', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId,
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Update configuration with toolPolicies

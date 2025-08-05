@@ -95,8 +95,6 @@ describe('Tool Approval System Integration', () => {
 
     session = Session.create({
       name: 'Tool Approval Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 

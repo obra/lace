@@ -99,8 +99,6 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Create real session with anthropic provider
     session = Session.create({
       name: 'Approval Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 

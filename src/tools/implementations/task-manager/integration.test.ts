@@ -96,8 +96,6 @@ describe('Multi-Agent Task Manager Integration', () => {
     // Create session with anthropic - the provider will be mocked
     session = Session.create({
       name: 'Integration Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 
@@ -368,8 +366,6 @@ describe('Multi-Agent Task Manager Integration', () => {
       const project2 = Project.create('Session 2 Project', '/tmp/test-session2');
       const session2 = Session.create({
         name: 'Session 2 Test',
-        providerInstanceId: testProviderInstances.anthropicInstanceId,
-        modelId: 'claude-sonnet-4-20250514',
         projectId: project2.getId(),
       });
 

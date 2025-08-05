@@ -158,7 +158,9 @@ describe('Session API endpoints under projects', () => {
         body: JSON.stringify({
           name: 'New Session',
           description: 'A new session',
-          configuration: { provider: 'anthropic' },
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {},
         }),
       });
 
@@ -180,6 +182,8 @@ describe('Session API endpoints under projects', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'New Session',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -235,6 +239,8 @@ describe('Session API endpoints under projects', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Minimal Session',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -255,6 +261,8 @@ describe('Session API endpoints under projects', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'New Session',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -279,10 +287,9 @@ describe('Session API endpoints under projects', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Provider Instance Session',
-          configuration: {
-            providerInstanceId: 'test-instance-id',
-            modelId: 'claude-3-5-haiku-20241022'
-          }
+          providerInstanceId: 'test-instance-id',
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {}
         }),
       });
 

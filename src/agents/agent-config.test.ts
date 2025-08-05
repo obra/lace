@@ -45,8 +45,6 @@ describe('Agent Configuration', () => {
     // Create test session
     testSession = Session.create({
       name: 'Test Session',
-      providerInstanceId: testProviderInstances.anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022',
       projectId,
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),

@@ -136,11 +136,9 @@ describe('Session Configuration Integration', () => {
       // Create session with minimal configuration to allow inheritance
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       const effectiveConfig = session.getEffectiveConfiguration();
@@ -157,11 +155,9 @@ describe('Session Configuration Integration', () => {
     it('should override project configuration with session configuration', () => {
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       // Update session configuration
@@ -193,11 +189,9 @@ describe('Session Configuration Integration', () => {
 
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       // Update session tool policies
@@ -248,11 +242,9 @@ describe('Session Configuration Integration', () => {
       // Apply preset to session
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
       session.updateConfiguration(preset!.configuration);
 
@@ -278,11 +270,9 @@ describe('Session Configuration Integration', () => {
     it('should return correct tool policies from configuration', () => {
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       // Set tool policies
@@ -307,11 +297,9 @@ describe('Session Configuration Integration', () => {
     it('should use session working directory override', () => {
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       // Set working directory override
@@ -327,11 +315,9 @@ describe('Session Configuration Integration', () => {
     it('should fall back to project working directory', () => {
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       // Should use project working directory
@@ -345,11 +331,9 @@ describe('Session Configuration Integration', () => {
     it('should include configuration in session info', () => {
       const session = Session.create({
         name: 'Test Session',
+        providerInstanceId: testProviderInstances.anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         projectId,
-        configuration: {
-          providerInstanceId: testProviderInstances.anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
       });
 
       const info = session.getInfo();
