@@ -41,9 +41,8 @@ export class DelegationMockProvider extends BaseMockProvider {
 
   async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     const response = this.responses[this.responseIndex] || 'Mock delegation response';
-    if (this.responseIndex < this.responses.length - 1) {
-      this.responseIndex++;
-    }
+    // Always increment and wrap around for proper cycling
+    this.responseIndex = (this.responseIndex + 1) % Math.max(this.responses.length, 1);
 
     // Look for task assignment message - consistent pattern across all delegation tests
     const taskMessage = messages.find(

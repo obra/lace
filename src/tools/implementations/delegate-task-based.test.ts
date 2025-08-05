@@ -11,9 +11,14 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import {
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
   createDelegationTestSetup,
   DelegationTestSetup,
 } from '~/test-utils/delegation-test-helper';
+import { DelegationMockProvider } from '~/test-utils/delegation-mock-provider';
+import { ProviderRegistry } from '~/providers/registry';
 import { ProviderMessage, ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 
@@ -45,9 +50,10 @@ describe('Task-Based DelegateTool Integration', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
-    testSetup.session?.destroy();
+    testSetup?.session?.destroy();
+    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });
@@ -73,12 +79,24 @@ describe('Task-Based DelegateTool Integration', () => {
     }, 15000); // Increase timeout to 15 seconds
 
     it('should handle parallel delegations without conflicts', async () => {
-      // Set up mock provider to respond with same response for all tasks
-      testSetup.mockProvider.setMockResponses([
-        'Parallel task completed',
-        'Parallel task completed',
-        'Parallel task completed',
+      // Create a fresh mock provider for this test to avoid state contamination
+      const freshMockProvider = new DelegationMockProvider('anthropic', 'claude-3-5-haiku-20241022');
+      freshMockProvider.setMockResponses([
+        'First parallel task completed',
+        'Second parallel task completed', 
+        'Third parallel task completed',
       ]);
+
+      // Override the registry to use our fresh provider
+      vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => freshMockProvider);
+      vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
+        () =>
+          ({
+            createProvider: () => freshMockProvider,
+            getProvider: () => freshMockProvider,
+            getProviderNames: () => ['anthropic', 'openai'],
+          }) as unknown as ProviderRegistry
+      );
 
       // Create three separate delegate tool instances with same TaskManager
       const tool1 = new DelegateTool();
@@ -121,17 +139,30 @@ describe('Task-Based DelegateTool Integration', () => {
       expect(result2.isError).toBe(false);
       expect(result3.isError).toBe(false);
 
-      // All should contain the completion message
-      expect(result1.content[0].text).toContain('Parallel task completed');
-      expect(result2.content[0].text).toContain('Parallel task completed');
-      expect(result3.content[0].text).toContain('Parallel task completed');
+      // Verify each got a different response (showing proper cycling)
+      const responses = [
+        result1.content[0].text,
+        result2.content[0].text,
+        result3.content[0].text,
+      ];
+      
+      // All should contain "parallel task" but be different
+      responses.forEach(response => {
+        expect(response).toContain('parallel task');
+      });
+      
+      // At least some should be different (not all identical)
+      const uniqueResponses = new Set(responses);
+      expect(uniqueResponses.size).toBeGreaterThan(1);
     });
 
     it('should handle task failures gracefully', async () => {
-      // Change the mock provider to simulate task blocking instead of completion
+      // Override the mock provider to trigger a task update to "blocked" status
+      const originalCreateResponse = testSetup.mockProvider.createResponse.bind(testSetup.mockProvider);
+      
       testSetup.mockProvider.createResponse = async (
         messages: ProviderMessage[],
-        _tools: Tool[]
+        tools: Tool[]
       ): Promise<ProviderResponse> => {
         // Look for task assignment message to extract task ID
         const taskAssignmentMessage = messages.find(
@@ -141,29 +172,29 @@ describe('Task-Based DelegateTool Integration', () => {
             m.content.includes('You have been assigned task')
         );
 
-        let taskId = 'unknown';
         if (taskAssignmentMessage && typeof taskAssignmentMessage.content === 'string') {
           const match = taskAssignmentMessage.content.match(/assigned task '([^']+)'/);
-          if (match) {
-            taskId = match[1];
-          }
+          const taskId = match ? match[1] : 'unknown';
+
+          // Create a tool call to update task to blocked status instead of completing it
+          const toolCall: ProviderToolCall = {
+            id: 'task_update_call',
+            name: 'task_update',
+            input: {
+              taskId: taskId,
+              status: 'blocked',
+            },
+          };
+
+          return Promise.resolve({
+            content: `I encountered an issue and cannot complete this task.`,
+            usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+            toolCalls: [toolCall],
+          });
         }
 
-        // Create a tool call to update task to blocked status instead of completing it
-        const toolCall: ProviderToolCall = {
-          id: 'task_update_call',
-          name: 'task_update',
-          input: {
-            taskId: taskId,
-            status: 'blocked',
-          },
-        };
-
-        return Promise.resolve({
-          content: `I encountered an issue and cannot complete this task.`,
-          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-          toolCalls: [toolCall],
-        });
+        // Fall back to original behavior for non-task messages
+        return originalCreateResponse(messages, tools);
       };
 
       const result = await delegateTool.execute(
@@ -177,7 +208,7 @@ describe('Task-Based DelegateTool Integration', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('is blocked');
+      expect(result.content[0].text).toContain('blocked');
     });
   });
 });

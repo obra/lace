@@ -22,7 +22,7 @@ export async function createDelegationTestSetup(options?: {
   provider?: string;
   model?: string;
 }): Promise<DelegationTestSetup> {
-  // Set up test provider instances
+  // Set up test provider instances with predictable IDs
   await setupTestProviderInstances();
 
   const mockProvider = new DelegationMockProvider(
@@ -41,19 +41,21 @@ export async function createDelegationTestSetup(options?: {
       }) as unknown as ProviderRegistry
   );
 
-  // Create project and session
+  // Create project with provider configuration (NOT session configuration)
   const project = Project.create(
     options?.projectName || 'Test Delegation Project',
-    options?.projectPath || '/tmp/test-delegation'
+    options?.projectPath || '/tmp/test-delegation',
+    'Test project for delegation',
+    {
+      providerInstanceId: 'test-anthropic', // Use predictable test provider instance ID
+      modelId: options?.model || 'claude-3-5-haiku-20241022',
+    }
   );
 
+  // Create session WITHOUT provider configuration - it inherits from project
   const session = Session.create({
     name: options?.sessionName || 'Delegation Test Session',
     projectId: project.getId(),
-    configuration: {
-      providerInstanceId: 'test-anthropic',
-      modelId: options?.model || 'claude-3-5-haiku-20241022',
-    },
     approvalCallback: {
       requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
     },
