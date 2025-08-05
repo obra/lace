@@ -19,6 +19,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
+  // Set longer timeout to accommodate server startup and project creation
+  timeout: 60000, // 60 seconds per test
+
   projects: [
     {
       name: 'chromium',
