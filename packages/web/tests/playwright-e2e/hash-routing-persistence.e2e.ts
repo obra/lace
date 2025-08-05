@@ -132,33 +132,29 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     // Navigate through project → session selection - wait for page to load
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
 
-    // Select or create a project - the entire project card is clickable
-    const existingProject = page.locator('h3:has-text("E2E Hash Test Project")').first();
-    if ((await existingProject.count()) > 0) {
-      // Click the project heading (entire project card is clickable)
-      await existingProject.click();
-    } else {
-      // Create project if none exists - check for auto-opened modal first
-      const modalHeading = page
-        .getByRole('heading', { name: 'Welcome to Lace' })
-        .or(page.getByRole('heading', { name: 'Create New Project' }));
+    // Always create a new project with unique name to avoid conflicts
+    // Check for auto-opened modal first
+    const modalHeading = page
+      .getByRole('heading', { name: 'Welcome to Lace' })
+      .or(page.getByRole('heading', { name: 'Create New Project' }));
 
-      try {
-        // Wait a bit to see if modal auto-opens
-        await expect(modalHeading).toBeVisible({ timeout: 5000 });
-        // Modal is already open, proceed directly
-      } catch {
-        // Modal not visible, click the New Project button
-        await page.getByTestId('new-project-button').click();
-        // Now wait for modal to appear after clicking
-        await expect(modalHeading).toBeVisible({ timeout: 15000 });
-      }
-
-      await page.getByTestId('project-path-input').fill('/tmp/e2e-hash-test-project');
-      const createButton = page.getByTestId('create-project-submit-button');
-      await expect(createButton).toBeEnabled({ timeout: 5000 });
-      await createButton.click();
+    try {
+      // Wait a bit to see if modal auto-opens
+      await expect(modalHeading).toBeVisible({ timeout: 5000 });
+      // Modal is already open, proceed directly
+    } catch {
+      // Modal not visible, click the New Project button
+      await page.getByTestId('new-project-button').click();
+      // Now wait for modal to appear after clicking
+      await expect(modalHeading).toBeVisible({ timeout: 15000 });
     }
+
+    const projectPathInput = page.getByTestId('project-path-input');
+    await projectPathInput.waitFor({ timeout: 15000 });
+    await projectPathInput.fill(`/tmp/e2e-session-test-${Date.now()}`);
+    const createButton = page.getByTestId('create-project-submit-button');
+    await expect(createButton).toBeEnabled({ timeout: 5000 });
+    await createButton.click();
 
     // Project creation auto-creates session and navigates to session view
     // Wait for session to be created and loaded (this happens automatically)
