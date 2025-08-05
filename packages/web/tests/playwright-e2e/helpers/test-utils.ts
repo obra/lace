@@ -42,8 +42,9 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
 // Project management utilities
 export async function createProject(page: Page, projectName: string, tempDir: string) {
   // Assume page.goto() has already been called with the test server baseURL
-  // Wait for page to load
-  await page.waitForTimeout(2000);
+  // Wait for DOM to be ready (not networkidle due to SSE streams)
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1000); // Brief pause for React hydration
 
   // Take screenshot before clicking for debugging
   await page.screenshot({ path: 'debug-before-new-project.png' });
@@ -245,8 +246,9 @@ export async function createProjectWithProvider(
   model: string
 ) {
   // Assume page.goto() has already been called with the test server baseURL
-  // Wait for page to load
-  await page.waitForTimeout(2000);
+  // Wait for DOM to be ready (not networkidle due to SSE streams)
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1000); // Brief pause for React hydration
 
   // Click "New Project" button
   const newProjectButton = page

@@ -44,15 +44,21 @@ export async function startTestServer(): Promise<TestServer> {
 
   // Create Next.js app in development mode for easier debugging
   const app = next({
-    dev: true, // Use dev mode for faster startup and better debugging
+    dev: true, // Use dev mode for easier debugging
     dir: process.cwd(),
     quiet: true, // Reduce noise in test output
+    turbo: false, // Disable turbo mode for more stable testing
   });
 
   const handle = app.getRequestHandler();
 
-  // Prepare the Next.js app
-  await app.prepare();
+  // Prepare the Next.js app with timeout
+  await Promise.race([
+    app.prepare(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Next.js app preparation timeout')), 30000)
+    ),
+  ]);
 
   // Create HTTP server
   const server = createServer(async (req, res) => {
@@ -66,13 +72,16 @@ export async function startTestServer(): Promise<TestServer> {
     }
   });
 
-  // Start listening on the port
-  await new Promise<void>((resolve, reject) => {
-    server.listen(port, (err?: Error) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+  // Start listening on the port with timeout
+  await Promise.race([
+    new Promise<void>((resolve, reject) => {
+      server.listen(port, (err?: Error) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Server start timeout')), 10000)),
+  ]);
 
   const baseURL = `http://localhost:${port}`;
 
@@ -81,14 +90,34 @@ export async function startTestServer(): Promise<TestServer> {
     port,
     baseURL,
     cleanup: async () => {
-      await new Promise<void>((resolve) => {
-        server.close(() => resolve());
-      });
-      // Note: app.close() might not be available in all Next.js versions
       try {
-        await app.close?.();
-      } catch {
-        // Ignore cleanup errors
+        // Force close any remaining connections first (Node.js 18.2+)
+        if (typeof server.closeAllConnections === 'function') {
+          server.closeAllConnections();
+        }
+
+        // Close the HTTP server with timeout
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            server.close(() => resolve());
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Server close timeout')), 5000)
+          ),
+        ]);
+
+        // Close the Next.js app with timeout
+        if (app.close) {
+          await Promise.race([
+            app.close(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Next.js app close timeout')), 5000)
+            ),
+          ]);
+        }
+      } catch (error) {
+        console.warn('Warning: Error during server cleanup:', error);
+        // Continue cleanup even if there are errors
       }
     },
   };
