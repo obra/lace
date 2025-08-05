@@ -71,7 +71,7 @@ describe('Multi-Agent Task Manager Integration', () => {
   beforeEach(async () => {
     setupTestPersistence();
     setupTestProviderDefaults();
-    await setupTestProviderInstances();
+    // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
     // Mock the ProviderRegistry to return our mock provider
@@ -91,10 +91,18 @@ describe('Multi-Agent Task Manager Integration', () => {
       return mockRegistry;
     });
 
-    // Create project first
-    project = Project.create('Integration Test Project', '/tmp/test-integration');
+    // Create project first with provider configuration
+    project = Project.create(
+      'Integration Test Project', 
+      '/tmp/test-integration',
+      'Test project for task manager integration',
+      {
+        providerInstanceId: 'anthropic-default', // Use environment-based default
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
 
-    // Create session with anthropic - the provider will be mocked
+    // Create session - it inherits provider config from project
     session = Session.create({
       name: 'Integration Test Session',
       projectId: project.getId(),
@@ -130,8 +138,7 @@ describe('Multi-Agent Task Manager Integration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    // Clean up provider instances
-    await cleanupTestProviderInstances(['test-anthropic', 'test-openai']);
+    // Using simpler provider defaults approach, no complex cleanup needed
     teardownTestPersistence();
     cleanupTestProviderDefaults();
   });
@@ -361,8 +368,16 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   describe('Session isolation', () => {
     it('should isolate tasks between different sessions', async () => {
-      // Create a second session with different project
-      const project2 = Project.create('Session 2 Project', '/tmp/test-session2');
+      // Create a second session with different project (with provider config)
+      const project2 = Project.create(
+        'Session 2 Project', 
+        '/tmp/test-session2',
+        'Second test project for session isolation',
+        {
+          providerInstanceId: 'anthropic-default',
+          modelId: 'claude-3-5-haiku-20241022',
+        }
+      );
       const session2 = Session.create({
         name: 'Session 2 Test',
         projectId: project2.getId(),
