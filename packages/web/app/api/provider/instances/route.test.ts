@@ -1,4 +1,4 @@
-// ABOUTME: Tests for provider instances API endpoint (GET/POST /api/provider/instances)  
+// ABOUTME: Tests for provider instances API endpoint (GET/POST /api/provider/instances)
 // ABOUTME: Verifies instance listing and creation with real implementations
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -8,8 +8,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { GET, POST } from './route';
 import { parseResponse } from '@/lib/serialization';
-import type { ProviderInstancesConfig } from '~/providers/catalog/types';
-import type { ConfiguredInstance } from '~/providers/registry';
+import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
+import type { ConfiguredInstance } from '@/lib/server/lace-imports';
 import type { InstancesResponse, CreateInstanceResponse } from './route';
 
 describe('Provider Instances API', () => {
@@ -88,10 +88,7 @@ describe('Provider Instances API', () => {
 
     it('should handle corrupted config file gracefully', async () => {
       // Write invalid JSON
-      fs.writeFileSync(
-        path.join(tempDir, 'provider-instances.json'),
-        'invalid json{'
-      );
+      fs.writeFileSync(path.join(tempDir, 'provider-instances.json'), 'invalid json{');
 
       const mockRequest = {} as NextRequest;
       const response = await GET(mockRequest);
@@ -136,18 +133,18 @@ describe('Provider Instances API', () => {
 
       expect(response.status).toBe(200);
       expect(data.instances).toHaveLength(2);
-      
+
       const withCreds = data.instances.find((i: ConfiguredInstance) => i.id === 'with-creds');
       const withoutCreds = data.instances.find((i: ConfiguredInstance) => i.id === 'without-creds');
-      
+
       expect(withCreds).toMatchObject({
         id: 'with-creds',
         displayName: 'Instance With Credentials',
         hasCredentials: true,
       });
-      
+
       expect(withoutCreds).toMatchObject({
-        id: 'without-creds', 
+        id: 'without-creds',
         displayName: 'Instance Without Credentials',
         hasCredentials: false,
       });
@@ -183,7 +180,7 @@ describe('Provider Instances API', () => {
         catalogProviderId: 'openai',
         hasCredentials: false,
       });
-      
+
       // Verify optional fields are undefined (not included in response)
       expect(data.instances[0].endpoint).toBeUndefined();
       expect(data.instances[0].retryPolicy).toBeUndefined();
@@ -219,7 +216,7 @@ describe('Provider Instances API', () => {
       // Verify instance was saved to file
       const configPath = path.join(tempDir, 'provider-instances.json');
       expect(fs.existsSync(configPath)).toBe(true);
-      
+
       const savedConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       expect(savedConfig.instances['openai-test']).toMatchObject({
         displayName: 'OpenAI Test',
@@ -230,7 +227,7 @@ describe('Provider Instances API', () => {
       // Verify credential was saved
       const credentialPath = path.join(tempDir, 'credentials', 'openai-test.json');
       expect(fs.existsSync(credentialPath)).toBe(true);
-      
+
       const savedCredential = JSON.parse(fs.readFileSync(credentialPath, 'utf-8'));
       expect(savedCredential).toMatchObject({
         apiKey: 'sk-test123',
@@ -239,7 +236,7 @@ describe('Provider Instances API', () => {
       // Verify instance appears in GET with correct contract
       const getResponse = await GET({} as NextRequest);
       const getData = await parseResponse<InstancesResponse>(getResponse);
-      
+
       expect(getData.instances).toHaveLength(1);
       expect(getData.instances[0]).toMatchObject({
         id: 'openai-test',
@@ -252,7 +249,7 @@ describe('Provider Instances API', () => {
 
     it('should reject invalid request body', async () => {
       const invalidBody = {
-        instanceId: '',  // Invalid: empty string
+        instanceId: '', // Invalid: empty string
         displayName: 'Test',
         catalogProviderId: 'openai',
       };

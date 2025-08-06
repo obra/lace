@@ -6,10 +6,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { Session } from '@/lib/server/lace-imports';
-
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -49,21 +51,21 @@ describe('Session API endpoints under projects', () => {
   describe('GET /api/projects/:projectId/sessions', () => {
     it('should return sessions for project', async () => {
       // Create additional sessions in the project
-      Session.create({ 
-        name: 'Session 1', 
+      Session.create({
+        name: 'Session 1',
         projectId,
         configuration: {
           providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
-        }
+        },
       });
-      Session.create({ 
-        name: 'Session 2', 
+      Session.create({
+        name: 'Session 2',
         projectId,
         configuration: {
           providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
-        }
+        },
       });
 
       const response = await GET(
@@ -73,15 +75,17 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = await parseResponse<{ sessions: Array<{ id: string; name: string; createdAt: Date; agentCount: number }> }>(response);
+      const data = await parseResponse<{
+        sessions: Array<{ id: string; name: string; createdAt: Date; agentCount: number }>;
+      }>(response);
 
       expect(response.status).toBe(200);
       expect(data.sessions.length).toBeGreaterThan(0);
-      
+
       // Find our created sessions
-      const session1 = data.sessions.find(s => s.name === 'Session 1');
-      const session2 = data.sessions.find(s => s.name === 'Session 2');
-      
+      const session1 = data.sessions.find((s) => s.name === 'Session 1');
+      const session2 = data.sessions.find((s) => s.name === 'Session 2');
+
       expect(session1).toBeDefined();
       expect(session2).toBeDefined();
     });
@@ -216,7 +220,7 @@ describe('Session API endpoints under projects', () => {
           name: 'Provider Instance Session',
           providerInstanceId,
           modelId: 'claude-3-5-haiku-20241022',
-          configuration: {}
+          configuration: {},
         }),
       });
 

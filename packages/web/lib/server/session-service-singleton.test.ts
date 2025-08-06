@@ -10,8 +10,11 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -56,15 +59,10 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
   it('should reproduce the exact E2E test scenario step by step', async () => {
     // Step 1: Create project with provider instance
-    const testProject = Project.create(
-      'Test Project',
-      '/test/path',
-      'Test project for API test',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const projectId = testProject.getId();
 
     // Step 2: Create session using Session.create (inherits provider from project)
@@ -81,7 +79,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
       const agent = session!.spawnAgent({
         name: 'Message Agent',
         providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        modelId: 'claude-3-5-haiku-20241022',
       });
 
       // Step 4: Verify agent is retrievable from the session
@@ -122,7 +120,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
       const _agent = sessionForAgent!.spawnAgent({
         name: `Test Agent ${i}`,
         providerInstanceId: providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        modelId: 'claude-3-5-haiku-20241022',
       });
       expect(_agent).toBeDefined();
     }
@@ -147,7 +145,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     const _agent = sessionForAgent!.spawnAgent({
       name: 'Test Agent',
       providerInstanceId: providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Clear active sessions
@@ -159,7 +157,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     const _secondAgent = sessionForSecondAgent!.spawnAgent({
       name: 'Another Agent',
       providerInstanceId: providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
   });
 
@@ -182,7 +180,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
     const _agent = sessionForAgent!.spawnAgent({
       name: 'Test Agent',
       providerInstanceId: providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Clear active sessions
@@ -199,7 +197,7 @@ describe('SessionService Singleton E2E Reproduction', () => {
       const _newAgent = reconstructedSession.spawnAgent({
         name: 'New Agent',
         providerInstanceId: providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        modelId: 'claude-3-5-haiku-20241022',
       });
       expect(_newAgent).toBeDefined();
     } else {

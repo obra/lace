@@ -9,7 +9,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -22,7 +25,6 @@ describe('Session.spawnAgent Method', () => {
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
@@ -34,7 +36,7 @@ describe('Session.spawnAgent Method', () => {
       displayName: 'Test Anthropic Instance',
       apiKey: 'test-anthropic-key',
     });
-    
+
     openaiInstanceId = await createTestProviderInstance({
       catalogId: 'openai',
       models: ['gpt-4o'],
@@ -52,8 +54,8 @@ describe('Session.spawnAgent Method', () => {
       projectId,
       configuration: {
         providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
-      }
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
   });
 
@@ -70,7 +72,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Test Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Verify agent properties
@@ -91,7 +93,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Retrievable Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 
@@ -109,7 +111,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Persistent Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 
@@ -130,17 +132,17 @@ describe('Session.spawnAgent Method', () => {
     const agent1 = session.spawnAgent({
       name: 'Agent 1',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agent2 = session.spawnAgent({
       name: 'Agent 2',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agent3 = session.spawnAgent({
       name: 'Agent 3',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Verify unique thread IDs
@@ -163,7 +165,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Eventful Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 
@@ -188,7 +190,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Cached Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 
@@ -242,7 +244,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Thread Switch Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 
@@ -286,7 +288,7 @@ describe('Session.spawnAgent Method', () => {
     const agent = session.spawnAgent({
       name: 'Reconstructable Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 

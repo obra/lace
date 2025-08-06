@@ -7,11 +7,13 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 
 // CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
 const _tempLaceDir = setupWebTest();
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import { Session } from '@/lib/server/lace-imports';
-
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -57,12 +59,12 @@ describe('Projects API Integration Tests', () => {
   beforeEach(async () => {
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
-    // Force persistence reset to ensure clean database state  
+
+    // Force persistence reset to ensure clean database state
     const { resetPersistence } = await import('~/persistence/database');
     resetPersistence();
 
-    // Create test provider instance  
+    // Create test provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022'],
@@ -93,13 +95,13 @@ describe('Projects API Integration Tests', () => {
 
       // Create sessions in project1 to test session counting
       const { Session } = await import('~/sessions/session');
-      Session.create({ 
-        name: 'Session 1', 
-        projectId: project1.getId()
+      Session.create({
+        name: 'Session 1',
+        projectId: project1.getId(),
       });
-      Session.create({ 
-        name: 'Session 2', 
-        projectId: project1.getId()
+      Session.create({
+        name: 'Session 2',
+        projectId: project1.getId(),
       });
 
       const response = await GET();

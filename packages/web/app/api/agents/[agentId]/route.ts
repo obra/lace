@@ -9,7 +9,6 @@ import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
-import { logger } from '@/lib/server/lace-imports';
 
 const AgentUpdateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -80,9 +79,6 @@ export async function PUT(
 
     const body = (await request.json()) as Record<string, unknown>;
 
-    // Log the incoming request for debugging
-    logger.debug('Agent update request:', { agentId, body });
-
     let validatedData;
     try {
       validatedData = AgentUpdateSchema.parse(body);
@@ -93,7 +89,6 @@ export async function PUT(
           message: e.message,
           received: body[e.path[0] as keyof typeof body],
         }));
-        logger.error('Agent update validation failed:', { agentId, errors: details, body });
         return createErrorResponse(
           `Validation failed: ${details.map((d) => `${d.path}: ${d.message}`).join(', ')}`,
           400,
@@ -136,18 +131,10 @@ export async function PUT(
       );
 
       if (!instance) {
-        logger.error('Provider instance not found:', {
-          providedId: validatedData.providerInstanceId,
+        return createErrorResponse('Provider instance not found', 400, {
+          code: 'VALIDATION_FAILED',
           availableInstances: configuredInstances.map((i) => ({ id: i.id, name: i.name })),
         });
-        return createErrorResponse(
-          `Provider instance '${validatedData.providerInstanceId}' not found. Available instances: ${configuredInstances.map((i) => i.name).join(', ')}`,
-          400,
-          {
-            code: 'VALIDATION_FAILED',
-            availableInstances: configuredInstances.map((i) => ({ id: i.id, name: i.name })),
-          }
-        );
       }
     }
 
@@ -180,8 +167,6 @@ export async function PUT(
     return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
     // Zod errors are now handled above with better messages
-
-    logger.error('Agent update failed:', { agentId, error });
 
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to update agent',

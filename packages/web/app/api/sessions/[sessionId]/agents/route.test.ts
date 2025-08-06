@@ -11,7 +11,7 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
@@ -27,7 +27,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 // Import the real API route handlers after mocks
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project } from '~/projects/project';
+import { Project } from '@/lib/server/lace-imports';
 import type { AgentInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 

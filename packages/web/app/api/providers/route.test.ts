@@ -7,7 +7,7 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module

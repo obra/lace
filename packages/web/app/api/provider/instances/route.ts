@@ -2,11 +2,15 @@
 // ABOUTME: Handles listing and creating provider instances with credential management
 
 import { NextRequest } from 'next/server';
-import { ProviderRegistry, ProviderInstanceManager, ProviderCatalogManager } from '@/lib/server/lace-imports';
+import {
+  ProviderRegistry,
+  ProviderInstanceManager,
+  ProviderCatalogManager,
+} from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
-import type { ConfiguredInstance } from '~/providers/registry';
+import type { ConfiguredInstance } from '@/lib/server/lace-imports';
 
 export interface InstancesResponse {
   instances: ConfiguredInstance[];
@@ -18,7 +22,13 @@ export interface CreateInstanceResponse {
 }
 
 const CreateInstanceSchema = z.object({
-  instanceId: z.string().min(1, 'Instance ID is required').regex(/^[a-z0-9\-]+$/, 'Instance ID must contain only lowercase letters, numbers, and hyphens'),
+  instanceId: z
+    .string()
+    .min(1, 'Instance ID is required')
+    .regex(
+      /^[a-z0-9\-]+$/,
+      'Instance ID must contain only lowercase letters, numbers, and hyphens'
+    ),
   displayName: z.string().min(1, 'Display name is required'),
   catalogProviderId: z.string().min(1, 'Catalog provider ID is required'),
   endpoint: z.string().url().optional(),
@@ -39,9 +49,10 @@ export async function GET(_request: NextRequest) {
 
     return createSuperjsonResponse({ instances } as InstancesResponse);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to load provider instances';
-    return createErrorResponse(errorMessage, 500, { 
-      code: 'INSTANCES_LOAD_FAILED'
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to load provider instances';
+    return createErrorResponse(errorMessage, 500, {
+      code: 'INSTANCES_LOAD_FAILED',
     });
   }
 }
@@ -54,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Validate catalog provider exists
     const catalogManager = new ProviderCatalogManager();
     await catalogManager.loadCatalogs();
-    
+
     const catalogProvider = catalogManager.getProvider(validatedData.catalogProviderId);
     if (!catalogProvider) {
       return createErrorResponse(
@@ -70,11 +81,9 @@ export async function POST(request: NextRequest) {
 
     // Check for duplicate instance ID
     if (config.instances[validatedData.instanceId]) {
-      return createErrorResponse(
-        `Instance ID already exists: ${validatedData.instanceId}`,
-        400,
-        { code: 'DUPLICATE_INSTANCE_ID' }
-      );
+      return createErrorResponse(`Instance ID already exists: ${validatedData.instanceId}`, 400, {
+        code: 'DUPLICATE_INSTANCE_ID',
+      });
     }
 
     // Create new instance
@@ -96,9 +105,9 @@ export async function POST(request: NextRequest) {
     });
 
     return createSuperjsonResponse(
-      { 
-        success: true, 
-        instanceId: validatedData.instanceId 
+      {
+        success: true,
+        instanceId: validatedData.instanceId,
       } as CreateInstanceResponse,
       { status: 201 }
     );
@@ -110,9 +119,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create provider instance';
-    return createErrorResponse(errorMessage, 500, { 
-      code: 'INSTANCE_CREATION_FAILED'
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to create provider instance';
+    return createErrorResponse(errorMessage, 500, {
+      code: 'INSTANCE_CREATION_FAILED',
     });
   }
 }

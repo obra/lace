@@ -7,8 +7,11 @@ import { Project, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import type { StreamEvent } from '@/types/stream-events';
 import { asThreadId } from '@/types/core';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Import real EventStreamManager for integration testing
 import { EventStreamManager } from '@/lib/event-stream-manager';
@@ -395,10 +398,10 @@ describe('SessionService TaskManager Event Forwarding', () => {
             threadId: asThreadId('test-session'),
             createdAt: new Date(),
             updatedAt: new Date(),
-            notes: []
+            notes: [],
           },
           context: { actor: 'human' },
-          timestamp: new Date()
+          timestamp: new Date(),
         },
       };
 

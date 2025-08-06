@@ -7,12 +7,9 @@ import { GET } from '@/app/api/sessions/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { Session } from '~/sessions/session';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { cleanupTestProviderInstances } from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
 
 // No mocking of env-loader needed - setupTestProviderDefaults() handles env vars
 
@@ -34,8 +31,8 @@ describe('Session API Routes', () => {
 
     // Create test provider instance with the ID that Session.create() prefers
     // Session.create() looks for 'anthropic-default' first, so we need to create it with that ID
-    const { ProviderInstanceManager } = await import('~/providers/instance/manager');
-    const { ProviderCatalogManager } = await import('~/providers/catalog/manager');
+    const { ProviderInstanceManager } = await import('@/lib/server/lace-imports');
+    const { ProviderCatalogManager } = await import('@/lib/server/lace-imports');
 
     const instanceManager = new ProviderInstanceManager();
     const catalogManager = new ProviderCatalogManager();
@@ -93,7 +90,7 @@ describe('Session API Routes', () => {
 
     it('should list all sessions', async () => {
       // Arrange: Create real project and sessions using real services
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const { getSessionService } = await import('@/lib/server/session-service');
 
       // Create and ensure project is saved
@@ -136,7 +133,7 @@ describe('Session API Routes', () => {
 
     it('should handle listing errors gracefully', async () => {
       // Arrange: Force a database error by corrupting the persistence layer
-      const { getPersistence } = await import('~/persistence/database');
+      const { getPersistence } = await import('@/lib/server/lace-imports');
 
       // Override a persistence method to throw an error
       const _originalMethod = getPersistence().database;

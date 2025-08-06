@@ -12,8 +12,11 @@ import { asThreadId } from '@/types/core';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 
@@ -65,10 +68,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     testProjectId = project.getId();
 
     // Create session using sessionService (inherits provider from project)
-    const newSession = await sessionService.createSession(
-      'Test Session',
-      testProjectId
-    );
+    const newSession = await sessionService.createSession('Test Session', testProjectId);
     testSessionId = newSession.id;
 
     // Get the active session instance to access task manager

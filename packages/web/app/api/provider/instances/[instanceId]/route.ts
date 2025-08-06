@@ -5,8 +5,8 @@ import { NextRequest } from 'next/server';
 import { ProviderRegistry, ProviderInstanceManager } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import type { ConfiguredInstance } from '~/providers/registry';
-import { ProviderInstanceSchema, CredentialSchema } from '~/providers/catalog/types';
+import type { ConfiguredInstance } from '@/lib/server/lace-imports';
+import { ProviderInstanceSchema, CredentialSchema } from '@/lib/server/lace-imports';
 
 export interface InstanceDetailResponse {
   instance: ConfiguredInstance;
@@ -26,26 +26,24 @@ export async function GET(
 ) {
   try {
     const { instanceId } = await params;
-    
+
     const registry = new ProviderRegistry();
     await registry.initialize();
 
     const instances = await registry.getConfiguredInstances();
-    const instance = instances.find(inst => inst.id === instanceId);
+    const instance = instances.find((inst) => inst.id === instanceId);
 
     if (!instance) {
-      return createErrorResponse(
-        `Instance not found: ${instanceId}`,
-        404,
-        { code: 'INSTANCE_NOT_FOUND' }
-      );
+      return createErrorResponse(`Instance not found: ${instanceId}`, 404, {
+        code: 'INSTANCE_NOT_FOUND',
+      });
     }
 
     return createSuperjsonResponse({ instance } as InstanceDetailResponse);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to get provider instance';
-    return createErrorResponse(errorMessage, 500, { 
-      code: 'INSTANCE_GET_FAILED'
+    return createErrorResponse(errorMessage, 500, {
+      code: 'INSTANCE_GET_FAILED',
     });
   }
 }
@@ -56,17 +54,15 @@ export async function DELETE(
 ) {
   try {
     const { instanceId } = await params;
-    
+
     const instanceManager = new ProviderInstanceManager();
     const config = await instanceManager.loadInstances();
 
     // Check if instance exists
     if (!config.instances[instanceId]) {
-      return createErrorResponse(
-        `Instance not found: ${instanceId}`,
-        404,
-        { code: 'INSTANCE_NOT_FOUND' }
-      );
+      return createErrorResponse(`Instance not found: ${instanceId}`, 404, {
+        code: 'INSTANCE_NOT_FOUND',
+      });
     }
 
     // Delete instance and credential
@@ -74,9 +70,10 @@ export async function DELETE(
 
     return createSuperjsonResponse({ success: true } as DeleteInstanceResponse);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to delete provider instance';
-    return createErrorResponse(errorMessage, 500, { 
-      code: 'INSTANCE_DELETE_FAILED'
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to delete provider instance';
+    return createErrorResponse(errorMessage, 500, {
+      code: 'INSTANCE_DELETE_FAILED',
     });
   }
 }
@@ -87,18 +84,16 @@ export async function PUT(
 ) {
   try {
     const { instanceId } = await params;
-    const requestBody = await request.json() as Record<string, unknown>;
-    
+    const requestBody = (await request.json()) as Record<string, unknown>;
+
     const instanceManager = new ProviderInstanceManager();
     const config = await instanceManager.loadInstances();
 
     // Check if instance exists
     if (!config.instances[instanceId]) {
-      return createErrorResponse(
-        `Instance not found: ${instanceId}`,
-        404,
-        { code: 'INSTANCE_NOT_FOUND' }
-      );
+      return createErrorResponse(`Instance not found: ${instanceId}`, 404, {
+        code: 'INSTANCE_NOT_FOUND',
+      });
     }
 
     // Extract credential from request body if provided
@@ -107,13 +102,12 @@ export async function PUT(
     // Validate instance updates using Zod schema (partial validation)
     const updateSchema = ProviderInstanceSchema.partial();
     const validationResult = updateSchema.safeParse(instanceUpdates);
-    
+
     if (!validationResult.success) {
-      return createErrorResponse(
-        `Invalid instance data: ${validationResult.error.message}`,
-        400,
-        { code: 'VALIDATION_ERROR', details: validationResult.error.issues }
-      );
+      return createErrorResponse(`Invalid instance data: ${validationResult.error.message}`, 400, {
+        code: 'VALIDATION_ERROR',
+        details: validationResult.error.issues,
+      });
     }
 
     // Update instance configuration (excluding catalogProviderId)
@@ -137,21 +131,18 @@ export async function PUT(
     const registry = new ProviderRegistry();
     await registry.initialize();
     const instances = await registry.getConfiguredInstances();
-    const updatedInstance = instances.find(inst => inst.id === instanceId);
+    const updatedInstance = instances.find((inst) => inst.id === instanceId);
 
     if (!updatedInstance) {
-      return createErrorResponse(
-        'Instance not found after update',
-        500,
-        { code: 'UPDATE_FAILED' }
-      );
+      return createErrorResponse('Instance not found after update', 500, { code: 'UPDATE_FAILED' });
     }
 
     return createSuperjsonResponse({ instance: updatedInstance } as UpdateInstanceResponse);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update provider instance';
-    return createErrorResponse(errorMessage, 500, { 
-      code: 'INSTANCE_UPDATE_FAILED'
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to update provider instance';
+    return createErrorResponse(errorMessage, 500, {
+      code: 'INSTANCE_UPDATE_FAILED',
     });
   }
 }

@@ -7,8 +7,11 @@ import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
@@ -62,10 +65,7 @@ describe('Session Configuration API', () => {
       maxTokens: 4000,
     });
 
-    const session = await sessionService.createSession(
-      'Test Session',
-      testProject.getId()
-    );
+    const session = await sessionService.createSession('Test Session', testProject.getId());
     sessionId = session.id;
   });
 
@@ -84,15 +84,17 @@ describe('Session Configuration API', () => {
 
       expect(response.status).toBe(200);
       expect(data.configuration).toBeDefined();
-      
+
       // With the new provider instance system, configuration format might be different
-      
+
       // Basic expectations - the exact field names might differ with new provider system
-      expect(data.configuration).toEqual(expect.objectContaining({
-        providerInstanceId: providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-        maxTokens: 4000,
-      }));
+      expect(data.configuration).toEqual(
+        expect.objectContaining({
+          providerInstanceId: providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+          maxTokens: 4000,
+        })
+      );
     });
 
     it('should return 404 when session not found', async () => {
@@ -229,10 +231,7 @@ describe('TDD: Direct Session Usage', () => {
       providerInstanceId: tddProviderInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
-    const session = await sessionService.createSession(
-      'TDD Test Session',
-      testProject.getId()
-    );
+    const session = await sessionService.createSession('TDD Test Session', testProject.getId());
     testSessionId = session.id;
   });
 

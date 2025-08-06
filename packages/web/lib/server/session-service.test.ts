@@ -6,16 +6,13 @@ import { getSessionService, SessionService } from '@/lib/server/session-service'
 import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { TestProvider } from '~/test-utils/test-provider';
+import { TestProvider } from '@/lib/server/lace-imports';
 import type { SessionEvent } from '@/types/web-sse';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@/lib/server/lace-imports';
 
 describe('SessionService with Provider Instances', () => {
   const _tempLaceDir = setupWebTest();

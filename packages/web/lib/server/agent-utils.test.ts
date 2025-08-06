@@ -6,10 +6,13 @@ import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
-import { TestProvider } from '~/test-utils/test-provider';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { ApprovalPendingError, ApprovalDecision } from '@/lib/server/lace-imports';
+import { TestProvider } from '@/lib/server/lace-imports';
 
 describe('Event-Based Approval Callback', () => {
   const _tempLaceDir = setupWebTest();
@@ -23,7 +26,7 @@ describe('Event-Based Approval Callback', () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
+
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022'],
@@ -41,15 +44,10 @@ describe('Event-Based Approval Callback', () => {
     const provider = new TestProvider();
 
     // Create project and session with provider configuration
-    const project = Project.create(
-      'Test Project',
-      process.cwd(),
-      'Test project',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const project = Project.create('Test Project', process.cwd(), 'Test project', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),

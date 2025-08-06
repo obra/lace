@@ -7,18 +7,15 @@ import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '~/projects/project';
+import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
-import { Session } from '~/sessions/session';
+import { Session } from '@/lib/server/lace-imports';
 
 // ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
 // Required for Next.js framework compatibility during testing

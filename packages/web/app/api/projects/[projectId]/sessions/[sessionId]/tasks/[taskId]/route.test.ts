@@ -14,8 +14,11 @@ import { getSessionService } from '@/lib/server/session-service';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -41,7 +44,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
   };
 
   beforeEach(async () => {
-
     // Set up test provider defaults
     setupTestProviderDefaults();
     Session.clearProviderCache();
@@ -57,22 +59,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     sessionService = getSessionService();
 
     // Create a real test project with provider configuration
-    const project = Project.create(
-      'Test Project',
-      process.cwd(),
-      'Project for testing',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
     // Create a real session
-    const newSession = await sessionService.createSession(
-      'Test Session',
-      testProjectId
-    );
+    const newSession = await sessionService.createSession('Test Session', testProjectId);
     testSessionId = newSession.id;
 
     // Get the active session instance to access task manager

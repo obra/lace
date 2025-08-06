@@ -12,8 +12,11 @@ import { asThreadId } from '@/types/core';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 
@@ -44,26 +47,20 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
+
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022'],
       apiKey: 'test-anthropic-key',
     });
 
-
     sessionService = getSessionService();
 
     // Create a real test project with provider configuration
-    const project = Project.create(
-      'Test Project',
-      process.cwd(),
-      'Project for testing',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
     // Create a real session that inherits from project

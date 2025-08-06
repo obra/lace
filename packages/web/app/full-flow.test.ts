@@ -15,8 +15,11 @@ import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route'
 import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
@@ -40,8 +43,12 @@ describe('Full Conversation Flow', () => {
     Session.clearProviderCache();
 
     // Set up spies on real EventStreamManager
-    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection') as ReturnType<typeof vi.spyOn>;
-    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast') as ReturnType<typeof vi.spyOn>;
+    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection') as ReturnType<
+      typeof vi.spyOn
+    >;
+    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast') as ReturnType<
+      typeof vi.spyOn
+    >;
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';

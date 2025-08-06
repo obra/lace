@@ -13,7 +13,10 @@ import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
@@ -56,22 +59,14 @@ describe('Thread Messaging API', () => {
     sessionService = getSessionService();
 
     // Create a real test project with provider configuration
-    const project = Project.create(
-      'Test Project', 
-      process.cwd(), 
-      'Project for testing',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
     // Create a real session (will inherit provider config from project)
-    const session = await sessionService.createSession(
-      'Test Session',
-      testProjectId
-    );
+    const session = await sessionService.createSession('Test Session', testProjectId);
     realSessionId = session.id;
     realThreadId = session.id; // Session ID equals coordinator thread ID
   });
@@ -218,7 +213,7 @@ describe('Thread Messaging API', () => {
     const delegateAgent = session!.spawnAgent({
       name: 'Test Delegate',
       providerInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const delegateThreadId = delegateAgent.threadId;
 

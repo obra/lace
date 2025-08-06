@@ -18,5 +18,27 @@ export { ThreadManager } from '~/threads/thread-manager';
 // Tool types
 export type { ToolResult, ToolCall, ToolContext, ToolAnnotations } from '~/tools/types';
 
+// Provider types
+export type { CatalogProvider, ProviderInstancesConfig } from '~/providers/catalog/types';
+export { ProviderInstanceSchema, CredentialSchema } from '~/providers/catalog/types';
+export type { ConfiguredInstance } from '~/providers/registry';
+export type { AIProvider } from '~/providers/base-provider';
+
+// Tool implementations
+export { FileReadTool } from '~/tools/implementations/file-read';
+export type { Tool } from '~/tools/tool';
+
 // Test utilities
-export { createTestProviderInstance } from '~/test-utils/provider-instances';
+export {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+export {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+export { TestProvider } from '~/test-utils/test-provider';
+export { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
+
+// Database
+export { getPersistence } from '~/persistence/database';

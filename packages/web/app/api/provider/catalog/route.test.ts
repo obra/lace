@@ -5,11 +5,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { GET } from './route';
 import { parseResponse } from '@/lib/serialization';
-import type { CatalogProvider } from '~/providers/catalog/types';
+import type { CatalogProvider } from '@/lib/server/lace-imports';
 import type { CatalogResponse } from './route';
 
 // Mock the ProviderRegistry
-vi.mock('~/providers/registry', () => ({
+vi.mock('@/lib/server/lace-imports', () => ({
   ProviderRegistry: vi.fn().mockImplementation(() => ({
     initialize: vi.fn(),
     getCatalogProviders: vi.fn(),
@@ -25,7 +25,7 @@ describe('Provider Catalog API', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    const { ProviderRegistry } = await import('~/providers/registry');
+    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
     mockRegistry = {
       initialize: vi.fn(),
       getCatalogProviders: vi.fn(),

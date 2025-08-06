@@ -100,9 +100,11 @@ export function SessionConfigPanel({
   const [editNewEnvValue, setEditNewEnvValue] = useState('');
 
 
-  // Get available providers (only those that are configured)
+  // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
-    return providers.filter(p => p.configured);
+    return providers.filter((p): p is ProviderInfo & { instanceId: string } => 
+      Boolean(p.configured && p.instanceId)
+    );
   }, [providers]);
 
   // Reset form when project changes
@@ -333,9 +335,9 @@ export function SessionConfigPanel({
   };
 
   // Handle agent edit
-  const handleEditAgentClick = (agent: AgentInfo) => {
-    // Convert AgentInfo to edit format - must have provider instance
-    const provider = providers.find(p => p.instanceId);
+  const handleEditAgentClick = (agent: { threadId: string; name: string; status: string }) => {
+    // Convert agent to edit format - must have provider instance
+    const provider = availableProviders[0];
     if (!provider) {
       console.error('No provider instances configured');
       return;
@@ -344,7 +346,7 @@ export function SessionConfigPanel({
     setEditingAgent({
       threadId: agent.threadId,
       name: agent.name,
-      providerInstanceId: provider.instanceId!,
+      providerInstanceId: provider.instanceId,
       modelId: provider.models[0]?.id || 'unknown'
     });
     setShowEditAgent(true);
@@ -1023,6 +1025,9 @@ export function SessionConfigPanel({
               </div>
 
               <div>
+                <label className="label">
+                  <span className="label-text font-medium">Model</span>
+                </label>
                 <select
                   value={editingAgent.modelId}
                   onChange={(e) => setEditingAgent(prev => prev ? { ...prev, modelId: e.target.value } : null)}

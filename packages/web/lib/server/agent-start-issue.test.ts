@@ -11,7 +11,10 @@ import type { ToolExecutor } from '@/lib/server/lace-imports';
 import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -24,7 +27,6 @@ describe('Agent Spawning and Thread Creation', () => {
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
@@ -36,7 +38,7 @@ describe('Agent Spawning and Thread Creation', () => {
       displayName: 'Test Anthropic Instance',
       apiKey: 'test-anthropic-key',
     });
-    
+
     openaiInstanceId = await createTestProviderInstance({
       catalogId: 'openai',
       models: ['gpt-4o'],
@@ -54,8 +56,8 @@ describe('Agent Spawning and Thread Creation', () => {
       projectId,
       configuration: {
         providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
-      }
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
   });
 
@@ -80,7 +82,7 @@ describe('Agent Spawning and Thread Creation', () => {
     const agent = session.spawnAgent({
       name: 'Test Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId;
 

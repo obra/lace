@@ -13,8 +13,11 @@ import type { SessionEvent } from '@/types/web-sse';
 import type { ApiErrorResponse } from '@/types/api';
 import { asThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 

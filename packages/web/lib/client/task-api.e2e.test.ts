@@ -8,8 +8,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 
@@ -44,7 +47,7 @@ describe('TaskAPIClient E2E Tests', () => {
   beforeEach(async () => {
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
+
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022'],
@@ -63,7 +66,7 @@ describe('TaskAPIClient E2E Tests', () => {
       }
     );
     projectId = testProject.getId();
-    
+
     const session = Session.create({
       name: 'TaskAPIClient E2E Test Session',
       projectId,

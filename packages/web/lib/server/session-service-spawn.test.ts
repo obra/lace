@@ -10,8 +10,8 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { cleanupTestProviderInstances } from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -65,15 +65,10 @@ describe('SessionService.spawnAgent Method', () => {
     sessionService = getSessionService();
 
     // Create a test project with provider configuration
-    const project = Project.create(
-      'Test Project',
-      '/test/path',
-      'Test project',
-      {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const project = Project.create('Test Project', '/test/path', 'Test project', {
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     projectId = project.getId();
 
     // Create session that inherits from project
@@ -98,7 +93,7 @@ describe('SessionService.spawnAgent Method', () => {
     const agent = session!.spawnAgent({
       name: 'Service Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Verify agent properties
@@ -128,7 +123,7 @@ describe('SessionService.spawnAgent Method', () => {
     const agent = session!.spawnAgent({
       name: 'Retrievable Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId as ThreadId;
 
@@ -155,12 +150,12 @@ describe('SessionService.spawnAgent Method', () => {
     const agent1 = session!.spawnAgent({
       name: 'Agent 1',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agent2 = session!.spawnAgent({
       name: 'Agent 2',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Verify both agents are retrievable
@@ -190,7 +185,7 @@ describe('SessionService.spawnAgent Method', () => {
     const agent = session!.spawnAgent({
       name: 'Reconstructed Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
 
     // Verify agent was spawned correctly
@@ -215,7 +210,7 @@ describe('SessionService.spawnAgent Method', () => {
     const agent = session!.spawnAgent({
       name: 'Persistent Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId as ThreadId;
 
@@ -250,7 +245,7 @@ describe('SessionService.spawnAgent Method', () => {
     const agent = session!.spawnAgent({
       name: 'Cache Test Agent',
       providerInstanceId: anthropicInstanceId,
-      modelId: 'claude-3-5-haiku-20241022'
+      modelId: 'claude-3-5-haiku-20241022',
     });
     const agentThreadId = agent.threadId as ThreadId;
 
@@ -308,7 +303,7 @@ describe('SessionService.spawnAgent Method', () => {
       session?.spawnAgent({
         name: 'Orphan Agent',
         providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022'
+        modelId: 'claude-3-5-haiku-20241022',
       });
     }).not.toThrow(); // This won't throw because session is null
   });

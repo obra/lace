@@ -3,25 +3,22 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Agent } from '~/agents/agent';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
+import { Agent } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
 import { type ThreadId, ApprovalDecision } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@/lib/server/lace-imports';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 // Use real file-read tool for testing
-import { FileReadTool } from '~/tools/implementations/file-read';
+import { FileReadTool } from '@/lib/server/lace-imports';
 
 describe('Event-Based Tool Approval Integration', () => {
   const _tempLaceDir = setupWebTest();
