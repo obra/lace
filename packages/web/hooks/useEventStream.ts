@@ -145,12 +145,17 @@ function isTaskEvent(streamEvent: StreamEvent): boolean {
 }
 
 function isAgentEvent(streamEvent: StreamEvent): boolean {
-  return (
-    streamEvent.eventType === 'task' &&
-    ['agent:spawned', 'agent:started', 'agent:stopped'].includes(
-      (streamEvent.data as AgentEvent).type
-    )
-  );
+  if (streamEvent.eventType !== 'task') {
+    return false;
+  }
+
+  const data = streamEvent.data as unknown;
+  if (!data || typeof data !== 'object' || !('type' in data)) {
+    return false;
+  }
+
+  const eventData = data as { type: string };
+  return ['agent:spawned', 'agent:started', 'agent:stopped'].includes(eventData.type);
 }
 
 function isProjectEvent(streamEvent: StreamEvent): boolean {
@@ -442,7 +447,7 @@ export function useEventStream({
             break;
         }
       } else if (isAgentEvent(streamEvent)) {
-        const agentEvent = streamEvent.data as AgentEvent;
+        const agentEvent = streamEvent.data as unknown as AgentEvent;
         callbackRefs.current.onAgentEvent?.(agentEvent);
         switch (agentEvent.type) {
           case 'agent:spawned':
