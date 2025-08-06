@@ -259,7 +259,7 @@ export function SessionConfigPanel({
       const res = await fetch(`/api/sessions/${selectedSession.id}/configuration`);
       
       if (res.ok) {
-        const data = await res.json() as { configuration: SessionConfiguration };
+        const data = await parseResponse<{ configuration: SessionConfiguration }>(res);
         setEditSessionName(selectedSession.name);
         setEditSessionDescription(''); // Session descriptions not currently stored
         
@@ -331,7 +331,7 @@ export function SessionConfigPanel({
         });
 
         if (!sessionRes.ok) {
-          const errorData = await sessionRes.json() as { error: string };
+          const errorData = await parseResponse<{ error: string }>(sessionRes);
           console.error('Failed to update session name/description:', errorData.error);
         }
       }
@@ -348,7 +348,7 @@ export function SessionConfigPanel({
         setShowEditConfig(false);
         resetEditSessionForm();
       } else {
-        const errorData = await configRes.json() as { error: string };
+        const errorData = await parseResponse<{ error: string }>(configRes);
         console.error('Failed to update session configuration:', errorData.error);
       }
     } catch (error) {
@@ -455,7 +455,7 @@ export function SessionConfigPanel({
         setShowEditAgent(false);
         setEditingAgent(null);
       } else {
-        const errorData = await res.json() as { error: string };
+        const errorData = await parseResponse<{ error: string }>(res);
         console.error('Failed to update agent:', errorData.error);
       }
     } catch (error) {

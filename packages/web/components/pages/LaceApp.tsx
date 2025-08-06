@@ -259,7 +259,7 @@ export const LaceApp = memo(function LaceApp() {
     // Load project configuration
     if (selectedProject) {
       fetch(`/api/projects/${selectedProject}/configuration`)
-        .then(res => res.json() as Promise<{ configuration?: Record<string, unknown> }>)
+        .then(res => parseResponse<{ configuration?: Record<string, unknown> }>(res))
         .then(data => {
           if (data.configuration) {
             setProjectConfig(data.configuration);
@@ -362,7 +362,7 @@ export const LaceApp = memo(function LaceApp() {
         // Reload sessions to show the new one
         void loadSessions();
       } else {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' })) as { error?: string; details?: unknown };
+        const errorData = await parseResponse<{ error?: string; details?: unknown }>(res).catch(() => ({ error: 'Unknown error' }));
         console.error('Failed to create session:', errorData);
         if (errorData.details) {
           console.error('Validation details:', errorData.details);
