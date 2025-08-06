@@ -846,8 +846,19 @@ Use your task_add_note tool to record important notes as you work and your task_
     // Check cache first
     const cached = Session._providerCache.get(cacheKey);
     if (cached) {
+      logger.debug('Using cached provider instance', {
+        providerInstanceId,
+        modelId,
+        cacheKey,
+      });
       return cached;
     }
+
+    logger.debug('Creating new provider instance (not cached)', {
+      providerInstanceId,
+      modelId,
+      cacheKey,
+    });
 
     // Use new provider instance system with synchronous credential loading
     try {
@@ -880,11 +891,38 @@ Use your task_add_note tool to record important notes as you work and your task_
           !('apiKey' in parsedCredentials) ||
           typeof parsedCredentials.apiKey !== 'string'
         ) {
+          logger.error('Invalid credential format', {
+            providerInstanceId,
+            hasCredentials: !!parsedCredentials,
+            isObject: typeof parsedCredentials === 'object',
+            hasApiKey:
+              parsedCredentials &&
+              typeof parsedCredentials === 'object' &&
+              'apiKey' in parsedCredentials,
+            apiKeyType:
+              parsedCredentials &&
+              typeof parsedCredentials === 'object' &&
+              'apiKey' in parsedCredentials
+                ? typeof (parsedCredentials as Record<string, unknown>).apiKey
+                : 'N/A',
+          });
           throw new Error('Invalid credential format');
         }
 
         credentials = parsedCredentials as ProviderCredentials;
-      } catch (_credentialError) {
+        logger.debug('Loaded credentials successfully', {
+          providerInstanceId,
+          hasApiKey: !!credentials.apiKey,
+          apiKeyLength: credentials.apiKey.length,
+        });
+      } catch (credentialError) {
+        logger.error('Failed to load credentials', {
+          providerInstanceId,
+          credentialPath,
+          error:
+            credentialError instanceof Error ? credentialError.message : String(credentialError),
+          fileExists: fs.existsSync(credentialPath),
+        });
         throw new Error(`No credentials found for instance: ${providerInstanceId}`);
       }
 

@@ -275,14 +275,20 @@ export class ProviderRegistry {
           hasConfigApiKey: !!config.apiKey,
           apiKeyLength: (config.apiKey as string)?.length,
         });
-        return new AnthropicProvider(config);
+        return new AnthropicProvider({
+          ...config,
+          apiKey: (config.apiKey as string) || null,
+        });
       }
       case 'openai': {
         logger.debug('Creating OpenAIProvider', {
           hasConfigApiKey: !!config.apiKey,
           apiKeyLength: (config.apiKey as string)?.length,
         });
-        return new OpenAIProvider(config);
+        return new OpenAIProvider({
+          ...config,
+          apiKey: (config.apiKey as string) || null,
+        });
       }
       case 'lmstudio': {
         return new LMStudioProvider(config);
