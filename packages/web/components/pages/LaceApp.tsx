@@ -362,7 +362,7 @@ export const LaceApp = memo(function LaceApp() {
         // Reload sessions to show the new one
         void loadSessions();
       } else {
-        const errorData = await parseResponse<{ error?: string; details?: unknown }>(res).catch(() => ({ error: 'Unknown error' }));
+        const errorData = await parseResponse<{ error?: string; details?: unknown }>(res).catch(() => ({ error: 'Unknown error', details: undefined }));
         console.error('Failed to create session:', errorData);
         if (errorData.details) {
           console.error('Validation details:', errorData.details);
