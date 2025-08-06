@@ -31,7 +31,9 @@ export class AnthropicProvider extends AIProvider {
     if (!this._anthropic) {
       const config = this._config as AnthropicProviderConfig;
       if (!config.apiKey) {
-        throw new Error('Missing required environment variable: ANTHROPIC_KEY');
+        throw new Error(
+          'Missing API key for Anthropic provider. Please ensure the provider instance has valid credentials.'
+        );
       }
 
       const anthropicConfig: {

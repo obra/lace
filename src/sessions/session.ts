@@ -900,6 +900,14 @@ Use your task_add_note tool to record important notes as you work and your task_
         ...(instance.timeout && { timeout: instance.timeout }),
       };
 
+      logger.debug('Creating provider with config', {
+        providerType,
+        modelId,
+        hasApiKey: !!providerConfig.apiKey,
+        apiKeyLength: (providerConfig.apiKey as string | undefined)?.length,
+        instanceId: providerInstanceId,
+      });
+
       // Create provider using the new registry system
       const providerRegistry = ProviderRegistry.getInstance();
       const providerInstance = providerRegistry.createProvider(providerType, providerConfig);

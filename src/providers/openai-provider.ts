@@ -32,7 +32,9 @@ export class OpenAIProvider extends AIProvider {
     if (!this._openai) {
       const config = this._config as OpenAIProviderConfig;
       if (!config.apiKey) {
-        throw new Error('Missing required environment variable: OPENAI_API_KEY or OPENAI_KEY');
+        throw new Error(
+          'Missing API key for OpenAI provider. Please ensure the provider instance has valid credentials.'
+        );
       }
 
       const openaiConfig: ClientOptions = {

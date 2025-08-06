@@ -2,7 +2,6 @@
 // ABOUTME: Handles provider registration and provides providers for agent execution
 
 import { AIProvider, ProviderConfig } from '~/providers/base-provider';
-import { getEnvVar } from '~/config/env-loader';
 import { AnthropicProvider } from '~/providers/anthropic-provider';
 import { OpenAIProvider } from '~/providers/openai-provider';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
@@ -10,6 +9,7 @@ import { OllamaProvider } from '~/providers/ollama-provider';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import type { CatalogProvider, CatalogModel } from '~/providers/catalog/types';
+import { logger } from '~/utils/logger';
 
 export interface ConfiguredInstance {
   id: string;
@@ -261,16 +261,28 @@ export class ProviderRegistry {
   }
 
   createProvider(providerName: string, config: ProviderConfig = {}): AIProvider {
+    logger.debug('ProviderRegistry.createProvider called', {
+      providerName,
+      hasApiKey: !!config.apiKey,
+      apiKeyLength: (config.apiKey as string)?.length,
+      configKeys: Object.keys(config),
+    });
+
     // Use static imports for better build performance
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
-        const apiKey = (config.apiKey as string) || getEnvVar('ANTHROPIC_KEY');
-        return new AnthropicProvider({ ...config, apiKey: apiKey || null });
+        logger.debug('Creating AnthropicProvider', {
+          hasConfigApiKey: !!config.apiKey,
+          apiKeyLength: (config.apiKey as string)?.length,
+        });
+        return new AnthropicProvider(config);
       }
       case 'openai': {
-        const apiKey =
-          (config.apiKey as string) || getEnvVar('OPENAI_API_KEY') || getEnvVar('OPENAI_KEY');
-        return new OpenAIProvider({ ...config, apiKey: apiKey || null });
+        logger.debug('Creating OpenAIProvider', {
+          hasConfigApiKey: !!config.apiKey,
+          apiKeyLength: (config.apiKey as string)?.length,
+        });
+        return new OpenAIProvider(config);
       }
       case 'lmstudio': {
         return new LMStudioProvider(config);
