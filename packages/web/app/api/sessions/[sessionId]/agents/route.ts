@@ -65,7 +65,11 @@ export async function POST(
     // Verify provider instance exists
     const registry = ProviderRegistry.getInstance();
 
-    const configuredInstances = await registry.getConfiguredInstances();
+    const [configuredInstances, catalogProviders] = await Promise.all([
+      registry.getConfiguredInstances(),
+      registry.getCatalogProviders(),
+    ]);
+
     const instance = configuredInstances.find((inst) => inst.id === body.providerInstanceId);
 
     if (!instance) {
@@ -74,9 +78,7 @@ export async function POST(
       });
     }
 
-    const catalogProvider = registry
-      .getCatalogProviders()
-      .find((p) => p.id === instance.catalogProviderId);
+    const catalogProvider = catalogProviders.find((p) => p.id === instance.catalogProviderId);
     if (!catalogProvider) {
       return createErrorResponse(
         `Catalog provider '${instance.catalogProviderId}' not found`,
