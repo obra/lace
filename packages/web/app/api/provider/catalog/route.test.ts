@@ -9,7 +9,7 @@ import type { CatalogProvider } from '~/providers/catalog/types';
 import type { CatalogResponse } from './route';
 
 // Mock the ProviderRegistry
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('~/providers/registry', () => ({
   ProviderRegistry: vi.fn().mockImplementation(() => ({
     initialize: vi.fn(),
     getCatalogProviders: vi.fn(),
@@ -24,13 +24,15 @@ describe('Provider Catalog API', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
-    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+
+    const { ProviderRegistry } = await import('~/providers/registry');
     mockRegistry = {
       initialize: vi.fn(),
       getCatalogProviders: vi.fn(),
     };
-    vi.mocked(ProviderRegistry).mockImplementation(() => mockRegistry as unknown as InstanceType<typeof ProviderRegistry>);
+    vi.mocked(ProviderRegistry).mockImplementation(
+      () => mockRegistry as unknown as InstanceType<typeof ProviderRegistry>
+    );
   });
 
   afterEach(() => {
@@ -96,7 +98,7 @@ describe('Provider Catalog API', () => {
 
       expect(response.status).toBe(200);
       expect(data.providers).toHaveLength(2);
-      
+
       // Check Anthropic provider
       expect(data.providers[0]).toMatchObject({
         id: 'anthropic',

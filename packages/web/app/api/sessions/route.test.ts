@@ -7,9 +7,12 @@ import { GET } from '@/app/api/sessions/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { Session } from '@/lib/server/lace-imports';
+import { Session } from '~/sessions/session';
 
 // No mocking of env-loader needed - setupTestProviderDefaults() handles env vars
 
@@ -33,11 +36,11 @@ describe('Session API Routes', () => {
     // Session.create() looks for 'anthropic-default' first, so we need to create it with that ID
     const { ProviderInstanceManager } = await import('~/providers/instance/manager');
     const { ProviderCatalogManager } = await import('~/providers/catalog/manager');
-    
+
     const instanceManager = new ProviderInstanceManager();
     const catalogManager = new ProviderCatalogManager();
     await catalogManager.loadCatalogs();
-    
+
     // Create anthropic-default instance manually
     const instancesConfig = await instanceManager.loadInstances();
     instancesConfig.instances['anthropic-default'] = {
@@ -48,7 +51,7 @@ describe('Session API Routes', () => {
     await instanceManager.saveCredential('anthropic-default', {
       apiKey: 'test-anthropic-key',
     });
-    
+
     anthropicInstanceId = 'anthropic-default';
 
     // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
@@ -90,7 +93,7 @@ describe('Session API Routes', () => {
 
     it('should list all sessions', async () => {
       // Arrange: Create real project and sessions using real services
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('~/projects/project');
       const { getSessionService } = await import('@/lib/server/session-service');
 
       // Create and ensure project is saved
@@ -99,15 +102,9 @@ describe('Session API Routes', () => {
 
       const sessionService = getSessionService();
 
-      const session1 = await sessionService.createSession(
-        'Test Session 1',
-        projectId
-      );
+      const session1 = await sessionService.createSession('Test Session 1', projectId);
 
-      const session2 = await sessionService.createSession(
-        'Test Session 2',
-        projectId
-      );
+      const session2 = await sessionService.createSession('Test Session 2', projectId);
 
       // Act: Call the API endpoint
       const request = new NextRequest('http://localhost:3005/api/sessions');

@@ -8,7 +8,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
@@ -24,7 +27,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 // Import the real API route handlers after mocks
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project } from '~/projects/project';
 import type { AgentInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 
@@ -52,7 +55,6 @@ describe('Agent Spawning API E2E Tests', () => {
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-
     // Set up environment for session service
     process.env = {
       ...process.env,
@@ -68,7 +70,7 @@ describe('Agent Spawning API E2E Tests', () => {
       displayName: 'Test Anthropic Instance',
       apiKey: 'test-anthropic-key',
     });
-    
+
     openaiInstanceId = await createTestProviderInstance({
       catalogId: 'openai',
       models: ['gpt-4o'],
@@ -88,10 +90,7 @@ describe('Agent Spawning API E2E Tests', () => {
     );
 
     sessionService = getSessionService();
-    const session = await sessionService.createSession(
-      'Agent Test Session',
-      testProject.getId()
-    );
+    const session = await sessionService.createSession('Agent Test Session', testProject.getId());
     sessionId = session.id as string;
   });
 
@@ -101,10 +100,10 @@ describe('Agent Spawning API E2E Tests', () => {
       await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
-    
+
     // Cleanup test provider instances
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
-    
+
     vi.clearAllMocks();
   });
 

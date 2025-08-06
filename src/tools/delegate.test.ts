@@ -5,10 +5,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { Session } from '~/sessions/session';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
 import type { ToolContext } from '~/tools/types';
 import {
   createDelegationTestSetup,
@@ -29,7 +25,6 @@ describe('DelegateTool', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestProviderDefaults();
     Session.clearProviderCache();
 
     // Create test provider instance
@@ -64,7 +59,6 @@ describe('DelegateTool', () => {
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    cleanupTestProviderDefaults();
   });
 
   it('should have correct metadata', () => {

@@ -4,7 +4,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET } from './route';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
@@ -12,10 +15,8 @@ vi.mock('server-only', () => ({}));
 
 describe('Provider Discovery API', () => {
   const _tempLaceDir = setupWebTest();
-  let testProviderInstances: {
-    anthropicInstanceId: string;
-    openaiInstanceId: string;
-  };
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
   let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
@@ -24,9 +25,22 @@ describe('Provider Discovery API', () => {
     // Set up environment
     process.env.LACE_DB_PATH = ':memory:';
 
-    // Create test provider instances
-    testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    // Create individual provider instances for test isolation
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      displayName: 'Test OpenAI',
+      apiKey: 'test-openai-key',
+    });
+
+    createdInstanceIds = [anthropicInstanceId, openaiInstanceId];
   });
 
   afterEach(async () => {
@@ -38,38 +52,40 @@ describe('Provider Discovery API', () => {
   describe('GET /api/providers', () => {
     it('should return configured provider instances instead of auto-discovered providers', async () => {
       const response = await GET();
-      
+
       expect(response.status).toBe(200);
-      
-      const data = await parseResponse<{ providers: Array<{ 
-        id: string; 
-        name: string; 
-        type: string;
-        models: Array<{ id: string; name: string }>;
-        configured: boolean;
-        instanceId?: string;
-      }> }>(response);
-      
+
+      const data = await parseResponse<{
+        providers: Array<{
+          id: string;
+          name: string;
+          type: string;
+          models: Array<{ id: string; name: string }>;
+          configured: boolean;
+          instanceId?: string;
+        }>;
+      }>(response);
+
       // Should return providers with configured instances
       expect(data.providers.length).toBeGreaterThan(0);
-      
+
       // All returned providers should be configured
-      data.providers.forEach(provider => {
+      data.providers.forEach((provider) => {
         expect(provider.configured).toBe(true);
         expect(provider.instanceId).toBeDefined();
         expect(provider.instanceId).toEqual(expect.stringMatching(/^test-/));
       });
-      
+
       // Should have unique provider types (no duplicates for same type)
-      const providerTypes = data.providers.map(p => p.type);
+      const providerTypes = data.providers.map((p) => p.type);
       const uniqueTypes = [...new Set(providerTypes)];
       expect(providerTypes).toHaveLength(uniqueTypes.length);
-      
+
       // Should NOT include providers without configured instances (like lmstudio, ollama)
-      const lmstudioProvider = data.providers.find(p => p.type === 'lmstudio');
+      const lmstudioProvider = data.providers.find((p) => p.type === 'lmstudio');
       expect(lmstudioProvider).toBeUndefined();
-      
-      const ollamaProvider = data.providers.find(p => p.type === 'ollama');
+
+      const ollamaProvider = data.providers.find((p) => p.type === 'ollama');
       expect(ollamaProvider).toBeUndefined();
     });
 
@@ -77,35 +93,37 @@ describe('Provider Discovery API', () => {
       // Clean up all instances first
       await cleanupTestProviderInstances(createdInstanceIds);
       createdInstanceIds = [];
-      
+
       const response = await GET();
-      
+
       expect(response.status).toBe(200);
-      
+
       const data = await parseResponse<{ providers: unknown[] }>(response);
       expect(data.providers).toHaveLength(0);
     });
 
     it('should include model information for each configured provider', async () => {
       const response = await GET();
-      
+
       if (response.status !== 200) {
         const errorData = await parseResponse<{ error: string }>(response);
         console.error('API Error:', errorData);
       }
-      
+
       expect(response.status).toBe(200);
-      
-      const data = await parseResponse<{ providers: Array<{ 
-        models: Array<{ id: string; displayName: string }>;
-      }> }>(response);
-      
+
+      const data = await parseResponse<{
+        providers: Array<{
+          models: Array<{ id: string; displayName: string }>;
+        }>;
+      }>(response);
+
       // Each provider should have its models listed
-      data.providers.forEach(provider => {
+      data.providers.forEach((provider) => {
         expect(provider.models).toBeInstanceOf(Array);
         expect(provider.models.length).toBeGreaterThan(0);
-        
-        provider.models.forEach(model => {
+
+        provider.models.forEach((model) => {
           expect(model.id).toEqual(expect.any(String));
           expect(model.displayName).toEqual(expect.any(String));
         });

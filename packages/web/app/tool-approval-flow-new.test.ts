@@ -3,11 +3,19 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Agent, Project, Session } from '@/lib/server/lace-imports';
+import { Agent } from '~/agents/agent';
+import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
 import { type ThreadId, ApprovalDecision } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -28,7 +36,7 @@ describe('Event-Based Tool Approval Integration', () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
+
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022'],

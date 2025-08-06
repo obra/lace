@@ -8,11 +8,13 @@ import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import { ProviderRegistry } from '@/lib/server/lace-imports';
+import { logger } from '@/lib/server/lace-imports';
 
 const AgentUpdateSchema = z.object({
   name: z.string().min(1).optional(),
-  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
-  model: z.string().optional(),
+  providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
+  modelId: z.string().min(1, 'Model ID is required'),
 });
 
 export async function GET(
@@ -77,7 +79,33 @@ export async function PUT(
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const validatedData = AgentUpdateSchema.parse(body);
+
+    // Log the incoming request for debugging
+    logger.debug('Agent update request:', { agentId, body });
+
+    let validatedData;
+    try {
+      validatedData = AgentUpdateSchema.parse(body);
+    } catch (zodError) {
+      if (zodError instanceof z.ZodError) {
+        const details = zodError.errors.map((e) => ({
+          path: e.path.join('.'),
+          message: e.message,
+          received: body[e.path[0] as keyof typeof body],
+        }));
+        logger.error('Agent update validation failed:', { agentId, errors: details, body });
+        return createErrorResponse(
+          `Validation failed: ${details.map((d) => `${d.path}: ${d.message}`).join(', ')}`,
+          400,
+          {
+            code: 'VALIDATION_FAILED',
+            details,
+            receivedData: body,
+          }
+        );
+      }
+      throw zodError;
+    }
 
     const agentThreadId = asThreadId(agentId);
 
@@ -97,6 +125,32 @@ export async function PUT(
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Validate provider instance if provided
+    if (validatedData.providerInstanceId) {
+      const registry = new ProviderRegistry();
+      await registry.initialize();
+
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(
+        (inst) => inst.id === validatedData.providerInstanceId
+      );
+
+      if (!instance) {
+        logger.error('Provider instance not found:', {
+          providedId: validatedData.providerInstanceId,
+          availableInstances: configuredInstances.map((i) => ({ id: i.id, name: i.name })),
+        });
+        return createErrorResponse(
+          `Provider instance '${validatedData.providerInstanceId}' not found. Available instances: ${configuredInstances.map((i) => i.name).join(', ')}`,
+          400,
+          {
+            code: 'VALIDATION_FAILED',
+            availableInstances: configuredInstances.map((i) => ({ id: i.id, name: i.name })),
+          }
+        );
+      }
+    }
+
     // Update agent properties via thread metadata
     const updates: Record<string, unknown> = {};
 
@@ -104,13 +158,9 @@ export async function PUT(
       updates.name = validatedData.name;
     }
 
-    if (validatedData.provider !== undefined) {
-      updates.provider = validatedData.provider;
-    }
-
-    if (validatedData.model !== undefined) {
-      updates.model = validatedData.model;
-    }
+    // Update provider instance and model
+    updates.providerInstanceId = validatedData.providerInstanceId;
+    updates.modelId = validatedData.modelId;
 
     if (Object.keys(updates).length > 0) {
       agent.updateThreadMetadata(updates);
@@ -129,12 +179,9 @@ export async function PUT(
 
     return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
-        code: 'VALIDATION_FAILED',
-        details: error.errors,
-      });
-    }
+    // Zod errors are now handled above with better messages
+
+    logger.error('Agent update failed:', { agentId, error });
 
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to update agent',

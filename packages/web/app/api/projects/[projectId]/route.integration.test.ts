@@ -4,15 +4,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
 import { parseResponse } from '@/lib/serialization';
-import { Session } from '@/lib/server/lace-imports';
+import { Session } from '~/sessions/session';
 
 // Type interfaces for API responses
 interface ProjectResponse {
@@ -44,7 +46,6 @@ describe('Individual Project API Integration Tests', () => {
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-    
     // Create test provider instances
     anthropicInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
@@ -95,13 +96,13 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should return project with correct session count', async () => {
       // Add some sessions to the project (they inherit provider config from project)
-      Session.create({ 
-        name: 'Session 1', 
-        projectId: testProject.getId()
+      Session.create({
+        name: 'Session 1',
+        projectId: testProject.getId(),
       });
-      Session.create({ 
-        name: 'Session 2', 
-        projectId: testProject.getId()
+      Session.create({
+        name: 'Session 2',
+        projectId: testProject.getId(),
       });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
@@ -357,21 +358,21 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should delete project with sessions', async () => {
       // Add sessions to the project
-      Session.create({ 
-        name: 'Session 1', 
+      Session.create({
+        name: 'Session 1',
         projectId: testProject.getId(),
         configuration: {
           providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022'
-        }
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
-      Session.create({ 
-        name: 'Session 2', 
+      Session.create({
+        name: 'Session 2',
         projectId: testProject.getId(),
         configuration: {
           providerInstanceId: openaiInstanceId,
-          modelId: 'gpt-4o-mini'
-        }
+          modelId: 'gpt-4o-mini',
+        },
       });
 
       const projectId = testProject.getId();

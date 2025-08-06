@@ -71,7 +71,12 @@ export function SessionConfigPanel({
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [showEditAgent, setShowEditAgent] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<{ threadId: string; name: string; provider: string; model: string } | null>(null);
+  const [editingAgent, setEditingAgent] = useState<{ 
+    threadId: string; 
+    name: string; 
+    providerInstanceId: string;
+    modelId: string;
+  } | null>(null);
   
   // Session creation state
   const [newSessionName, setNewSessionName] = useState('');
@@ -328,8 +333,20 @@ export function SessionConfigPanel({
   };
 
   // Handle agent edit
-  const handleEditAgentClick = (agent: { threadId: string; name: string; provider: string; model: string }) => {
-    setEditingAgent(agent);
+  const handleEditAgentClick = (agent: AgentInfo) => {
+    // Convert AgentInfo to edit format - must have provider instance
+    const provider = providers.find(p => p.instanceId);
+    if (!provider) {
+      console.error('No provider instances configured');
+      return;
+    }
+    
+    setEditingAgent({
+      threadId: agent.threadId,
+      name: agent.name,
+      providerInstanceId: provider.instanceId!,
+      modelId: provider.models[0]?.id || 'unknown'
+    });
     setShowEditAgent(true);
   };
 
@@ -343,8 +360,8 @@ export function SessionConfigPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editingAgent.name.trim(),
-          provider: editingAgent.provider,
-          model: editingAgent.model,
+          providerInstanceId: editingAgent.providerInstanceId,
+          modelId: editingAgent.modelId,
         }),
       });
 
@@ -984,20 +1001,21 @@ export function SessionConfigPanel({
                   <span className="label-text font-medium">Provider</span>
                 </label>
                 <select
-                  value={editingAgent.provider}
+                  value={editingAgent.providerInstanceId}
                   onChange={(e) => {
-                    const newProvider = e.target.value;
-                    const providerModels = providers.find(p => p.name === newProvider)?.models || [];
+                    const newInstanceId = e.target.value;
+                    const provider = providers.find(p => p.instanceId === newInstanceId);
+                    const providerModels = provider?.models || [];
                     setEditingAgent(prev => prev ? {
                       ...prev,
-                      provider: newProvider,
-                      model: providerModels[0]?.id || prev.model,
+                      providerInstanceId: newInstanceId,
+                      modelId: providerModels[0]?.id || prev.modelId,
                     } : null);
                   }}
                   className="select select-bordered w-full"
                 >
                   {availableProviders.map((provider) => (
-                    <option key={provider.name} value={provider.name}>
+                    <option key={provider.instanceId} value={provider.instanceId}>
                       {provider.displayName}
                     </option>
                   ))}
@@ -1005,13 +1023,17 @@ export function SessionConfigPanel({
               </div>
 
               <div>
-                <ModelDropdown
-                  providers={providers}
-                  selectedProvider={editingAgent.provider}
-                  selectedModel={editingAgent.model}
-                  onChange={(model: string) => setEditingAgent(prev => prev ? { ...prev, model } : null)}
-                  label="Model"
-                />
+                <select
+                  value={editingAgent.modelId}
+                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, modelId: e.target.value } : null)}
+                  className="select select-bordered w-full"
+                >
+                  {providers.find(p => p.instanceId === editingAgent.providerInstanceId)?.models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.displayName}
+                    </option>
+                  )) || []}
+                </select>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
