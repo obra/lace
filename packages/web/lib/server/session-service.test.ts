@@ -271,7 +271,6 @@ describe('SessionService approval event forwarding', () => {
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockReturnValue(mockProvider);
     vi.spyOn(ProviderRegistry.prototype, 'getProvider').mockReturnValue(mockProvider);
-    vi.spyOn(ProviderRegistry.prototype, 'initialize').mockResolvedValue(undefined);
 
     sessionService = getSessionService();
 

@@ -64,7 +64,7 @@ export async function DELETE(
       });
     }
 
-    // Delete instance and credential
+    // Delete instance and credential directly through InstanceManager
     await instanceManager.deleteInstance(instanceId);
 
     return createSuperjsonResponse({ success: true } as DeleteInstanceResponse);
@@ -111,7 +111,9 @@ export async function PUT(
 
     // Update instance configuration (excluding catalogProviderId)
     const { catalogProviderId: _catalogProviderId, ...safeUpdates } = validationResult.data;
-    await instanceManager.updateInstance(instanceId, safeUpdates);
+    if (Object.keys(safeUpdates).length > 0) {
+      await instanceManager.updateInstance(instanceId, safeUpdates);
+    }
 
     // Update credential if provided
     if (credential) {
@@ -126,7 +128,7 @@ export async function PUT(
       await instanceManager.saveCredential(instanceId, credentialValidation.data);
     }
 
-    // Return updated instance from registry
+    // Get updated instance from registry for response
     const registry = ProviderRegistry.getInstance();
     const instances = await registry.getConfiguredInstances();
     const updatedInstance = instances.find((inst) => inst.id === instanceId);

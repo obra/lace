@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest) {
   try {
     const registry = ProviderRegistry.getInstance();
 
-    const providers = registry.getCatalogProviders();
+    const providers = await registry.getCatalogProviders();
 
     return createSuperjsonResponse({ providers } as CatalogResponse);
   } catch (error: unknown) {

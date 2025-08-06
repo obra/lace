@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
       additionalAuth: validatedData.credential.additionalAuth,
     });
 
+    // No need to refresh registry - it reads fresh data on demand
+
     return createSuperjsonResponse(
       {
         success: true,

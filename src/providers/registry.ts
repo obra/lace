@@ -9,7 +9,7 @@ import { LMStudioProvider } from '~/providers/lmstudio-provider';
 import { OllamaProvider } from '~/providers/ollama-provider';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
-import type { CatalogProvider, CatalogModel, ProviderInstance } from '~/providers/catalog/types';
+import type { CatalogProvider, CatalogModel } from '~/providers/catalog/types';
 
 export interface ConfiguredInstance {
   id: string;
@@ -28,7 +28,6 @@ export class ProviderRegistry {
   private _providers = new Map<string, AIProvider>();
   private catalogManager: ProviderCatalogManager;
   private instanceManager: ProviderInstanceManager;
-  private configuredInstances: Map<string, ProviderInstance> = new Map();
   private isInitialized = false;
 
   private constructor() {
@@ -68,17 +67,8 @@ export class ProviderRegistry {
   }
 
   private async doInitialize(): Promise<void> {
-    // Load catalog data
+    // Only load catalog data - instances are loaded on demand
     await this.catalogManager.loadCatalogs();
-
-    // Load user instances
-    const config = await this.instanceManager.loadInstances();
-    this.configuredInstances.clear();
-
-    for (const [instanceId, instance] of Object.entries(config.instances)) {
-      this.configuredInstances.set(instanceId, instance);
-    }
-
     this.isInitialized = true;
   }
 
@@ -89,9 +79,12 @@ export class ProviderRegistry {
 
   async getConfiguredInstances(): Promise<ConfiguredInstance[]> {
     await this.ensureInitialized();
+
+    // Load instances fresh from disk every time
+    const config = await this.instanceManager.loadInstances();
     const instances: ConfiguredInstance[] = [];
 
-    for (const [instanceId, instance] of this.configuredInstances.entries()) {
+    for (const [instanceId, instance] of Object.entries(config.instances)) {
       // Check if credentials exist without loading them
       const hasCredentials = (await this.instanceManager.loadCredential(instanceId)) !== null;
 
@@ -116,7 +109,10 @@ export class ProviderRegistry {
 
   async createProviderFromInstance(instanceId: string): Promise<AIProvider> {
     await this.ensureInitialized();
-    const instance = this.configuredInstances.get(instanceId);
+
+    // Load fresh instance data
+    const config = await this.instanceManager.loadInstances();
+    const instance = config.instances[instanceId];
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
@@ -148,7 +144,10 @@ export class ProviderRegistry {
     modelId: string
   ): Promise<AIProvider> {
     await this.ensureInitialized();
-    const instance = this.configuredInstances.get(instanceId);
+
+    // Load fresh instance data
+    const config = await this.instanceManager.loadInstances();
+    const instance = config.instances[instanceId];
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }

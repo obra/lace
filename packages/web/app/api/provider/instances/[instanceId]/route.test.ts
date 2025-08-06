@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { GET, DELETE, PUT } from './route';
 import { parseResponse } from '@/lib/serialization';
+import { ProviderRegistry } from '@/lib/server/lace-imports';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
 import type {
   InstanceDetailResponse,
@@ -20,6 +21,9 @@ describe('Provider Instance Detail API', () => {
   let originalLaceDir: string | undefined;
 
   beforeEach(() => {
+    // Clear Registry singleton to ensure clean state
+    ProviderRegistry.clearInstance();
+
     // Create temp directory for testing
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
     originalLaceDir = process.env.LACE_DIR;
@@ -27,6 +31,9 @@ describe('Provider Instance Detail API', () => {
   });
 
   afterEach(() => {
+    // Clear Registry singleton to prevent state leakage
+    ProviderRegistry.clearInstance();
+
     // Cleanup
     if (originalLaceDir) {
       process.env.LACE_DIR = originalLaceDir;

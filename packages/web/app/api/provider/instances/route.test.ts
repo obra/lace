@@ -1,36 +1,23 @@
 // ABOUTME: Tests for provider instances API endpoint (GET/POST /api/provider/instances)
 // ABOUTME: Verifies instance listing and creation with real implementations
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { GET, POST } from './route';
 import { parseResponse } from '@/lib/serialization';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
 import type { ConfiguredInstance } from '@/lib/server/lace-imports';
 import type { InstancesResponse, CreateInstanceResponse } from './route';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 
 describe('Provider Instances API', () => {
+  const tempContext = setupWebTest();
   let tempDir: string;
-  let originalLaceDir: string | undefined;
 
   beforeEach(() => {
-    // Create temp directory for testing
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
-    originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-  });
-
-  afterEach(() => {
-    // Cleanup
-    if (originalLaceDir) {
-      process.env.LACE_DIR = originalLaceDir;
-    } else {
-      delete process.env.LACE_DIR;
-    }
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    tempDir = tempContext.tempDir;
   });
 
   describe('GET /api/provider/instances', () => {
