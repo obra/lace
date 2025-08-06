@@ -11,7 +11,8 @@ import { getEnvVar } from '~/config/env-loader';
  * Uses LACE_DIR environment variable, falls back to ~/.lace/
  */
 export function getLaceDir(): string {
-  const laceDir = getEnvVar('LACE_DIR') || path.join(os.homedir(), '.lace');
+  const envValue = getEnvVar('LACE_DIR');
+  const laceDir = envValue || path.join(os.homedir(), '.lace');
   return laceDir;
 }
 

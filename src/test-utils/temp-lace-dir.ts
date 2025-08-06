@@ -25,7 +25,7 @@ export function useTempLaceDir(): TempLaceDirContext {
     // Create a proper temp directory
     context.tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-test-'));
 
-    // Save original LACE_DIR and set it to our temp directory
+    // Save original LACE_DIR and set it to our temp directory  
     context.originalLaceDir = process.env.LACE_DIR;
     process.env.LACE_DIR = context.tempDir;
   });

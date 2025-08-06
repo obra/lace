@@ -1186,10 +1186,11 @@ export class DatabasePersistence {
 let globalPersistence: DatabasePersistence | null = null;
 
 export function initializePersistence(dbPath?: string): void {
+  const finalDbPath = dbPath || getLaceDbPath();
   if (globalPersistence) {
     globalPersistence.close();
   }
-  globalPersistence = new DatabasePersistence(dbPath || getLaceDbPath());
+  globalPersistence = new DatabasePersistence(finalDbPath);
 }
 
 export function getPersistence(): DatabasePersistence {
