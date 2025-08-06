@@ -263,6 +263,8 @@ export const LaceApp = memo(function LaceApp() {
         .then(data => {
           if (data.configuration) {
             setProjectConfig(data.configuration);
+          } else {
+            setProjectConfig({});
           }
         })
         .catch((err: unknown) => {

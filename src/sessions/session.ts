@@ -114,7 +114,7 @@ export class Session {
 
     // Extract provider instance and model from effective configuration
     let providerInstanceId = effectiveConfig.providerInstanceId;
-    let modelId = effectiveConfig.modelId;
+    const modelId = effectiveConfig.modelId;
 
     logger.debug('Session.create() provider configuration check', {
       sessionId: sessionData.id,
@@ -145,19 +145,13 @@ export class Session {
           ? 'anthropic-default'
           : existingInstanceIds[0];
 
-        const instance = existingConfig.instances[defaultInstanceId];
-
         providerInstanceId = providerInstanceId || defaultInstanceId;
 
-        // Determine default model based on catalog provider
+        // No hardcoded defaults - use what was explicitly configured
         if (!modelId) {
-          if (instance.catalogProviderId === 'anthropic') {
-            modelId = 'claude-3-5-haiku-20241022';
-          } else if (instance.catalogProviderId === 'openai') {
-            modelId = 'gpt-4o';
-          } else {
-            modelId = 'default-model';
-          }
+          throw new Error(
+            `No model configured for provider instance ${providerInstanceId}. Please specify a model in the session or project configuration.`
+          );
         }
 
         logger.debug('Using existing provider configuration for session', {
@@ -176,19 +170,13 @@ export class Session {
             ? 'anthropic-default'
             : autoInstanceIds[0];
 
-          const instance = defaultConfig.instances[defaultInstanceId];
-
           providerInstanceId = providerInstanceId || defaultInstanceId;
 
-          // Determine default model based on catalog provider
+          // No hardcoded defaults - use what was explicitly configured
           if (!modelId) {
-            if (instance.catalogProviderId === 'anthropic') {
-              modelId = 'claude-3-5-haiku-20241022';
-            } else if (instance.catalogProviderId === 'openai') {
-              modelId = 'gpt-4o';
-            } else {
-              modelId = 'default-model';
-            }
+            throw new Error(
+              `No model configured for provider instance ${providerInstanceId}. Please specify a model in the session or project configuration.`
+            );
           }
 
           logger.debug('Using auto-created default provider configuration for session', {
