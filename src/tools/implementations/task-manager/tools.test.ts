@@ -13,7 +13,6 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import type { Task } from '~/tasks/types';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
@@ -54,7 +53,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Enhanced Task Manager Tools', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let context: ToolContext;
   let session: Session;
   let project: Project;
@@ -73,7 +72,6 @@ describe('Enhanced Task Manager Tools', () => {
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -87,14 +85,7 @@ describe('Enhanced Task Manager Tools', () => {
 
     mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-      (_name: string, _config?: unknown) => {
-        return mockProvider;
-      }
-    );
-
-    // Mock the ProviderRegistry createProvider method
+    // Mock AnthropicProvider to avoid real API calls during testing
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
     // Create project with provider configuration
@@ -108,7 +99,7 @@ describe('Enhanced Task Manager Tools', () => {
       }
     );
 
-    // Create session with anthropic - the provider will be mocked
+    // Create session with explicit provider configuration to match project
     session = Session.create({
       name: 'Tool Test Session',
       projectId: project.getId(),
@@ -140,7 +131,6 @@ describe('Enhanced Task Manager Tools', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
@@ -233,6 +223,9 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
+      if (result.isError) {
+        console.error('Task creation failed:', result.content?.[0]?.text);
+      }
       expect(result.isError).toBe(false);
       // After agent spawning, the task should be assigned to the spawned agent thread ID
       expect(result.content?.[0]?.text).toContain('Research task');

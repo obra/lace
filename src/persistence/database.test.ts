@@ -8,8 +8,10 @@ import { ApprovalDecision } from '~/tools/approval-types';
 import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {
+  const _tempLaceDir = setupCoreTest();
+
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
+    // Test setup handled by setupCoreTest
   });
 
   afterEach(() => {
@@ -80,10 +82,11 @@ describe('Project and Session database schema', () => {
 });
 
 describe('Session persistence', () => {
+  const _tempLaceDir = setupCoreTest();
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = // setupTestPersistence replaced by setupCoreTest
+    db = getPersistence();
 
     // Create projects first to satisfy foreign key constraints
     db.database!.prepare(
@@ -237,10 +240,11 @@ describe('Session persistence', () => {
 });
 
 describe('tool approval unique constraint', () => {
+  const _tempLaceDir = setupCoreTest();
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = // setupTestPersistence replaced by setupCoreTest
+    db = getPersistence();
   });
 
   afterEach(() => {

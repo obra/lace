@@ -15,21 +15,19 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { Session } from '@/lib/server/lace-imports';
 
 describe('SSE Stream E2E Tests', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -92,7 +90,6 @@ describe('SSE Stream E2E Tests', () => {
     await cleanupTestProviderInstances([providerInstanceId]);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
-    teardownTestPersistence();
   });
 
   it('should establish SSE stream connection for valid session', async () => {

@@ -5,10 +5,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Agent, Project, Session } from '@/lib/server/lace-imports';
 import { type ThreadId, ApprovalDecision } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -17,7 +16,7 @@ import { tmpdir } from 'os';
 import { FileReadTool } from '~/tools/implementations/file-read';
 
 describe('Event-Based Tool Approval Integration', () => {
-  const _tempLaceDir = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let projectId: string;
   let sessionId: ThreadId;
@@ -35,9 +34,6 @@ describe('Event-Based Tool Approval Integration', () => {
       models: ['claude-3-5-haiku-20241022'],
       apiKey: 'test-anthropic-key',
     });
-
-    // Set up test persistence
-    setupTestPersistence();
 
     // Create temp directory for test files
     tempDir = await mkdtemp(join(tmpdir(), 'lace-approval-test-'));
@@ -94,7 +90,6 @@ describe('Event-Based Tool Approval Integration', () => {
     if (tempDir) {
       await rm(tempDir, { recursive: true });
     }
-    teardownTestPersistence();
   });
 
   it('should create TOOL_APPROVAL_REQUEST event when tool requires approval', async () => {

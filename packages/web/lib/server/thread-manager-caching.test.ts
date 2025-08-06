@@ -7,17 +7,17 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '@/lib/server/lace-imports';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('ThreadManager Caching Issues', () => {
+  const _tempLaceDir = setupWebTest();
   let threadManager: ThreadManager;
   let parentThreadId: string;
 
   beforeEach(() => {
-    setupTestPersistence();
     threadManager = new ThreadManager();
 
     // Create a parent thread
@@ -25,7 +25,7 @@ describe('ThreadManager Caching Issues', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should find delegate thread immediately after creation', () => {

@@ -8,12 +8,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { ToolContext } from '~/tools/types';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
@@ -22,21 +25,29 @@ import {
 // Using shared delegation test utilities
 
 describe('Task-Based DelegateTool Integration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let testSetup: DelegationTestSetup;
   let delegateTool: DelegateTool;
   let context: ToolContext;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
+    
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Use shared delegation test setup with MSW
     testSetup = await createDelegationTestSetup({
       sessionName: 'Task-Based Delegate Test Session',
       projectName: 'Task-Based Test Project',
-      model: 'claude-sonnet-4-20250514',
-      provider: 'anthropic',
+      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
     });
 
     // Create delegate tool and inject TaskManager
@@ -59,6 +70,9 @@ describe('Task-Based DelegateTool Integration', () => {
 
     // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('Integration Tests', () => {

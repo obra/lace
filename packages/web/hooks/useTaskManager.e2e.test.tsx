@@ -6,10 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { TaskAPIClient } from '@/lib/client/task-api';
@@ -30,14 +29,13 @@ vi.mock('@/lib/server/approval-manager', () => ({
 
 
 describe('TaskAPIClient E2E with Real API Routes', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionId: string;
   let projectId: string;
   let client: TaskAPIClient;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
     
@@ -173,7 +171,6 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
 
   afterEach(async () => {
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
     await cleanupTestProviderInstances([providerInstanceId]);
     vi.clearAllMocks();
     if (global.sessionService) {

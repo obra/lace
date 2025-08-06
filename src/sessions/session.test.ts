@@ -14,7 +14,6 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock external dependencies that don't affect core functionality
 vi.mock('server-only', () => ({}));
@@ -48,13 +47,12 @@ vi.mock('child_process', () => ({
 vi.mock('node-fetch', () => vi.fn());
 
 describe('Session', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let testProject: Project;
   let providerInstanceId: string;
   let openaiProviderInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
@@ -86,7 +84,6 @@ describe('Session', () => {
 
   afterEach(async () => {
     cleanupTestProviderDefaults();
-    // Test cleanup handled by setupCoreTest
     if (providerInstanceId || openaiProviderInstanceId) {
       await cleanupTestProviderInstances(
         [providerInstanceId, openaiProviderInstanceId].filter(Boolean)

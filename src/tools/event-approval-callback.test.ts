@@ -24,8 +24,6 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-
 // Enhanced test provider that can return tool calls once, then regular responses
 class MockProviderWithToolCalls extends TestProvider {
   private configuredResponse?: ProviderResponse;
@@ -72,7 +70,7 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('EventApprovalCallback Integration Tests', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -81,8 +79,8 @@ describe('EventApprovalCallback Integration Tests', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     // Create real provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -95,8 +93,8 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Create real project
     project = Project.create(
       'Approval Test Project',
+      '/tmp/approval-test',
       'Project for approval testing',
-      tempDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

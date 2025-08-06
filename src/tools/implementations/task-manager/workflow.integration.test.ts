@@ -11,7 +11,6 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
@@ -89,7 +88,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Task Management Workflow Integration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
@@ -105,8 +104,16 @@ describe('Task Management Workflow Integration', () => {
   let delegateTool: DelegateTool;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create a real provider instance for testing
     providerInstanceId = await createTestProviderInstance({

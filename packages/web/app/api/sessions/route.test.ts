@@ -6,10 +6,9 @@ import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { Session } from '@/lib/server/lace-imports';
 
 // No mocking of env-loader needed - setupTestProviderDefaults() handles env vars
@@ -18,7 +17,7 @@ import { Session } from '@/lib/server/lace-imports';
 // Minimal mocking - only env vars. Tests validate real HTTP behavior
 
 describe('Session API Routes', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
   let anthropicInstanceId: string;
@@ -27,7 +26,6 @@ describe('Session API Routes', () => {
     vi.clearAllMocks();
 
     // Set up isolated test persistence
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -45,7 +43,6 @@ describe('Session API Routes', () => {
     instancesConfig.instances['anthropic-default'] = {
       displayName: 'Test Anthropic Default',
       catalogProviderId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'], // Add supported models
     };
     await instanceManager.saveInstances(instancesConfig);
     await instanceManager.saveCredential('anthropic-default', {
@@ -73,7 +70,7 @@ describe('Session API Routes', () => {
     }
 
     // Clean up test persistence
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   // POST endpoint removed - sessions must be created through projects

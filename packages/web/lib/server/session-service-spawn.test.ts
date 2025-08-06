@@ -9,10 +9,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -37,7 +36,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('SessionService.spawnAgent Method', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
@@ -48,8 +47,6 @@ describe('SessionService.spawnAgent Method', () => {
     // Set up test provider defaults and create instances
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
-    setupTestPersistence();
 
     // Create test provider instances individually for more control
     const { createTestProviderInstance } = await import('~/test-utils/provider-instances');
@@ -91,7 +88,7 @@ describe('SessionService.spawnAgent Method', () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should spawn agent via service and make it retrievable', async () => {

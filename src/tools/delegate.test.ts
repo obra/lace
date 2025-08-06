@@ -9,31 +9,43 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { ToolContext } from '~/tools/types';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
 } from '~/test-utils/delegation-test-helper';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 // Using shared delegation test utilities
 
 describe('DelegateTool', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let testSetup: DelegationTestSetup;
   let tool: DelegateTool;
   let context: ToolContext;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
+
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Delegate Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Use shared delegation test setup
     testSetup = await createDelegationTestSetup({
       sessionName: 'Delegate Test Session',
       projectName: 'Delegate Test Project',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
     });
 
     // Get tool from session agent's toolExecutor
@@ -47,10 +59,12 @@ describe('DelegateTool', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     testSetup.session?.destroy();
-    // Test cleanup handled by setupCoreTest
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     cleanupTestProviderDefaults();
   });
 
@@ -68,7 +82,7 @@ describe('DelegateTool', () => {
         title: 'Analyze test failures',
         prompt: 'Look at the failing tests and identify common patterns',
         expected_response: 'A list of failure patterns',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -105,7 +119,7 @@ describe('DelegateTool', () => {
         title: 'List files',
         prompt: 'List the files in the current directory',
         expected_response: 'List of files',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -124,7 +138,7 @@ describe('DelegateTool', () => {
         title: 'Format test',
         prompt: 'Test system prompt formatting',
         expected_response: 'Formatted response',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -157,7 +171,7 @@ describe('DelegateTool', () => {
         title: 'Multi-response test',
         prompt: 'Generate multiple responses',
         expected_response: 'Combined responses',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -174,7 +188,7 @@ describe('DelegateTool', () => {
         title: 'Metadata test',
         prompt: 'Test metadata inclusion',
         expected_response: 'Response with metadata',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -186,9 +200,8 @@ describe('DelegateTool', () => {
 
   it('should accept valid model formats', async () => {
     const validModels = [
-      'anthropic:claude-sonnet-4-20250514',
-      'openai:gpt-4',
       'anthropic:claude-3-5-haiku-20241022',
+      'openai:gpt-4',
     ];
 
     for (const model of validModels) {

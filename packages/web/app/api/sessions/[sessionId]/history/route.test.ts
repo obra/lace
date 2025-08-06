@@ -12,7 +12,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ApiErrorResponse } from '@/types/api';
 import { asThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { Project, Session } from '@/lib/server/lace-imports';
@@ -23,13 +23,13 @@ interface HistoryResponse {
 }
 
 describe('Session History API', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let realSessionId: string;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -64,7 +64,7 @@ describe('Session History API', () => {
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
+    vi.clearAllMocks();
     await cleanupTestProviderInstances([providerInstanceId]);
   });
 

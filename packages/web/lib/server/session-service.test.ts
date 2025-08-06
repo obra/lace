@@ -5,15 +5,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { TestProvider } from '~/test-utils/test-provider';
 import type { SessionEvent } from '@/types/web-sse';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
 describe('SessionService with Provider Instances', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
   let testProject: import('@/lib/server/lace-imports').Project;
 
@@ -22,7 +21,7 @@ describe('SessionService with Provider Instances', () => {
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
-      tempDirContext.tempDir,
+      process.cwd(),
       'Test project for provider instance tests',
       {}
     );
@@ -77,14 +76,13 @@ describe('SessionService with Provider Instances', () => {
 // Don't mock lace-imports - use real implementations with temp directory
 
 describe('SessionService Missing Methods', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let Session: typeof import('@/lib/server/lace-imports').Session;
   let testProject: import('@/lib/server/lace-imports').Project;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     vi.clearAllMocks();
 
     // Set up test provider defaults
@@ -107,7 +105,7 @@ describe('SessionService Missing Methods', () => {
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
-      tempDirContext.tempDir,
+      _tempDirContext.tempDir,
       'Test project for session service tests',
       {}
     );
@@ -129,7 +127,7 @@ describe('SessionService Missing Methods', () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('updateSession', () => {
@@ -177,7 +175,7 @@ describe('SessionService Missing Methods', () => {
 });
 
 describe('SessionService approval event forwarding', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = setupWebTest();
   let sessionService: SessionService;
   let session: Session;
   let agent: Agent;
@@ -216,7 +214,6 @@ describe('SessionService approval event forwarding', () => {
   }
 
   beforeEach(async () => {
-    setupTestPersistence();
     vi.clearAllMocks();
 
     // Set up test provider defaults
@@ -240,7 +237,7 @@ describe('SessionService approval event forwarding', () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
@@ -254,7 +251,7 @@ describe('SessionService approval event forwarding', () => {
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
-      tempDirContext.tempDir,
+      _tempDirContext.tempDir,
       'Test project for approval flow testing',
       {}
     );

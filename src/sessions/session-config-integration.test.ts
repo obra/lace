@@ -10,7 +10,6 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -19,14 +18,13 @@ import {
 // No mocking for integration tests - use real filesystem access
 
 describe('Session Configuration Integration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let testProject: Project;
   let projectId: string;
   let presetManager: ConfigurationPresetManager;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -51,7 +49,6 @@ describe('Session Configuration Integration', () => {
 
   afterEach(async () => {
     cleanupTestProviderDefaults();
-    // Test cleanup handled by setupCoreTest
     await cleanupTestProviderInstances([providerInstanceId]);
   });
 

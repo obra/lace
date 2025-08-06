@@ -10,22 +10,20 @@ import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-import
 import type { ToolExecutor } from '@/lib/server/lace-imports';
 import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Agent Spawning and Thread Creation', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let session: Session;
   let projectId: string;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
@@ -66,7 +64,7 @@ describe('Agent Spawning and Thread Creation', () => {
       session.destroy();
     }
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should reproduce the exact E2E test scenario', async () => {

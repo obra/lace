@@ -8,22 +8,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir as _useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Session.spawnAgent Method', () => {
-  const _tempDirContext = _useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let session: Session;
   let projectId: string;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
@@ -64,7 +62,7 @@ describe('Session.spawnAgent Method', () => {
       session.destroy();
     }
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should spawn agent and create delegate thread', () => {

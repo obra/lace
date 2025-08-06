@@ -2,17 +2,18 @@
 // ABOUTME: Validates pending approval queries and approval status checks
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence } from '~/persistence/database';
+import { DatabasePersistence, getPersistence } from '~/persistence/database';
 import { ThreadEvent } from '~/threads/types';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Approval Database Queries', () => {
+  const _tempLaceDir = setupCoreTest();
   let db: DatabasePersistence;
   let threadId: string;
 
   beforeEach(() => {
-    db = // setupTestPersistence replaced by setupCoreTest
+    db = getPersistence();
     threadId = 'test_thread_123';
 
     // Create a test thread

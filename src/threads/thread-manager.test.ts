@@ -8,16 +8,15 @@ import { expectEventAdded } from '~/test-utils/event-helpers';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('ThreadManager', () => {
+  const _tempLaceDir = setupCoreTest();
   let threadManager: ThreadManager;
 
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
     threadManager = new ThreadManager();
   });
 
   afterEach(() => {
     threadManager.close();
-    // Test cleanup handled by setupCoreTest
   });
 
   describe('addEvent', () => {

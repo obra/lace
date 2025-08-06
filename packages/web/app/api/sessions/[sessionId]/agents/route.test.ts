@@ -7,9 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
@@ -45,7 +44,7 @@ interface ErrorResponse {
 // Note: parseResponse is imported from @/lib/serialization
 
 describe('Agent Spawning API E2E Tests', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
   let testProject: Project;
   let sessionId: string;
@@ -53,7 +52,6 @@ describe('Agent Spawning API E2E Tests', () => {
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
 
     // Set up environment for session service
     process.env = {
@@ -107,7 +105,7 @@ describe('Agent Spawning API E2E Tests', () => {
     // Cleanup test provider instances
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('POST /api/sessions/{sessionId}/agents', () => {

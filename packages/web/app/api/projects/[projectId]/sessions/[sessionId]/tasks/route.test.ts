@@ -11,10 +11,9 @@ import { GET, POST } from './route';
 import { asThreadId } from '@/types/core';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 
@@ -22,7 +21,7 @@ import { parseResponse } from '@/lib/serialization';
 vi.mock('server-only', () => ({}));
 
 describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
-  const _tempLaceDir = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let testSessionId: string;
@@ -52,7 +51,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       apiKey: 'test-anthropic-key',
     });
 
-    setupTestPersistence();
 
     sessionService = getSessionService();
 
@@ -103,7 +101,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
     vi.clearAllMocks();
   });
 

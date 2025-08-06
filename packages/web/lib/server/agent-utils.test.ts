@@ -1,19 +1,18 @@
 // ABOUTME: Tests for event-based approval callback with real Agent and Session instances
 // ABOUTME: Validates that approval requests create events and session-wide approvals work correctly
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
 import { TestProvider } from '~/test-utils/test-provider';
 
 describe('Event-Based Approval Callback', () => {
-  const _tempLaceDir = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let agent: Agent;
   let session: Session;
   let threadId: ThreadId;
@@ -31,8 +30,7 @@ describe('Event-Based Approval Callback', () => {
       apiKey: 'test-anthropic-key',
     });
 
-    // Set up test persistence
-    setupTestPersistence();
+    // Test persistence is set up automatically by setupWebTest()
 
     // Create real instances
     threadManager = new ThreadManager();
@@ -75,7 +73,7 @@ describe('Event-Based Approval Callback', () => {
   afterEach(async () => {
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should create TOOL_APPROVAL_REQUEST event when approval is requested', async () => {

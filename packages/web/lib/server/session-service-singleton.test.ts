@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 
@@ -24,11 +24,11 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('SessionService Singleton E2E Reproduction', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -50,8 +50,8 @@ describe('SessionService Singleton E2E Reproduction', () => {
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
     await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should reproduce the exact E2E test scenario step by step', async () => {

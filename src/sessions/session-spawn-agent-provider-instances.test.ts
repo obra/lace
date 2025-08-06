@@ -13,17 +13,15 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('Session.spawnAgent() with Provider Instances', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let testProject: Project;
   let testSession: Session;
   let providerInstanceId: string;
   let openaiProviderInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -62,7 +60,6 @@ describe('Session.spawnAgent() with Provider Instances', () => {
 
   afterEach(async () => {
     testSession?.destroy();
-    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId || openaiProviderInstanceId) {
       await cleanupTestProviderInstances(

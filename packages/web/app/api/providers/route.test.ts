@@ -3,16 +3,15 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET } from './route';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Provider Discovery API', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let testProviderInstances: {
     anthropicInstanceId: string;
     openaiInstanceId: string;
@@ -20,7 +19,6 @@ describe('Provider Discovery API', () => {
   let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
-    setupTestPersistence();
     vi.clearAllMocks();
 
     // Set up environment
@@ -34,7 +32,7 @@ describe('Provider Discovery API', () => {
   afterEach(async () => {
     // Clean up provider instances
     await cleanupTestProviderInstances(createdInstanceIds);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('GET /api/providers', () => {

@@ -11,7 +11,6 @@ import {
 } from '~/tools/implementations/task-manager/tools';
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   cleanupTestProviderInstances,
@@ -52,7 +51,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Multi-Agent Task Manager Integration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
@@ -70,7 +69,6 @@ describe('Multi-Agent Task Manager Integration', () => {
   let agent3Context: ToolContext;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -141,11 +139,9 @@ describe('Multi-Agent Task Manager Integration', () => {
   afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    // Clean up provider instance
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
-    // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
   });
 

@@ -4,9 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionService, getSessionService } from './session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import type { StreamEvent } from '@/types/stream-events';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '@/types/core';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
@@ -15,7 +14,7 @@ import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('SessionService TaskManager Event Forwarding', () => {
-  const _tempDir = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
   let testProject: ReturnType<typeof Project.create>;
@@ -23,7 +22,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
   let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     vi.clearAllMocks();
 
@@ -67,7 +65,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
     }
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances(createdInstanceIds);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('task:created event forwarding', () => {

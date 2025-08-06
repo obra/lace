@@ -12,9 +12,8 @@ import type { MessageResponse } from '@/types/api';
 import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
@@ -25,7 +24,7 @@ let originalConsoleError: typeof console.error;
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Thread Messaging API', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let realSessionId: string;
@@ -33,7 +32,6 @@ describe('Thread Messaging API', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     vi.clearAllMocks();
 
     // Set up console capture
@@ -87,7 +85,7 @@ describe('Thread Messaging API', () => {
     await cleanupTestProviderInstances([providerInstanceId]);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should accept and process messages', async () => {

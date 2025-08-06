@@ -14,10 +14,9 @@ import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessi
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { SessionInfo, ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { parseResponse } from '@/lib/serialization';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
@@ -26,7 +25,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Full Conversation Flow', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let addConnectionSpy: ReturnType<typeof vi.spyOn>;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
@@ -34,7 +33,6 @@ describe('Full Conversation Flow', () => {
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     vi.clearAllMocks();
 
@@ -79,7 +77,6 @@ describe('Full Conversation Flow', () => {
     cleanupTestProviderDefaults();
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
-    teardownTestPersistence();
   });
 
   it('should complete full session workflow', async () => {
