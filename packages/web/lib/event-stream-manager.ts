@@ -153,7 +153,15 @@ export class EventStreamManager {
       this.broadcast({
         eventType: 'task',
         scope: { projectId, sessionId, taskId: e.taskId },
-        data: { ...e },
+        data: {
+          type: e.type,
+          taskId: e.taskId,
+          agentThreadId: e.agentThreadId,
+          provider: e.providerInstanceId, // Map providerInstanceId to provider
+          model: e.modelId, // Map modelId to model
+          context: e.context,
+          timestamp: e.timestamp,
+        },
       });
     });
   }
