@@ -126,7 +126,9 @@ describe('Task Management Workflow Integration', () => {
     // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method
+    // For now, we're using the @internal createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
     // Create project and session with provider configuration

@@ -85,6 +85,8 @@ describe('Enhanced Task Manager Tools', () => {
 
     mockProvider = new MockProvider();
 
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method
     // Mock AnthropicProvider to avoid real API calls during testing
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 

@@ -82,7 +82,12 @@ describe('Multi-Agent Task Manager Integration', () => {
     // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method. This would involve:
+    // 1. Creating a test provider instance using createTestProviderInstance
+    // 2. Mocking the HTTP responses at the network level
+    // 3. Or creating a custom test provider type that can be registered
+    // For now, we're using the @internal createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
       (_name: string, _config?: unknown) => {
         return mockProvider;

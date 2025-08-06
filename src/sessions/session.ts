@@ -896,6 +896,8 @@ Use your task_add_note tool to record important notes as you work and your task_
     });
 
     // Use new provider instance system with synchronous credential loading
+    // Note: We do our own synchronous loading here because Session needs to be synchronous
+    // The registry's createProviderFromInstanceAndModel is async, so we can't use it
     try {
       const instanceManager = new ProviderInstanceManager();
       const config = instanceManager.loadInstancesSync();
@@ -981,7 +983,10 @@ Use your task_add_note tool to record important notes as you work and your task_
         instanceId: providerInstanceId,
       });
 
-      // Create provider using the new registry system
+      // Create provider using the registry's internal createProvider method
+      // This is intentional - Session needs synchronous operation, so we can't use
+      // the async createProviderFromInstanceAndModel. We're essentially doing the same
+      // thing but synchronously
       const providerRegistry = ProviderRegistry.getInstance();
       const providerInstance = providerRegistry.createProvider(providerType, providerConfig);
 

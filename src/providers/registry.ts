@@ -260,6 +260,11 @@ export class ProviderRegistry {
     }
   }
 
+  /**
+   * Internal method to create a provider directly.
+   * @internal This should only be used by Session.resolveProviderInstance for synchronous operation.
+   * All other code should use createProviderFromInstance or createProviderFromInstanceAndModel.
+   */
   createProvider(providerName: string, config: ProviderConfig = {}): AIProvider {
     logger.debug('ProviderRegistry.createProvider called', {
       providerName,

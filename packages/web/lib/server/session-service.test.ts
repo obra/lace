@@ -267,6 +267,8 @@ describe('SessionService approval event forwarding', () => {
     // Create mock provider that returns tool calls
     const mockProvider = new MockApprovalProvider();
 
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method
     // Mock ProviderRegistry to return our mock provider
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockReturnValue(mockProvider);
