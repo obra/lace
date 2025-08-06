@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
-import { ModelSelectionForm } from '@/components/providers/ModelSelectionForm';
+import { ModelSelectionForm } from './ModelSelectionForm';
 import { ModelDropdown } from '@/components/config/ModelDropdown';
 import type { 
   ProviderInfo, 
@@ -228,25 +228,45 @@ export function SessionConfigPanel({
         const data = await res.json() as { configuration: SessionConfiguration };
         setEditSessionName(selectedSession.name);
         setEditSessionDescription(''); // Session descriptions not currently stored
-        setEditSessionConfig({
+        
+        // Merge with defaults and ensure provider instance is set
+        const config = {
           ...DEFAULT_CONFIG,
           ...data.configuration,
-        });
+        };
+        
+        // If no provider instance configured, use first available
+        if (!config.providerInstanceId && availableProviders.length > 0) {
+          config.providerInstanceId = availableProviders[0].instanceId;
+          config.modelId = availableProviders[0].models[0]?.id || '';
+        }
+        
+        setEditSessionConfig(config);
         setShowEditConfig(true);
       } else {
         console.error('Failed to load session configuration');
-        // Fallback to default configuration
+        // Fallback to default configuration with first available provider
+        const config = { ...DEFAULT_CONFIG };
+        if (availableProviders.length > 0) {
+          config.providerInstanceId = availableProviders[0].instanceId;
+          config.modelId = availableProviders[0].models[0]?.id || '';
+        }
         setEditSessionName(selectedSession.name);
         setEditSessionDescription('');
-        setEditSessionConfig(DEFAULT_CONFIG);
+        setEditSessionConfig(config);
         setShowEditConfig(true);
       }
     } catch (error) {
       console.error('Error loading session configuration:', error);
-      // Fallback to default configuration
+      // Fallback to default configuration with first available provider
+      const config = { ...DEFAULT_CONFIG };
+      if (availableProviders.length > 0) {
+        config.providerInstanceId = availableProviders[0].instanceId;
+        config.modelId = availableProviders[0].models[0]?.id || '';
+      }
       setEditSessionName(selectedSession.name);
       setEditSessionDescription('');
-      setEditSessionConfig(DEFAULT_CONFIG);
+      setEditSessionConfig(config);
       setShowEditConfig(true);
     }
   };
@@ -572,7 +592,14 @@ export function SessionConfigPanel({
                   </div>
                 </div>
 
-                {/* Legacy provider/model configuration removed - now using provider instances via ModelSelectionForm */}
+                {/* Provider and Model Selection */}
+                <ModelSelectionForm
+                  providers={providers}
+                  providerInstanceId={sessionConfig.providerInstanceId}
+                  modelId={sessionConfig.modelId}
+                  onProviderChange={(instanceId) => setSessionConfig(prev => ({ ...prev, providerInstanceId: instanceId }))}
+                  onModelChange={(modelId) => setSessionConfig(prev => ({ ...prev, modelId }))}
+                />
 
                 {/* Working Directory */}
                 <div>
@@ -812,7 +839,14 @@ export function SessionConfigPanel({
                   </div>
                 </div>
 
-                {/* Legacy provider/model configuration removed - now using provider instances via ModelSelectionForm */}
+                {/* Provider and Model Selection */}
+                <ModelSelectionForm
+                  providers={providers}
+                  providerInstanceId={editSessionConfig.providerInstanceId}
+                  modelId={editSessionConfig.modelId}
+                  onProviderChange={(instanceId) => setEditSessionConfig(prev => ({ ...prev, providerInstanceId: instanceId }))}
+                  onModelChange={(modelId) => setEditSessionConfig(prev => ({ ...prev, modelId }))}
+                />
 
                 {/* Working Directory */}
                 <div>
