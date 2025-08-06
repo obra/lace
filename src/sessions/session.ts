@@ -276,34 +276,35 @@ export class Session {
 
     logger.debug(`Reconstructing session agent for ${sessionId}`);
 
-    // Get provider and model - prefer thread metadata over session config
+    // Get provider and model from session configuration
     const sessionConfig = sessionData.configuration || {};
     const tempThreadManager = new ThreadManager();
     const existingThread = tempThreadManager.getThread(sessionId);
 
-    // Determine provider (thread metadata > session config > default)
-    const provider =
-      (existingThread?.metadata?.provider as string) ||
-      (sessionConfig.provider as string) ||
-      'anthropic';
+    // Get provider instance ID and model ID from thread metadata or session config
+    const providerInstanceId =
+      (existingThread?.metadata?.providerInstanceId as string) ||
+      (sessionConfig.providerInstanceId as string);
 
-    // Determine model (thread metadata > session config > provider default)
-    let model: string;
-    if (existingThread?.metadata?.model) {
-      model = existingThread.metadata.model;
-    } else if (sessionConfig.model) {
-      model = sessionConfig.model as string;
-    } else {
-      // Get provider default by creating temporary instance
-      const registry = ProviderRegistry.getInstance();
-      const tempProvider = registry.createProvider(provider);
-      model = tempProvider.defaultModel;
-      tempProvider.cleanup();
+    const modelId =
+      (existingThread?.metadata?.modelId as string) ||
+      (existingThread?.metadata?.model as string) || // backwards compatibility
+      (sessionConfig.modelId as string) ||
+      (sessionConfig.model as string); // backwards compatibility
+
+    if (!providerInstanceId || !modelId) {
+      logger.error('Session missing provider configuration', {
+        sessionId,
+        hasProviderInstanceId: !!providerInstanceId,
+        hasModelId: !!modelId,
+        metadata: existingThread?.metadata,
+        sessionConfig,
+      });
+      throw new Error(`Session ${sessionId} is missing provider configuration`);
     }
 
-    // Create provider and tool executor
-    const registry = ProviderRegistry.getInstance();
-    const providerInstance = registry.createProvider(provider, { model });
+    // Create provider using the provider instance system
+    const providerInstance = Session.resolveProviderInstance(providerInstanceId, modelId);
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
