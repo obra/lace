@@ -50,6 +50,8 @@ export interface AgentInfo {
   name: string;
   provider: string;
   model: string;
+  providerInstanceId?: string;
+  modelId?: string;
   status: AgentState;
 }
 
@@ -419,11 +421,14 @@ export class Agent extends EventEmitter {
   }
 
   getInfo(): AgentInfo {
+    const metadata = this.getThreadMetadata();
     return {
       threadId: asThreadId(this._threadId),
       name: this.name,
       provider: this.provider,
       model: this.model,
+      providerInstanceId: metadata?.providerInstanceId as string | undefined,
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || undefined,
       status: this.status,
     };
   }
