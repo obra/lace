@@ -28,6 +28,7 @@ interface SessionConfiguration {
 
 interface SessionConfigPanelProps {
   selectedProject: ProjectInfo;
+  projectConfiguration?: Record<string, unknown> | null;
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
   providers: ProviderInfo[];
@@ -56,6 +57,7 @@ const DEFAULT_CONFIG: SessionConfiguration = {
 
 export function SessionConfigPanel({
   selectedProject,
+  projectConfiguration,
   sessions,
   selectedSession,
   providers,
@@ -107,7 +109,7 @@ export function SessionConfigPanel({
     );
   }, [providers]);
 
-  // Reset form when project changes
+  // Reset form when project or project configuration changes
   const projectId = (selectedProject as { id: string }).id;
   useEffect(() => {
     setShowCreateSession(false);
@@ -118,12 +120,32 @@ export function SessionConfigPanel({
     resetSessionForm();
     resetAgentForm();
     resetEditSessionForm();
-  }, [projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, projectConfiguration]);
 
   const resetSessionForm = () => {
     setNewSessionName('');
     setNewSessionDescription('');
-    setSessionConfig(DEFAULT_CONFIG);
+    // Use project configuration as defaults if available
+    const defaultConfig = { ...DEFAULT_CONFIG };
+    if (projectConfiguration) {
+      if (projectConfiguration.providerInstanceId) {
+        defaultConfig.providerInstanceId = projectConfiguration.providerInstanceId as string;
+      }
+      if (projectConfiguration.modelId) {
+        defaultConfig.modelId = projectConfiguration.modelId as string;
+      }
+      if (projectConfiguration.workingDirectory) {
+        defaultConfig.workingDirectory = projectConfiguration.workingDirectory as string;
+      }
+      if (projectConfiguration.environmentVariables) {
+        defaultConfig.environmentVariables = projectConfiguration.environmentVariables as Record<string, string>;
+      }
+      if (projectConfiguration.toolPolicies) {
+        defaultConfig.toolPolicies = projectConfiguration.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>;
+      }
+    }
+    setSessionConfig(defaultConfig);
     setNewEnvKey('');
     setNewEnvValue('');
   };
@@ -536,7 +558,10 @@ export function SessionConfigPanel({
         
         {/* New Session Button - moved to bottom */}
         <button
-          onClick={() => setShowCreateSession(true)}
+          onClick={() => {
+            resetSessionForm(); // Reset with project defaults
+            setShowCreateSession(true);
+          }}
           className="btn btn-primary btn-sm w-full"
           disabled={loading}
         >
@@ -758,9 +783,11 @@ export function SessionConfigPanel({
 
               {/* Provider Instance Selection Toggle */}
               <ModelSelectionForm
-                onSelectionChange={handleProviderInstanceSelection}
-                selectedInstanceId={selectedInstanceId}
-                selectedModelId={selectedModelId}
+                providers={providers}
+                providerInstanceId={selectedInstanceId}
+                modelId={selectedModelId}
+                onProviderChange={setSelectedInstanceId}
+                onModelChange={setSelectedModelId}
                 className="mb-4"
               />
 

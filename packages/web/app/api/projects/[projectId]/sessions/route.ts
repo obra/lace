@@ -84,9 +84,24 @@ export async function POST(
     return createSuperjsonResponse({ session: sessionData }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
+      // Provide detailed field-level validation errors
+      const fieldErrors: Record<string, string> = {};
+      error.errors.forEach((err) => {
+        const field = err.path.join('.');
+        fieldErrors[field] = err.message;
+      });
+
+      const errorMessage = Object.entries(fieldErrors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join(', ');
+
+      return createErrorResponse(`Validation failed: ${errorMessage}`, 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors,
+        details: {
+          errors: error.errors,
+          fieldErrors,
+          summary: errorMessage,
+        },
       });
     }
 
