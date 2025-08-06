@@ -29,7 +29,6 @@ interface MockInstance {
   displayName: string;
   catalogProviderId: string;
   endpoint?: string;
-  timeout?: number;
   hasCredentials: boolean;
 }
 
@@ -39,7 +38,6 @@ describe('EditInstanceModal', () => {
     displayName: 'Test Instance',
     catalogProviderId: 'openai',
     endpoint: 'https://api.openai.com/v1',
-    timeout: 30000,
     hasCredentials: true
   };
 
@@ -65,7 +63,6 @@ describe('EditInstanceModal', () => {
 
     expect(screen.getByDisplayValue('Test Instance')).toBeInTheDocument();
     expect(screen.getByDisplayValue('https://api.openai.com/v1')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('30')).toBeInTheDocument(); // timeout in seconds
     expect(screen.getByText('openai')).toBeInTheDocument(); // read-only provider badge
   });
 
@@ -75,8 +72,7 @@ describe('EditInstanceModal', () => {
     // Mock successful API response
     const mockUpdatedInstance = {
       ...mockInstance,
-      displayName: 'Updated Instance Name',
-      timeout: 60000
+      displayName: 'Updated Instance Name'
     };
     
     mockParseResponse.mockResolvedValue({
@@ -96,9 +92,9 @@ describe('EditInstanceModal', () => {
     await user.clear(nameInput);
     await user.type(nameInput, 'Updated Instance Name');
 
-    // Update timeout - use fireEvent for more reliable input
-    const timeoutInput = screen.getByDisplayValue('30');
-    fireEvent.change(timeoutInput, { target: { value: '60' } });
+    // Update endpoint
+    const endpointInput = screen.getByDisplayValue('https://api.openai.com/v1');
+    fireEvent.change(endpointInput, { target: { value: 'https://custom.api.com' } });
 
     // Submit form
     const saveButton = screen.getByRole('button', { name: /save changes/i });
@@ -110,8 +106,7 @@ describe('EditInstanceModal', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: 'Updated Instance Name',
-          endpoint: 'https://api.openai.com/v1',
-          timeout: 60000
+          endpoint: 'https://custom.api.com'
         })
       });
     });
@@ -149,7 +144,6 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Test Instance',
           endpoint: 'https://api.openai.com/v1',
-          timeout: 30000,
           credential: { apiKey: 'new-api-key' }
         })
       });

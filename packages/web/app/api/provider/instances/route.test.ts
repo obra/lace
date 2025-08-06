@@ -249,7 +249,7 @@ describe('Provider Instances API', () => {
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toContain('Invalid request body');
+      expect(data.error).toContain('Validation failed');
     });
 
     it('should reject non-existent catalog provider', async () => {

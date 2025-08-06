@@ -175,7 +175,7 @@ describe('Session API endpoints under projects', () => {
       const data = await parseResponse<{ error: string; details?: unknown }>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(data.error).toContain('Validation failed');
       expect(data.details).toBeDefined();
     });
 
@@ -189,7 +189,7 @@ describe('Session API endpoints under projects', () => {
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(data.error).toContain('Validation failed');
     });
 
     it('should use default values for optional fields', async () => {

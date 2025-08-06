@@ -20,13 +20,16 @@ describe('SessionService with Provider Instances', () => {
   let testProject: import('@/lib/server/lace-imports').Project;
 
   beforeEach(async () => {
-    // Create a real test project
+    // Create a real test project with provider configuration
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
       process.cwd(),
       'Test project for provider instance tests',
-      {}
+      {
+        providerInstanceId: 'test-instance-id',
+        modelId: 'claude-3-5-sonnet-20241022',
+      }
     );
 
     sessionService = new SessionService();

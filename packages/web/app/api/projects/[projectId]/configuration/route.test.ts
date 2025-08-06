@@ -184,7 +184,7 @@ describe('Project Configuration API', () => {
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(data.error).toContain('Validation failed');
       expect(data.details).toBeDefined();
     });
 

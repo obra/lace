@@ -93,8 +93,11 @@ describe('Session API Routes', () => {
       const { Project } = await import('@/lib/server/lace-imports');
       const { getSessionService } = await import('@/lib/server/session-service');
 
-      // Create and ensure project is saved
-      const testProject = Project.create('Test Project', '/test', 'Test project for sessions');
+      // Create and ensure project is saved with provider configuration
+      const testProject = Project.create('Test Project', '/test', 'Test project for sessions', {
+        providerInstanceId: 'anthropic-default',
+        modelId: 'claude-3-5-sonnet-20241022',
+      });
       const projectId = testProject.getId();
 
       const sessionService = getSessionService();
