@@ -27,8 +27,8 @@ type ProjectFilter = 'active' | 'archived' | 'all';
 type ProjectTimeFrame = 'week' | 'month' | 'all';
 
 interface ProjectConfiguration {
-  provider?: string;
-  model?: string;
+  providerInstanceId?: string;
+  modelId?: string;
   maxTokens?: number;
   tools?: string[];
   toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
@@ -44,8 +44,7 @@ const AVAILABLE_TOOLS = [
 ];
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  // providerInstanceId and modelId will be set from available instances
   maxTokens: 4096,
   tools: AVAILABLE_TOOLS,
   toolPolicies: {},
@@ -88,6 +87,25 @@ export function ProjectSelectorPanel({
   // State for simplified mode - default to simplified for all project creation
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const isSimplifiedMode = !showAdvancedOptions;
+  
+  // Get available providers (only those that are configured with instance IDs)
+  const availableProviders = useMemo(() => {
+    return providers.filter((p): p is ProviderInfo & { instanceId: string } => 
+      Boolean(p.configured && p.instanceId)
+    );
+  }, [providers]);
+  
+  // Initialize with first available provider instance
+  useEffect(() => {
+    if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
+      const firstProvider = availableProviders[0];
+      setCreateConfig(prev => ({
+        ...prev,
+        providerInstanceId: firstProvider.instanceId,
+        modelId: firstProvider.models[0]?.id || ''
+      }));
+    }
+  }, [availableProviders, createConfig.providerInstanceId]);
 
   // Auto-open project creation modal when requested
   useEffect(() => {
@@ -111,20 +129,15 @@ export function ProjectSelectorPanel({
 
   // Get available models for project configuration
   const availableModels = useMemo(() => {
-    const provider = providers.find(p => p.name === editConfig.provider);
+    const provider = providers.find(p => p.instanceId === editConfig.providerInstanceId);
     return provider?.models || [];
-  }, [providers, editConfig.provider]);
+  }, [providers, editConfig.providerInstanceId]);
 
   // Get available models for project creation
   const availableCreateModels = useMemo(() => {
-    const provider = providers.find(p => p.name === createConfig.provider);
+    const provider = providers.find(p => p.instanceId === createConfig.providerInstanceId);
     return provider?.models || [];
-  }, [providers, createConfig.provider]);
-
-  // Get available providers (only those that are configured)
-  const availableProviders = useMemo(() => {
-    return providers.filter(p => p.configured);
-  }, [providers]);
+  }, [providers, createConfig.providerInstanceId]);
 
   // Helper function to check if project was active in given timeframe
   const isProjectActiveInTimeframe = (project: ProjectInfo, timeframe: ProjectTimeFrame): boolean => {
@@ -755,20 +768,21 @@ export function ProjectSelectorPanel({
                       <span className="label-text font-medium">Default Provider</span>
                     </label>
                     <select
-                      value={editConfig.provider}
+                      value={editConfig.providerInstanceId || ''}
                       onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
+                        const newInstanceId = e.target.value;
+                        const provider = providers.find(p => p.instanceId === newInstanceId);
+                        const providerModels = provider?.models || [];
                         setEditConfig(prev => ({
                           ...prev,
-                          provider: newProvider,
-                          model: providerModels[0]?.id || prev.model,
+                          providerInstanceId: newInstanceId,
+                          modelId: providerModels[0]?.id || prev.modelId,
                         }));
                       }}
                       className="select select-bordered w-full"
                     >
                       {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
+                        <option key={provider.instanceId} value={provider.instanceId}>
                           {provider.displayName}
                         </option>
                       ))}
@@ -780,8 +794,8 @@ export function ProjectSelectorPanel({
                       <span className="label-text font-medium">Default Model</span>
                     </label>
                     <select
-                      value={editConfig.model}
-                      onChange={(e) => setEditConfig(prev => ({ ...prev, model: e.target.value }))}
+                      value={editConfig.modelId || ''}
+                      onChange={(e) => setEditConfig(prev => ({ ...prev, modelId: e.target.value }))}
                       className="select select-bordered w-full"
                     >
                       {availableModels.map((model) => (
@@ -1043,20 +1057,21 @@ export function ProjectSelectorPanel({
                     </label>
                     <select
                       data-testid="create-project-provider-select"
-                      value={createConfig.provider}
+                      value={createConfig.providerInstanceId || ''}
                       onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
+                        const newInstanceId = e.target.value;
+                        const provider = providers.find(p => p.instanceId === newInstanceId);
+                        const providerModels = provider?.models || [];
                         setCreateConfig(prev => ({
                           ...prev,
-                          provider: newProvider,
-                          model: providerModels[0]?.id || prev.model,
+                          providerInstanceId: newInstanceId,
+                          modelId: providerModels[0]?.id || prev.modelId,
                         }));
                       }}
                       className="select select-bordered w-full"
                     >
                       {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
+                        <option key={provider.instanceId} value={provider.instanceId}>
                           {provider.displayName}
                         </option>
                       ))}
@@ -1069,8 +1084,8 @@ export function ProjectSelectorPanel({
                     </label>
                     <select
                       data-testid="create-project-model-select"
-                      value={createConfig.model}
-                      onChange={(e) => setCreateConfig(prev => ({ ...prev, model: e.target.value }))}
+                      value={createConfig.modelId || ''}
+                      onChange={(e) => setCreateConfig(prev => ({ ...prev, modelId: e.target.value }))}
                       className="select select-bordered w-full"
                     >
                       {availableCreateModels.map((model) => (

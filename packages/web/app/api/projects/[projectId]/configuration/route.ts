@@ -8,8 +8,8 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
-  model: z.string().optional(),
+  providerInstanceId: z.string().min(1).optional(),
+  modelId: z.string().min(1).optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
   toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
@@ -54,6 +54,28 @@ export async function PUT(
 
     if (!project) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    // Validate provider instance if provided
+    if (validatedData.providerInstanceId) {
+      const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+      const registry = new ProviderRegistry();
+      await registry.initialize();
+
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(
+        (inst) => inst.id === validatedData.providerInstanceId
+      );
+
+      if (!instance) {
+        return createErrorResponse('Provider instance not found', 400, {
+          code: 'VALIDATION_FAILED',
+          availableInstances: configuredInstances.map((i) => ({
+            id: i.id,
+            name: i.name || i.displayName,
+          })),
+        });
+      }
     }
 
     project.updateConfiguration(validatedData);

@@ -53,8 +53,8 @@ export interface AgentEvent {
   type: 'agent:spawned' | 'agent:started' | 'agent:stopped';
   taskId?: string;
   agentThreadId: ThreadId;
-  provider: string;
-  model: string;
+  providerInstanceId: string;
+  modelId: string;
   context: {
     actor: string;
     isHuman: boolean;

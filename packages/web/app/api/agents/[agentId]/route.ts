@@ -10,11 +10,24 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 
-const AgentUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
-  modelId: z.string().min(1, 'Model ID is required'),
-});
+const AgentUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    providerInstanceId: z.string().min(1).optional(),
+    modelId: z.string().min(1).optional(),
+  })
+  .refine(
+    (data) => {
+      // If either providerInstanceId or modelId is provided, both must be provided
+      if (data.providerInstanceId || data.modelId) {
+        return data.providerInstanceId && data.modelId;
+      }
+      return true;
+    },
+    {
+      message: 'Both providerInstanceId and modelId must be provided together',
+    }
+  );
 
 export async function GET(
   request: NextRequest,
@@ -133,7 +146,10 @@ export async function PUT(
       if (!instance) {
         return createErrorResponse('Provider instance not found', 400, {
           code: 'VALIDATION_FAILED',
-          availableInstances: configuredInstances.map((i) => ({ id: i.id, name: i.name })),
+          availableInstances: configuredInstances.map((i) => ({
+            id: i.id,
+            name: i.name || i.displayName,
+          })),
         });
       }
     }
@@ -145,9 +161,13 @@ export async function PUT(
       updates.name = validatedData.name;
     }
 
-    // Update provider instance and model
-    updates.providerInstanceId = validatedData.providerInstanceId;
-    updates.modelId = validatedData.modelId;
+    // Update provider instance and model if provided
+    if (validatedData.providerInstanceId !== undefined) {
+      updates.providerInstanceId = validatedData.providerInstanceId;
+    }
+    if (validatedData.modelId !== undefined) {
+      updates.modelId = validatedData.modelId;
+    }
 
     if (Object.keys(updates).length > 0) {
       agent.updateThreadMetadata(updates);

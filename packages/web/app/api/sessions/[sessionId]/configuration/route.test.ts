@@ -127,6 +127,7 @@ describe('Session Configuration API', () => {
   describe('PUT /api/sessions/:sessionId/configuration', () => {
     it('should update session configuration successfully', async () => {
       const updates = {
+        providerInstanceId: providerInstanceId,
         modelId: 'claude-sonnet-4-20250514',
         maxTokens: 8000,
         toolPolicies: {
@@ -154,7 +155,10 @@ describe('Session Configuration API', () => {
     it('should return 404 when session not found', async () => {
       const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration', {
         method: 'PUT',
-        body: JSON.stringify({ provider: 'openai' }),
+        body: JSON.stringify({
+          providerInstanceId: 'test-provider',
+          modelId: 'test-model',
+        }),
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -297,6 +301,7 @@ describe('TDD: Direct Session Configuration Update', () => {
 
   it('should use SessionService.getSession() which calls session.updateConfiguration() directly', async () => {
     const configUpdate = {
+      providerInstanceId: updateProviderInstanceId,
       modelId: 'claude-sonnet-4-20250514',
       maxTokens: 8000,
       toolPolicies: {
