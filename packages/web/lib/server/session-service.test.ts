@@ -526,7 +526,7 @@ describe('SessionService agent state change broadcasting', () => {
       data: expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
-        timestamp: expect.any(String),
+        timestamp: expect.any(Date),
         data: expect.objectContaining({
           agentId: agent.threadId,
           from: 'idle',
