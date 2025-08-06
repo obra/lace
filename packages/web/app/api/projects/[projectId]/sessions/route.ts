@@ -61,6 +61,9 @@ export async function POST(
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Clear provider cache to ensure fresh credentials are loaded
+    Session.clearProviderCache();
+
     // Create session using Session.create with project inheritance
     const session = Session.create({
       name: validatedData.name,

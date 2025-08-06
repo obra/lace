@@ -844,15 +844,26 @@ Use your task_add_note tool to record important notes as you work and your task_
   static resolveProviderInstance(providerInstanceId: string, modelId: string): AIProvider {
     const cacheKey = `${providerInstanceId}:${modelId}`;
 
-    // Check cache first
+    // Check cache first, but validate it's properly configured
     const cached = Session._providerCache.get(cacheKey);
-    if (cached) {
+    if (cached && cached.isConfigured()) {
       logger.debug('Using cached provider instance', {
         providerInstanceId,
         modelId,
         cacheKey,
+        isConfigured: true,
       });
       return cached;
+    }
+
+    if (cached && !cached.isConfigured()) {
+      logger.debug('Cached provider not properly configured, recreating', {
+        providerInstanceId,
+        modelId,
+        cacheKey,
+        isConfigured: false,
+      });
+      Session._providerCache.delete(cacheKey);
     }
 
     logger.debug('Creating new provider instance (not cached)', {
