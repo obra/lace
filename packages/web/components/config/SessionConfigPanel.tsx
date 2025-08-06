@@ -277,7 +277,6 @@ export function SessionConfigPanel({
         setEditSessionConfig(config);
         setShowEditConfig(true);
       } else {
-        console.error('Failed to load session configuration');
         // Fallback to default configuration with first available provider
         const config = { ...DEFAULT_CONFIG };
         if (availableProviders.length > 0) {

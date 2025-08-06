@@ -405,7 +405,13 @@ export class Agent extends EventEmitter {
 
   get model(): string {
     const metadata = this.getThreadMetadata();
-    return (metadata?.model as string) || this._provider.modelName || 'unknown-model';
+    // Check both 'model' and 'modelId' for backwards compatibility
+    return (
+      (metadata?.model as string) ||
+      (metadata?.modelId as string) ||
+      this._provider.modelName ||
+      'unknown-model'
+    );
   }
 
   get status(): AgentState {
