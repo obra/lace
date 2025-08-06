@@ -161,8 +161,9 @@ export function ToolCallDisplay({
   const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
   const args = metadata?.arguments;
   const hasArgs: boolean = Boolean(args && typeof args === 'object' && args !== null && Object.keys(args).length > 0);
-  const toolDisplayName = renderer.getDisplayName?.(tool, result || undefined) ?? tool;
   const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
+  // For file_read, use the summary as the display name since it contains the full path
+  const toolDisplayName = tool === 'file_read' ? toolSummary : (renderer.getDisplayName?.(tool, result || undefined) ?? tool);
   const resultContent = hasResult ? (renderer.renderResult?.(result!, undefined) ?? createDefaultResultRenderer(result!)) : null;
   
   // Create success/error icon for header
@@ -195,28 +196,31 @@ export function ToolCallDisplay({
         />
         
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          <div className="p-3 bg-base-50 border-b border-base-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {tool.toLowerCase() === 'bash' && args && typeof args === 'object' && 'command' in args ? (
-                  <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
-                    $ {String((args as { command: unknown }).command)}
-                  </code>
-                ) : (
-                  <span className="text-sm text-base-content/80">{String(toolSummary)}</span>
+          {/* Only show the header bar if we have content to display */}
+          {(tool !== 'file_read' || hasArgs) && (
+            <div className="p-3 bg-base-50 border-b border-base-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {tool.toLowerCase() === 'bash' && args && typeof args === 'object' && 'command' in args ? (
+                    <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
+                      $ {String((args as { command: unknown }).command)}
+                    </code>
+                  ) : tool !== 'file_read' ? (
+                    <span className="text-sm text-base-content/80">{String(toolSummary)}</span>
+                  ) : null}
+                </div>
+                
+                {hasArgs && (
+                  <button
+                    onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                    className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
+                  >
+                    {showTechnicalDetails ? 'Hide' : 'Show'} Details
+                  </button>
                 )}
               </div>
-              
-              {hasArgs && (
-                <button
-                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                  className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
-                >
-                  {showTechnicalDetails ? 'Hide' : 'Show'} Details
-                </button>
-              )}
             </div>
-          </div>
+          )}
           
           {/* Technical Details (when expanded) */}
           {showTechnicalDetails && hasArgs && (

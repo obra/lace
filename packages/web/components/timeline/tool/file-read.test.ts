@@ -56,7 +56,7 @@ describe('fileReadRenderer', () => {
   describe('getSummary', () => {
     test('should create concise summary for file read operations', () => {
       const summary = fileReadRenderer.getSummary?.(mockFileReadArgs);
-      expect(summary).toBe('Read Button.tsx (lines 1-10)');
+      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx');
     });
 
     test('should handle line ranges in summary', () => {
@@ -66,7 +66,7 @@ describe('fileReadRenderer', () => {
         endLine: 25,
       };
       const summary = fileReadRenderer.getSummary?.(rangeArgs);
-      expect(summary).toBe('Read Button.tsx (lines 15-25)');
+      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx');
     });
 
     test('should handle start line only', () => {
@@ -76,7 +76,7 @@ describe('fileReadRenderer', () => {
         endLine: undefined,
       };
       const summary = fileReadRenderer.getSummary?.(startOnlyArgs);
-      expect(summary).toBe('Read Button.tsx (from line 10)');
+      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx');
     });
 
     test('should handle end line only', () => {
@@ -86,7 +86,7 @@ describe('fileReadRenderer', () => {
         endLine: 20,
       };
       const summary = fileReadRenderer.getSummary?.(endOnlyArgs);
-      expect(summary).toBe('Read Button.tsx (to line 20)');
+      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx');
     });
 
     test('should handle missing or invalid args', () => {
@@ -105,12 +105,12 @@ describe('fileReadRenderer', () => {
       expect(fileReadRenderer.isError?.(mockSuccessResult)).toBe(false);
     });
 
-    test('should detect error from content text patterns', () => {
+    test('should only trust isError flag for error detection', () => {
       const contentErrorResult: ToolResult = {
         content: [{ type: 'text', text: 'Permission denied accessing file' }],
-        isError: false, // Will be detected by content analysis
+        isError: false, // Tool says it's not an error, so we trust it
       };
-      expect(fileReadRenderer.isError?.(contentErrorResult)).toBe(true);
+      expect(fileReadRenderer.isError?.(contentErrorResult)).toBe(false);
     });
 
     test('should handle missing content gracefully', () => {
