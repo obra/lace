@@ -798,26 +798,19 @@ export function ProjectSelectorPanel({
                       onChange={(e) => setEditConfig(prev => ({ ...prev, modelId: e.target.value }))}
                       className="select select-bordered w-full"
                     >
-                      {availableModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.displayName}
-                        </option>
-                      ))}
+                      {availableModels.length === 0 ? (
+                        <option value="">No models available</option>
+                      ) : (
+                        <>
+                          {!editConfig.modelId && <option value="">Select a model</option>}
+                          {availableModels.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.displayName}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Max Tokens</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="200000"
-                      value={editConfig.maxTokens}
-                      onChange={(e) => setEditConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
-                      className="input input-bordered w-full"
-                    />
                   </div>
                 </div>
 
@@ -1088,26 +1081,19 @@ export function ProjectSelectorPanel({
                       onChange={(e) => setCreateConfig(prev => ({ ...prev, modelId: e.target.value }))}
                       className="select select-bordered w-full"
                     >
-                      {availableCreateModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.displayName}
-                        </option>
-                      ))}
+                      {availableCreateModels.length === 0 ? (
+                        <option value="">No models available</option>
+                      ) : (
+                        <>
+                          {!createConfig.modelId && <option value="">Select a model</option>}
+                          {availableCreateModels.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.displayName}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Max Tokens</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="200000"
-                      value={createConfig.maxTokens}
-                      onChange={(e) => setCreateConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
-                      className="input input-bordered w-full"
-                    />
                   </div>
                 </div>
 

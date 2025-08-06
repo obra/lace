@@ -228,7 +228,10 @@ export function SessionConfigPanel({
         const data = await res.json() as { configuration: SessionConfiguration };
         setEditSessionName(selectedSession.name);
         setEditSessionDescription(''); // Session descriptions not currently stored
-        setEditSessionConfig(data.configuration);
+        setEditSessionConfig({
+          ...DEFAULT_CONFIG,
+          ...data.configuration,
+        });
         setShowEditConfig(true);
       } else {
         console.error('Failed to load session configuration');
@@ -570,22 +573,6 @@ export function SessionConfigPanel({
                 </div>
 
                 {/* Legacy provider/model configuration removed - now using provider instances via ModelSelectionForm */}
-                
-                <div className="grid md:grid-cols-1 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Max Tokens</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="200000"
-                      value={sessionConfig.maxTokens}
-                      onChange={(e) => setSessionConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
-                      className="input input-bordered w-full"
-                    />
-                  </div>
-                </div>
 
                 {/* Working Directory */}
                 <div>
@@ -826,23 +813,6 @@ export function SessionConfigPanel({
                 </div>
 
                 {/* Legacy provider/model configuration removed - now using provider instances via ModelSelectionForm */}
-                
-                <div className="grid md:grid-cols-1 gap-4">
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Max Tokens</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="200000"
-                      value={editSessionConfig.maxTokens}
-                      onChange={(e) => setEditSessionConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
-                      className="input input-bordered w-full"
-                    />
-                  </div>
-                </div>
 
                 {/* Working Directory */}
                 <div>

@@ -1,5 +1,5 @@
 // ABOUTME: Modal for editing existing provider instances
-// ABOUTME: Allows updating display name, endpoint, timeout, and credentials
+// ABOUTME: Allows updating display name, endpoint, and credentials
 
 'use client';
 
@@ -15,7 +15,6 @@ interface EditInstanceModalProps {
     displayName: string;
     catalogProviderId: string;
     endpoint?: string;
-    timeout?: number;
     hasCredentials: boolean;
   };
   onClose: () => void;
@@ -34,7 +33,6 @@ export function EditInstanceModal({
   const [formData, setFormData] = useState({
     displayName: instance.displayName,
     endpoint: instance.endpoint || '',
-    timeout: Math.floor((instance.timeout || 30000) / 1000), // Convert to seconds
     apiKey: ''
   });
 
@@ -43,7 +41,6 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
-      timeout: Math.floor((instance.timeout || 30000) / 1000),
       apiKey: ''
     });
   }, [instance]);
@@ -58,7 +55,6 @@ export function EditInstanceModal({
       const updateData: Record<string, unknown> = {
         displayName: formData.displayName,
         endpoint: formData.endpoint || undefined,
-        timeout: formData.timeout * 1000, // Convert back to milliseconds
       };
 
       // Only include credential if API key was provided
@@ -91,7 +87,6 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
-      timeout: Math.floor((instance.timeout || 30000) / 1000),
       apiKey: ''
     });
     onClose();
@@ -172,19 +167,6 @@ export function EditInstanceModal({
           </div>
         </div>
 
-        <div>
-          <label className="label">
-            <span className="label-text">Timeout (seconds)</span>
-          </label>
-          <input
-            type="number"
-            className="input input-bordered w-full"
-            value={formData.timeout}
-            onChange={(e) => setFormData({...formData, timeout: parseInt(e.target.value) || 30})}
-            min={5}
-            max={300}
-          />
-        </div>
 
         <div className="flex justify-end space-x-3 pt-4">
           <button 
