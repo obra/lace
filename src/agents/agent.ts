@@ -23,7 +23,6 @@ import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-
 import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
-import { ProviderRegistry } from '~/providers/registry';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
@@ -153,8 +152,6 @@ export class Agent extends EventEmitter {
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
   private _configuration: AgentConfiguration = {};
-  private _cachedProviderInstance: AIProvider | null = null;
-  private _cachedProviderKey: string | null = null;
 
   // Simple tool batch tracking
   private _pendingToolCount = 0;
@@ -354,45 +351,10 @@ export class Agent extends EventEmitter {
   }
 
   get providerInstance(): AIProvider {
-    const metadata = this.getThreadMetadata();
-    const targetProvider = (metadata?.provider as string) || this._provider.providerName;
-    const targetModel = (metadata?.model as string) || this._provider.modelName;
-
-    // Create cache key based on provider and model
-    const cacheKey = `${targetProvider}:${targetModel}`;
-
-    // Create cache key based on provider and model
-
-    // If current metadata matches the constructor provider, return it
-    if (
-      targetProvider === this._provider.providerName &&
-      targetModel === this._provider.modelName
-    ) {
-      // Using constructor provider - no need to create new instance
-      return this._provider;
-    }
-
-    // Check if we have a cached provider for this configuration
-    if (this._cachedProviderKey === cacheKey && this._cachedProviderInstance) {
-      return this._cachedProviderInstance;
-    }
-
-    // Clean up old cached provider if it exists
-    if (this._cachedProviderInstance && this._cachedProviderKey !== cacheKey) {
-      this._cachedProviderInstance.cleanup();
-    }
-
-    // Create new provider instance and cache it
-    // Creating new provider instance from metadata
-    const registry = ProviderRegistry.getInstance();
-    const newProvider = registry.createProvider(targetProvider, { model: targetModel });
-
-    // Cache the new provider
-    this._cachedProviderInstance = newProvider;
-    this._cachedProviderKey = cacheKey;
-
-    // Provider instance created and cached
-    return newProvider;
+    // Always use the provider that was passed to the constructor
+    // The Session class is responsible for creating agents with the correct provider
+    // based on their metadata when reconstructing from persistence
+    return this._provider;
   }
 
   get provider(): string {

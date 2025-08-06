@@ -346,9 +346,32 @@ export class Session {
 
         logger.debug(`Creating delegate agent for ${delegateThreadId}`);
 
-        // Create agent for this delegate thread
+        // Get the delegate's provider configuration from its own thread metadata
+        const delegateProviderInstanceId = delegateThread.metadata?.providerInstanceId as string;
+        const delegateModelId =
+          (delegateThread.metadata?.modelId as string) ||
+          (delegateThread.metadata?.model as string);
+
+        if (!delegateProviderInstanceId || !delegateModelId) {
+          logger.error('Delegate agent missing provider configuration', {
+            delegateThreadId,
+            hasProviderInstanceId: !!delegateProviderInstanceId,
+            hasModelId: !!delegateModelId,
+            metadata: delegateThread.metadata,
+          });
+          // Skip this agent if it doesn't have proper configuration
+          return;
+        }
+
+        // Resolve the provider for this specific delegate agent based on its metadata
+        const delegateProviderInstance = Session.resolveProviderInstance(
+          delegateProviderInstanceId,
+          delegateModelId
+        );
+
+        // Create agent for this delegate thread with its own provider
         const delegateAgent = new Agent({
-          provider: providerInstance,
+          provider: delegateProviderInstance,
           toolExecutor,
           threadManager,
           threadId: delegateThreadId,
