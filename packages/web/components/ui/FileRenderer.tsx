@@ -12,6 +12,7 @@ import { faExpand, faCompress, faCopy, faCheck } from '@/lib/fontawesome';
 interface FileRendererProps {
   content: string;
   filename?: string;
+  fileSize?: string;
   maxLines?: number;
   showLineNumbers?: boolean;
   showCopyButton?: boolean;
@@ -23,6 +24,7 @@ const INLINE_PREVIEW_LINES = 10;
 export default function FileRenderer({
   content,
   filename,
+  fileSize,
   maxLines = INLINE_PREVIEW_LINES,
   showLineNumbers = false,
   showCopyButton = true,
@@ -75,19 +77,21 @@ export default function FileRenderer({
           className="border-0 bg-transparent"
         />
         
-        {/* Expansion controls */}
-        {needsExpansion && (
+        {/* Footer with file info and expansion */}
+        {(needsExpansion || fileSize) && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-base-300">
             <div className="text-xs text-base-content/60">
-              Showing {maxLines} of {totalLines} lines
+              {totalLines} lines{fileSize && ` • ${fileSize}`}
             </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="text-xs text-primary hover:text-primary-focus flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-primary/10 transition-colors"
-            >
-              <FontAwesomeIcon icon={faExpand} className="w-3 h-3" />
-              View Full File
-            </button>
+            {needsExpansion && (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="text-xs text-primary hover:text-primary-focus flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-primary/10 transition-colors"
+              >
+                <FontAwesomeIcon icon={faExpand} className="w-3 h-3" />
+                View Full File
+              </button>
+            )}
           </div>
         )}
       </div>

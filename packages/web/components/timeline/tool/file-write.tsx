@@ -85,21 +85,13 @@ export const fileWriteRenderer: ToolRenderer = {
     
     return (
       <div className="bg-success/5 border border-success/20 rounded-lg">
-        {/* Header with size info */}
-        <div className="px-3 py-2 border-b border-success/20 bg-success/10">
-          <div className="flex items-center gap-2 text-sm">
-            {displaySize && (
-              <span className="text-success/70">Size: {displaySize}</span>
-            )}
-          </div>
-        </div>
-        
         {/* File content that was written */}
         {fileContent && (
           <div className="p-3">
             <FileRenderer
               content={fileContent}
               filename={filePath}
+              fileSize={displaySize}
               maxLines={10}
               showLineNumbers={false}
               showCopyButton={true}

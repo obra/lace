@@ -79,31 +79,13 @@ export const fileReadRenderer: ToolRenderer = {
 
     return (
       <div className="bg-primary/5 border border-primary/20 rounded-lg">
-        {/* Header with metadata */}
-        <div className="px-3 py-2 border-b border-primary/20 bg-primary/10">
-          <div className="flex items-center gap-2 text-sm">
-            
-            {resultMetadata?.fileSize && (
-              <span className="text-primary/70">Size: {resultMetadata.fileSize}</span>
-            )}
-            
-            {resultMetadata?.totalLines && (
-              <span className="text-primary/70">
-                Lines: {resultMetadata.linesReturned || resultMetadata.totalLines}
-                {resultMetadata.linesReturned && resultMetadata.totalLines !== resultMetadata.linesReturned 
-                  ? ` of ${resultMetadata.totalLines}` 
-                  : ''
-                }
-              </span>
-            )}
-          </div>
-        </div>
 
         {/* Content display with syntax highlighting and modal expansion */}
         <div className="p-3">
           <FileRenderer
             content={content}
             filename={filePath}
+            fileSize={resultMetadata?.fileSize}
             maxLines={10}
             showLineNumbers={false}
             showCopyButton={true}
