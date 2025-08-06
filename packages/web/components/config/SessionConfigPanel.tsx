@@ -391,21 +391,39 @@ export function SessionConfigPanel({
   };
 
   // Handle agent edit
-  const handleEditAgentClick = (agent: { threadId: string; name: string; status: string }) => {
-    // Convert agent to edit format - must have provider instance
-    const provider = availableProviders[0];
-    if (!provider) {
-      console.error('No provider instances configured');
-      return;
+  const handleEditAgentClick = async (agent: { threadId: string; name: string; status: string }) => {
+    try {
+      // Fetch agent's actual configuration
+      const res = await fetch(`/api/agents/${agent.threadId}`);
+      if (!res.ok) {
+        console.error('Failed to fetch agent configuration');
+        return;
+      }
+      
+      const data = await res.json() as { agent: { 
+        threadId: string; 
+        name: string; 
+        providerInstanceId?: string;
+        modelId?: string;
+      } };
+      
+      // Use agent's actual provider/model or fall back to first available
+      const provider = availableProviders[0];
+      if (!provider) {
+        console.error('No provider instances configured');
+        return;
+      }
+      
+      setEditingAgent({
+        threadId: data.agent.threadId,
+        name: data.agent.name,
+        providerInstanceId: data.agent.providerInstanceId || provider.instanceId,
+        modelId: data.agent.modelId || provider.models[0]?.id || 'unknown'
+      });
+      setShowEditAgent(true);
+    } catch (error) {
+      console.error('Failed to load agent for editing:', error);
     }
-    
-    setEditingAgent({
-      threadId: agent.threadId,
-      name: agent.name,
-      providerInstanceId: provider.instanceId,
-      modelId: provider.models[0]?.id || 'unknown'
-    });
-    setShowEditAgent(true);
   };
 
   const handleEditAgentSubmit = async (e: React.FormEvent) => {

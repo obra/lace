@@ -64,7 +64,9 @@ export async function GET(
       threadId: agent.threadId,
       name: (metadata?.name as string) || 'Agent ' + agent.threadId,
       provider: (metadata?.provider as string) || agent.providerName,
-      model: (metadata?.model as string) || 'unknown',
+      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
+      providerInstanceId: (metadata?.providerInstanceId as string) || '',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
       createdAt: new Date(), // TODO: Get actual creation time
     };
@@ -179,7 +181,9 @@ export async function PUT(
       threadId: agent.threadId,
       name: (metadata?.name as string) || 'Agent ' + agent.threadId,
       provider: (metadata?.provider as string) || agent.providerName,
-      model: (metadata?.model as string) || 'unknown',
+      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
+      providerInstanceId: (metadata?.providerInstanceId as string) || '',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
       createdAt: new Date(), // TODO: Get actual creation time
     };

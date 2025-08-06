@@ -39,6 +39,7 @@ const validAgentId = 'lace_20241122_abc123.1';
 const mockAgent = {
   threadId: validAgentId,
   providerName: 'anthropic',
+  model: 'claude-3-sonnet',
   getCurrentState: vi.fn().mockReturnValue('idle'),
   getThreadMetadata: vi.fn().mockReturnValue({
     name: 'Test Agent',
@@ -123,6 +124,8 @@ describe('Agent API', () => {
         name: 'Test Agent',
         provider: 'anthropic',
         model: 'claude-3-sonnet',
+        providerInstanceId: '',
+        modelId: 'claude-3-sonnet',
         status: 'idle',
         createdAt: expect.any(Date) as Date,
       });
@@ -146,7 +149,9 @@ describe('Agent API', () => {
       expect(response.status).toBe(200);
       expect(data.agent.name).toBe('Agent lace_20241122_abc123.1');
       expect(data.agent.provider).toBe('anthropic');
-      expect(data.agent.model).toBe('unknown');
+      expect(data.agent.model).toBe('claude-3-sonnet');
+      expect(data.agent.providerInstanceId).toBe('');
+      expect(data.agent.modelId).toBe('claude-3-sonnet');
     });
 
     it('should return 400 for invalid agent ID', async () => {
@@ -232,6 +237,8 @@ describe('Agent API', () => {
         name: 'Test Agent',
         provider: 'anthropic',
         model: 'claude-3-sonnet',
+        providerInstanceId: '',
+        modelId: 'claude-3-sonnet',
         status: 'idle',
         createdAt: expect.any(Date) as Date,
       });
