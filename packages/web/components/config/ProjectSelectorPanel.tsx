@@ -322,16 +322,35 @@ export function ProjectSelectorPanel({
       
       if (res.ok) {
         const data = await parseResponse<{ configuration: ProjectConfiguration }>(res);
-        setEditConfig(data.configuration);
+        // If no provider instance configured, use first available
+        const config = {
+          ...DEFAULT_PROJECT_CONFIG,
+          ...data.configuration
+        };
+        if (!config.providerInstanceId && availableProviders.length > 0) {
+          config.providerInstanceId = availableProviders[0].instanceId;
+          config.modelId = availableProviders[0].models[0]?.id || '';
+        }
+        setEditConfig(config);
       } else {
         console.error('Failed to load project configuration');
-        // Fallback to default configuration
-        setEditConfig(DEFAULT_PROJECT_CONFIG);
+        // Fallback to default configuration with first available provider
+        const config = { ...DEFAULT_PROJECT_CONFIG };
+        if (availableProviders.length > 0) {
+          config.providerInstanceId = availableProviders[0].instanceId;
+          config.modelId = availableProviders[0].models[0]?.id || '';
+        }
+        setEditConfig(config);
       }
     } catch (error) {
       console.error('Error loading project configuration:', error);
-      // Fallback to default configuration
-      setEditConfig(DEFAULT_PROJECT_CONFIG);
+      // Fallback to default configuration with first available provider
+      const config = { ...DEFAULT_PROJECT_CONFIG };
+      if (availableProviders.length > 0) {
+        config.providerInstanceId = availableProviders[0].instanceId;
+        config.modelId = availableProviders[0].models[0]?.id || '';
+      }
+      setEditConfig(config);
     }
   };
 
@@ -781,11 +800,18 @@ export function ProjectSelectorPanel({
                       }}
                       className="select select-bordered w-full"
                     >
-                      {availableProviders.map((provider) => (
-                        <option key={provider.instanceId} value={provider.instanceId}>
-                          {provider.displayName}
-                        </option>
-                      ))}
+                      {availableProviders.length === 0 ? (
+                        <option value="">No providers available</option>
+                      ) : (
+                        <>
+                          {!editConfig.providerInstanceId && <option value="">Select a provider</option>}
+                          {availableProviders.map((provider) => (
+                            <option key={provider.instanceId} value={provider.instanceId}>
+                              {provider.displayName}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 
