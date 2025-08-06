@@ -87,7 +87,7 @@ export class SlowMockProvider extends BaseMockProvider {
       await Promise.race([delayPromise, abortPromise]);
     } catch (error) {
       // If aborted, throw the abort error
-      throw error;
+      throw new Error(`Slow provider interrupted: ${String(error)}`);
     }
 
     // Final abort check after delay completes

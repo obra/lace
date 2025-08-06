@@ -113,7 +113,7 @@ describe('SessionService abort error filtering', () => {
       data: {
         type: 'LOCAL_SYSTEM_MESSAGE',
         threadId: 'test-session.1',
-        timestamp: expect.any(String),
+        timestamp: expect.any(Date),
         data: { content: 'Agent error: Network connection failed' },
       },
     });

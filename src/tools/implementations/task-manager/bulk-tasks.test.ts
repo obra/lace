@@ -16,13 +16,13 @@ import {
 } from '~/test-utils/provider-defaults';
 
 describe('Bulk Task Creation', () => {
+  const _tempLaceDir = setupCoreTest();
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
 
     // Create real provider instance

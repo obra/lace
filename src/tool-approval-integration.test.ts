@@ -34,7 +34,6 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ThreadId } from '~/threads/types';
 
 // Mock approval interface for testing
@@ -79,7 +78,7 @@ function createToolCall(
 }
 
 describe('Tool Approval System Integration', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let mockInterface: MockApprovalInterface;
   let session: Session;
@@ -103,7 +102,7 @@ describe('Tool Approval System Integration', () => {
     project = Project.create(
       'Tool Approval Test Project',
       'Project for tool approval integration testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -126,7 +125,7 @@ describe('Tool Approval System Integration', () => {
     toolContext = {
       threadId: 'test-thread-id' as ThreadId,
       parentThreadId: 'test-parent-thread-id' as ThreadId,
-      workingDirectory: tempDirContext.tempDir,
+      workingDirectory: tempLaceDirContext.tempDir,
       session, // REQUIRED for security policy enforcement
     };
 

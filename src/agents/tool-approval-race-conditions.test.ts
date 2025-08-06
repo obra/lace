@@ -12,7 +12,6 @@ import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -64,8 +63,7 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('Tool Approval Race Condition Integration Tests', () => {
-  const _tempLaceDir = setupCoreTest();
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -91,7 +89,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     project = Project.create(
       'Race Condition Test Project',
       'Project for race condition testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

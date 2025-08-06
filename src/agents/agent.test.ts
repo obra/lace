@@ -21,7 +21,6 @@ import { expectEventAdded } from '~/test-utils/event-helpers';
 import { BashTool } from '~/tools/implementations/bash';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -80,8 +79,7 @@ class MockTool extends Tool {
 }
 
 describe('Enhanced Agent', () => {
-  const _tempLaceDir = setupCoreTest();
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let mockProvider: MockProvider;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
@@ -105,7 +103,7 @@ describe('Enhanced Agent', () => {
     project = Project.create(
       'Agent Test Project',
       'Project for agent testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

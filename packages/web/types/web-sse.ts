@@ -125,7 +125,7 @@ export type SessionEvent =
   | {
       type: 'AGENT_STATE_CHANGE';
       threadId: ThreadId;
-      timestamp: string;
+      timestamp: Date;
       data: {
         agentId: ThreadId;
         from: string;

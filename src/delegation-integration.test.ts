@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
@@ -87,7 +86,6 @@ class MockProvider extends BaseMockProvider {
 
 describe('Delegation Integration Tests', () => {
   const _tempLaceDir = setupCoreTest();
-  const _tempDirContext = useTempLaceDir();
   let threadManager: ThreadManager;
   let session: Session;
   let project: Project;

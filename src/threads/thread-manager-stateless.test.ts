@@ -4,11 +4,11 @@ import { expectEventAdded } from '~/test-utils/event-helpers';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('ThreadManager - Core Behavior', () => {
+  const _tempLaceDir = setupCoreTest();
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
     threadManager = new ThreadManager();
     threadId = threadManager.createThread();
   });

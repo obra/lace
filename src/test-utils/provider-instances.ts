@@ -97,14 +97,14 @@ export async function setupTestProviderInstances(): Promise<{
     models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
     displayName: 'Test Anthropic',
   });
-  
+
   const openaiInstanceId = await createTestProviderInstance({
     catalogId: 'openai',
     models: ['gpt-4o', 'gpt-4o-mini'],
     displayName: 'Test OpenAI',
   });
 
-  // Ensure predictable IDs are returned  
+  // Ensure predictable IDs are returned
   const predictableIds = {
     anthropicInstanceId,
     openaiInstanceId,

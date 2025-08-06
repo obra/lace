@@ -13,16 +13,13 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-
 describe('Project configuration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let project: Project;
   let projectId: string;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
     setupTestProviderDefaults();
     Session.clearProviderCache();
 

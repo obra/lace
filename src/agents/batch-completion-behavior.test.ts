@@ -15,7 +15,6 @@ import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -93,8 +92,7 @@ class MockProviderWithToolCalls extends TestProvider {
 }
 
 describe('Tool Batch Completion Behavior', () => {
-  const _tempLaceDir = setupCoreTest();
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -119,7 +117,7 @@ describe('Tool Batch Completion Behavior', () => {
     project = Project.create(
       'Batch Completion Test Project',
       'Project for batch completion testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

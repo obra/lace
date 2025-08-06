@@ -14,6 +14,7 @@ import { FileWriteTool } from '~/tools/implementations/file-write';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('ToolExecutor policy enforcement', () => {
+  const _tempLaceDir = setupCoreTest();
   let executor: ToolExecutor;
   let project: Project;
   let projectId: string;
@@ -21,8 +22,6 @@ describe('ToolExecutor policy enforcement', () => {
   let mockSession: Session;
 
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
-
     // Create a test project with tool policies
     project = Project.create('Test Project', '/project/path', 'A test project', {
       provider: 'anthropic',

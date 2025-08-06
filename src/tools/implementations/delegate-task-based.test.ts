@@ -33,7 +33,7 @@ describe('Task-Based DelegateTool Integration', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    
+
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
@@ -47,7 +47,6 @@ describe('Task-Based DelegateTool Integration', () => {
       sessionName: 'Task-Based Delegate Test Session',
       projectName: 'Task-Based Test Project',
       model: 'claude-3-5-haiku-20241022',
-      providerInstanceId,
     });
 
     // Create delegate tool and inject TaskManager

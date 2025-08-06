@@ -8,7 +8,6 @@ import { Project } from '~/projects/project';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { Agent } from '~/agents/agent';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { ToolCall, ToolContext } from '~/tools/types';
 import {
   createTestProviderInstance,
@@ -20,7 +19,7 @@ import {
 } from '~/test-utils/provider-defaults';
 
 describe('ToolExecutor Security with Real Session Context', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let session: Session;
   let agent: Agent;
@@ -43,7 +42,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
     project = Project.create(
       'Security Test Project',
       'Project for security testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -121,7 +120,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session,
       };
 
@@ -143,7 +142,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session,
       };
 
@@ -174,7 +173,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session: permissiveSession,
       };
 
@@ -205,7 +204,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session: restrictiveSession,
       };
 
@@ -231,7 +230,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session,
       };
 

@@ -7,12 +7,12 @@ import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/type
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Enhanced Task Data Model', () => {
+  const _tempLaceDir = setupCoreTest();
   let testTask: Task;
   const creatorThreadId = createThreadId('lace_20250703_abc123');
   const parentThreadId = createThreadId('lace_20250703_abc123');
 
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
     testTask = {
       id: 'task_20250703_test01',
       title: 'Implement authentication',

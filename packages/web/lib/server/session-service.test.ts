@@ -8,8 +8,14 @@ import { Agent, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { TestProvider } from '~/test-utils/test-provider';
 import type { SessionEvent } from '@/types/web-sse';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('SessionService with Provider Instances', () => {
   const _tempLaceDir = setupWebTest();
@@ -48,17 +54,14 @@ describe('SessionService with Provider Instances', () => {
       catalogProviderId: 'anthropic',
     };
     await instanceManager.saveInstances(config);
-    
+
     // Save a test credential
     await instanceManager.saveCredential('test-instance-id', {
-      apiKey: 'test-key-123'
+      apiKey: 'test-key-123',
     });
 
-    // Now the test should pass - createSession should resolve the provider instance  
-    const session = await sessionService.createSession(
-      'Test Session',
-      testProject.getId()
-    );
+    // Now the test should pass - createSession should resolve the provider instance
+    const session = await sessionService.createSession('Test Session', testProject.getId());
 
     expect(session).toBeDefined();
     expect(session.name).toBe('Test Session');
@@ -87,7 +90,7 @@ describe('SessionService Missing Methods', () => {
 
     // Set up test provider defaults
     setupTestProviderDefaults();
-    
+
     // Import Session for use in tests
     const imports = await import('@/lib/server/lace-imports');
     Session = imports.Session;
@@ -109,13 +112,13 @@ describe('SessionService Missing Methods', () => {
       'Test project for session service tests',
       {}
     );
-    
+
     // Configure project with provider after creation
     testProject.updateConfiguration({
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
-    
+
     // Ensure project is saved/available
     await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -255,7 +258,7 @@ describe('SessionService approval event forwarding', () => {
       'Test project for approval flow testing',
       {}
     );
-    
+
     // Configure project with provider after creation
     testProject.updateConfiguration({
       providerInstanceId,
@@ -277,10 +280,7 @@ describe('SessionService approval event forwarding', () => {
     sessionService = getSessionService();
 
     // Create a real session with real agent using the real project
-    const sessionData = await sessionService.createSession(
-      'Test Session',
-      testProject.getId()
-    );
+    const sessionData = await sessionService.createSession('Test Session', testProject.getId());
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
@@ -327,11 +327,12 @@ describe('SessionService approval event forwarding', () => {
 });
 
 describe('SessionService agent state change broadcasting', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
   let session: Session;
   let agent: Agent;
   let testProject: import('@/lib/server/lace-imports').Project;
+  let providerInstanceId: string;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
@@ -340,17 +341,32 @@ describe('SessionService agent state change broadcasting', () => {
     // Set up test environment
     process.env.ANTHROPIC_KEY = 'test-key';
 
+    // Set up test provider defaults
+    setupTestProviderDefaults();
+
+    // Clear provider cache for test isolation
+    const { Session } = await import('@/lib/server/lace-imports');
+    Session.clearProviderCache();
+
+    // Create provider instance using the documented pattern
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Create a real test project using temp directory
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
+      _tempLaceDir.tempDir,
       'Test project for agent state change testing',
-      tempDirContext.path,
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
-
-    // Ensure project is saved (Project.create should handle this, but let's be explicit)
-    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Instrument real EventStreamManager to capture broadcasts
     const { EventStreamManager } = await import('@/lib/event-stream-manager');
@@ -360,24 +376,26 @@ describe('SessionService agent state change broadcasting', () => {
     sessionService = getSessionService();
 
     // Create a real session with real agent
-    const sessionData = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProject.getId()
-    );
+    const sessionData = await sessionService.createSession('Test Session', testProject.getId());
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
   });
 
   afterEach(async () => {
+    // Stop services first
     if (agent) {
       agent.removeAllListeners();
       agent.abort(); // Use abort() instead of stop() for proper cleanup
     }
     sessionService.clearActiveSessions();
-    vi.restoreAllMocks();
+
+    // Clean up test utilities following docs/testing.md pattern
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+
+    // Clear mocks last
+    vi.clearAllMocks();
   });
 
   it('should broadcast AGENT_STATE_CHANGE events when agent transitions from idle to thinking', async () => {
@@ -443,7 +461,7 @@ describe('SessionService agent state change broadcasting', () => {
     // Act: Simulate streaming → tool_execution transition
     agent.emit('state_change', { from: 'streaming', to: 'tool_execution' });
 
-    // Wait for event processing  
+    // Wait for event processing
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Assert: Verify the broadcast
@@ -511,7 +529,7 @@ describe('SessionService agent state change broadcasting', () => {
         timestamp: expect.any(String),
         data: expect.objectContaining({
           agentId: agent.threadId,
-          from: 'idle', 
+          from: 'idle',
           to: 'thinking',
         }),
       }),
@@ -542,7 +560,7 @@ describe('SessionService agent state change broadcasting', () => {
 
     // Assert: Should only see ONE broadcast despite multiple handler registrations
     const stateChangeCalls = broadcastSpy.mock.calls.filter(
-      call => (call[0].data as SessionEvent).type === 'AGENT_STATE_CHANGE'
+      (call) => (call[0].data as SessionEvent).type === 'AGENT_STATE_CHANGE'
     );
     expect(stateChangeCalls).toHaveLength(1);
   });

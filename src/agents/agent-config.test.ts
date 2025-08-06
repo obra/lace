@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
@@ -19,7 +18,6 @@ import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('Agent Configuration', () => {
   const _tempLaceDir = setupCoreTest();
-  const _tempDirContext = useTempLaceDir();
   let testProject: Project;
   let testSession: Session;
   let projectId: string;

@@ -75,7 +75,6 @@ describe('Agent Abort Functionality', () => {
   let threadId: string;
 
   beforeEach(async () => {
-
     // Create mock response
     const mockResponse: ProviderResponse = {
       content: 'Test response',

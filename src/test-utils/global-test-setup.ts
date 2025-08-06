@@ -2,7 +2,6 @@
 // ABOUTME: Detects when tests use ThreadManager and auto-applies persistence helper pattern
 
 import { beforeEach, afterEach } from 'vitest';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
 import type { ThreadManager } from '~/threads/thread-manager';
 
 // Track whether persistence is needed for current test

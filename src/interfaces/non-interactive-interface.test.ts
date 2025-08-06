@@ -10,12 +10,12 @@ import { setupCoreTest } from '~/test-utils/core-test-setup';
 // Mock dependencies
 
 describe('NonInteractiveInterface', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let nonInteractive: NonInteractiveInterface;
   let mockEventEmitter: EventEmitter;
 
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
     // Mock stdout before creating NonInteractiveInterface to prevent "Test response" output
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 

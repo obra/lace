@@ -16,12 +16,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { asThreadId } from '~/threads/types';
 
 describe('Agent Session Context', () => {
-  const _tempLaceDir = setupCoreTest();
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let session: Session;
   let agent: Agent;
   let project: Project;
@@ -43,7 +41,7 @@ describe('Agent Session Context', () => {
     project = Project.create(
       'Test Project',
       'Project for session context testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

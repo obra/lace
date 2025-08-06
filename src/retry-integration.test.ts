@@ -9,14 +9,13 @@ import { AIProvider } from '~/providers/base-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Retry System Integration Tests', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
-
     toolExecutor = new ToolExecutor();
     threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();

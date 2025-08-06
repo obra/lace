@@ -1,16 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach as _beforeEach, afterEach as _afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('ThreadManager - Stateless Behavior', () => {
-  beforeEach(() => {
-    // setupTestPersistence replaced by setupCoreTest
-  });
-
-  afterEach(() => {
-    // Test cleanup handled by setupCoreTest
-  });
+  const _tempLaceDir = setupCoreTest();
 
   it('should share data across instances via shared cache', () => {
     const manager1 = new ThreadManager();

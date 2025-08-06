@@ -6,7 +6,6 @@ import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { ProviderRegistry } from '~/providers/registry';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
@@ -149,8 +148,7 @@ function createMockOllamaServer(baseUrl: string) {
 }
 
 describe('Provider Instance E2E Tests', () => {
-  let tempDir: string;
-  let originalLaceDir: string | undefined;
+  const _tempLaceDir = setupCoreTest();
   let registry: ProviderRegistry;
   let instanceManager: ProviderInstanceManager;
   let _catalogManager: ProviderCatalogManager;
@@ -163,13 +161,7 @@ describe('Provider Instance E2E Tests', () => {
   let ollamaServer: ReturnType<typeof createMockOllamaServer>;
 
   beforeEach(async () => {
-    // Setup temporary directory
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-provider-e2e-'));
-    originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    // Setup test persistence
-    // setupTestPersistence replaced by setupCoreTest
+    // Temp directory and persistence setup handled by setupCoreTest()
 
     // Create mock servers
     openaiServer1 = createMockOpenAIServer('http://mock-openai-1.test', 'test-key-1');
@@ -188,7 +180,7 @@ describe('Provider Instance E2E Tests', () => {
     _catalogManager = new ProviderCatalogManager();
 
     // Create test catalog data in the user-catalog directory
-    const testCatalogDir = path.join(tempDir, 'user-catalog');
+    const testCatalogDir = path.join(process.env.LACE_DIR!, 'user-catalog');
     fs.mkdirSync(testCatalogDir, { recursive: true });
 
     // OpenAI catalog
@@ -341,7 +333,7 @@ describe('Provider Instance E2E Tests', () => {
     };
 
     // Save instance configuration
-    const instanceConfigPath = path.join(tempDir, 'provider-instances.json');
+    const instanceConfigPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
     fs.writeFileSync(instanceConfigPath, JSON.stringify(testInstanceConfig, null, 2));
 
     // Save test credentials for all providers
@@ -364,15 +356,7 @@ describe('Provider Instance E2E Tests', () => {
     lmstudioServer.close();
     ollamaServer.close();
 
-    // Cleanup
-    // Test cleanup handled by setupCoreTest
-
-    if (originalLaceDir) {
-      process.env.LACE_DIR = originalLaceDir;
-    } else {
-      delete process.env.LACE_DIR;
-    }
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    // Temp directory cleanup handled by setupCoreTest()
   });
 
   describe('Provider Instance Resolution', () => {
@@ -416,7 +400,7 @@ describe('Provider Instance E2E Tests', () => {
         },
       };
 
-      const configPath = path.join(tempDir, 'provider-instances.json');
+      const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
       fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
 
       // Reinitialize registry to pick up new config
@@ -692,7 +676,7 @@ describe('Provider Instance E2E Tests', () => {
           },
         };
 
-        const configPath = path.join(tempDir, 'provider-instances.json');
+        const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
         fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
         await instanceManager.saveCredential('dns-fail-test', { apiKey: 'test-key' });
         await registry.initialize();
@@ -741,7 +725,7 @@ describe('Provider Instance E2E Tests', () => {
           },
         };
 
-        const configPath = path.join(tempDir, 'provider-instances.json');
+        const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
         fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
         await instanceManager.saveCredential('invalid-url-test', { apiKey: 'test-key' });
         await registry.initialize();
@@ -769,7 +753,7 @@ describe('Provider Instance E2E Tests', () => {
           },
         };
 
-        const configPath = path.join(tempDir, 'provider-instances.json');
+        const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
         fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
         await instanceManager.saveCredential('missing-catalog-test', { apiKey: 'test-key' });
         await registry.initialize();

@@ -45,7 +45,6 @@ describe('DelegateTool', () => {
       sessionName: 'Delegate Test Session',
       projectName: 'Delegate Test Project',
       model: 'claude-3-5-haiku-20241022',
-      providerInstanceId,
     });
 
     // Get tool from session agent's toolExecutor
@@ -199,10 +198,7 @@ describe('DelegateTool', () => {
   });
 
   it('should accept valid model formats', async () => {
-    const validModels = [
-      'anthropic:claude-3-5-haiku-20241022',
-      'openai:gpt-4',
-    ];
+    const validModels = ['anthropic:claude-3-5-haiku-20241022', 'openai:gpt-4'];
 
     for (const model of validModels) {
       testSetup.setMockResponses(['Valid model response']);
