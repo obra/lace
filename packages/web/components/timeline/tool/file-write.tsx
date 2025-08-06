@@ -74,34 +74,20 @@ export const fileWriteRenderer: ToolRenderer = {
       fileSize?: string;
     } | undefined;
     
-    // Parse success message for additional info if not in metadata
-    const sizeMatch = content.match(/(\d+(?:\.\d+)?\s*(?:bytes?|KB|MB|GB))/i);
-    const fileSize = resultMetadata?.fileSize || (sizeMatch ? sizeMatch[1] : null);
+    // Extract size info from the content message or metadata
+    const sizeMatch = content.match(/(\d+(?:\.\d+)?)\s*(bytes?|KB|MB|GB)/i);
+    const displaySize = resultMetadata?.fileSize || (sizeMatch ? `${sizeMatch[1]} ${sizeMatch[2]}` : null);
     
     return (
       <div className="bg-success/5 border border-success/20 rounded-lg">
-        {/* Header with success indicator */}
-        <div className="px-3 py-2 border-b border-success/20 bg-success/10">
+        {/* Simple success indicator with size */}
+        <div className="px-3 py-2 bg-success/10 rounded-lg">
           <div className="flex items-center gap-2 text-sm">
             <FontAwesomeIcon icon={faCheck} className="w-4 h-4 text-success flex-shrink-0" />
-            <span className="text-success font-medium">Write Successful</span>
-            
-            {fileSize && (
-              <span className="text-success/70">{fileSize} written</span>
+            <span className="text-success font-medium">Successfully written</span>
+            {displaySize && (
+              <span className="text-success/70">• {displaySize}</span>
             )}
-          </div>
-        </div>
-        
-        {/* File info and success message */}
-        <div className="p-3">
-          {filePath && (
-            <div className="text-base-content/70 text-sm font-mono mb-2">
-              <span className="text-base-content/50">File: </span>
-              {filePath}
-            </div>
-          )}
-          <div className="text-base-content/80 text-sm font-mono">
-            {content}
           </div>
         </div>
       </div>
