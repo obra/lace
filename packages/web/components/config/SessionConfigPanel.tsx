@@ -32,7 +32,13 @@ interface SessionConfigPanelProps {
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
   providers: ProviderInfo[];
-  onSessionCreate: (sessionData: { name: string; description?: string; configuration?: SessionConfiguration }) => void;
+  onSessionCreate: (sessionData: { 
+    name: string; 
+    description?: string; 
+    providerInstanceId?: string;
+    modelId?: string;
+    configuration?: Record<string, unknown> 
+  }) => void;
   onSessionSelect: (session: SessionInfo) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
   onAgentSelect?: (agentId: string) => void;
@@ -173,10 +179,15 @@ export function SessionConfigPanel({
     e.preventDefault();
     if (!newSessionName.trim()) return;
 
+    // Extract provider and model from sessionConfig to send at top level
+    const { providerInstanceId, modelId, ...restConfig } = sessionConfig;
+    
     onSessionCreate({
       name: newSessionName.trim(),
       description: newSessionDescription.trim() || undefined,
-      configuration: sessionConfig,
+      providerInstanceId: providerInstanceId || '',
+      modelId: modelId || '',
+      configuration: restConfig,
     });
 
     resetSessionForm();
