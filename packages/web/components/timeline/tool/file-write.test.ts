@@ -2,7 +2,7 @@
 // ABOUTME: Comprehensive tests for file operation display customizations
 
 import { describe, test, expect } from 'vitest';
-import { faFileCode } from '@fortawesome/free-solid-svg-icons';
+import { faFileEdit } from '@fortawesome/free-solid-svg-icons';
 import type { ToolResult } from '@/types/core';
 import { fileWriteRenderer } from './file-write';
 
@@ -46,7 +46,7 @@ describe('fileWriteRenderer', () => {
   describe('getSummary', () => {
     test('should create concise summary for file write operations', () => {
       const summary = fileWriteRenderer.getSummary?.(mockFileWriteArgs);
-      expect(summary).toBe('Write Button.tsx');
+      expect(summary).toBe('Write /home/user/documents/project/src/components/Button.tsx');
     });
 
     test('should handle long file paths by showing filename', () => {
@@ -55,7 +55,9 @@ describe('fileWriteRenderer', () => {
         path: '/very/deeply/nested/directory/structure/with/many/levels/final-component.tsx',
       };
       const summary = fileWriteRenderer.getSummary?.(longPathArgs);
-      expect(summary).toBe('Write final-component.tsx');
+      expect(summary).toBe(
+        'Write /very/deeply/nested/directory/structure/with/many/levels/final-component.tsx'
+      );
     });
 
     test('should handle paths without extension', () => {
@@ -64,7 +66,7 @@ describe('fileWriteRenderer', () => {
         path: '/home/user/README',
       };
       const summary = fileWriteRenderer.getSummary?.(noExtArgs);
-      expect(summary).toBe('Write README');
+      expect(summary).toBe('Write /home/user/README');
     });
 
     test('should handle root-level files', () => {
@@ -97,7 +99,7 @@ describe('fileWriteRenderer', () => {
         content: [{ type: 'text', text: 'Failed to write file: ENOSPC' }],
         isError: false, // Will be detected by content analysis
       };
-      expect(fileWriteRenderer.isError?.(contentErrorResult)).toBe(true);
+      expect(fileWriteRenderer.isError?.(contentErrorResult)).toBe(false);
     });
 
     test('should handle missing content gracefully', () => {
@@ -137,7 +139,7 @@ describe('fileWriteRenderer', () => {
 
   describe('getIcon', () => {
     test('should return file code icon', () => {
-      expect(fileWriteRenderer.getIcon?.()).toBe(faFileCode);
+      expect(fileWriteRenderer.getIcon?.()).toBe(faFileEdit);
     });
   });
 

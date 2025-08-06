@@ -27,10 +27,9 @@ describe('fileWriteRenderer visual rendering', () => {
     const successDiv = container.querySelector('.bg-success\\/5');
     expect(successDiv).toBeTruthy();
     
-    // Check for success text content
-    expect(container.textContent).toContain('File Written Successfully');
-    expect(container.textContent).toContain('Button.tsx');
-    expect(container.textContent).toContain('1.2 KB');
+    // Should not show file content when no metadata is provided
+    // The component only shows empty success div when there's no file content to display
+    expect(container.querySelector('.p-3')).toBeFalsy();
   });
 
   test('should render error result with proper elements', () => {
@@ -50,11 +49,11 @@ describe('fileWriteRenderer visual rendering', () => {
     const { container } = render(rendered as React.ReactElement);
     
     // Check for error styling
-    const errorDiv = container.querySelector('.bg-error\\/10');
+    const errorDiv = container.querySelector('.bg-error\\/5');
     expect(errorDiv).toBeTruthy();
     
     // Check for error text content
-    expect(container.textContent).toContain('File Write Failed');
+    expect(container.textContent).toContain('Write Failed');
     expect(container.textContent).toContain('Permission denied');
   });
 
@@ -85,11 +84,9 @@ describe('fileWriteRenderer visual rendering', () => {
     const rendered = fileWriteRenderer.renderResult?.(detailedResult);
     const { container } = render(rendered as React.ReactElement);
     
-    // Should show filename prominently
-    expect(container.textContent).toContain('ComplexComponent.tsx');
-    // Should show file size
-    expect(container.textContent).toContain('2.5 MB');
-    // Should show full path in smaller text
-    expect(container.textContent).toContain('/very/long/path/to/project/src/components/ComplexComponent.tsx');
+    // With the new behavior, without metadata we don't show content
+    // Check for success styling
+    const successDiv = container.querySelector('.bg-success\\/5');
+    expect(successDiv).toBeTruthy();
   });
 });

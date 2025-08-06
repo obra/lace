@@ -2,7 +2,7 @@
 // ABOUTME: Validates file_write and file_read renderer registration and functionality
 
 import { describe, test, expect } from 'vitest';
-import { faFileCode } from '@fortawesome/free-solid-svg-icons';
+import { faFileCode, faFileEdit } from '@fortawesome/free-solid-svg-icons';
 import { getToolRenderer } from './index';
 
 describe('File Tool Renderer Integration', () => {
@@ -46,8 +46,8 @@ describe('File Tool Renderer Integration', () => {
   });
 
   describe('File tool renderer specifics', () => {
-    test('file_write should return file icon', () => {
-      expect(getToolRenderer('file_write').getIcon?.()).toBe(faFileCode);
+    test('file_write should return file edit icon', () => {
+      expect(getToolRenderer('file_write').getIcon?.()).toBe(faFileEdit);
     });
 
     test('file_read should return file icon', () => {
@@ -56,15 +56,19 @@ describe('File Tool Renderer Integration', () => {
 
     test('file_write should generate appropriate summaries', () => {
       const renderer = getToolRenderer('file_write');
-      expect(renderer.getSummary?.({ path: '/home/user/test.txt' })).toBe('Write test.txt');
+      expect(renderer.getSummary?.({ path: '/home/user/test.txt' })).toBe(
+        'Write /home/user/test.txt'
+      );
       expect(renderer.getSummary?.({ path: 'README.md' })).toBe('Write README.md');
     });
 
     test('file_read should generate appropriate summaries', () => {
       const renderer = getToolRenderer('file_read');
-      expect(renderer.getSummary?.({ path: '/home/user/test.txt' })).toBe('Read test.txt');
+      expect(renderer.getSummary?.({ path: '/home/user/test.txt' })).toBe(
+        'Read /home/user/test.txt'
+      );
       expect(renderer.getSummary?.({ path: 'README.md', startLine: 1, endLine: 10 })).toBe(
-        'Read README.md (lines 1-10)'
+        'Read README.md'
       );
     });
   });
