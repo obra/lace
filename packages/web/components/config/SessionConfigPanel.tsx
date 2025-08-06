@@ -14,6 +14,7 @@ import type {
   CreateAgentRequest 
 } from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 
 interface SessionConfiguration {
   providerInstanceId?: string;
@@ -400,12 +401,17 @@ export function SessionConfigPanel({
         return;
       }
       
-      const data = await res.json() as { agent: { 
+      const data = await parseResponse<{ agent: { 
         threadId: string; 
         name: string; 
         providerInstanceId?: string;
         modelId?: string;
-      } };
+      } }>(res);
+      
+      if (!data.agent) {
+        console.error('No agent data in response');
+        return;
+      }
       
       // Use agent's actual provider/model or fall back to first available
       const provider = availableProviders[0];
