@@ -3,20 +3,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
-// Mock environment variables to provide test API keys
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -49,13 +38,12 @@ interface SuccessResponse {
 }
 
 describe('Individual Project API Integration Tests', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let testProject: import('~/projects/project').Project;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     
     // Create test provider instances
     anthropicInstanceId = await createTestProviderInstance({
@@ -83,7 +71,7 @@ describe('Individual Project API Integration Tests', () => {
   afterEach(async () => {
     // Clean up provider instances
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('GET /api/projects/:projectId', () => {

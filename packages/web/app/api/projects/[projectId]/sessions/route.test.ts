@@ -5,33 +5,21 @@ import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import { Session } from '@/lib/server/lace-imports';
 
-// Mock environment variables
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Session API endpoints under projects', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let providerInstanceId: string;
   let projectId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -55,7 +43,7 @@ describe('Session API endpoints under projects', () => {
   afterEach(async () => {
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   describe('GET /api/projects/:projectId/sessions', () => {

@@ -6,21 +6,10 @@ import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
 import { parseResponse } from '@/lib/serialization';
-
-// Mock environment variables to provide test API keys
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -43,13 +32,13 @@ interface ErrorResponse {
 }
 
 describe('Session Configuration API', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProject: ReturnType<typeof Project.create>;
   let sessionId: string;
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -83,8 +72,8 @@ describe('Session Configuration API', () => {
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
     await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   describe('GET /api/sessions/:sessionId/configuration', () => {
@@ -214,12 +203,12 @@ describe('Session Configuration API', () => {
 });
 
 describe('TDD: Direct Session Usage', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testSessionId: string;
   let tddProviderInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -250,8 +239,8 @@ describe('TDD: Direct Session Usage', () => {
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
     await cleanupTestProviderInstances([tddProviderInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should use SessionService.getSession() which calls session.getEffectiveConfiguration() directly', async () => {
@@ -267,12 +256,12 @@ describe('TDD: Direct Session Usage', () => {
 });
 
 describe('TDD: Direct Session Configuration Update', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testSessionId: string;
   let updateProviderInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
@@ -303,8 +292,8 @@ describe('TDD: Direct Session Configuration Update', () => {
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    teardownTestPersistence();
     await cleanupTestProviderInstances([updateProviderInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should use SessionService.getSession() which calls session.updateConfiguration() directly', async () => {
