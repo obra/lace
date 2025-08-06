@@ -193,6 +193,13 @@ export class Session {
     }
 
     // Resolve provider instance for the session agent
+    logger.info('🏗️ SESSION CREATE - Resolving provider', {
+      sessionId: sessionData.id,
+      providerInstanceId,
+      modelId,
+      projectId: options.projectId,
+      effectiveConfig,
+    });
     const providerInstance = Session.resolveProviderInstance(providerInstanceId, modelId);
 
     // Create agent
@@ -304,6 +311,13 @@ export class Session {
     }
 
     // Create provider using the provider instance system
+    logger.info('🔄 SESSION.GETBYID - Resolving session provider', {
+      sessionId,
+      providerInstanceId,
+      modelId,
+      threadMetadata: existingThread?.metadata,
+      sessionConfig,
+    });
     const providerInstance = Session.resolveProviderInstance(providerInstanceId, modelId);
 
     // Create TaskManager using global persistence
@@ -364,6 +378,13 @@ export class Session {
         }
 
         // Resolve the provider for this specific delegate agent based on its metadata
+        logger.info('🔄 SESSION.GETBYID - Resolving delegate provider', {
+          sessionId,
+          delegateThreadId,
+          delegateProviderInstanceId,
+          delegateModelId,
+          delegateMetadata: delegateThread.metadata,
+        });
         const delegateProviderInstance = Session.resolveProviderInstance(
           delegateProviderInstanceId,
           delegateModelId
@@ -661,6 +682,16 @@ export class Session {
     }
 
     // Resolve provider instance lazily
+    logger.info('🚀 SPAWN AGENT - Resolving provider', {
+      sessionId: this._sessionId,
+      agentName,
+      targetProviderInstanceId,
+      targetModelId,
+      configProviderInstanceId: config.providerInstanceId,
+      configModelId: config.modelId,
+      effectiveProviderInstanceId: targetProviderInstanceId,
+      effectiveModelId: targetModelId,
+    });
     const providerInstance = Session.resolveProviderInstance(
       targetProviderInstanceId,
       targetModelId
@@ -867,20 +898,30 @@ Use your task_add_note tool to record important notes as you work and your task_
   static resolveProviderInstance(providerInstanceId: string, modelId: string): AIProvider {
     const cacheKey = `${providerInstanceId}:${modelId}`;
 
+    logger.info('📦 RESOLVE PROVIDER INSTANCE', {
+      providerInstanceId,
+      modelId,
+      cacheKey,
+      cacheSize: Session._providerCache.size,
+      cacheKeys: Array.from(Session._providerCache.keys()),
+    });
+
     // Check cache first, but validate it's properly configured
     const cached = Session._providerCache.get(cacheKey);
     if (cached && cached.isConfigured()) {
-      logger.debug('Using cached provider instance', {
+      logger.info('✅ Using cached provider instance', {
         providerInstanceId,
         modelId,
         cacheKey,
         isConfigured: true,
+        cachedProviderName: cached.providerName,
+        cachedModelName: cached.modelName,
       });
       return cached;
     }
 
     if (cached && !cached.isConfigured()) {
-      logger.debug('Cached provider not properly configured, recreating', {
+      logger.warn('⚠️ Cached provider not properly configured, recreating', {
         providerInstanceId,
         modelId,
         cacheKey,
@@ -989,6 +1030,16 @@ Use your task_add_note tool to record important notes as you work and your task_
       // thing but synchronously
       const providerRegistry = ProviderRegistry.getInstance();
       const providerInstance = providerRegistry.createProvider(providerType, providerConfig);
+
+      logger.info('✨ Created new provider instance', {
+        providerInstanceId,
+        modelId,
+        providerType,
+        providerName: providerInstance.providerName,
+        providerModelName: providerInstance.modelName,
+        isConfigured: providerInstance.isConfigured(),
+        cacheKey,
+      });
 
       // Cache the result
       Session._providerCache.set(cacheKey, providerInstance);

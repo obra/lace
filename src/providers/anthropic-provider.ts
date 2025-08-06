@@ -154,13 +154,32 @@ export class AnthropicProvider extends AIProvider {
       input_schema: tool.inputSchema,
     }));
 
-    return {
+    const payload = {
       model: this.modelName,
       max_tokens: this._config.maxTokens || 4000,
       messages: anthropicMessages,
       system: systemPrompt,
       tools: anthropicTools,
     };
+
+    // Comprehensive debug logging of request metadata (excluding message content)
+    logger.info('🔍 ANTHROPIC REQUEST METADATA', {
+      model: payload.model,
+      modelFromConfig: this._config.model,
+      modelFromProvider: this.modelName,
+      maxTokens: payload.max_tokens,
+      messageCount: payload.messages.length,
+      systemPromptLength: payload.system?.length || 0,
+      systemPromptPreview: payload.system?.substring(0, 100) + '...',
+      toolCount: payload.tools?.length || 0,
+      toolNames: payload.tools?.map((t) => t.name),
+      configKeys: Object.keys(this._config),
+      providerName: this.providerName,
+      contextWindow: this.contextWindow,
+      maxCompletionTokens: this.maxCompletionTokens,
+    });
+
+    return payload;
   }
 
   async createResponse(

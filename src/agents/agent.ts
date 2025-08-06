@@ -464,6 +464,21 @@ export class Agent extends EventEmitter {
       const contextWindow = this.providerInstance.contextWindow;
       const maxOutputTokens = this.providerInstance.maxCompletionTokens;
 
+      // Debug logging for provider configuration
+      const metadata = this.getThreadMetadata();
+      logger.info('🎯 AGENT PROVIDER CALL', {
+        threadId: this._threadId,
+        agentName: (metadata?.name as string) || 'unknown',
+        providerName: this.providerInstance.providerName,
+        modelName: this.providerInstance.modelName,
+        metadataProvider: metadata?.provider as string,
+        metadataModel: metadata?.model as string,
+        metadataModelId: metadata?.modelId as string,
+        metadataProviderInstanceId: metadata?.providerInstanceId as string,
+        contextWindow,
+        maxOutputTokens,
+      });
+
       // Try provider-specific token counting first, fall back to estimation
       let promptTokens: number;
       const providerCount = await this.providerInstance.countTokens(conversation, this._tools);
