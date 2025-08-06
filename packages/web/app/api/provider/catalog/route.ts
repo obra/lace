@@ -13,8 +13,7 @@ export interface CatalogResponse {
 
 export async function GET(_request: NextRequest) {
   try {
-    const registry = new ProviderRegistry();
-    await registry.initialize();
+    const registry = ProviderRegistry.getInstance();
 
     const providers = registry.getCatalogProviders();
 

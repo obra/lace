@@ -207,9 +207,9 @@ export async function createDelegationTestSetup(options?: {
     }
   );
 
-  // Initialize provider registry to make sure provider instances are loaded
-  const registry = new ProviderRegistry();
-  await registry.initialize();
+  // Provider registry will auto-initialize when needed
+  // Just ensure singleton exists for test consistency
+  ProviderRegistry.getInstance();
 
   // Create project with real provider instance
   const project = Project.create(

@@ -22,17 +22,52 @@ export interface ConfiguredInstance {
 }
 
 export class ProviderRegistry {
+  private static instance: ProviderRegistry | null = null;
+  private static initializationPromise: Promise<void> | null = null;
+
   private _providers = new Map<string, AIProvider>();
   private catalogManager: ProviderCatalogManager;
   private instanceManager: ProviderInstanceManager;
   private configuredInstances: Map<string, ProviderInstance> = new Map();
+  private isInitialized = false;
 
-  constructor() {
+  private constructor() {
     this.catalogManager = new ProviderCatalogManager();
     this.instanceManager = new ProviderInstanceManager();
   }
 
-  async initialize(): Promise<void> {
+  static getInstance(): ProviderRegistry {
+    if (!ProviderRegistry.instance) {
+      ProviderRegistry.instance = new ProviderRegistry();
+      // Start initialization immediately (fire and forget)
+      void ProviderRegistry.instance.ensureInitialized();
+    }
+    return ProviderRegistry.instance;
+  }
+
+  static clearInstance(): void {
+    ProviderRegistry.instance = null;
+    ProviderRegistry.initializationPromise = null;
+  }
+
+  async ensureInitialized(): Promise<void> {
+    // If already initialized, return immediately
+    if (this.isInitialized) {
+      return;
+    }
+
+    // If initialization is in progress, wait for it
+    if (ProviderRegistry.initializationPromise) {
+      return ProviderRegistry.initializationPromise;
+    }
+
+    // Start initialization
+    ProviderRegistry.initializationPromise = this.doInitialize();
+    await ProviderRegistry.initializationPromise;
+    ProviderRegistry.initializationPromise = null;
+  }
+
+  private async doInitialize(): Promise<void> {
     // Load catalog data
     await this.catalogManager.loadCatalogs();
 
@@ -43,13 +78,17 @@ export class ProviderRegistry {
     for (const [instanceId, instance] of Object.entries(config.instances)) {
       this.configuredInstances.set(instanceId, instance);
     }
+
+    this.isInitialized = true;
   }
 
-  getCatalogProviders(): CatalogProvider[] {
+  async getCatalogProviders(): Promise<CatalogProvider[]> {
+    await this.ensureInitialized();
     return this.catalogManager.getAvailableProviders();
   }
 
   async getConfiguredInstances(): Promise<ConfiguredInstance[]> {
+    await this.ensureInitialized();
     const instances: ConfiguredInstance[] = [];
 
     for (const [instanceId, instance] of this.configuredInstances.entries()) {
@@ -70,11 +109,13 @@ export class ProviderRegistry {
     return instances;
   }
 
-  getModelFromCatalog(providerId: string, modelId: string): CatalogModel | null {
+  async getModelFromCatalog(providerId: string, modelId: string): Promise<CatalogModel | null> {
+    await this.ensureInitialized();
     return this.catalogManager.getModel(providerId, modelId);
   }
 
   async createProviderFromInstance(instanceId: string): Promise<AIProvider> {
+    await this.ensureInitialized();
     const instance = this.configuredInstances.get(instanceId);
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
@@ -106,6 +147,7 @@ export class ProviderRegistry {
     instanceId: string,
     modelId: string
   ): Promise<AIProvider> {
+    await this.ensureInitialized();
     const instance = this.configuredInstances.get(instanceId);
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
@@ -122,7 +164,7 @@ export class ProviderRegistry {
     }
 
     // Verify model exists in catalog
-    const model = this.getModelFromCatalog(instance.catalogProviderId, modelId);
+    const model = await this.getModelFromCatalog(instance.catalogProviderId, modelId);
     if (!model) {
       throw new Error(
         `Model not found in catalog: ${modelId} for provider ${instance.catalogProviderId}`

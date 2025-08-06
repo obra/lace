@@ -108,6 +108,7 @@ export function SessionConfigPanel({
   }, [providers]);
 
   // Reset form when project changes
+  const projectId = (selectedProject as { id: string }).id;
   useEffect(() => {
     setShowCreateSession(false);
     setShowCreateAgent(false);
@@ -117,7 +118,7 @@ export function SessionConfigPanel({
     resetSessionForm();
     resetAgentForm();
     resetEditSessionForm();
-  }, [selectedProject.id]);
+  }, [projectId]);
 
   const resetSessionForm = () => {
     setNewSessionName('');
@@ -390,8 +391,8 @@ export function SessionConfigPanel({
         <div className="flex items-center gap-3">
           <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold text-base-content">{selectedProject.name}</h2>
-            <p className="text-sm text-base-content/60">{selectedProject.description}</p>
+            <h2 className="text-xl font-semibold text-base-content">{(selectedProject as { name: string }).name}</h2>
+            <p className="text-sm text-base-content/60">{(selectedProject as { description: string }).description}</p>
           </div>
         </div>
         
@@ -593,10 +594,10 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={sessionConfig.workingDirectory || selectedProject.workingDirectory}
+                    value={sessionConfig.workingDirectory || (selectedProject as { workingDirectory: string }).workingDirectory}
                     onChange={(e) => setSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
                     className="input input-bordered w-full"
-                    placeholder={selectedProject.workingDirectory}
+                    placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
                   />
                 </div>
 
@@ -850,10 +851,10 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={editSessionConfig.workingDirectory || selectedProject.workingDirectory}
+                    value={editSessionConfig.workingDirectory || (selectedProject as { workingDirectory: string }).workingDirectory}
                     onChange={(e) => setEditSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
                     className="input input-bordered w-full"
-                    placeholder={selectedProject.workingDirectory}
+                    placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
                   />
                 </div>
 

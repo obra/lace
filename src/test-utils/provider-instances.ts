@@ -186,8 +186,8 @@ export async function cleanupTestProviderInstances(instanceIds: string[]): Promi
  * @returns Promise that resolves to array of test instance IDs
  */
 export async function getTestProviderInstances(): Promise<string[]> {
-  const registry = new ProviderRegistry();
-  await registry.initialize();
+  const registry = ProviderRegistry.getInstance();
+  // Registry will auto-initialize when needed
 
   const instances = await registry.getConfiguredInstances();
   return instances

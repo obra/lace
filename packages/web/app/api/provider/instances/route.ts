@@ -42,8 +42,7 @@ const CreateInstanceSchema = z.object({
 
 export async function GET(_request: NextRequest) {
   try {
-    const registry = new ProviderRegistry();
-    await registry.initialize();
+    const registry = ProviderRegistry.getInstance();
 
     const instances = await registry.getConfiguredInstances();
 

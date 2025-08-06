@@ -135,8 +135,7 @@ export async function PUT(
 
     // Validate provider instance if provided
     if (validatedData.providerInstanceId) {
-      const registry = new ProviderRegistry();
-      await registry.initialize();
+      const registry = ProviderRegistry.getInstance();
 
       const configuredInstances = await registry.getConfiguredInstances();
       const instance = configuredInstances.find(
@@ -148,7 +147,7 @@ export async function PUT(
           code: 'VALIDATION_FAILED',
           availableInstances: configuredInstances.map((i) => ({
             id: i.id,
-            name: i.name || i.displayName,
+            name: (i as { name?: string; displayName: string }).name || i.displayName,
           })),
         });
       }

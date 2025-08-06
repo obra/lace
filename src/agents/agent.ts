@@ -382,7 +382,7 @@ export class Agent extends EventEmitter {
 
     // Create new provider instance and cache it
     // Creating new provider instance from metadata
-    const registry = new ProviderRegistry();
+    const registry = ProviderRegistry.getInstance();
     const newProvider = registry.createProvider(targetProvider, { model: targetModel });
 
     // Cache the new provider

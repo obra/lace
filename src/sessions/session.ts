@@ -307,14 +307,14 @@ export class Session {
       model = sessionConfig.model as string;
     } else {
       // Get provider default by creating temporary instance
-      const registry = new ProviderRegistry();
+      const registry = ProviderRegistry.getInstance();
       const tempProvider = registry.createProvider(provider);
       model = tempProvider.defaultModel;
       tempProvider.cleanup();
     }
 
     // Create provider and tool executor
-    const registry = new ProviderRegistry();
+    const registry = ProviderRegistry.getInstance();
     const providerInstance = registry.createProvider(provider, { model });
 
     // Create TaskManager using global persistence
@@ -899,7 +899,7 @@ Use your task_add_note tool to record important notes as you work and your task_
       };
 
       // Create provider using the new registry system
-      const providerRegistry = new ProviderRegistry();
+      const providerRegistry = ProviderRegistry.getInstance();
       const providerInstance = providerRegistry.createProvider(providerType, providerConfig);
 
       // Cache the result

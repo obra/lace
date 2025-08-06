@@ -25,31 +25,32 @@ export interface ProvidersResponse {
 export async function GET(): Promise<NextResponse> {
   try {
     // Use new provider instance system instead of auto-discovery
-    const registry = new ProviderRegistry();
-    await registry.initialize();
-    
+    const registry = ProviderRegistry.getInstance();
+
     const configuredInstances = await registry.getConfiguredInstances();
-    
+
     // If no instances are configured, return empty array
     if (configuredInstances.length === 0) {
       return createSuperjsonResponse({ providers: [] });
     }
-    
+
     // Get catalog manager to access provider and model information
     const catalogManager = new ProviderCatalogManager();
     await catalogManager.loadCatalogs();
-    
+
     // Build providers array - one entry per instance as requested
-    const providers: ProviderWithModels[] = configuredInstances.map(instance => {
+    const providers: ProviderWithModels[] = configuredInstances.map((instance) => {
       const catalogProvider = catalogManager.getProvider(instance.catalogProviderId);
       if (!catalogProvider) {
-        throw new Error(`Catalog provider ${instance.catalogProviderId} not found for instance ${instance.id}`);
+        throw new Error(
+          `Catalog provider ${instance.catalogProviderId} not found for instance ${instance.id}`
+        );
       }
-      
+
       const catalogModels = catalogManager.getProviderModels(instance.catalogProviderId);
-      
+
       // Transform catalog models to ModelInfo format
-      const models: ModelInfo[] = catalogModels.map(catalogModel => ({
+      const models: ModelInfo[] = catalogModels.map((catalogModel) => ({
         id: catalogModel.id,
         displayName: catalogModel.name,
         description: undefined, // Not available in catalog format
@@ -58,7 +59,7 @@ export async function GET(): Promise<NextResponse> {
         capabilities: catalogModel.supports_attachments ? ['attachments'] : undefined,
         isDefault: false, // Would need to check against catalog provider defaults
       }));
-      
+
       return {
         id: catalogProvider.id,
         name: catalogProvider.name,

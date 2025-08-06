@@ -344,8 +344,8 @@ describe('Provider Instance E2E Tests', () => {
     await instanceManager.saveCredential('ollama-local', { apiKey: 'not-needed-for-ollama' });
 
     // Initialize registry
-    registry = new ProviderRegistry();
-    await registry.initialize();
+    ProviderRegistry.clearInstance();
+    registry = ProviderRegistry.getInstance();
   });
 
   afterEach(() => {
@@ -355,6 +355,9 @@ describe('Provider Instance E2E Tests', () => {
     anthropicServer.close();
     lmstudioServer.close();
     ollamaServer.close();
+
+    // Clear singleton after test
+    ProviderRegistry.clearInstance();
 
     // Temp directory cleanup handled by setupCoreTest()
   });
@@ -404,7 +407,7 @@ describe('Provider Instance E2E Tests', () => {
       fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
 
       // Reinitialize registry to pick up new config
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       await expect(registry.createProviderFromInstance('no-creds')).rejects.toThrow(
         'No credentials found for instance: no-creds'
@@ -445,7 +448,7 @@ describe('Provider Instance E2E Tests', () => {
       await instanceManager.saveCredential('openai-prod', { apiKey: 'wrong-key' });
 
       // Reinitialize registry
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       const provider = await registry.createProviderFromInstanceAndModel('openai-prod', 'gpt-4');
 
@@ -519,7 +522,7 @@ describe('Provider Instance E2E Tests', () => {
       await instanceManager.saveCredential('anthropic-test', { apiKey: 'wrong-anthropic-key' });
 
       // Reinitialize registry
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       const provider = await registry.createProviderFromInstanceAndModel(
         'anthropic-test',
@@ -679,7 +682,7 @@ describe('Provider Instance E2E Tests', () => {
         const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
         fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
         await instanceManager.saveCredential('dns-fail-test', { apiKey: 'test-key' });
-        await registry.initialize();
+        // Registry will auto-initialize when needed
 
         const provider = await registry.createProviderFromInstanceAndModel(
           'dns-fail-test',
@@ -728,7 +731,7 @@ describe('Provider Instance E2E Tests', () => {
         const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
         fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
         await instanceManager.saveCredential('invalid-url-test', { apiKey: 'test-key' });
-        await registry.initialize();
+        // Registry will auto-initialize when needed
 
         const provider = await registry.createProviderFromInstanceAndModel(
           'invalid-url-test',
@@ -756,7 +759,7 @@ describe('Provider Instance E2E Tests', () => {
         const configPath = path.join(process.env.LACE_DIR!, 'provider-instances.json');
         fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
         await instanceManager.saveCredential('missing-catalog-test', { apiKey: 'test-key' });
-        await registry.initialize();
+        // Registry will auto-initialize when needed
 
         await expect(
           registry.createProviderFromInstanceAndModel('missing-catalog-test', 'gpt-4')

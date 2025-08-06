@@ -63,26 +63,33 @@ export async function POST(
     }
 
     // Verify provider instance exists
-    const registry = new ProviderRegistry();
-    await registry.initialize();
-    
+    const registry = ProviderRegistry.getInstance();
+
     const configuredInstances = await registry.getConfiguredInstances();
-    const instance = configuredInstances.find(inst => inst.id === body.providerInstanceId);
-    
+    const instance = configuredInstances.find((inst) => inst.id === body.providerInstanceId);
+
     if (!instance) {
-      return createErrorResponse(`Provider instance '${body.providerInstanceId}' not found`, 400, { code: 'VALIDATION_FAILED' });
+      return createErrorResponse(`Provider instance '${body.providerInstanceId}' not found`, 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
 
-    const catalogProvider = registry.getCatalogProviders().find(p => p.id === instance.catalogProviderId);
+    const catalogProvider = registry
+      .getCatalogProviders()
+      .find((p) => p.id === instance.catalogProviderId);
     if (!catalogProvider) {
-      return createErrorResponse(`Catalog provider '${instance.catalogProviderId}' not found`, 400, { code: 'VALIDATION_FAILED' });
+      return createErrorResponse(
+        `Catalog provider '${instance.catalogProviderId}' not found`,
+        400,
+        { code: 'VALIDATION_FAILED' }
+      );
     }
 
     // Spawn agent using provider instance configuration
     const agent = session.spawnAgent({
       name: body.name || '',
       providerInstanceId: body.providerInstanceId,
-      modelId: body.modelId
+      modelId: body.modelId,
     });
 
     // Setup agent approvals using utility

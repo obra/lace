@@ -22,7 +22,9 @@ describe('ProviderRegistry', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
     originalLaceDir = process.env.LACE_DIR;
     process.env.LACE_DIR = tempDir;
-    registry = new ProviderRegistry();
+    // Clear singleton for tests
+    ProviderRegistry.clearInstance();
+    registry = ProviderRegistry.getInstance();
   });
 
   afterEach(() => {
@@ -33,6 +35,8 @@ describe('ProviderRegistry', () => {
       delete process.env.LACE_DIR;
     }
     fs.rmSync(tempDir, { recursive: true, force: true });
+    // Clear singleton after test
+    ProviderRegistry.clearInstance();
   });
 
   describe('registerProvider', () => {
@@ -114,7 +118,7 @@ describe('ProviderRegistry', () => {
 
   describe('Provider Registration', () => {
     it('should start with empty registry and support manual registration', () => {
-      const registry = new ProviderRegistry();
+      const registry = ProviderRegistry.getInstance();
       expect(registry.getProviderNames()).toEqual([]);
 
       // Manual registration should work
@@ -125,7 +129,7 @@ describe('ProviderRegistry', () => {
     });
 
     it('should support registering multiple providers manually', () => {
-      const registry = new ProviderRegistry();
+      const registry = ProviderRegistry.getInstance();
 
       registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
       registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
@@ -141,7 +145,7 @@ describe('ProviderRegistry', () => {
     });
 
     it('should maintain provider identity after registration', () => {
-      const registry = new ProviderRegistry();
+      const registry = ProviderRegistry.getInstance();
 
       registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
       registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
@@ -166,8 +170,8 @@ describe('ProviderRegistry', () => {
 
     it('should properly initialize without auto-discovery', () => {
       // Verify that constructor doesn't throw and creates empty registry
-      expect(() => new ProviderRegistry()).not.toThrow();
-      const registry = new ProviderRegistry();
+      expect(() => ProviderRegistry.getInstance()).not.toThrow();
+      const registry = ProviderRegistry.getInstance();
       expect(registry.getProviderNames()).toEqual([]);
     });
   });
@@ -202,11 +206,11 @@ describe('ProviderRegistry', () => {
   // New catalog and instance functionality tests
   describe('catalog integration', () => {
     beforeEach(async () => {
-      await registry.initialize();
+      // Registry will auto-initialize when needed
     });
 
-    it('should load provider catalogs on initialization', () => {
-      const catalogProviders = registry.getCatalogProviders();
+    it('should load provider catalogs on initialization', async () => {
+      const catalogProviders = await registry.getCatalogProviders();
       expect(catalogProviders.length).toBeGreaterThan(0);
 
       const anthropic = catalogProviders.find((p) => p.id === 'anthropic');
@@ -214,22 +218,22 @@ describe('ProviderRegistry', () => {
       expect(anthropic?.models.length).toBeGreaterThan(0);
     });
 
-    it('should return model from catalog', () => {
-      const model = registry.getModelFromCatalog('anthropic', 'claude-3-5-haiku-20241022');
+    it('should return model from catalog', async () => {
+      const model = await registry.getModelFromCatalog('anthropic', 'claude-3-5-haiku-20241022');
       expect(model).toBeTruthy();
       expect(model?.id).toBe('claude-3-5-haiku-20241022');
       expect(model?.name).toBe('Claude 3.5 Haiku');
     });
 
-    it('should return null for non-existent model', () => {
-      const model = registry.getModelFromCatalog('anthropic', 'non-existent-model');
+    it('should return null for non-existent model', async () => {
+      const model = await registry.getModelFromCatalog('anthropic', 'non-existent-model');
       expect(model).toBeNull();
     });
   });
 
   describe('instance management', () => {
     beforeEach(async () => {
-      await registry.initialize();
+      // Registry will auto-initialize when needed
     });
 
     it('should return empty instances when none configured', async () => {
@@ -255,7 +259,7 @@ describe('ProviderRegistry', () => {
         JSON.stringify(config, null, 2)
       );
 
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       const instances = await registry.getConfiguredInstances();
       expect(instances).toHaveLength(1);
@@ -292,7 +296,7 @@ describe('ProviderRegistry', () => {
         JSON.stringify(credential, null, 2)
       );
 
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       const provider = await registry.createProviderFromInstance('anthropic-test');
       expect(provider).toBeTruthy();
@@ -327,7 +331,7 @@ describe('ProviderRegistry', () => {
         JSON.stringify(credential, null, 2)
       );
 
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       const provider = await registry.createProviderFromInstanceAndModel(
         'anthropic-test',
@@ -359,7 +363,7 @@ describe('ProviderRegistry', () => {
         JSON.stringify(config, null, 2)
       );
 
-      await registry.initialize();
+      // Registry will auto-initialize when needed
 
       await expect(registry.createProviderFromInstance('no-creds')).rejects.toThrow(
         'No credentials found for instance: no-creds'

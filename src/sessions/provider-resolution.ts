@@ -19,12 +19,15 @@ export async function findProviderInstanceForType(
 ): Promise<string> {
   logger.debug('Finding provider instance for type', { providerType, modelId });
 
-  // Create registry and initialize it
-  const registry = new ProviderRegistry();
-  await registry.initialize();
+  // Get singleton registry
+  const registry = ProviderRegistry.getInstance();
+  // Registry will auto-initialize on first use of getConfiguredInstances
 
-  // Get all configured instances
-  const configuredInstances = await registry.getConfiguredInstances();
+  // Get all configured instances and catalog providers (both will ensure initialization)
+  const [configuredInstances, catalogProviders] = await Promise.all([
+    registry.getConfiguredInstances(),
+    registry.getCatalogProviders(),
+  ]);
 
   if (configuredInstances.length === 0) {
     throw new Error(
@@ -32,12 +35,17 @@ export async function findProviderInstanceForType(
     );
   }
 
+  // Pre-check all models for the instances we care about
+  const modelChecks = new Map<string, boolean>();
+  for (const provider of catalogProviders) {
+    const hasModel = (await registry.getModelFromCatalog(provider.id, modelId)) !== null;
+    modelChecks.set(provider.id, hasModel);
+  }
+
   // Find instances matching the provider type
   const matchingInstances = configuredInstances.filter((instance) => {
     // Get catalog provider for this instance
-    const catalogProvider = registry
-      .getCatalogProviders()
-      .find((p) => p.id === instance.catalogProviderId);
+    const catalogProvider = catalogProviders.find((p) => p.id === instance.catalogProviderId);
 
     if (!catalogProvider) {
       logger.warn('Catalog provider not found for instance', {
@@ -51,14 +59,13 @@ export async function findProviderInstanceForType(
     const isTypeMatch = catalogProvider.type.toLowerCase() === providerType.toLowerCase();
 
     // Check if the model exists in this provider's catalog
-    const hasModel = registry.getModelFromCatalog(catalogProvider.id, modelId) !== null;
+    const hasModel = modelChecks.get(catalogProvider.id) || false;
 
     // Only include instances with credentials
     return isTypeMatch && hasModel && instance.hasCredentials;
   });
 
   if (matchingInstances.length === 0) {
-    const catalogProviders = registry.getCatalogProviders();
     const matchingCatalogProvider = catalogProviders.find(
       (p) => p.type.toLowerCase() === providerType.toLowerCase()
     );
@@ -67,7 +74,7 @@ export async function findProviderInstanceForType(
       throw new Error(`Unknown provider type: ${providerType}`);
     }
 
-    const hasModel = registry.getModelFromCatalog(matchingCatalogProvider.id, modelId) !== null;
+    const hasModel = modelChecks.get(matchingCatalogProvider.id) || false;
     if (!hasModel) {
       throw new Error(`Model ${modelId} not found in catalog for provider type ${providerType}`);
     }
@@ -126,8 +133,7 @@ export function normalizeProviderType(providerType: string): string {
 export async function validateProviderInstance(instanceId: string, modelId: string): Promise<void> {
   logger.debug('Validating provider instance', { instanceId, modelId });
 
-  const registry = new ProviderRegistry();
-  await registry.initialize();
+  const registry = ProviderRegistry.getInstance();
 
   const configuredInstances = await registry.getConfiguredInstances();
   const instance = configuredInstances.find((i) => i.id === instanceId);
