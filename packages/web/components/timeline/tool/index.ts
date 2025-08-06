@@ -5,6 +5,8 @@ import type { ToolRenderer } from './types';
 import { bashRenderer } from './bash';
 import { taskRenderers } from './task';
 import { delegateRenderer } from './delegate';
+import { fileWriteRenderer } from './file-write';
+import { fileReadRenderer } from './file-read';
 
 // Registry of tool renderers - add new tools here
 const toolRenderers: Record<string, ToolRenderer> = {
@@ -22,6 +24,10 @@ const toolRenderers: Record<string, ToolRenderer> = {
 
   // Delegation tools
   delegate: delegateRenderer,
+
+  // File operation tools
+  file_write: fileWriteRenderer,
+  file_read: fileReadRenderer,
 };
 
 /**
