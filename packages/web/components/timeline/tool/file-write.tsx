@@ -92,8 +92,14 @@ export const fileWriteRenderer: ToolRenderer = {
           </div>
         </div>
         
-        {/* Success message */}
+        {/* File info and success message */}
         <div className="p-3">
+          {filePath && (
+            <div className="text-base-content/70 text-sm font-mono mb-2">
+              <span className="text-base-content/50">File: </span>
+              {filePath}
+            </div>
+          )}
           <div className="text-base-content/80 text-sm font-mono">
             {content}
           </div>

@@ -164,7 +164,7 @@ export function ToolCallDisplay({
   const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
   // For file_read and file_write, use the summary as the display name since it contains the full path
   const toolDisplayName = (tool === 'file_read' || tool === 'file_write') ? toolSummary : (renderer.getDisplayName?.(tool, result || undefined) ?? tool);
-  const resultContent = hasResult ? (renderer.renderResult?.(result!, undefined) ?? createDefaultResultRenderer(result!)) : null;
+  const resultContent = hasResult ? (renderer.renderResult?.(result!, metadata) ?? createDefaultResultRenderer(result!)) : null;
   
   // Create success/error icon for header
   const statusIcon = hasResult ? (
