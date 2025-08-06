@@ -107,8 +107,7 @@ export async function PUT(
           400,
           {
             code: 'VALIDATION_FAILED',
-            details,
-            receivedData: body,
+            details: { errors: details, receivedData: body },
           }
         );
       }
@@ -145,10 +144,12 @@ export async function PUT(
       if (!instance) {
         return createErrorResponse('Provider instance not found', 400, {
           code: 'VALIDATION_FAILED',
-          availableInstances: configuredInstances.map((i) => ({
-            id: i.id,
-            name: (i as { name?: string; displayName: string }).name || i.displayName,
-          })),
+          details: {
+            availableInstances: configuredInstances.map((i) => ({
+              id: i.id,
+              name: (i as { name?: string; displayName: string }).name || i.displayName,
+            })),
+          },
         });
       }
     }
