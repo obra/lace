@@ -4,8 +4,9 @@
 // ABOUTME: Provides custom display logic for file write operations with path, size, and status
 
 import React from 'react';
-import { faFileEdit, faCheck, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faFileEdit, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import FileRenderer from '@/components/ui/FileRenderer';
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 
@@ -63,9 +64,13 @@ export const fileWriteRenderer: ToolRenderer = {
       );
     }
 
-    // Extract file path from arguments
+    // Extract file path and content from arguments
     const filePath = typeof metadata?.arguments === 'object' && metadata?.arguments !== null 
       ? (metadata.arguments as { path?: string }).path 
+      : undefined;
+    
+    const fileContent = typeof metadata?.arguments === 'object' && metadata?.arguments !== null 
+      ? (metadata.arguments as { content?: string }).content 
       : undefined;
     
     // Extract metadata from result
@@ -80,16 +85,27 @@ export const fileWriteRenderer: ToolRenderer = {
     
     return (
       <div className="bg-success/5 border border-success/20 rounded-lg">
-        {/* Simple success indicator with size */}
-        <div className="px-3 py-2 bg-success/10 rounded-lg">
+        {/* Header with size info */}
+        <div className="px-3 py-2 border-b border-success/20 bg-success/10">
           <div className="flex items-center gap-2 text-sm">
-            <FontAwesomeIcon icon={faCheck} className="w-4 h-4 text-success flex-shrink-0" />
-            <span className="text-success font-medium">Successfully written</span>
             {displaySize && (
-              <span className="text-success/70">• {displaySize}</span>
+              <span className="text-success/70">Size: {displaySize}</span>
             )}
           </div>
         </div>
+        
+        {/* File content that was written */}
+        {fileContent && (
+          <div className="p-3">
+            <FileRenderer
+              content={fileContent}
+              filename={filePath}
+              maxLines={10}
+              showLineNumbers={false}
+              showCopyButton={true}
+            />
+          </div>
+        )}
       </div>
     );
   },
