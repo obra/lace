@@ -1,70 +1,9 @@
-// ABOUTME: Test utilities for tool testing
-// ABOUTME: Provides helper functions to create ToolCall objects and temp directories for tests
+// ABOUTME: Mock session and context utilities for testing
+// ABOUTME: Provides standardized mock objects for session-based tests
 
-import { mkdtemp, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { ToolCall, ToolContext } from '~/tools/types';
+import { ToolContext } from '~/tools/types';
 import { asThreadId } from '~/threads/types';
 import { Session } from '~/sessions/session';
-
-/**
- * Creates a ToolCall object for testing
- * @param name - The tool name
- * @param args - The arguments to pass to the tool
- * @param id - Optional tool call ID (defaults to 'test-id')
- * @returns A ToolCall object
- */
-export function createTestToolCall(
-  name: string,
-  args: Record<string, unknown>,
-  id: string = 'test-id'
-): ToolCall {
-  return {
-    id,
-    name,
-    arguments: args,
-  };
-}
-
-/**
- * Helper to create a ToolCall with a specific tool name
- * Useful for creating tool-specific test helpers
- */
-export function createToolCallFactory(toolName: string) {
-  return (args: Record<string, unknown>, id?: string) => createTestToolCall(toolName, args, id);
-}
-
-/**
- * Creates a temporary directory and registers cleanup with test framework
- * Use in beforeAll/afterAll or similar test lifecycle hooks
- */
-export function createTestTempDir(prefix = 'lace-test-'): {
-  getPath: () => Promise<string>;
-  cleanup: () => Promise<void>;
-} {
-  let tempPath: string | null = null;
-
-  const getPath = async (): Promise<string> => {
-    if (!tempPath) {
-      tempPath = await mkdtemp(join(tmpdir(), prefix));
-    }
-    return tempPath;
-  };
-
-  const cleanup = async (): Promise<void> => {
-    if (tempPath) {
-      try {
-        await rm(tempPath, { recursive: true, force: true });
-        tempPath = null;
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-  };
-
-  return { getPath, cleanup };
-}
 
 interface MockSession {
   getToolPolicy: (toolName: string) => 'allow' | 'require-approval' | 'deny';
