@@ -46,11 +46,3 @@ export function useTempLaceDir(): TempLaceDirContext {
 
   return context;
 }
-
-/**
- * Gets the path to the test database file in the current temp LACE_DIR.
- * Useful for creating persistence instances in tests.
- */
-export function getTestDbPath(context: TempLaceDirContext): string {
-  return path.join(context.tempDir, 'lace.db');
-}
