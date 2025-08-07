@@ -7,6 +7,7 @@ import { taskRenderers } from './task';
 import { delegateRenderer } from './delegate';
 import { fileWriteRenderer } from './file-write';
 import { fileReadRenderer } from './file-read';
+import { fileEditRenderer } from './file-edit';
 
 // Registry of tool renderers - add new tools here
 const toolRenderers: Record<string, ToolRenderer> = {
@@ -28,6 +29,7 @@ const toolRenderers: Record<string, ToolRenderer> = {
   // File operation tools
   file_write: fileWriteRenderer,
   file_read: fileReadRenderer,
+  file_edit: fileEditRenderer,
 };
 
 /**
