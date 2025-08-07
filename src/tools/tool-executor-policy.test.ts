@@ -55,10 +55,10 @@ describe('ToolExecutor policy enforcement', () => {
     } as unknown as Session;
 
     context = {
-      threadId: asThreadId('thread1'),
-      parentThreadId: asThreadId('session1'),
+      threadId: asThreadId('lace_20250101_test03'),
+      parentThreadId: asThreadId('lace_20250101_sess01'),
       workingDirectory: '/project/path',
-      sessionId: 'session1',
+      sessionId: 'lace_20250101_sess01',
       projectId: projectId,
       session: mockSession,
     };
@@ -122,7 +122,7 @@ describe('ToolExecutor policy enforcement', () => {
 
   it('should require session context for security policy enforcement', async () => {
     const contextWithoutSession = {
-      threadId: asThreadId('thread1'),
+      threadId: asThreadId('lace_20250101_test03'),
     };
 
     const toolCall = { id: 'test-id', name: 'file-read', arguments: { file_path: '/test.txt' } };

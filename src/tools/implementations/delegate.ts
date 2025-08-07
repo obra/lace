@@ -117,7 +117,7 @@ Examples:
           assignedTo: assigneeSpec,
         },
         {
-          actor: context?.threadId || 'unknown',
+          actor: context?.threadId || 'human',
         }
       );
 

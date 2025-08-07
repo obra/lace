@@ -14,15 +14,16 @@ describe('Agent Spawning on Assignment', () => {
   let sessionId: string;
   let mockAgentCreator: ReturnType<typeof vi.fn>;
 
+  let delegateCounter: number;
+
   beforeEach(() => {
     persistence = getPersistence();
-    sessionId = 'lace_20250727_test456';
+    sessionId = 'lace_20250727_abc456';
+    delegateCounter = 1;
 
     // Mock agent creation callback
-    mockAgentCreator = vi.fn().mockImplementation((provider: string, model: string) => {
-      return Promise.resolve(
-        asThreadId(`${sessionId}.delegate_${provider}_${model}_${Date.now()}`)
-      );
+    mockAgentCreator = vi.fn().mockImplementation((_provider: string, _model: string) => {
+      return Promise.resolve(asThreadId(`${sessionId}.${delegateCounter++}`));
     });
 
     taskManager = new TaskManager(asThreadId(sessionId), persistence, mockAgentCreator);
@@ -49,7 +50,7 @@ describe('Agent Spawning on Assignment', () => {
     expect(mockAgentCreator).toHaveBeenCalledWith('anthropic', 'claude-3-5-haiku-20241022', task);
 
     // Task should have delegate thread ID, not original assignment
-    expect(task.assignedTo).toContain(`${sessionId}.delegate_anthropic_claude-3-5-haiku-20241022_`);
+    expect(task.assignedTo).toBe(`${sessionId}.1`);
     expect(task.assignedTo).not.toBe('new:anthropic/claude-3-5-haiku-20241022');
 
     // Should be marked as in_progress due to agent spawning
@@ -90,9 +91,7 @@ describe('Agent Spawning on Assignment', () => {
     );
 
     // Task should have delegate thread ID, not original assignment
-    expect(updatedTask.assignedTo).toContain(
-      `${sessionId}.delegate_anthropic_claude-sonnet-4-20250514_`
-    );
+    expect(updatedTask.assignedTo).toBe(`${sessionId}.1`);
     expect(updatedTask.assignedTo).not.toBe('new:anthropic/claude-sonnet-4-20250514');
 
     // Should be marked as in_progress due to agent spawning
@@ -101,7 +100,7 @@ describe('Agent Spawning on Assignment', () => {
 
   it('should not spawn agent when assigning to existing thread ID', async () => {
     const taskContext = { actor: sessionId, isHuman: false };
-    const existingThreadId = 'lace_20250727_existing123';
+    const existingThreadId = 'lace_20250727_def123';
 
     // Create task with existing thread assignment
     const task = await taskManager.createTask(
@@ -181,8 +180,8 @@ describe('Agent Spawning on Assignment', () => {
     );
 
     // Tasks should have different delegate thread IDs
-    expect(task1.assignedTo).toContain('delegate_anthropic_claude-3-5-haiku-20241022_');
-    expect(task2.assignedTo).toContain('delegate_anthropic_claude-sonnet-4-20250514_');
+    expect(task1.assignedTo).toBe(`${sessionId}.1`);
+    expect(task2.assignedTo).toBe(`${sessionId}.2`);
     expect(task1.assignedTo).not.toBe(task2.assignedTo);
   });
 });

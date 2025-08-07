@@ -58,7 +58,7 @@ export function createMockSession(
   return {
     getToolPolicy: overrides.getToolPolicy || (() => 'require-approval'),
     getEffectiveConfiguration: overrides.getEffectiveConfiguration || (() => ({})),
-    getId: overrides.getId || (() => 'test-session-id'),
+    getId: overrides.getId || (() => 'lace_20250101_sess01'),
     ...overrides,
   };
 }
@@ -78,7 +78,7 @@ export function createMockToolContext(
   } = {}
 ): ToolContext {
   return {
-    threadId: asThreadId(overrides.threadId || 'test-thread-id'),
+    threadId: asThreadId(overrides.threadId || 'lace_20250101_test01'),
     workingDirectory: overrides.workingDirectory, // Allow explicitly undefined
     projectId: overrides.projectId,
     parentThreadId: overrides.parentThreadId ? asThreadId(overrides.parentThreadId) : undefined,

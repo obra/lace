@@ -123,8 +123,8 @@ describe('Tool Approval System Integration', () => {
 
     // Create tool context with session for security policy enforcement
     toolContext = {
-      threadId: 'test-thread-id' as ThreadId,
-      parentThreadId: 'test-parent-thread-id' as ThreadId,
+      threadId: 'lace_20250101_test02' as ThreadId,
+      parentThreadId: 'lace_20250101_parent' as ThreadId,
       workingDirectory: tempLaceDirContext.tempDir,
       session, // REQUIRED for security policy enforcement
     };

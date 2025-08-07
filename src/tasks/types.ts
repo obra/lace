@@ -7,10 +7,13 @@ export type {
   TaskNote,
   TaskStatus,
   TaskPriority,
+  TaskActor,
 } from '~/tools/implementations/task-manager/types';
 
+import type { TaskActor } from '~/tools/implementations/task-manager/types';
+
 export interface TaskContext {
-  actor: string; // Who is performing the action
+  actor: TaskActor; // Who is performing the action (ThreadId or 'human')
   isHuman?: boolean; // Quick check for human vs agent
 }
 

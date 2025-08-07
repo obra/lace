@@ -74,7 +74,7 @@ describe('NonInteractiveInterface Agent API Usage', () => {
     });
 
     it('should generate thread IDs through Agent API', () => {
-      const testThreadId = 'test-thread-123';
+      const testThreadId = 'lace_20250101_test01';
       const agentGenerateThreadIdSpy = vi
         .spyOn(agent, 'generateThreadId')
         .mockReturnValue(asThreadId(testThreadId));
