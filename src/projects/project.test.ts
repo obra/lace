@@ -13,6 +13,8 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import { existsSync } from 'fs';
+import { getProcessTempDir } from '~/config/lace-dir';
 
 describe('Project', () => {
   const _tempLaceDir = setupCoreTest();
@@ -539,6 +541,41 @@ describe('Project', () => {
           expect(project.getSessionCount()).toBe(1); // Auto-created session remains
         });
       });
+    });
+  });
+
+  describe('temp directory management', () => {
+    it('should create project temp directory', () => {
+      const projectId = 'test-project-123';
+      const tempDir = Project.getProjectTempDir(projectId);
+
+      expect(tempDir).toContain(`project-${projectId}`);
+      expect(existsSync(tempDir)).toBe(true);
+    });
+
+    it('should return same directory for same project', () => {
+      const projectId = 'test-project-456';
+      const tempDir1 = Project.getProjectTempDir(projectId);
+      const tempDir2 = Project.getProjectTempDir(projectId);
+
+      expect(tempDir1).toBe(tempDir2);
+    });
+
+    it('should create different directories for different projects', () => {
+      const tempDir1 = Project.getProjectTempDir('project-a');
+      const tempDir2 = Project.getProjectTempDir('project-b');
+
+      expect(tempDir1).not.toBe(tempDir2);
+      expect(tempDir1).toContain('project-a');
+      expect(tempDir2).toContain('project-b');
+    });
+
+    it('should create directory under process temp dir', () => {
+      const projectId = 'nested-test';
+      const tempDir = Project.getProjectTempDir(projectId);
+      const processTempDir = getProcessTempDir();
+
+      expect(tempDir).toContain(processTempDir);
     });
   });
 });

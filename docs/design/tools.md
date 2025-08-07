@@ -2037,3 +2037,118 @@ Approval decisions can be cached per session (ALLOW_SESSION) to avoid repeated p
 3. **Session Isolation**: Approval decisions are scoped to individual sessions
 4. **Timeout Protection**: Approvals auto-deny after timeout to prevent hanging processes
 5. **Audit Trail**: All approval decisions are logged for security auditing
+
+## Tool Temp Directory Usage
+
+Tools can store large outputs and intermediate files using the temp directory system, which provides session-scoped temporary storage for tool execution.
+
+### Getting Temp Directories
+
+```typescript
+// In any tool that extends Tool base class
+const toolCallId = 'unique-tool-call-id'; // Provided by executor
+const context: ToolContext = { sessionId, projectId };
+
+// Get tool-call-specific temp directory
+const tempDir = this.getToolCallTempDir(toolCallId, context);
+
+// Get standard output file paths
+const paths = this.getOutputFilePaths(toolCallId, context);
+// paths.stdout, paths.stderr, paths.combined
+```
+
+### Directory Structure
+
+```
+/tmp/lace-runtime-{pid}-{timestamp}-{random}/
+├── project-{projectId}/           # Optional project grouping
+│   └── session-{sessionId}/       # Session-scoped directories
+│       └── tool-call-{toolCallId}/ # Tool-call-specific directories
+│           ├── stdout.txt         # Standard output
+│           ├── stderr.txt         # Standard error
+│           └── combined.txt       # Combined output
+└── session-{sessionId}/           # Sessions without projects
+    └── tool-call-{toolCallId}/
+        ├── stdout.txt
+        ├── stderr.txt
+        └── combined.txt
+```
+
+### Best Practices
+
+1. **Large Output Management**: Store full output in temp files, return summaries to model
+2. **File Naming**: Use standard names (stdout.txt, stderr.txt, combined.txt) for consistency
+3. **Error Handling**: Always create temp directories even if command fails
+4. **Memory Usage**: Stream output to files, don't buffer everything in memory
+5. **Audit Trail**: Full output is preserved for debugging and analysis
+
+### Example: Bash Tool Implementation
+
+The bash tool demonstrates proper large output handling:
+- Streams output to temp files during execution
+- Returns head+tail preview to model (first 100 + last 50 lines)
+- Includes truncation statistics and file references
+- Maintains complete audit trail in temp files
+
+```typescript
+// Example result format
+{
+  command: "npm test",
+  exitCode: 1,
+  runtime: 15000,
+  stdoutPreview: "first 100 lines...\n=== TRUNCATED ===/n...last 50 lines",
+  stderrPreview: "Error summary...",
+  truncated: {
+    stdout: { total: 5000, skipped: 4850 },
+    stderr: { total: 200, skipped: 50 }
+  },
+  outputFiles: {
+    stdout: "/tmp/lace-runtime-123/session-abc/tool-call-def/stdout.txt",
+    stderr: "/tmp/lace-runtime-123/session-abc/tool-call-def/stderr.txt",
+    combined: "/tmp/lace-runtime-123/session-abc/tool-call-def/combined.txt"
+  }
+}
+```
+
+### Directory Lifecycle
+
+- **Creation**: Directories are created on-demand when tools request them
+- **Persistence**: Temp directories persist for the entire server runtime
+- **Stability**: Same tool call ID always returns same directory path
+- **Cleanup**: Automatic cleanup when server process ends (via OS temp directory cleanup)
+
+### Usage in Tool Implementation
+
+```typescript
+export class MyLargeOutputTool extends Tool {
+  protected async executeValidated(
+    args: z.infer<typeof mySchema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
+    // Generate unique tool call ID (or receive from executor)
+    const toolCallId = this.generateToolCallId();
+    
+    // Get temp file paths
+    const outputPaths = this.getOutputFilePaths(toolCallId, context);
+    
+    // Stream output to files while processing
+    const stdoutStream = createWriteStream(outputPaths.stdout);
+    const stderrStream = createWriteStream(outputPaths.stderr);
+    
+    try {
+      // Process with streaming...
+      const result = await this.processWithStreaming(args, stdoutStream, stderrStream);
+      
+      // Return summary with temp file references
+      return this.createResult({
+        summary: this.createSummary(result),
+        outputFiles: outputPaths,
+        // ... other metadata
+      });
+    } finally {
+      stdoutStream.end();
+      stderrStream.end();
+    }
+  }
+}
+```

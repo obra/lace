@@ -5,6 +5,10 @@ import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/ty
 import { Tool } from '~/tools/tool';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
+import { Session } from '~/sessions/session';
+import { ThreadId } from '~/threads/types';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
@@ -28,6 +32,9 @@ export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private approvalCallback?: ApprovalCallback;
   private envManager: ProjectEnvironmentManager;
+
+  // Constants for temp directory naming
+  private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
 
   constructor() {
     this.envManager = new ProjectEnvironmentManager();
@@ -88,6 +95,28 @@ export class ToolExecutor {
     ];
 
     this.registerTools(tools);
+  }
+
+  /**
+   * Create temp directory for a tool call
+   */
+  private createToolTempDirectory(toolCallId: string, context: ToolContext): string {
+    if (!context.sessionId || !context.projectId) {
+      throw new Error('Session ID and Project ID required for temp directory creation');
+    }
+
+    // Get session instance and use its temp directory method
+    const session = Session.getByIdSync(context.sessionId as ThreadId);
+    if (!session) {
+      throw new Error(`Session not found: ${context.sessionId}`);
+    }
+    const sessionTempDir = session.getSessionTempDir();
+
+    // Create tool-specific directory
+    const toolTempDir = join(sessionTempDir, `${ToolExecutor.TOOL_CALL_TEMP_PREFIX}${toolCallId}`);
+    mkdirSync(toolTempDir, { recursive: true });
+
+    return toolTempDir;
   }
 
   async requestToolPermission(
@@ -203,7 +232,22 @@ export class ToolExecutor {
         Object.assign(process.env, projectEnv);
       }
 
-      const result = await tool.execute(call.arguments, context);
+      // Create enhanced context with temp directory information
+      let toolContext: ToolContext = context || {};
+
+      // Create temp directories if session and project are available
+      if (context?.sessionId && context?.projectId) {
+        // Use the LLM-provided tool call ID and create temp directory
+        const toolTempDir = this.createToolTempDirectory(call.id, context);
+
+        // Enhanced context with temp directory information
+        toolContext = {
+          ...context,
+          toolTempDir,
+        };
+      }
+
+      const result = await tool.execute(call.arguments, toolContext);
 
       // Ensure the result has the call ID if it wasn't set by the tool
       if (!result.id && call.id) {

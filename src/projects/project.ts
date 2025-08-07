@@ -11,6 +11,9 @@ import type { SessionConfiguration } from '~/sessions/session-config';
 import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
+import { getProcessTempDir } from '~/config/lace-dir';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
 
 export interface ProjectInfo {
   id: string;
@@ -388,6 +391,17 @@ export class Project {
 
   deletePromptTemplate(templateId: string): boolean {
     return this._promptTemplateManager.deleteTemplate(this._id, templateId);
+  }
+
+  /**
+   * Get temporary directory for a project
+   * Creates: /tmp/lace-runtime-{pid}-{timestamp}-{random}/project-{projectId}/
+   */
+  static getProjectTempDir(projectId: string): string {
+    const processTempDir = getProcessTempDir();
+    const projectTempPath = join(processTempDir, `project-${projectId}`);
+    mkdirSync(projectTempPath, { recursive: true });
+    return projectTempPath;
   }
 
   private static generateNameFromDirectory(workingDirectory: string): string {

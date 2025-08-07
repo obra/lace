@@ -4,6 +4,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
 import { getEnvVar } from '~/config/env-loader';
 
 /**
@@ -61,4 +63,30 @@ export const BUILTIN_PROVIDER_CATALOG_PATH = './data';
  */
 export function getBuiltinProviderCatalogPath(): string {
   return BUILTIN_PROVIDER_CATALOG_PATH;
+}
+
+/**
+ * Process-scoped temporary directory for this server runtime
+ * Stable across session recreations, cleaned up when process ends
+ */
+let _processTempDir: string | null = null;
+
+/**
+ * Get or create the process temporary directory
+ * Creates one stable temp dir per server process that persists until process ends
+ */
+export function getProcessTempDir(): string {
+  if (!_processTempDir) {
+    const processId = process.pid;
+    const timestamp = Date.now();
+    _processTempDir = mkdtempSync(path.join(tmpdir(), `lace-runtime-${processId}-${timestamp}-`));
+  }
+  return _processTempDir;
+}
+
+/**
+ * Clear process temp dir cache - primarily for testing
+ */
+export function clearProcessTempDirCache(): void {
+  _processTempDir = null;
 }
