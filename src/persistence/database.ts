@@ -1185,7 +1185,7 @@ export class DatabasePersistence {
 // Global persistence instance
 let globalPersistence: DatabasePersistence | null = null;
 
-export function initializePersistence(dbPath?: string): void {
+function initializePersistence(dbPath?: string): void {
   const finalDbPath = dbPath || getLaceDbPath();
   if (globalPersistence) {
     globalPersistence.close();
