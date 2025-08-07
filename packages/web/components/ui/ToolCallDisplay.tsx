@@ -18,6 +18,7 @@ import {
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
 import { getToolRenderer, type ToolResult } from '@/components/timeline/tool';
+import type { ToolAggregatedEventData, ToolCallEventData } from '@/types/web-events';
 
 interface ToolCallDisplayProps {
   tool: string;
@@ -164,7 +165,21 @@ export function ToolCallDisplay({
   const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
   // For file_read and file_write, use the summary as the display name since it contains the full path
   const toolDisplayName = (tool === 'file_read' || tool === 'file_write') ? toolSummary : (renderer.getDisplayName?.(tool, result || undefined) ?? tool);
-  const resultContent = hasResult ? (renderer.renderResult?.(result!, metadata) ?? createDefaultResultRenderer(result!)) : null;
+  
+  // Create a proper ToolAggregatedEventData object if we need it for renderResult
+  const aggregatedData: ToolAggregatedEventData | undefined = metadata ? {
+    call: {
+      id: metadata.toolId || '',
+      name: tool,
+      arguments: metadata.arguments
+    } as ToolCallEventData,
+    result,
+    toolName: tool,
+    toolId: metadata.toolId,
+    arguments: metadata.arguments
+  } : undefined;
+  
+  const resultContent = hasResult ? (renderer.renderResult?.(result!, aggregatedData) ?? createDefaultResultRenderer(result!)) : null;
   
   // Create success/error icon for header
   const statusIcon = hasResult ? (

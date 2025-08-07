@@ -81,7 +81,7 @@ export const fileWriteRenderer: ToolRenderer = {
     
     // Extract size info from the content message or metadata
     const sizeMatch = content.match(/(\d+(?:\.\d+)?)\s*(bytes?|KB|MB|GB)/i);
-    const displaySize = resultMetadata?.fileSize || (sizeMatch ? `${sizeMatch[1]} ${sizeMatch[2]}` : null);
+    const displaySize = resultMetadata?.fileSize || (sizeMatch ? `${sizeMatch[1]} ${sizeMatch[2]}` : undefined);
     
     return (
       <div className="bg-success/5 border border-success/20 rounded-lg">
