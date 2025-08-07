@@ -380,10 +380,8 @@ export class Agent extends EventEmitter {
     return {
       threadId: asThreadId(this._threadId),
       name: this.name,
-      provider: this.provider,
-      model: this.model,
-      providerInstanceId: metadata?.providerInstanceId as string | undefined,
-      modelId: (metadata?.modelId as string) || (metadata?.model as string) || undefined,
+      providerInstanceId: (metadata?.providerInstanceId as string) || 'unknown',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || 'unknown',
       status: this.status,
     };
   }

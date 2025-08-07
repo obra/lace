@@ -78,8 +78,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Agent should inherit session's provider instance configuration
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.provider).toBe('anthropic');
-      expect(spawnedAgent?.model).toBe('claude-3-5-haiku-20241022');
+      expect(spawnedAgent?.providerInstanceId).toBe(providerInstanceId);
+      expect(spawnedAgent?.modelId).toBe('claude-3-5-haiku-20241022');
       expect(spawnedAgent?.name).toBe('Default Agent');
     });
 
@@ -97,7 +97,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Note: During transition, provider resolution falls back to 'anthropic'
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.model).toBe('gpt-4o'); // Model should be preserved
+      expect(spawnedAgent?.modelId).toBe('gpt-4o'); // Model should be preserved
       expect(spawnedAgent?.name).toBe('OpenAI Agent');
     });
 
@@ -113,8 +113,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Agent should use same provider but different model
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.provider).toBe('anthropic');
-      expect(spawnedAgent?.model).toBe('claude-3-5-sonnet-20241022');
+      expect(spawnedAgent?.providerInstanceId).toBe(providerInstanceId);
+      expect(spawnedAgent?.modelId).toBe('claude-3-5-sonnet-20241022');
       expect(spawnedAgent?.name).toBe('Sonnet Agent');
     });
   });
@@ -127,8 +127,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
 
       // Should inherit from session
-      expect(spawnedAgent?.provider).toBe('anthropic');
-      expect(spawnedAgent?.model).toBe('claude-3-5-haiku-20241022');
+      expect(spawnedAgent?.providerInstanceId).toBe(providerInstanceId);
+      expect(spawnedAgent?.modelId).toBe('claude-3-5-haiku-20241022');
     });
 
     it('should accept explicit provider instance parameters', () => {
@@ -143,7 +143,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
 
       // Should accept parameters and preserve model
       // Note: Provider resolution currently falls back during transition
-      expect(spawnedAgent?.model).toBe('gpt-4o-mini');
+      expect(spawnedAgent?.modelId).toBe('gpt-4o-mini');
       expect(spawnedAgent?.name).toBe('Override Agent');
     });
 
@@ -171,7 +171,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(agent).toBeDefined();
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.model).toBe('claude-3-5-sonnet-20241022');
+      expect(spawnedAgent?.modelId).toBe('claude-3-5-sonnet-20241022');
     });
   });
 
@@ -193,11 +193,11 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
 
       const anthropicSpawned = agents.find((a) => a.threadId === anthropicAgent.threadId);
-      expect(anthropicSpawned?.model).toBe('claude-3-5-sonnet-20241022');
+      expect(anthropicSpawned?.modelId).toBe('claude-3-5-sonnet-20241022');
       expect(anthropicSpawned?.name).toBe('Anthropic Agent');
 
       const openaiSpawned = agents.find((a) => a.threadId === openaiAgent.threadId);
-      expect(openaiSpawned?.model).toBe('gpt-4o');
+      expect(openaiSpawned?.modelId).toBe('gpt-4o');
       expect(openaiSpawned?.name).toBe('OpenAI Agent');
     });
 
@@ -213,11 +213,11 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
 
       const defaultSpawned = agents.find((a) => a.threadId === defaultAgent.threadId);
-      expect(defaultSpawned?.model).toBe('claude-3-5-haiku-20241022'); // Inherited from session
+      expect(defaultSpawned?.modelId).toBe('claude-3-5-haiku-20241022'); // Inherited from session
       expect(defaultSpawned?.name).toBe('Default Agent');
 
       const explicitSpawned = agents.find((a) => a.threadId === explicitAgent.threadId);
-      expect(explicitSpawned?.model).toBe('gpt-4o-mini'); // Model should be preserved
+      expect(explicitSpawned?.modelId).toBe('gpt-4o-mini'); // Model should be preserved
       expect(explicitSpawned?.name).toBe('Explicit Agent');
     });
   });
@@ -280,8 +280,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
 
       // Verify models are preserved correctly
-      expect(coordinatorAgent?.model).toBe('gpt-4o');
-      expect(spawnedAgent?.model).toBe('claude-3-5-haiku-20241022');
+      expect(coordinatorAgent?.modelId).toBe('gpt-4o');
+      expect(spawnedAgent?.modelId).toBe('claude-3-5-haiku-20241022');
       expect(spawnedAgent?.name).toBe('Cross Provider Agent');
 
       openaiSession.destroy();
