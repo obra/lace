@@ -37,6 +37,8 @@ import { getEnvVar } from '~/config/env-loader';
 import { getLaceDir } from '~/config/lace-dir';
 import * as fs from 'fs';
 import * as path from 'path';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -1057,6 +1059,20 @@ Use your task_add_note tool to record important notes as you work and your task_
 
   static clearProviderCache(): void {
     Session._providerCache.clear();
+  }
+
+  /**
+   * Get temporary directory for this session
+   * Creates: /tmp/lace-runtime-{pid}-{timestamp}/project-{projectId}/session-{sessionId}/
+   */
+  getSessionTempDir(): string {
+    if (!this._projectId) {
+      throw new Error('Session must have a projectId to create temp directories');
+    }
+    const projectTempDir = Project.getProjectTempDir(this._projectId);
+    const sessionTempPath = join(projectTempDir, `session-${this._sessionId}`);
+    mkdirSync(sessionTempPath, { recursive: true });
+    return sessionTempPath;
   }
 
   /**

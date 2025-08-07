@@ -1,13 +1,18 @@
 // ABOUTME: Tests for ToolExecutor with new schema-based tools
 // ABOUTME: Validates that new Tool classes work with existing executor infrastructure
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { createTestTempDir, createMockToolContext } from '~/tools/test-utils';
+import { existsSync } from 'fs';
+import { clearProcessTempDirCache } from '~/config/lace-dir';
+import { z } from 'zod';
+import { Tool } from '~/tools/tool';
+import type { ToolContext, ToolResult } from '~/tools/types';
 
 describe('ToolExecutor with new schema-based tools', () => {
   const tempDir = createTestTempDir();
@@ -176,4 +181,117 @@ describe('ToolExecutor with new schema-based tools', () => {
       ).rejects.toThrow('Tool execution requires approval but no approval callback is configured');
     });
   });
+
+  describe('ToolExecutor temp directory management', () => {
+    let toolExecutor: ToolExecutor;
+    let mockTool: MockTool;
+
+    beforeEach(() => {
+      toolExecutor = new ToolExecutor();
+      mockTool = new MockTool();
+      toolExecutor.registerTool(mockTool.name, mockTool);
+      toolExecutor.setApprovalCallback(autoApprovalCallback);
+      clearProcessTempDirCache();
+    });
+
+    it('should provide temp directory to tools', async () => {
+      const context = createMockToolContext();
+      context.sessionId = 'test-session';
+      context.projectId = 'test-project';
+
+      await toolExecutor.executeTool(
+        { id: 'test-temp-1', name: 'mock_tool', arguments: { input: 'test' } },
+        context
+      );
+
+      // Verify tool received temp directory context
+      const receivedContext = mockTool.getCapturedContext();
+      expect(receivedContext.toolTempDir).toBeDefined();
+      expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
+    });
+
+    it('should create unique tool call IDs', async () => {
+      const context = createMockToolContext();
+      context.sessionId = 'test-session';
+      context.projectId = 'test-project';
+
+      await toolExecutor.executeTool(
+        { id: 'test-temp-2a', name: 'mock_tool', arguments: { input: 'test1' } },
+        context
+      );
+      const context1 = mockTool.getCapturedContext();
+
+      await toolExecutor.executeTool(
+        { id: 'test-temp-2b', name: 'mock_tool', arguments: { input: 'test2' } },
+        context
+      );
+      const context2 = mockTool.getCapturedContext();
+
+      expect(context1.toolTempDir).toBeDefined();
+      expect(context2.toolTempDir).toBeDefined();
+      expect(context1.toolTempDir).not.toBe(context2.toolTempDir);
+    });
+
+    it('should create temp directories that exist', async () => {
+      const context = createMockToolContext();
+      context.sessionId = 'test-session';
+      context.projectId = 'test-project';
+
+      await toolExecutor.executeTool(
+        { id: 'test-temp-3', name: 'mock_tool', arguments: { input: 'test' } },
+        context
+      );
+
+      const receivedContext = mockTool.getCapturedContext();
+      expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
+    });
+
+    it('should throw error when session ID missing', async () => {
+      const context = createMockToolContext();
+      context.projectId = 'test-project';
+      // No sessionId
+
+      const result = await toolExecutor.executeTool(
+        { id: 'test-temp-4', name: 'mock_tool', arguments: { input: 'test' } },
+        context
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Session ID and Project ID required');
+    });
+
+    it('should work without temp directories when session/project missing', async () => {
+      const context = createMockToolContext();
+      // No sessionId or projectId - should work but not create temp directories
+
+      await toolExecutor.executeTool(
+        { id: 'test-temp-5', name: 'mock_tool', arguments: { input: 'test' } },
+        context
+      );
+
+      const receivedContext = mockTool.getCapturedContext();
+      expect(receivedContext.toolTempDir).toBeUndefined();
+    });
+  });
 });
+
+// Mock tool for testing temp directory functionality
+class MockTool extends Tool {
+  name = 'mock_tool';
+  description = 'Mock tool for testing';
+  schema = z.object({ input: z.string() });
+
+  private capturedContext?: ToolContext;
+
+  protected async executeValidated(
+    args: z.infer<typeof this.schema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
+    this.capturedContext = context;
+    return Promise.resolve(this.createResult(`Processed: ${args.input}`));
+  }
+
+  getCapturedContext(): ToolContext {
+    return this.capturedContext!;
+  }
+}

@@ -14,6 +14,9 @@ export interface ToolContext {
   sessionId?: string;
   projectId?: string;
   session?: Session; // TaskManager accessed via session.getTaskManager()
+
+  // Temp directory management - provided by ToolExecutor
+  toolTempDir?: string; // Tool-specific temp directory
 }
 
 export interface ToolAnnotations {

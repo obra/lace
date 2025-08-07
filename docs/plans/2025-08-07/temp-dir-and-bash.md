@@ -29,15 +29,545 @@ Session Temp Directory Structure:
 
 ## Implementation Plan: Two Stacked PRs
 
-### PR 1: Temp Directory Infrastructure
+### PR 1: Temp Directory Infrastructure ✅ COMPLETED
 Foundation for session-scoped temporary directories
+
+### PR 1.5: Architecture Fixes
+Fix architecture issues discovered after PR 1 implementation
 
 ### PR 2: Bash Tool Output Management  
 Update bash tool to use temp directories and implement smart truncation
 
 ---
 
-# PR 1: Temp Directory Infrastructure
+# PR 1.5: Architecture Fixes
+
+## Overview
+PR 1 has been implemented, but there are two critical architecture issues that need to be fixed before implementing the bash tool changes:
+
+1. **Sessions always have projects** - Remove dead fallback code for sessions without projects
+2. **ToolExecutor should provide temp directories** - Move temp directory responsibility from Tool base class to ToolExecutor for better separation of concerns
+
+---
+
+## Task 1: Fix Session Temp Directory - Remove Dead Fallback Code
+
+### Background Context
+All sessions must have a `projectId`. The current implementation has a fallback case for sessions without projects, but this can never happen in practice.
+
+### Code Changes
+
+**File**: `src/sessions/session.ts`
+
+Update the `getSessionTempDir` method to remove the fallback:
+
+```typescript
+/**
+ * Get temporary directory for a session
+ * Creates: /tmp/lace-runtime-{pid}-{timestamp}/project-{projectId}/session-{sessionId}/
+ * Note: All sessions must have a projectId - no fallback case needed
+ */
+static getSessionTempDir(sessionId: string, projectId: string): string {
+  const projectTempDir = Project.getProjectTempDir(projectId);
+  const sessionTempPath = join(projectTempDir, `session-${sessionId}`);
+  mkdirSync(sessionTempPath, { recursive: true });
+  return sessionTempPath;
+}
+```
+
+### Testing
+
+**File**: `src/sessions/session.test.ts`
+
+Update the tests to remove the "without project" test cases and make `projectId` required:
+
+```typescript
+describe('temp directory management', () => {
+  it('should create session temp directory', () => {
+    const sessionId = 'test-session-123';
+    const projectId = 'test-project-456';
+    const tempDir = Session.getSessionTempDir(sessionId, projectId);
+    
+    expect(tempDir).toContain(`project-${projectId}`);
+    expect(tempDir).toContain(`session-${sessionId}`);
+    expect(existsSync(tempDir)).toBe(true);
+  });
+
+  it('should return same directory for same session and project', () => {
+    const sessionId = 'stable-session';
+    const projectId = 'stable-project';
+    const tempDir1 = Session.getSessionTempDir(sessionId, projectId);
+    const tempDir2 = Session.getSessionTempDir(sessionId, projectId);
+    
+    expect(tempDir1).toBe(tempDir2);
+  });
+
+  it('should create different directories for different sessions', () => {
+    const projectId = 'same-project';
+    const tempDir1 = Session.getSessionTempDir('session-a', projectId);
+    const tempDir2 = Session.getSessionTempDir('session-b', projectId);
+    
+    expect(tempDir1).not.toBe(tempDir2);
+    expect(tempDir1).toContain('session-a');
+    expect(tempDir2).toContain('session-b');
+  });
+
+  it('should nest under project directory', () => {
+    const sessionId = 'nested-session';
+    const projectId = 'parent-project';
+    const sessionTempDir = Session.getSessionTempDir(sessionId, projectId);
+    const projectTempDir = Project.getProjectTempDir(projectId);
+    
+    expect(sessionTempDir).toContain(projectTempDir);
+  });
+
+  // Remove the "without project" test cases - they're no longer valid
+});
+```
+
+### Commit Message
+```
+fix(sessions): make projectId required in getSessionTempDir
+
+- Remove fallback case for sessions without projects
+- All sessions must have a projectId in practice
+- Simplify temp directory logic and remove dead code
+- Update tests to reflect required projectId parameter
+```
+
+## Task 2: Move Temp Directory Logic from Tool to ToolExecutor
+
+### Background Context
+The current architecture has the Tool base class managing temp directories, but this violates separation of concerns. The ToolExecutor should manage temp directories because:
+
+- ToolExecutor already has session context
+- ToolExecutor generates tool call IDs
+- Tool base class shouldn't need to import Session
+- Better testability and cleaner architecture
+
+### Code Changes
+
+**File**: `src/tools/types.ts`
+
+Add temp directory fields to `ToolContext`:
+
+```typescript
+export interface ToolContext {
+  threadId?: ThreadId;
+  parentThreadId?: ThreadId; // Parent thread (session)
+  workingDirectory?: string;
+  sessionId?: string;
+  projectId?: string;
+  session?: Session; // TaskManager accessed via session.getTaskManager()
+  
+  // Temp directory management - provided by ToolExecutor
+  toolCallId?: string;        // Unique ID for this tool call
+  toolTempDir?: string;       // Tool-specific temp directory
+  outputFilePaths?: {         // Standard output file paths
+    stdout: string;
+    stderr: string;
+    combined: string;
+  };
+}
+```
+
+**File**: `src/tools/tool.ts`
+
+Remove the temp directory methods and update to use provided context:
+
+```typescript
+export abstract class Tool {
+  // ... existing code ...
+  
+  // Remove these methods - ToolExecutor will provide temp directories:
+  // - getToolCallTempDir()
+  // - getOutputFilePaths()
+  
+  /**
+   * Get output file paths provided by ToolExecutor
+   * Throws error if ToolExecutor didn't provide temp directory
+   */
+  protected getOutputFilePaths(context?: ToolContext): {
+    stdout: string;
+    stderr: string;
+    combined: string;
+  } {
+    if (!context?.outputFilePaths) {
+      throw new Error('Output file paths not provided by ToolExecutor. This is a system error.');
+    }
+    return context.outputFilePaths;
+  }
+
+  /**
+   * Get tool temp directory provided by ToolExecutor
+   * Throws error if ToolExecutor didn't provide temp directory
+   */
+  protected getToolTempDir(context?: ToolContext): string {
+    if (!context?.toolTempDir) {
+      throw new Error('Tool temp directory not provided by ToolExecutor. This is a system error.');
+    }
+    return context.toolTempDir;
+  }
+}
+```
+
+**File**: `src/tools/executor.ts`
+
+Add temp directory management to ToolExecutor:
+
+```typescript
+import { Session } from '~/sessions/session';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
+
+export class ToolExecutor {
+  // ... existing code ...
+  
+  // Constants for temp directory naming
+  private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
+  private static readonly OUTPUT_FILE_STDOUT = 'stdout.txt';
+  private static readonly OUTPUT_FILE_STDERR = 'stderr.txt';
+  private static readonly OUTPUT_FILE_COMBINED = 'combined.txt';
+
+  /**
+   * Generate unique tool call ID
+   */
+  private generateToolCallId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    return `${timestamp}-${random}`;
+  }
+
+  /**
+   * Create temp directory and file paths for a tool call
+   */
+  private createToolTempDirectory(toolCallId: string, context: ToolContext): {
+    toolTempDir: string;
+    outputFilePaths: {
+      stdout: string;
+      stderr: string;
+      combined: string;
+    };
+  } {
+    if (!context.sessionId || !context.projectId) {
+      throw new Error('Session ID and Project ID required for temp directory creation');
+    }
+
+    // Get session temp directory
+    const sessionTempDir = Session.getSessionTempDir(context.sessionId, context.projectId);
+    
+    // Create tool-specific directory
+    const toolTempDir = join(sessionTempDir, `${ToolExecutor.TOOL_CALL_TEMP_PREFIX}${toolCallId}`);
+    mkdirSync(toolTempDir, { recursive: true });
+
+    // Create output file paths
+    const outputFilePaths = {
+      stdout: join(toolTempDir, ToolExecutor.OUTPUT_FILE_STDOUT),
+      stderr: join(toolTempDir, ToolExecutor.OUTPUT_FILE_STDERR),
+      combined: join(toolTempDir, ToolExecutor.OUTPUT_FILE_COMBINED),
+    };
+
+    return { toolTempDir, outputFilePaths };
+  }
+
+  async executeTool(toolName: string, args: unknown, context: ToolContext): Promise<ToolResult> {
+    const tool = this.getTool(toolName);
+    if (!tool) {
+      throw new Error(`Tool not found: ${toolName}`);
+    }
+
+    // Generate tool call ID and create temp directory
+    const toolCallId = this.generateToolCallId();
+    const { toolTempDir, outputFilePaths } = this.createToolTempDirectory(toolCallId, context);
+
+    // Enhanced context with temp directory information
+    const toolContext: ToolContext = {
+      ...context,
+      toolCallId,
+      toolTempDir,
+      outputFilePaths,
+    };
+
+    // Execute tool with enhanced context
+    return await tool.execute(args, toolContext);
+  }
+}
+```
+
+### Testing
+
+**File**: `src/tools/executor.test.ts`
+
+Add tests for temp directory management:
+
+```typescript
+describe('ToolExecutor temp directory management', () => {
+  let toolExecutor: ToolExecutor;
+  let mockTool: MockTool;
+
+  beforeEach(() => {
+    toolExecutor = new ToolExecutor();
+    mockTool = new MockTool();
+    toolExecutor.registerTool(mockTool.name, mockTool);
+    clearProcessTempDirCache();
+  });
+
+  it('should provide temp directory to tools', async () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+    };
+
+    await toolExecutor.executeTool('mock_tool', { input: 'test' }, context);
+
+    // Verify tool received temp directory context
+    const receivedContext = mockTool.getCapturedContext();
+    expect(receivedContext.toolCallId).toBeDefined();
+    expect(receivedContext.toolTempDir).toBeDefined();
+    expect(receivedContext.outputFilePaths).toBeDefined();
+    expect(receivedContext.outputFilePaths!.stdout).toContain('stdout.txt');
+    expect(receivedContext.outputFilePaths!.stderr).toContain('stderr.txt');
+    expect(receivedContext.outputFilePaths!.combined).toContain('combined.txt');
+  });
+
+  it('should create unique tool call IDs', async () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+    };
+
+    await toolExecutor.executeTool('mock_tool', { input: 'test1' }, context);
+    const context1 = mockTool.getCapturedContext();
+
+    await toolExecutor.executeTool('mock_tool', { input: 'test2' }, context);
+    const context2 = mockTool.getCapturedContext();
+
+    expect(context1.toolCallId).toBeDefined();
+    expect(context2.toolCallId).toBeDefined();
+    expect(context1.toolCallId).not.toBe(context2.toolCallId);
+  });
+
+  it('should create temp directories that exist', async () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+    };
+
+    await toolExecutor.executeTool('mock_tool', { input: 'test' }, context);
+
+    const receivedContext = mockTool.getCapturedContext();
+    expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
+  });
+
+  it('should throw error when session ID missing', async () => {
+    const context: ToolContext = {
+      projectId: 'test-project',
+      // No sessionId
+    };
+
+    await expect(
+      toolExecutor.executeTool('mock_tool', { input: 'test' }, context)
+    ).rejects.toThrow('Session ID and Project ID required');
+  });
+});
+
+// Mock tool for testing
+class MockTool extends Tool {
+  name = 'mock_tool';
+  description = 'Mock tool for testing';
+  schema = z.object({ input: z.string() });
+  
+  private capturedContext?: ToolContext;
+
+  protected async executeValidated(
+    args: z.infer<typeof this.schema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
+    this.capturedContext = context;
+    return this.createResult(`Processed: ${args.input}`);
+  }
+
+  getCapturedContext(): ToolContext {
+    return this.capturedContext!;
+  }
+}
+```
+
+**File**: `src/tools/tool.test.ts`
+
+Update tool tests to work with the new architecture:
+
+```typescript
+describe('Tool temp directory functionality', () => {
+  let testTool: TestTool;
+
+  beforeEach(() => {
+    testTool = new TestTool();
+  });
+
+  it('should get output file paths from context', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      outputFilePaths: {
+        stdout: '/tmp/test/stdout.txt',
+        stderr: '/tmp/test/stderr.txt',
+        combined: '/tmp/test/combined.txt',
+      },
+    };
+
+    const paths = testTool.getOutputFilePathsPublic(context);
+    expect(paths.stdout).toBe('/tmp/test/stdout.txt');
+    expect(paths.stderr).toBe('/tmp/test/stderr.txt');
+    expect(paths.combined).toBe('/tmp/test/combined.txt');
+  });
+
+  it('should throw error when output file paths not provided', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      // No outputFilePaths
+    };
+
+    expect(() => {
+      testTool.getOutputFilePathsPublic(context);
+    }).toThrow('Output file paths not provided by ToolExecutor');
+  });
+
+  it('should get tool temp dir from context', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      toolTempDir: '/tmp/test/tool-call-123',
+    };
+
+    const tempDir = testTool.getToolTempDirPublic(context);
+    expect(tempDir).toBe('/tmp/test/tool-call-123');
+  });
+
+  it('should throw error when tool temp dir not provided', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      // No toolTempDir
+    };
+
+    expect(() => {
+      testTool.getToolTempDirPublic(context);
+    }).toThrow('Tool temp directory not provided by ToolExecutor');
+  });
+});
+```
+
+### Commit Message
+```
+refactor(tools): move temp directory management to ToolExecutor
+
+- ToolExecutor now manages tool call IDs and temp directories
+- Tool base class simplified - just uses provided context
+- Better separation of concerns and testability
+- Add toolCallId, toolTempDir, outputFilePaths to ToolContext
+- ToolExecutor creates temp dirs before passing to tools
+- Remove temp directory logic from Tool base class
+```
+
+## Task 3: Update Integration Tests
+
+Since the architecture changed, update the integration tests to reflect the new pattern:
+
+**File**: `src/tools/temp-directory-integration.test.ts`
+
+Update to test the full ToolExecutor → Tool flow:
+
+```typescript
+describe('Temp Directory Integration', () => {
+  let toolExecutor: ToolExecutor;
+  let integrationTool: IntegrationTestTool;
+
+  beforeEach(() => {
+    toolExecutor = new ToolExecutor();
+    integrationTool = new IntegrationTestTool();
+    toolExecutor.registerTool(integrationTool.name, integrationTool);
+    clearProcessTempDirCache();
+  });
+
+  it('should create proper directory hierarchy through ToolExecutor', async () => {
+    const context: ToolContext = {
+      sessionId: 'integration-session',
+      projectId: 'integration-project',
+    };
+
+    await toolExecutor.executeTool('integration_test_tool', { content: 'test' }, context);
+
+    // Tool should have received proper temp directory context
+    const receivedContext = integrationTool.getCapturedContext();
+    
+    // Verify the hierarchy exists
+    const toolTempDir = receivedContext.toolTempDir!;
+    const sessionTempDir = Session.getSessionTempDir(context.sessionId!, context.projectId!);
+    const projectTempDir = Project.getProjectTempDir(context.projectId!);
+    const processTempDir = getProcessTempDir();
+
+    expect(toolTempDir).toContain(sessionTempDir);
+    expect(sessionTempDir).toContain(projectTempDir);
+    expect(projectTempDir).toContain(processTempDir);
+
+    // Verify all directories exist
+    expect(existsSync(toolTempDir)).toBe(true);
+    expect(existsSync(sessionTempDir)).toBe(true);
+    expect(existsSync(projectTempDir)).toBe(true);
+    expect(existsSync(processTempDir)).toBe(true);
+  });
+
+  it('should handle file operations through ToolExecutor', async () => {
+    const context: ToolContext = {
+      sessionId: 'file-ops-session',
+      projectId: 'file-ops-project',
+    };
+
+    await toolExecutor.executeTool('integration_test_tool', { content: 'test content' }, context);
+
+    const receivedContext = integrationTool.getCapturedContext();
+    const outputFiles = receivedContext.outputFilePaths!;
+
+    // Write test content to output files
+    writeFileSync(outputFiles.stdout, 'stdout content');
+    writeFileSync(outputFiles.stderr, 'stderr content');
+    writeFileSync(outputFiles.combined, 'combined content');
+
+    // Verify files exist and have correct content
+    expect(readFileSync(outputFiles.stdout, 'utf-8')).toBe('stdout content');
+    expect(readFileSync(outputFiles.stderr, 'utf-8')).toBe('stderr content');
+    expect(readFileSync(outputFiles.combined, 'utf-8')).toBe('combined content');
+  });
+});
+```
+
+### How to Test
+```bash
+# Run all tool tests
+npm test -- src/tools/
+
+# Run specific integration tests
+npm test -- src/tools/temp-directory-integration.test.ts
+
+# Run full test suite
+npm test
+```
+
+### Final Commit Message
+```
+test: update temp directory integration tests for new architecture
+
+- Update integration tests to use ToolExecutor pattern
+- Test full flow: ToolExecutor creates temp dirs → passes to Tool
+- Verify proper directory hierarchy through ToolExecutor
+- Test file operations work with new context pattern
+```
+
+---
+
+# PR 2: Bash Tool Output Management
 
 ## Overview
 Add process-stable temporary directory management with project/session/tool-call hierarchy. This provides the foundation for tools to store large outputs without overwhelming the model.

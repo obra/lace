@@ -86,6 +86,18 @@ export abstract class Tool {
     return resolve(workingDir, path);
   }
 
+
+  /**
+   * Get tool temp directory provided by ToolExecutor
+   * Throws error if ToolExecutor didn't provide temp directory
+   */
+  protected getToolTempDir(context?: ToolContext): string {
+    if (!context?.toolTempDir) {
+      throw new Error('Tool temp directory not provided by ToolExecutor. This is a system error.');
+    }
+    return context.toolTempDir;
+  }
+
   // Private implementation
   private _makeResult(options: {
     content: string | Record<string, unknown>;

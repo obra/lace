@@ -1,7 +1,7 @@
 // ABOUTME: Tests for schema-based tool validation system
 // ABOUTME: Ensures tools validate inputs and handle errors correctly
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { ToolContext, ToolResult } from '~/tools/types';
@@ -149,5 +149,90 @@ describe('Tool with complex validation', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('endLine: endLine must be >= startLine');
+  });
+});
+
+// Test tool for temp directory functionality
+class TempDirectoryTestTool extends Tool {
+  name = 'temp_dir_test_tool';
+  description = 'Tool for testing temp directory functionality';
+  schema = z.object({
+    message: z.string(),
+  });
+
+  protected async executeValidated(
+    args: z.infer<typeof this.schema>,
+    _context?: ToolContext
+  ): Promise<ToolResult> {
+    return Promise.resolve(this.createResult(`Test executed: ${args.message}`));
+  }
+
+  // Expose protected methods for testing
+  public getToolTempDirPublic(context?: ToolContext): string {
+    return this.getToolTempDir(context);
+  }
+
+  public getOutputFilePathsPublic(context?: ToolContext) {
+    return this.getOutputFilePaths(context);
+  }
+}
+
+describe('Tool temp directory functionality', () => {
+  let testTool: TempDirectoryTestTool;
+
+  beforeEach(() => {
+    testTool = new TempDirectoryTestTool();
+  });
+
+  it('should get output file paths from context', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      outputFilePaths: {
+        stdout: '/tmp/test/stdout.txt',
+        stderr: '/tmp/test/stderr.txt',
+        combined: '/tmp/test/combined.txt',
+      },
+    };
+
+    const paths = testTool.getOutputFilePathsPublic(context);
+    expect(paths.stdout).toBe('/tmp/test/stdout.txt');
+    expect(paths.stderr).toBe('/tmp/test/stderr.txt');
+    expect(paths.combined).toBe('/tmp/test/combined.txt');
+  });
+
+  it('should throw error when output file paths not provided', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      // No outputFilePaths
+    };
+
+    expect(() => {
+      testTool.getOutputFilePathsPublic(context);
+    }).toThrow('Output file paths not provided by ToolExecutor');
+  });
+
+  it('should get tool temp dir from context', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      toolTempDir: '/tmp/test/tool-call-123',
+    };
+
+    const tempDir = testTool.getToolTempDirPublic(context);
+    expect(tempDir).toBe('/tmp/test/tool-call-123');
+  });
+
+  it('should throw error when tool temp dir not provided', () => {
+    const context: ToolContext = {
+      sessionId: 'test-session',
+      projectId: 'test-project',
+      // No toolTempDir
+    };
+
+    expect(() => {
+      testTool.getToolTempDirPublic(context);
+    }).toThrow('Tool temp directory not provided by ToolExecutor');
   });
 });

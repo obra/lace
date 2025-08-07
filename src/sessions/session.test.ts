@@ -14,6 +14,7 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import { existsSync } from 'fs';
 
 // Mock external dependencies that don't affect core functionality
 vi.mock('server-only', () => ({}));
@@ -629,6 +630,46 @@ describe('Session', () => {
         const session = await Session.getById(asThreadId('non-existent-id'));
         expect(session).toBeNull();
       });
+    });
+  });
+
+  describe('temp directory management', () => {
+    it('should create session temp directory', () => {
+      const sessionId = 'test-session-123';
+      const projectId = 'test-project-456';
+      const tempDir = Session.getSessionTempDir(sessionId, projectId);
+
+      expect(tempDir).toContain(`project-${projectId}`);
+      expect(tempDir).toContain(`session-${sessionId}`);
+      expect(existsSync(tempDir)).toBe(true);
+    });
+
+    it('should return same directory for same session and project', () => {
+      const sessionId = 'stable-session';
+      const projectId = 'stable-project';
+      const tempDir1 = Session.getSessionTempDir(sessionId, projectId);
+      const tempDir2 = Session.getSessionTempDir(sessionId, projectId);
+
+      expect(tempDir1).toBe(tempDir2);
+    });
+
+    it('should create different directories for different sessions', () => {
+      const projectId = 'same-project';
+      const tempDir1 = Session.getSessionTempDir('session-a', projectId);
+      const tempDir2 = Session.getSessionTempDir('session-b', projectId);
+
+      expect(tempDir1).not.toBe(tempDir2);
+      expect(tempDir1).toContain('session-a');
+      expect(tempDir2).toContain('session-b');
+    });
+
+    it('should nest under project directory', () => {
+      const sessionId = 'nested-session';
+      const projectId = 'parent-project';
+      const sessionTempDir = Session.getSessionTempDir(sessionId, projectId);
+      const projectTempDir = Project.getProjectTempDir(projectId);
+
+      expect(sessionTempDir).toContain(projectTempDir);
     });
   });
 });

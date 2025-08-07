@@ -5,7 +5,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { getLaceDir, ensureLaceDir, getLaceFilePath, getLaceDbPath } from '~/config/lace-dir';
+import { existsSync } from 'fs';
+import { tmpdir } from 'os';
+import {
+  getLaceDir,
+  ensureLaceDir,
+  getLaceFilePath,
+  getLaceDbPath,
+  getProcessTempDir,
+  clearProcessTempDirCache,
+} from '~/config/lace-dir';
 
 describe('Lace Directory Management', () => {
   let tempDir: string;
@@ -268,6 +277,42 @@ describe('Lace Directory Management', () => {
       const ensuredDir = ensureLaceDir();
       expect(ensuredDir).toBe(specialPath);
       expect(fs.existsSync(specialPath)).toBe(true);
+    });
+  });
+
+  describe('process temp directory', () => {
+    afterEach(() => {
+      // Clean up for next test
+      clearProcessTempDirCache();
+    });
+
+    it('should create a process temp directory', () => {
+      const tempDir = getProcessTempDir();
+
+      expect(tempDir).toMatch(/^.*lace-runtime-\d+-\d+-[a-zA-Z0-9]+$/);
+      expect(existsSync(tempDir)).toBe(true);
+    });
+
+    it('should return the same directory on multiple calls', () => {
+      const tempDir1 = getProcessTempDir();
+      const tempDir2 = getProcessTempDir();
+
+      expect(tempDir1).toBe(tempDir2);
+    });
+
+    it('should create different directories after cache clear', () => {
+      const tempDir1 = getProcessTempDir();
+      clearProcessTempDirCache();
+      const tempDir2 = getProcessTempDir();
+
+      expect(tempDir1).not.toBe(tempDir2);
+    });
+
+    it('should create directory under system tmpdir', () => {
+      const tempDir = getProcessTempDir();
+      const systemTmpDir = tmpdir();
+
+      expect(tempDir).toContain(systemTmpDir);
     });
   });
 });
