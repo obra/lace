@@ -4,7 +4,7 @@
 import { TrimToolResultsStrategy } from '~/threads/compaction/trim-tool-results-strategy';
 import type { CompactionStrategy } from '~/threads/compaction/types';
 
-export function createDefaultStrategies(): CompactionStrategy[] {
+function createDefaultStrategies(): CompactionStrategy[] {
   return [new TrimToolResultsStrategy()];
 }
 

@@ -16,11 +16,3 @@ export function expectEventAdded<T extends ThreadEvent | null>(
   }
   return result as NonNullable<T>;
 }
-
-/**
- * Type guard to check if an event was successfully added.
- * Useful for conditional logic in tests.
- */
-export function eventWasAdded<T extends ThreadEvent | null>(result: T): result is NonNullable<T> {
-  return result !== null;
-}
