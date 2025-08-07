@@ -2,7 +2,6 @@
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
 import { ProviderMessage, ProviderToolCall, ProviderToolResult } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
@@ -149,7 +148,6 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
       }
     });
 }
-
 
 /**
  * Converts enhanced ProviderMessage format to text-only format

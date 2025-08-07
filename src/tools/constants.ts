@@ -25,4 +25,3 @@ export const TOOL_LIMITS = {
   MAX_LIST_DEPTH: 10, // Maximum depth for file listing
   DEFAULT_LIST_DEPTH: 3, // Default depth for file listing
 } as const;
-
