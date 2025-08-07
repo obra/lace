@@ -73,4 +73,4 @@ packages/web/.next/
 .next/
 
 # Storybook
-storybook-static/
+storybook-static/packages/web/.playwright-server-url

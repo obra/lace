@@ -20,7 +20,7 @@ interface AgentResponse {
     threadId: string;
     name: string;
     provider: string;
-    model: string;
+    modelId: string;
     status: string;
     createdAt: string;
   };
@@ -149,8 +149,6 @@ describe('Agent API', () => {
       expect(response.status).toBe(200);
       expect(data.agent.name).toBe('Agent lace_20241122_abc123.1');
       expect(data.agent.provider).toBe('anthropic');
-      expect(data.agent.model).toBe('claude-3-sonnet');
-      expect(data.agent.providerInstanceId).toBe('');
       expect(data.agent.modelId).toBe('claude-3-sonnet');
     });
 

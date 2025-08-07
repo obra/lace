@@ -1,7 +1,7 @@
 // ABOUTME: Test setup for vitest
 // ABOUTME: Global test configuration and mocks for server-only modules
 
-import { vi } from 'vitest';
+import { vi, afterAll, afterEach } from 'vitest';
 import '@testing-library/jest-dom';
 
 // Import superjson to ensure it's available in test environment
@@ -108,4 +108,34 @@ vi.mock('@anthropic-ai/sdk', () => {
     default: vi.fn().mockImplementation(() => mockClient),
     Anthropic: vi.fn().mockImplementation(() => mockClient),
   };
+});
+
+// Global cleanup after each test file
+afterAll(() => {
+  // Clear all timers (both real and fake)
+  // Strategy: Get the next timer ID by creating a temporary timer, then clear all
+  // timers from 1 to that ID. This handles cases where tests create timers but
+  // don't properly clean them up, which can prevent the Node.js process from exiting.
+  // This approach works because Node.js timer IDs are incrementing integers.
+  if (typeof globalThis.clearTimeout === 'function') {
+    const maxId = Number(setTimeout(() => {}, 0));
+    for (let i = 1; i <= maxId; i++) {
+      clearTimeout(i);
+      clearInterval(i);
+    }
+  }
+
+  // Force garbage collection to clean up any remaining references
+  // This helps ensure EventEmitters and other objects are properly collected
+  if (global.gc) {
+    global.gc();
+  }
+});
+
+// Cleanup after each individual test
+afterEach(() => {
+  // Reset all vitest mocks and timers
+  vi.clearAllMocks();
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });

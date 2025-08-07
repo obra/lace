@@ -10,19 +10,19 @@ import type { ToolResult } from './types';
 describe('fileEditRenderer', () => {
   describe('getSummary', () => {
     it('should return path-specific summary when path is provided', () => {
-      const summary = fileEditRenderer.getSummary({ path: '/src/app.ts' });
+      const summary = fileEditRenderer.getSummary?.({ path: '/src/app.ts' });
       expect(summary).toBe('Edit /src/app.ts');
     });
 
     it('should return generic summary when no path', () => {
-      const summary = fileEditRenderer.getSummary({});
+      const summary = fileEditRenderer.getSummary?.({});
       expect(summary).toBe('Edit file');
     });
 
     it('should handle invalid arguments gracefully', () => {
-      expect(fileEditRenderer.getSummary(null)).toBe('Edit file');
-      expect(fileEditRenderer.getSummary(undefined)).toBe('Edit file');
-      expect(fileEditRenderer.getSummary('string')).toBe('Edit file');
+      expect(fileEditRenderer.getSummary?.(null)).toBe('Edit file');
+      expect(fileEditRenderer.getSummary?.(undefined)).toBe('Edit file');
+      expect(fileEditRenderer.getSummary?.('string')).toBe('Edit file');
     });
   });
 
@@ -91,6 +91,8 @@ describe('fileEditRenderer', () => {
       };
 
       const metadata = {
+        call: { id: 'test-call-id', name: 'file_edit' },
+        toolName: 'file_edit',
         arguments: {
           path: '/test/file.js',
           old_text: 'const x = 1;',
@@ -98,7 +100,7 @@ describe('fileEditRenderer', () => {
         },
       };
 
-      const rendered = fileEditRenderer.renderResult!(result, metadata as any);
+      const rendered = fileEditRenderer.renderResult!(result, metadata);
       const { container } = render(React.createElement('div', null, rendered));
 
       // Should show warning about no context
@@ -157,7 +159,7 @@ describe('fileEditRenderer', () => {
     it('should return the file edit icon', () => {
       const icon = fileEditRenderer.getIcon!();
       expect(icon).toBeDefined();
-      expect(icon.iconName).toBe('file-edit');
+      expect(icon.iconName).toBe('file-pen');
     });
   });
 });
