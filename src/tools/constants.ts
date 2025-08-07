@@ -26,6 +26,3 @@ export const TOOL_LIMITS = {
   DEFAULT_LIST_DEPTH: 3, // Default depth for file listing
 } as const;
 
-export const FILE_SIZE_UNITS = {
-  BYTES_PER_KB: 1024,
-} as const;

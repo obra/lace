@@ -57,18 +57,3 @@ export function createTestTempDir(prefix = 'lace-test-'): {
   return { getPath, cleanup };
 }
 
-/**
- * Wrapper for tests that automatically handles temp directory lifecycle
- * Use this for simple cases where you need a temp dir for one test
- */
-export async function withTempDir<T>(
-  testFn: (tempPath: string) => Promise<T>,
-  prefix = 'lace-test-'
-): Promise<T> {
-  const { path, cleanup } = await createTempDir(prefix);
-  try {
-    return await testFn(path);
-  } finally {
-    await cleanup();
-  }
-}

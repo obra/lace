@@ -33,7 +33,7 @@ export function createToolCallFactory(toolName: string) {
 }
 
 // Re-export temp directory utilities for convenience
-export { createTempDir, createTestTempDir, withTempDir } from './temp-utils';
+export { createTempDir, createTestTempDir } from './temp-utils';
 
 interface MockSession {
   getToolPolicy: (toolName: string) => 'allow' | 'require-approval' | 'deny';
