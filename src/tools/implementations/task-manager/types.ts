@@ -6,6 +6,9 @@ import { ThreadId, AssigneeId } from '~/threads/types';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
 export type TaskPriority = 'high' | 'medium' | 'low';
 
+// Task actors can be either a ThreadId or 'human' (or any string that represents a valid thread ID)
+export type TaskActor = string;
+
 export interface Task {
   id: string;
   title: string; // Brief summary
@@ -14,7 +17,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   assignedTo?: AssigneeId; // ThreadId or NewAgentSpec
-  createdBy: ThreadId; // Full hierarchical thread ID of creating agent
+  createdBy: TaskActor; // ThreadId of creating agent or 'human'
   threadId: ThreadId; // Parent thread ID only (e.g., "lace_20250703_abc123")
   createdAt: Date;
   updatedAt: Date;
@@ -23,7 +26,7 @@ export interface Task {
 
 export interface TaskNote {
   id: string;
-  author: ThreadId; // Full hierarchical thread ID of author
+  author: TaskActor; // ThreadId of note author or 'human'
   content: string;
   timestamp: Date;
 }

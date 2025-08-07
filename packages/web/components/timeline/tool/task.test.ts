@@ -19,7 +19,7 @@ describe('Task Tool Renderers', () => {
       title: 'Implement user authentication',
       description: 'Add login and registration functionality',
       priority: 'high',
-      assignedTo: 'thread-123',
+      assignedTo: 'lace_20250101_thrd01',
     };
 
     const mockTaskAddResult: ToolResult = {
@@ -96,14 +96,14 @@ describe('Task Tool Renderers', () => {
                 title: 'Fix login bug',
                 status: 'pending',
                 priority: 'high',
-                assignedTo: 'thread-123',
+                assignedTo: 'lace_20250101_thrd01',
               },
               {
                 id: 'task-2',
                 title: 'Update documentation',
                 status: 'in_progress',
                 priority: 'medium',
-                assignedTo: 'thread-456',
+                assignedTo: 'lace_20250101_thrd02',
               },
             ],
             totalCount: 2,
@@ -270,7 +270,7 @@ describe('Task Tool Renderers', () => {
             status: 'in_progress',
             priority: 'high',
             createdAt: '2025-01-15T10:30:00Z',
-            assignedTo: 'thread-123',
+            assignedTo: 'lace_20250101_thrd01',
             notes: [
               {
                 id: 'note-1',

@@ -48,7 +48,7 @@ const sampleEvents: FeedbackEvent[] = [
     timestamp: new Date(Date.now() - 60000), // 1 minute ago
     tags: ['optimization', 'performance'],
     context: {
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thrd01',
       agentState: 'thinking',
       currentTool: 'code_analysis',
     },
@@ -62,7 +62,7 @@ const sampleEvents: FeedbackEvent[] = [
     timestamp: new Date(Date.now() - 120000), // 2 minutes ago
     tags: ['performance', 'react'],
     context: {
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thrd01',
       agentState: 'analyzing',
       currentTool: 'performance_monitor',
     },
@@ -76,7 +76,7 @@ const sampleEvents: FeedbackEvent[] = [
     timestamp: new Date(Date.now() - 180000), // 3 minutes ago
     tags: ['typescript', 'learning'],
     context: {
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thrd01',
       agentState: 'idle',
       currentTool: 'code_review',
     },
@@ -90,7 +90,7 @@ const sampleEvents: FeedbackEvent[] = [
     timestamp: new Date(Date.now() - 240000), // 4 minutes ago
     tags: ['error', 'async'],
     context: {
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thrd01',
       agentState: 'analyzing',
       currentTool: 'error_detector',
     },
@@ -104,7 +104,7 @@ const sampleEvents: FeedbackEvent[] = [
     timestamp: new Date(Date.now() - 300000), // 5 minutes ago
     tags: ['celebration', 'milestone'],
     context: {
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thrd01',
       agentState: 'idle',
       currentTool: 'achievement_tracker',
     },
@@ -118,7 +118,7 @@ const sampleEvents: FeedbackEvent[] = [
     timestamp: new Date(Date.now() - 360000), // 6 minutes ago
     tags: ['optimization', 'bundle'],
     context: {
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thrd01',
       agentState: 'analyzing',
       currentTool: 'bundle_analyzer',
     },

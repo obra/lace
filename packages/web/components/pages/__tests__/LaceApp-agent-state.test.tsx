@@ -143,8 +143,8 @@ describe('LaceApp agent state handling', () => {
     // Set up default hash router state
     mockUseHashRouter.mockReturnValue({
       project: 'test-project',
-      session: 'test-session',
-      agent: 'test-agent',
+      session: 'lace_20250101_sess01',
+      agent: 'lace_20250101_agent1',
       setProject: vi.fn(),
       setSession: vi.fn(),
       setAgent: vi.fn(),
@@ -205,11 +205,11 @@ describe('LaceApp agent state handling', () => {
 
     // Set up session details with an agent in idle state initially
     const mockSessionInfo: SessionInfo = {
-      id: asThreadId('test-session'),
+      id: asThreadId('lace_20250101_sess01'),
       name: 'Test Session',
       createdAt: new Date(),
       agents: [{
-        threadId: asThreadId('test-agent'),
+        threadId: asThreadId('lace_20250101_agent1'),
         name: 'Test Agent',
         provider: 'anthropic', // Legacy field still needed by AgentInfo type
         providerInstanceId: 'test-anthropic-instance',
@@ -222,7 +222,7 @@ describe('LaceApp agent state handling', () => {
     // Act: Simulate agent state change to thinking
     await act(async () => {
       if (onAgentStateChangeCallback) {
-        onAgentStateChangeCallback('test-agent', 'idle', 'thinking');
+        onAgentStateChangeCallback('lace_20250101_agent1', 'idle', 'thinking');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -251,7 +251,7 @@ describe('LaceApp agent state handling', () => {
     // Act: Simulate agent state change to streaming
     await act(async () => {
       if (onAgentStateChangeCallback) {
-        onAgentStateChangeCallback('test-agent', 'thinking', 'streaming');
+        onAgentStateChangeCallback('lace_20250101_agent1', 'thinking', 'streaming');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -279,7 +279,7 @@ describe('LaceApp agent state handling', () => {
     // Act: Simulate agent state change to tool_execution
     await act(async () => {
       if (onAgentStateChangeCallback) {
-        onAgentStateChangeCallback('test-agent', 'streaming', 'tool_execution');
+        onAgentStateChangeCallback('lace_20250101_agent1', 'streaming', 'tool_execution');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -307,7 +307,7 @@ describe('LaceApp agent state handling', () => {
     // Act: Simulate agent state change back to idle
     await act(async () => {
       if (onAgentStateChangeCallback) {
-        onAgentStateChangeCallback('test-agent', 'tool_execution', 'idle');
+        onAgentStateChangeCallback('lace_20250101_agent1', 'tool_execution', 'idle');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -335,9 +335,9 @@ describe('LaceApp agent state handling', () => {
     // Act: Simulate state changes for different agents
     await act(async () => {
       if (onAgentStateChangeCallback) {
-        onAgentStateChangeCallback('agent-1', 'idle', 'thinking');
-        onAgentStateChangeCallback('agent-2', 'idle', 'streaming');
-        onAgentStateChangeCallback('test-agent', 'idle', 'tool_execution');
+        onAgentStateChangeCallback('lace_20250101_agent2', 'idle', 'thinking');
+        onAgentStateChangeCallback('lace_20250101_agent3', 'idle', 'streaming');
+        onAgentStateChangeCallback('lace_20250101_agent1', 'idle', 'tool_execution');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -365,7 +365,7 @@ describe('LaceApp agent state handling', () => {
     // Act: Simulate state change for a different agent
     await act(async () => {
       if (onAgentStateChangeCallback) {
-        onAgentStateChangeCallback('different-agent', 'idle', 'thinking');
+        onAgentStateChangeCallback('lace_20250101_other1', 'idle', 'thinking');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -395,7 +395,7 @@ describe('LaceApp agent state handling', () => {
       if (onAgentStateChangeCallback) {
         // Test with invalid parameters
         onAgentStateChangeCallback('', '', '');
-        onAgentStateChangeCallback('test-agent', 'invalid-from', 'invalid-to');
+        onAgentStateChangeCallback('lace_20250101_agent1', 'invalid-from', 'invalid-to');
       }
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -428,8 +428,8 @@ describe('LaceApp agent state handling', () => {
       expect.objectContaining({
         onAgentStateChange: expect.any(Function),
         projectId: 'test-project',
-        sessionId: 'test-session',
-        threadIds: [asThreadId('test-agent')],
+        sessionId: 'lace_20250101_sess01',
+        threadIds: [asThreadId('lace_20250101_agent1')],
       })
     );
 
@@ -437,7 +437,7 @@ describe('LaceApp agent state handling', () => {
     await act(async () => {
       if (onAgentStateChangeCallback) {
         expect(() => {
-          onAgentStateChangeCallback!('test-agent', 'idle', 'thinking');
+          onAgentStateChangeCallback!('lace_20250101_agent1', 'idle', 'thinking');
         }).not.toThrow();
       }
     });

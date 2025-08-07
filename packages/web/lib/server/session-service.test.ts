@@ -135,7 +135,7 @@ describe('SessionService Missing Methods', () => {
   describe('updateSession', () => {
     it('should update session metadata and persist changes', async () => {
       // Arrange: Create a session first
-      const _sessionId = asThreadId('test-session-id');
+      const _sessionId = asThreadId('lace_20250101_sess02');
 
       // Create a real session using SessionService
       const initialSession = await sessionService.createSession(

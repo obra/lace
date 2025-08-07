@@ -182,6 +182,13 @@ export function TaskDisplayModal({
     return agent ? `${agent.name} (${agent.model})` : assigneeId;
   };
 
+  const getAuthorName = (author: string) => {
+    if (author === 'human') return 'Human';
+    
+    const agent = agents.find(a => a.threadId === author);
+    return agent ? `${agent.name} (${agent.model})` : author;
+  };
+
   if (!task) {
     return null;
   }
@@ -426,7 +433,7 @@ export function TaskDisplayModal({
                     <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
                     <span>{formatDate(note.timestamp)}</span>
                     <span>•</span>
-                    <span>{getAssigneeName(note.author)}</span>
+                    <span>{getAuthorName(note.author)}</span>
                   </div>
                   <div className="text-base-content whitespace-pre-wrap">
                     {note.content}

@@ -91,7 +91,7 @@ describe('Agent Session Context', () => {
         provider,
         toolExecutor,
         threadManager: session.getAgent(session.getId())!.threadManager,
-        threadId: 'orphan-thread-123',
+        threadId: asThreadId('lace_20250101_orphan'),
         tools: [],
       });
 
@@ -118,7 +118,7 @@ describe('Agent Session Context', () => {
     });
 
     it('should return null for non-existent session IDs', async () => {
-      const nonExistentSession = await Session.getById(asThreadId('non-existent-session-123'));
+      const nonExistentSession = await Session.getById(asThreadId('lace_20250101_notfnd'));
       expect(nonExistentSession).toBeNull();
     });
   });

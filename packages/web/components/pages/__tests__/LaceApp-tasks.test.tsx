@@ -114,9 +114,9 @@ describe('LaceApp Task Sidebar Integration', () => {
         }]
       },
       '/api/providers': { providers: [] },
-      '/api/sessions/test-session': { 
+      '/api/sessions/lace_20250101_sess01': { 
         session: { 
-          id: 'test-session', 
+          id: 'lace_20250101_sess01', 
           name: 'Test Session',
           agents: [] 
         } 
@@ -126,7 +126,7 @@ describe('LaceApp Task Sidebar Integration', () => {
     // Default hash router mock with session
     vi.mocked(useHashRouter).mockReturnValue({
       project: 'test-project',
-      session: asThreadId('test-session'),
+      session: asThreadId('lace_20250101_sess01'),
       agent: null,
       setProject: vi.fn(),
       setSession: vi.fn(),
@@ -200,8 +200,8 @@ describe('LaceApp Task Sidebar Integration', () => {
           status: 'pending' as const,
           priority: 'high' as const,
           assignedTo: asAssigneeId('human'),
-          createdBy: asThreadId('test-user'),
-          threadId: asThreadId('test-session'),
+          createdBy: asThreadId('lace_20250101_user01'),
+          threadId: asThreadId('lace_20250101_sess01'),
           createdAt: new Date(),
           updatedAt: new Date(),
           notes: [],

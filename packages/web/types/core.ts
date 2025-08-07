@@ -13,6 +13,7 @@ export type {
   TaskNote,
   TaskStatus,
   TaskPriority,
+  TaskActor,
   TaskContext,
   TaskFilters,
 } from '~/tasks/types';
@@ -32,7 +33,6 @@ export type { CompactionData } from '~/threads/compaction/types';
 // Re-export utility functions
 export {
   asThreadId,
-  createThreadId,
   isThreadId,
   asNewAgentSpec,
   createNewAgentSpec,

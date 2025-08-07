@@ -3,10 +3,10 @@
 
 import { vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
-import { createThreadId } from '~/threads/types';
+import { asThreadId } from '~/threads/types';
 
 export function createMockThreadManager(threadId?: string) {
-  const testThreadId = threadId ? createThreadId(threadId) : createThreadId('lace_20250723_abc123');
+  const testThreadId = threadId ? asThreadId(threadId) : asThreadId('lace_20250723_abc123');
 
   return {
     addEvent: vi.fn(),

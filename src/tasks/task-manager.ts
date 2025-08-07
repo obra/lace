@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events';
 import { DatabasePersistence } from '~/persistence/database';
 import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
-import { ThreadId, AssigneeId, asThreadId, isNewAgentSpec } from '~/threads/types';
+import { ThreadId, AssigneeId, isNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 // Type for agent creation callback
@@ -49,7 +49,7 @@ export class TaskManager extends EventEmitter {
       status: 'pending',
       priority: request.priority || 'medium',
       assignedTo: request.assignedTo as AssigneeId | undefined,
-      createdBy: asThreadId(context.actor),
+      createdBy: context.actor,
       threadId: this.sessionId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -173,7 +173,7 @@ export class TaskManager extends EventEmitter {
 
     // Create note without ID (database will assign it)
     const noteData = {
-      author: asThreadId(context.actor),
+      author: context.actor,
       content: noteContent.trim(),
       timestamp: new Date(),
     };

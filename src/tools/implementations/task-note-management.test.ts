@@ -3,12 +3,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
-import { createThreadId } from '~/threads/types';
+import { asThreadId } from '~/threads/types';
 
 describe('Task Note Management', () => {
-  const parentThreadId = createThreadId('lace_20250703_parent');
-  const agent1ThreadId = createThreadId('lace_20250703_parent.1');
-  const agent2ThreadId = createThreadId('lace_20250703_parent.2');
+  const parentThreadId = asThreadId('lace_20250703_parent');
+  const agent1ThreadId = asThreadId('lace_20250703_parent.1');
+  const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   function createTestTask(): Task {
     return {

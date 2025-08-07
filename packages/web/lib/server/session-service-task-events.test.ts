@@ -97,7 +97,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'high',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
           isHuman: true,
         }
       );
@@ -120,7 +120,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
               priority: 'high',
             }),
             context: expect.objectContaining({
-              actor: 'human',
+              actor: 'lace_20250101_human1',
               isHuman: true,
             }),
             timestamp: expect.any(Date),
@@ -151,7 +151,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'medium',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 
@@ -194,7 +194,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'low',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 
@@ -245,7 +245,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'medium',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 
@@ -296,7 +296,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'high',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 
@@ -304,7 +304,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
       broadcastSpy.mockClear();
 
       // Add a note (this also triggers task:updated, so we'll get 2 events)
-      await taskManager.addNote(task.id, 'Test note content', { actor: 'human' });
+      await taskManager.addNote(task.id, 'Test note content', { actor: 'lace_20250101_human1' });
 
       // Find the task:note_added event (not the task:updated event)
       const noteAddedCalls = broadcastSpy.mock.calls.filter(
@@ -327,7 +327,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
             notes: expect.arrayContaining([
               expect.objectContaining({
                 content: 'Test note content',
-                author: 'human',
+                author: 'lace_20250101_human1',
               }),
             ]),
           }),
@@ -356,7 +356,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'medium',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 
@@ -394,13 +394,13 @@ describe('SessionService TaskManager Event Forwarding', () => {
             prompt: 'Test task prompt',
             status: 'pending' as const,
             priority: 'medium' as const,
-            createdBy: asThreadId('test-creator'),
-            threadId: asThreadId('test-session'),
+            createdBy: asThreadId('lace_20250101_test01'),
+            threadId: asThreadId('lace_20250101_test02'),
             createdAt: new Date(),
             updatedAt: new Date(),
             notes: [],
           },
-          context: { actor: 'human' },
+          context: { actor: 'lace_20250101_human1' },
           timestamp: new Date(),
         },
       };
@@ -426,7 +426,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'medium',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 
@@ -469,7 +469,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
           priority: 'high',
         },
         {
-          actor: 'human',
+          actor: 'lace_20250101_human1',
         }
       );
 

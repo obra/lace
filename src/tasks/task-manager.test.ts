@@ -99,14 +99,15 @@ describe('TaskManager', () => {
         title: 'Human Task',
         prompt: 'Do this task',
       };
+      const humanActor = asThreadId('lace_20250714_human1');
       const context: TaskContext = {
-        actor: `${sessionId}:human`,
+        actor: humanActor,
         isHuman: true,
       };
 
       const task = await manager.createTask(request, context);
 
-      expect(task.createdBy).toBe(`${sessionId}:human`);
+      expect(task.createdBy).toBe(humanActor);
     });
   });
 
@@ -221,10 +222,10 @@ describe('TaskManager', () => {
 
     it('should not return tasks from other sessions', async () => {
       // Create task in different session
-      const otherManager = new TaskManager(asThreadId('other_session'), persistence);
+      const otherManager = new TaskManager(asThreadId('lace_20250715_xyz789'), persistence);
       const otherTask = await otherManager.createTask(
         { title: 'Other Task', prompt: 'Test' },
-        { actor: 'other_session.1', isHuman: false }
+        { actor: 'lace_20250715_xyz789.1', isHuman: false }
       );
 
       const task = manager.getTaskById(otherTask.id);
@@ -292,10 +293,10 @@ describe('TaskManager', () => {
     });
 
     it('should not update tasks from other sessions', async () => {
-      const otherManager = new TaskManager(asThreadId('other_session'), persistence);
+      const otherManager = new TaskManager(asThreadId('lace_20250715_xyz789'), persistence);
       const otherTask = await otherManager.createTask(
         { title: 'Other Task', prompt: 'Test' },
-        { actor: 'other_session.1', isHuman: false }
+        { actor: 'lace_20250715_xyz789.1', isHuman: false }
       );
 
       await expect(
@@ -341,8 +342,9 @@ describe('TaskManager', () => {
         actor: 'lace_20250714_abc123.2',
         isHuman: false,
       });
+      const humanActor = asThreadId('lace_20250714_human1');
       await manager.addNote(testTask.id, 'Third note', {
-        actor: `${sessionId}:human`,
+        actor: humanActor,
         isHuman: true,
       });
 
@@ -351,7 +353,7 @@ describe('TaskManager', () => {
       expect(updatedTask?.notes[0].content).toBe('First note');
       expect(updatedTask?.notes[1].content).toBe('Second note');
       expect(updatedTask?.notes[2].content).toBe('Third note');
-      expect(updatedTask?.notes[2].author).toBe(`${sessionId}:human`);
+      expect(updatedTask?.notes[2].author).toBe(humanActor);
     });
 
     it('should throw error for non-existent task', async () => {
@@ -387,10 +389,10 @@ describe('TaskManager', () => {
     });
 
     it('should not delete tasks from other sessions', async () => {
-      const otherManager = new TaskManager(asThreadId('other_session'), persistence);
+      const otherManager = new TaskManager(asThreadId('lace_20250715_xyz789'), persistence);
       const otherTask = await otherManager.createTask(
         { title: 'Other Task', prompt: 'Test' },
-        { actor: 'other_session.1', isHuman: false }
+        { actor: 'lace_20250715_xyz789.1', isHuman: false }
       );
 
       await expect(
@@ -443,7 +445,7 @@ describe('TaskManager', () => {
     });
 
     it('should return zero counts for empty session', () => {
-      const emptyManager = new TaskManager(asThreadId('empty_session'), persistence);
+      const emptyManager = new TaskManager(asThreadId('lace_20250716_empty1'), persistence);
       const summary = emptyManager.getTaskSummary();
 
       expect(summary.total).toBe(0);

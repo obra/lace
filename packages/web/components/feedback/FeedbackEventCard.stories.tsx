@@ -38,7 +38,7 @@ const baseEvent = {
   id: '1',
   timestamp: new Date(Date.now() - 300000), // 5 minutes ago
   context: {
-    threadId: 'thread-123',
+    threadId: 'lace_20250101_thrd01',
     agentState: 'thinking',
     currentTool: 'file_read',
     turnMetrics: {

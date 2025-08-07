@@ -36,7 +36,7 @@ describe('SessionService abort error filtering', () => {
     vi.clearAllMocks();
     sessionService = new SessionService();
     mockAgent = Object.assign(new EventEmitter(), {
-      threadId: 'test-session.1',
+      threadId: 'lace_20250101_sess01.1',
     });
   });
 
@@ -45,7 +45,7 @@ describe('SessionService abort error filtering', () => {
   });
 
   it('should filter out AbortError from UI messages', () => {
-    const sessionId = asThreadId('test-session');
+    const sessionId = asThreadId('lace_20250101_sess01');
 
     // Set up event handlers
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
@@ -57,14 +57,14 @@ describe('SessionService abort error filtering', () => {
 
     // Should log the error but not broadcast to UI
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Agent test-session.1 error:'),
+      expect.stringContaining('Agent lace_20250101_sess01.1 error:'),
       abortError
     );
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
   it('should filter out generic "Request was aborted" errors', () => {
-    const sessionId = asThreadId('test-session');
+    const sessionId = asThreadId('lace_20250101_sess01');
 
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
@@ -78,7 +78,7 @@ describe('SessionService abort error filtering', () => {
   });
 
   it('should filter out "Aborted" errors', () => {
-    const sessionId = asThreadId('test-session');
+    const sessionId = asThreadId('lace_20250101_sess01');
 
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
@@ -92,7 +92,7 @@ describe('SessionService abort error filtering', () => {
   });
 
   it('should still broadcast non-abort errors to UI', () => {
-    const sessionId = asThreadId('test-session');
+    const sessionId = asThreadId('lace_20250101_sess01');
 
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
 
@@ -102,7 +102,7 @@ describe('SessionService abort error filtering', () => {
 
     // Should log the error AND broadcast to UI
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Agent test-session.1 error:'),
+      expect.stringContaining('Agent lace_20250101_sess01.1 error:'),
       regularError
     );
 
@@ -112,7 +112,7 @@ describe('SessionService abort error filtering', () => {
       scope: { sessionId },
       data: {
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: 'test-session.1',
+        threadId: 'lace_20250101_sess01.1',
         timestamp: expect.any(Date),
         data: { content: 'Agent error: Network connection failed' },
       },

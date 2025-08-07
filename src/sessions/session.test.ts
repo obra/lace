@@ -420,7 +420,7 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
       });
-      const agent = session.getAgent(asThreadId('non-existent'));
+      const agent = session.getAgent(asThreadId('lace_20250101_notfnd'));
       expect(agent).toBeNull();
     });
 
@@ -462,8 +462,8 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
       });
-      await expect(session.startAgent(asThreadId('non-existent'))).rejects.toThrow(
-        'Agent not found: non-existent'
+      await expect(session.startAgent(asThreadId('lace_20250101_notfnd'))).rejects.toThrow(
+        'Agent not found: lace_20250101_notfnd'
       );
     });
   });
@@ -485,8 +485,8 @@ describe('Session', () => {
         name: 'Test Session',
         projectId: testProject.getId(),
       });
-      expect(() => session.stopAgent(asThreadId('non-existent'))).toThrow(
-        'Agent not found: non-existent'
+      expect(() => session.stopAgent(asThreadId('lace_20250101_notfnd'))).toThrow(
+        'Agent not found: lace_20250101_notfnd'
       );
     });
   });
@@ -627,7 +627,7 @@ describe('Session', () => {
 
     describe('getById', () => {
       it('should return null for non-existent session', async () => {
-        const session = await Session.getById(asThreadId('non-existent-id'));
+        const session = await Session.getById(asThreadId('lace_20250101_nofind'));
         expect(session).toBeNull();
       });
     });

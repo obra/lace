@@ -328,10 +328,18 @@ describe('useSessionAPI', () => {
       expect(result.current.error).toBe(null);
 
       // Test successful operation clears any previous error
-      mockFetch.mockResolvedValueOnce(createMockResponse({ session: { 
-        id: 'test-session' as ThreadId, name: 'Test', provider: 'anthropic', model: 'claude-3-5-haiku-20241022', 
-        createdAt: new Date().toISOString(), agents: [] 
-      }}));
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          session: {
+            id: 'lace_20250101_sess01' as ThreadId,
+            name: 'Test',
+            provider: 'anthropic',
+            model: 'claude-3-5-haiku-20241022',
+            createdAt: new Date().toISOString(),
+            agents: [],
+          },
+        })
+      );
 
       await act(async () => {
         await result.current.createSession({ name: 'Test Session' });

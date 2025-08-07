@@ -3,10 +3,16 @@
 
 import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
+import { ThreadId } from '@/types/core';
+import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+
+// Type guard for ThreadId using client-safe validation
+function isValidThreadId(sessionId: string): sessionId is ThreadId {
+  return isClientValidThreadId(sessionId);
+}
 
 const ConfigurationSchema = z.object({
   providerInstanceId: z.string(),
@@ -23,9 +29,15 @@ export async function GET(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const { sessionId } = await params;
+    const { sessionId: sessionIdParam } = await params;
+
+    if (!isValidThreadId(sessionIdParam)) {
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    const sessionId = sessionIdParam;
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(asThreadId(sessionId));
+    const session = await sessionService.getSession(sessionId);
 
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -48,12 +60,18 @@ export async function PUT(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const { sessionId } = await params;
+    const { sessionId: sessionIdParam } = await params;
+
+    if (!isValidThreadId(sessionIdParam)) {
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    const sessionId = sessionIdParam;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
     const sessionService = getSessionService();
-    const session = await sessionService.getSession(asThreadId(sessionId));
+    const session = await sessionService.getSession(sessionId);
 
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
