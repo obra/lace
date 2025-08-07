@@ -3,14 +3,14 @@
 
 import type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
 
-export const mockProviderInfo: ProviderInfo = {
+const mockProviderInfo: ProviderInfo = {
   name: 'test',
   displayName: 'Test Provider',
   requiresApiKey: false,
   configurationHint: 'No configuration needed for tests',
 };
 
-export const mockModelInfo: ModelInfo[] = [
+const mockModelInfo: ModelInfo[] = [
   {
     id: 'test-model',
     displayName: 'Test Model',
