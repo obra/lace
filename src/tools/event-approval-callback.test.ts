@@ -139,6 +139,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Use the SAME threadManager instance everywhere
     threadManager = agent.threadManager;
 
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
     // Set up the EventApprovalCallback
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);

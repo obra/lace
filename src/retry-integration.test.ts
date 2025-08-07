@@ -39,7 +39,6 @@ describe('Retry System Integration Tests', () => {
       // Use a mock provider to avoid external dependencies
       const mockProvider = {
         providerName: 'mock-integration',
-        defaultModel: 'mock-model',
         supportsStreaming: true,
         config: {},
         contextWindow: 100000,
@@ -49,27 +48,31 @@ describe('Retry System Integration Tests', () => {
         cleanup: vi.fn(),
 
         // Mock successful response without retries
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response for integration test',
-          toolCalls: [],
-          stopReason: 'stop',
-          usage: {
-            promptTokens: 10,
-            completionTokens: 20,
-            totalTokens: 30,
-          },
-        }),
+        createResponse: vi.fn((_messages, _tools, _model) =>
+          Promise.resolve({
+            content: 'Mock response for integration test',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: {
+              promptTokens: 10,
+              completionTokens: 20,
+              totalTokens: 30,
+            },
+          })
+        ),
 
-        createStreamingResponse: vi.fn().mockResolvedValue({
-          content: 'Mock streaming response',
-          toolCalls: [],
-          stopReason: 'stop',
-          usage: {
-            promptTokens: 10,
-            completionTokens: 20,
-            totalTokens: 30,
-          },
-        }),
+        createStreamingResponse: vi.fn((_messages, _tools, _model) =>
+          Promise.resolve({
+            content: 'Mock streaming response',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: {
+              promptTokens: 10,
+              completionTokens: 20,
+              totalTokens: 30,
+            },
+          })
+        ),
 
         // Mock event emitter methods
         on: vi.fn(),
@@ -86,6 +89,12 @@ describe('Retry System Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'mock-model',
+        providerInstanceId: 'test-instance',
+      });
 
       const turnStartEvents: unknown[] = [];
       const turnCompleteEvents: unknown[] = [];
@@ -134,7 +143,6 @@ describe('Retry System Integration Tests', () => {
 
       const mockProvider = {
         providerName: 'mock-retry-events',
-        defaultModel: 'mock-model',
         supportsStreaming: true,
         config: {},
         contextWindow: 100000,
@@ -143,19 +151,23 @@ describe('Retry System Integration Tests', () => {
         countTokens: vi.fn().mockResolvedValue(null),
         cleanup: vi.fn(),
 
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          stopReason: 'stop',
-          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
-        }),
+        createResponse: vi.fn((_messages, _tools, _model) =>
+          Promise.resolve({
+            content: 'Mock response',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          })
+        ),
 
-        createStreamingResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          stopReason: 'stop',
-          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
-        }),
+        createStreamingResponse: vi.fn((_messages, _tools, _model) =>
+          Promise.resolve({
+            content: 'Mock response',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          })
+        ),
 
         // Track event listener setup
         on: vi.fn(),
@@ -172,6 +184,12 @@ describe('Retry System Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'mock-model',
+        providerInstanceId: 'test-instance',
+      });
 
       await agent.sendMessage('Test retry event forwarding setup');
 
@@ -217,7 +235,6 @@ describe('Retry System Integration Tests', () => {
 
       const mockProvider = {
         providerName: 'mock-error',
-        defaultModel: 'mock-model',
         supportsStreaming: true,
         config: {},
         contextWindow: 100000,

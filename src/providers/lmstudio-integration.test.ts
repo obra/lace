@@ -68,7 +68,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [mockTool]);
+    const response = await provider.createResponse(messages, [mockTool], 'qwen/qwen3-30b-a3b');
 
     // With native tool calling, we should get proper tool calls
     expect(response.content).toBeTruthy();
@@ -105,7 +105,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       { role: 'user' as const, content: 'Now use it again with action "followup"' },
     ];
 
-    const response = await provider.createResponse(messages, [mockTool]);
+    const response = await provider.createResponse(messages, [mockTool], 'qwen/qwen3-30b-a3b');
 
     expect(response.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(response.toolCalls[0].name).toBe('mock_tool');
@@ -143,7 +143,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
     ];
 
     // Try multiple times as AI models can be unpredictable under load
-    let response = await provider.createResponse(messages, [complexTool]);
+    let response = await provider.createResponse(messages, [complexTool], 'qwen/qwen3-30b-a3b');
     let attempts = 0;
     const maxAttempts = 3;
 
@@ -152,7 +152,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       if (attempts < maxAttempts) {
         // Wait a bit before retrying
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        response = await provider.createResponse(messages, [complexTool]);
+        response = await provider.createResponse(messages, [complexTool], 'qwen/qwen3-30b-a3b');
       }
     }
 
@@ -168,7 +168,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       { role: 'user' as const, content: 'Use the failing_tool with message "test failure"' },
     ];
 
-    const response = await provider.createResponse(messages, [failingTool]);
+    const response = await provider.createResponse(messages, [failingTool], 'qwen/qwen3-30b-a3b');
 
     // Should still generate a tool call even if we know it will fail
     expect(response.toolCalls.length).toBeGreaterThanOrEqual(1);
@@ -184,7 +184,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [mockTool]);
+    const response = await provider.createResponse(messages, [mockTool], 'qwen/qwen3-30b-a3b');
 
     // Should have both text content and tool calls
     // Should have both text content and tool calls
@@ -198,7 +198,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
   it('should handle no available tools', async () => {
     const messages = [{ role: 'user' as const, content: 'Hello, can you help me?' }];
 
-    const response = await provider.createResponse(messages, []);
+    const response = await provider.createResponse(messages, [], 'qwen/qwen3-30b-a3b');
 
     expect(response.content).toBeTruthy();
     expect(response.toolCalls.length).toBe(0);
@@ -212,7 +212,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [mockTool]);
+    const response = await provider.createResponse(messages, [mockTool], 'qwen/qwen3-30b-a3b');
 
     // Should respond without crashing, might not generate tool calls for nonexistent tool
     expect(response.content).toBeTruthy();
@@ -226,7 +226,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, []);
+    const response = await provider.createResponse(messages, [], 'qwen/qwen3-30b-a3b');
 
     expect(response.content).toBeTruthy();
     // Should handle the request without crashing
@@ -258,7 +258,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [simpleTool]);
+    const response = await provider.createResponse(messages, [simpleTool], 'qwen/qwen3-30b-a3b');
 
     // Verify native tool calling works
     expect(response.toolCalls.length).toBeGreaterThan(0);

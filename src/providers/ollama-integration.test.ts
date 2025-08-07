@@ -50,7 +50,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, []);
+    const response = await provider.createResponse(messages, [], 'qwen3:32b');
 
     expect(response.content).toBeTruthy();
     expect(response.content.length).toBeGreaterThan(0);
@@ -65,7 +65,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [mockTool]);
+    const response = await provider.createResponse(messages, [mockTool], 'qwen3:32b');
 
     // Ollama tool calling might be less reliable than other providers
     expect(response.content).toBeTruthy();
@@ -76,7 +76,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
   it('should handle conversation without tools', async () => {
     const messages = [{ role: 'user' as const, content: 'What is 2 + 2?' }];
 
-    const response = await provider.createResponse(messages, []);
+    const response = await provider.createResponse(messages, [], 'qwen3:32b');
 
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('4');
@@ -88,14 +88,14 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
       { role: 'user', content: 'What is 5 + 3?' },
     ];
 
-    let response = await provider.createResponse(messages, []);
+    let response = await provider.createResponse(messages, [], 'qwen3:32b');
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('8');
 
     messages.push({ role: 'assistant', content: response.content });
     messages.push({ role: 'user', content: 'What was that answer again?' });
 
-    response = await provider.createResponse(messages, []);
+    response = await provider.createResponse(messages, [], 'qwen3:32b');
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('8');
   }, 45000);
@@ -103,7 +103,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
   it('should return usage metadata', async () => {
     const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-    const response = await provider.createResponse(messages, []);
+    const response = await provider.createResponse(messages, [], 'qwen3:32b');
 
     expect(response.content).toBeTruthy();
     expect(response.stopReason).toBeDefined();

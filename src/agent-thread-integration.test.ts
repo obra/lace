@@ -44,6 +44,12 @@ describe('Agent Single Event Source Integration', () => {
     // Start agent so we can send messages (which will trigger _addEventAndEmit)
     await agent.start();
 
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
     // Use Agent methods that trigger _addEventAndEmit internally
     await agent.sendMessage('test message');
 

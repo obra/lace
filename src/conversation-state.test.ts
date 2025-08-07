@@ -106,9 +106,7 @@ class MockConversationProvider extends BaseMockProvider {
   get providerName() {
     return 'mock';
   }
-  get defaultModel() {
-    return 'mock-model';
-  }
+  // defaultModel removed - providers are now model-agnostic
   get supportsStreaming() {
     return true;
   }
@@ -134,14 +132,19 @@ class MockConversationProvider extends BaseMockProvider {
     return 'list_files_result';
   }
 
-  createResponse(messages: unknown[], _tools: unknown[] = []): Promise<ProviderResponse> {
+  createResponse(
+    messages: unknown[],
+    _tools: unknown[] = [],
+    _model: string = 'mock-model'
+  ): Promise<ProviderResponse> {
     const key = this.getResponseKey(messages);
     return Promise.resolve(this.responseMap.get(key) || this.responseMap.get('list_files_result')!);
   }
 
   async createStreamingResponse(
     messages: unknown[],
-    _tools: unknown[] = []
+    _tools: unknown[] = [],
+    _model: string = 'mock-model'
   ): Promise<ProviderResponse> {
     const response = await this.createResponse(messages, _tools);
 
@@ -189,6 +192,12 @@ describe('Conversation State Management with Enhanced Agent', () => {
       tools: toolExecutor.getAllTools(),
     });
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'mock-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {

@@ -506,7 +506,8 @@ describe('Provider Instance E2E Tests', () => {
 
       const response = await provider.createResponse(
         [{ role: 'user', content: 'Hello Anthropic' }],
-        []
+        [],
+        'claude-3-5-haiku-20241022'
       );
 
       // Verify the provider was configured with the correct baseURL
