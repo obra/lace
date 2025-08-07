@@ -5,7 +5,6 @@ import { describe, it, expect } from 'vitest';
 import {
   ThreadId,
   isThreadId,
-  createThreadId,
   asThreadId,
   NewAgentSpec,
   isNewAgentSpec,
@@ -39,26 +38,17 @@ describe('ThreadId types', () => {
     });
   });
 
-  describe('createThreadId', () => {
+  describe('asThreadId', () => {
     it('should create valid thread IDs', () => {
-      const id = createThreadId('lace_20250703_abc123');
+      const id = asThreadId('lace_20250703_abc123');
       expect(id).toBe('lace_20250703_abc123');
       // TypeScript should see this as ThreadId type
       const _typeCheck: ThreadId = id;
     });
 
     it('should throw on invalid thread IDs', () => {
-      expect(() => createThreadId('invalid')).toThrow('Invalid thread ID format: invalid');
-      expect(() => createThreadId('lace_2025_abc123')).toThrow();
-    });
-  });
-
-  describe('asThreadId', () => {
-    it('should cast strings to ThreadId without validation', () => {
-      const id = asThreadId('anything');
-      expect(id).toBe('anything');
-      // TypeScript should see this as ThreadId type
-      const _typeCheck: ThreadId = id;
+      expect(() => asThreadId('invalid')).toThrow('Invalid thread ID format: invalid');
+      expect(() => asThreadId('lace_2025_abc123')).toThrow();
     });
   });
 });

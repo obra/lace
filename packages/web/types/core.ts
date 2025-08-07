@@ -32,7 +32,6 @@ export type { CompactionData } from '~/threads/compaction/types';
 // Re-export utility functions
 export {
   asThreadId,
-  createThreadId,
   isThreadId,
   asNewAgentSpec,
   createNewAgentSpec,

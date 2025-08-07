@@ -4,14 +4,14 @@
 import { describe, it, expect, beforeEach as _beforeEach, afterEach as _afterEach } from 'vitest';
 import { TaskFormatter } from '~/tools/implementations/task-manager/formatter';
 import { Task } from '~/tools/implementations/task-manager/types';
-import { createThreadId, createNewAgentSpec } from '~/threads/types';
+import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('TaskFormatter', () => {
   const _tempLaceDir = setupCoreTest();
-  const parentThreadId = createThreadId('lace_20250703_parent');
-  const agent1ThreadId = createThreadId('lace_20250703_parent.1');
-  const agent2ThreadId = createThreadId('lace_20250703_parent.2');
+  const parentThreadId = asThreadId('lace_20250703_parent');
+  const agent1ThreadId = asThreadId('lace_20250703_parent.1');
+  const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
   const createTestTasks = (): Task[] => [
     {

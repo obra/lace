@@ -3,14 +3,14 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
-import { createThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
+import { asThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Enhanced Task Data Model', () => {
   const _tempLaceDir = setupCoreTest();
   let testTask: Task;
-  const creatorThreadId = createThreadId('lace_20250703_abc123');
-  const parentThreadId = createThreadId('lace_20250703_abc123');
+  const creatorThreadId = asThreadId('lace_20250703_abc123');
+  const parentThreadId = asThreadId('lace_20250703_abc123');
 
   beforeEach(() => {
     testTask = {
@@ -50,7 +50,7 @@ describe('Enhanced Task Data Model', () => {
     });
 
     it('should accept task with thread ID assignee', () => {
-      const assigneeId = createThreadId('lace_20250703_xyz789.1');
+      const assigneeId = asThreadId('lace_20250703_xyz789.1');
       testTask.assignedTo = assigneeId;
       expect(testTask.assignedTo).toBe(assigneeId);
       expect(isAssigneeId(testTask.assignedTo)).toBe(true);
@@ -79,7 +79,7 @@ describe('Enhanced Task Data Model', () => {
     it('should add notes to task', () => {
       const note: TaskNote = {
         id: '1',
-        author: createThreadId('lace_20250703_xyz789.1'),
+        author: asThreadId('lace_20250703_xyz789.1'),
         content: 'Started working on authentication module',
         timestamp: new Date(),
       };
@@ -92,14 +92,14 @@ describe('Enhanced Task Data Model', () => {
     it('should maintain note order', () => {
       const note1: TaskNote = {
         id: '1',
-        author: createThreadId('lace_20250703_xyz789.1'),
+        author: asThreadId('lace_20250703_xyz789.1'),
         content: 'First note',
         timestamp: new Date('2025-01-01T10:00:00Z'),
       };
 
       const note2: TaskNote = {
         id: '2',
-        author: createThreadId('lace_20250703_xyz789.2'),
+        author: asThreadId('lace_20250703_xyz789.2'),
         content: 'Second note',
         timestamp: new Date('2025-01-01T11:00:00Z'),
       };

@@ -109,17 +109,12 @@ export function isThreadId(value: string): value is ThreadId {
   return /^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/.test(value);
 }
 
-// Constructor
-export function createThreadId(value: string): ThreadId {
+// Constructor with validation
+export function asThreadId(value: string): ThreadId {
   if (!isThreadId(value)) {
     throw new Error(`Invalid thread ID format: ${value}`);
   }
   return value;
-}
-
-// Unsafe cast for internal use only (e.g., when we know format is correct)
-export function asThreadId(value: string): ThreadId {
-  return value as ThreadId;
 }
 
 // For new agent specifications
