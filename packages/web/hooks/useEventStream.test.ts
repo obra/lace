@@ -122,10 +122,10 @@ describe('useEventStream agent state change handling', () => {
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('agent-456'),
+        threadId: asThreadId('lace_20250101_agent1'),
         timestamp: new Date(),
         data: {
-          agentId: asThreadId('agent-456'),
+          agentId: asThreadId('lace_20250101_agent1'),
           from: 'idle',
           to: 'thinking',
         },
@@ -140,7 +140,7 @@ describe('useEventStream agent state change handling', () => {
     // Assert: Verify the callback was called with correct parameters
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(1);
     expect(mockOnAgentStateChange).toHaveBeenCalledWith(
-      asThreadId('agent-456'),
+      asThreadId('lace_20250101_agent1'),
       'idle',
       'thinking'
     );
@@ -164,10 +164,10 @@ describe('useEventStream agent state change handling', () => {
 
     // Act: Simulate multiple state transitions
     const transitions = [
-      { agentId: asThreadId('agent-456'), from: 'idle', to: 'thinking' },
-      { agentId: asThreadId('agent-456'), from: 'thinking', to: 'streaming' },
-      { agentId: asThreadId('agent-456'), from: 'streaming', to: 'tool_execution' },
-      { agentId: asThreadId('agent-456'), from: 'tool_execution', to: 'idle' },
+      { agentId: asThreadId('lace_20250101_agent1'), from: 'idle', to: 'thinking' },
+      { agentId: asThreadId('lace_20250101_agent1'), from: 'thinking', to: 'streaming' },
+      { agentId: asThreadId('lace_20250101_agent1'), from: 'streaming', to: 'tool_execution' },
+      { agentId: asThreadId('lace_20250101_agent1'), from: 'tool_execution', to: 'idle' },
     ];
 
     for (const transition of transitions) {
@@ -194,25 +194,25 @@ describe('useEventStream agent state change handling', () => {
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(4);
     expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
       1,
-      asThreadId('agent-456'),
+      asThreadId('lace_20250101_agent1'),
       'idle',
       'thinking'
     );
     expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
       2,
-      asThreadId('agent-456'),
+      asThreadId('lace_20250101_agent1'),
       'thinking',
       'streaming'
     );
     expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
       3,
-      asThreadId('agent-456'),
+      asThreadId('lace_20250101_agent1'),
       'streaming',
       'tool_execution'
     );
     expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
       4,
-      asThreadId('agent-456'),
+      asThreadId('lace_20250101_agent1'),
       'tool_execution',
       'idle'
     );
@@ -242,10 +242,10 @@ describe('useEventStream agent state change handling', () => {
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('agent-1'),
+        threadId: asThreadId('lace_20250101_agent2'),
         timestamp: new Date(),
         data: {
-          agentId: asThreadId('agent-1'),
+          agentId: asThreadId('lace_20250101_agent2'),
           from: 'idle',
           to: 'thinking',
         },
@@ -259,10 +259,10 @@ describe('useEventStream agent state change handling', () => {
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('agent-2'),
+        threadId: asThreadId('lace_20250101_agent3'),
         timestamp: new Date(),
         data: {
-          agentId: asThreadId('agent-2'),
+          agentId: asThreadId('lace_20250101_agent3'),
           from: 'idle',
           to: 'streaming',
         },
@@ -283,13 +283,13 @@ describe('useEventStream agent state change handling', () => {
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(2);
     expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
       1,
-      asThreadId('agent-1'),
+      asThreadId('lace_20250101_agent2'),
       'idle',
       'thinking'
     );
     expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
       2,
-      asThreadId('agent-2'),
+      asThreadId('lace_20250101_agent3'),
       'idle',
       'streaming'
     );
@@ -335,7 +335,7 @@ describe('useEventStream agent state change handling', () => {
         scope: { sessionId: 'test-session' },
         data: {
           ...eventData,
-          threadId: asThreadId('agent-456'),
+          threadId: asThreadId('lace_20250101_agent1'),
           timestamp: new Date(),
         } as SessionEvent,
       };
@@ -376,11 +376,11 @@ describe('useEventStream agent state change handling', () => {
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('agent-456'),
+        threadId: asThreadId('lace_20250101_agent1'),
         timestamp: new Date(),
         data: {
           // Missing required fields
-          agentId: asThreadId('agent-456'),
+          agentId: asThreadId('lace_20250101_agent1'),
           // from and to are missing
         },
       } as SessionEvent,
@@ -419,10 +419,10 @@ describe('useEventStream agent state change handling', () => {
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('agent-456'),
+        threadId: asThreadId('lace_20250101_agent1'),
         timestamp: new Date(),
         data: {
-          agentId: asThreadId('agent-456'),
+          agentId: asThreadId('lace_20250101_agent1'),
           from: 'idle',
           to: 'thinking',
         },
