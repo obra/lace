@@ -565,7 +565,8 @@ describe('Provider Instance E2E Tests', () => {
 
       const response = await provider.createResponse(
         [{ role: 'user', content: 'Hello Ollama' }],
-        []
+        [],
+        'llama2'
       );
 
       // Verify response contains endpoint-specific information
@@ -623,9 +624,13 @@ describe('Provider Instance E2E Tests', () => {
 
       // Make concurrent requests
       const [openaiResponse, anthropicResponse, ollamaResponse] = await Promise.all([
-        openaiProvider.createResponse([{ role: 'user', content: 'Hello OpenAI' }], []),
-        anthropicProvider.createResponse([{ role: 'user', content: 'Hello Anthropic' }], []),
-        ollamaProvider.createResponse([{ role: 'user', content: 'Hello Ollama' }], []),
+        openaiProvider.createResponse([{ role: 'user', content: 'Hello OpenAI' }], [], 'gpt-4o'),
+        anthropicProvider.createResponse(
+          [{ role: 'user', content: 'Hello Anthropic' }],
+          [],
+          'claude-3-5-haiku-20241022'
+        ),
+        ollamaProvider.createResponse([{ role: 'user', content: 'Hello Ollama' }], [], 'llama2'),
       ]);
 
       // Verify each provider used the correct endpoint
