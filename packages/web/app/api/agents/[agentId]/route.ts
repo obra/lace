@@ -173,6 +173,21 @@ export async function PUT(
 
     if (Object.keys(updates).length > 0) {
       agent.updateThreadMetadata(updates);
+
+      // Special case: If this is the session agent (Lace), also update session configuration
+      // The session agent's threadId equals the sessionId
+      if (agentThreadId === sessionId) {
+        const configUpdates: Record<string, unknown> = {};
+        if (validatedData.providerInstanceId !== undefined) {
+          configUpdates.providerInstanceId = validatedData.providerInstanceId;
+        }
+        if (validatedData.modelId !== undefined) {
+          configUpdates.modelId = validatedData.modelId;
+        }
+        if (Object.keys(configUpdates).length > 0) {
+          session.updateConfiguration(configUpdates);
+        }
+      }
     }
 
     const metadata = agent.getThreadMetadata();

@@ -200,7 +200,7 @@ export class Session {
       projectId: options.projectId,
       effectiveConfig,
     });
-    const providerInstance = Session.resolveProviderInstance(providerInstanceId, modelId);
+    const providerInstance = Session.resolveProviderInstance(providerInstanceId);
 
     // Create agent
     const sessionAgent = new Agent({
@@ -299,6 +299,16 @@ export class Session {
       (sessionConfig.modelId as string) ||
       (sessionConfig.model as string); // backwards compatibility
 
+    logger.info('🔍 SESSION AGENT MODEL RESOLUTION', {
+      sessionId,
+      threadMetadataModelId: existingThread?.metadata?.modelId,
+      threadMetadataModel: existingThread?.metadata?.model,
+      sessionConfigModelId: sessionConfig.modelId,
+      sessionConfigModel: sessionConfig.model,
+      resolvedModelId: modelId,
+      fullThreadMetadata: existingThread?.metadata,
+    });
+
     if (!providerInstanceId || !modelId) {
       logger.error('Session missing provider configuration', {
         sessionId,
@@ -318,7 +328,7 @@ export class Session {
       threadMetadata: existingThread?.metadata,
       sessionConfig,
     });
-    const providerInstance = Session.resolveProviderInstance(providerInstanceId, modelId);
+    const providerInstance = Session.resolveProviderInstance(providerInstanceId);
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
@@ -386,8 +396,7 @@ export class Session {
           delegateMetadata: delegateThread.metadata,
         });
         const delegateProviderInstance = Session.resolveProviderInstance(
-          delegateProviderInstanceId,
-          delegateModelId
+          delegateProviderInstanceId
         );
 
         // Create agent for this delegate thread with its own provider
@@ -692,10 +701,7 @@ export class Session {
       effectiveProviderInstanceId: targetProviderInstanceId,
       effectiveModelId: targetModelId,
     });
-    const providerInstance = Session.resolveProviderInstance(
-      targetProviderInstanceId,
-      targetModelId
-    );
+    const providerInstance = Session.resolveProviderInstance(targetProviderInstanceId);
 
     // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
@@ -895,12 +901,11 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private static _providerCache = new Map<string, AIProvider>();
 
-  static resolveProviderInstance(providerInstanceId: string, modelId: string): AIProvider {
-    const cacheKey = `${providerInstanceId}:${modelId}`;
+  static resolveProviderInstance(providerInstanceId: string): AIProvider {
+    const cacheKey = providerInstanceId;
 
     logger.info('📦 RESOLVE PROVIDER INSTANCE', {
       providerInstanceId,
-      modelId,
       cacheKey,
       cacheSize: Session._providerCache.size,
       cacheKeys: Array.from(Session._providerCache.keys()),
@@ -911,11 +916,9 @@ Use your task_add_note tool to record important notes as you work and your task_
     if (cached && cached.isConfigured()) {
       logger.info('✅ Using cached provider instance', {
         providerInstanceId,
-        modelId,
         cacheKey,
         isConfigured: true,
         cachedProviderName: cached.providerName,
-        cachedModelName: cached.modelName,
       });
       return cached;
     }
@@ -923,7 +926,6 @@ Use your task_add_note tool to record important notes as you work and your task_
     if (cached && !cached.isConfigured()) {
       logger.warn('⚠️ Cached provider not properly configured, recreating', {
         providerInstanceId,
-        modelId,
         cacheKey,
         isConfigured: false,
       });
@@ -932,7 +934,6 @@ Use your task_add_note tool to record important notes as you work and your task_
 
     logger.debug('Creating new provider instance (not cached)', {
       providerInstanceId,
-      modelId,
       cacheKey,
     });
 
@@ -1007,9 +1008,8 @@ Use your task_add_note tool to record important notes as you work and your task_
       // Map catalog provider ID to actual provider type
       const providerType = instance.catalogProviderId; // anthropic, openai, etc.
 
-      // Build provider config from instance and credentials
+      // Build provider config from instance and credentials (no model!)
       const providerConfig: ProviderConfig = {
-        model: modelId,
         apiKey: credentials.apiKey,
         ...(credentials.additionalAuth || {}),
         ...(instance.endpoint && { baseURL: instance.endpoint }),
@@ -1018,7 +1018,6 @@ Use your task_add_note tool to record important notes as you work and your task_
 
       logger.debug('Creating provider with config', {
         providerType,
-        modelId,
         hasApiKey: !!providerConfig.apiKey,
         apiKeyLength: (providerConfig.apiKey as string | undefined)?.length,
         instanceId: providerInstanceId,
@@ -1033,10 +1032,8 @@ Use your task_add_note tool to record important notes as you work and your task_
 
       logger.info('✨ Created new provider instance', {
         providerInstanceId,
-        modelId,
         providerType,
         providerName: providerInstance.providerName,
-        providerModelName: providerInstance.modelName,
         isConfigured: providerInstance.isConfigured(),
         cacheKey,
       });
@@ -1047,7 +1044,7 @@ Use your task_add_note tool to record important notes as you work and your task_
       return providerInstance;
     } catch (error) {
       throw new Error(
-        `Failed to resolve provider instance ${providerInstanceId} with model ${modelId}: ${
+        `Failed to resolve provider instance ${providerInstanceId}: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
