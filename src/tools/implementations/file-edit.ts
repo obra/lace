@@ -13,6 +13,14 @@ const fileEditSchema = z.object({
   new_text: z.string(),
 });
 
+export interface FileEditDiffContext {
+  beforeContext: string;
+  afterContext: string;
+  oldContent: string;
+  newContent: string;
+  startLine: number;
+}
+
 export class FileEditTool extends Tool {
   name = 'file_edit';
   description = `Edit files by replacing exact text matches. 
@@ -84,7 +92,15 @@ The old_text must appear exactly once in the file.`;
       const newLines = this.countLines(new_text);
       const lineInfo = this.formatLineChange(oldLines, newLines);
 
-      return this.createResult(`Successfully replaced text in ${args.path} (${lineInfo})`);
+      // Extract context for the diff display
+      const diffContext = this.extractDiffContext(content, old_text, new_text);
+
+      return this.createResult(`Successfully replaced text in ${args.path} (${lineInfo})`, {
+        diff: diffContext,
+        path: args.path,
+        oldText: old_text,
+        newText: new_text,
+      });
     } catch (error: unknown) {
       return this.createError(
         `File edit operation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the input parameters and try again.`
@@ -140,5 +156,59 @@ The old_text must appear exactly once in the file.`;
       return `${oldLines} line${oldLines === 1 ? '' : 's'}`;
     }
     return `${oldLines} line${oldLines === 1 ? '' : 's'} → ${newLines} line${newLines === 1 ? '' : 's'}`;
+  }
+
+  /**
+   * Extracts context around the change for diff display
+   */
+  private extractDiffContext(
+    fullContent: string,
+    oldText: string,
+    newText: string,
+    contextLines: number = 3
+  ): FileEditDiffContext {
+    const lines = fullContent.split('\n');
+    const matchIndex = fullContent.indexOf(oldText);
+
+    if (matchIndex === -1) {
+      // This shouldn't happen as we already validated the match exists
+      return {
+        beforeContext: '',
+        afterContext: '',
+        oldContent: fullContent,
+        newContent: fullContent.replace(oldText, newText),
+        startLine: 1,
+      };
+    }
+
+    // Find the line number where the match starts
+    const beforeMatch = fullContent.substring(0, matchIndex);
+    const startLine = beforeMatch.split('\n').length;
+
+    // Find the line number where the match ends
+    const endOfMatch = matchIndex + oldText.length;
+    const beforeEndMatch = fullContent.substring(0, endOfMatch);
+    const endLine = beforeEndMatch.split('\n').length;
+
+    // Extract context lines before the change
+    const contextStartLine = Math.max(0, startLine - contextLines - 1);
+    const beforeContext = lines.slice(contextStartLine, startLine - 1).join('\n');
+
+    // Extract context lines after the change
+    const contextEndLine = Math.min(lines.length, endLine + contextLines);
+    const afterContext = lines.slice(endLine, contextEndLine).join('\n');
+
+    // Build the full content with context for diff display
+    const oldContent = [beforeContext, oldText, afterContext].filter(Boolean).join('\n');
+
+    const newContent = [beforeContext, newText, afterContext].filter(Boolean).join('\n');
+
+    return {
+      beforeContext,
+      afterContext,
+      oldContent,
+      newContent,
+      startLine: contextStartLine + 1, // Convert to 1-based line numbering
+    };
   }
 }

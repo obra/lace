@@ -6,6 +6,8 @@ export type { ThreadId, AssigneeId, ThreadEventType, ThreadEvent, Thread } from 
 
 export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
+export type { FileEditDiffContext } from '~/tools/implementations/file-edit';
+
 export type {
   Task,
   TaskNote,
