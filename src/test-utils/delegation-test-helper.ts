@@ -84,16 +84,15 @@ export async function createDelegationTestSetup(options?: {
     }
 
     get providerName(): string {
-      return `test-${this._config.model}`;
+      return 'test-provider';
     }
 
-    get defaultModel(): string {
-      return this._config.model || 'claude-3-5-haiku-20241022';
-    }
+    // defaultModel removed - providers are now model-agnostic
 
     createResponse(
       messages: ProviderMessage[],
       _tools: Tool[],
+      _model: string,
       _signal?: AbortSignal
     ): Promise<ProviderResponse> {
       // Look for task assignment patterns (delegation-specific logic)
@@ -177,7 +176,7 @@ export async function createDelegationTestSetup(options?: {
     getAvailableModels(): ModelInfo[] {
       return [
         {
-          id: this.defaultModel,
+          id: 'claude-3-5-haiku-20241022',
           displayName: 'Test Model',
           description: 'Mock model for testing',
           contextWindow: 200000,

@@ -110,7 +110,7 @@ describe('LMStudioProvider retry functionality', () => {
       mockListLoaded.mockResolvedValue([{ identifier: 'test-model' }]);
       mockLoad.mockResolvedValue(mockModel);
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'qwen/qwen3-30b-a3b');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -174,7 +174,7 @@ describe('LMStudioProvider retry functionality', () => {
       const retryAttemptSpy = vi.fn();
       provider.on('retry_attempt', retryAttemptSpy);
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'qwen/qwen3-30b-a3b');
 
       // Wait for first attempt
       await vi.advanceTimersByTimeAsync(0);
@@ -208,7 +208,9 @@ describe('LMStudioProvider retry functionality', () => {
         retryCapture.errors.push(event.error);
       });
 
-      await expect(provider.createResponse(messages, [])).rejects.toEqual(authError);
+      await expect(provider.createResponse(messages, [], 'qwen/qwen3-30b-a3b')).rejects.toEqual(
+        authError
+      );
 
       // Test that no retry was attempted for auth error
       expect(retryCapture.attempts).toBe(0);
@@ -232,7 +234,9 @@ describe('LMStudioProvider retry functionality', () => {
         maxDelayMs: 2,
       };
 
-      await expect(provider.createResponse(messages, [])).rejects.toMatchObject({
+      await expect(
+        provider.createResponse(messages, [], 'qwen/qwen3-30b-a3b')
+      ).rejects.toMatchObject({
         code: 'ETIMEDOUT',
       });
 
@@ -282,7 +286,7 @@ describe('LMStudioProvider retry functionality', () => {
       mockListLoaded.mockResolvedValue([{ identifier: 'test-model' }]);
       mockLoad.mockResolvedValue(mockModel);
 
-      const promise = provider.createStreamingResponse(messages, []);
+      const promise = provider.createStreamingResponse(messages, [], 'qwen/qwen3-30b-a3b');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       }); // during retry
@@ -337,9 +341,9 @@ describe('LMStudioProvider retry functionality', () => {
         streamingStarted = true;
       });
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow(
-        'LMStudio prediction failed'
-      );
+      await expect(
+        provider.createStreamingResponse(messages, [], 'qwen/qwen3-30b-a3b')
+      ).rejects.toThrow('LMStudio prediction failed');
 
       // Should only try once since streaming started
       expect(streamingStarted).toBe(true);

@@ -427,12 +427,14 @@ describe('Provider Instance E2E Tests', () => {
       // Make requests with both providers
       const response1 = await provider1.createResponse(
         [{ role: 'user', content: 'Hello from prod' }],
-        []
+        [],
+        'claude-3-5-haiku-20241022'
       );
 
       const response2 = await provider2.createResponse(
         [{ role: 'user', content: 'Hello from dev' }],
-        []
+        [],
+        'claude-3-5-haiku-20241022'
       );
 
       // Verify responses contain endpoint-specific information
@@ -454,7 +456,7 @@ describe('Provider Instance E2E Tests', () => {
 
       // This should fail with authentication error
       await expect(
-        provider.createResponse([{ role: 'user', content: 'Hello' }], [])
+        provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
       ).rejects.toThrow(); // Should throw due to 401 response
     });
   });
@@ -542,7 +544,7 @@ describe('Provider Instance E2E Tests', () => {
 
       // This should fail with authentication error
       await expect(
-        provider.createResponse([{ role: 'user', content: 'Hello' }], [])
+        provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
       ).rejects.toThrow('Authentication failed: Invalid API key');
     });
   });
@@ -668,7 +670,7 @@ describe('Provider Instance E2E Tests', () => {
           .mockRejectedValue(new Error('Connection timeout: fetch failed'));
 
         await expect(
-          provider.createResponse([{ role: 'user', content: 'Hello' }], [])
+          provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
         ).rejects.toThrow(/timeout|fetch failed/i);
       });
 
@@ -696,7 +698,7 @@ describe('Provider Instance E2E Tests', () => {
         );
 
         await expect(
-          provider.createResponse([{ role: 'user', content: 'Hello' }], [])
+          provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
         ).rejects.toThrow(/getaddrinfo ENOTFOUND|fetch failed|Connection error/i);
       }, 8000); // Increase timeout for network tests
     });
@@ -714,7 +716,7 @@ describe('Provider Instance E2E Tests', () => {
           .mockRejectedValue(new Error('Authentication failed: Invalid API key'));
 
         await expect(
-          provider.createResponse([{ role: 'user', content: 'Hello' }], [])
+          provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
         ).rejects.toThrow(/Authentication failed: Invalid API key/i);
       });
     });
@@ -745,7 +747,7 @@ describe('Provider Instance E2E Tests', () => {
         );
 
         await expect(
-          provider.createResponse([{ role: 'user', content: 'Hello' }], [])
+          provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
         ).rejects.toThrow(/fetch failed|ENOTFOUND|Connection error/i);
       }, 6000);
 

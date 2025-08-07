@@ -42,6 +42,7 @@ class MockProviderWithToolCalls extends TestProvider {
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
@@ -65,7 +66,7 @@ class MockProviderWithToolCalls extends TestProvider {
         };
       }
     }
-    return super.createResponse(_messages, _tools, signal);
+    return super.createResponse(_messages, _tools, _model, signal);
   }
 }
 

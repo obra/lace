@@ -68,7 +68,7 @@ describe('AnthropicProvider retry functionality', () => {
         stop_reason: 'end_turn',
       });
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'claude-3-5-haiku-20241022');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -100,7 +100,7 @@ describe('AnthropicProvider retry functionality', () => {
       const retryAttemptSpy = vi.fn();
       provider.on('retry_attempt', retryAttemptSpy);
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'claude-3-5-haiku-20241022');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -125,7 +125,9 @@ describe('AnthropicProvider retry functionality', () => {
       const authError = { status: 401, message: 'Invalid API key' };
       mockCreate.mockRejectedValue(authError);
 
-      await expect(provider.createResponse(messages, [])).rejects.toEqual(authError);
+      await expect(
+        provider.createResponse(messages, [], 'claude-3-5-haiku-20241022')
+      ).rejects.toEqual(authError);
       expect(mockCreate).toHaveBeenCalledTimes(1);
     });
 
@@ -146,7 +148,9 @@ describe('AnthropicProvider retry functionality', () => {
         maxDelayMs: 2,
       };
 
-      await expect(provider.createResponse(messages, [])).rejects.toMatchObject({
+      await expect(
+        provider.createResponse(messages, [], 'claude-3-5-haiku-20241022')
+      ).rejects.toMatchObject({
         code: 'ETIMEDOUT',
       });
 
@@ -194,7 +198,7 @@ describe('AnthropicProvider retry functionality', () => {
         })
         .mockImplementationOnce(() => successfulStream);
 
-      const promise = provider.createStreamingResponse(messages, []);
+      const promise = provider.createStreamingResponse(messages, [], 'claude-3-5-haiku-20241022');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       }); // during retry
@@ -242,7 +246,9 @@ describe('AnthropicProvider retry functionality', () => {
         streamingStarted = true;
       });
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toMatchObject({
+      await expect(
+        provider.createStreamingResponse(messages, [], 'claude-3-5-haiku-20241022')
+      ).rejects.toMatchObject({
         code: 'ECONNRESET',
       });
 

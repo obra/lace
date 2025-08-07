@@ -57,6 +57,7 @@ export class SlowMockProvider extends BaseMockProvider {
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Create a promise that resolves after the delay
@@ -114,10 +115,11 @@ export class SlowMockProvider extends BaseMockProvider {
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (!this.streaming) {
-      return await this.createResponse(messages, tools, signal);
+      return await this.createResponse(messages, tools, model, signal);
     }
 
     // For streaming, simulate token-by-token emission with delays
