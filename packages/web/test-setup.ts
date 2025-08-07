@@ -1,7 +1,7 @@
 // ABOUTME: Test setup for vitest
 // ABOUTME: Global test configuration and mocks for server-only modules
 
-import { vi } from 'vitest';
+import { vi, afterAll, afterEach } from 'vitest';
 import '@testing-library/jest-dom';
 
 // Import superjson to ensure it's available in test environment
@@ -108,4 +108,30 @@ vi.mock('@anthropic-ai/sdk', () => {
     default: vi.fn().mockImplementation(() => mockClient),
     Anthropic: vi.fn().mockImplementation(() => mockClient),
   };
+});
+
+// Global cleanup after each test file
+afterAll(() => {
+  // Clear all timers (both real and fake)
+  if (typeof globalThis.clearTimeout === 'function') {
+    // Clear any remaining timeouts/intervals
+    const maxId = setTimeout(() => {}, 0);
+    for (let i = 1; i <= maxId; i++) {
+      clearTimeout(i);
+      clearInterval(i);
+    }
+  }
+
+  // Force garbage collection if available
+  if (global.gc) {
+    global.gc();
+  }
+});
+
+// Cleanup after each individual test
+afterEach(() => {
+  // Reset all vitest mocks and timers
+  vi.clearAllMocks();
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });
