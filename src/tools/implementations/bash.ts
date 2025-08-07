@@ -8,7 +8,7 @@ import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
-interface BashOutput {
+export interface BashOutput {
   command: string;
   exitCode: number;
   runtime: number;
@@ -78,6 +78,10 @@ export class BashTool extends Tool {
       let stdoutLineCount = 0;
       let stderrLineCount = 0;
 
+      // Line buffers for handling partial lines at chunk boundaries
+      let stdoutLineBuffer = '';
+      let stderrLineBuffer = '';
+
       // Execute command with spawn for streaming
       const childProcess = spawn('/bin/bash', ['-c', command], {
         cwd: context?.workingDirectory || process.cwd(),
@@ -93,8 +97,14 @@ export class BashTool extends Tool {
           stdoutStream.write(data);
           combinedStream.write(data);
 
-          // Track lines for head+tail preview
-          const lines = text.split('\n');
+          // Process complete lines only
+          stdoutLineBuffer += text;
+          const lines = stdoutLineBuffer.split('\n');
+
+          // Keep the last element as it may be a partial line
+          stdoutLineBuffer = lines.pop() || '';
+
+          // Process complete lines (count all lines, including empty ones from \n\n)
           for (const line of lines) {
             stdoutLineCount++;
 
@@ -122,8 +132,14 @@ export class BashTool extends Tool {
           stderrStream.write(data);
           combinedStream.write(data);
 
-          // Track lines for head+tail preview
-          const lines = text.split('\n');
+          // Process complete lines only
+          stderrLineBuffer += text;
+          const lines = stderrLineBuffer.split('\n');
+
+          // Keep the last element as it may be a partial line
+          stderrLineBuffer = lines.pop() || '';
+
+          // Process complete lines (count all lines, including empty ones from \n\n)
           for (const line of lines) {
             stderrLineCount++;
 
@@ -146,6 +162,37 @@ export class BashTool extends Tool {
         // Handle completion
         childProcess.on('close', (exitCode) => {
           const runtime = Date.now() - startTime;
+
+          // Process any remaining partial lines (including empty buffer which represents final newline)
+          if (stdoutLineBuffer.length > 0 || stdoutLineCount > 0) {
+            if (stdoutLineBuffer.length > 0) {
+              stdoutLineCount++;
+            }
+            if (stdoutHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
+              stdoutHeadLines.push(stdoutLineBuffer);
+            }
+            if (stdoutTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
+              stdoutTailLines.push(stdoutLineBuffer);
+            } else {
+              stdoutTailLines.shift();
+              stdoutTailLines.push(stdoutLineBuffer);
+            }
+          }
+
+          if (stderrLineBuffer.length > 0 || stderrLineCount > 0) {
+            if (stderrLineBuffer.length > 0) {
+              stderrLineCount++;
+            }
+            if (stderrHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
+              stderrHeadLines.push(stderrLineBuffer);
+            }
+            if (stderrTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
+              stderrTailLines.push(stderrLineBuffer);
+            } else {
+              stderrTailLines.shift();
+              stderrTailLines.push(stderrLineBuffer);
+            }
+          }
 
           // Close file streams
           stdoutStream.end();

@@ -5,25 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { BashTool } from '~/tools/implementations/bash';
+import { BashTool, type BashOutput } from '~/tools/implementations/bash';
 import type { ToolContext } from '~/tools/types';
-
-interface BashOutput {
-  command: string;
-  exitCode: number;
-  runtime: number;
-  stdoutPreview: string;
-  stderrPreview: string;
-  truncated: {
-    stdout: { skipped: number; total: number };
-    stderr: { skipped: number; total: number };
-  };
-  outputFiles: {
-    stdout: string;
-    stderr: string;
-    combined: string;
-  };
-}
 
 describe('BashTool', () => {
   let bashTool: BashTool;
@@ -516,7 +499,7 @@ describe('BashTool', () => {
       expect(output.exitCode).toBe(0);
 
       // Should have truncation info showing skipped lines
-      expect(output.truncated.stdout.total).toBeGreaterThan(200);
+      expect(output.truncated.stdout.total).toBe(200);
       expect(output.truncated.stdout.skipped).toBeGreaterThan(0);
 
       // Preview should contain early lines (head)
