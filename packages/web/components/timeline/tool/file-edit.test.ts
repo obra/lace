@@ -98,7 +98,7 @@ describe('fileEditRenderer', () => {
         },
       };
 
-      const rendered = fileEditRenderer.renderResult!(result, metadata as any);
+      const rendered = fileEditRenderer.renderResult!(result, metadata);
       const { container } = render(React.createElement('div', null, rendered));
 
       // Should show warning about no context
@@ -157,7 +157,7 @@ describe('fileEditRenderer', () => {
     it('should return the file edit icon', () => {
       const icon = fileEditRenderer.getIcon!();
       expect(icon).toBeDefined();
-      expect(icon.iconName).toBe('file-edit');
+      expect(icon.iconName).toBe('file-pen');
     });
   });
 });

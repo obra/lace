@@ -115,7 +115,7 @@ afterAll(() => {
   // Clear all timers (both real and fake)
   if (typeof globalThis.clearTimeout === 'function') {
     // Clear any remaining timeouts/intervals
-    const maxId = setTimeout(() => {}, 0);
+    const maxId = Number(setTimeout(() => {}, 0));
     for (let i = 1; i <= maxId; i++) {
       clearTimeout(i);
       clearInterval(i);
