@@ -317,8 +317,9 @@ select {
   contain: layout style paint;
 }
 
-/* Ensure proper word breaking for long lines */
+/* Prevent line wrapping - use horizontal scroll instead */
 .code-line-content code {
-  word-break: break-all;
-  white-space: pre-wrap;
+  white-space: pre;
+  overflow-x: auto;
+  display: block;
 }

@@ -43,8 +43,51 @@ export default function CodeBlock({
 
   // Simple syntax highlighting
   const highlightCode = (code: string, lang?: string) => {
+    // Try to detect language from filename if no language provided
+    if (!lang && filename) {
+      const ext = filename.split('.').pop()?.toLowerCase();
+      // Map common extensions to highlight.js language names
+      const extMap: Record<string, string> = {
+        'ts': 'typescript',
+        'tsx': 'typescript',
+        'js': 'javascript', 
+        'jsx': 'javascript',
+        'py': 'python',
+        'rb': 'ruby',
+        'go': 'go',
+        'rs': 'rust',
+        'cpp': 'cpp',
+        'c': 'c',
+        'h': 'c',
+        'hpp': 'cpp',
+        'java': 'java',
+        'cs': 'csharp',
+        'php': 'php',
+        'swift': 'swift',
+        'kt': 'kotlin',
+        'sh': 'bash',
+        'yml': 'yaml',
+        'yaml': 'yaml',
+        'json': 'json',
+        'xml': 'xml',
+        'html': 'html',
+        'css': 'css',
+        'scss': 'scss',
+        'sass': 'sass',
+        'less': 'less',
+        'sql': 'sql',
+        'md': 'markdown',
+      };
+      lang = extMap[ext || ''];
+    }
+    
     if (!lang) {
-      return { value: code, language: 'plaintext' };
+      try {
+        const result = hljs.highlightAuto(code);
+        return { value: result.value, language: result.language || 'plaintext' };
+      } catch (e) {
+        return { value: code, language: 'plaintext' };
+      }
     }
 
     try {
@@ -61,7 +104,7 @@ export default function CodeBlock({
 
       const result = hljs.highlight(codeToHighlight, { language: lang });
       return { value: result.value, language: result.language || lang };
-    } catch {
+    } catch (e) {
       // Fallback to auto-detection or plain text
       try {
         const result = hljs.highlightAuto(code);
