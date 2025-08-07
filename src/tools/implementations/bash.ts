@@ -82,6 +82,10 @@ export class BashTool extends Tool {
       let stdoutLineBuffer = '';
       let stderrLineBuffer = '';
 
+      // Circular buffer indices for efficient tail rotation
+      let stdoutTailIndex = 0;
+      let stderrTailIndex = 0;
+
       // Execute command with spawn for streaming
       const childProcess = spawn('/bin/bash', ['-c', command], {
         cwd: context?.workingDirectory || process.cwd(),
@@ -91,175 +95,86 @@ export class BashTool extends Tool {
       return new Promise<ToolResult>((resolve) => {
         // Handle stdout
         childProcess.stdout?.on('data', (data: Buffer) => {
-          const text = data.toString();
-
-          // Write to files
-          stdoutStream.write(data);
-          combinedStream.write(data);
-
-          // Process complete lines only
-          stdoutLineBuffer += text;
-          const lines = stdoutLineBuffer.split('\n');
-
-          // Keep the last element as it may be a partial line
-          stdoutLineBuffer = lines.pop() || '';
-
-          // Process complete lines (count all lines, including empty ones from \n\n)
-          for (const line of lines) {
-            stdoutLineCount++;
-
-            // Always collect head lines
-            if (stdoutHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
-              stdoutHeadLines.push(line);
-            }
-
-            // Collect tail lines (using rotating buffer)
-            if (stdoutTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
-              stdoutTailLines.push(line);
-            } else {
-              // Rotate tail buffer
-              stdoutTailLines.shift();
-              stdoutTailLines.push(line);
-            }
-          }
+          const result = this.processStreamData(
+            data,
+            stdoutStream,
+            combinedStream,
+            stdoutLineBuffer,
+            stdoutHeadLines,
+            stdoutTailLines,
+            stdoutLineCount,
+            stdoutTailIndex
+          );
+          stdoutLineBuffer = result.lineBuffer;
+          stdoutLineCount = result.lineCount;
+          stdoutTailIndex = result.tailIndex;
         });
 
         // Handle stderr
         childProcess.stderr?.on('data', (data: Buffer) => {
-          const text = data.toString();
-
-          // Write to files
-          stderrStream.write(data);
-          combinedStream.write(data);
-
-          // Process complete lines only
-          stderrLineBuffer += text;
-          const lines = stderrLineBuffer.split('\n');
-
-          // Keep the last element as it may be a partial line
-          stderrLineBuffer = lines.pop() || '';
-
-          // Process complete lines (count all lines, including empty ones from \n\n)
-          for (const line of lines) {
-            stderrLineCount++;
-
-            // Always collect head lines
-            if (stderrHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
-              stderrHeadLines.push(line);
-            }
-
-            // Collect tail lines (using rotating buffer)
-            if (stderrTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
-              stderrTailLines.push(line);
-            } else {
-              // Rotate tail buffer
-              stderrTailLines.shift();
-              stderrTailLines.push(line);
-            }
-          }
+          const result = this.processStreamData(
+            data,
+            stderrStream,
+            combinedStream,
+            stderrLineBuffer,
+            stderrHeadLines,
+            stderrTailLines,
+            stderrLineCount,
+            stderrTailIndex
+          );
+          stderrLineBuffer = result.lineBuffer;
+          stderrLineCount = result.lineCount;
+          stderrTailIndex = result.tailIndex;
         });
 
         // Handle completion
         childProcess.on('close', (exitCode) => {
           const runtime = Date.now() - startTime;
 
-          // Process any remaining partial lines
-          // Only add to arrays and count if we have actual lines processed OR a non-empty buffer
-          if (stdoutLineBuffer.length > 0) {
-            stdoutLineCount++;
-          }
-          if (stdoutLineCount > 0) {
-            // Always add the buffer (even if empty) to represent final newline
-            if (stdoutHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
-              stdoutHeadLines.push(stdoutLineBuffer);
-            }
-            if (stdoutTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
-              stdoutTailLines.push(stdoutLineBuffer);
-            } else {
-              stdoutTailLines.shift();
-              stdoutTailLines.push(stdoutLineBuffer);
-            }
-          }
-
-          if (stderrLineBuffer.length > 0) {
-            stderrLineCount++;
-          }
-          if (stderrLineCount > 0) {
-            // Always add the buffer (even if empty) to represent final newline
-            if (stderrHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
-              stderrHeadLines.push(stderrLineBuffer);
-            }
-            if (stderrTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
-              stderrTailLines.push(stderrLineBuffer);
-            } else {
-              stderrTailLines.shift();
-              stderrTailLines.push(stderrLineBuffer);
-            }
-          }
-
-          // Close file streams
-          stdoutStream.end();
-          stderrStream.end();
-          combinedStream.end();
-
-          // Generate head+tail previews
-          const stdoutPreview = this.generateHeadTailPreview(
+          // Process any remaining partial lines with circular buffer
+          stdoutLineCount = this.processRemainingLines(
+            stdoutLineBuffer,
+            stdoutLineCount,
             stdoutHeadLines,
             stdoutTailLines,
-            stdoutLineCount
+            stdoutTailIndex
           );
-          const stderrPreview = this.generateHeadTailPreview(
+          stderrLineCount = this.processRemainingLines(
+            stderrLineBuffer,
+            stderrLineCount,
             stderrHeadLines,
             stderrTailLines,
-            stderrLineCount
+            stderrTailIndex
           );
 
-          const result: BashOutput = {
-            command,
-            exitCode: exitCode || 0,
-            runtime,
-            stdoutPreview,
-            stderrPreview,
-            truncated: {
-              stdout: {
-                skipped: Math.max(
-                  0,
-                  stdoutLineCount -
-                    stdoutHeadLines.length -
-                    this.getUniqueTailLines(stdoutHeadLines, stdoutTailLines)
-                ),
-                total: stdoutLineCount,
-              },
-              stderr: {
-                skipped: Math.max(
-                  0,
-                  stderrLineCount -
-                    stderrHeadLines.length -
-                    this.getUniqueTailLines(stderrHeadLines, stderrTailLines)
-                ),
-                total: stderrLineCount,
-              },
-            },
-            outputFiles: outputPaths,
+          // Close file streams and wait for completion to avoid race conditions
+          let streamsCompleted = 0;
+          const totalStreams = 3;
+
+          const onStreamComplete = () => {
+            streamsCompleted++;
+            if (streamsCompleted === totalStreams) {
+              // All streams are closed, safe to proceed with file paths
+              this.completeExecution(
+                command,
+                exitCode || 0,
+                runtime,
+                stdoutHeadLines,
+                stderrHeadLines,
+                stdoutTailLines,
+                stderrTailLines,
+                stdoutLineCount,
+                stderrLineCount,
+                outputPaths,
+                resolve
+              );
+            }
           };
 
-          // Important distinction: Tool success vs Command exit code
-          // - Tool success = "Did the bash tool successfully execute the command?"
-          // - Command exit code = "What was the result of the command itself?"
-          //
-          // Examples:
-          // - ESLint finds issues: Tool success=true, exit code=1, stdout=linting errors
-          // - Git status with changes: Tool success=true, exit code=1, stdout=file list
-          // - Single invalid command: Tool success=false, exit code=127, stderr=command not found
-          // - Command sequence with invalid command: Tool success=true, exit code=0, stderr=command not found
-
-          // Special case: Command not found with exit code 127 and no stdout = tool failure
-          // This handles single nonexistent commands like "nonexistentcommand12345"
-          if (exitCode === 127 && stdoutLineCount === 0) {
-            resolve(this.createError(result as unknown as Record<string, unknown>));
-          } else {
-            resolve(this.createResult(result as unknown as Record<string, unknown>));
-          }
+          // Close streams with completion callbacks
+          stdoutStream.end(onStreamComplete);
+          stderrStream.end(onStreamComplete);
+          combinedStream.end(onStreamComplete);
         });
 
         // Handle process errors (e.g., spawn failures)
@@ -364,6 +279,161 @@ export class BashTool extends Tool {
   private getUniqueTailLinesArray(headLines: string[], tailLines: string[]): string[] {
     const headLinesSet = new Set(headLines);
     return tailLines.filter((line) => !headLinesSet.has(line));
+  }
+
+  /**
+   * Process stream data with line buffering and circular tail buffer for efficiency
+   */
+  private processStreamData(
+    data: Buffer,
+    stream: NodeJS.WritableStream,
+    combinedStream: NodeJS.WritableStream,
+    lineBuffer: string,
+    headLines: string[],
+    tailLines: string[],
+    lineCount: number,
+    tailIndex: number
+  ): { lineBuffer: string; lineCount: number; tailIndex: number } {
+    const text = data.toString();
+
+    // Write to files
+    stream.write(data);
+    combinedStream.write(data);
+
+    // Process complete lines only
+    lineBuffer += text;
+    const lines = lineBuffer.split('\n');
+
+    // Keep the last element as it may be a partial line
+    lineBuffer = lines.pop() || '';
+
+    // Process complete lines (count all lines, including empty ones from \n\n)
+    for (const line of lines) {
+      lineCount++;
+
+      // Always collect head lines
+      if (headLines.length < BashTool.PREVIEW_HEAD_LINES) {
+        headLines.push(line);
+      }
+
+      // Collect tail lines using circular buffer (O(1) instead of O(n) shift)
+      if (tailLines.length < BashTool.PREVIEW_TAIL_LINES) {
+        tailLines.push(line);
+      } else {
+        // Use circular buffer - overwrite oldest entry
+        tailLines[tailIndex] = line;
+        tailIndex = (tailIndex + 1) % BashTool.PREVIEW_TAIL_LINES;
+      }
+    }
+
+    return { lineBuffer, lineCount, tailIndex };
+  }
+
+  /**
+   * Process any remaining partial lines at command completion
+   */
+  private processRemainingLines(
+    lineBuffer: string,
+    lineCount: number,
+    headLines: string[],
+    tailLines: string[],
+    tailIndex: number
+  ): number {
+    // Only increment count if buffer has content
+    if (lineBuffer.length > 0) {
+      lineCount++;
+    }
+
+    // Only add to arrays if we processed any lines (maintains newline structure)
+    if (lineCount > 0) {
+      if (headLines.length < BashTool.PREVIEW_HEAD_LINES) {
+        headLines.push(lineBuffer);
+      }
+
+      if (tailLines.length < BashTool.PREVIEW_TAIL_LINES) {
+        tailLines.push(lineBuffer);
+      } else {
+        tailLines[tailIndex] = lineBuffer;
+      }
+    }
+
+    return lineCount;
+  }
+
+  /**
+   * Complete command execution and generate final result
+   */
+  private completeExecution(
+    command: string,
+    exitCode: number,
+    runtime: number,
+    stdoutHeadLines: string[],
+    stderrHeadLines: string[],
+    stdoutTailLines: string[],
+    stderrTailLines: string[],
+    stdoutLineCount: number,
+    stderrLineCount: number,
+    outputPaths: { stdout: string; stderr: string; combined: string },
+    resolve: (result: ToolResult) => void
+  ): void {
+    // Generate head+tail previews
+    const stdoutPreview = this.generateHeadTailPreview(
+      stdoutHeadLines,
+      stdoutTailLines,
+      stdoutLineCount
+    );
+    const stderrPreview = this.generateHeadTailPreview(
+      stderrHeadLines,
+      stderrTailLines,
+      stderrLineCount
+    );
+
+    const result: BashOutput = {
+      command,
+      exitCode,
+      runtime,
+      stdoutPreview,
+      stderrPreview,
+      truncated: {
+        stdout: {
+          skipped: Math.max(
+            0,
+            stdoutLineCount -
+              stdoutHeadLines.length -
+              this.getUniqueTailLines(stdoutHeadLines, stdoutTailLines)
+          ),
+          total: stdoutLineCount,
+        },
+        stderr: {
+          skipped: Math.max(
+            0,
+            stderrLineCount -
+              stderrHeadLines.length -
+              this.getUniqueTailLines(stderrHeadLines, stderrTailLines)
+          ),
+          total: stderrLineCount,
+        },
+      },
+      outputFiles: outputPaths,
+    };
+
+    // Important distinction: Tool success vs Command exit code
+    // - Tool success = "Did the bash tool successfully execute the command?"
+    // - Command exit code = "What was the result of the command itself?"
+    //
+    // Examples:
+    // - ESLint finds issues: Tool success=true, exit code=1, stdout=linting errors
+    // - Git status with changes: Tool success=true, exit code=1, stdout=file list
+    // - Single invalid command: Tool success=false, exit code=127, stderr=command not found
+    // - Command sequence with invalid command: Tool success=true, exit code=0, stderr=command not found
+
+    // Special case: Command not found with exit code 127 and no stdout = tool failure
+    // This handles single nonexistent commands like "nonexistentcommand12345"
+    if (exitCode === 127 && stdoutLineCount === 0) {
+      resolve(this.createError(result as unknown as Record<string, unknown>));
+    } else {
+      resolve(this.createResult(result as unknown as Record<string, unknown>));
+    }
   }
 
   private getOutputFilePaths(context?: ToolContext): {
