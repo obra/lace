@@ -163,11 +163,13 @@ export class BashTool extends Tool {
         childProcess.on('close', (exitCode) => {
           const runtime = Date.now() - startTime;
 
-          // Process any remaining partial lines (including empty buffer which represents final newline)
-          if (stdoutLineBuffer.length > 0 || stdoutLineCount > 0) {
-            if (stdoutLineBuffer.length > 0) {
-              stdoutLineCount++;
-            }
+          // Process any remaining partial lines
+          // Only add to arrays and count if we have actual lines processed OR a non-empty buffer
+          if (stdoutLineBuffer.length > 0) {
+            stdoutLineCount++;
+          }
+          if (stdoutLineCount > 0) {
+            // Always add the buffer (even if empty) to represent final newline
             if (stdoutHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
               stdoutHeadLines.push(stdoutLineBuffer);
             }
@@ -179,10 +181,11 @@ export class BashTool extends Tool {
             }
           }
 
-          if (stderrLineBuffer.length > 0 || stderrLineCount > 0) {
-            if (stderrLineBuffer.length > 0) {
-              stderrLineCount++;
-            }
+          if (stderrLineBuffer.length > 0) {
+            stderrLineCount++;
+          }
+          if (stderrLineCount > 0) {
+            // Always add the buffer (even if empty) to represent final newline
             if (stderrHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
               stderrHeadLines.push(stderrLineBuffer);
             }
