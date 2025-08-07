@@ -1,6 +1,9 @@
 // ABOUTME: Test utilities for tool testing
-// ABOUTME: Provides helper functions to create ToolCall objects for tests
+// ABOUTME: Provides helper functions to create ToolCall objects and temp directories for tests
 
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { ToolCall, ToolContext } from '~/tools/types';
 import { asThreadId } from '~/threads/types';
 import { Session } from '~/sessions/session';
@@ -32,8 +35,36 @@ export function createToolCallFactory(toolName: string) {
   return (args: Record<string, unknown>, id?: string) => createTestToolCall(toolName, args, id);
 }
 
-// Re-export temp directory utilities for convenience
-export { createTempDir, createTestTempDir } from './temp-utils';
+/**
+ * Creates a temporary directory and registers cleanup with test framework
+ * Use in beforeAll/afterAll or similar test lifecycle hooks
+ */
+export function createTestTempDir(prefix = 'lace-test-'): {
+  getPath: () => Promise<string>;
+  cleanup: () => Promise<void>;
+} {
+  let tempPath: string | null = null;
+
+  const getPath = async (): Promise<string> => {
+    if (!tempPath) {
+      tempPath = await mkdtemp(join(tmpdir(), prefix));
+    }
+    return tempPath;
+  };
+
+  const cleanup = async (): Promise<void> => {
+    if (tempPath) {
+      try {
+        await rm(tempPath, { recursive: true, force: true });
+        tempPath = null;
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  };
+
+  return { getPath, cleanup };
+}
 
 interface MockSession {
   getToolPolicy: (toolName: string) => 'allow' | 'require-approval' | 'deny';
