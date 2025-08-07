@@ -12,15 +12,15 @@ const mockAgents: AgentInfo[] = [
   {
     threadId: asThreadId('lace_20250721_sess01.1'),
     name: 'Claude',
-    provider: 'anthropic',
-    model: 'claude-3-sonnet',
+    providerInstanceId: 'anthropic-instance-1',
+    modelId: 'claude-3-sonnet',
     status: 'idle',
   },
   {
     threadId: asThreadId('lace_20250721_sess01.2'),
     name: 'GPT-4',
-    provider: 'openai',
-    model: 'gpt-4',
+    providerInstanceId: 'openai-instance-1',
+    modelId: 'gpt-4',
     status: 'idle',
   },
 ];

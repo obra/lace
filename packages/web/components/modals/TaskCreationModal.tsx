@@ -235,7 +235,7 @@ export function TaskCreationModal({
             <option value="human">👨‍💻 Human</option>
             {agents.map((agent) => (
               <option key={agent.threadId} value={agent.threadId}>
-                🤖 {agent.name} ({agent.model})
+                🤖 {agent.name} ({agent.modelId})
               </option>
             ))}
           </select>

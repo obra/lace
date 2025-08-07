@@ -14,17 +14,8 @@ import {
   cleanupTestProviderDefaults,
 } from '@/lib/server/lace-imports';
 
-// Type interfaces for API responses
-interface AgentResponse {
-  agent: {
-    threadId: string;
-    name: string;
-    provider: string;
-    modelId: string;
-    status: string;
-    createdAt: string;
-  };
-}
+// Import shared AgentResponse type
+import type { AgentResponse } from '@/types/api';
 
 interface ErrorResponse {
   error: string;
@@ -148,7 +139,7 @@ describe('Agent API', () => {
 
       expect(response.status).toBe(200);
       expect(data.agent.name).toBe('Agent lace_20241122_abc123.1');
-      expect(data.agent.provider).toBe('anthropic');
+      expect(data.agent.providerInstanceId).toBeDefined();
       expect(data.agent.modelId).toBe('claude-3-sonnet');
     });
 

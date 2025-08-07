@@ -47,13 +47,7 @@ export async function GET(
       id: session.getId(),
       name: sessionInfo?.name ?? 'Unknown',
       createdAt: sessionInfo?.createdAt ?? new Date(),
-      agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-      })),
+      agents: agents,
     };
 
     return createSuperjsonResponse({ session: sessionData });
@@ -138,13 +132,7 @@ export async function PATCH(
       description: (updatedSessionData as { description?: string }).description,
       status: (updatedSessionData as { status?: string }).status,
       createdAt: (updatedSessionData as { createdAt: Date }).createdAt,
-      agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-      })),
+      agents: agents,
     };
 
     return createSuperjsonResponse({ session: sessionData });

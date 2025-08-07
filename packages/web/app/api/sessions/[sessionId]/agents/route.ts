@@ -161,11 +161,7 @@ export async function GET(
     const agents = session.getAgents();
     return createSuperjsonResponse({
       agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
+        ...agent,
         createdAt: new Date(),
       })),
     });

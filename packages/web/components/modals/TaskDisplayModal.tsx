@@ -179,14 +179,14 @@ export function TaskDisplayModal({
     if (assigneeId === 'human') return 'Human';
     
     const agent = agents.find(a => a.threadId === assigneeId);
-    return agent ? `${agent.name} (${agent.model})` : assigneeId;
+    return agent ? `${agent.name} (${agent.modelId})` : assigneeId;
   };
 
   const getAuthorName = (author: string) => {
     if (author === 'human') return 'Human';
     
     const agent = agents.find(a => a.threadId === author);
-    return agent ? `${agent.name} (${agent.model})` : author;
+    return agent ? `${agent.name} (${agent.modelId})` : author;
   };
 
   if (!task) {
@@ -308,7 +308,7 @@ export function TaskDisplayModal({
                 <option value="human">👨‍💻 Human</option>
                 {agents.map((agent) => (
                   <option key={agent.threadId} value={agent.threadId}>
-                    🤖 {agent.name} ({agent.model})
+                    🤖 {agent.name} ({agent.modelId})
                   </option>
                 ))}
               </select>

@@ -47,10 +47,8 @@ export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 export interface AgentInfo {
   threadId: ThreadId;
   name: string;
-  provider: string;
-  model: string;
-  providerInstanceId?: string;
-  modelId?: string;
+  providerInstanceId: string;
+  modelId: string;
   status: AgentState;
 }
 
