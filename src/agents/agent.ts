@@ -37,7 +37,7 @@ export interface AgentConfig {
   tokenBudget?: TokenBudgetConfig;
 }
 
-export interface AgentResponse {
+interface AgentMessageResult {
   content: string;
   toolCalls: ProviderToolCall[];
 }
@@ -506,7 +506,7 @@ export class Agent extends EventEmitter {
       this.emit('agent_thinking_start');
 
       // Get agent response with available tools
-      let response: AgentResponse;
+      let response: AgentMessageResult;
 
       try {
         response = await this._createResponse(
@@ -609,7 +609,7 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     signal?: AbortSignal
-  ): Promise<AgentResponse> {
+  ): Promise<AgentMessageResult> {
     // Default to streaming if provider supports it (unless explicitly disabled)
     const useStreaming =
       this.providerInstance.supportsStreaming && this.providerInstance.config?.streaming !== false;
@@ -625,7 +625,7 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     signal?: AbortSignal
-  ): Promise<AgentResponse> {
+  ): Promise<AgentMessageResult> {
     // Set to streaming state
     this._setState('streaming');
 
@@ -762,7 +762,7 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     signal?: AbortSignal
-  ): Promise<AgentResponse> {
+  ): Promise<AgentMessageResult> {
     // Set up retry event listeners for non-streaming requests
     const retryAttemptListener = ({
       attempt,
