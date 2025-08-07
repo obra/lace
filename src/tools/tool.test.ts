@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { ToolContext, ToolResult } from '~/tools/types';
+import { join } from 'path';
 
 // Test implementation of new Tool class
 class TestTool extends Tool {
@@ -173,7 +174,13 @@ class TempDirectoryTestTool extends Tool {
   }
 
   public getOutputFilePathsPublic(context?: ToolContext) {
-    return this.getOutputFilePaths(context);
+    // Use toolTempDir to create output file paths
+    const toolTempDir = this.getToolTempDir(context);
+    return {
+      stdout: join(toolTempDir, 'stdout.txt'),
+      stderr: join(toolTempDir, 'stderr.txt'),
+      combined: join(toolTempDir, 'combined.txt'),
+    };
   }
 }
 
@@ -184,33 +191,27 @@ describe('Tool temp directory functionality', () => {
     testTool = new TempDirectoryTestTool();
   });
 
-  it('should get output file paths from context', () => {
+  it('should get output file paths from temp directory', () => {
     const context: ToolContext = {
-      sessionId: 'test-session',
-      projectId: 'test-project',
-      outputFilePaths: {
-        stdout: '/tmp/test/stdout.txt',
-        stderr: '/tmp/test/stderr.txt',
-        combined: '/tmp/test/combined.txt',
-      },
+      toolTempDir: '/tmp/test/tool-temp-dir',
     };
 
     const paths = testTool.getOutputFilePathsPublic(context);
-    expect(paths.stdout).toBe('/tmp/test/stdout.txt');
-    expect(paths.stderr).toBe('/tmp/test/stderr.txt');
-    expect(paths.combined).toBe('/tmp/test/combined.txt');
+    expect(paths.stdout).toBe('/tmp/test/tool-temp-dir/stdout.txt');
+    expect(paths.stderr).toBe('/tmp/test/tool-temp-dir/stderr.txt');
+    expect(paths.combined).toBe('/tmp/test/tool-temp-dir/combined.txt');
   });
 
-  it('should throw error when output file paths not provided', () => {
+  it('should throw error when temp directory not provided', () => {
     const context: ToolContext = {
       sessionId: 'test-session',
       projectId: 'test-project',
-      // No outputFilePaths
+      // No toolTempDir
     };
 
     expect(() => {
       testTool.getOutputFilePathsPublic(context);
-    }).toThrow('Output file paths not provided by ToolExecutor');
+    }).toThrow('Tool temp directory not provided by ToolExecutor');
   });
 
   it('should get tool temp dir from context', () => {

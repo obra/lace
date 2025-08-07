@@ -6,6 +6,7 @@ import { Tool } from '~/tools/tool';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { Session } from '~/sessions/session';
+import { ThreadId } from '~/threads/types';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { BashTool } from '~/tools/implementations/bash';
@@ -96,7 +97,6 @@ export class ToolExecutor {
     this.registerTools(tools);
   }
 
-
   /**
    * Create temp directory for a tool call
    */
@@ -106,7 +106,7 @@ export class ToolExecutor {
     }
 
     // Get session instance and use its temp directory method
-    const session = Session.getByIdSync(context.sessionId);
+    const session = Session.getByIdSync(context.sessionId as ThreadId);
     if (!session) {
       throw new Error(`Session not found: ${context.sessionId}`);
     }

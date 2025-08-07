@@ -269,6 +269,17 @@ export class Session {
     return null;
   }
 
+  /**
+   * Static method for backward compatibility with existing tests
+   * Creates session temp directory using project temp directory as base
+   */
+  static getSessionTempDir(sessionId: string, projectId: string): string {
+    const projectTempDir = Project.getProjectTempDir(projectId);
+    const sessionTempPath = join(projectTempDir, `session-${sessionId}`);
+    mkdirSync(sessionTempPath, { recursive: true });
+    return sessionTempPath;
+  }
+
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 

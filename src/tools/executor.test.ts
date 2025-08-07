@@ -16,8 +16,14 @@ import type { ToolContext, ToolResult } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('ToolExecutor with new schema-based tools', () => {
   const tempDir = createTestTempDir();
@@ -305,9 +311,10 @@ describe('ToolExecutor with new schema-based tools', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('session context required for security policy enforcement');
+      expect(result.content[0].text).toContain(
+        'session context required for security policy enforcement'
+      );
     });
-
 
     it('should work without temp directories when session/project missing', async () => {
       const context: ToolContext = {

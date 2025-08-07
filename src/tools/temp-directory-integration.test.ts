@@ -14,8 +14,14 @@ import { join } from 'path';
 import type { ToolContext, ToolResult } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 // Test tool for integration testing
 class IntegrationTestTool extends Tool {
@@ -150,7 +156,7 @@ describe('Temp Directory Integration', () => {
     const stdoutFile = join(toolTempDir, 'stdout.txt');
     const stderrFile = join(toolTempDir, 'stderr.txt');
     const combinedFile = join(toolTempDir, 'combined.txt');
-    
+
     writeFileSync(stdoutFile, 'stdout content');
     writeFileSync(stderrFile, 'stderr content');
     writeFileSync(combinedFile, 'combined content');

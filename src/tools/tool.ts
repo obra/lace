@@ -86,7 +86,6 @@ export abstract class Tool {
     return resolve(workingDir, path);
   }
 
-
   /**
    * Get tool temp directory provided by ToolExecutor
    * Throws error if ToolExecutor didn't provide temp directory
