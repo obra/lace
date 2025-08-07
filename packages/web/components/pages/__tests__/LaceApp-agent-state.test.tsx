@@ -12,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { LaceApp } from '@/components/pages/LaceApp';
 import type { SessionInfo, AgentInfo, AgentState } from '@/types/core';
 import { stringify } from '@/lib/serialization';
+import { asThreadId } from '~/threads/types';
 
 // Use real theme provider instead of mocking internal business logic  
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
@@ -125,7 +126,7 @@ const renderWithProviders = (component: React.ReactElement) => {
 
 // Helper to render with proper act() wrapping to avoid warnings
 const renderWithProvidersAsync = async (component: React.ReactElement) => {
-  let result: ReturnType<typeof renderWithProviders>;
+  let result!: ReturnType<typeof renderWithProviders>;
   await act(async () => {
     result = renderWithProviders(component);
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -204,16 +205,16 @@ describe('LaceApp agent state handling', () => {
 
     // Set up session details with an agent in idle state initially
     const mockSessionInfo: SessionInfo = {
-      id: 'test-session',
+      id: asThreadId('test-session'),
       name: 'Test Session',
       createdAt: new Date(),
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       agents: [{
-        threadId: 'test-agent',
+        threadId: asThreadId('test-agent'),
         name: 'Test Agent',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
+        provider: 'anthropic', // Legacy field still needed by AgentInfo type
+        providerInstanceId: 'test-anthropic-instance',
+        model: 'claude-3-5-haiku-20241022', // Legacy field still needed by AgentInfo type
+        modelId: 'claude-3-5-haiku-20241022',
         status: 'idle' as AgentState,
       }],
     };
@@ -428,7 +429,7 @@ describe('LaceApp agent state handling', () => {
         onAgentStateChange: expect.any(Function),
         projectId: 'test-project',
         sessionId: 'test-session',
-        threadIds: ['test-agent'],
+        threadIds: [asThreadId('test-agent')],
       })
     );
 
@@ -436,7 +437,7 @@ describe('LaceApp agent state handling', () => {
     await act(async () => {
       if (onAgentStateChangeCallback) {
         expect(() => {
-          onAgentStateChangeCallback('test-agent', 'idle', 'thinking');
+          onAgentStateChangeCallback!('test-agent', 'idle', 'thinking');
         }).not.toThrow();
       }
     });

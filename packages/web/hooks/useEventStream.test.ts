@@ -7,6 +7,7 @@ import { useEventStream } from './useEventStream';
 import type { SessionEvent } from '@/types/web-sse';
 import type { StreamEvent } from '@/types/stream-events';
 import { stringify } from '@/lib/serialization';
+import { asThreadId } from '~/threads/types';
 
 // Mock logger to suppress intentional error messages during testing
 vi.mock('~/utils/logger', () => ({
@@ -76,7 +77,7 @@ describe('useEventStream agent state change handling', () => {
     vi.clearAllMocks();
     // Mock console.error to suppress intentional error logging during error handling tests
     console.error = vi.fn();
-    
+
     // Intercept EventSource creation to get reference to mock
     const OriginalEventSource = global.EventSource;
     global.EventSource = vi.fn().mockImplementation((url: string) => {
@@ -97,7 +98,7 @@ describe('useEventStream agent state change handling', () => {
   it('should call onAgentStateChange callback when AGENT_STATE_CHANGE event is received', async () => {
     // Arrange: Set up the hook with a mock callback
     const mockOnAgentStateChange = vi.fn();
-    
+
     const { result } = renderHook(() =>
       useEventStream({
         sessionId: 'test-session',
@@ -107,7 +108,7 @@ describe('useEventStream agent state change handling', () => {
 
     // Wait for connection to establish
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     // Verify connection is established
@@ -117,14 +118,14 @@ describe('useEventStream agent state change handling', () => {
     const mockStreamEvent = {
       id: 'event-123',
       eventType: 'session',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-456',
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId('agent-456'),
+        timestamp: new Date(),
         data: {
-          agentId: 'agent-456',
+          agentId: asThreadId('agent-456'),
           from: 'idle',
           to: 'thinking',
         },
@@ -133,18 +134,22 @@ describe('useEventStream agent state change handling', () => {
 
     await act(async () => {
       mockEventSource.simulateMessage(mockStreamEvent);
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Assert: Verify the callback was called with correct parameters
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(1);
-    expect(mockOnAgentStateChange).toHaveBeenCalledWith('agent-456', 'idle', 'thinking');
+    expect(mockOnAgentStateChange).toHaveBeenCalledWith(
+      asThreadId('agent-456'),
+      'idle',
+      'thinking'
+    );
   });
 
   it('should handle multiple agent state transitions correctly', async () => {
     // Arrange: Set up the hook with a mock callback
     const mockOnAgentStateChange = vi.fn();
-    
+
     const { result } = renderHook(() =>
       useEventStream({
         sessionId: 'test-session',
@@ -154,49 +159,69 @@ describe('useEventStream agent state change handling', () => {
 
     // Wait for connection to establish
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     // Act: Simulate multiple state transitions
     const transitions = [
-      { agentId: 'agent-456', from: 'idle', to: 'thinking' },
-      { agentId: 'agent-456', from: 'thinking', to: 'streaming' },
-      { agentId: 'agent-456', from: 'streaming', to: 'tool_execution' },
-      { agentId: 'agent-456', from: 'tool_execution', to: 'idle' },
+      { agentId: asThreadId('agent-456'), from: 'idle', to: 'thinking' },
+      { agentId: asThreadId('agent-456'), from: 'thinking', to: 'streaming' },
+      { agentId: asThreadId('agent-456'), from: 'streaming', to: 'tool_execution' },
+      { agentId: asThreadId('agent-456'), from: 'tool_execution', to: 'idle' },
     ];
 
     for (const transition of transitions) {
       const mockStreamEvent = {
         id: `event-${Date.now()}`,
         eventType: 'session',
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         scope: { sessionId: 'test-session' },
         data: {
           type: 'AGENT_STATE_CHANGE',
           threadId: transition.agentId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: transition,
         } satisfies SessionEvent,
       };
 
       await act(async () => {
         mockEventSource.simulateMessage(mockStreamEvent);
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
     }
 
     // Assert: Verify all transitions were processed
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(4);
-    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(1, 'agent-456', 'idle', 'thinking');
-    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(2, 'agent-456', 'thinking', 'streaming');
-    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(3, 'agent-456', 'streaming', 'tool_execution');
-    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(4, 'agent-456', 'tool_execution', 'idle');
+    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
+      1,
+      asThreadId('agent-456'),
+      'idle',
+      'thinking'
+    );
+    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
+      2,
+      asThreadId('agent-456'),
+      'thinking',
+      'streaming'
+    );
+    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
+      3,
+      asThreadId('agent-456'),
+      'streaming',
+      'tool_execution'
+    );
+    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
+      4,
+      asThreadId('agent-456'),
+      'tool_execution',
+      'idle'
+    );
   });
 
   it('should handle multiple agents with different state changes', async () => {
     // Arrange: Set up the hook with a mock callback
     const mockOnAgentStateChange = vi.fn();
-    
+
     const { result } = renderHook(() =>
       useEventStream({
         sessionId: 'test-session',
@@ -206,21 +231,21 @@ describe('useEventStream agent state change handling', () => {
 
     // Wait for connection to establish
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     // Act: Simulate state changes for different agents
     const agent1Event = {
       id: 'event-1',
       eventType: 'session',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-1',
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId('agent-1'),
+        timestamp: new Date(),
         data: {
-          agentId: 'agent-1',
+          agentId: asThreadId('agent-1'),
           from: 'idle',
           to: 'thinking',
         },
@@ -230,14 +255,14 @@ describe('useEventStream agent state change handling', () => {
     const agent2Event = {
       id: 'event-2',
       eventType: 'session',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-2',
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId('agent-2'),
+        timestamp: new Date(),
         data: {
-          agentId: 'agent-2',
+          agentId: asThreadId('agent-2'),
           from: 'idle',
           to: 'streaming',
         },
@@ -246,24 +271,34 @@ describe('useEventStream agent state change handling', () => {
 
     await act(async () => {
       mockEventSource.simulateMessage(agent1Event);
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     await act(async () => {
       mockEventSource.simulateMessage(agent2Event);
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Assert: Verify both agents' state changes were processed
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(2);
-    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(1, 'agent-1', 'idle', 'thinking');
-    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(2, 'agent-2', 'idle', 'streaming');
+    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
+      1,
+      asThreadId('agent-1'),
+      'idle',
+      'thinking'
+    );
+    expect(mockOnAgentStateChange).toHaveBeenNthCalledWith(
+      2,
+      asThreadId('agent-2'),
+      'idle',
+      'streaming'
+    );
   });
 
   it('should not call onAgentStateChange for non-AGENT_STATE_CHANGE events', async () => {
     // Arrange: Set up the hook with a mock callback
     const mockOnAgentStateChange = vi.fn();
-    
+
     const { result } = renderHook(() =>
       useEventStream({
         sessionId: 'test-session',
@@ -273,7 +308,7 @@ describe('useEventStream agent state change handling', () => {
 
     // Wait for connection to establish
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     // Act: Simulate receiving other types of session events
@@ -296,18 +331,18 @@ describe('useEventStream agent state change handling', () => {
       const mockStreamEvent = {
         id: `event-${Date.now()}`,
         eventType: 'session',
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         scope: { sessionId: 'test-session' },
         data: {
           ...eventData,
-          threadId: 'agent-456',
-          timestamp: new Date().toISOString(),
+          threadId: asThreadId('agent-456'),
+          timestamp: new Date(),
         } as SessionEvent,
       };
 
       await act(async () => {
         mockEventSource.simulateMessage(mockStreamEvent);
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
     }
 
@@ -319,7 +354,7 @@ describe('useEventStream agent state change handling', () => {
     // Arrange: Set up the hook with mock callbacks
     const mockOnAgentStateChange = vi.fn();
     const mockOnError = vi.fn();
-    
+
     const { result } = renderHook(() =>
       useEventStream({
         sessionId: 'test-session',
@@ -330,22 +365,22 @@ describe('useEventStream agent state change handling', () => {
 
     // Wait for connection to establish
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     // Act: Simulate receiving a malformed AGENT_STATE_CHANGE event
     const malformedEvent = {
       id: 'event-123',
       eventType: 'session',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-456',
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId('agent-456'),
+        timestamp: new Date(),
         data: {
           // Missing required fields
-          agentId: 'agent-456',
+          agentId: asThreadId('agent-456'),
           // from and to are missing
         },
       } as SessionEvent,
@@ -353,7 +388,7 @@ describe('useEventStream agent state change handling', () => {
 
     await act(async () => {
       mockEventSource.simulateMessage(malformedEvent);
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Assert: Should handle the error and not crash
@@ -373,21 +408,21 @@ describe('useEventStream agent state change handling', () => {
 
     // Wait for connection to establish
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     // Act: Simulate receiving an AGENT_STATE_CHANGE event
     const mockStreamEvent = {
       id: 'event-123',
       eventType: 'session',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       scope: { sessionId: 'test-session' },
       data: {
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-456',
-        timestamp: new Date().toISOString(),
+        threadId: asThreadId('agent-456'),
+        timestamp: new Date(),
         data: {
-          agentId: 'agent-456', 
+          agentId: asThreadId('agent-456'),
           from: 'idle',
           to: 'thinking',
         },
@@ -396,7 +431,7 @@ describe('useEventStream agent state change handling', () => {
 
     await act(async () => {
       mockEventSource.simulateMessage(mockStreamEvent);
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Assert: Should not throw any errors - this is a smoke test

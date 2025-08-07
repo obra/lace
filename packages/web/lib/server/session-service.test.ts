@@ -536,8 +536,8 @@ describe('SessionService agent state change broadcasting', () => {
     });
 
     // Verify timestamp is reasonable
-    const broadcastCall = broadcastSpy.mock.calls[0][0];
-    const eventData = broadcastCall.data as SessionEvent;
+    const broadcastCall = broadcastSpy.mock.calls[0][0] as { data: SessionEvent };
+    const eventData = broadcastCall.data;
     const timestamp = new Date(eventData.timestamp);
     expect(timestamp.getTime()).toBeGreaterThanOrEqual(beforeTime.getTime());
     expect(timestamp.getTime()).toBeLessThanOrEqual(afterTime.getTime());
@@ -560,7 +560,7 @@ describe('SessionService agent state change broadcasting', () => {
 
     // Assert: Should only see ONE broadcast despite multiple handler registrations
     const stateChangeCalls = broadcastSpy.mock.calls.filter(
-      (call) => (call[0].data as SessionEvent).type === 'AGENT_STATE_CHANGE'
+      (call) => (call[0] as { data: SessionEvent }).data.type === 'AGENT_STATE_CHANGE'
     );
     expect(stateChangeCalls).toHaveLength(1);
   });
