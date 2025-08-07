@@ -6,6 +6,7 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import { fileEditRenderer } from './file-edit';
 import type { ToolResult } from './types';
+import type { ToolAggregatedEventData } from '@/types/web-events';
 
 describe('fileEditRenderer', () => {
   describe('getSummary', () => {
@@ -100,7 +101,7 @@ describe('fileEditRenderer', () => {
         },
       };
 
-      const rendered = fileEditRenderer.renderResult!(result, metadata);
+      const rendered = fileEditRenderer.renderResult!(result, metadata as ToolAggregatedEventData);
       const { container } = render(React.createElement('div', null, rendered));
 
       // Should show warning about no context

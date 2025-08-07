@@ -97,27 +97,27 @@ describe('Session Configuration API', () => {
       );
     });
 
-    it('should return 404 when session not found', async () => {
+    it('should return 400 for invalid session ID format', async () => {
       const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration');
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: 'nonexistent' }),
       });
       const data = await parseResponse<ErrorResponse>(response);
 
-      expect(response.status).toBe(404);
-      expect(data.error).toBe('Session not found');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
     });
 
-    it('should handle errors gracefully', async () => {
-      // Test with a malformed sessionId that will cause an error in the route
+    it('should return 404 when session not found', async () => {
+      // Use a valid thread ID format that doesn't exist in the database
+      const nonExistentSessionId = 'lace_20250101_sess01';
       const request = new NextRequest(
-        'http://localhost/api/sessions/invalid-session-id/configuration'
+        `http://localhost/api/sessions/${nonExistentSessionId}/configuration`
       );
       const response = await GET(request, {
-        params: Promise.resolve({ sessionId: 'invalid-session-id' }),
+        params: Promise.resolve({ sessionId: nonExistentSessionId }),
       });
 
-      // Should return 404 for non-existent session (which is the actual behavior)
       expect(response.status).toBe(404);
       const data = await parseResponse<ErrorResponse>(response);
       expect(data.error).toBe('Session not found');
@@ -152,7 +152,7 @@ describe('Session Configuration API', () => {
       expect(data.configuration.maxTokens).toBe(8000);
     });
 
-    it('should return 404 when session not found', async () => {
+    it('should return 400 for invalid session ID format', async () => {
       const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration', {
         method: 'PUT',
         body: JSON.stringify({
@@ -164,6 +164,30 @@ describe('Session Configuration API', () => {
 
       const response = await PUT(request, {
         params: Promise.resolve({ sessionId: 'nonexistent' }),
+      });
+      const data = await parseResponse<ErrorResponse>(response);
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid session ID');
+    });
+
+    it('should return 404 when session not found', async () => {
+      // Use a valid thread ID format that doesn't exist in the database
+      const nonExistentSessionId = 'lace_20250101_sess02';
+      const request = new NextRequest(
+        `http://localhost/api/sessions/${nonExistentSessionId}/configuration`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            providerInstanceId: providerInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const response = await PUT(request, {
+        params: Promise.resolve({ sessionId: nonExistentSessionId }),
       });
       const data = await parseResponse<ErrorResponse>(response);
 

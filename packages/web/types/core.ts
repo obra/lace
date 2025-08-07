@@ -13,6 +13,7 @@ export type {
   TaskNote,
   TaskStatus,
   TaskPriority,
+  TaskActor,
   TaskContext,
   TaskFilters,
 } from '~/tasks/types';

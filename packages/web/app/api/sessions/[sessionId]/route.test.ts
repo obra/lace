@@ -14,7 +14,6 @@ import {
 } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/types/core';
 import { Session } from '@/lib/server/lace-imports';
 
 // ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
@@ -145,11 +144,11 @@ describe('Session Detail API Route', () => {
     });
 
     it('should return 400 for invalid session ID format', async () => {
-      const sessionId = asThreadId('non_existent');
+      const invalidSessionId = 'non_existent';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`);
       const response = await GET(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
+        params: Promise.resolve({ sessionId: invalidSessionId }),
       });
       const data = await parseResponse<{ error: string }>(response);
 
@@ -158,11 +157,11 @@ describe('Session Detail API Route', () => {
     });
 
     it('should handle invalid session ID format gracefully', async () => {
-      const sessionId = asThreadId('invalid_session_id');
+      const invalidSessionId = 'invalid_session_id';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`);
       const response = await GET(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
+        params: Promise.resolve({ sessionId: invalidSessionId }),
       });
       const data = await parseResponse<{ error: string }>(response);
 
@@ -225,16 +224,16 @@ describe('Session Detail API Route', () => {
     });
 
     it('should return 400 for invalid session ID format', async () => {
-      const sessionId = asThreadId('non_existent');
+      const invalidSessionId = 'non_existent';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated Name' }),
         headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
+        params: Promise.resolve({ sessionId: invalidSessionId }),
       });
 
       const data = await parseResponse<{ error: string }>(response);
@@ -324,16 +323,16 @@ describe('Session Detail API Route', () => {
     });
 
     it('should handle invalid session ID format in updates', async () => {
-      const sessionId = asThreadId('invalid_session_id');
+      const invalidSessionId = 'invalid_session_id';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated Name' }),
         headers: { 'Content-Type': 'application/json' },
       });
 
       const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
+        params: Promise.resolve({ sessionId: invalidSessionId }),
       });
 
       const data = await parseResponse<{ error: string }>(response);
@@ -350,7 +349,7 @@ describe('Session Detail API Route', () => {
       // Mock the Session class directly
       const { Session } = await import('~/sessions/session');
       const mockDirectSessionData = {
-        id: 'test-session',
+        id: 'lace_20250101_sess01',
         name: 'Updated Session',
         description: 'Updated description',
         status: 'active',

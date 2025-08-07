@@ -62,8 +62,8 @@ const mockTasks: Task[] = [
     status: 'in_progress',
     priority: 'high',
     assignedTo: asAssigneeId('human'),
-    createdBy: asThreadId('test-user'),
-    threadId: asThreadId('test-session'),
+    createdBy: asThreadId('lace_20250101_user01'),
+    threadId: asThreadId('lace_20250101_sess01'),
     createdAt: new Date('2024-01-15T10:00:00Z'),
     updatedAt: new Date('2024-01-15T10:00:00Z'),
     notes: [],
@@ -76,8 +76,8 @@ const mockTasks: Task[] = [
     status: 'pending',
     priority: 'medium',
     assignedTo: undefined,
-    createdBy: asThreadId('test-user'),
-    threadId: asThreadId('test-session'),
+    createdBy: asThreadId('lace_20250101_user01'),
+    threadId: asThreadId('lace_20250101_sess01'),
     createdAt: new Date('2024-01-15T09:00:00Z'),
     updatedAt: new Date('2024-01-15T09:00:00Z'),
     notes: [],
@@ -90,8 +90,8 @@ const mockTasks: Task[] = [
     status: 'blocked',
     priority: 'low',
     assignedTo: asAssigneeId('agent-123'),
-    createdBy: asThreadId('test-user'),
-    threadId: asThreadId('test-session'),
+    createdBy: asThreadId('lace_20250101_user01'),
+    threadId: asThreadId('lace_20250101_sess01'),
     createdAt: new Date('2024-01-15T08:00:00Z'),
     updatedAt: new Date('2024-01-15T08:00:00Z'),
     notes: [],
@@ -123,7 +123,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should render task summary', () => {
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -134,7 +134,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show in progress tasks first', () => {
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -146,7 +146,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show pending tasks', () => {
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -158,7 +158,7 @@ describe('TaskListSidebar', () => {
   });
 
   it('should show blocked tasks', () => {
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -173,7 +173,7 @@ describe('TaskListSidebar', () => {
     const mockOnOpenTaskBoard = vi.fn();
     const user = userEvent.setup();
 
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -194,7 +194,7 @@ describe('TaskListSidebar', () => {
     const mockOnCreateTask = vi.fn();
     const user = userEvent.setup();
 
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -227,7 +227,7 @@ describe('TaskListSidebar', () => {
       handleTaskNoteAdded: vi.fn(),
     });
 
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -256,7 +256,7 @@ describe('TaskListSidebar', () => {
       handleTaskNoteAdded: vi.fn(),
     });
 
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}
@@ -277,8 +277,8 @@ describe('TaskListSidebar', () => {
         status: 'in_progress' as const,
         priority: 'medium' as const,
         assignedTo: asAssigneeId('human'),
-        createdBy: asThreadId('test-user'),
-        threadId: asThreadId('test-session'),
+        createdBy: asThreadId('lace_20250101_user01'),
+        threadId: asThreadId('lace_20250101_sess01'),
         createdAt: new Date('2024-01-15T10:00:00Z'),
         updatedAt: new Date('2024-01-15T10:00:00Z'),
         notes: [],
@@ -291,8 +291,8 @@ describe('TaskListSidebar', () => {
         status: 'pending' as const,
         priority: 'medium' as const,
         assignedTo: undefined,
-        createdBy: asThreadId('test-user'),
-        threadId: asThreadId('test-session'),
+        createdBy: asThreadId('lace_20250101_user01'),
+        threadId: asThreadId('lace_20250101_sess01'),
         createdAt: new Date('2024-01-15T09:00:00Z'),
         updatedAt: new Date('2024-01-15T09:00:00Z'),
         notes: [],
@@ -317,7 +317,7 @@ describe('TaskListSidebar', () => {
       handleTaskNoteAdded: vi.fn(),
     });
 
-    const mockTaskManager = useTaskManager('test-project', 'test-session');
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(
       <TaskListSidebar
         taskManager={mockTaskManager}

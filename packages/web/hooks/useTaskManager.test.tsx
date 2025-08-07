@@ -29,7 +29,7 @@ describe('useTaskManager Hook Logic', () => {
   let mockClient: Partial<TaskAPIClient>;
 
   const mockProjectId = 'project_123';
-  const mockSessionId = 'lace_20240101_session';
+  const mockSessionId = 'lace_20240101_sess01';
   const mockTask: Task = {
     id: 'task_20240101_abc123',
     title: 'Test Task',
@@ -38,7 +38,7 @@ describe('useTaskManager Hook Logic', () => {
     status: 'pending',
     priority: 'high',
     createdBy: asThreadId('lace_20240101_agent1'),
-    threadId: asThreadId('lace_20240101_session'),
+    threadId: asThreadId('lace_20240101_sess01'),
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
     notes: [],

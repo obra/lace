@@ -10,14 +10,14 @@ import { convertSessionEventsToTimeline, type ConversionContext } from '@/lib/ti
 
 const mockAgents: AgentInfo[] = [
   {
-    threadId: asThreadId('session-123.agent-1'),
+    threadId: asThreadId('lace_20250721_sess01.1'),
     name: 'Claude',
     provider: 'anthropic',
     model: 'claude-3-sonnet',
     status: 'idle',
   },
   {
-    threadId: asThreadId('session-123.agent-2'),
+    threadId: asThreadId('lace_20250721_sess01.2'),
     name: 'GPT-4',
     provider: 'openai',
     model: 'gpt-4',
@@ -28,19 +28,19 @@ const mockAgents: AgentInfo[] = [
 const mockSessionEvents: SessionEvent[] = [
   {
     type: 'USER_MESSAGE',
-    threadId: asThreadId('session-123'),
+    threadId: asThreadId('lace_20250721_sess01'),
     timestamp: new Date('2025-07-21T10:30:00Z'),
     data: { content: 'Hello, can you help me with TypeScript?' },
   },
   {
     type: 'AGENT_MESSAGE',
-    threadId: asThreadId('session-123.agent-1'),
+    threadId: asThreadId('lace_20250721_sess01.1'),
     timestamp: new Date('2025-07-21T10:30:30Z'),
     data: { content: "Of course! I'd be happy to help you with TypeScript." },
   },
   {
     type: 'TOOL_CALL',
-    threadId: asThreadId('session-123.agent-1'),
+    threadId: asThreadId('lace_20250721_sess01.1'),
     timestamp: new Date('2025-07-21T10:31:00Z'),
     data: {
       id: 'call-123',
@@ -50,7 +50,7 @@ const mockSessionEvents: SessionEvent[] = [
   },
   {
     type: 'TOOL_RESULT',
-    threadId: asThreadId('session-123.agent-1'),
+    threadId: asThreadId('lace_20250721_sess01.1'),
     timestamp: new Date('2025-07-21T10:31:15Z'),
     data: {
       content: [{ type: 'text', text: 'interface User { id: number; name: string; }' }],
@@ -59,7 +59,7 @@ const mockSessionEvents: SessionEvent[] = [
   },
   {
     type: 'LOCAL_SYSTEM_MESSAGE',
-    threadId: asThreadId('session-123'),
+    threadId: asThreadId('lace_20250721_sess01'),
     timestamp: new Date('2025-07-21T10:32:00Z'),
     data: { content: 'Connected to session stream' },
   },
@@ -78,7 +78,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01-\d+-0$/) as string,
         type: 'human',
         content: 'Hello, can you help me with TypeScript?',
         timestamp: new Date('2025-07-21T10:30:00Z'),
@@ -93,7 +93,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01\.1-\d+-0$/) as string,
         type: 'ai',
         content: "Of course! I'd be happy to help you with TypeScript.",
         timestamp: new Date('2025-07-21T10:30:30Z'),
@@ -109,7 +109,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01\.1-\d+-0$/) as string,
         type: 'tool',
         content: 'file_read',
         tool: 'file_read',
@@ -129,7 +129,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01\.1-\d+-0$/) as string,
         type: 'tool',
         content: 'file_read',
         tool: 'file_read',
@@ -158,7 +158,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01-\d+-0$/) as string,
         type: 'admin',
         content: 'Connected to session stream',
         timestamp: new Date('2025-07-21T10:32:00Z'),
@@ -169,7 +169,7 @@ describe('convertSessionEventsToTimeline', () => {
   test('filters events by selected agent', () => {
     const contextWithSelectedAgent: ConversionContext = {
       ...defaultContext,
-      selectedAgent: asThreadId('session-123.agent-1'),
+      selectedAgent: asThreadId('lace_20250721_sess01.1'),
     };
 
     const result = convertSessionEventsToTimeline(mockSessionEvents, contextWithSelectedAgent);
@@ -190,19 +190,19 @@ describe('convertSessionEventsToTimeline', () => {
     const streamingEvents: SessionEvent[] = [
       {
         type: 'AGENT_TOKEN',
-        threadId: asThreadId('session-123.agent-1'),
+        threadId: asThreadId('lace_20250721_sess01.1'),
         timestamp: new Date('2025-07-21T10:35:00Z'),
         data: { token: 'Hello ' },
       },
       {
         type: 'AGENT_TOKEN',
-        threadId: asThreadId('session-123.agent-1'),
+        threadId: asThreadId('lace_20250721_sess01.1'),
         timestamp: new Date('2025-07-21T10:35:01Z'),
         data: { token: 'there!' },
       },
       {
         type: 'AGENT_MESSAGE',
-        threadId: asThreadId('session-123.agent-1'),
+        threadId: asThreadId('lace_20250721_sess01.1'),
         timestamp: new Date('2025-07-21T10:35:02Z'),
         data: { content: 'Hello there!' },
       },
@@ -214,7 +214,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01\.1-\d+-0$/) as string,
         type: 'ai',
         content: 'Hello there!',
         timestamp: new Date('2025-07-21T10:35:02Z'),
@@ -227,13 +227,13 @@ describe('convertSessionEventsToTimeline', () => {
     const incompleteStreamingEvents: SessionEvent[] = [
       {
         type: 'AGENT_TOKEN',
-        threadId: asThreadId('session-123.agent-1'),
+        threadId: asThreadId('lace_20250721_sess01.1'),
         timestamp: new Date('2025-07-21T10:36:00Z'),
         data: { token: 'Hello ' },
       },
       {
         type: 'AGENT_TOKEN',
-        threadId: asThreadId('session-123.agent-1'),
+        threadId: asThreadId('lace_20250721_sess01.1'),
         timestamp: new Date('2025-07-21T10:36:01Z'),
         data: { token: 'incomplete...' },
       },
@@ -245,7 +245,7 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123\.agent-1-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01\.1-\d+-0$/) as string,
         type: 'ai',
         content: 'Hello incomplete...',
         timestamp: new Date('2025-07-21T10:36:01Z'),
@@ -260,7 +260,7 @@ describe('convertSessionEventsToTimeline', () => {
     for (let i = 0; i < 150; i++) {
       manyTokenEvents.push({
         type: 'AGENT_TOKEN',
-        threadId: asThreadId('session-123.agent-1'),
+        threadId: asThreadId('lace_20250721_sess01.1'),
         timestamp: new Date(`2025-07-21T10:40:${String(i).padStart(2, '0')}Z`),
         data: { token: `token${i} ` },
       });
@@ -276,7 +276,7 @@ describe('convertSessionEventsToTimeline', () => {
     const unknownAgentEvent: SessionEvent[] = [
       {
         type: 'AGENT_MESSAGE',
-        threadId: asThreadId('session-123.unknown-agent'),
+        threadId: asThreadId('lace_20250721_sess01.9'),
         timestamp: new Date('2025-07-21T10:37:00Z'),
         data: { content: 'Message from unknown agent' },
       },
@@ -285,7 +285,7 @@ describe('convertSessionEventsToTimeline', () => {
     const result = convertSessionEventsToTimeline(unknownAgentEvent, defaultContext);
 
     expect(result).toHaveLength(1);
-    expect(result[0].agent).toBe('Agent unknown'); // Fallback agent name
+    expect(result[0].agent).toBe('Agent 9'); // Fallback agent name
   });
 
   test('handles empty events array', () => {
@@ -316,7 +316,7 @@ describe('convertSessionEventsToTimeline', () => {
   test('handles unknown event types gracefully', () => {
     const unknownEvent = {
       type: 'UNKNOWN_EVENT_TYPE',
-      threadId: asThreadId('session-123'),
+      threadId: asThreadId('lace_20250721_sess01'),
       timestamp: new Date('2025-07-21T10:38:00Z'),
       data: { someData: 'test' },
     } as unknown as SessionEvent; // Cast to SessionEvent to test fallback handling
@@ -326,14 +326,14 @@ describe('convertSessionEventsToTimeline', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
       expect.objectContaining({
-        id: expect.stringMatching(/^session-123-\d+-0$/) as string,
+        id: expect.stringMatching(/^lace_20250721_sess01-\d+-0$/) as string,
         type: 'unknown',
         eventType: 'UNKNOWN_EVENT_TYPE',
         content: '{\n  "someData": "test"\n}',
         timestamp: new Date('2025-07-21T10:38:00Z'),
         metadata: {
           originalType: 'UNKNOWN_EVENT_TYPE',
-          threadId: 'session-123',
+          threadId: 'lace_20250721_sess01',
         },
       })
     );

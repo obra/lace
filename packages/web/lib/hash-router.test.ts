@@ -81,8 +81,8 @@ describe('Hash Router Utilities', () => {
     const testCases: AppState[] = [
       {},
       { project: 'test-project' },
-      { project: 'test-project', session: 'session-123' },
-      { project: 'test-project', session: 'session-123', agent: 'agent-456' },
+      { project: 'test-project', session: 'lace_20250101_sess01' },
+      { project: 'test-project', session: 'lace_20250101_sess01', agent: 'agent-456' },
     ];
 
     testCases.forEach((state) => {

@@ -143,7 +143,7 @@ describe('LaceApp agent state handling', () => {
     // Set up default hash router state
     mockUseHashRouter.mockReturnValue({
       project: 'test-project',
-      session: 'test-session',
+      session: 'lace_20250101_sess01',
       agent: 'test-agent',
       setProject: vi.fn(),
       setSession: vi.fn(),
@@ -205,7 +205,7 @@ describe('LaceApp agent state handling', () => {
 
     // Set up session details with an agent in idle state initially
     const mockSessionInfo: SessionInfo = {
-      id: asThreadId('test-session'),
+      id: asThreadId('lace_20250101_sess01'),
       name: 'Test Session',
       createdAt: new Date(),
       agents: [{
@@ -428,7 +428,7 @@ describe('LaceApp agent state handling', () => {
       expect.objectContaining({
         onAgentStateChange: expect.any(Function),
         projectId: 'test-project',
-        sessionId: 'test-session',
+        sessionId: 'lace_20250101_sess01',
         threadIds: [asThreadId('test-agent')],
       })
     );
