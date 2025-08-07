@@ -126,6 +126,7 @@ describe('Tool Approval System Integration', () => {
       threadId: 'test-thread-id' as ThreadId,
       parentThreadId: 'test-parent-thread-id' as ThreadId,
       workingDirectory: tempLaceDirContext.tempDir,
+      toolTempDir: tempLaceDirContext.tempDir, // Required for bash tool output management
       session, // REQUIRED for security policy enforcement
     };
 
