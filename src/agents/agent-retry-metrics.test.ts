@@ -36,18 +36,14 @@ class MockRetryMetricsProvider extends BaseMockProvider {
     return 'mock-retry-metrics';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
   get supportsStreaming(): boolean {
     return true;
   }
 
   async createResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[] = [],
-    _signal?: AbortSignal
+    _tools: Tool[],
+    _model: string
   ): Promise<ProviderResponse> {
     if (this.shouldTriggerRetries) {
       // Simulate retry attempts
@@ -75,10 +71,10 @@ class MockRetryMetricsProvider extends BaseMockProvider {
 
   async createStreamingResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[] = [],
-    _signal?: AbortSignal
+    _tools: Tool[],
+    _model: string
   ): Promise<ProviderResponse> {
-    return this.createResponse(_messages, _tools, _signal);
+    return this.createResponse(_messages, _tools, _model);
   }
 }
 
@@ -108,6 +104,12 @@ describe('Agent Retry Metrics Tracking', () => {
     });
 
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {
@@ -168,6 +170,12 @@ describe('Agent Retry Metrics Tracking', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
 
@@ -204,6 +212,12 @@ describe('Agent Retry Metrics Tracking', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const retryExhaustedEvents: Array<{ attempts: number; lastError: Error }> = [];
@@ -254,6 +268,12 @@ describe('Agent Retry Metrics Tracking', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
 
@@ -284,6 +304,12 @@ describe('Agent Retry Metrics Tracking', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       const turnProgressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
       agent.on('turn_progress', (data) => turnProgressEvents.push(data));
 
@@ -313,6 +339,12 @@ describe('Agent Retry Metrics Tracking', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnAbortedEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];

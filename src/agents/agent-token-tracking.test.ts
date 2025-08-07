@@ -30,11 +30,15 @@ class MockTokenProvider extends BaseMockProvider {
     return 'mock-token';
   }
 
-  get defaultModel(): string {
-    return 'mock-token-model';
+  get supportsStreaming(): boolean {
+    return true;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  async createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     if (this.delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, this.delay));
     }
@@ -48,7 +52,8 @@ class MockTokenProvider extends BaseMockProvider {
 
   async createStreamingResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[]
+    _tools: Tool[],
+    _model: string
   ): Promise<ProviderResponse> {
     // Simulate streaming with token events
     if (this.mockResponse.usage) {
@@ -72,7 +77,7 @@ class MockTokenProvider extends BaseMockProvider {
       }, 20);
     }
 
-    return this.createResponse(_messages, _tools);
+    return this.createResponse(_messages, _tools, _model);
   }
 }
 
@@ -119,6 +124,13 @@ describe('Agent Token Tracking Integration', () => {
     };
 
     agent = new Agent(config);
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
     await agent.start();
   });
 
@@ -216,6 +228,13 @@ describe('Agent Token Tracking Integration', () => {
         threadId,
         tools: [mockTool],
       });
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      multiCallAgent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       await multiCallAgent.start();
 
       // Setup provider to return different responses on subsequent calls
@@ -318,6 +337,13 @@ describe('Agent Token Tracking Integration', () => {
         threadId,
         tools: [mockTool],
       });
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      multiCallAgent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       await multiCallAgent.start();
 
       let callCount = 0;
@@ -365,10 +391,7 @@ describe('Agent Token Tracking Integration', () => {
         },
       });
 
-      // Mock to support streaming
-      Object.defineProperty(streamingProvider, 'supportsStreaming', {
-        get: () => true,
-      });
+      // The provider already supports streaming since supportsStreaming getter returns true
 
       const streamingAgent = new Agent({
         provider: streamingProvider,
@@ -377,6 +400,13 @@ describe('Agent Token Tracking Integration', () => {
         threadId,
         tools: [],
       });
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      streamingAgent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       await streamingAgent.start();
 
       streamingAgent.on('turn_progress', (data) => progressEvents.push(data));
@@ -422,6 +452,13 @@ describe('Agent Token Tracking Integration', () => {
         threadId,
         tools: [],
       });
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      noUsageAgent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       await noUsageAgent.start();
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];

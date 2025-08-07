@@ -25,11 +25,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  async createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     if (this.delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, this.delay));
     }
@@ -75,6 +79,12 @@ describe('Agent Turn Tracking', () => {
 
     agent = new Agent(config);
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {

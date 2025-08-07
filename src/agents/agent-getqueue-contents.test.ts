@@ -20,11 +20,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },

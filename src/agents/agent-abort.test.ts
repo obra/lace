@@ -25,13 +25,14 @@ class MockAbortableProvider extends BaseMockProvider {
     return 'mock-abortable';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return true;
   }
 
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Check if aborted before starting
@@ -60,9 +61,10 @@ class MockAbortableProvider extends BaseMockProvider {
   async createStreamingResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return this.createResponse(_messages, _tools, signal);
+    return this.createResponse(_messages, _tools, _model, signal);
   }
 }
 
@@ -101,6 +103,13 @@ describe('Agent Abort Functionality', () => {
     };
 
     agent = new Agent(config);
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
     await agent.start();
   });
 
@@ -253,6 +262,13 @@ describe('Agent Abort Functionality', () => {
         threadId,
         tools: [],
       });
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      abortAgent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       await abortAgent.start();
 
       const errorEvents: any[] = [];
@@ -278,11 +294,6 @@ describe('Agent Abort Functionality', () => {
         100
       ); // 100ms delay to allow abort
 
-      // Make it support streaming
-      Object.defineProperty(streamingProvider, 'supportsStreaming', {
-        get: () => true,
-      });
-
       const streamingAgent = new Agent({
         provider: streamingProvider,
         toolExecutor,
@@ -290,6 +301,13 @@ describe('Agent Abort Functionality', () => {
         threadId,
         tools: [],
       });
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      streamingAgent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       await streamingAgent.start();
 
       // Act

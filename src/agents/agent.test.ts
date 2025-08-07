@@ -43,11 +43,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     return Promise.resolve(this.mockResponse);
   }
 }
@@ -191,7 +195,15 @@ describe('Enhanced Agent', () => {
       tools: [],
     };
 
-    return new Agent({ ...defaultConfig, ...config });
+    const agent = new Agent({ ...defaultConfig, ...config });
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
+    return agent;
   }
 
   describe('constructor and basic properties', () => {

@@ -27,10 +27,6 @@ export class TestProvider extends BaseMockProvider {
     return 'test-provider';
   }
 
-  get defaultModel(): string {
-    return 'test-model';
-  }
-
   get supportsStreaming(): boolean {
     return false;
   }
@@ -52,15 +48,12 @@ export class TestProvider extends BaseMockProvider {
 
   async createResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[] = [],
-    signal?: AbortSignal
+    _tools: Tool[],
+    _model: string,
+    _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, this.delay));
-
-    if (signal?.aborted) {
-      throw new Error('Request was aborted');
-    }
 
     if (this.shouldError) {
       throw new Error('Mock provider error during response creation');
@@ -80,10 +73,11 @@ export class TestProvider extends BaseMockProvider {
 
   async createStreamingResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[] = [],
-    signal?: AbortSignal
+    _tools: Tool[],
+    _model: string,
+    _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // For test provider, just return the same as non-streaming
-    return await this.createResponse(_messages, _tools, signal);
+    return await this.createResponse(_messages, _tools, _model, _signal);
   }
 }

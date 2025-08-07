@@ -27,11 +27,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
@@ -68,6 +72,12 @@ describe('Agent Queue Processing', () => {
       threadManager: mockThreadManager,
       threadId: testThreadId,
       tools: [],
+    });
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
     });
   });
 
@@ -159,7 +169,7 @@ describe('Agent Queue Processing', () => {
 
       // Create a mock provider that will fail on the first message
       let callCount = 0;
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(() => {
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
         callCount++;
         if (callCount === 1) {
           return Promise.reject(new Error('Processing failed'));

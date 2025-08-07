@@ -17,10 +17,6 @@ class MockRetryProvider extends BaseMockProvider {
     return 'mock-retry';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
   get supportsStreaming(): boolean {
     return true;
   }
@@ -37,7 +33,8 @@ class MockRetryProvider extends BaseMockProvider {
 
   createResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[] = [],
+    _tools: Tool[],
+    _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this._shouldEmitRetryEvents && this._retryEventData) {
@@ -64,7 +61,8 @@ class MockRetryProvider extends BaseMockProvider {
 
   createStreamingResponse(
     _messages: ProviderMessage[],
-    _tools: Tool[] = [],
+    _tools: Tool[],
+    _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this._shouldEmitRetryEvents && this._retryEventData) {
@@ -133,6 +131,12 @@ describe('Agent retry event forwarding', () => {
     });
 
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {

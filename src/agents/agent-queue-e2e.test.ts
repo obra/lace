@@ -21,11 +21,15 @@ class LongOperationProvider extends BaseMockProvider {
     return 'long-operation';
   }
 
-  get defaultModel(): string {
-    return 'slow-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  async createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     // Simulate long-running operation
     await new Promise((resolve) => setTimeout(resolve, this.delayMs));
     return {
@@ -71,6 +75,12 @@ describe('Agent Queue End-to-End Scenarios', () => {
     });
 
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {

@@ -20,7 +20,8 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import type { ProviderResponse } from '~/providers/base-provider';
+import type { ProviderResponse, ProviderMessage } from '~/providers/base-provider';
+import type { Tool } from '~/tools/tool';
 
 // Mock provider that can return tool calls once then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -38,7 +39,10 @@ class MockProviderWithToolCalls extends TestProvider {
   }
 
   async createResponse(
-    ...args: Parameters<TestProvider['createResponse']>
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string,
+    _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
       // Simulate network delay
@@ -58,7 +62,7 @@ class MockProviderWithToolCalls extends TestProvider {
         };
       }
     }
-    return super.createResponse(...args);
+    return super.createResponse(_messages, _tools, _model, _signal);
   }
 }
 
@@ -124,9 +128,20 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     // Set up EventApprovalCallback for approval workflow
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
+
+    await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
+    });
   });
 
   afterEach(async () => {
+    if (agent) {
+      agent.stop();
+    }
     // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {

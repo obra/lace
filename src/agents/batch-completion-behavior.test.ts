@@ -67,6 +67,7 @@ class MockProviderWithToolCalls extends TestProvider {
   async createResponse(
     _messages: ProviderMessage[] = [],
     _tools: Tool[] = [],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
@@ -87,7 +88,7 @@ class MockProviderWithToolCalls extends TestProvider {
         };
       }
     }
-    return super.createResponse(_messages, _tools, signal);
+    return super.createResponse(_messages, _tools, _model, signal);
   }
 }
 
@@ -148,11 +149,22 @@ describe('Tool Batch Completion Behavior', () => {
       tools: [configurableTool],
     });
 
+    await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
+    });
+
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
   afterEach(async () => {
+    if (agent) {
+      agent.stop();
+    }
     // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
