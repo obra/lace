@@ -2,6 +2,248 @@
 
 This document outlines testing patterns and best practices for the Lace codebase.
 
+## ⚠️ CRITICAL: Provider Instance Management in Tests
+
+### Always Use `createTestProviderInstance()` for Test Isolation
+
+**Race Condition Warning**: Using `setupTestProviderInstances()` causes race conditions when tests run in parallel. This leads to "Provider instance not found" errors and flaky tests.
+
+### Correct Pattern ✅
+
+```typescript
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('My Test Suite', () => {
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    // Create individual provider instance for this test
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Use the instance in your test setup
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId, // Direct usage
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+  });
+
+  afterEach(async () => {
+    // Clean up the instance
+    await cleanupTestProviderInstances([providerInstanceId]);
+  });
+});
+```
+
+### Incorrect Pattern ❌ (Causes Race Conditions)
+
+```typescript
+// DON'T DO THIS - Creates shared instances that cause race conditions
+import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('My Test Suite', () => {
+  let testProviderInstances: {
+    anthropicInstanceId: string;
+    openaiInstanceId: string;
+  };
+  let createdInstanceIds: string[] = [];
+
+  beforeEach(async () => {
+    // This creates shared instances that can conflict when tests run in parallel
+    testProviderInstances = await setupTestProviderInstances();
+    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+  });
+});
+```
+
+### Why This Pattern Is Critical
+
+- **Test Isolation**: Each test gets its own provider instances, preventing conflicts
+- **Parallel Execution**: Tests can run in parallel without race conditions
+- **Reliability**: Eliminates "Provider instance not found" errors
+- **Debugging**: Easier to debug when tests don't interfere with each other
+
+### Multiple Provider Types
+
+If you need multiple provider types in a single test:
+
+```typescript
+describe('Multi-Provider Test', () => {
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
+
+  beforeEach(async () => {
+    // Create each provider type individually
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o-mini'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
+  });
+
+  afterEach(async () => {
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+  });
+});
+```
+
+## Test Environment Setup
+
+### Core Tests (src/)
+
+For core Lace tests, use the unified setup that handles both temp LACE_DIR and persistence automatically:
+
+```typescript
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('Core Integration Test', () => {
+  const _tempLaceDir = setupCoreTest(); // Handles temp LACE_DIR + persistence automatically
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache(); // Important for test isolation
+
+    // Create provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+  });
+
+  afterEach(async () => {
+    // Clean up in correct order
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
+  });
+});
+```
+
+### Web Tests (packages/web/)
+
+For web package tests, use the web-specific setup:
+
+```typescript
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+
+describe('Web Integration Test', () => {
+  const _tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+  });
+
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
+  });
+});
+```
+```
+
+### Session and Project Creation
+
+When creating sessions and projects in tests, ensure proper provider inheritance:
+
+```typescript
+// Create project with provider configuration
+const project = Project.create(
+  'Test Project',
+  '/test/path',
+  'Test project description',
+  {
+    providerInstanceId, // Use the test instance
+    modelId: 'claude-3-5-haiku-20241022',
+  }
+);
+
+// Create session - will inherit provider from project
+const session = await sessionService.createSession(
+  'Test Session',
+  project.getId()
+);
+```
+
+### Common Pitfalls
+
+#### 1. Shared State Between Tests
+- Always use individual provider instances
+- Clear caches with `Session.clearProviderCache()`
+- Use `:memory:` database for isolation
+
+#### 2. Cleanup Order
+```typescript
+afterEach(async () => {
+  // Stop services first
+  await sessionService.stopAllAgents();
+  sessionService.clearActiveSessions();
+  
+  // Clean up test utilities
+  cleanupTestProviderDefaults();
+  await cleanupTestProviderInstances([providerInstanceId]);
+  
+  // Clear mocks last
+  vi.clearAllMocks();
+  // Note: Persistence cleanup is handled automatically by setupCoreTest/setupWebTest
+});
+```
+
+#### 3. Environment Variables
+Always set required environment variables in test setup:
+```typescript
+beforeEach(() => {
+  process.env.ANTHROPIC_KEY = 'test-key';
+  // Note: LACE_DIR is handled automatically by setupCoreTest/setupWebTest
+});
+```
+
+### Debugging Provider Instance Errors
+
+If you see errors like "Failed to resolve provider instance" or "Provider instance not found":
+
+1. **Check Pattern**: Verify you're using `createTestProviderInstance()` not `setupTestProviderInstances()`
+2. **Verify Creation**: Ensure the provider instance is created before being used
+3. **Check Setup**: Ensure you're using `setupCoreTest()` or `setupWebTest()` for proper test isolation
+4. **Check Cleanup Order**: Ensure cleanup happens in the correct order
+5. **Test Isolation**: Run the failing test individually to check for shared state issues
+
+### Key Benefits of New Test Setup
+
+- **Race Condition Prevention**: Database and provider instances use the same isolated temp directory
+- **Simplified Setup**: One function call handles both LACE_DIR and persistence
+- **Automatic Cleanup**: Temp directories are cleaned up automatically
+- **No Manual DB Paths**: Persistence auto-initializes to the correct location
+- **Impossible to Do Wrong**: Unified setup prevents configuration mistakes
+
 ## Philosophy: Test Behavior, Not Implementation
 
 **Golden Rule**: Test what the system does, not how it does it.
@@ -222,17 +464,19 @@ const highPriorityTask = createMockTask({ priority: 'high' });
 ```
 
 ### Database Testing
-Use real database with test data:
+The unified test setup handles database isolation automatically:
 
 ```typescript
-beforeEach(async () => {
-  // Use real database operations
-  await setupTestDatabase();
-  await seedTestData();
-});
-
-afterEach(async () => {
-  await cleanupTestDatabase();
+describe('Database Test', () => {
+  const _tempLaceDir = setupCoreTest(); // Database auto-initializes to temp directory
+  
+  beforeEach(async () => {
+    // Database is already isolated and ready to use
+    const persistence = getPersistence(); // Auto-initializes to ${LACE_DIR}/lace.db
+    await seedTestData(persistence);
+  });
+  
+  // No manual cleanup needed - temp directory handles it
 });
 ```
 

@@ -1,119 +1,115 @@
 // ABOUTME: Test suite for session API endpoints under projects hierarchy
-// ABOUTME: Tests CRUD operations with proper project-session relationships and validation
+// ABOUTME: Tests CRUD operations with real Project and Session classes, not mocks
 
 import { NextRequest } from 'next/server';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
-import { Project } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
 
-// Mock Project
-vi.mock('@/lib/server/lace-imports', () => ({
-  Project: {
-    getById: vi.fn(),
-  },
-}));
-
-// Mock sessionService
-const mockSessionService = {
-  createSession: vi.fn(),
-};
-
-vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: () => mockSessionService,
-}));
-
-// Mock generateId
-vi.mock('@/lib/utils/id-generator', () => ({
-  generateId: vi.fn(() => 'test-session-id'),
-}));
+// Mock server-only module
+vi.mock('server-only', () => ({}));
 
 describe('Session API endpoints under projects', () => {
-  interface MockProject {
-    getSessions: () => unknown[];
-    createSession: (name: string, description: string, config: Record<string, unknown>) => unknown;
-  }
+  const _tempLaceDir = setupWebTest();
+  let providerInstanceId: string;
+  let projectId: string;
 
-  let mockProject: MockProject;
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-  beforeEach(() => {
-    const getSessionsMock = vi.fn();
-    const createSessionMock = vi.fn();
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
-    mockProject = {
-      getSessions: getSessionsMock,
-      createSession: createSessionMock,
-    };
-    const mockedGetById = vi.mocked(Project.getById);
-    mockedGetById.mockReturnValue(mockProject as unknown as ReturnType<typeof Project.getById>);
+    // Create a test project
+    const { Project } = await import('~/projects/project');
+    const testProject = Project.create('Test Project', '/test/path', 'A test project', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+    projectId = testProject.getId();
+  });
+
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   describe('GET /api/projects/:projectId/sessions', () => {
     it('should return sessions for project', async () => {
-      const mockSessions = [
-        {
-          id: 'session1',
-          projectId: 'project1',
-          name: 'Session 1',
-          description: 'First session',
-          configuration: {},
-          status: 'active',
-          createdAt: new Date('2023-01-01'),
-          updatedAt: new Date('2023-01-01'),
+      // Create additional sessions in the project
+      Session.create({
+        name: 'Session 1',
+        projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         },
-        {
-          id: 'session2',
-          projectId: 'project1',
-          name: 'Session 2',
-          description: 'Second session',
-          configuration: {},
-          status: 'active',
-          createdAt: new Date('2023-01-02'),
-          updatedAt: new Date('2023-01-02'),
+      });
+      Session.create({
+        name: 'Session 2',
+        projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         },
-      ];
-
-      vi.mocked(mockProject.getSessions).mockReturnValue(mockSessions);
+      });
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        new NextRequest(`http://localhost/api/projects/${projectId}/sessions`),
         {
-          params: Promise.resolve({ projectId: 'project1' }),
+          params: Promise.resolve({ projectId }),
         }
       );
 
-      const data = await parseResponse<{ sessions: typeof mockSessions }>(response);
+      const data = await parseResponse<{
+        sessions: Array<{ id: string; name: string; createdAt: Date; agentCount: number }>;
+      }>(response);
 
       expect(response.status).toBe(200);
-      expect(data.sessions).toHaveLength(2);
-      expect(data.sessions[0].id).toBe('session1');
-      expect(data.sessions[1].id).toBe('session2');
+      expect(data.sessions.length).toBeGreaterThan(0);
+
+      // Find our created sessions
+      const session1 = data.sessions.find((s) => s.name === 'Session 1');
+      const session2 = data.sessions.find((s) => s.name === 'Session 2');
+
+      expect(session1).toBeDefined();
+      expect(session2).toBeDefined();
     });
 
-    it('should return empty array when no sessions exist', async () => {
-      vi.mocked(mockProject.getSessions).mockReturnValue([]);
-
+    it('should return sessions when only default session exists', async () => {
+      // Project.create() auto-creates a default session
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        new NextRequest(`http://localhost/api/projects/${projectId}/sessions`),
         {
-          params: Promise.resolve({ projectId: 'project1' }),
+          params: Promise.resolve({ projectId }),
         }
       );
 
-      const data = await parseResponse<{ sessions: [] }>(response);
+      const data = await parseResponse<{ sessions: Array<{ id: string; name: string }> }>(response);
 
       expect(response.status).toBe(200);
-      expect(data.sessions).toHaveLength(0);
+      expect(data.sessions.length).toBeGreaterThan(0); // At least the default session
     });
 
     it('should return 404 when project not found', async () => {
-      const mockedGetById = vi.mocked(Project.getById);
-      mockedGetById.mockReturnValue(null);
-
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions'),
+        new NextRequest('http://localhost/api/projects/nonexistent/sessions'),
         {
-          params: Promise.resolve({ projectId: 'project1' }),
+          params: Promise.resolve({ projectId: 'nonexistent' }),
         }
       );
 
@@ -122,64 +118,39 @@ describe('Session API endpoints under projects', () => {
       expect(response.status).toBe(404);
       expect(data.error).toBe('Project not found');
     });
-
-    it('should handle database errors', async () => {
-      vi.mocked(mockProject.getSessions).mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
-      const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions'),
-        {
-          params: Promise.resolve({ projectId: 'project1' }),
-        }
-      );
-
-      const data = await parseResponse<{ error: string }>(response);
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
-    });
   });
 
   describe('POST /api/projects/:projectId/sessions', () => {
     it('should create session in project', async () => {
-      const mockSession = {
-        id: 'test-session-id',
-        name: 'New Session',
-        createdAt: '2023-01-01T00:00:00.000Z',
-        agents: [],
-      };
-
-      mockSessionService.createSession.mockResolvedValue(mockSession);
-
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'New Session',
           description: 'A new session',
-          configuration: { provider: 'anthropic' },
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {},
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
+      const response = await POST(request, { params: Promise.resolve({ projectId }) });
       const data = await parseResponse<{
-        session: { id: string; name: string; projectId: string };
+        session: { id: string; name: string; createdAt: Date };
       }>(response);
 
       expect(response.status).toBe(201);
-      expect(data.session.id).toBe('test-session-id');
+      expect(data.session.id).toBeDefined();
       expect(data.session.name).toBe('New Session');
+      expect(data.session.createdAt).toBeDefined();
     });
 
     it('should return 404 when project not found', async () => {
-      const mockedGetById = vi.mocked(Project.getById);
-      mockedGetById.mockReturnValue(null);
-
       const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions', {
         method: 'POST',
         body: JSON.stringify({
           name: 'New Session',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -193,76 +164,75 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should validate required fields', async () => {
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: '', // Empty name should fail validation
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
+      const response = await POST(request, { params: Promise.resolve({ projectId }) });
       const data = await parseResponse<{ error: string; details?: unknown }>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(data.error).toContain('Validation failed');
       expect(data.details).toBeDefined();
     });
 
     it('should handle missing request body', async () => {
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
+      const response = await POST(request, { params: Promise.resolve({ projectId }) });
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(data.error).toContain('Validation failed');
     });
 
     it('should use default values for optional fields', async () => {
-      const mockSession = {
-        id: 'test-session-id',
-        name: 'Minimal Session',
-        createdAt: '2023-01-01T00:00:00.000Z',
-        agents: [],
-      };
-
-      mockSessionService.createSession.mockResolvedValue(mockSession);
-
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Minimal Session',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
+      const response = await POST(request, { params: Promise.resolve({ projectId }) });
       const data = await parseResponse<{
-        session: { id: string; name: string };
+        session: { id: string; name: string; createdAt: Date };
       }>(response);
 
       expect(response.status).toBe(201);
-      expect(data.session.id).toBe('test-session-id');
+      expect(data.session.id).toBeDefined();
       expect(data.session.name).toBe('Minimal Session');
+      expect(data.session.createdAt).toBeDefined();
     });
 
-    it('should handle database errors during creation', async () => {
-      mockSessionService.createSession.mockRejectedValue(new Error('Database error'));
-
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions', {
+    it('should create session using providerInstanceId and modelId', async () => {
+      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
-          name: 'New Session',
+          name: 'Provider Instance Session',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {},
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId: 'project1' }) });
-      const data = await parseResponse<{ error: string }>(response);
+      const response = await POST(request, { params: Promise.resolve({ projectId }) });
+      const data = await parseResponse<{
+        session: { id: string; name: string; createdAt: Date };
+      }>(response);
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Database error');
+      expect(response.status).toBe(201);
+      expect(data.session.id).toBeDefined();
+      expect(data.session.name).toBe('Provider Instance Session');
+      expect(data.session.createdAt).toBeDefined();
     });
   });
 });

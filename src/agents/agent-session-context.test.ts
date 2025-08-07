@@ -7,32 +7,50 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { asThreadId } from '~/threads/types';
 
 describe('Agent Session Context', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let session: Session;
   let agent: Agent;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    // setupTestPersistence replaced by setupCoreTest
+    setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Agent Session Context Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project
     project = Project.create(
       'Test Project',
       'Project for session context testing',
-      tempDirContext.tempDir,
-      {}
+      tempLaceDirContext.tempDir,
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
-    // Create real session
+    // Create real session with provider instance
     session = Session.create({
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -44,8 +62,13 @@ describe('Agent Session Context', () => {
     agent = coordinatorAgent;
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    // Clean up provider instances
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
   });
 
   describe('getFullSession', () => {
@@ -84,8 +107,6 @@ describe('Agent Session Context', () => {
       // Create session via Session.create()
       const createdSession = Session.create({
         name: 'Roundtrip Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
       });
 

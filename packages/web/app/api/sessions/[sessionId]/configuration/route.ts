@@ -9,8 +9,8 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
-  model: z.string().optional(),
+  providerInstanceId: z.string(),
+  modelId: z.string(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
   toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),

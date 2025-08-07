@@ -20,7 +20,13 @@ interface MockSession {
 }
 
 interface MockSessionService {
+  createSession: ReturnType<typeof vi.fn>;
+  listSessions: ReturnType<typeof vi.fn>;
   getSession: ReturnType<typeof vi.fn>;
+  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
+  updateSession: ReturnType<typeof vi.fn>;
+  stopAllAgents: ReturnType<typeof vi.fn>;
+  clearActiveSessions: ReturnType<typeof vi.fn>;
 }
 
 describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
@@ -41,10 +47,16 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
     // Create mock SessionService
     mockSessionService = {
+      createSession: vi.fn(),
+      listSessions: vi.fn(),
       getSession: vi.fn().mockReturnValue(mockSession),
+      setupAgentEventHandlers: vi.fn(),
+      updateSession: vi.fn(),
+      stopAllAgents: vi.fn(),
+      clearActiveSessions: vi.fn(),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService as unknown as ReturnType<typeof getSessionService>);
   });
 
   afterEach(() => {
@@ -67,7 +79,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     );
 
     // Mock params
-    const params = { threadId, toolCallId };
+    const params = Promise.resolve({ threadId, toolCallId });
 
     // Call the API route
     const response = await POST(request, { params });
@@ -96,7 +108,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
         }
       );
 
-      const params = { threadId, toolCallId };
+      const params = Promise.resolve({ threadId, toolCallId });
       const response = await POST(request, { params });
 
       expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
@@ -107,7 +119,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
 
       // Clear mocks between iterations
       vi.clearAllMocks();
-      mockGetSessionService.mockReturnValue(mockSessionService);
+      mockGetSessionService.mockReturnValue(mockSessionService as unknown as ReturnType<typeof getSessionService>);
       mockSessionService.getSession.mockReturnValue(mockSession);
       mockSession.getAgent.mockReturnValue(mockAgent);
     }
@@ -130,7 +142,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = { threadId, toolCallId };
+    const params = Promise.resolve({ threadId, toolCallId });
     const response = await POST(request, { params });
 
     // Should not call handleApprovalResponse if agent not found
@@ -154,7 +166,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = { threadId, toolCallId };
+    const params = Promise.resolve({ threadId, toolCallId });
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
@@ -175,7 +187,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = { threadId, toolCallId };
+    const params = Promise.resolve({ threadId, toolCallId });
     const response = await POST(request, { params });
 
     expect(response.status).toBe(400);
@@ -204,7 +216,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = { threadId, toolCallId };
+    const params = Promise.resolve({ threadId, toolCallId });
     const response1 = await POST(request1, { params });
 
     expect(response1.status).toBe(200);
@@ -248,7 +260,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = { threadId, toolCallId };
+    const params = Promise.resolve({ threadId, toolCallId });
     const response = await POST(request, { params });
 
     expect(response.status).toBe(500);

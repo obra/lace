@@ -1,72 +1,45 @@
 // ABOUTME: Integration tests for Session class with new configuration system
 // ABOUTME: Tests session creation with configuration and preset integration
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
-// Mock external dependencies
-vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn().mockReturnValue({
-      createProvider: vi.fn().mockReturnValue({
-        type: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
-        providerName: 'anthropic',
-        defaultModel: 'claude-3-5-haiku-20241022',
-        setSystemPrompt: vi.fn(),
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-        }),
-      }),
-    }),
-  },
-}));
-
-// Mock external dependencies that require system calls or network access
-// - File system operations are mocked to avoid disk I/O during tests
-vi.mock('fs/promises', () => ({
-  default: {
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
-    mkdir: vi.fn(),
-    readdir: vi.fn(),
-  },
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-  mkdir: vi.fn(),
-  readdir: vi.fn(),
-}));
-
-// - Process operations are mocked to avoid spawning real processes
-vi.mock('child_process', () => ({
-  default: {
-    spawn: vi.fn(),
-    exec: vi.fn(),
-  },
-  spawn: vi.fn(),
-  exec: vi.fn(),
-}));
-
-// - Network operations are mocked to avoid external requests
-vi.mock('node-fetch', () => vi.fn());
+// No mocking for integration tests - use real filesystem access
 
 describe('Session Configuration Integration', () => {
+  const _tempLaceDir = setupCoreTest();
   let testProject: Project;
   let projectId: string;
   let presetManager: ConfigurationPresetManager;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Create a test project
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create a test project with the real provider instance
     testProject = Project.create('Test Project', '/test/path', 'Test project for configuration', {
-      provider: 'anthropic',
-      model: 'claude-3-sonnet',
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
     });
     projectId = testProject.getId();
@@ -74,15 +47,16 @@ describe('Session Configuration Integration', () => {
     presetManager = new ConfigurationPresetManager();
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
   });
 
   describe('Session configuration validation', () => {
     it('should validate session configuration during creation', () => {
       const validConfig: SessionConfiguration = {
-        provider: 'openai',
-        model: 'gpt-4',
+        providerInstanceId: 'openai-default',
+        modelId: 'gpt-4',
         maxTokens: 8000,
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
@@ -93,8 +67,8 @@ describe('Session Configuration Integration', () => {
       };
 
       const validated = Session.validateConfiguration(validConfig);
-      expect(validated.provider).toBe('openai');
-      expect(validated.model).toBe('gpt-4');
+      expect(validated.providerInstanceId).toBe('openai-default');
+      expect(validated.modelId).toBe('gpt-4');
       expect(validated.maxTokens).toBe(8000);
       expect(validated.temperature).toBe(0.7);
       expect(validated.systemPrompt).toBe('You are a helpful assistant.');
@@ -104,7 +78,7 @@ describe('Session Configuration Integration', () => {
 
     it('should reject invalid session configuration', () => {
       const invalidConfig = {
-        provider: 'invalid-provider',
+        providerInstanceId: 'invalid-provider-instance',
         maxTokens: -100,
         temperature: 5.0,
       };
@@ -120,17 +94,19 @@ describe('Session Configuration Integration', () => {
       // Create session with minimal configuration to allow inheritance
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       const effectiveConfig = session.getEffectiveConfiguration();
 
       // Should inherit from project
-      expect(effectiveConfig.provider).toBe('anthropic');
-      // Note: Session creation model parameter overrides project model
-      expect(effectiveConfig.model).toBe('claude-3-5-haiku-20241022'); // From session creation
+      expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId);
+      // Note: Session creation modelId parameter overrides project modelId
+      expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // From session creation
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
 
       session.destroy();
@@ -139,14 +115,16 @@ describe('Session Configuration Integration', () => {
     it('should override project configuration with session configuration', () => {
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       // Update session configuration
       session.updateConfiguration({
-        model: 'claude-3-5-haiku-20241022',
+        modelId: 'claude-3-5-haiku-20241022',
         temperature: 0.8,
         systemPrompt: 'You are a code reviewer.',
       });
@@ -154,7 +132,7 @@ describe('Session Configuration Integration', () => {
       const effectiveConfig = session.getEffectiveConfiguration();
 
       // Should have session overrides
-      expect(effectiveConfig.model).toBe('claude-3-5-haiku-20241022'); // Session override
+      expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // Session override
       expect(effectiveConfig.temperature).toBe(0.8); // Session override
       expect(effectiveConfig.systemPrompt).toBe('You are a code reviewer.'); // Session override
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
@@ -173,9 +151,11 @@ describe('Session Configuration Integration', () => {
 
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       // Update session tool policies
@@ -204,7 +184,7 @@ describe('Session Configuration Integration', () => {
       presetManager.savePreset(
         'code-review',
         {
-          model: 'claude-3-sonnet',
+          modelId: 'claude-3-sonnet',
           temperature: 0.2,
           maxTokens: 8000,
           systemPrompt: 'You are a senior software engineer conducting code reviews.',
@@ -226,15 +206,17 @@ describe('Session Configuration Integration', () => {
       // Apply preset to session
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
       session.updateConfiguration(preset!.configuration);
 
       const effectiveConfig = session.getEffectiveConfiguration();
 
-      expect(effectiveConfig.model).toBe('claude-3-sonnet');
+      expect(effectiveConfig.modelId).toBe('claude-3-sonnet');
       expect(effectiveConfig.temperature).toBe(0.2);
       expect(effectiveConfig.maxTokens).toBe(8000);
       expect(effectiveConfig.systemPrompt).toBe(
@@ -254,9 +236,11 @@ describe('Session Configuration Integration', () => {
     it('should return correct tool policies from configuration', () => {
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       // Set tool policies
@@ -281,9 +265,11 @@ describe('Session Configuration Integration', () => {
     it('should use session working directory override', () => {
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       // Set working directory override
@@ -299,9 +285,11 @@ describe('Session Configuration Integration', () => {
     it('should fall back to project working directory', () => {
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       // Should use project working directory
@@ -315,15 +303,16 @@ describe('Session Configuration Integration', () => {
     it('should include configuration in session info', () => {
       const session = Session.create({
         name: 'Test Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId,
+        configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
       });
 
       const info = session.getInfo();
       expect(info).toBeDefined();
       expect(info?.name).toBe('Test Session');
-      expect(info?.provider).toBe('anthropic');
 
       session.destroy();
     });

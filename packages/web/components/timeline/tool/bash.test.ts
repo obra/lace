@@ -3,7 +3,7 @@
 
 import { describe, test, expect } from 'vitest';
 import { faTerminal } from '@fortawesome/free-solid-svg-icons';
-import type { ToolResult } from '@/lib/server/lace-imports';
+import type { ToolResult } from '@/types/core';
 import { bashRenderer } from './bash';
 
 describe('bashRenderer', () => {

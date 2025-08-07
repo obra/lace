@@ -13,8 +13,6 @@ describe('Web Types', () => {
       id: asThreadId('lace_20250731_abc123'),
       name: 'Test Session',
       createdAt: new Date(),
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
       agents: [],
     };
 

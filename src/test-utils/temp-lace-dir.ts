@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { beforeEach, afterEach } from 'vitest';
 
-interface TempLaceDirContext {
+export interface TempLaceDirContext {
   tempDir: string;
   originalLaceDir: string | undefined;
 }

@@ -10,10 +10,7 @@ describe('OllamaProvider', () => {
     expect(provider.providerName).toBe('ollama');
   });
 
-  it('should have correct default model', () => {
-    const provider = new OllamaProvider();
-    expect(provider.defaultModel).toBe('qwen3:32b');
-  });
+  // defaultModel removed - providers are now model-agnostic
 
   it('should support streaming', () => {
     const provider = new OllamaProvider();

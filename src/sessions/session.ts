@@ -2,9 +2,11 @@
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
 import { Agent, type AgentInfo } from '~/agents/agent';
+import type { AIProvider, ProviderConfig } from '~/providers/base-provider';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderRegistry } from '~/providers/registry';
+import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
 import { Task } from '~/tasks/types';
@@ -32,13 +34,14 @@ import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
+import { getLaceDir } from '~/config/lace-dir';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface SessionInfo {
   id: ThreadId;
   name: string;
   createdAt: Date;
-  provider: string;
-  model: string;
   agents: AgentInfo[];
 }
 
@@ -51,6 +54,7 @@ export class Session {
   private _taskManager: TaskManager;
   private _destroyed = false;
   private _projectId?: string;
+  private _providerCache?: unknown; // Cached provider instance
 
   constructor(sessionAgent: Agent, projectId?: string) {
     this._sessionAgent = sessionAgent;
@@ -67,19 +71,11 @@ export class Session {
   static create(options: {
     name?: string;
     description?: string;
-    provider?: string;
-    model?: string;
-    projectId: string; // REQUIRED: All sessions must be project-based
+    projectId: string;
     approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
-    // Use existing logic for provider/model detection with intelligent defaults
-    const provider = options.provider || Session.detectDefaultProvider();
-    const model = options.model || Session.getDefaultModel(provider);
     const name = options.name || Session.generateSessionName();
-    // Create provider
-    const registry = ProviderRegistry.createWithAutoDiscovery();
-    const providerInstance = registry.createProvider(provider, { model });
 
     // Create thread manager
     const threadManager = new ThreadManager();
@@ -90,7 +86,9 @@ export class Session {
       projectId: options.projectId,
       name,
       description: options.description || '',
-      configuration: { provider, model, ...options.configuration },
+      configuration: {
+        ...options.configuration,
+      },
       status: 'active' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -108,6 +106,102 @@ export class Session {
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor);
 
+    // Get effective configuration by merging project and session configs
+    const effectiveConfig = Session.getEffectiveConfiguration(
+      options.projectId,
+      options.configuration
+    );
+
+    // Extract provider instance and model from effective configuration
+    let providerInstanceId = effectiveConfig.providerInstanceId;
+    const modelId = effectiveConfig.modelId;
+
+    logger.debug('Session.create() provider configuration check', {
+      sessionId: sessionData.id,
+      providerInstanceId,
+      modelId,
+      effectiveConfig,
+      needsDefaults: !providerInstanceId || !modelId,
+    });
+
+    // Provide reasonable defaults when no provider configuration is available
+    if (!providerInstanceId || !modelId) {
+      const instanceManager = new ProviderInstanceManager();
+
+      // Load existing provider instances first (including any created by tests)
+      const existingConfig = instanceManager.loadInstancesSync();
+      const existingInstanceIds = Object.keys(existingConfig.instances);
+
+      logger.debug('Checking for existing provider instances', {
+        sessionId: sessionData.id,
+        existingInstanceIds,
+        existingConfig: existingConfig,
+        configPath: instanceManager.constructor.name,
+      });
+
+      if (existingInstanceIds.length > 0) {
+        // Use existing configured instances
+        const defaultInstanceId = existingInstanceIds.includes('anthropic-default')
+          ? 'anthropic-default'
+          : existingInstanceIds[0];
+
+        providerInstanceId = providerInstanceId || defaultInstanceId;
+
+        // No hardcoded defaults - use what was explicitly configured
+        if (!modelId) {
+          throw new Error(
+            `No model configured for provider instance ${providerInstanceId}. Please specify a model in the session or project configuration.`
+          );
+        }
+
+        logger.debug('Using existing provider configuration for session', {
+          sessionId: sessionData.id,
+          providerInstanceId,
+          modelId,
+        });
+      } else {
+        // No existing instances, try to auto-create defaults from environment
+        const defaultConfig = instanceManager.getDefaultConfig();
+        const autoInstanceIds = Object.keys(defaultConfig.instances);
+
+        if (autoInstanceIds.length > 0) {
+          // Auto-created defaults are available
+          const defaultInstanceId = autoInstanceIds.includes('anthropic-default')
+            ? 'anthropic-default'
+            : autoInstanceIds[0];
+
+          providerInstanceId = providerInstanceId || defaultInstanceId;
+
+          // No hardcoded defaults - use what was explicitly configured
+          if (!modelId) {
+            throw new Error(
+              `No model configured for provider instance ${providerInstanceId}. Please specify a model in the session or project configuration.`
+            );
+          }
+
+          logger.debug('Using auto-created default provider configuration for session', {
+            sessionId: sessionData.id,
+            providerInstanceId,
+            modelId,
+          });
+        } else {
+          throw new Error(
+            'No provider instances configured and no environment variables found. Please set ANTHROPIC_KEY or OPENAI_API_KEY, or configure provider instances in Lace settings.'
+          );
+        }
+      }
+    }
+
+    // Resolve provider instance for the session agent
+    logger.info('🏗️ SESSION CREATE - Resolving provider', {
+      sessionId: sessionData.id,
+      providerInstanceId,
+      modelId,
+      projectId: options.projectId,
+      effectiveConfig,
+    });
+    const providerInstance = Session.resolveProviderInstance(providerInstanceId);
+
     // Create agent
     const sessionAgent = new Agent({
       provider: providerInstance,
@@ -121,8 +215,8 @@ export class Session {
     sessionAgent.updateThreadMetadata({
       isSession: true,
       name: 'Lace', // Always name the coordinator agent "Lace"
-      provider,
-      model,
+      providerInstanceId: providerInstanceId,
+      modelId: modelId,
     });
 
     const session = new Session(sessionAgent, options.projectId);
@@ -152,8 +246,6 @@ export class Session {
       id: asThreadId(session.id),
       name: session.name,
       createdAt: session.createdAt,
-      provider: (session.configuration?.provider as string) || 'unknown',
-      model: (session.configuration?.model as string) || 'unknown',
       agents: [], // Will be populated later if needed
     }));
   }
@@ -191,34 +283,52 @@ export class Session {
 
     logger.debug(`Reconstructing session agent for ${sessionId}`);
 
-    // Get provider and model - prefer thread metadata over session config
+    // Get provider and model from session configuration
     const sessionConfig = sessionData.configuration || {};
     const tempThreadManager = new ThreadManager();
     const existingThread = tempThreadManager.getThread(sessionId);
 
-    // Determine provider (thread metadata > session config > default)
-    const provider =
-      (existingThread?.metadata?.provider as string) ||
-      (sessionConfig.provider as string) ||
-      'anthropic';
+    // Get provider instance ID and model ID from thread metadata or session config
+    const providerInstanceId =
+      (existingThread?.metadata?.providerInstanceId as string) ||
+      (sessionConfig.providerInstanceId as string);
 
-    // Determine model (thread metadata > session config > provider default)
-    let model: string;
-    if (existingThread?.metadata?.model) {
-      model = existingThread.metadata.model;
-    } else if (sessionConfig.model) {
-      model = sessionConfig.model as string;
-    } else {
-      // Get provider default by creating temporary instance
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      const tempProvider = registry.createProvider(provider);
-      model = tempProvider.defaultModel;
-      tempProvider.cleanup();
+    const modelId =
+      (existingThread?.metadata?.modelId as string) ||
+      (existingThread?.metadata?.model as string) || // backwards compatibility
+      (sessionConfig.modelId as string) ||
+      (sessionConfig.model as string); // backwards compatibility
+
+    logger.info('🔍 SESSION AGENT MODEL RESOLUTION', {
+      sessionId,
+      threadMetadataModelId: existingThread?.metadata?.modelId,
+      threadMetadataModel: existingThread?.metadata?.model,
+      sessionConfigModelId: sessionConfig.modelId,
+      sessionConfigModel: sessionConfig.model,
+      resolvedModelId: modelId,
+      fullThreadMetadata: existingThread?.metadata,
+    });
+
+    if (!providerInstanceId || !modelId) {
+      logger.error('Session missing provider configuration', {
+        sessionId,
+        hasProviderInstanceId: !!providerInstanceId,
+        hasModelId: !!modelId,
+        metadata: existingThread?.metadata,
+        sessionConfig,
+      });
+      throw new Error(`Session ${sessionId} is missing provider configuration`);
     }
 
-    // Create provider and tool executor
-    const registry = ProviderRegistry.createWithAutoDiscovery();
-    const providerInstance = registry.createProvider(provider, { model });
+    // Create provider using the provider instance system
+    logger.info('🔄 SESSION.GETBYID - Resolving session provider', {
+      sessionId,
+      providerInstanceId,
+      modelId,
+      threadMetadata: existingThread?.metadata,
+      sessionConfig,
+    });
+    const providerInstance = Session.resolveProviderInstance(providerInstanceId);
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
@@ -260,9 +370,38 @@ export class Session {
 
         logger.debug(`Creating delegate agent for ${delegateThreadId}`);
 
-        // Create agent for this delegate thread
+        // Get the delegate's provider configuration from its own thread metadata
+        const delegateProviderInstanceId = delegateThread.metadata?.providerInstanceId as string;
+        const delegateModelId =
+          (delegateThread.metadata?.modelId as string) ||
+          (delegateThread.metadata?.model as string);
+
+        if (!delegateProviderInstanceId || !delegateModelId) {
+          logger.error('Delegate agent missing provider configuration', {
+            delegateThreadId,
+            hasProviderInstanceId: !!delegateProviderInstanceId,
+            hasModelId: !!delegateModelId,
+            metadata: delegateThread.metadata,
+          });
+          // Skip this agent if it doesn't have proper configuration
+          return;
+        }
+
+        // Resolve the provider for this specific delegate agent based on its metadata
+        logger.info('🔄 SESSION.GETBYID - Resolving delegate provider', {
+          sessionId,
+          delegateThreadId,
+          delegateProviderInstanceId,
+          delegateModelId,
+          delegateMetadata: delegateThread.metadata,
+        });
+        const delegateProviderInstance = Session.resolveProviderInstance(
+          delegateProviderInstanceId
+        );
+
+        // Create agent for this delegate thread with its own provider
         const delegateAgent = new Agent({
-          provider: providerInstance,
+          provider: delegateProviderInstance,
           toolExecutor,
           threadManager,
           threadId: delegateThreadId,
@@ -322,17 +461,37 @@ export class Session {
       sessionData: sessionData,
     });
 
-    // If session not found, let's see what sessions DO exist
+    // If session not found, let's see what sessions DO exist (only if database is still available)
     if (!sessionData) {
-      const allSessions =
-        (getPersistence()
-          .database?.prepare('SELECT id, name, project_id FROM sessions')
-          .all() as Array<{ id: string; name: string; project_id: string }>) || [];
-      logger.debug('Session.getSession() - session not found, showing all sessions', {
-        requestedSessionId: sessionId,
-        allSessionIds: allSessions.map((s) => s.id),
-        allSessions: allSessions,
-      });
+      try {
+        const persistence = getPersistence();
+        // Only query if database is available and not closed
+        if (persistence.database && !persistence['_closed'] && !persistence['_disabled']) {
+          const allSessions = persistence.database
+            .prepare('SELECT id, name, project_id FROM sessions')
+            .all() as Array<{ id: string; name: string; project_id: string }>;
+          logger.debug('Session.getSession() - session not found, showing all sessions', {
+            requestedSessionId: sessionId,
+            allSessionIds: allSessions.map((s) => s.id),
+            allSessions: allSessions,
+          });
+        } else {
+          logger.debug(
+            'Session.getSession() - session not found, database unavailable for debugging',
+            {
+              requestedSessionId: sessionId,
+            }
+          );
+        }
+      } catch (error) {
+        logger.debug(
+          'Session.getSession() - session not found, error querying sessions for debug',
+          {
+            requestedSessionId: sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
     }
 
     return sessionData;
@@ -440,7 +599,8 @@ export class Session {
     return process.cwd();
   }
 
-  private getSessionData() {
+  // Made public for testing - should be private in production
+  public getSessionData() {
     return Session.getSession(this._sessionId);
   }
 
@@ -459,11 +619,25 @@ export class Session {
       : {};
     const sessionConfig = sessionData.configuration || {};
 
+    logger.debug('getEffectiveConfiguration', {
+      sessionId: this._sessionId,
+      projectConfig,
+      sessionConfig,
+      sessionData,
+    });
+
     // Merge configurations with session overriding project
-    return ConfigurationValidator.mergeConfigurations(
+    const merged = ConfigurationValidator.mergeConfigurations(
       projectConfig as SessionConfiguration,
       sessionConfig as Partial<SessionConfiguration>
     );
+
+    logger.debug('Merged configuration', {
+      sessionId: this._sessionId,
+      merged,
+    });
+
+    return merged;
   }
 
   updateConfiguration(updates: Partial<SessionConfiguration>): void {
@@ -484,33 +658,50 @@ export class Session {
 
   getInfo(): SessionInfo | null {
     const agents = this.getAgents();
-    const metadata = this._sessionAgent.getThreadMetadata();
     const sessionData = this.getSessionData();
 
     return {
       id: this._sessionId,
       name: sessionData?.name || 'Session ' + this._sessionId,
       createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
-      provider: this._sessionAgent.providerName,
-      model: (metadata?.model as string) || 'unknown',
       agents,
     };
   }
 
-  spawnAgent(name: string, provider?: string, model?: string): Agent {
-    const agentName = name.trim() || 'Lace';
-    const targetProvider = provider || this._sessionAgent.providerName;
-    const targetModel = model || this._sessionAgent.providerInstance.modelName;
+  spawnAgent(config: { name?: string; providerInstanceId?: string; modelId?: string }): Agent {
+    const agentName = config.name?.trim() || 'Lace';
 
-    // Create new provider instance if configuration differs from session
-    let providerInstance = this._sessionAgent.providerInstance;
-    if (
-      targetProvider !== this._sessionAgent.providerName ||
-      targetModel !== this._sessionAgent.providerInstance.modelName
-    ) {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      providerInstance = registry.createProvider(targetProvider, { model: targetModel });
+    // If no provider instance specified, inherit from session
+    let targetProviderInstanceId = config.providerInstanceId;
+    let targetModelId = config.modelId;
+
+    if (!targetProviderInstanceId || !targetModelId) {
+      // Get effective configuration (merges project and session configs)
+      const effectiveConfig = this.getEffectiveConfiguration();
+
+      targetProviderInstanceId =
+        targetProviderInstanceId || (effectiveConfig.providerInstanceId as string);
+      targetModelId = targetModelId || (effectiveConfig.modelId as string);
+
+      if (!targetProviderInstanceId || !targetModelId) {
+        throw new Error(
+          'No provider instance configuration available - specify providerInstanceId and modelId or ensure session has provider instance configuration'
+        );
+      }
     }
+
+    // Resolve provider instance lazily
+    logger.info('🚀 SPAWN AGENT - Resolving provider', {
+      sessionId: this._sessionId,
+      agentName,
+      targetProviderInstanceId,
+      targetModelId,
+      configProviderInstanceId: config.providerInstanceId,
+      configModelId: config.modelId,
+      effectiveProviderInstanceId: targetProviderInstanceId,
+      effectiveModelId: targetModelId,
+    });
+    const providerInstance = Session.resolveProviderInstance(targetProviderInstanceId);
 
     // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
@@ -528,8 +719,8 @@ export class Session {
       name: agentName, // Use processed name
       isAgent: true,
       parentSessionId: this._sessionId,
-      provider: targetProvider,
-      model: targetModel,
+      providerInstanceId: targetProviderInstanceId,
+      modelId: targetModelId,
     });
 
     // Set up approval callback for spawned agent (inherit from session agent)
@@ -645,8 +836,12 @@ export class Session {
       // Create a more descriptive agent name based on the task
       const agentName = `task-${task.id.split('_').pop()}`;
 
-      // Use the existing spawnAgent method to create the agent
-      const agent = this.spawnAgent(agentName, provider, model);
+      // Use the new spawnAgent method - convert old provider/model strings to provider instance
+      // TODO: Update TaskManager to use provider instances directly
+      const agent = this.spawnAgent({
+        name: agentName,
+        // For now, inherit from session since task system doesn't have provider instances yet
+      });
 
       // Send initial task notification to the new agent
       await this.sendTaskNotification(agent, task);
@@ -701,8 +896,167 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Clear the session registry - primarily for testing
    */
+  /**
+   * Resolve provider instance configuration to actual provider instance (with caching)
+   */
+  private static _providerCache = new Map<string, AIProvider>();
+
+  static resolveProviderInstance(providerInstanceId: string): AIProvider {
+    const cacheKey = providerInstanceId;
+
+    logger.info('📦 RESOLVE PROVIDER INSTANCE', {
+      providerInstanceId,
+      cacheKey,
+      cacheSize: Session._providerCache.size,
+      cacheKeys: Array.from(Session._providerCache.keys()),
+    });
+
+    // Check cache first, but validate it's properly configured
+    const cached = Session._providerCache.get(cacheKey);
+    if (cached && cached.isConfigured()) {
+      logger.info('✅ Using cached provider instance', {
+        providerInstanceId,
+        cacheKey,
+        isConfigured: true,
+        cachedProviderName: cached.providerName,
+      });
+      return cached;
+    }
+
+    if (cached && !cached.isConfigured()) {
+      logger.warn('⚠️ Cached provider not properly configured, recreating', {
+        providerInstanceId,
+        cacheKey,
+        isConfigured: false,
+      });
+      Session._providerCache.delete(cacheKey);
+    }
+
+    logger.debug('Creating new provider instance (not cached)', {
+      providerInstanceId,
+      cacheKey,
+    });
+
+    // Use new provider instance system with synchronous credential loading
+    // Note: We do our own synchronous loading here because Session needs to be synchronous
+    // The registry's createProviderFromInstanceAndModel is async, so we can't use it
+    try {
+      const instanceManager = new ProviderInstanceManager();
+      const config = instanceManager.loadInstancesSync();
+      const instance = config.instances[providerInstanceId];
+
+      if (!instance) {
+        throw new Error(`Provider instance not found: ${providerInstanceId}`);
+      }
+
+      // Load credentials synchronously by reading the credential file directly
+      interface ProviderCredentials {
+        apiKey: string;
+        additionalAuth?: Record<string, unknown>;
+      }
+
+      const credentialsDir = path.join(getLaceDir(), 'credentials');
+      const credentialPath = path.join(credentialsDir, `${providerInstanceId}.json`);
+      let credentials: ProviderCredentials;
+
+      try {
+        const credentialContent = fs.readFileSync(credentialPath, 'utf-8');
+        const parsedCredentials = JSON.parse(credentialContent) as unknown;
+
+        // Type guard to ensure we have valid credentials
+        if (
+          !parsedCredentials ||
+          typeof parsedCredentials !== 'object' ||
+          !('apiKey' in parsedCredentials) ||
+          typeof parsedCredentials.apiKey !== 'string'
+        ) {
+          logger.error('Invalid credential format', {
+            providerInstanceId,
+            hasCredentials: !!parsedCredentials,
+            isObject: typeof parsedCredentials === 'object',
+            hasApiKey:
+              parsedCredentials &&
+              typeof parsedCredentials === 'object' &&
+              'apiKey' in parsedCredentials,
+            apiKeyType:
+              parsedCredentials &&
+              typeof parsedCredentials === 'object' &&
+              'apiKey' in parsedCredentials
+                ? typeof (parsedCredentials as Record<string, unknown>).apiKey
+                : 'N/A',
+          });
+          throw new Error('Invalid credential format');
+        }
+
+        credentials = parsedCredentials as ProviderCredentials;
+        logger.debug('Loaded credentials successfully', {
+          providerInstanceId,
+          hasApiKey: !!credentials.apiKey,
+          apiKeyLength: credentials.apiKey.length,
+        });
+      } catch (credentialError) {
+        logger.error('Failed to load credentials', {
+          providerInstanceId,
+          credentialPath,
+          error:
+            credentialError instanceof Error ? credentialError.message : String(credentialError),
+          fileExists: fs.existsSync(credentialPath),
+        });
+        throw new Error(`No credentials found for instance: ${providerInstanceId}`);
+      }
+
+      // Map catalog provider ID to actual provider type
+      const providerType = instance.catalogProviderId; // anthropic, openai, etc.
+
+      // Build provider config from instance and credentials (no model!)
+      const providerConfig: ProviderConfig = {
+        apiKey: credentials.apiKey,
+        ...(credentials.additionalAuth || {}),
+        ...(instance.endpoint && { baseURL: instance.endpoint }),
+        ...(instance.timeout && { timeout: instance.timeout }),
+      };
+
+      logger.debug('Creating provider with config', {
+        providerType,
+        hasApiKey: !!providerConfig.apiKey,
+        apiKeyLength: (providerConfig.apiKey as string | undefined)?.length,
+        instanceId: providerInstanceId,
+      });
+
+      // Create provider using the registry's internal createProvider method
+      // This is intentional - Session needs synchronous operation, so we can't use
+      // the async createProviderFromInstanceAndModel. We're essentially doing the same
+      // thing but synchronously
+      const providerRegistry = ProviderRegistry.getInstance();
+      const providerInstance = providerRegistry.createProvider(providerType, providerConfig);
+
+      logger.info('✨ Created new provider instance', {
+        providerInstanceId,
+        providerType,
+        providerName: providerInstance.providerName,
+        isConfigured: providerInstance.isConfigured(),
+        cacheKey,
+      });
+
+      // Cache the result
+      Session._providerCache.set(cacheKey, providerInstance);
+
+      return providerInstance;
+    } catch (error) {
+      throw new Error(
+        `Failed to resolve provider instance ${providerInstanceId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
   static clearRegistry(): void {
     Session._sessionRegistry.clear();
+  }
+
+  static clearProviderCache(): void {
+    Session._providerCache.clear();
   }
 
   /**

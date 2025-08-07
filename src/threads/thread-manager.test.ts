@@ -3,21 +3,20 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 describe('ThreadManager', () => {
+  const _tempLaceDir = setupCoreTest();
   let threadManager: ThreadManager;
 
   beforeEach(() => {
-    setupTestPersistence();
     threadManager = new ThreadManager();
   });
 
   afterEach(() => {
     threadManager.close();
-    teardownTestPersistence();
   });
 
   describe('addEvent', () => {

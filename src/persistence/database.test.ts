@@ -3,17 +3,19 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {
+  const _tempLaceDir = setupCoreTest();
+
   beforeEach(() => {
-    setupTestPersistence();
+    // Test setup handled by setupCoreTest
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 
@@ -80,10 +82,11 @@ describe('Project and Session database schema', () => {
 });
 
 describe('Session persistence', () => {
+  const _tempLaceDir = setupCoreTest();
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = setupTestPersistence();
+    db = getPersistence();
 
     // Create projects first to satisfy foreign key constraints
     db.database!.prepare(
@@ -102,7 +105,7 @@ describe('Session persistence', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 
@@ -237,14 +240,15 @@ describe('Session persistence', () => {
 });
 
 describe('tool approval unique constraint', () => {
+  const _tempLaceDir = setupCoreTest();
   let db: DatabasePersistence;
 
   beforeEach(() => {
-    db = setupTestPersistence();
+    db = getPersistence();
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
   });
 

@@ -5,9 +5,9 @@ import { randomUUID } from 'crypto';
 import { basename } from 'path';
 import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
+import { Session } from '~/sessions/session';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
-import { Session } from '~/sessions/session';
 import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
@@ -65,29 +65,21 @@ export class Project {
     // Create the project instance
     const project = new Project(projectData.id);
 
-    // Automatically create a default session with coordinator agent for the new project
-    const sessionOptions: {
-      projectId: string;
-      provider?: string;
-      model?: string;
-    } = {
-      projectId: projectData.id,
-    };
+    // Auto-create a default session (no provider info needed at session level)
+    try {
+      Session.create({
+        name: 'Main Session',
+        description: 'Default session for project',
+        projectId: projectData.id,
+      });
 
-    // Let Session.create() handle provider/model defaults unless overridden
-    if (configuration.provider) {
-      sessionOptions.provider = configuration.provider as string;
+      logger.debug('Auto-created default session for project', { projectId: projectData.id });
+    } catch (error) {
+      logger.warn('Failed to create default session for project', {
+        projectId: projectData.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
-    if (configuration.model) {
-      sessionOptions.model = configuration.model as string;
-    }
-
-    const session = Session.create(sessionOptions);
-
-    logger.info('Default session with coordinator agent created for new project', {
-      projectId: projectData.id,
-      sessionId: session.getId(),
-    });
 
     return project;
   }

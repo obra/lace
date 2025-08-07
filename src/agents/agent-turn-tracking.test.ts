@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -25,11 +25,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  async createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     if (this.delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, this.delay));
     }
@@ -38,6 +42,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Agent Turn Tracking', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let provider: MockProvider;
   let toolExecutor: ToolExecutor;
@@ -45,7 +50,7 @@ describe('Agent Turn Tracking', () => {
   let threadId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
 
     // Create mock response without tool calls
     const mockResponse: ProviderResponse = {
@@ -74,10 +79,16 @@ describe('Agent Turn Tracking', () => {
 
     agent = new Agent(config);
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     vi.clearAllTimers();
     vi.useRealTimers();
   });

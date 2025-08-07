@@ -52,9 +52,7 @@ describe('LMStudioProvider', () => {
       expect(provider.providerName).toBe('lmstudio');
     });
 
-    it('should have correct default model', () => {
-      expect(provider.defaultModel).toBe('qwen/qwen3-30b-a3b');
-    });
+    // defaultModel removed - providers are now model-agnostic
 
     it('should support streaming', () => {
       expect(provider.supportsStreaming).toBe(true);
@@ -151,7 +149,7 @@ describe('LMStudioProvider', () => {
       const testProvider = new LMStudioProvider();
 
       await expect(
-        testProvider.createResponse([{ role: 'user', content: 'Test' }])
+        testProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'qwen/qwen3-30b-a3b')
       ).rejects.toThrow('Cannot connect to LMStudio server');
     });
 
@@ -171,7 +169,7 @@ describe('LMStudioProvider', () => {
       const testProvider = new LMStudioProvider();
 
       await expect(
-        testProvider.createResponse([{ role: 'user', content: 'Test' }])
+        testProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'qwen/qwen3-30b-a3b')
       ).rejects.toThrow('No models are currently loaded in LMStudio');
     });
   });

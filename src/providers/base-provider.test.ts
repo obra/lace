@@ -11,13 +11,15 @@ class TestProvider extends BaseMockProvider {
   get providerName(): string {
     return 'test';
   }
-  get defaultModel(): string {
-    return 'test-model';
+
+  get supportsStreaming(): boolean {
+    return false;
   }
 
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
+    _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return await Promise.resolve({

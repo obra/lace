@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Type helper for accessing private methods in tests
@@ -27,11 +27,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     return Promise.resolve({
       content: 'mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
@@ -42,13 +46,14 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Agent Queue Processing', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
 
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     mockProvider = new MockProvider();
 
     mockToolExecutor = {
@@ -68,10 +73,16 @@ describe('Agent Queue Processing', () => {
       threadId: testThreadId,
       tools: [],
     });
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('processQueuedMessages', () => {
@@ -158,7 +169,7 @@ describe('Agent Queue Processing', () => {
 
       // Create a mock provider that will fail on the first message
       let callCount = 0;
-      vi.spyOn(mockProvider, 'createResponse').mockImplementation(() => {
+      vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
         callCount++;
         if (callCount === 1) {
           return Promise.reject(new Error('Processing failed'));

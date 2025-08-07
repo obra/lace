@@ -5,8 +5,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -78,40 +85,56 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Delegation Integration Tests', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let threadManager: ThreadManager;
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    // setupTestPersistence replaced by setupCoreTest
+    setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Delegation Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method. This would involve:
+    // 1. Creating a test provider instance using createTestProviderInstance
+    // 2. Mocking the HTTP responses at the network level
+    // 3. Or creating a custom test provider type that can be registered
+    // For now, we're using the @internal createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
       (_name: string, _config?: unknown) => {
         return mockProvider;
       }
     );
 
-    // Also mock the static createWithAutoDiscovery method
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
-      const mockRegistry = {
-        createProvider: () => mockProvider,
-        getProvider: () => mockProvider,
-        getProviderNames: () => ['anthropic', 'openai'],
-      } as unknown as ProviderRegistry;
-      return mockRegistry;
-    });
+    // Mock the ProviderRegistry constructor to return our mock registry
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
-    project = Project.create('Test Project', '/tmp/test-delegation');
+    project = Project.create(
+      'Test Project',
+      '/tmp/test-delegation',
+      'Test project for delegation integration',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
     session = Session.create({
       name: 'Delegation Integration Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
@@ -119,11 +142,15 @@ describe('Delegation Integration Tests', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
     threadManager.close();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   it('should create hierarchical delegate thread IDs', () => {

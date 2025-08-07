@@ -8,8 +8,8 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
-  model: z.string().optional(),
+  providerInstanceId: z.string().min(1).optional(),
+  modelId: z.string().min(1).optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
   toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
@@ -56,6 +56,29 @@ export async function PUT(
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Validate provider instance if provided
+    if (validatedData.providerInstanceId) {
+      const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+      const registry = ProviderRegistry.getInstance();
+
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(
+        (inst) => inst.id === validatedData.providerInstanceId
+      );
+
+      if (!instance) {
+        return createErrorResponse('Provider instance not found', 400, {
+          code: 'VALIDATION_FAILED',
+          details: {
+            availableInstances: configuredInstances.map((i) => ({
+              id: i.id,
+              name: (i as { name?: string; displayName: string }).name || i.displayName,
+            })),
+          },
+        });
+      }
+    }
+
     project.updateConfiguration(validatedData);
 
     const configuration = project.getConfiguration();
@@ -63,9 +86,24 @@ export async function PUT(
     return createSuperjsonResponse({ configuration });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
+      // Provide detailed field-level validation errors
+      const fieldErrors: Record<string, string> = {};
+      error.errors.forEach((err) => {
+        const field = err.path.join('.');
+        fieldErrors[field] = err.message;
+      });
+
+      const errorMessage = Object.entries(fieldErrors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join(', ');
+
+      return createErrorResponse(`Validation failed: ${errorMessage}`, 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors,
+        details: {
+          errors: error.errors,
+          fieldErrors,
+          summary: errorMessage,
+        },
       });
     }
 

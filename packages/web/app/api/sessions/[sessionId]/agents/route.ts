@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
+import { ProviderRegistry } from '@/lib/server/lace-imports';
 import { CreateAgentRequest } from '@/types/api';
 import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
@@ -19,7 +20,11 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
   return (
     typeof body === 'object' &&
     body !== null &&
-    (!('name' in body) || typeof (body as { name: unknown }).name === 'string')
+    (!('name' in body) || typeof (body as { name: unknown }).name === 'string') &&
+    'providerInstanceId' in body &&
+    typeof (body as { providerInstanceId: unknown }).providerInstanceId === 'string' &&
+    'modelId' in body &&
+    typeof (body as { modelId: unknown }).modelId === 'string'
   );
 }
 
@@ -51,15 +56,43 @@ export async function POST(
 
     const body: CreateAgentRequest = bodyData;
 
-    // Allow empty names - spawnAgent will provide default
-
     // Get session and spawn agent directly
     const session = await sessionService.getSession(sessionId);
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const agent = await session.spawnAgent(body.name || '', body.provider, body.model);
+    // Verify provider instance exists
+    const registry = ProviderRegistry.getInstance();
+
+    const [configuredInstances, catalogProviders] = await Promise.all([
+      registry.getConfiguredInstances(),
+      registry.getCatalogProviders(),
+    ]);
+
+    const instance = configuredInstances.find((inst) => inst.id === body.providerInstanceId);
+
+    if (!instance) {
+      return createErrorResponse(`Provider instance '${body.providerInstanceId}' not found`, 400, {
+        code: 'VALIDATION_FAILED',
+      });
+    }
+
+    const catalogProvider = catalogProviders.find((p) => p.id === instance.catalogProviderId);
+    if (!catalogProvider) {
+      return createErrorResponse(
+        `Catalog provider '${instance.catalogProviderId}' not found`,
+        400,
+        { code: 'VALIDATION_FAILED' }
+      );
+    }
+
+    // Spawn agent using provider instance configuration
+    const agent = session.spawnAgent({
+      name: body.name || '',
+      providerInstanceId: body.providerInstanceId,
+      modelId: body.modelId,
+    });
 
     // Setup agent approvals using utility
     const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
@@ -73,8 +106,8 @@ export async function POST(
     const agentResponse = {
       threadId: agent.threadId,
       name: agent.name,
-      provider: agent.provider,
-      model: agent.model,
+      provider: catalogProvider.type,
+      model: body.modelId,
       status: agent.status,
       createdAt: new Date(),
     };
@@ -85,7 +118,7 @@ export async function POST(
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentResponse.threadId as ThreadId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       data: { content: `Agent "${agentResponse.name}" spawned successfully` },
     };
     sseManager.broadcast({

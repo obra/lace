@@ -6,15 +6,15 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { createMockProvider } from '~/test-utils/mock-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Agent Single Event Source Integration', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
 
   beforeEach(() => {
-    setupTestPersistence();
     const mockProvider = createMockProvider();
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
@@ -29,7 +29,7 @@ describe('Agent Single Event Source Integration', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should emit Agent events for thread operations', async () => {
@@ -43,6 +43,12 @@ describe('Agent Single Event Source Integration', () => {
 
     // Start agent so we can send messages (which will trigger _addEventAndEmit)
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
 
     // Use Agent methods that trigger _addEventAndEmit internally
     await agent.sendMessage('test message');

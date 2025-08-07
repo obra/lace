@@ -14,7 +14,8 @@ const mockProps = {
     name: 'anthropic',
     displayName: 'Anthropic',
     configured: true,
-    models: [{ id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4' }]
+    requiresApiKey: true,
+    models: [{ id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4', contextWindow: 200000, maxOutputTokens: 8192 }]
   }],
   onProjectSelect: vi.fn(),
   onProjectCreate: vi.fn(),

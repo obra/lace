@@ -9,9 +9,14 @@ import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from './route';
 import { asThreadId } from '@/types/core';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 
@@ -19,10 +24,12 @@ import { parseResponse } from '@/lib/serialization';
 vi.mock('server-only', () => ({}));
 
 describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let testSessionId: string;
   let testTaskId: string;
+  let providerInstanceId: string;
 
   const mockTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
     title: 'Test Task',
@@ -30,33 +37,38 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     prompt: 'Test prompt',
     status: 'pending',
     priority: 'medium',
-    assignedTo: 'user1',
-    createdBy: 'human',
-    threadId: 'session1',
+    assignedTo: 'human',
+    createdBy: asThreadId('lace_20250804_abc123'),
+    threadId: asThreadId('lace_20250804_def456'),
     notes: [],
   };
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // Set up test provider defaults and create instance
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Set up environment for session service
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.LACE_DB_PATH = ':memory:';
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
 
     sessionService = getSessionService();
 
-    // Create a real test project
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    // Create a real test project with provider configuration
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
-    // Create a real session
-    const newSession = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProjectId
-    );
-    testSessionId = newSession.id;
+    // Create a real session that inherits from project
+    const newSession = Session.create({
+      name: 'Test Session',
+      projectId: testProjectId,
+    });
+    testSessionId = newSession.getId();
 
     // Get the active session instance to access task manager
     const session = await sessionService.getSession(asThreadId(testSessionId));
@@ -82,9 +94,11 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     testTaskId = task.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
-    teardownTestPersistence();
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
     vi.clearAllMocks();
   });
 
@@ -175,7 +189,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
 
     it('should apply multiple filters', async () => {
       const request = new NextRequest(
-        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?status=pending&priority=medium&assignedTo=user1`
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?status=pending&priority=medium&assignedTo=human`
       );
       const context = {
         params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
@@ -188,23 +202,21 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       expect(data.tasks).toHaveLength(1);
       expect(data.tasks[0].status).toBe('pending');
       expect(data.tasks[0].priority).toBe('medium');
-      expect(data.tasks[0].assignedTo).toBe('user1');
+      expect(data.tasks[0].assignedTo).toBe('human');
     });
 
     it('should return empty tasks list when no tasks exist', async () => {
-      // Create a new session without any tasks
-      const newSession = await sessionService.createSession(
-        'Empty Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        testProjectId
-      );
+      // Create a new session without any tasks that inherits from project
+      const newSession = Session.create({
+        name: 'Empty Session',
+        projectId: testProjectId,
+      });
 
       const request = new NextRequest(
-        `http://localhost/api/projects/${testProjectId}/sessions/${newSession.id}/tasks`
+        `http://localhost/api/projects/${testProjectId}/sessions/${newSession.getId()}/tasks`
       );
       const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: newSession.id }),
+        params: Promise.resolve({ projectId: testProjectId, sessionId: newSession.getId() }),
       };
 
       const response = await GET(request, context);

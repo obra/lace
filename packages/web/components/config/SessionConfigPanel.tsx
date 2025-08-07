@@ -6,18 +6,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
-import { ModelDropdown } from './ModelDropdown';
-import { ProviderDropdown } from './ProviderDropdown';
+import { ModelSelectionForm } from './ModelSelectionForm';
+import { ModelDropdown } from '@/components/config/ModelDropdown';
 import type { 
   ProviderInfo, 
   ModelInfo, 
   CreateAgentRequest 
 } from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
+import { parseResponse } from '@/lib/serialization';
 
 interface SessionConfiguration {
-  provider?: string;
-  model?: string;
+  providerInstanceId?: string;
+  modelId?: string;
   maxTokens?: number;
   tools?: string[];
   toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
@@ -28,10 +29,17 @@ interface SessionConfiguration {
 
 interface SessionConfigPanelProps {
   selectedProject: ProjectInfo;
+  projectConfiguration?: Record<string, unknown> | null;
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
   providers: ProviderInfo[];
-  onSessionCreate: (sessionData: { name: string; description?: string; configuration?: SessionConfiguration }) => void;
+  onSessionCreate: (sessionData: { 
+    name: string; 
+    description?: string; 
+    providerInstanceId?: string;
+    modelId?: string;
+    configuration?: Record<string, unknown> 
+  }) => void;
   onSessionSelect: (session: SessionInfo) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
   onAgentSelect?: (agentId: string) => void;
@@ -47,8 +55,7 @@ const AVAILABLE_TOOLS = [
 ];
 
 const DEFAULT_CONFIG: SessionConfiguration = {
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  // Note: providerInstanceId and modelId should be set by user selection, not defaults
   maxTokens: 4096,
   tools: AVAILABLE_TOOLS,
   toolPolicies: {},
@@ -57,6 +64,7 @@ const DEFAULT_CONFIG: SessionConfiguration = {
 
 export function SessionConfigPanel({
   selectedProject,
+  projectConfiguration,
   sessions,
   selectedSession,
   providers,
@@ -72,7 +80,12 @@ export function SessionConfigPanel({
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [showEditAgent, setShowEditAgent] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<{ threadId: string; name: string; provider: string; model: string } | null>(null);
+  const [editingAgent, setEditingAgent] = useState<{ 
+    threadId: string; 
+    name: string; 
+    providerInstanceId: string;
+    modelId: string;
+  } | null>(null);
   
   // Session creation state
   const [newSessionName, setNewSessionName] = useState('');
@@ -81,8 +94,8 @@ export function SessionConfigPanel({
   
   // Agent creation state  
   const [newAgentName, setNewAgentName] = useState('');
-  const [agentProvider, setAgentProvider] = useState('anthropic');
-  const [agentModel, setAgentModel] = useState('claude-3-sonnet-20241022');
+  const [selectedInstanceId, setSelectedInstanceId] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState('');
 
   // Environment variables helper state
   const [newEnvKey, setNewEnvKey] = useState('');
@@ -96,12 +109,15 @@ export function SessionConfigPanel({
   const [editNewEnvValue, setEditNewEnvValue] = useState('');
 
 
-  // Get available providers (only those that are configured)
+  // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
-    return providers.filter(p => p.configured);
+    return providers.filter((p): p is ProviderInfo & { instanceId: string } => 
+      Boolean(p.configured && p.instanceId)
+    );
   }, [providers]);
 
-  // Reset form when project changes
+  // Reset form when project or project configuration changes
+  const projectId = (selectedProject as { id: string }).id;
   useEffect(() => {
     setShowCreateSession(false);
     setShowCreateAgent(false);
@@ -111,20 +127,40 @@ export function SessionConfigPanel({
     resetSessionForm();
     resetAgentForm();
     resetEditSessionForm();
-  }, [selectedProject.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, projectConfiguration]);
 
   const resetSessionForm = () => {
     setNewSessionName('');
     setNewSessionDescription('');
-    setSessionConfig(DEFAULT_CONFIG);
+    // Use project configuration as defaults if available
+    const defaultConfig = { ...DEFAULT_CONFIG };
+    if (projectConfiguration) {
+      if (projectConfiguration.providerInstanceId) {
+        defaultConfig.providerInstanceId = projectConfiguration.providerInstanceId as string;
+      }
+      if (projectConfiguration.modelId) {
+        defaultConfig.modelId = projectConfiguration.modelId as string;
+      }
+      if (projectConfiguration.workingDirectory) {
+        defaultConfig.workingDirectory = projectConfiguration.workingDirectory as string;
+      }
+      if (projectConfiguration.environmentVariables) {
+        defaultConfig.environmentVariables = projectConfiguration.environmentVariables as Record<string, string>;
+      }
+      if (projectConfiguration.toolPolicies) {
+        defaultConfig.toolPolicies = projectConfiguration.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>;
+      }
+    }
+    setSessionConfig(defaultConfig);
     setNewEnvKey('');
     setNewEnvValue('');
   };
 
   const resetAgentForm = () => {
     setNewAgentName('');
-    setAgentProvider('anthropic');
-    setAgentModel('claude-3-sonnet-20241022');
+    setSelectedInstanceId('');
+    setSelectedModelId('');
   };
 
   const resetEditSessionForm = () => {
@@ -135,14 +171,24 @@ export function SessionConfigPanel({
     setEditNewEnvValue('');
   };
 
+  const handleProviderInstanceSelection = (instanceId: string, modelId: string) => {
+    setSelectedInstanceId(instanceId);
+    setSelectedModelId(modelId);
+  };
+
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSessionName.trim()) return;
 
+    // Extract provider and model from sessionConfig to send at top level
+    const { providerInstanceId, modelId, ...restConfig } = sessionConfig;
+    
     onSessionCreate({
       name: newSessionName.trim(),
       description: newSessionDescription.trim() || undefined,
-      configuration: sessionConfig,
+      providerInstanceId: providerInstanceId || '',
+      modelId: modelId || '',
+      configuration: restConfig,
     });
 
     resetSessionForm();
@@ -153,10 +199,17 @@ export function SessionConfigPanel({
     e.preventDefault();
     if (!newAgentName.trim() || !selectedSession) return;
 
+    // All agents now require provider instances - no fallback to legacy system
+    if (!selectedInstanceId || !selectedModelId) {
+      // Should not happen with proper UI validation
+      console.error('Cannot create agent without provider instance and model selection');
+      return;
+    }
+
     onAgentCreate(selectedSession.id, {
       name: newAgentName.trim(),
-      provider: agentProvider,
-      model: agentModel,
+      providerInstanceId: selectedInstanceId,
+      modelId: selectedModelId,
     });
 
     resetAgentForm();
@@ -206,25 +259,47 @@ export function SessionConfigPanel({
       const res = await fetch(`/api/sessions/${selectedSession.id}/configuration`);
       
       if (res.ok) {
-        const data = await res.json() as { configuration: SessionConfiguration };
+        const data = await parseResponse<{ configuration: SessionConfiguration }>(res);
         setEditSessionName(selectedSession.name);
         setEditSessionDescription(''); // Session descriptions not currently stored
-        setEditSessionConfig(data.configuration);
+        
+        // Merge with defaults and ensure provider instance is set
+        const config = {
+          ...DEFAULT_CONFIG,
+          ...data.configuration,
+        };
+        
+        // If no provider instance configured, use first available
+        if (!config.providerInstanceId && availableProviders.length > 0) {
+          config.providerInstanceId = availableProviders[0].instanceId;
+          config.modelId = availableProviders[0].models[0]?.id || '';
+        }
+        
+        setEditSessionConfig(config);
         setShowEditConfig(true);
       } else {
-        console.error('Failed to load session configuration');
-        // Fallback to default configuration
+        // Fallback to default configuration with first available provider
+        const config = { ...DEFAULT_CONFIG };
+        if (availableProviders.length > 0) {
+          config.providerInstanceId = availableProviders[0].instanceId;
+          config.modelId = availableProviders[0].models[0]?.id || '';
+        }
         setEditSessionName(selectedSession.name);
         setEditSessionDescription('');
-        setEditSessionConfig(DEFAULT_CONFIG);
+        setEditSessionConfig(config);
         setShowEditConfig(true);
       }
     } catch (error) {
       console.error('Error loading session configuration:', error);
-      // Fallback to default configuration
+      // Fallback to default configuration with first available provider
+      const config = { ...DEFAULT_CONFIG };
+      if (availableProviders.length > 0) {
+        config.providerInstanceId = availableProviders[0].instanceId;
+        config.modelId = availableProviders[0].models[0]?.id || '';
+      }
       setEditSessionName(selectedSession.name);
       setEditSessionDescription('');
-      setEditSessionConfig(DEFAULT_CONFIG);
+      setEditSessionConfig(config);
       setShowEditConfig(true);
     }
   };
@@ -256,7 +331,7 @@ export function SessionConfigPanel({
         });
 
         if (!sessionRes.ok) {
-          const errorData = await sessionRes.json() as { error: string };
+          const errorData = await parseResponse<{ error: string }>(sessionRes);
           console.error('Failed to update session name/description:', errorData.error);
         }
       }
@@ -273,7 +348,7 @@ export function SessionConfigPanel({
         setShowEditConfig(false);
         resetEditSessionForm();
       } else {
-        const errorData = await configRes.json() as { error: string };
+        const errorData = await parseResponse<{ error: string }>(configRes);
         console.error('Failed to update session configuration:', errorData.error);
       }
     } catch (error) {
@@ -317,9 +392,44 @@ export function SessionConfigPanel({
   };
 
   // Handle agent edit
-  const handleEditAgentClick = (agent: { threadId: string; name: string; provider: string; model: string }) => {
-    setEditingAgent(agent);
-    setShowEditAgent(true);
+  const handleEditAgentClick = async (agent: { threadId: string; name: string; status: string }) => {
+    try {
+      // Fetch agent's actual configuration
+      const res = await fetch(`/api/agents/${agent.threadId}`);
+      if (!res.ok) {
+        console.error('Failed to fetch agent configuration');
+        return;
+      }
+      
+      const data = await parseResponse<{ agent: { 
+        threadId: string; 
+        name: string; 
+        providerInstanceId?: string;
+        modelId?: string;
+      } }>(res);
+      
+      if (!data.agent) {
+        console.error('No agent data in response');
+        return;
+      }
+      
+      // Use agent's actual provider/model or fall back to first available
+      const provider = availableProviders[0];
+      if (!provider) {
+        console.error('No provider instances configured');
+        return;
+      }
+      
+      setEditingAgent({
+        threadId: data.agent.threadId,
+        name: data.agent.name,
+        providerInstanceId: data.agent.providerInstanceId || provider.instanceId,
+        modelId: data.agent.modelId || provider.models[0]?.id || 'unknown'
+      });
+      setShowEditAgent(true);
+    } catch (error) {
+      console.error('Failed to load agent for editing:', error);
+    }
   };
 
   const handleEditAgentSubmit = async (e: React.FormEvent) => {
@@ -332,8 +442,8 @@ export function SessionConfigPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editingAgent.name.trim(),
-          provider: editingAgent.provider,
-          model: editingAgent.model,
+          providerInstanceId: editingAgent.providerInstanceId,
+          modelId: editingAgent.modelId,
         }),
       });
 
@@ -345,7 +455,7 @@ export function SessionConfigPanel({
         setShowEditAgent(false);
         setEditingAgent(null);
       } else {
-        const errorData = await res.json() as { error: string };
+        const errorData = await parseResponse<{ error: string }>(res);
         console.error('Failed to update agent:', errorData.error);
       }
     } catch (error) {
@@ -360,8 +470,8 @@ export function SessionConfigPanel({
         <div className="flex items-center gap-3">
           <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold text-base-content">{selectedProject.name}</h2>
-            <p className="text-sm text-base-content/60">{selectedProject.description}</p>
+            <h2 className="text-xl font-semibold text-base-content">{(selectedProject as { name: string }).name}</h2>
+            <p className="text-sm text-base-content/60">{(selectedProject as { description: string }).description}</p>
           </div>
         </div>
         
@@ -482,7 +592,10 @@ export function SessionConfigPanel({
         
         {/* New Session Button - moved to bottom */}
         <button
-          onClick={() => setShowCreateSession(true)}
+          onClick={() => {
+            resetSessionForm(); // Reset with project defaults
+            setShowCreateSession(true);
+          }}
           className="btn btn-primary btn-sm w-full"
           disabled={loading}
         >
@@ -538,57 +651,14 @@ export function SessionConfigPanel({
                   </div>
                 </div>
 
-                {/* Provider and Model Configuration */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Provider</span>
-                    </label>
-                    <select
-                      value={sessionConfig.provider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                        setSessionConfig(prev => ({
-                          ...prev,
-                          provider: newProvider,
-                          model: providerModels[0]?.id || prev.model,
-                        }));
-                      }}
-                      className="select select-bordered w-full"
-                    >
-                      {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
-                          {provider.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <ModelDropdown
-                      providers={providers}
-                      selectedProvider={sessionConfig.provider || ''}
-                      selectedModel={sessionConfig.model || ''}
-                      onChange={(model) => setSessionConfig(prev => ({ ...prev, model }))}
-                      label="Default Model"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Max Tokens</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="200000"
-                      value={sessionConfig.maxTokens}
-                      onChange={(e) => setSessionConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
-                      className="input input-bordered w-full"
-                    />
-                  </div>
-                </div>
+                {/* Provider and Model Selection */}
+                <ModelSelectionForm
+                  providers={providers}
+                  providerInstanceId={sessionConfig.providerInstanceId}
+                  modelId={sessionConfig.modelId}
+                  onProviderChange={(instanceId) => setSessionConfig(prev => ({ ...prev, providerInstanceId: instanceId }))}
+                  onModelChange={(modelId) => setSessionConfig(prev => ({ ...prev, modelId }))}
+                />
 
                 {/* Working Directory */}
                 <div>
@@ -597,10 +667,10 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={sessionConfig.workingDirectory || selectedProject.workingDirectory}
+                    value={sessionConfig.workingDirectory || (selectedProject as { workingDirectory: string }).workingDirectory}
                     onChange={(e) => setSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
                     className="input input-bordered w-full"
-                    placeholder={selectedProject.workingDirectory}
+                    placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
                   />
                 </div>
 
@@ -745,37 +815,15 @@ export function SessionConfigPanel({
                 />
               </div>
 
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Provider</span>
-                </label>
-                <select
-                  value={agentProvider}
-                  onChange={(e) => {
-                    const newProvider = e.target.value;
-                    const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                    setAgentProvider(newProvider);
-                    setAgentModel(providerModels[0]?.id || agentModel);
-                  }}
-                  className="select select-bordered w-full"
-                >
-                  {availableProviders.map((provider) => (
-                    <option key={provider.name} value={provider.name}>
-                      {provider.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <ModelDropdown
-                  providers={providers}
-                  selectedProvider={agentProvider}
-                  selectedModel={agentModel}
-                  onChange={setAgentModel}
-                  label="Model"
-                />
-              </div>
+              {/* Provider Instance Selection Toggle */}
+              <ModelSelectionForm
+                providers={providers}
+                providerInstanceId={selectedInstanceId}
+                modelId={selectedModelId}
+                onProviderChange={setSelectedInstanceId}
+                onModelChange={setSelectedModelId}
+                className="mb-4"
+              />
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
@@ -788,7 +836,7 @@ export function SessionConfigPanel({
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={!newAgentName.trim() || loading}
+                  disabled={!newAgentName.trim() || loading || !selectedInstanceId || !selectedModelId}
                 >
                   {loading ? (
                     <>
@@ -852,57 +900,14 @@ export function SessionConfigPanel({
                   </div>
                 </div>
 
-                {/* Provider and Model Configuration */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Provider</span>
-                    </label>
-                    <select
-                      value={editSessionConfig.provider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value;
-                        const providerModels = providers.find(p => p.name === newProvider)?.models || [];
-                        setEditSessionConfig(prev => ({
-                          ...prev,
-                          provider: newProvider,
-                          model: providerModels[0]?.id || prev.model,
-                        }));
-                      }}
-                      className="select select-bordered w-full"
-                    >
-                      {availableProviders.map((provider) => (
-                        <option key={provider.name} value={provider.name}>
-                          {provider.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <ModelDropdown
-                      providers={providers}
-                      selectedProvider={editSessionConfig.provider || ''}
-                      selectedModel={editSessionConfig.model || ''}
-                      onChange={(model) => setEditSessionConfig(prev => ({ ...prev, model }))}
-                      label="Default Model"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Max Tokens</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="200000"
-                      value={editSessionConfig.maxTokens}
-                      onChange={(e) => setEditSessionConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) || 4096 }))}
-                      className="input input-bordered w-full"
-                    />
-                  </div>
-                </div>
+                {/* Provider and Model Selection */}
+                <ModelSelectionForm
+                  providers={providers}
+                  providerInstanceId={editSessionConfig.providerInstanceId}
+                  modelId={editSessionConfig.modelId}
+                  onProviderChange={(instanceId) => setEditSessionConfig(prev => ({ ...prev, providerInstanceId: instanceId }))}
+                  onModelChange={(modelId) => setEditSessionConfig(prev => ({ ...prev, modelId }))}
+                />
 
                 {/* Working Directory */}
                 <div>
@@ -911,10 +916,10 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={editSessionConfig.workingDirectory || selectedProject.workingDirectory}
+                    value={editSessionConfig.workingDirectory || (selectedProject as { workingDirectory: string }).workingDirectory}
                     onChange={(e) => setEditSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
                     className="input input-bordered w-full"
-                    placeholder={selectedProject.workingDirectory}
+                    placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
                   />
                 </div>
 
@@ -1064,20 +1069,21 @@ export function SessionConfigPanel({
                   <span className="label-text font-medium">Provider</span>
                 </label>
                 <select
-                  value={editingAgent.provider}
+                  value={editingAgent.providerInstanceId}
                   onChange={(e) => {
-                    const newProvider = e.target.value;
-                    const providerModels = providers.find(p => p.name === newProvider)?.models || [];
+                    const newInstanceId = e.target.value;
+                    const provider = providers.find(p => p.instanceId === newInstanceId);
+                    const providerModels = provider?.models || [];
                     setEditingAgent(prev => prev ? {
                       ...prev,
-                      provider: newProvider,
-                      model: providerModels[0]?.id || prev.model,
+                      providerInstanceId: newInstanceId,
+                      modelId: providerModels[0]?.id || prev.modelId,
                     } : null);
                   }}
                   className="select select-bordered w-full"
                 >
                   {availableProviders.map((provider) => (
-                    <option key={provider.name} value={provider.name}>
+                    <option key={provider.instanceId} value={provider.instanceId}>
                       {provider.displayName}
                     </option>
                   ))}
@@ -1085,13 +1091,20 @@ export function SessionConfigPanel({
               </div>
 
               <div>
-                <ModelDropdown
-                  providers={providers}
-                  selectedProvider={editingAgent.provider}
-                  selectedModel={editingAgent.model}
-                  onChange={(model) => setEditingAgent(prev => prev ? { ...prev, model } : null)}
-                  label="Model"
-                />
+                <label className="label">
+                  <span className="label-text font-medium">Model</span>
+                </label>
+                <select
+                  value={editingAgent.modelId}
+                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, modelId: e.target.value } : null)}
+                  className="select select-bordered w-full"
+                >
+                  {providers.find(p => p.instanceId === editingAgent.providerInstanceId)?.models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.displayName}
+                    </option>
+                  )) || []}
+                </select>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">

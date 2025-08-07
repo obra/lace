@@ -12,7 +12,11 @@ import type { MessageResponse } from '@/types/api';
 import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 // Console capture for verifying error output
@@ -23,13 +27,14 @@ let originalConsoleError: typeof console.error;
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Thread Messaging API', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let realSessionId: string;
   let realThreadId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
     vi.clearAllMocks();
 
     // Set up console capture
@@ -43,20 +48,25 @@ describe('Thread Messaging API', () => {
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
 
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     sessionService = getSessionService();
 
-    // Create a real test project
-    testProjectId = 'test-project-1';
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    // Create a real test project with provider configuration
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
-    // Create a real session
-    const session = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProjectId
-    );
+    // Create a real session (will inherit provider config from project)
+    const session = await sessionService.createSession('Test Session', testProjectId);
     realSessionId = session.id;
     realThreadId = session.id; // Session ID equals coordinator thread ID
   });
@@ -66,9 +76,11 @@ describe('Thread Messaging API', () => {
     // Stop all agents first to prevent async operations after database closure
     await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
+    // Clean up provider instances
+    await cleanupTestProviderInstances([providerInstanceId]);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should accept and process messages', async () => {
@@ -198,7 +210,11 @@ describe('Thread Messaging API', () => {
     const session = await sessionService.getSession(asThreadId(realSessionId));
     expect(session).toBeDefined();
 
-    const delegateAgent = session!.spawnAgent('Test Delegate');
+    const delegateAgent = session!.spawnAgent({
+      name: 'Test Delegate',
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const delegateThreadId = delegateAgent.threadId;
 
     const request = new NextRequest('http://localhost/api/threads/test/message', {

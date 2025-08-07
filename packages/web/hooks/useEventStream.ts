@@ -28,7 +28,7 @@ export interface TaskEvent {
     actor: string;
     isHuman?: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // Project event types
@@ -45,7 +45,7 @@ export interface ProjectEvent {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // Agent event types
@@ -53,13 +53,13 @@ export interface AgentEvent {
   type: 'agent:spawned' | 'agent:started' | 'agent:stopped';
   taskId?: string;
   agentThreadId: ThreadId;
-  provider: string;
-  model: string;
+  providerInstanceId: string;
+  modelId: string;
   context: {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 // Global event types
@@ -71,7 +71,7 @@ export interface GlobalEvent {
     actor: string;
     isHuman: boolean;
   };
-  timestamp: string;
+  timestamp: Date;
 }
 
 interface EventHandlers {
@@ -145,12 +145,17 @@ function isTaskEvent(streamEvent: StreamEvent): boolean {
 }
 
 function isAgentEvent(streamEvent: StreamEvent): boolean {
-  return (
-    streamEvent.eventType === 'task' &&
-    ['agent:spawned', 'agent:started', 'agent:stopped'].includes(
-      (streamEvent.data as AgentEvent).type
-    )
-  );
+  if (streamEvent.eventType !== 'task') {
+    return false;
+  }
+
+  const data = streamEvent.data as unknown;
+  if (!data || typeof data !== 'object' || !('type' in data)) {
+    return false;
+  }
+
+  const eventData = data as { type: string };
+  return ['agent:spawned', 'agent:started', 'agent:stopped'].includes(eventData.type);
 }
 
 function isProjectEvent(streamEvent: StreamEvent): boolean {
@@ -382,7 +387,7 @@ export function useEventStream({
               name: approvalData.toolName,
               arguments: approvalData.input,
             },
-            requestedAt: streamTimestamp, // Now a string
+            requestedAt: streamTimestamp, // Date object, SuperJSON handles serialization
             requestData: approvalData,
           };
           callbackRefs.current.onApprovalRequest?.(pendingApproval);
@@ -442,7 +447,7 @@ export function useEventStream({
             break;
         }
       } else if (isAgentEvent(streamEvent)) {
-        const agentEvent = streamEvent.data as AgentEvent;
+        const agentEvent = streamEvent.data as unknown as AgentEvent;
         callbackRefs.current.onAgentEvent?.(agentEvent);
         switch (agentEvent.type) {
           case 'agent:spawned':

@@ -7,9 +7,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { cleanupTestProviderInstances } from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -34,44 +36,65 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('SessionService.spawnAgent Method', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // Set up test provider defaults and create instances
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Set up environment
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.LACE_DB_PATH = ':memory:';
+    // Create test provider instances individually for more control
+    const { createTestProviderInstance } = await import('~/test-utils/provider-instances');
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      apiKey: 'test-openai-key',
+    });
 
     // Create session service
     sessionService = getSessionService();
 
-    // Create a test project
-    const project = Project.create('Test Project', '/test/path', 'Test project', {});
+    // Create a test project with provider configuration
+    const project = Project.create('Test Project', '/test/path', 'Test project', {
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     projectId = project.getId();
 
-    // Create session
-    const session = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      projectId
-    );
-    sessionId = session.id as string;
+    // Create session that inherits from project
+    const session = Session.create({
+      name: 'Test Session',
+      projectId,
+    });
+    sessionId = session.getId() as string;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
-    teardownTestPersistence();
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should spawn agent via service and make it retrievable', async () => {
     // Spawn agent via service
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Service Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session!.spawnAgent({
+      name: 'Service Agent',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     // Verify agent properties
     expect(agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
@@ -97,11 +120,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent(
-      'Retrievable Agent',
-      'anthropic',
-      'claude-3-5-haiku-20241022'
-    );
+    const agent = session!.spawnAgent({
+      name: 'Retrievable Agent',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const agentThreadId = agent.threadId as ThreadId;
 
     // Test immediate retrieval
@@ -124,8 +147,16 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn multiple agents
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent1 = session!.spawnAgent('Agent 1', 'anthropic', 'claude-3-5-haiku-20241022');
-    const agent2 = session!.spawnAgent('Agent 2', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent1 = session!.spawnAgent({
+      name: 'Agent 1',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+    const agent2 = session!.spawnAgent({
+      name: 'Agent 2',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     // Verify both agents are retrievable
     const retrievedAgent1 = session!.getAgent(agent1.threadId as ThreadId);
@@ -151,11 +182,11 @@ describe('SessionService.spawnAgent Method', () => {
     expect(session).toBeDefined();
 
     // Spawn agent in reconstructed session
-    const agent = session!.spawnAgent(
-      'Reconstructed Agent',
-      'anthropic',
-      'claude-3-5-haiku-20241022'
-    );
+    const agent = session!.spawnAgent({
+      name: 'Reconstructed Agent',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     // Verify agent was spawned correctly
     expect(agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
@@ -176,7 +207,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Persistent Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session!.spawnAgent({
+      name: 'Persistent Agent',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const agentThreadId = agent.threadId as ThreadId;
 
     // Get the agent to ensure it's started
@@ -197,7 +232,7 @@ describe('SessionService.spawnAgent Method', () => {
     const events = threadManager.getEvents(agentThreadId);
     expect(events.length).toBeGreaterThan(0);
     // Find our specific event among the events (agent may add startup events)
-    const ourEvent = events.find((e) => e.id === event.id);
+    const ourEvent = events.find((e) => e.id === event?.id);
     expect(ourEvent).toBeDefined();
     expect(ourEvent?.type).toBe('USER_MESSAGE');
     expect(ourEvent?.data).toBe('Hello persistent agent');
@@ -207,7 +242,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Spawn agent via service
     const session = await sessionService.getSession(sessionId as ThreadId);
     expect(session).toBeDefined();
-    const agent = session!.spawnAgent('Cache Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session!.spawnAgent({
+      name: 'Cache Test Agent',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const agentThreadId = agent.threadId as ThreadId;
 
     // Verify agent is retrievable via session
@@ -229,7 +268,8 @@ describe('SessionService.spawnAgent Method', () => {
       'USER_MESSAGE',
       'Hello from fresh manager'
     );
-    expect(event.threadId).toBe(agentThreadId);
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(agentThreadId);
 
     // Verify event is visible from service's agent
     if (serviceAgent) {
@@ -244,7 +284,7 @@ describe('SessionService.spawnAgent Method', () => {
 
       // Find our specific event among the events (agent may add startup events)
       const ourEvent = eventsFromService.find(
-        (e: unknown) => (e as { id: string }).id === event.id
+        (e: unknown) => (e as { id: string }).id === event?.id
       );
       expect(ourEvent).toBeDefined();
       expect((ourEvent as { type: string } | undefined)?.type).toBe('USER_MESSAGE');
@@ -260,7 +300,11 @@ describe('SessionService.spawnAgent Method', () => {
     // This should not be possible since getSession returns null
     // but we can test the error by trying to call on null
     expect(() => {
-      session?.spawnAgent('Orphan Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+      session?.spawnAgent({
+        name: 'Orphan Agent',
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
     }).not.toThrow(); // This won't throw because session is null
   });
 });

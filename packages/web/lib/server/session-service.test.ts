@@ -1,53 +1,69 @@
-// ABOUTME: Unit tests for SessionService methods required by service layer refactoring
-// ABOUTME: Tests the missing methods needed to eliminate direct business logic calls from API routes
+// ABOUTME: Unit tests for SessionService provider instance integration
+// ABOUTME: Tests createSession with providerInstanceId and modelId parameters
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { TestProvider } from '~/test-utils/test-provider';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { TestProvider } from '@/lib/server/lace-imports';
 import type { SessionEvent } from '@/types/web-sse';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
-describe('SessionService after getProjectForSession removal', () => {
-  it('should not have getProjectForSession method', () => {
-    const sessionService = new SessionService();
+describe('SessionService with Provider Instances', () => {
+  const _tempLaceDir = setupWebTest();
+  let sessionService: SessionService;
+  let testProject: import('@/lib/server/lace-imports').Project;
 
-    // This test should FAIL initially because method still exists
-    expect(
-      (sessionService as unknown as Record<string, unknown>).getProjectForSession
-    ).toBeUndefined();
+  beforeEach(async () => {
+    // Create a real test project with provider configuration
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create(
+      'Test Project',
+      process.cwd(),
+      'Test project for provider instance tests',
+      {
+        providerInstanceId: 'test-instance-id',
+        modelId: 'claude-3-5-sonnet-20241022',
+      }
+    );
+
+    sessionService = new SessionService();
+    sessionService.clearActiveSessions();
   });
-});
 
-describe('SessionService after getEffectiveConfiguration removal', () => {
-  it('should not have getEffectiveConfiguration method', () => {
-    const sessionService = new SessionService();
-
-    // This test should FAIL initially because method still exists
-    expect(
-      (sessionService as unknown as Record<string, unknown>).getEffectiveConfiguration
-    ).toBeUndefined();
+  afterEach(() => {
+    sessionService.clearActiveSessions();
   });
-});
 
-describe('SessionService after updateSessionConfiguration removal', () => {
-  it('should not have updateSessionConfiguration method', () => {
-    const sessionService = new SessionService();
+  it('should create session using providerInstanceId and modelId', async () => {
+    // Set up a configured provider instance
+    const { ProviderRegistry, ProviderInstanceManager } = await import('@/lib/server/lace-imports');
+    const _registry = ProviderRegistry.getInstance();
 
-    // This test should FAIL initially because method still exists
-    expect(
-      (sessionService as unknown as Record<string, unknown>).updateSessionConfiguration
-    ).toBeUndefined();
-  });
-});
+    // Create a test provider instance
+    const instanceManager = new ProviderInstanceManager();
+    const config = await instanceManager.loadInstances();
+    config.instances['test-instance-id'] = {
+      displayName: 'Test Anthropic Instance',
+      catalogProviderId: 'anthropic',
+    };
+    await instanceManager.saveInstances(config);
 
-describe('SessionService after getSessionData removal', () => {
-  it('should not have getSessionData method', () => {
-    const sessionService = new SessionService();
+    // Save a test credential
+    await instanceManager.saveCredential('test-instance-id', {
+      apiKey: 'test-key-123',
+    });
 
-    // This test should FAIL initially because method still exists
-    expect((sessionService as unknown as Record<string, unknown>).getSessionData).toBeUndefined();
+    // Now the test should pass - createSession should resolve the provider instance
+    const session = await sessionService.createSession('Test Session', testProject.getId());
+
+    expect(session).toBeDefined();
+    expect(session.name).toBe('Test Session');
   });
 });
 
@@ -62,36 +78,58 @@ describe('SessionService after getSessionData removal', () => {
 // Don't mock lace-imports - use real implementations with temp directory
 
 describe('SessionService Missing Methods', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let Session: typeof import('@/lib/server/lace-imports').Session;
   let testProject: import('@/lib/server/lace-imports').Project;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Set up test environment
-    process.env.ANTHROPIC_KEY = 'test-key';
-
-    // Create a real test project
-    const { Project } = await import('@/lib/server/lace-imports');
-    testProject = Project.create(
-      'Test Project',
-      'Test project for session service tests',
-      tempDirContext.path,
-      {}
-    );
-
-    sessionService = getSessionService();
-    sessionService.clearActiveSessions();
+    // Set up test provider defaults
+    setupTestProviderDefaults();
 
     // Import Session for use in tests
     const imports = await import('@/lib/server/lace-imports');
     Session = imports.Session;
+    Session.clearProviderCache();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create a real test project with provider configuration
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create(
+      'Test Project',
+      _tempDirContext.tempDir,
+      'Test project for session service tests',
+      {}
+    );
+
+    // Configure project with provider after creation
+    testProject.updateConfiguration({
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+
+    // Ensure project is saved/available
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    sessionService = getSessionService();
+    sessionService.clearActiveSessions();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   describe('updateSession', () => {
@@ -102,8 +140,6 @@ describe('SessionService Missing Methods', () => {
       // Create a real session using SessionService
       const initialSession = await sessionService.createSession(
         'Original Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 
@@ -124,8 +160,6 @@ describe('SessionService Missing Methods', () => {
       // Arrange: Create a session with multiple properties
       const initialSession = await sessionService.createSession(
         'Original Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
         testProject.getId()
       );
 
@@ -143,11 +177,12 @@ describe('SessionService Missing Methods', () => {
 });
 
 describe('SessionService approval event forwarding', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempDirContext = setupWebTest();
   let sessionService: SessionService;
   let session: Session;
   let agent: Agent;
   let testProject: import('@/lib/server/lace-imports').Project;
+  let providerInstanceId: string;
 
   // Mock provider that returns tool calls to trigger approval flow
   class MockApprovalProvider extends TestProvider {
@@ -180,11 +215,20 @@ describe('SessionService approval event forwarding', () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Set up test environment
-    process.env.ANTHROPIC_KEY = 'test-key';
+    // Set up test provider defaults
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
   });
 
   afterEach(async () => {
@@ -193,6 +237,9 @@ describe('SessionService approval event forwarding', () => {
       agent.abort(); // Use abort() instead of stop() for proper cleanup
     }
     sessionService.clearActiveSessions();
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
@@ -202,14 +249,20 @@ describe('SessionService approval event forwarding', () => {
     const realEventStreamManager = EventStreamManager.getInstance();
     const broadcastSpy = vi.spyOn(realEventStreamManager, 'broadcast');
 
-    // Create a real test project using temp directory
+    // Create a real test project using temp directory with provider configuration
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
+      _tempDirContext.tempDir,
       'Test project for approval flow testing',
-      tempDirContext.path,
       {}
     );
+
+    // Configure project with provider after creation
+    testProject.updateConfiguration({
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     // Ensure project is saved (Project.create should handle this, but let's be explicit)
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -217,22 +270,17 @@ describe('SessionService approval event forwarding', () => {
     // Create mock provider that returns tool calls
     const mockProvider = new MockApprovalProvider();
 
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method
     // Mock ProviderRegistry to return our mock provider
     const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockReturnValue({
-      createProvider: vi.fn().mockReturnValue(mockProvider),
-      getProvider: vi.fn().mockReturnValue(mockProvider),
-    } as unknown as ReturnType<typeof ProviderRegistry.createWithAutoDiscovery>);
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockReturnValue(mockProvider);
+    vi.spyOn(ProviderRegistry.prototype, 'getProvider').mockReturnValue(mockProvider);
 
     sessionService = getSessionService();
 
     // Create a real session with real agent using the real project
-    const sessionData = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProject.getId()
-    );
+    const sessionData = await sessionService.createSession('Test Session', testProject.getId());
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
@@ -279,11 +327,12 @@ describe('SessionService approval event forwarding', () => {
 });
 
 describe('SessionService agent state change broadcasting', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
   let session: Session;
   let agent: Agent;
   let testProject: import('@/lib/server/lace-imports').Project;
+  let providerInstanceId: string;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
@@ -292,17 +341,32 @@ describe('SessionService agent state change broadcasting', () => {
     // Set up test environment
     process.env.ANTHROPIC_KEY = 'test-key';
 
+    // Set up test provider defaults
+    setupTestProviderDefaults();
+
+    // Clear provider cache for test isolation
+    const { Session } = await import('@/lib/server/lace-imports');
+    Session.clearProviderCache();
+
+    // Create provider instance using the documented pattern
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     // Create a real test project using temp directory
     const { Project } = await import('@/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
+      _tempLaceDir.tempDir,
       'Test project for agent state change testing',
-      tempDirContext.path,
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
-
-    // Ensure project is saved (Project.create should handle this, but let's be explicit)
-    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Instrument real EventStreamManager to capture broadcasts
     const { EventStreamManager } = await import('@/lib/event-stream-manager');
@@ -312,24 +376,26 @@ describe('SessionService agent state change broadcasting', () => {
     sessionService = getSessionService();
 
     // Create a real session with real agent
-    const sessionData = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProject.getId()
-    );
+    const sessionData = await sessionService.createSession('Test Session', testProject.getId());
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
   });
 
   afterEach(async () => {
+    // Stop services first
     if (agent) {
       agent.removeAllListeners();
       agent.abort(); // Use abort() instead of stop() for proper cleanup
     }
     sessionService.clearActiveSessions();
-    vi.restoreAllMocks();
+
+    // Clean up test utilities following docs/testing.md pattern
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+
+    // Clear mocks last
+    vi.clearAllMocks();
   });
 
   it('should broadcast AGENT_STATE_CHANGE events when agent transitions from idle to thinking', async () => {
@@ -395,7 +461,7 @@ describe('SessionService agent state change broadcasting', () => {
     // Act: Simulate streaming → tool_execution transition
     agent.emit('state_change', { from: 'streaming', to: 'tool_execution' });
 
-    // Wait for event processing  
+    // Wait for event processing
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Assert: Verify the broadcast
@@ -460,10 +526,10 @@ describe('SessionService agent state change broadcasting', () => {
       data: expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
-        timestamp: expect.any(String),
+        timestamp: expect.any(Date),
         data: expect.objectContaining({
           agentId: agent.threadId,
-          from: 'idle', 
+          from: 'idle',
           to: 'thinking',
         }),
       }),
@@ -494,7 +560,7 @@ describe('SessionService agent state change broadcasting', () => {
 
     // Assert: Should only see ONE broadcast despite multiple handler registrations
     const stateChangeCalls = broadcastSpy.mock.calls.filter(
-      call => (call[0].data as SessionEvent).type === 'AGENT_STATE_CHANGE'
+      (call) => (call[0].data as SessionEvent).type === 'AGENT_STATE_CHANGE'
     );
     expect(stateChangeCalls).toHaveLength(1);
   });

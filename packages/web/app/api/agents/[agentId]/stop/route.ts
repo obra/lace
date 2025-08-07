@@ -7,6 +7,7 @@ import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { Session } from '~/sessions/session';
 
 export async function POST(
   request: NextRequest,
@@ -52,6 +53,10 @@ export async function POST(
 
     // Attempt to stop the agent's current processing
     const stopped = agent.abort();
+
+    // Clear the provider cache to ensure fresh credentials are loaded
+    // This is a temporary workaround for the caching issue
+    Session.clearProviderCache();
 
     return createSuperjsonResponse({
       success: true,

@@ -6,7 +6,6 @@ import { ContentBlock } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 
 export interface ProviderConfig {
-  model?: string;
   maxTokens?: number;
   systemPrompt?: string;
   streaming?: boolean; // Enable token-by-token streaming
@@ -139,6 +138,7 @@ export abstract class AIProvider extends EventEmitter {
   abstract createResponse(
     messages: ProviderMessage[],
     tools: Tool[],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse>;
 
@@ -146,10 +146,11 @@ export abstract class AIProvider extends EventEmitter {
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     // Default implementation: fall back to non-streaming
-    return this.createResponse(messages, tools, signal);
+    return this.createResponse(messages, tools, model, signal);
   }
 
   // Check if provider supports streaming
@@ -172,11 +173,6 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   abstract get providerName(): string;
-  abstract get defaultModel(): string;
-
-  get modelName(): string {
-    return this._config.model || this.defaultModel;
-  }
 
   // Provider metadata - must be implemented by each provider
   abstract getProviderInfo(): ProviderInfo;
@@ -184,17 +180,6 @@ export abstract class AIProvider extends EventEmitter {
 
   // Check if provider is properly configured
   abstract isConfigured(): boolean;
-
-  // Model capability getters - providers should override based on their models
-  get contextWindow(): number {
-    // Conservative default - providers should override
-    return 8192;
-  }
-
-  get maxCompletionTokens(): number {
-    // Use configured value or conservative default
-    return this._config.maxTokens || 4096;
-  }
 
   // Token estimation utility for streaming
   protected estimateTokens(text: string): number {
@@ -204,7 +189,8 @@ export abstract class AIProvider extends EventEmitter {
   // Provider-specific token counting - providers can override for accurate counts
   countTokens(
     messages: ProviderMessage[],
-    _tools: Tool[] = []
+    _tools: Tool[] = [],
+    _model?: string
   ): Promise<number | null> | number | null {
     // Default implementation returns null to indicate estimation should be used
     return null;

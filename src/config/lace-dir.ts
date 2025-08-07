@@ -11,7 +11,8 @@ import { getEnvVar } from '~/config/env-loader';
  * Uses LACE_DIR environment variable, falls back to ~/.lace/
  */
 export function getLaceDir(): string {
-  const laceDir = getEnvVar('LACE_DIR') || path.join(os.homedir(), '.lace');
+  const envValue = getEnvVar('LACE_DIR');
+  const laceDir = envValue || path.join(os.homedir(), '.lace');
   return laceDir;
 }
 
@@ -46,4 +47,18 @@ export function getLaceFilePath(filename: string): string {
  */
 export function getLaceDbPath(): string {
   return getLaceFilePath('lace.db');
+}
+
+/**
+ * The relative path to the builtin provider catalog data directory
+ * Used for require.context() calls to bundle catalog JSON files
+ */
+export const BUILTIN_PROVIDER_CATALOG_PATH = './data';
+
+/**
+ * Get the relative path to the builtin provider catalog data directory
+ * Used for require.context() calls to bundle catalog JSON files
+ */
+export function getBuiltinProviderCatalogPath(): string {
+  return BUILTIN_PROVIDER_CATALOG_PATH;
 }

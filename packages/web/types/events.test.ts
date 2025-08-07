@@ -39,7 +39,7 @@ describe('Event Types', () => {
     const event: SessionEvent = {
       type: 'USER_MESSAGE',
       threadId: asThreadId('lace_20250731_test123'),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(),
       data: { content: 'Hello' },
     };
 

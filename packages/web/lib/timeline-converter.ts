@@ -53,7 +53,7 @@ function filterEventsByAgent(events: SessionEvent[], selectedAgent?: ThreadId): 
 
 function processStreamingTokens(events: SessionEvent[]): SessionEvent[] {
   const processed: SessionEvent[] = [];
-  const streamingMessages = new Map<string, { content: string; timestamp: string }>();
+  const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
 
   for (const event of events) {
     if (event.type === 'AGENT_TOKEN') {

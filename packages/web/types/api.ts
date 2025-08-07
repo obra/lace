@@ -28,7 +28,7 @@ export interface PendingApproval {
     name: string;
     arguments: unknown;
   };
-  requestedAt: string;
+  requestedAt: Date;
   requestData: ToolApprovalRequestData;
 }
 
@@ -50,9 +50,9 @@ export interface CreateSessionRequest {
 }
 
 export interface CreateAgentRequest {
-  name?: string; // Made optional for default
-  provider?: string;
-  model?: string;
+  name?: string;
+  providerInstanceId: string; // REQUIRED - no fallback to old system
+  modelId: string; // REQUIRED - no fallback to old system
 }
 
 // API response types
@@ -116,6 +116,7 @@ export interface PendingApprovalsResponse {
 export interface ProviderInfo extends BackendProviderInfo {
   models: ModelInfo[];
   configured: boolean;
+  instanceId?: string; // ID of the configured provider instance
 }
 
 // Re-export backend ModelInfo directly - it matches what we need

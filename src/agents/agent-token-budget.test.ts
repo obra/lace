@@ -1,70 +1,69 @@
 // ABOUTME: Tests for Agent integration with TokenBudgetManager
 // ABOUTME: Verifies token budget tracking, warnings, and request blocking work correctly
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Agent } from '~/agents/agent';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
 import { BudgetStatus, BudgetRecommendations } from '~/token-management/types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-
-// Mock provider for testing token budget integration
-class MockProvider extends BaseMockProvider {
-  private mockResponse: ProviderResponse;
-
-  constructor() {
-    super({});
-    this.mockResponse = {
-      content: 'Default response',
-      toolCalls: [],
-    };
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
-  get supportsStreaming(): boolean {
-    return false;
-  }
-
-  setNextResponse(response: ProviderResponse): void {
-    this.mockResponse = response;
-  }
-
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return Promise.resolve(this.mockResponse);
-  }
-
-  createStreamingResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    return Promise.resolve(this.mockResponse);
-  }
-}
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('Agent Token Budget Integration', () => {
+  const _tempLaceDir = setupCoreTest();
+  let session: Session;
   let agent: Agent;
-  let mockProvider: MockProvider;
-  let toolExecutor: ToolExecutor;
-  let threadManager: ThreadManager;
-  const threadId = 'test-thread-budget';
+  let project: Project;
+  let providerInstanceId: string;
+  let mockCreateResponse: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    setupTestPersistence();
-    mockProvider = new MockProvider();
-    toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
-    threadManager = new ThreadManager();
-    threadManager.createThread(threadId);
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    const config: AgentConfig = {
-      provider: mockProvider,
+    // Create provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create project with provider configuration and token budget
+    project = Project.create('Test Project', '/test/path', 'Test project for token budget', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+      tokenBudget: {
+        maxTokens: 1000,
+        warningThreshold: 0.8,
+        reserveTokens: 100,
+      },
+    });
+
+    // Create session
+    session = Session.create({
+      name: 'Test Session',
+      projectId: project.getId(),
+    });
+
+    // Get the session's coordinator agent
+    // Note: Session doesn't currently pass token budget to agents, so we need to
+    // create our own agent with token budget for this test
+    const threadManager = new (await import('~/threads/thread-manager')).ThreadManager();
+    const toolExecutor = new (await import('~/tools/executor')).ToolExecutor();
+    const threadId = threadManager.generateThreadId();
+    threadManager.createThread(threadId, session.getId());
+
+    const AgentClass = (await import('~/agents/agent')).Agent;
+    agent = new AgentClass({
+      provider: Session.resolveProviderInstance(providerInstanceId),
       toolExecutor,
       threadManager,
       threadId,
@@ -74,19 +73,17 @@ describe('Agent Token Budget Integration', () => {
         warningThreshold: 0.8,
         reserveTokens: 100,
       },
-    };
+    });
 
-    agent = new Agent(config);
-    await agent.start();
-  });
+    // Set model metadata
+    agent.updateThreadMetadata({
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
+    });
 
-  afterEach(() => {
-    teardownTestPersistence();
-  });
-
-  it('should track token usage from provider responses', async () => {
-    mockProvider.setNextResponse({
-      content: 'Hello world',
+    // Mock the provider's createResponse and createStreamingResponse to control responses for testing
+    mockCreateResponse = vi.fn().mockResolvedValue({
+      content: 'Default response',
       toolCalls: [],
       usage: {
         promptTokens: 50,
@@ -94,6 +91,24 @@ describe('Agent Token Budget Integration', () => {
         totalTokens: 80,
       },
     });
+
+    vi.spyOn(agent.providerInstance, 'createResponse').mockImplementation(mockCreateResponse);
+    vi.spyOn(agent.providerInstance, 'createStreamingResponse').mockImplementation(
+      mockCreateResponse
+    );
+
+    await agent.start();
+  });
+
+  afterEach(async () => {
+    session.destroy();
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
+  });
+
+  it('should track token usage from provider responses', async () => {
+    // Already mocked in beforeEach with default response
 
     await agent.sendMessage('Hello');
 
@@ -115,7 +130,7 @@ describe('Agent Token Budget Integration', () => {
     });
 
     // Set up response that will trigger warning (85% of budget)
-    mockProvider.setNextResponse({
+    mockCreateResponse.mockResolvedValueOnce({
       content: 'Large response',
       toolCalls: [],
       usage: {
@@ -135,7 +150,7 @@ describe('Agent Token Budget Integration', () => {
 
   it('should block requests that would exceed token budget', async () => {
     // First, use up most of the budget
-    mockProvider.setNextResponse({
+    mockCreateResponse.mockResolvedValueOnce({
       content: 'Response using most budget',
       toolCalls: [],
       usage: {
@@ -148,7 +163,7 @@ describe('Agent Token Budget Integration', () => {
     await agent.sendMessage('First message');
 
     // Reset mock for second call that should be blocked
-    mockProvider.setNextResponse({
+    mockCreateResponse.mockResolvedValueOnce({
       content: 'This should not be called',
       toolCalls: [],
       usage: {
@@ -180,7 +195,7 @@ describe('Agent Token Budget Integration', () => {
   });
 
   it('should provide budget status and recommendations', async () => {
-    mockProvider.setNextResponse({
+    mockCreateResponse.mockResolvedValueOnce({
       content: 'Response',
       toolCalls: [],
       usage: {
@@ -211,7 +226,7 @@ describe('Agent Token Budget Integration', () => {
   });
 
   it('should reset token budget when requested', async () => {
-    mockProvider.setNextResponse({
+    mockCreateResponse.mockResolvedValueOnce({
       content: 'Response',
       toolCalls: [],
       usage: {
@@ -231,24 +246,27 @@ describe('Agent Token Budget Integration', () => {
   });
 
   it('should work normally without token budget configuration', async () => {
-    // Create thread for this test
-    const noBudgetThreadId = 'test-no-budget';
-    threadManager.createThread(noBudgetThreadId);
+    // Create a new session without token budget
+    const noBudgetProject = Project.create(
+      'No Budget Project',
+      '/test/no-budget',
+      'Project without token budget',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+        // No tokenBudget config
+      }
+    );
 
-    // Create agent without token budget
-    const configWithoutBudget: AgentConfig = {
-      provider: mockProvider,
-      toolExecutor,
-      threadManager,
-      threadId: noBudgetThreadId,
-      tools: [],
-      // No tokenBudget config
-    };
+    const noBudgetSession = Session.create({
+      name: 'No Budget Session',
+      projectId: noBudgetProject.getId(),
+    });
 
-    const agentNoBudget = new Agent(configWithoutBudget);
-    await agentNoBudget.start();
+    const agentNoBudget = noBudgetSession.getAgent(noBudgetSession.getId())!;
 
-    mockProvider.setNextResponse({
+    // Mock the provider's createResponse and createStreamingResponse for this agent
+    const mockResponse = {
       content: 'Response',
       toolCalls: [],
       usage: {
@@ -256,17 +274,26 @@ describe('Agent Token Budget Integration', () => {
         completionTokens: 200,
         totalTokens: 500,
       },
-    });
+    };
+    vi.spyOn(agentNoBudget.providerInstance, 'createResponse').mockResolvedValueOnce(mockResponse);
+    vi.spyOn(agentNoBudget.providerInstance, 'createStreamingResponse').mockResolvedValueOnce(
+      mockResponse
+    );
+
+    await agentNoBudget.start();
 
     await agentNoBudget.sendMessage('Test');
 
     // Budget methods should return null when budget tracking is disabled
     expect(agentNoBudget.getTokenBudgetStatus()).toBeNull();
     expect(agentNoBudget.getTokenBudgetRecommendations()).toBeNull();
+
+    // Clean up
+    noBudgetSession.destroy();
   });
 
   it('should handle responses without usage data gracefully', async () => {
-    mockProvider.setNextResponse({
+    mockCreateResponse.mockResolvedValueOnce({
       content: 'Response without usage',
       toolCalls: [],
       // No usage field

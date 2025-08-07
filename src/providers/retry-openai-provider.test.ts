@@ -83,7 +83,7 @@ describe('OpenAIProvider retry functionality', () => {
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       });
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'gpt-4o');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -132,7 +132,7 @@ describe('OpenAIProvider retry functionality', () => {
       const retryAttemptSpy = vi.fn();
       provider.on('retry_attempt', retryAttemptSpy);
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'gpt-4o');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -166,7 +166,7 @@ describe('OpenAIProvider retry functionality', () => {
         retryCapture.errors.push(event.error);
       });
 
-      await expect(provider.createResponse(messages, [])).rejects.toEqual(authError);
+      await expect(provider.createResponse(messages, [], 'gpt-4o')).rejects.toEqual(authError);
 
       // Test that no retry was attempted for auth error
       expect(retryCapture.attempts).toBe(0);
@@ -190,7 +190,7 @@ describe('OpenAIProvider retry functionality', () => {
         maxDelayMs: 2,
       };
 
-      await expect(provider.createResponse(messages, [])).rejects.toMatchObject({
+      await expect(provider.createResponse(messages, [], 'gpt-4o')).rejects.toMatchObject({
         code: 'ETIMEDOUT',
       });
 
@@ -239,7 +239,7 @@ describe('OpenAIProvider retry functionality', () => {
 
       mockCreate.mockRejectedValueOnce(networkError).mockReturnValueOnce(successStream);
 
-      const promise = provider.createStreamingResponse(messages, []);
+      const promise = provider.createStreamingResponse(messages, [], 'gpt-4o');
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
@@ -282,7 +282,7 @@ describe('OpenAIProvider retry functionality', () => {
         streamingStarted = true;
       });
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toMatchObject({
+      await expect(provider.createStreamingResponse(messages, [], 'gpt-4o')).rejects.toMatchObject({
         code: 'ECONNRESET',
       });
 

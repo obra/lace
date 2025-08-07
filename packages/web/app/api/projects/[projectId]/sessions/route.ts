@@ -2,8 +2,7 @@
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
 import { NextRequest } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
@@ -11,6 +10,8 @@ import { z } from 'zod';
 const CreateSessionSchema = z.object({
   name: z.string().min(1, 'Session name is required'),
   description: z.string().optional(),
+  providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
+  modelId: z.string().min(1, 'Model ID is required'),
   configuration: z.record(z.unknown()).optional(),
 });
 
@@ -60,21 +61,50 @@ export async function POST(
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Use sessionService to create session, which handles both database and in-memory management
-    const sessionService = getSessionService();
-    const session = await sessionService.createSession(
-      validatedData.name,
-      (validatedData.configuration?.provider as string) || 'anthropic',
-      (validatedData.configuration?.model as string) || 'claude-3-5-haiku-20241022',
-      projectId
-    );
+    // Clear provider cache to ensure fresh credentials are loaded
+    Session.clearProviderCache();
 
-    return createSuperjsonResponse({ session }, { status: 201 });
+    // Create session using Session.create with project inheritance
+    const session = Session.create({
+      name: validatedData.name,
+      description: validatedData.description,
+      projectId,
+      configuration: {
+        providerInstanceId: validatedData.providerInstanceId,
+        modelId: validatedData.modelId,
+        ...validatedData.configuration,
+      },
+    });
+
+    // Convert to API format
+    const sessionInfo = session.getInfo();
+    const sessionData = {
+      id: session.getId(),
+      name: sessionInfo?.name || validatedData.name,
+      createdAt: sessionInfo?.createdAt || new Date(),
+    };
+
+    return createSuperjsonResponse({ session: sessionData }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
+      // Provide detailed field-level validation errors
+      const fieldErrors: Record<string, string> = {};
+      error.errors.forEach((err) => {
+        const field = err.path.join('.');
+        fieldErrors[field] = err.message;
+      });
+
+      const errorMessage = Object.entries(fieldErrors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join(', ');
+
+      return createErrorResponse(`Validation failed: ${errorMessage}`, 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors,
+        details: {
+          errors: error.errors,
+          fieldErrors,
+          summary: errorMessage,
+        },
       });
     }
 

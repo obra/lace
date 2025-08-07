@@ -3,28 +3,44 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Agent, Project } from '@/lib/server/lace-imports';
-import { type ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { Agent } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
+import { type ThreadId, ApprovalDecision } from '@/types/core';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 // Use real file-read tool for testing
-import { FileReadTool } from '~/tools/implementations/file-read';
+import { FileReadTool } from '@/lib/server/lace-imports';
 
 describe('Event-Based Tool Approval Integration', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let projectId: string;
   let sessionId: ThreadId;
   let agent: Agent;
   let tempDir: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
-    // Set up test persistence
-    setupTestPersistence();
+    // Set up test provider defaults and create instance
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Create temp directory
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create temp directory for test files
     tempDir = await mkdtemp(join(tmpdir(), 'lace-approval-test-'));
 
     // Create a test file for reading
@@ -33,29 +49,27 @@ describe('Event-Based Tool Approval Integration', () => {
       'This is test content for approval flow testing'
     );
 
-    // Set up environment
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.LACE_DB_PATH = ':memory:';
-
     // Initialize services
     sessionService = getSessionService();
 
-    // Create a test project
+    // Create a test project with provider configuration
     const project = Project.create(
       'Tool Approval Test Project',
+      tempDir,
       'Project for testing tool approval flow',
-      tempDir
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     projectId = project.getId();
 
-    // Create a test session
-    const session = await sessionService.createSession(
-      'Tool Approval Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      projectId
-    );
-    sessionId = session.id;
+    // Create a test session that inherits from project
+    const session = Session.create({
+      name: 'Tool Approval Test Session',
+      projectId,
+    });
+    sessionId = session.getId();
 
     // Get the session and its coordinator agent
     const sessionInstance = await sessionService.getSession(sessionId);
@@ -76,10 +90,11 @@ describe('Event-Based Tool Approval Integration', () => {
   });
 
   afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
     if (tempDir) {
       await rm(tempDir, { recursive: true });
     }
-    teardownTestPersistence();
   });
 
   it('should create TOOL_APPROVAL_REQUEST event when tool requires approval', async () => {
@@ -95,20 +110,16 @@ describe('Event-Based Tool Approval Integration', () => {
     agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
 
     // Get the approval callback that was set up
-    const toolExecutor = agent.toolExecutor as unknown as {
-      approvalCallback?: {
-        requestApproval: (toolName: string, input: unknown) => Promise<string>;
-      };
-    };
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
 
-    expect(toolExecutor.approvalCallback).toBeDefined();
-    if (!toolExecutor.approvalCallback) {
+    expect(approvalCallback).toBeDefined();
+    if (!approvalCallback) {
       throw new Error('Approval callback not found');
     }
 
     // Start approval request (this should create TOOL_APPROVAL_REQUEST event and throw ApprovalPendingError)
     try {
-      await toolExecutor.approvalCallback.requestApproval({
+      await approvalCallback.requestApproval({
         id: 'test-call-123',
         name: 'file-read',
         arguments: {
@@ -142,23 +153,19 @@ describe('Event-Based Tool Approval Integration', () => {
     agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
     agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'existing-call-456',
-      decision: 'allow_session',
+      decision: ApprovalDecision.ALLOW_SESSION,
     });
 
     // Get the approval callback
-    const toolExecutor = agent.toolExecutor as unknown as {
-      approvalCallback?: {
-        requestApproval: (toolName: string, input: unknown) => Promise<string>;
-      };
-    };
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
 
-    expect(toolExecutor.approvalCallback).toBeDefined();
-    if (!toolExecutor.approvalCallback) {
+    expect(approvalCallback).toBeDefined();
+    if (!approvalCallback) {
       throw new Error('Approval callback not found');
     }
 
     // Request approval - should return existing decision immediately
-    const decision = await toolExecutor.approvalCallback.requestApproval({
+    const decision = await approvalCallback.requestApproval({
       id: 'existing-call-456',
       name: 'file-read',
       arguments: {
@@ -199,7 +206,7 @@ describe('Event-Based Tool Approval Integration', () => {
     // Add approval response
     agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'pending-call-789',
-      decision: 'deny',
+      decision: ApprovalDecision.DENY,
     });
 
     // Now should have no pending approvals

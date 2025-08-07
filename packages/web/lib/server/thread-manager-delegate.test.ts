@@ -7,17 +7,17 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '@/lib/server/lace-imports';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('ThreadManager Delegate Thread Creation', () => {
+  const _tempLaceDir = setupWebTest();
   let threadManager: ThreadManager;
   let parentThreadId: string;
 
   beforeEach(() => {
-    setupTestPersistence();
     threadManager = new ThreadManager();
 
     // Create a parent thread
@@ -25,7 +25,7 @@ describe('ThreadManager Delegate Thread Creation', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   it('should create delegate thread and persist it', () => {
@@ -78,14 +78,15 @@ describe('ThreadManager Delegate Thread Creation', () => {
     const event = threadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello delegate');
 
     // Verify event was added
-    expect(event.threadId).toBe(delegateThreadId);
-    expect(event.type).toBe('USER_MESSAGE');
-    expect(event.data).toBe('Hello delegate');
+    expect(event).not.toBeNull();
+    expect(event?.threadId).toBe(delegateThreadId);
+    expect(event?.type).toBe('USER_MESSAGE');
+    expect(event?.data).toBe('Hello delegate');
 
     // Verify event persists
     const events = threadManager.getEvents(delegateThreadId);
     expect(events).toHaveLength(1);
-    expect(events[0]?.id).toBe(event.id);
+    expect(events[0]?.id).toBe(event?.id);
   });
 
   it('should generate unique delegate thread IDs', () => {

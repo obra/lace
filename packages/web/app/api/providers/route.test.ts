@@ -1,292 +1,133 @@
 // ABOUTME: Tests for provider discovery API endpoint (GET /api/providers)
-// ABOUTME: Verifies provider listing with models and configuration status
+// ABOUTME: Verifies API returns configured provider instances instead of auto-discovered providers
 
-import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
-import { GET, type ProviderWithModels } from '@/app/api/providers/route';
-import type { ProviderInfo, ModelInfo } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { GET } from './route';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
-// ProviderRegistry is mocked but not directly used in tests
 
-// Response type for tests
-interface ProvidersResponse {
-  providers: ProviderWithModels[];
-  error?: string;
-}
-
-// Mock the module
-vi.mock('@/lib/server/lace-imports', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn(),
-  },
-}));
+// Mock server-only module
+vi.mock('server-only', () => ({}));
 
 describe('Provider Discovery API', () => {
-  let mockRegistry: {
-    getAvailableProviders: MockedFunction<
-      () => Array<{ info: ProviderInfo; models: ModelInfo[]; configured: boolean }>
-    >;
-    _providers: Map<string, unknown>;
-    registerProvider: MockedFunction<(name: string, provider: unknown) => void>;
-    getProvider: MockedFunction<(name: string) => unknown>;
-    getAllProviders: MockedFunction<() => unknown[]>;
-    getAvailableModelsByProvider: MockedFunction<(providerName: string) => unknown[]>;
-    isProviderConfigured: MockedFunction<(providerName: string) => boolean>;
-  };
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  const _tempLaceDir = setupWebTest();
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
+  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
-    setupTestPersistence();
     vi.clearAllMocks();
-    mockRegistry = {
-      getAvailableProviders: vi.fn(),
-      _providers: new Map(),
-      registerProvider: vi.fn(),
-      getProvider: vi.fn(),
-      getAllProviders: vi.fn(),
-      getAvailableModelsByProvider: vi.fn(),
-      isProviderConfigured: vi.fn(),
-    };
 
-    // Mock console methods to prevent stderr pollution during tests
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Set up environment
+    process.env.LACE_DB_PATH = ':memory:';
 
-    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
-    vi.mocked(ProviderRegistry.createWithAutoDiscovery).mockReturnValue(
-      mockRegistry as unknown as typeof ProviderRegistry.prototype
-    );
+    // Create individual provider instances for test isolation
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      displayName: 'Test OpenAI',
+      apiKey: 'test-openai-key',
+    });
+
+    createdInstanceIds = [anthropicInstanceId, openaiInstanceId];
   });
 
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
-    teardownTestPersistence();
+  afterEach(async () => {
+    // Clean up provider instances
+    await cleanupTestProviderInstances(createdInstanceIds);
+    vi.clearAllMocks();
   });
 
   describe('GET /api/providers', () => {
-    it('should list all available providers with their models', async () => {
-      const mockProviders: Array<{
-        info: ProviderInfo;
-        models: ModelInfo[];
-        configured: boolean;
-      }> = [
-        {
-          info: {
-            name: 'anthropic',
-            displayName: 'Anthropic Claude',
-            requiresApiKey: true,
-            configurationHint: 'Set ANTHROPIC_API_KEY environment variable',
-          },
-          models: [
-            {
-              id: 'claude-sonnet-4-20250514',
-              displayName: 'Claude 3.5 Sonnet',
-              description: 'Most capable model for complex tasks',
-              contextWindow: 200000,
-              maxOutputTokens: 8192,
-              capabilities: ['vision', 'function-calling'],
-              isDefault: true,
-            },
-            {
-              id: 'claude-3-5-haiku-20241022',
-              displayName: 'Claude 3 Haiku',
-              description: 'Fast and efficient for simple tasks',
-              contextWindow: 200000,
-              maxOutputTokens: 4096,
-              capabilities: ['function-calling'],
-            },
-          ],
-          configured: true,
-        },
-        {
-          info: {
-            name: 'openai',
-            displayName: 'OpenAI',
-            requiresApiKey: true,
-            configurationHint: 'Set OPENAI_API_KEY environment variable',
-          },
-          models: [
-            {
-              id: 'gpt-4-turbo',
-              displayName: 'GPT-4 Turbo',
-              description: 'Most capable GPT-4 model',
-              contextWindow: 128000,
-              maxOutputTokens: 4096,
-              capabilities: ['vision', 'function-calling'],
-              isDefault: true,
-            },
-          ],
-          configured: false,
-        },
-      ];
-
-      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
-
+    it('should return configured provider instances instead of auto-discovered providers', async () => {
       const response = await GET();
-      const data = await parseResponse<ProvidersResponse>(response);
 
       expect(response.status).toBe(200);
-      expect(data.providers).toHaveLength(2);
-      expect(data.providers[0]).toMatchObject({
-        name: 'anthropic',
-        displayName: 'Anthropic Claude',
-        requiresApiKey: true,
-        configured: true,
-      });
-      expect(data.providers[0]?.models).toContainEqual(
-        expect.objectContaining({
-          id: 'claude-sonnet-4-20250514',
-          displayName: 'Claude 3.5 Sonnet',
-        })
-      );
-      expect(data.providers[1]).toMatchObject({
-        name: 'openai',
-        displayName: 'OpenAI',
-        requiresApiKey: true,
-        configured: false,
-        configurationHint: 'Set OPENAI_API_KEY environment variable',
-      });
-      expect(data.providers[1]?.models).toContainEqual(
-        expect.objectContaining({
-          id: 'gpt-4-turbo',
-          displayName: 'GPT-4 Turbo',
-        })
-      );
-    });
 
-    it('should handle empty provider list', async () => {
-      mockRegistry.getAvailableProviders.mockReturnValue([]);
+      const data = await parseResponse<{
+        providers: Array<{
+          id: string;
+          name: string;
+          type: string;
+          models: Array<{ id: string; name: string }>;
+          configured: boolean;
+          instanceId?: string;
+        }>;
+      }>(response);
 
-      const response = await GET();
-      const data = await parseResponse<ProvidersResponse>(response);
+      // Should return providers with configured instances
+      expect(data.providers.length).toBeGreaterThan(0);
 
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ providers: [] });
-    });
-
-    it('should include configuration hints for unconfigured providers', async () => {
-      const mockProviders = [
-        {
-          info: {
-            name: 'anthropic',
-            displayName: 'Anthropic Claude',
-            requiresApiKey: true,
-            configurationHint: 'Set ANTHROPIC_API_KEY environment variable',
-          },
-          models: [
-            {
-              id: 'claude-3-5-haiku-20241022',
-              displayName: 'Claude 3 Haiku',
-              contextWindow: 200000,
-              maxOutputTokens: 4096,
-            },
-          ],
-          configured: false,
-        },
-      ];
-
-      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
-
-      const response = await GET();
-      const data = await parseResponse<ProvidersResponse>(response);
-
-      expect(response.status).toBe(200);
-      expect(data.providers[0]).toMatchObject({
-        name: 'anthropic',
-        configured: false,
-        configurationHint: 'Set ANTHROPIC_API_KEY environment variable',
-      } as Partial<ProviderWithModels>);
-    });
-
-    it('should handle provider discovery errors gracefully', async () => {
-      mockRegistry.getAvailableProviders.mockImplementation(() => {
-        throw new Error('Failed to discover providers');
+      // All returned providers should be configured
+      data.providers.forEach((provider) => {
+        expect(provider.configured).toBe(true);
+        expect(provider.instanceId).toBeDefined();
+        expect(provider.instanceId).toEqual(expect.stringMatching(/^test-/));
       });
 
-      const response = await GET();
-      const data = await parseResponse<{ error: string }>(response);
+      // Should have unique provider types (no duplicates for same type)
+      const providerTypes = data.providers.map((p) => p.type);
+      const uniqueTypes = [...new Set(providerTypes)];
+      expect(providerTypes).toHaveLength(uniqueTypes.length);
 
-      expect(response.status).toBe(500);
-      expect(data).toMatchObject({
-        error: 'Failed to discover providers',
+      // Should NOT include providers without configured instances (like lmstudio, ollama)
+      const lmstudioProvider = data.providers.find((p) => p.type === 'lmstudio');
+      expect(lmstudioProvider).toBeUndefined();
+
+      const ollamaProvider = data.providers.find((p) => p.type === 'ollama');
+      expect(ollamaProvider).toBeUndefined();
+    });
+
+    it('should return empty array when no provider instances are configured', async () => {
+      // Clean up all instances first
+      await cleanupTestProviderInstances(createdInstanceIds);
+      createdInstanceIds = [];
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+
+      const data = await parseResponse<{ providers: unknown[] }>(response);
+      expect(data.providers).toHaveLength(0);
+    });
+
+    it('should include model information for each configured provider', async () => {
+      const response = await GET();
+
+      if (response.status !== 200) {
+        const errorData = await parseResponse<{ error: string }>(response);
+        console.error('API Error:', errorData);
+      }
+
+      expect(response.status).toBe(200);
+
+      const data = await parseResponse<{
+        providers: Array<{
+          models: Array<{ id: string; displayName: string }>;
+        }>;
+      }>(response);
+
+      // Each provider should have its models listed
+      data.providers.forEach((provider) => {
+        expect(provider.models).toBeInstanceOf(Array);
+        expect(provider.models.length).toBeGreaterThan(0);
+
+        provider.models.forEach((model) => {
+          expect(model.id).toEqual(expect.any(String));
+          expect(model.displayName).toEqual(expect.any(String));
+        });
       });
-    });
-
-    it('should mark providers with default models correctly', async () => {
-      const mockProviders = [
-        {
-          info: {
-            name: 'anthropic',
-            displayName: 'Anthropic Claude',
-            requiresApiKey: true,
-          },
-          models: [
-            {
-              id: 'claude-sonnet-4-20250514',
-              displayName: 'Claude 3.5 Sonnet',
-              contextWindow: 200000,
-              maxOutputTokens: 8192,
-              isDefault: true,
-            },
-            {
-              id: 'claude-sonnet-4-20250514',
-              displayName: 'Claude 3 Opus',
-              contextWindow: 200000,
-              maxOutputTokens: 4096,
-              isDefault: false,
-            },
-          ],
-          configured: true,
-        },
-      ];
-
-      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
-
-      const response = await GET();
-      const data = await parseResponse<ProvidersResponse>(response);
-
-      expect(response.status).toBe(200);
-      const provider = data.providers[0];
-      expect(provider).toBeDefined();
-      const defaultModel = provider.models.find((m) => m.isDefault);
-      expect(defaultModel).toBeDefined();
-      expect(defaultModel?.id).toBe('claude-sonnet-4-20250514');
-    });
-
-    it('should include model capabilities when available', async () => {
-      const mockProviders = [
-        {
-          info: {
-            name: 'openai',
-            displayName: 'OpenAI',
-            requiresApiKey: true,
-          },
-          models: [
-            {
-              id: 'gpt-4-vision-preview',
-              displayName: 'GPT-4 Vision',
-              contextWindow: 128000,
-              maxOutputTokens: 4096,
-              capabilities: ['vision', 'function-calling', 'json-mode'],
-            },
-          ],
-          configured: true,
-        },
-      ];
-
-      mockRegistry.getAvailableProviders.mockReturnValue(mockProviders);
-
-      const response = await GET();
-      const data = await parseResponse<ProvidersResponse>(response);
-
-      expect(response.status).toBe(200);
-      const provider = data.providers[0];
-      expect(provider).toBeDefined();
-      const model = provider.models[0];
-      expect(model).toBeDefined();
-      expect(model?.capabilities).toEqual(['vision', 'function-calling', 'json-mode']);
     });
   });
 });

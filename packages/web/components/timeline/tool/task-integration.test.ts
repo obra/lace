@@ -59,7 +59,7 @@ describe('Task Tool Renderer Integration', () => {
 
         expect(summary).toBeDefined();
         expect(typeof summary).toBe('string');
-        expect(summary.length).toBeGreaterThan(0);
+        expect(summary?.length).toBeGreaterThan(0);
       });
     });
   });
@@ -103,7 +103,7 @@ describe('Task Tool Renderer Integration', () => {
     const errorResult = {
       content: [
         {
-          type: 'text',
+          type: 'text' as const,
           text: JSON.stringify({
             error: 'Task not found',
             code: 'TASK_NOT_FOUND',

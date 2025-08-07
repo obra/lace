@@ -10,22 +10,22 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { createMockProvider } from '~/test-utils/mock-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Agent Delegate Creation', () => {
+  const _tempLaceDir = setupCoreTest();
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
   let mockProvider: ReturnType<typeof createMockProvider>;
 
   beforeEach(() => {
-    setupTestPersistence();
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
     mockProvider = createMockProvider();
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should create delegate agent with correct parent thread ID', () => {

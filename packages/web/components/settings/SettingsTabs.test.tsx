@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
+import { expect, it, describe, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsTabs } from './SettingsTabs';
 

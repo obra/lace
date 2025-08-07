@@ -25,7 +25,13 @@ interface MockSession {
 }
 
 interface MockSessionService {
+  createSession: ReturnType<typeof vi.fn>;
+  listSessions: ReturnType<typeof vi.fn>;
   getSession: ReturnType<typeof vi.fn>;
+  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
+  updateSession: ReturnType<typeof vi.fn>;
+  stopAllAgents: ReturnType<typeof vi.fn>;
+  clearActiveSessions: ReturnType<typeof vi.fn>;
 }
 
 describe('GET /api/threads/[threadId]/approvals/pending', () => {
@@ -52,10 +58,16 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     // Create mock SessionService
     mockSessionService = {
+      createSession: vi.fn(),
+      listSessions: vi.fn(),
       getSession: vi.fn().mockReturnValue(mockSession),
+      setupAgentEventHandlers: vi.fn(),
+      updateSession: vi.fn(),
+      stopAllAgents: vi.fn(),
+      clearActiveSessions: vi.fn(),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService as unknown as ReturnType<typeof getSessionService>);
   });
 
   afterEach(() => {
@@ -114,7 +126,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -135,7 +147,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -155,7 +167,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -256,7 +268,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 
@@ -276,7 +288,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const request = new NextRequest(
       `http://localhost:3000/api/threads/${threadId}/approvals/pending`
     );
-    const params = { threadId };
+    const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
 

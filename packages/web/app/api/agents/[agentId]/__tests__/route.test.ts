@@ -1,10 +1,18 @@
 // ABOUTME: Tests for agent API endpoints - GET, PUT for agent management
 // ABOUTME: Covers agent retrieval, updates with validation and error handling
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PUT } from '@/app/api/agents/[agentId]/route';
 import { parseResponse } from '@/lib/serialization';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  Session,
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@/lib/server/lace-imports';
 
 // Type interfaces for API responses
 interface AgentResponse {
@@ -31,6 +39,7 @@ const validAgentId = 'lace_20241122_abc123.1';
 const mockAgent = {
   threadId: validAgentId,
   providerName: 'anthropic',
+  model: 'claude-3-sonnet',
   getCurrentState: vi.fn().mockReturnValue('idle'),
   getThreadMetadata: vi.fn().mockReturnValue({
     name: 'Test Agent',
@@ -65,8 +74,22 @@ vi.mock('@/types/core', () => ({
 // Using real validation with valid threadId formats
 
 describe('Agent API', () => {
-  beforeEach(() => {
+  const _tempDir = setupWebTest();
+  // Declare provider instance IDs at describe level
+  let testProviderInstanceId: string;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create real provider instance for testing
+    testProviderInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      displayName: 'Test Provider Instance',
+      apiKey: 'test-key',
+    });
 
     // Reset service mocks to default behaviors
     mockSessionService.getSession.mockResolvedValue(mockSession);
@@ -79,6 +102,12 @@ describe('Agent API', () => {
       parentSessionId: 'lace_20241122_abc123',
     });
     mockAgent.getCurrentState.mockReturnValue('idle');
+  });
+
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([testProviderInstanceId]);
+    vi.clearAllMocks();
   });
 
   describe('GET /api/agents/:agentId', () => {
@@ -95,6 +124,8 @@ describe('Agent API', () => {
         name: 'Test Agent',
         provider: 'anthropic',
         model: 'claude-3-sonnet',
+        providerInstanceId: '',
+        modelId: 'claude-3-sonnet',
         status: 'idle',
         createdAt: expect.any(Date) as Date,
       });
@@ -118,7 +149,9 @@ describe('Agent API', () => {
       expect(response.status).toBe(200);
       expect(data.agent.name).toBe('Agent lace_20241122_abc123.1');
       expect(data.agent.provider).toBe('anthropic');
-      expect(data.agent.model).toBe('unknown');
+      expect(data.agent.model).toBe('claude-3-sonnet');
+      expect(data.agent.providerInstanceId).toBe('');
+      expect(data.agent.modelId).toBe('claude-3-sonnet');
     });
 
     it('should return 400 for invalid agent ID', async () => {
@@ -174,8 +207,8 @@ describe('Agent API', () => {
     it('should update agent successfully', async () => {
       const updateData = {
         name: 'Updated Agent',
-        provider: 'openai',
-        model: 'gpt-4',
+        providerInstanceId: testProviderInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
       };
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
@@ -196,14 +229,16 @@ describe('Agent API', () => {
       expect(response.status).toBe(200);
       expect(mockAgent.updateThreadMetadata).toHaveBeenCalledWith({
         name: 'Updated Agent',
-        provider: 'openai',
-        model: 'gpt-4',
+        providerInstanceId: testProviderInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
       });
       expect(data.agent).toEqual({
         threadId: 'lace_20241122_abc123.1',
         name: 'Test Agent',
         provider: 'anthropic',
         model: 'claude-3-sonnet',
+        providerInstanceId: '',
+        modelId: 'claude-3-sonnet',
         status: 'idle',
         createdAt: expect.any(Date) as Date,
       });
@@ -250,7 +285,11 @@ describe('Agent API', () => {
     it('should return 400 for invalid agent ID', async () => {
       const request = new NextRequest('http://localhost/api/agents/invalid-id', {
         method: 'PUT',
-        body: JSON.stringify({ name: 'Test' }),
+        body: JSON.stringify({
+          name: 'Test',
+          providerInstanceId: testProviderInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -263,7 +302,9 @@ describe('Agent API', () => {
 
     it('should return 400 for invalid request data', async () => {
       const invalidData = {
-        provider: 'invalid-provider', // Not in enum
+        // Provide only one of the provider fields - should fail validation
+        providerInstanceId: testProviderInstanceId,
+        // Missing modelId
       };
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
@@ -278,7 +319,7 @@ describe('Agent API', () => {
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid request data');
+      expect(data.error).toContain('Both providerInstanceId and modelId must be provided together');
       expect(data.details).toBeDefined();
     });
 
@@ -287,7 +328,11 @@ describe('Agent API', () => {
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
-        body: JSON.stringify({ name: 'Test' }),
+        body: JSON.stringify({
+          name: 'Test',
+          providerInstanceId: 'test-provider',
+          modelId: 'test-model',
+        }),
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -305,7 +350,11 @@ describe('Agent API', () => {
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.99', {
         method: 'PUT',
-        body: JSON.stringify({ name: 'Test' }),
+        body: JSON.stringify({
+          name: 'Test',
+          providerInstanceId: testProviderInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -341,7 +390,11 @@ describe('Agent API', () => {
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
-        body: JSON.stringify({ name: 'Test' }),
+        body: JSON.stringify({
+          name: 'Test',
+          providerInstanceId: testProviderInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
         headers: { 'Content-Type': 'application/json' },
       });
 

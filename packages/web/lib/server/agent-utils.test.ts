@@ -1,26 +1,39 @@
 // ABOUTME: Tests for event-based approval callback with real Agent and Session instances
 // ABOUTME: Validates that approval requests create events and session-wide approvals work correctly
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { ApprovalPendingError } from '~/tools/approval-types';
-import { createProvider } from '~/app';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { ApprovalPendingError, ApprovalDecision } from '@/lib/server/lace-imports';
+import { TestProvider } from '@/lib/server/lace-imports';
 
 describe('Event-Based Approval Callback', () => {
+  const _tempLaceDir = setupWebTest();
   let agent: Agent;
   let session: Session;
   let threadId: ThreadId;
   let threadManager: ThreadManager;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
-    // Set up test persistence
-    setupTestPersistence();
+    // Set up test provider defaults and create instance
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Set up test environment
-    process.env.ANTHROPIC_KEY = 'test-key';
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Test persistence is set up automatically by setupWebTest()
 
     // Create real instances
     threadManager = new ThreadManager();
@@ -28,15 +41,16 @@ describe('Event-Based Approval Callback', () => {
     const toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
-    const provider = createProvider('anthropic', 'claude-3-haiku-20240307');
+    const provider = new TestProvider();
 
-    // Create project and session
-    const project = Project.create('Test Project', process.cwd(), 'Test project');
+    // Create project and session with provider configuration
+    const project = Project.create('Test Project', process.cwd(), 'Test project', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     session = Session.create({
-      projectId: project.getId(),
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-haiku-20240307',
+      projectId: project.getId(),
     });
     threadId = asThreadId(session.getId());
 
@@ -54,12 +68,14 @@ describe('Event-Based Approval Callback', () => {
     setupAgentApprovals(agent, threadId);
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should create TOOL_APPROVAL_REQUEST event when approval is requested', async () => {
-    const approvalCallback = agent.toolExecutor.approvalCallback;
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
     // Request approval for a tool that requires approval
@@ -88,13 +104,13 @@ describe('Event-Based Approval Callback', () => {
       toolPolicies: { bash: 'allow' },
     });
 
-    const approvalCallback = agent.toolExecutor.approvalCallback;
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
     const toolCall = { id: 'call_456', name: 'bash', arguments: { command: 'pwd' } };
 
     const decision = await approvalCallback!.requestApproval(toolCall);
-    expect(decision).toBe('allow_session');
+    expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
 
     // Should not create approval request event since tool is pre-approved
     const events = threadManager.getEvents(threadId);
@@ -105,7 +121,7 @@ describe('Event-Based Approval Callback', () => {
   });
 
   it('should return existing approval if response already exists', async () => {
-    const approvalCallback = agent.toolExecutor.approvalCallback;
+    const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
     const toolCall = { id: 'call_789', name: 'read', arguments: { file_path: '/test.txt' } };
@@ -120,11 +136,11 @@ describe('Event-Based Approval Callback', () => {
     // Now simulate an approval response
     threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
       toolCallId: 'call_789',
-      decision: 'allow_once',
+      decision: ApprovalDecision.ALLOW_ONCE,
     });
 
     // Second request should return the existing approval
     const decision = await approvalCallback!.requestApproval(toolCall);
-    expect(decision).toBe('allow_once');
+    expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
   });
 });

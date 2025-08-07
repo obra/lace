@@ -6,40 +6,20 @@ import { NextRequest } from 'next/server';
 import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '~/projects/project';
+import { Project } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
+import { Session } from '@/lib/server/lace-imports';
 
 // ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
 // Required for Next.js framework compatibility during testing
 vi.mock('server-only', () => ({}));
-
-// ✅ ESSENTIAL MOCK - Provider registry to avoid real AI API calls during testing
-// Prevents external network dependencies while testing API route behavior
-vi.mock('~/providers/registry', () => ({
-  ProviderRegistry: {
-    createWithAutoDiscovery: vi.fn().mockReturnValue({
-      createProvider: vi.fn().mockReturnValue({
-        type: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
-        providerName: 'anthropic',
-        defaultModel: 'claude-3-5-haiku-20241022',
-        setSystemPrompt: vi.fn(),
-        createResponse: vi.fn().mockResolvedValue({
-          content: 'Mock response',
-          toolCalls: [],
-          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-        }),
-        createStreamingResponse: vi.fn().mockReturnValue({
-          *[Symbol.asyncIterator]() {
-            yield { type: 'content', content: 'Mock streaming response' };
-          },
-        }),
-      }),
-    }),
-  },
-}));
 
 // Mock only external dependencies while using real tools
 // URL fetch tool might make external HTTP requests
@@ -69,13 +49,24 @@ vi.mock('~/tools/implementations/bash', () => ({
 }));
 
 describe('Session Detail API Route', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let anthropicInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
     vi.clearAllMocks();
+
+    // Create test provider instance using the proper helper
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Set up environment for session service
     process.env = {
@@ -91,13 +82,22 @@ describe('Session Detail API Route', () => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
     // Clear global singleton
     global.sessionService = undefined;
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
-    teardownTestPersistence();
+
+    // Clean up provider defaults
+    cleanupTestProviderDefaults();
+
+    // Clean up provider instance
+    if (anthropicInstanceId) {
+      await cleanupTestProviderInstances([anthropicInstanceId]);
+    }
+
+    vi.clearAllMocks();
   });
 
   describe('GET /api/sessions/[sessionId]', () => {
@@ -107,17 +107,15 @@ describe('Session Detail API Route', () => {
         'Test Project',
         '/test/path',
         'Test project for API test',
-        {}
+        {
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }
       );
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession(
-        'Test Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
+      const session = await sessionService.createSession('Test Session', projectId);
       const sessionId = session.id;
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
@@ -180,17 +178,15 @@ describe('Session Detail API Route', () => {
         'Test Project',
         '/test/path',
         'Test project for API test',
-        {}
+        {
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }
       );
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession(
-        'Original Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
+      const session = await sessionService.createSession('Original Session', projectId);
       const sessionId = session.id;
 
       const updates = {
@@ -252,17 +248,15 @@ describe('Session Detail API Route', () => {
         'Test Project',
         '/test/path',
         'Test project for API test',
-        {}
+        {
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }
       );
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession(
-        'Test Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
+      const session = await sessionService.createSession('Test Session', projectId);
       const sessionId = session.id;
 
       const invalidUpdates = {
@@ -292,17 +286,15 @@ describe('Session Detail API Route', () => {
         'Test Project',
         '/test/path',
         'Test project for API test',
-        {}
+        {
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }
       );
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession(
-        'Original Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
+      const session = await sessionService.createSession('Original Session', projectId);
       const sessionId = session.id;
 
       // Only update name, leaving description and status unchanged
@@ -356,7 +348,7 @@ describe('Session Detail API Route', () => {
       // instead of going through sessionService.getSessionData()
 
       // Mock the Session class directly
-      const { Session } = await import('@/lib/server/lace-imports');
+      const { Session } = await import('~/sessions/session');
       const mockDirectSessionData = {
         id: 'test-session',
         name: 'Updated Session',
@@ -374,13 +366,11 @@ describe('Session Detail API Route', () => {
         .mockReturnValue(mockDirectSessionData as never);
 
       // Create a real session first for the route to work with
-      const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {});
-      const session = await sessionService.createSession(
-        'Test Session',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        testProject.getId()
-      );
+      const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
+      const session = await sessionService.createSession('Test Session', testProject.getId());
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${session.id}`, {
         method: 'PATCH',

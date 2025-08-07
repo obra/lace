@@ -8,12 +8,26 @@ import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import { ProviderRegistry } from '@/lib/server/lace-imports';
 
-const AgentUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
-  model: z.string().optional(),
-});
+const AgentUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    providerInstanceId: z.string().min(1).optional(),
+    modelId: z.string().min(1).optional(),
+  })
+  .refine(
+    (data) => {
+      // If either providerInstanceId or modelId is provided, both must be provided
+      if (data.providerInstanceId || data.modelId) {
+        return data.providerInstanceId && data.modelId;
+      }
+      return true;
+    },
+    {
+      message: 'Both providerInstanceId and modelId must be provided together',
+    }
+  );
 
 export async function GET(
   request: NextRequest,
@@ -50,7 +64,9 @@ export async function GET(
       threadId: agent.threadId,
       name: (metadata?.name as string) || 'Agent ' + agent.threadId,
       provider: (metadata?.provider as string) || agent.providerName,
-      model: (metadata?.model as string) || 'unknown',
+      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
+      providerInstanceId: (metadata?.providerInstanceId as string) || '',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
       createdAt: new Date(), // TODO: Get actual creation time
     };
@@ -77,7 +93,28 @@ export async function PUT(
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const validatedData = AgentUpdateSchema.parse(body);
+
+    let validatedData;
+    try {
+      validatedData = AgentUpdateSchema.parse(body);
+    } catch (zodError) {
+      if (zodError instanceof z.ZodError) {
+        const details = zodError.errors.map((e) => ({
+          path: e.path.join('.'),
+          message: e.message,
+          received: body[e.path[0] as keyof typeof body],
+        }));
+        return createErrorResponse(
+          `Validation failed: ${details.map((d) => `${d.path}: ${d.message}`).join(', ')}`,
+          400,
+          {
+            code: 'VALIDATION_FAILED',
+            details: { errors: details, receivedData: body },
+          }
+        );
+      }
+      throw zodError;
+    }
 
     const agentThreadId = asThreadId(agentId);
 
@@ -97,6 +134,28 @@ export async function PUT(
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Validate provider instance if provided
+    if (validatedData.providerInstanceId) {
+      const registry = ProviderRegistry.getInstance();
+
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(
+        (inst) => inst.id === validatedData.providerInstanceId
+      );
+
+      if (!instance) {
+        return createErrorResponse('Provider instance not found', 400, {
+          code: 'VALIDATION_FAILED',
+          details: {
+            availableInstances: configuredInstances.map((i) => ({
+              id: i.id,
+              name: (i as { name?: string; displayName: string }).name || i.displayName,
+            })),
+          },
+        });
+      }
+    }
+
     // Update agent properties via thread metadata
     const updates: Record<string, unknown> = {};
 
@@ -104,16 +163,31 @@ export async function PUT(
       updates.name = validatedData.name;
     }
 
-    if (validatedData.provider !== undefined) {
-      updates.provider = validatedData.provider;
+    // Update provider instance and model if provided
+    if (validatedData.providerInstanceId !== undefined) {
+      updates.providerInstanceId = validatedData.providerInstanceId;
     }
-
-    if (validatedData.model !== undefined) {
-      updates.model = validatedData.model;
+    if (validatedData.modelId !== undefined) {
+      updates.modelId = validatedData.modelId;
     }
 
     if (Object.keys(updates).length > 0) {
       agent.updateThreadMetadata(updates);
+
+      // Special case: If this is the session agent (Lace), also update session configuration
+      // The session agent's threadId equals the sessionId
+      if (agentThreadId === sessionId) {
+        const configUpdates: Record<string, unknown> = {};
+        if (validatedData.providerInstanceId !== undefined) {
+          configUpdates.providerInstanceId = validatedData.providerInstanceId;
+        }
+        if (validatedData.modelId !== undefined) {
+          configUpdates.modelId = validatedData.modelId;
+        }
+        if (Object.keys(configUpdates).length > 0) {
+          session.updateConfiguration(configUpdates);
+        }
+      }
     }
 
     const metadata = agent.getThreadMetadata();
@@ -122,19 +196,16 @@ export async function PUT(
       threadId: agent.threadId,
       name: (metadata?.name as string) || 'Agent ' + agent.threadId,
       provider: (metadata?.provider as string) || agent.providerName,
-      model: (metadata?.model as string) || 'unknown',
+      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
+      providerInstanceId: (metadata?.providerInstanceId as string) || '',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
       createdAt: new Date(), // TODO: Get actual creation time
     };
 
     return createSuperjsonResponse({ agent: agentResponse });
   } catch (error: unknown) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
-        code: 'VALIDATION_FAILED',
-        details: error.errors,
-      });
-    }
+    // Zod errors are now handled above with better messages
 
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to update agent',

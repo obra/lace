@@ -31,18 +31,41 @@ export class AnthropicProvider extends AIProvider {
     if (!this._anthropic) {
       const config = this._config as AnthropicProviderConfig;
       if (!config.apiKey) {
-        throw new Error('Missing required environment variable: ANTHROPIC_KEY');
+        throw new Error(
+          'Missing API key for Anthropic provider. Please ensure the provider instance has valid credentials.'
+        );
       }
-      this._anthropic = new Anthropic({
+
+      const anthropicConfig: {
+        apiKey: string;
+        dangerouslyAllowBrowser: boolean;
+        baseURL?: string;
+      } = {
         apiKey: config.apiKey,
         dangerouslyAllowBrowser: true, // Allow in test environments
-      });
+      };
+
+      // Support custom base URL for Anthropic-compatible APIs
+      const configBaseURL = config.baseURL as string | undefined;
+      if (configBaseURL) {
+        anthropicConfig.baseURL = configBaseURL;
+        logger.info('Using custom Anthropic base URL', { baseURL: configBaseURL });
+      }
+
+      this._anthropic = new Anthropic(anthropicConfig);
     }
     return this._anthropic;
   }
 
   // Provider-specific token counting using Anthropic's beta API
-  async countTokens(messages: ProviderMessage[], tools: Tool[] = []): Promise<number | null> {
+  async countTokens(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    model?: string
+  ): Promise<number | null> {
+    if (!model) {
+      return null; // Can't count without model
+    }
     try {
       // Convert to Anthropic format
       const anthropicMessages = convertToAnthropicFormat(messages);
@@ -57,7 +80,7 @@ export class AnthropicProvider extends AIProvider {
 
       // Use beta API to count tokens
       const result = await this.getAnthropicClient().beta.messages.countTokens({
-        model: this.modelName,
+        model,
         messages: anthropicMessages,
         system: systemPrompt,
         tools: anthropicTools,
@@ -74,56 +97,14 @@ export class AnthropicProvider extends AIProvider {
     return 'anthropic';
   }
 
-  get defaultModel(): string {
-    return 'claude-sonnet-4-20250514';
-  }
-
   get supportsStreaming(): boolean {
     return true;
   }
 
-  get contextWindow(): number {
-    const model = this.modelName.toLowerCase();
-
-    // All Claude 3 and Claude 4 models support 200k context
-    if (model.includes('claude')) {
-      return 200000;
-    }
-
-    // Fallback to base implementation
-    return super.contextWindow;
-  }
-
-  get maxCompletionTokens(): number {
-    const model = this.modelName.toLowerCase();
-
-    // Claude 4 and Claude 3.7 models support 8192 output tokens
-    if (
-      model.includes('claude-4') ||
-      model.includes('claude-sonnet-4') ||
-      model.includes('claude-opus-4') ||
-      model.includes('claude-3-7')
-    ) {
-      return 8192;
-    }
-
-    // Claude 3.5 models support 8192 output tokens
-    if (model.includes('claude-3-5')) {
-      return 8192;
-    }
-
-    // Claude 3 models support 4096 output tokens
-    if (model.includes('claude-3')) {
-      return 4096;
-    }
-
-    // Use configured value or fallback
-    return this._config.maxTokens || 4096;
-  }
-
   private _createRequestPayload(
     messages: ProviderMessage[],
-    tools: Tool[]
+    tools: Tool[],
+    model: string
   ): Anthropic.Messages.MessageCreateParams {
     // Convert our enhanced generic messages to Anthropic format
     const anthropicMessages = convertToAnthropicFormat(messages);
@@ -138,23 +119,39 @@ export class AnthropicProvider extends AIProvider {
       input_schema: tool.inputSchema,
     }));
 
-    return {
-      model: this.modelName,
+    const payload = {
+      model,
       max_tokens: this._config.maxTokens || 4000,
       messages: anthropicMessages,
       system: systemPrompt,
       tools: anthropicTools,
     };
+
+    // Comprehensive debug logging of request metadata (excluding message content)
+    logger.info('🔍 ANTHROPIC REQUEST METADATA', {
+      model: payload.model,
+      maxTokens: payload.max_tokens,
+      messageCount: payload.messages.length,
+      systemPromptLength: payload.system?.length || 0,
+      systemPromptPreview: payload.system?.substring(0, 100) + '...',
+      toolCount: payload.tools?.length || 0,
+      toolNames: payload.tools?.map((t) => t.name),
+      configKeys: Object.keys(this._config),
+      providerName: this.providerName,
+    });
+
+    return payload;
   }
 
   async createResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools);
+        const requestPayload = this._createRequestPayload(messages, tools, model);
 
         logger.debug('Sending request to Anthropic', {
           provider: 'anthropic',
@@ -227,6 +224,7 @@ export class AnthropicProvider extends AIProvider {
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
@@ -234,7 +232,7 @@ export class AnthropicProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools);
+        const requestPayload = this._createRequestPayload(messages, tools, model);
 
         logger.debug('Sending streaming request to Anthropic', {
           provider: 'anthropic',

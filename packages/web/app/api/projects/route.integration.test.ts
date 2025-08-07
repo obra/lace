@@ -3,19 +3,17 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { parseResponse } from '@/lib/serialization';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 
-// Mock environment variables to provide test API keys
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
+// CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
+const _tempLaceDir = setupWebTest();
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { parseResponse } from '@/lib/serialization';
+import { Session } from '@/lib/server/lace-imports';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -55,12 +53,30 @@ interface ErrorResponse {
 }
 
 describe('Projects API Integration Tests', () => {
-  beforeEach(() => {
-    setupTestPersistence();
+  // _tempLaceDir already set up at module level
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Force persistence reset to ensure clean database state
+    const { resetPersistence } = await import('~/persistence/database');
+    resetPersistence();
+
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   describe('GET /api/projects', () => {
@@ -68,13 +84,25 @@ describe('Projects API Integration Tests', () => {
       // Create some test projects directly using the real Project class
       const { Project } = await import('~/projects/project');
 
-      const project1 = Project.create('Project 1', '/path/1', 'First project');
-      Project.create('Project 2', '/path/2', 'Second project');
+      const project1 = Project.create('Project 1', '/path/1', 'First project', {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
+      Project.create('Project 2', '/path/2', 'Second project', {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
 
       // Create sessions in project1 to test session counting
       const { Session } = await import('~/sessions/session');
-      Session.create({ name: 'Session 1', projectId: project1.getId() });
-      Session.create({ name: 'Session 2', projectId: project1.getId() });
+      Session.create({
+        name: 'Session 1',
+        projectId: project1.getId(),
+      });
+      Session.create({
+        name: 'Session 2',
+        projectId: project1.getId(),
+      });
 
       const response = await GET();
       const data = await parseResponse<ProjectsResponse>(response);

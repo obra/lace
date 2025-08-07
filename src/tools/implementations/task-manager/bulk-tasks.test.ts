@@ -5,33 +5,60 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('Bulk Task Creation', () => {
+  const _tempLaceDir = setupCoreTest();
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create session with TaskManager like real usage
-    project = Project.create('Test Project', '/tmp/test-bulk-tasks');
+    project = Project.create('Test Project', 'Test project description', '/tmp/test-bulk-tasks', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     session = Session.create({
       name: 'Bulk Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
 
     // Create tool that gets TaskManager from context
     tool = new TaskCreateTool();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     session?.destroy();
-    teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
   });
 
   it('should create multiple tasks from tasks array', async () => {

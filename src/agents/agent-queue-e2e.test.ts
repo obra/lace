@@ -9,7 +9,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 // Mock provider with configurable delay for testing long operations
 class LongOperationProvider extends BaseMockProvider {
@@ -21,11 +21,15 @@ class LongOperationProvider extends BaseMockProvider {
     return 'long-operation';
   }
 
-  get defaultModel(): string {
-    return 'slow-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  async createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  async createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     // Simulate long-running operation
     await new Promise((resolve) => setTimeout(resolve, this.delayMs));
     return {
@@ -37,13 +41,13 @@ class LongOperationProvider extends BaseMockProvider {
 }
 
 describe('Agent Queue End-to-End Scenarios', () => {
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let longProvider: LongOperationProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
 
   beforeEach(async () => {
-    setupTestPersistence();
     longProvider = new LongOperationProvider(200); // 200ms delay
 
     mockToolExecutor = {
@@ -71,6 +75,12 @@ describe('Agent Queue End-to-End Scenarios', () => {
     });
 
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {
@@ -78,7 +88,7 @@ describe('Agent Queue End-to-End Scenarios', () => {
       agent.removeAllListeners();
       agent.stop();
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('Scenario 1: Multiple messages during long operation', () => {

@@ -7,34 +7,56 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { Agent } from '~/agents/agent';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ToolCall, ToolContext } from '~/tools/types';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 describe('ToolExecutor Security with Real Session Context', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let session: Session;
   let agent: Agent;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    // setupTestPersistence replaced by setupCoreTest
+    setupTestProviderDefaults();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project
     project = Project.create(
       'Security Test Project',
       'Project for security testing',
-      tempDirContext.tempDir,
-      {}
+      tempLaceDirContext.tempDir,
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     // Create real session
     session = Session.create({
       name: 'Security Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
 
     // Get coordinator agent and set up tool executor
@@ -57,8 +79,12 @@ describe('ToolExecutor Security with Real Session Context', () => {
     toolExecutor.setApprovalCallback(approvalCallback);
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
   });
 
   describe('Security Policy Enforcement', () => {
@@ -94,7 +120,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session,
       };
 
@@ -116,7 +142,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session,
       };
 
@@ -129,10 +155,10 @@ describe('ToolExecutor Security with Real Session Context', () => {
       // Create session with explicit allow policy for file-read
       const permissiveSession = Session.create({
         name: 'Permissive Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
           toolPolicies: {
             file_read: 'allow' as const,
           },
@@ -147,7 +173,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session: permissiveSession,
       };
 
@@ -160,10 +186,10 @@ describe('ToolExecutor Security with Real Session Context', () => {
       // Create session with explicit deny policy for bash
       const restrictiveSession = Session.create({
         name: 'Restrictive Session',
-        provider: 'anthropic',
-        model: 'claude-3-5-haiku-20241022',
         projectId: project.getId(),
         configuration: {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
           toolPolicies: {
             bash: 'deny' as const,
           },
@@ -178,7 +204,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session: restrictiveSession,
       };
 
@@ -204,7 +230,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       const toolContext: ToolContext = {
         threadId: agent.threadId,
-        workingDirectory: tempDirContext.tempDir,
+        workingDirectory: tempLaceDirContext.tempDir,
         session,
       };
 

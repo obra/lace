@@ -23,7 +23,6 @@ import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-
 import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
-import { ProviderRegistry } from '~/providers/registry';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
@@ -50,6 +49,8 @@ export interface AgentInfo {
   name: string;
   provider: string;
   model: string;
+  providerInstanceId?: string;
+  modelId?: string;
   status: AgentState;
 }
 
@@ -151,8 +152,6 @@ export class Agent extends EventEmitter {
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
   private _configuration: AgentConfiguration = {};
-  private _cachedProviderInstance: AIProvider | null = null;
-  private _cachedProviderKey: string | null = null;
 
   // Simple tool batch tracking
   private _pendingToolCount = 0;
@@ -352,45 +351,10 @@ export class Agent extends EventEmitter {
   }
 
   get providerInstance(): AIProvider {
-    const metadata = this.getThreadMetadata();
-    const targetProvider = (metadata?.provider as string) || this._provider.providerName;
-    const targetModel = (metadata?.model as string) || this._provider.modelName;
-
-    // Create cache key based on provider and model
-    const cacheKey = `${targetProvider}:${targetModel}`;
-
-    // Create cache key based on provider and model
-
-    // If current metadata matches the constructor provider, return it
-    if (
-      targetProvider === this._provider.providerName &&
-      targetModel === this._provider.modelName
-    ) {
-      // Using constructor provider - no need to create new instance
-      return this._provider;
-    }
-
-    // Check if we have a cached provider for this configuration
-    if (this._cachedProviderKey === cacheKey && this._cachedProviderInstance) {
-      return this._cachedProviderInstance;
-    }
-
-    // Clean up old cached provider if it exists
-    if (this._cachedProviderInstance && this._cachedProviderKey !== cacheKey) {
-      this._cachedProviderInstance.cleanup();
-    }
-
-    // Create new provider instance and cache it
-    // Creating new provider instance from metadata
-    const registry = ProviderRegistry.createWithAutoDiscovery();
-    const newProvider = registry.createProvider(targetProvider, { model: targetModel });
-
-    // Cache the new provider
-    this._cachedProviderInstance = newProvider;
-    this._cachedProviderKey = cacheKey;
-
-    // Provider instance created and cached
-    return newProvider;
+    // Always use the provider that was passed to the constructor
+    // The Session class is responsible for creating agents with the correct provider
+    // based on their metadata when reconstructing from persistence
+    return this._provider;
   }
 
   get provider(): string {
@@ -405,7 +369,8 @@ export class Agent extends EventEmitter {
 
   get model(): string {
     const metadata = this.getThreadMetadata();
-    return (metadata?.model as string) || this._provider.modelName || 'unknown-model';
+    // Check both 'model' and 'modelId' for backwards compatibility
+    return (metadata?.model as string) || (metadata?.modelId as string) || 'unknown-model';
   }
 
   get status(): AgentState {
@@ -413,11 +378,14 @@ export class Agent extends EventEmitter {
   }
 
   getInfo(): AgentInfo {
+    const metadata = this.getThreadMetadata();
     return {
       threadId: asThreadId(this._threadId),
       name: this.name,
       provider: this.provider,
       model: this.model,
+      providerInstanceId: metadata?.providerInstanceId as string | undefined,
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || undefined,
       status: this.status,
     };
   }
@@ -487,13 +455,28 @@ export class Agent extends EventEmitter {
         }
       }
 
-      // Check context window before making request
-      const contextWindow = this.providerInstance.contextWindow;
-      const maxOutputTokens = this.providerInstance.maxCompletionTokens;
+      // Debug logging for provider configuration
+      const metadata = this.getThreadMetadata();
+      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+
+      logger.info('🎯 AGENT PROVIDER CALL', {
+        threadId: this._threadId,
+        agentName: (metadata?.name as string) || 'unknown',
+        providerName: this.providerInstance.providerName,
+        modelId,
+        metadataProvider: metadata?.provider as string,
+        metadataModel: metadata?.model as string,
+        metadataModelId: metadata?.modelId as string,
+        metadataProviderInstanceId: metadata?.providerInstanceId as string,
+      });
 
       // Try provider-specific token counting first, fall back to estimation
       let promptTokens: number;
-      const providerCount = await this.providerInstance.countTokens(conversation, this._tools);
+      const providerCount = await this.providerInstance.countTokens(
+        conversation,
+        this._tools,
+        modelId
+      );
       if (providerCount !== null) {
         promptTokens = providerCount;
         logger.debug('Using provider-specific token count', {
@@ -509,41 +492,14 @@ export class Agent extends EventEmitter {
         });
       }
 
-      if (promptTokens + maxOutputTokens > contextWindow) {
-        const percentage = Math.floor((promptTokens / contextWindow) * 100);
-
-        this.emit('error', {
-          error: new Error(
-            `Context window exceeded: ${promptTokens} tokens (${percentage}% of ${contextWindow})`
-          ),
-          context: {
-            phase: 'pre_request_validation',
-            threadId: this._threadId,
-            estimatedPromptTokens: promptTokens,
-            contextWindow,
-            maxOutputTokens,
-          },
-        });
-
-        logger.error('Request blocked by context window limit', {
-          threadId: this._threadId,
-          promptTokens,
-          contextWindow,
-          maxOutputTokens,
-          percentage,
-        });
-
-        this._setState('idle');
-        return;
-      } else if (promptTokens > contextWindow * 0.9) {
-        // Emit warning if over 90% of context
-        logger.warn('Context window nearly full', {
-          threadId: this._threadId,
-          promptTokens,
-          contextWindow,
-          percentage: Math.floor((promptTokens / contextWindow) * 100),
-        });
-      }
+      // Note: Context window checks are now handled by the provider
+      // Since context windows are model-specific, the provider will handle
+      // any context window issues when it actually makes the request
+      logger.debug('Token count for request', {
+        threadId: this._threadId,
+        promptTokens,
+        model: modelId,
+      });
 
       // Set state and emit thinking start
       this._setState('thinking');
@@ -748,7 +704,19 @@ export class Agent extends EventEmitter {
     this.providerInstance.on('retry_exhausted', retryExhaustedListener);
 
     try {
-      const response = await this.providerInstance.createStreamingResponse(messages, tools, signal);
+      // Get model from thread metadata
+      const metadata = this.getThreadMetadata();
+      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      if (!modelId) {
+        throw new Error('No model configured for agent');
+      }
+
+      const response = await this.providerInstance.createStreamingResponse(
+        messages,
+        tools,
+        modelId,
+        signal
+      );
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -835,7 +803,14 @@ export class Agent extends EventEmitter {
     this.providerInstance.on('retry_exhausted', retryExhaustedListener);
 
     try {
-      const response = await this.providerInstance.createResponse(messages, tools, signal);
+      // Get model from thread metadata
+      const metadata = this.getThreadMetadata();
+      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      if (!modelId) {
+        throw new Error('No model configured for agent');
+      }
+
+      const response = await this.providerInstance.createResponse(messages, tools, modelId, signal);
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);

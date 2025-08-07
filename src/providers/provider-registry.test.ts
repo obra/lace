@@ -1,18 +1,42 @@
 // ABOUTME: Tests for the provider registry system
 // ABOUTME: Verifies provider registration, retrieval, and management functionality
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { ProviderRegistry } from '~/providers/registry';
 import { AnthropicProvider } from '~/providers/anthropic-provider';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
 import { OpenAIProvider } from '~/providers/openai-provider';
 import { OllamaProvider } from '~/providers/ollama-provider';
+import type { ProviderInstancesConfig, Credential } from '~/providers/catalog/types';
 
 describe('ProviderRegistry', () => {
   let registry: ProviderRegistry;
+  let tempDir: string;
+  let originalLaceDir: string | undefined;
 
   beforeEach(() => {
-    registry = new ProviderRegistry();
+    // Create temp directory for testing
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
+    originalLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = tempDir;
+    // Clear singleton for tests
+    ProviderRegistry.clearInstance();
+    registry = ProviderRegistry.getInstance();
+  });
+
+  afterEach(() => {
+    // Cleanup
+    if (originalLaceDir) {
+      process.env.LACE_DIR = originalLaceDir;
+    } else {
+      delete process.env.LACE_DIR;
+    }
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    // Clear singleton after test
+    ProviderRegistry.clearInstance();
   });
 
   describe('registerProvider', () => {
@@ -92,11 +116,27 @@ describe('ProviderRegistry', () => {
     });
   });
 
-  describe('createWithAutoDiscovery', () => {
-    it('should discover and register all existing provider files', () => {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      const providerNames = registry.getProviderNames();
+  describe('Provider Registration', () => {
+    it('should start with empty registry and support manual registration', () => {
+      const registry = ProviderRegistry.getInstance();
+      expect(registry.getProviderNames()).toEqual([]);
 
+      // Manual registration should work
+      const provider = new AnthropicProvider({ apiKey: 'test-key' });
+      registry.registerProvider(provider);
+      expect(registry.getProviderNames()).toContain('anthropic');
+      expect(registry.getProvider('anthropic')).toBeDefined();
+    });
+
+    it('should support registering multiple providers manually', () => {
+      const registry = ProviderRegistry.getInstance();
+
+      registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new LMStudioProvider({ baseUrl: 'http://localhost:1234' }));
+      registry.registerProvider(new OllamaProvider({ baseUrl: 'http://localhost:11434' }));
+
+      const providerNames = registry.getProviderNames();
       expect(providerNames).toContain('anthropic');
       expect(providerNames).toContain('openai');
       expect(providerNames).toContain('lmstudio');
@@ -104,8 +144,13 @@ describe('ProviderRegistry', () => {
       expect(providerNames).toHaveLength(4);
     });
 
-    it('should register providers with correct instances', () => {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
+    it('should maintain provider identity after registration', () => {
+      const registry = ProviderRegistry.getInstance();
+
+      registry.registerProvider(new AnthropicProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new OpenAIProvider({ apiKey: 'test-key' }));
+      registry.registerProvider(new LMStudioProvider({ baseUrl: 'http://localhost:1234' }));
+      registry.registerProvider(new OllamaProvider({ baseUrl: 'http://localhost:11434' }));
 
       const anthropicProvider = registry.getProvider('anthropic');
       const openaiProvider = registry.getProvider('openai');
@@ -123,20 +168,11 @@ describe('ProviderRegistry', () => {
       expect(ollamaProvider!.providerName).toBe('ollama');
     });
 
-    it('should only discover files matching *-provider.ts pattern', () => {
-      const registry = ProviderRegistry.createWithAutoDiscovery();
-      const providerNames = registry.getProviderNames();
-
-      // Should not include non-provider files like types.ts, registry.ts, etc.
-      expect(providerNames).not.toContain('types');
-      expect(providerNames).not.toContain('registry');
-      expect(providerNames).not.toContain('format-converters');
-    });
-
-    it('should handle provider files with missing exports gracefully', () => {
-      // This test ensures auto-discovery doesn't crash on malformed files
-      // We don't need to create malformed files - just verify it doesn't throw
-      expect(ProviderRegistry.createWithAutoDiscovery()).toBeDefined();
+    it('should properly initialize without auto-discovery', () => {
+      // Verify that constructor doesn't throw and creates empty registry
+      expect(() => ProviderRegistry.getInstance()).not.toThrow();
+      const registry = ProviderRegistry.getInstance();
+      expect(registry.getProviderNames()).toEqual([]);
     });
   });
 
@@ -164,6 +200,174 @@ describe('ProviderRegistry', () => {
       expect(ProviderRegistry.isProviderClass(123)).toBe(false);
       expect(ProviderRegistry.isProviderClass(null)).toBe(false);
       expect(ProviderRegistry.isProviderClass(undefined)).toBe(false);
+    });
+  });
+
+  // New catalog and instance functionality tests
+  describe('catalog integration', () => {
+    beforeEach(async () => {
+      // Registry will auto-initialize when needed
+    });
+
+    it('should load provider catalogs on initialization', async () => {
+      const catalogProviders = await registry.getCatalogProviders();
+      expect(catalogProviders.length).toBeGreaterThan(0);
+
+      const anthropic = catalogProviders.find((p) => p.id === 'anthropic');
+      expect(anthropic).toBeTruthy();
+      expect(anthropic?.models.length).toBeGreaterThan(0);
+    });
+
+    it('should return model from catalog', async () => {
+      const model = await registry.getModelFromCatalog('anthropic', 'claude-3-5-haiku-20241022');
+      expect(model).toBeTruthy();
+      expect(model?.id).toBe('claude-3-5-haiku-20241022');
+      expect(model?.name).toBe('Claude 3.5 Haiku');
+    });
+
+    it('should return null for non-existent model', async () => {
+      const model = await registry.getModelFromCatalog('anthropic', 'non-existent-model');
+      expect(model).toBeNull();
+    });
+  });
+
+  describe('instance management', () => {
+    beforeEach(async () => {
+      // Registry will auto-initialize when needed
+    });
+
+    it('should return empty instances when none configured', async () => {
+      const instances = await registry.getConfiguredInstances();
+      expect(instances).toEqual([]);
+    });
+
+    it('should load configured instances', async () => {
+      // Set up test instance configuration
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'openai-test': {
+            displayName: 'OpenAI Test',
+            catalogProviderId: 'openai',
+            timeout: 30000,
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      // Registry will auto-initialize when needed
+
+      const instances = await registry.getConfiguredInstances();
+      expect(instances).toHaveLength(1);
+      expect(instances[0].id).toBe('openai-test');
+      expect(instances[0].displayName).toBe('OpenAI Test');
+      expect(instances[0].catalogProviderId).toBe('openai');
+    });
+
+    it('should create provider from instance configuration', async () => {
+      // Set up test instance and credentials
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'anthropic-test': {
+            displayName: 'Anthropic Test',
+            catalogProviderId: 'anthropic',
+          },
+        },
+      };
+
+      const credential: Credential = {
+        apiKey: 'sk-ant-test123',
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const credentialsDir = path.join(tempDir, 'credentials');
+      fs.mkdirSync(credentialsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(credentialsDir, 'anthropic-test.json'),
+        JSON.stringify(credential, null, 2)
+      );
+
+      // Registry will auto-initialize when needed
+
+      const provider = await registry.createProviderFromInstance('anthropic-test');
+      expect(provider).toBeTruthy();
+      expect(provider.providerName).toBe('anthropic');
+    });
+
+    it('should create provider from instance and model', async () => {
+      // Set up test instance and credentials
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'anthropic-test': {
+            displayName: 'Anthropic Test',
+            catalogProviderId: 'anthropic',
+          },
+        },
+      };
+
+      const credential: Credential = {
+        apiKey: 'sk-ant-test123',
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const credentialsDir = path.join(tempDir, 'credentials');
+      fs.mkdirSync(credentialsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(credentialsDir, 'anthropic-test.json'),
+        JSON.stringify(credential, null, 2)
+      );
+
+      // Registry will auto-initialize when needed
+
+      const provider = await registry.createProviderFromInstanceAndModel(
+        'anthropic-test',
+        'claude-3-5-haiku-20241022'
+      );
+      expect(provider).toBeTruthy();
+      expect(provider.providerName).toBe('anthropic');
+    });
+
+    it('should throw error for non-existent instance', async () => {
+      await expect(registry.createProviderFromInstance('non-existent')).rejects.toThrow(
+        'Provider instance not found: non-existent'
+      );
+    });
+
+    it('should throw error for instance without credentials', async () => {
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'no-creds': {
+            displayName: 'No Credentials',
+            catalogProviderId: 'openai',
+          },
+        },
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      // Registry will auto-initialize when needed
+
+      await expect(registry.createProviderFromInstance('no-creds')).rejects.toThrow(
+        'No credentials found for instance: no-creds'
+      );
     });
   });
 });

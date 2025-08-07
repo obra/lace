@@ -11,9 +11,10 @@ import { Project } from '~/projects/project';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('ToolExecutor policy enforcement', () => {
+  const _tempLaceDir = setupCoreTest();
   let executor: ToolExecutor;
   let project: Project;
   let projectId: string;
@@ -21,8 +22,6 @@ describe('ToolExecutor policy enforcement', () => {
   let mockSession: Session;
 
   beforeEach(() => {
-    setupTestPersistence();
-
     // Create a test project with tool policies
     project = Project.create('Test Project', '/project/path', 'A test project', {
       provider: 'anthropic',
@@ -66,7 +65,7 @@ describe('ToolExecutor policy enforcement', () => {
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   it('should allow tool when policy is allow', async () => {

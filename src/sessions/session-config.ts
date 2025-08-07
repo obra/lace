@@ -4,8 +4,8 @@
 import { z } from 'zod';
 
 export const SessionConfigurationSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'lmstudio', 'ollama']).optional(),
-  model: z.string().optional(),
+  providerInstanceId: z.string().optional(),
+  modelId: z.string().optional(),
   maxTokens: z.number().positive().max(100000).optional(),
   temperature: z.number().min(0).max(2).optional(),
   topP: z.number().min(0).max(1).optional(),

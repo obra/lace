@@ -72,9 +72,7 @@ describe('AnthropicProvider', () => {
       expect(provider.providerName).toBe('anthropic');
     });
 
-    it('should have correct default model', () => {
-      expect(provider.defaultModel).toBe('claude-sonnet-4-20250514');
-    });
+    // defaultModel removed - providers are now model-agnostic
 
     it('should support streaming', () => {
       expect(provider.supportsStreaming).toBe(true);
@@ -96,7 +94,11 @@ describe('AnthropicProvider', () => {
     it('should create non-streaming response correctly', async () => {
       const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-      const response = await provider.createResponse(messages, [mockTool]);
+      const response = await provider.createResponse(
+        messages,
+        [mockTool],
+        'claude-sonnet-4-20250514'
+      );
 
       expect(response.content).toBe('Test response');
       expect(response.toolCalls).toEqual([]);
@@ -117,7 +119,11 @@ describe('AnthropicProvider', () => {
       });
 
       const messages = [{ role: 'user' as const, content: 'Use tool' }];
-      const response = await provider.createResponse(messages, [mockTool]);
+      const response = await provider.createResponse(
+        messages,
+        [mockTool],
+        'claude-sonnet-4-20250514'
+      );
 
       expect(response.content).toBe('Using tool');
       expect(response.toolCalls).toEqual([
@@ -136,7 +142,7 @@ describe('AnthropicProvider', () => {
         { role: 'assistant' as const, content: 'Assistant message' },
       ];
 
-      await provider.createResponse(messages, []);
+      await provider.createResponse(messages, [], 'claude-sonnet-4-20250514');
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
@@ -173,7 +179,11 @@ describe('AnthropicProvider', () => {
       const messages = [{ role: 'user' as const, content: 'Stream this' }];
 
       // Start the streaming response (don't await yet)
-      const responsePromise = provider.createStreamingResponse(messages, [mockTool]);
+      const responsePromise = provider.createStreamingResponse(
+        messages,
+        [mockTool],
+        'claude-sonnet-4-20250514'
+      );
 
       // Simulate the streaming events
       const textCallback = mockStream.on.mock.calls.find(
@@ -203,7 +213,11 @@ describe('AnthropicProvider', () => {
       const messages = [{ role: 'user' as const, content: 'Stream tokens' }];
 
       // Start streaming
-      const responsePromise = provider.createStreamingResponse(messages, []);
+      const responsePromise = provider.createStreamingResponse(
+        messages,
+        [],
+        'claude-sonnet-4-20250514'
+      );
 
       // Simulate token events
       const textCallback = mockStream.on.mock.calls.find(
@@ -231,7 +245,7 @@ describe('AnthropicProvider', () => {
       mockStream.finalMessage.mockResolvedValue(finalMessage);
 
       const messages = [{ role: 'user' as const, content: 'Complete test' }];
-      await provider.createStreamingResponse(messages, []);
+      await provider.createStreamingResponse(messages, [], 'claude-sonnet-4-20250514');
 
       expect(completeEvents).toHaveLength(1);
       expect(completeEvents[0].response.content).toBe('Final content');
@@ -248,7 +262,9 @@ describe('AnthropicProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Error test' }];
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow('Stream failed');
+      await expect(
+        provider.createStreamingResponse(messages, [], 'claude-sonnet-4-20250514')
+      ).rejects.toThrow('Stream failed');
 
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0].message).toBe('Stream failed');
@@ -270,7 +286,11 @@ describe('AnthropicProvider', () => {
       mockStream.finalMessage.mockResolvedValue(finalMessage);
 
       const messages = [{ role: 'user' as const, content: 'Stream with tools' }];
-      const response = await provider.createStreamingResponse(messages, [mockTool]);
+      const response = await provider.createStreamingResponse(
+        messages,
+        [mockTool],
+        'claude-sonnet-4-20250514'
+      );
 
       expect(response.content).toBe('Using tool via stream');
       expect(response.toolCalls).toEqual([
@@ -284,10 +304,9 @@ describe('AnthropicProvider', () => {
   });
 
   describe('configuration handling', () => {
-    it('should use custom model when provided', async () => {
+    it('should use model passed as parameter', async () => {
       const customProvider = new AnthropicProvider({
         apiKey: 'test-key',
-        model: 'claude-sonnet-4-20250514',
       });
 
       mockCreateResponse.mockResolvedValue({
@@ -295,7 +314,11 @@ describe('AnthropicProvider', () => {
         usage: {},
       });
 
-      await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
+      await customProvider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [],
+        'claude-sonnet-4-20250514'
+      );
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
@@ -313,7 +336,11 @@ describe('AnthropicProvider', () => {
         usage: {},
       });
 
-      await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
+      await customProvider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [],
+        'claude-sonnet-4-20250514'
+      );
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
@@ -330,7 +357,11 @@ describe('AnthropicProvider', () => {
         usage: {},
       });
 
-      await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], []);
+      await noSystemProvider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [],
+        'claude-sonnet-4-20250514'
+      );
 
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
@@ -345,7 +376,9 @@ describe('AnthropicProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Error test' }];
 
-      await expect(provider.createResponse(messages, [])).rejects.toThrow('API Error');
+      await expect(
+        provider.createResponse(messages, [], 'claude-sonnet-4-20250514')
+      ).rejects.toThrow('API Error');
     });
 
     it('should handle streaming setup errors', async () => {
@@ -356,9 +389,9 @@ describe('AnthropicProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Stream error test' }];
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow(
-        'Stream setup failed'
-      );
+      await expect(
+        provider.createStreamingResponse(messages, [], 'claude-sonnet-4-20250514')
+      ).rejects.toThrow('Stream setup failed');
     });
   });
 });

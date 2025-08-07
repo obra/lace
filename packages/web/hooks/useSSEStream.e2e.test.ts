@@ -15,19 +15,36 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
 
 describe('SSE Stream E2E Tests', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
+  let providerInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
     // Set up environment for session service
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     sessionService = getSessionService();
 
@@ -36,7 +53,10 @@ describe('SSE Stream E2E Tests', () => {
       'SSE E2E Test Project',
       '/test/path',
       'Test project for SSE E2E testing',
-      {}
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     projectId = testProject.getId();
 
@@ -47,10 +67,8 @@ describe('SSE Stream E2E Tests', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'SSE E2E Test Session',
-          configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -71,9 +89,10 @@ describe('SSE Stream E2E Tests', () => {
       await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
-    teardownTestPersistence();
   });
 
   it('should establish SSE stream connection for valid session', async () => {
@@ -105,8 +124,8 @@ describe('SSE Stream E2E Tests', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'test-agent',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }

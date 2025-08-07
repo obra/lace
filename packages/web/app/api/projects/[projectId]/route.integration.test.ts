@@ -3,18 +3,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-
-// Mock environment variables to provide test API keys
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -47,18 +40,39 @@ interface SuccessResponse {
 }
 
 describe('Individual Project API Integration Tests', () => {
-  let testProject: import('~/projects/project').Project;
+  const _tempLaceDir = setupWebTest();
+  let testProject: import('@/lib/server/lace-imports').Project;
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // Create test provider instances
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o-mini', 'gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create a test project for each test
-    const { Project } = await import('~/projects/project');
-    testProject = Project.create('Test Project', '/test/path', 'A test project', { key: 'value' });
+    const { Project } = await import('@/lib/server/lace-imports');
+    testProject = Project.create('Test Project', '/test/path', 'A test project', {
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    // Clean up provider instances
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    vi.clearAllMocks();
   });
 
   describe('GET /api/projects/:projectId', () => {
@@ -81,9 +95,15 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should return project with correct session count', async () => {
-      // Add some sessions to the project
-      Session.create({ name: 'Session 1', projectId: testProject.getId() });
-      Session.create({ name: 'Session 2', projectId: testProject.getId() });
+      // Add some sessions to the project (they inherit provider config from project)
+      Session.create({
+        name: 'Session 1',
+        projectId: testProject.getId(),
+      });
+      Session.create({
+        name: 'Session 2',
+        projectId: testProject.getId(),
+      });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await GET(request, {
@@ -128,7 +148,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.workingDirectory).toBe('/test/path'); // Should remain unchanged
 
       // Verify the update was persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Updated Project Name');
     });
@@ -151,7 +171,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.name).toBe('Test Project'); // Should remain unchanged
 
       // Verify the update was persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.description).toBe('Updated description');
     });
@@ -173,7 +193,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.workingDirectory).toBe('/updated/path');
 
       // Verify the update was persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getWorkingDirectory()).toBe('/updated/path');
     });
@@ -194,7 +214,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(response.status).toBe(200);
 
       // Verify the update was persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getConfiguration()).toEqual({ newKey: 'newValue', another: 'config' });
     });
@@ -216,7 +236,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.isArchived).toBe(true);
 
       // Verify the update was persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.isArchived).toBe(true);
     });
@@ -241,7 +261,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.isArchived).toBe(false);
 
       // Verify the update was persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.isArchived).toBe(false);
     });
@@ -273,7 +293,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.project.isArchived).toBe(true);
 
       // Verify all updates were persisted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Multi-Update Project');
       expect(updatedProject!.getInfo()!.description).toBe('Multiple fields updated');
@@ -331,15 +351,29 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.success).toBe(true);
 
       // Verify the project was actually deleted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const deletedProject = Project.getById(projectId);
       expect(deletedProject).toBeNull();
     });
 
     it('should delete project with sessions', async () => {
       // Add sessions to the project
-      Session.create({ name: 'Session 1', projectId: testProject.getId() });
-      Session.create({ name: 'Session 2', projectId: testProject.getId() });
+      Session.create({
+        name: 'Session 1',
+        projectId: testProject.getId(),
+        configuration: {
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        },
+      });
+      Session.create({
+        name: 'Session 2',
+        projectId: testProject.getId(),
+        configuration: {
+          providerInstanceId: openaiInstanceId,
+          modelId: 'gpt-4o-mini',
+        },
+      });
 
       const projectId = testProject.getId();
       const request = new NextRequest(`http://localhost/api/projects/${projectId}`);
@@ -351,7 +385,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.success).toBe(true);
 
       // Verify the project was actually deleted
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const deletedProject = Project.getById(projectId);
       expect(deletedProject).toBeNull();
     });

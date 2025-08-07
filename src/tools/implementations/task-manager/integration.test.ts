@@ -11,8 +11,15 @@ import {
 } from '~/tools/implementations/task-manager/tools';
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  cleanupTestProviderInstances,
+  createTestProviderInstance,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -44,10 +51,11 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Multi-Agent Task Manager Integration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
   let createTool: TaskCreateTool;
   let listTool: TaskListTool;
   let updateTool: TaskUpdateTool;
@@ -60,35 +68,49 @@ describe('Multi-Agent Task Manager Integration', () => {
   let agent2Context: ToolContext;
   let agent3Context: ToolContext;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Task Manager Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method. This would involve:
+    // 1. Creating a test provider instance using createTestProviderInstance
+    // 2. Mocking the HTTP responses at the network level
+    // 3. Or creating a custom test provider type that can be registered
+    // For now, we're using the @internal createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
       (_name: string, _config?: unknown) => {
         return mockProvider;
       }
     );
 
-    // Also mock the static createWithAutoDiscovery method
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(() => {
-      const mockRegistry = {
-        createProvider: () => mockProvider,
-        getProvider: () => mockProvider,
-        getProviderNames: () => ['anthropic', 'openai'],
-      } as unknown as ProviderRegistry;
-      return mockRegistry;
-    });
+    // Mock the ProviderRegistry createProvider method
+    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
-    // Create project first
-    project = Project.create('Integration Test Project', '/tmp/test-integration');
+    // Create project first with provider configuration
+    project = Project.create(
+      'Integration Test Project',
+      '/tmp/test-integration',
+      'Test project for task manager integration',
+      {
+        providerInstanceId, // Use real provider instance
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
 
-    // Create session with anthropic - the provider will be mocked
+    // Create session - it inherits provider config from project
     session = Session.create({
       name: 'Integration Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
 
@@ -119,10 +141,13 @@ describe('Multi-Agent Task Manager Integration', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
+    cleanupTestProviderDefaults();
   });
 
   describe('Multi-agent task workflow', () => {
@@ -350,12 +375,18 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   describe('Session isolation', () => {
     it('should isolate tasks between different sessions', async () => {
-      // Create a second session with different project
-      const project2 = Project.create('Session 2 Project', '/tmp/test-session2');
+      // Create a second session with different project (with provider config)
+      const project2 = Project.create(
+        'Session 2 Project',
+        '/tmp/test-session2',
+        'Second test project for session isolation',
+        {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }
+      );
       const session2 = Session.create({
         name: 'Session 2 Test',
-        provider: 'anthropic',
-        model: 'claude-sonnet-4-20250514',
         projectId: project2.getId(),
       });
 

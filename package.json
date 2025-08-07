@@ -6,14 +6,8 @@
   "engines": {
     "node": ">=20.18.3"
   },
-  "bin": {
-    "lace": "./dist/cli.js",
-    "debug-thread": "./dist/debug-thread.js"
-  },
   "scripts": {
     "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true && cd packages/web && npm run build",
-    "start": "npm run build && node dist/cli.js",
-    "debug-thread": "npm run build && node dist/debug-thread.js",
     "typecheck": "tsc --noEmit",
     "lint": "npm run typecheck ; eslint src ; ( cd packages/web && npm run lint)",
     "lint:fix": "npm run typecheck ; eslint src --fix ; (cd packages/web && npm run lint:fix)",
@@ -47,8 +41,6 @@
     "test:e2e:headed": "cd packages/web && npm run test:e2e:headed",
     "test:all": "npm run test:run && npm run test:web:run && npm run test:e2e",
     "test:all:unit": "npm run test:unit && npm run test:web:unit"
-
-
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
@@ -88,6 +80,7 @@
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "lint-staged": "^16.1.1",
+    "msw": "^2.10.4",
     "playwright": "^1.49.0",
     "prettier": "^3.5.3",
     "tsc-alias": "^1.8.16",

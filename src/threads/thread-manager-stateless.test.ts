@@ -1,20 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { expectEventAdded } from '~/test-utils/event-helpers';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('ThreadManager - Core Behavior', () => {
+  const _tempLaceDir = setupCoreTest();
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
-    setupTestPersistence();
     threadManager = new ThreadManager();
     threadId = threadManager.createThread();
   });
 
   afterEach(() => {
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('Core thread operations', () => {

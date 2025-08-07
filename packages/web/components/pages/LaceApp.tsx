@@ -78,6 +78,7 @@ export const LaceApp = memo(function LaceApp() {
   const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [projectConfig, setProjectConfig] = useState<Record<string, unknown> | null>(null);
 
   // Use session events hook for event management (without event stream)
   const {
@@ -251,9 +252,28 @@ export const LaceApp = memo(function LaceApp() {
     }
   }, []);
 
-  // Load sessions when project is selected
+  // Load sessions and project configuration when project is selected
   useEffect(() => {
     void loadSessions();
+    
+    // Load project configuration
+    if (selectedProject) {
+      fetch(`/api/projects/${selectedProject}/configuration`)
+        .then(res => parseResponse<{ configuration?: Record<string, unknown> }>(res))
+        .then(data => {
+          if (data.configuration) {
+            setProjectConfig(data.configuration);
+          } else {
+            setProjectConfig({});
+          }
+        })
+        .catch((err: unknown) => {
+          console.error('Failed to load project configuration:', err);
+          setProjectConfig(null);
+        });
+    } else {
+      setProjectConfig(null);
+    }
   }, [selectedProject, loadSessions]);
 
   // Load session details when session is selected
@@ -342,7 +362,11 @@ export const LaceApp = memo(function LaceApp() {
         // Reload sessions to show the new one
         void loadSessions();
       } else {
-        console.error('Failed to create session');
+        const errorData = await parseResponse<{ error?: string; details?: unknown }>(res).catch(() => ({ error: 'Unknown error', details: undefined }));
+        console.error('Failed to create session:', errorData);
+        if (errorData.details) {
+          console.error('Validation details:', errorData.details);
+        }
       }
     } catch (error) {
       console.error('Failed to create session:', error);
@@ -924,6 +948,7 @@ export const LaceApp = memo(function LaceApp() {
               <div className="flex-1 p-6">
                 <SessionConfigPanel
                   selectedProject={currentProject}
+                  projectConfiguration={projectConfig}
                   sessions={sessions}
                   selectedSession={selectedSessionDetails}
                   providers={providers}

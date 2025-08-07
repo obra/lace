@@ -3,30 +3,43 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { Session } from '~/sessions/session';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import type { ToolContext } from '~/tools/types';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
 } from '~/test-utils/delegation-test-helper';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 // Using shared delegation test utilities
 
 describe('DelegateTool', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let testSetup: DelegationTestSetup;
   let tool: DelegateTool;
   let context: ToolContext;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    Session.clearProviderCache();
+
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Delegate Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Use shared delegation test setup
-    testSetup = createDelegationTestSetup({
+    testSetup = await createDelegationTestSetup({
       sessionName: 'Delegate Test Session',
       projectName: 'Delegate Test Project',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-haiku-20241022',
     });
 
     // Get tool from session agent's toolExecutor
@@ -40,10 +53,12 @@ describe('DelegateTool', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     testSetup.session?.destroy();
-    teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   it('should have correct metadata', () => {
@@ -53,14 +68,14 @@ describe('DelegateTool', () => {
   });
 
   it('should delegate a simple task with default model', async () => {
-    testSetup.mockProvider.setMockResponses(['Analysis complete: 3 test failures identified']);
+    testSetup.setMockResponses(['Analysis complete: 3 test failures identified']);
 
     const result = await tool.execute(
       {
         title: 'Analyze test failures',
         prompt: 'Look at the failing tests and identify common patterns',
         expected_response: 'A list of failure patterns',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -72,7 +87,7 @@ describe('DelegateTool', () => {
   });
 
   it('should handle custom provider:model format', async () => {
-    testSetup.mockProvider.setMockResponses(['Custom model response']);
+    testSetup.setMockResponses(['Custom model response']);
 
     const result = await tool.execute(
       {
@@ -90,14 +105,14 @@ describe('DelegateTool', () => {
   });
 
   it('should create delegate thread and execute subagent', async () => {
-    testSetup.mockProvider.setMockResponses(['Directory listed successfully']);
+    testSetup.setMockResponses(['Directory listed successfully']);
 
     const result = await tool.execute(
       {
         title: 'List files',
         prompt: 'List the files in the current directory',
         expected_response: 'List of files',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -109,14 +124,14 @@ describe('DelegateTool', () => {
   });
 
   it('should format the subagent system prompt correctly', async () => {
-    testSetup.mockProvider.setMockResponses(['Task completed']);
+    testSetup.setMockResponses(['Task completed']);
 
     const result = await tool.execute(
       {
         title: 'Format test',
         prompt: 'Test system prompt formatting',
         expected_response: 'Formatted response',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -142,14 +157,14 @@ describe('DelegateTool', () => {
   });
 
   it('should collect all subagent responses', async () => {
-    testSetup.mockProvider.setMockResponses(['Task completed with combined responses']);
+    testSetup.setMockResponses(['Task completed with combined responses']);
 
     const result = await tool.execute(
       {
         title: 'Multi-response test',
         prompt: 'Generate multiple responses',
         expected_response: 'Combined responses',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -159,14 +174,14 @@ describe('DelegateTool', () => {
   });
 
   it('should include delegate thread ID in result metadata', async () => {
-    testSetup.mockProvider.setMockResponses(['Task completed with metadata']);
+    testSetup.setMockResponses(['Task completed with metadata']);
 
     const result = await tool.execute(
       {
         title: 'Metadata test',
         prompt: 'Test metadata inclusion',
         expected_response: 'Response with metadata',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: 'anthropic:claude-3-5-haiku-20241022',
       },
       context
     );
@@ -177,14 +192,10 @@ describe('DelegateTool', () => {
   });
 
   it('should accept valid model formats', async () => {
-    const validModels = [
-      'anthropic:claude-sonnet-4-20250514',
-      'openai:gpt-4',
-      'anthropic:claude-3-5-haiku-20241022',
-    ];
+    const validModels = ['anthropic:claude-3-5-haiku-20241022', 'openai:gpt-4'];
 
     for (const model of validModels) {
-      testSetup.mockProvider.setMockResponses(['Valid model response']);
+      testSetup.setMockResponses(['Valid model response']);
 
       const result = await tool.execute(
         {

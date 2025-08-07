@@ -6,31 +6,50 @@ import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { cleanupTestProviderInstances } from '@/lib/server/lace-imports';
+import { Session } from '@/lib/server/lace-imports';
 
-// Mock only environment variables - avoid requiring real API keys in tests
-vi.mock('~/config/env-loader', () => ({
-  getEnvVar: vi.fn((key: string) => {
-    const envVars: Record<string, string> = {
-      ANTHROPIC_KEY: 'test-anthropic-key',
-      OPENAI_API_KEY: 'test-openai-key',
-    };
-    return envVars[key] || '';
-  }),
-}));
+// No mocking of env-loader needed - setupTestProviderDefaults() handles env vars
 
 // Using real SessionService with isolated temporary database
 // Minimal mocking - only env vars. Tests validate real HTTP behavior
 
 describe('Session API Routes', () => {
+  const _tempLaceDir = setupWebTest();
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let anthropicInstanceId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Set up isolated test persistence
-    setupTestPersistence();
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create test provider instance with the ID that Session.create() prefers
+    // Session.create() looks for 'anthropic-default' first, so we need to create it with that ID
+    const { ProviderInstanceManager } = await import('@/lib/server/lace-imports');
+    const { ProviderCatalogManager } = await import('@/lib/server/lace-imports');
+
+    const instanceManager = new ProviderInstanceManager();
+    const catalogManager = new ProviderCatalogManager();
+    await catalogManager.loadCatalogs();
+
+    // Create anthropic-default instance manually
+    const instancesConfig = await instanceManager.loadInstances();
+    instancesConfig.instances['anthropic-default'] = {
+      displayName: 'Test Anthropic Default',
+      catalogProviderId: 'anthropic',
+    };
+    await instanceManager.saveInstances(instancesConfig);
+    await instanceManager.saveCredential('anthropic-default', {
+      apiKey: 'test-anthropic-key',
+    });
+
+    anthropicInstanceId = 'anthropic-default';
 
     // ✅ ESSENTIAL MOCK - Console suppression to prevent test output noise and control log verification
     // These mocks are necessary for clean test output and error handling verification
@@ -38,12 +57,20 @@ describe('Session API Routes', () => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
 
+    // Clean up provider defaults
+    cleanupTestProviderDefaults();
+
+    // Clean up test provider instances
+    if (anthropicInstanceId) {
+      await cleanupTestProviderInstances([anthropicInstanceId]);
+    }
+
     // Clean up test persistence
-    teardownTestPersistence();
+    vi.clearAllMocks();
   });
 
   // POST endpoint removed - sessions must be created through projects
@@ -66,25 +93,18 @@ describe('Session API Routes', () => {
       const { Project } = await import('@/lib/server/lace-imports');
       const { getSessionService } = await import('@/lib/server/session-service');
 
-      // Create and ensure project is saved
-      const testProject = Project.create('Test Project', '/test', 'Test project for sessions');
+      // Create and ensure project is saved with provider configuration
+      const testProject = Project.create('Test Project', '/test', 'Test project for sessions', {
+        providerInstanceId: 'anthropic-default',
+        modelId: 'claude-3-5-sonnet-20241022',
+      });
       const projectId = testProject.getId();
 
       const sessionService = getSessionService();
 
-      const session1 = await sessionService.createSession(
-        'Test Session 1',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
+      const session1 = await sessionService.createSession('Test Session 1', projectId);
 
-      const session2 = await sessionService.createSession(
-        'Test Session 2',
-        'anthropic',
-        'claude-3-5-haiku-20241022',
-        projectId
-      );
+      const session2 = await sessionService.createSession('Test Session 2', projectId);
 
       // Act: Call the API endpoint
       const request = new NextRequest('http://localhost:3005/api/sessions');
@@ -116,7 +136,7 @@ describe('Session API Routes', () => {
 
     it('should handle listing errors gracefully', async () => {
       // Arrange: Force a database error by corrupting the persistence layer
-      const { getPersistence } = await import('~/persistence/database');
+      const { getPersistence } = await import('@/lib/server/lace-imports');
 
       // Override a persistence method to throw an error
       const _originalMethod = getPersistence().database;

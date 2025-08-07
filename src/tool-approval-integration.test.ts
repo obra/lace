@@ -5,15 +5,35 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
 import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
-import { CLIOptions } from '~/cli/args';
+// Note: CLIOptions type removed with CLI refactor, defining minimal type here for approval tests
+type CLIOptions = {
+  approveAll?: boolean;
+  denyAll?: boolean;
+  autoApprove?: string[];
+  provider?: string;
+  model?: string;
+  help?: boolean;
+  logLevel?: string;
+  logFile?: string;
+  prompt?: string;
+  ui?: string;
+  [key: string]: any; // Allow any additional properties for test flexibility
+};
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
 import { ToolCall, ToolContext } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { ThreadId } from '~/threads/types';
 
 // Mock approval interface for testing
@@ -58,22 +78,34 @@ function createToolCall(
 }
 
 describe('Tool Approval System Integration', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let mockInterface: MockApprovalInterface;
   let session: Session;
   let project: Project;
   let toolContext: ToolContext;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    // setupTestPersistence replaced by setupCoreTest
+    setupTestProviderDefaults();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Tool Approval Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper tool execution context
     project = Project.create(
       'Tool Approval Test Project',
       'Project for tool approval integration testing',
-      tempDirContext.tempDir,
+      tempLaceDirContext.tempDir,
       {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         tools: ['bash', 'file_read', 'file_write'], // Enable tools for testing
         toolPolicies: {
           // All tools require approval by default
@@ -86,8 +118,6 @@ describe('Tool Approval System Integration', () => {
 
     session = Session.create({
       name: 'Tool Approval Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -95,7 +125,7 @@ describe('Tool Approval System Integration', () => {
     toolContext = {
       threadId: 'test-thread-id' as ThreadId,
       parentThreadId: 'test-parent-thread-id' as ThreadId,
-      workingDirectory: tempDirContext.tempDir,
+      workingDirectory: tempLaceDirContext.tempDir,
       session, // REQUIRED for security policy enforcement
     };
 
@@ -107,9 +137,15 @@ describe('Tool Approval System Integration', () => {
     mockInterface = new MockApprovalInterface();
   });
 
-  afterEach(() => {
-    mockInterface.reset();
-    teardownTestPersistence();
+  afterEach(async () => {
+    if (mockInterface) {
+      mockInterface.reset();
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('complete approval flow without policies', () => {

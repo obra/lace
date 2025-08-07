@@ -9,20 +9,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, PATCH, DELETE } from './route';
 import { asThreadId } from '@/types/core';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
 
 describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProjectId: string;
   let testSessionId: string;
   let testTaskId: string;
+  let providerInstanceId: string;
 
   const mockTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
     title: 'Test Task',
@@ -30,32 +37,36 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     prompt: 'Test prompt',
     status: 'pending',
     priority: 'medium',
-    assignedTo: 'user1',
-    createdBy: 'human',
-    threadId: 'session1',
+    assignedTo: 'human',
+    createdBy: asThreadId('lace_20250804_abc123'),
+    threadId: asThreadId('lace_20250804_def456'),
     notes: [],
   };
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // Set up test provider defaults
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
 
-    // Set up environment for session service
-    process.env.ANTHROPIC_KEY = 'test-key';
-    process.env.LACE_DB_PATH = ':memory:';
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     sessionService = getSessionService();
 
-    // Create a real test project
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing');
+    // Create a real test project with provider configuration
+    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     testProjectId = project.getId();
 
     // Create a real session
-    const newSession = await sessionService.createSession(
-      'Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProjectId
-    );
+    const newSession = await sessionService.createSession('Test Session', testProjectId);
     testSessionId = newSession.id;
 
     // Get the active session instance to access task manager
@@ -82,9 +93,11 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     testTaskId = task.id;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     sessionService.clearActiveSessions();
-    teardownTestPersistence();
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
     vi.clearAllMocks();
   });
 

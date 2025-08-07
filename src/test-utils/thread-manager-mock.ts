@@ -18,6 +18,7 @@ export function createMockThreadManager(threadId?: string) {
       events: [],
       metadata: {},
     }),
+    saveThread: vi.fn().mockResolvedValue(undefined),
     getSessionInfo: vi.fn().mockReturnValue({
       threadId: testThreadId,
       model: 'test-model',

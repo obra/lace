@@ -6,7 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
@@ -15,7 +15,14 @@ import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { z } from 'zod';
 
 // Test tool that can be configured to fail or succeed
@@ -60,6 +67,7 @@ class MockProviderWithToolCalls extends TestProvider {
   async createResponse(
     _messages: ProviderMessage[] = [],
     _tools: Tool[] = [],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
@@ -80,34 +88,45 @@ class MockProviderWithToolCalls extends TestProvider {
         };
       }
     }
-    return super.createResponse(_messages, _tools, signal);
+    return super.createResponse(_messages, _tools, _model, signal);
   }
 }
 
 describe('Tool Batch Completion Behavior', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
   let configurableTool: ConfigurableTool;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    // setupTestPersistence replaced by setupCoreTest
+    setupTestProviderDefaults();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Batch Completion Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper context
     project = Project.create(
       'Batch Completion Test Project',
       'Project for batch completion testing',
-      tempDirContext.tempDir,
-      {}
+      tempLaceDirContext.tempDir,
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     session = Session.create({
       name: 'Batch Completion Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -130,12 +149,27 @@ describe('Tool Batch Completion Behavior', () => {
       tools: [configurableTool],
     });
 
+    await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
+    });
+
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    if (agent) {
+      agent.stop();
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   it('should continue conversation when tool execution fails', async () => {

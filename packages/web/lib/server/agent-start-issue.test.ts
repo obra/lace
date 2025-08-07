@@ -10,21 +10,41 @@ import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-import
 import type { ToolExecutor } from '@/lib/server/lace-imports';
 import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Agent Spawning and Thread Creation', () => {
+  const _tempLaceDir = setupWebTest();
   let session: Session;
   let projectId: string;
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
-
+  beforeEach(async () => {
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create test provider instances
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create a test project
     const project = Project.create('Test Project', '/test/path', 'Test project', {});
@@ -33,15 +53,20 @@ describe('Agent Spawning and Thread Creation', () => {
     // Create session
     session = Session.create({
       name: 'Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId,
+      configuration: {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
   });
 
-  afterEach(() => {
-    session.destroy();
-    teardownTestPersistence();
+  afterEach(async () => {
+    if (session) {
+      session.destroy();
+    }
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should reproduce the exact E2E test scenario', async () => {
@@ -54,7 +79,11 @@ describe('Agent Spawning and Thread Creation', () => {
     expect(threadManager).toBeDefined();
 
     // Spawn agent (this is what SessionService.spawnAgent does)
-    const agent = session.spawnAgent('Test Agent', 'anthropic', 'claude-3-5-haiku-20241022');
+    const agent = session.spawnAgent({
+      name: 'Test Agent',
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const agentThreadId = agent.threadId;
 
     // Check if the agent's thread exists in ThreadManager

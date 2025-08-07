@@ -15,12 +15,7 @@ export class SessionService {
 
   constructor() {}
 
-  async createSession(
-    name: string,
-    provider: string,
-    model: string,
-    projectId: string
-  ): Promise<SessionInfo> {
+  async createSession(name: string, projectId: string): Promise<SessionInfo> {
     // Create project-based session
     const { Project } = await import('@/lib/server/lace-imports');
     const project = Project.getById(projectId);
@@ -31,8 +26,6 @@ export class SessionService {
     // Create session using Session.create which handles both database and thread creation
     const session = Session.create({
       name,
-      provider,
-      model,
       projectId,
     });
 
@@ -123,7 +116,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_MESSAGE',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { content },
       };
       sseManager.broadcast({
@@ -142,7 +135,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_TOKEN',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: { token },
       };
       sseManager.broadcast({
@@ -158,7 +151,7 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_CALL',
           threadId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: { id: callId, name: toolName, arguments: input },
         };
         sseManager.broadcast({
@@ -175,7 +168,7 @@ export class SessionService {
         const event: SessionEvent = {
           type: 'TOOL_RESULT',
           threadId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: result as ToolResult, // Cast to ToolResult for type safety
         };
         sseManager.broadcast({
@@ -192,7 +185,7 @@ export class SessionService {
       const event: SessionEvent = {
         type: 'AGENT_STATE_CHANGE',
         threadId,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         data: {
           agentId: threadId,
           from,
@@ -209,18 +202,19 @@ export class SessionService {
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
       logger.error(`Agent ${threadId} error:`, error);
-      
+
       // Filter out abort-related errors from UI messages to prevent duplicates
       // (These should already be filtered at the agent level, but this is defense-in-depth)
-      const isAbortError = error.name === 'AbortError' || 
-                          error.message === 'Request was aborted' ||
-                          error.message === 'Aborted';
-      
+      const isAbortError =
+        error.name === 'AbortError' ||
+        error.message === 'Request was aborted' ||
+        error.message === 'Aborted';
+
       if (!isAbortError) {
         const event: SessionEvent = {
           type: 'LOCAL_SYSTEM_MESSAGE',
           threadId,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
           data: { content: `Agent error: ${error.message}` },
         };
         sseManager.broadcast({
@@ -271,7 +265,7 @@ export class SessionService {
             const sessionEvent: SessionEvent = {
               type: 'TOOL_APPROVAL_REQUEST',
               threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp).toISOString(),
+              timestamp: new Date(event.timestamp),
               data: {
                 requestId: toolCallData.toolCallId,
                 toolName: toolCall.name,
@@ -300,7 +294,7 @@ export class SessionService {
           const sessionEvent: SessionEvent = {
             type: 'TOOL_APPROVAL_RESPONSE',
             threadId: asThreadId(eventThreadId),
-            timestamp: new Date(event.timestamp).toISOString(),
+            timestamp: new Date(event.timestamp),
             data: {
               toolCallId: responseData.toolCallId,
               decision: responseData.decision,
@@ -368,8 +362,6 @@ export class SessionService {
       id: session.getId(),
       name: sessionInfo.name,
       createdAt: sessionInfo.createdAt,
-      provider: sessionInfo.provider,
-      model: sessionInfo.model,
       agents: agents.map((agent) => ({
         threadId: agent.threadId,
         name: agent.name,

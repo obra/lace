@@ -175,10 +175,6 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Test built CLI
-        run: |
-          chmod +x dist/cli.js
-          node dist/cli.js --help
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -237,7 +233,5 @@ jobs:
             script -q /dev/null sh -c "$CORE_CMD"
           fi
 
-      - name: Build and test CLI
-        run: |
-          npm run build
-          node dist/cli.js --help
+      - name: Build project
+        run: npm run build

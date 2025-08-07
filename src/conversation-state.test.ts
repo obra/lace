@@ -8,7 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 // Helper function to wait for agent to return to idle state
@@ -106,9 +106,7 @@ class MockConversationProvider extends BaseMockProvider {
   get providerName() {
     return 'mock';
   }
-  get defaultModel() {
-    return 'mock-model';
-  }
+  // defaultModel removed - providers are now model-agnostic
   get supportsStreaming() {
     return true;
   }
@@ -134,14 +132,19 @@ class MockConversationProvider extends BaseMockProvider {
     return 'list_files_result';
   }
 
-  createResponse(messages: unknown[], _tools: unknown[] = []): Promise<ProviderResponse> {
+  createResponse(
+    messages: unknown[],
+    _tools: unknown[] = [],
+    _model: string = 'mock-model'
+  ): Promise<ProviderResponse> {
     const key = this.getResponseKey(messages);
     return Promise.resolve(this.responseMap.get(key) || this.responseMap.get('list_files_result')!);
   }
 
   async createStreamingResponse(
     messages: unknown[],
-    _tools: unknown[] = []
+    _tools: unknown[] = [],
+    _model: string = 'mock-model'
   ): Promise<ProviderResponse> {
     const response = await this.createResponse(messages, _tools);
 
@@ -157,6 +160,7 @@ class MockConversationProvider extends BaseMockProvider {
 
 // Mock-based tests for stable, fast execution
 describe('Conversation State Management with Enhanced Agent', () => {
+  const _tempLaceDir = setupCoreTest();
   let provider: MockConversationProvider;
   let agent: Agent;
   let threadManager: ThreadManager;
@@ -164,7 +168,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
   let threadId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
 
     provider = new MockConversationProvider();
     threadManager = new ThreadManager();
@@ -188,6 +192,12 @@ describe('Conversation State Management with Enhanced Agent', () => {
       tools: toolExecutor.getAllTools(),
     });
     await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'mock-model',
+      providerInstanceId: 'test-instance',
+    });
   });
 
   afterEach(() => {
@@ -202,7 +212,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
       }
       threadManager.close();
     }
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
     // Clear provider references
     provider = null as unknown as MockConversationProvider;
     toolExecutor = null as unknown as ToolExecutor;

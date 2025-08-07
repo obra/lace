@@ -144,3 +144,8 @@ export type AssigneeId = ThreadId | NewAgentSpec | 'human';
 export function isAssigneeId(value: string): value is AssigneeId {
   return isThreadId(value) || isNewAgentSpec(value) || value === 'human';
 }
+
+// Unsafe cast for internal use only (e.g., when we know format is correct)
+export function asAssigneeId(value: string): AssigneeId {
+  return value as AssigneeId;
+}

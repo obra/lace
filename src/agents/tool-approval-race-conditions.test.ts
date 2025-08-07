@@ -6,14 +6,22 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { BashTool } from '~/tools/implementations/bash';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import type { ProviderResponse } from '~/providers/base-provider';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import type { ProviderResponse, ProviderMessage } from '~/providers/base-provider';
+import type { Tool } from '~/tools/tool';
 
 // Mock provider that can return tool calls once then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -31,7 +39,10 @@ class MockProviderWithToolCalls extends TestProvider {
   }
 
   async createResponse(
-    ...args: Parameters<TestProvider['createResponse']>
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string,
+    _signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
       // Simulate network delay
@@ -51,12 +62,12 @@ class MockProviderWithToolCalls extends TestProvider {
         };
       }
     }
-    return super.createResponse(...args);
+    return super.createResponse(_messages, _tools, _model, _signal);
   }
 }
 
 describe('Tool Approval Race Condition Integration Tests', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -64,22 +75,33 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   let bashTool: BashTool;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    // setupTestPersistence replaced by setupCoreTest
+    setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Race Condition Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper context
     project = Project.create(
       'Race Condition Test Project',
       'Project for race condition testing',
-      tempDirContext.tempDir,
-      {}
+      tempLaceDirContext.tempDir,
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     session = Session.create({
       name: 'Race Condition Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -106,10 +128,25 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     // Set up EventApprovalCallback for approval workflow
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
+
+    await agent.start();
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
+    });
   });
 
-  afterEach(() => {
-    teardownTestPersistence();
+  afterEach(async () => {
+    if (agent) {
+      agent.stop();
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('defense-in-depth integration', () => {

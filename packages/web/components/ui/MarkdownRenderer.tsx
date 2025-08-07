@@ -35,7 +35,7 @@ export default function MarkdownRenderer({
     // Style elements to match our design system
     code: ({ className, children, ...props }) => {
       // For inline code (no language class)
-      if (!className || !className.includes('language-')) {
+      if (!className || (typeof className === 'string' && !className.includes('language-'))) {
         return (
           <code className="bg-base-200 px-1 py-0.5 rounded text-sm font-mono text-base-content" {...props}>
             {children}
@@ -43,7 +43,7 @@ export default function MarkdownRenderer({
         );
       }
       // For code blocks, let rehype-highlight handle it with default styling
-      return <code className={className} {...props}>{children}</code>;
+      return <code className={className as string} {...props}>{children}</code>;
     },
     pre: ({ children, ...props }) => (
       <pre className="bg-base-200 rounded-lg p-3 overflow-x-auto text-sm border border-base-300" {...props}>
@@ -57,7 +57,7 @@ export default function MarkdownRenderer({
     em: ({ children }) => <em className="italic text-base-content">{children}</em>,
     a: ({ href, children }) => {
       // Defense in depth: sanitize href even though react-markdown is generally safe
-      const sanitizedHref = href ? DOMPurify.sanitize(href) : '';
+      const sanitizedHref = href ? DOMPurify.sanitize(href as string) : '';
       return (
         <a 
           href={sanitizedHref} 
@@ -81,7 +81,7 @@ export default function MarkdownRenderer({
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
-          components={components}
+          components={components as Components}
         >
           {displayContent}
         </ReactMarkdown>

@@ -11,8 +11,15 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ProviderRegistry } from '~/providers/registry';
@@ -81,10 +88,11 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Task Management Workflow Integration', () => {
-  const _tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
+  let providerInstanceId: string;
 
   // Tool instances
   let taskCreateTool: TaskCreateTool;
@@ -95,27 +103,46 @@ describe('Task Management Workflow Integration', () => {
   let taskViewTool: TaskViewTool;
   let delegateTool: DelegateTool;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create test provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Task Workflow Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Use simpler provider defaults approach instead of setupTestProviderInstances
     mockProvider = new MockProvider();
 
-    // Mock the ProviderRegistry to return our mock provider
+    // TODO: Update this test to use real provider instances with mocked responses
+    // instead of mocking the internal createProvider method
+    // For now, we're using the @internal createProvider method
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-    vi.spyOn(ProviderRegistry, 'createWithAutoDiscovery').mockImplementation(
-      () =>
-        ({
-          createProvider: () => mockProvider,
-          getProvider: () => mockProvider,
-          getProviderNames: () => ['anthropic', 'openai'],
-        }) as unknown as ProviderRegistry
-    );
 
-    // Create project and session
-    project = Project.create('Task Workflow Integration Test Project', '/tmp/test-workflow');
+    // Create project and session with provider configuration
+    project = Project.create(
+      'Task Workflow Integration Test Project',
+      '/tmp/test-workflow',
+      'Test project for task workflow integration',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
     session = Session.create({
       name: 'Task Workflow Integration Test Session',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
       approvalCallback: {
         requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
@@ -134,10 +161,14 @@ describe('Task Management Workflow Integration', () => {
     delegateTool = toolExecutor.getTool('delegate') as DelegateTool;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
     session?.destroy();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
   describe('Basic Task Lifecycle', () => {

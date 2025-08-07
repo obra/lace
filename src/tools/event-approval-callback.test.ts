@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
@@ -16,8 +16,14 @@ import { Tool } from '~/tools/tool';
 import { type ToolResult } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 // Enhanced test provider that can return tool calls once, then regular responses
 class MockProviderWithToolCalls extends TestProvider {
   private configuredResponse?: ProviderResponse;
@@ -36,6 +42,7 @@ class MockProviderWithToolCalls extends TestProvider {
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[] = [],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     if (this.configuredResponse) {
@@ -59,27 +66,39 @@ class MockProviderWithToolCalls extends TestProvider {
         };
       }
     }
-    return super.createResponse(_messages, _tools, signal);
+    return super.createResponse(_messages, _tools, _model, signal);
   }
 }
 
 describe('EventApprovalCallback Integration Tests', () => {
-  const tempDirContext = useTempLaceDir();
+  const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create real provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project
     project = Project.create(
       'Approval Test Project',
+      '/tmp/approval-test',
       'Project for approval testing',
-      tempDirContext.tempDir,
       {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
         tools: ['bash'], // Enable bash tool
         toolPolicies: {
           bash: 'require-approval',
@@ -90,9 +109,11 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Create real session with anthropic provider
     session = Session.create({
       name: 'Approval Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
     });
 
     // Create manual components for controlled testing
@@ -119,6 +140,12 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Use the SAME threadManager instance everywhere
     threadManager = agent.threadManager;
 
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
     // Set up the EventApprovalCallback
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
@@ -131,7 +158,11 @@ describe('EventApprovalCallback Integration Tests', () => {
       // Wait a moment for any pending operations to abort
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    teardownTestPersistence();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
+    // Test cleanup handled by setupCoreTest
+    cleanupTestProviderDefaults();
   });
 
   it('should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring approval', async () => {
@@ -357,15 +388,27 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     const conversationPromise = agent.sendMessage('Please run echo test');
 
-    // Wait for event emission
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for the TOOL_APPROVAL_REQUEST event to be emitted
+    // Poll for the event with a reasonable timeout
+    let approvalRequestCalls: unknown[] = [];
+    let attempts = 0;
+    const maxAttempts = 20; // 200ms total timeout
+
+    while (attempts < maxAttempts && approvalRequestCalls.length === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      approvalRequestCalls = eventSpy.mock.calls.filter(
+        (call) => (call[0] as { event: { type: string } }).event.type === 'TOOL_APPROVAL_REQUEST'
+      );
+      attempts++;
+    }
 
     // Should have emitted the TOOL_APPROVAL_REQUEST event
-    const approvalRequestCalls = eventSpy.mock.calls.filter(
-      (call) => (call[0] as { event: { type: string } }).event.type === 'TOOL_APPROVAL_REQUEST'
-    );
     expect(approvalRequestCalls).toHaveLength(1);
-    expect((approvalRequestCalls[0][0] as { event: { data: unknown } }).event.data).toEqual({
+    const approvalRequestCall = approvalRequestCalls[0] as unknown[];
+    const approvalRequestEvent = approvalRequestCall[0] as {
+      event: { data: { toolCallId: string } };
+    };
+    expect(approvalRequestEvent.event.data).toEqual({
       toolCallId: 'call_emit_test',
     });
 

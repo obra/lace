@@ -91,7 +91,7 @@ describe('OllamaProvider retry functionality', () => {
         eval_count: 5,
       });
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'qwen3:32b');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -139,7 +139,7 @@ describe('OllamaProvider retry functionality', () => {
       const retryAttemptSpy = vi.fn();
       provider.on('retry_attempt', retryAttemptSpy);
 
-      const promise = provider.createResponse(messages, []);
+      const promise = provider.createResponse(messages, [], 'qwen3:32b');
       promise.catch(() => {
         // Prevent unhandled rejection in test
       });
@@ -173,7 +173,7 @@ describe('OllamaProvider retry functionality', () => {
         retryCapture.errors.push(event.error);
       });
 
-      await expect(provider.createResponse(messages, [])).rejects.toEqual(authError);
+      await expect(provider.createResponse(messages, [], 'qwen3:32b')).rejects.toEqual(authError);
 
       // Test that no retry was attempted for auth error
       expect(retryCapture.attempts).toBe(0);
@@ -197,7 +197,7 @@ describe('OllamaProvider retry functionality', () => {
         maxDelayMs: 2,
       };
 
-      await expect(provider.createResponse(messages, [])).rejects.toMatchObject({
+      await expect(provider.createResponse(messages, [], 'qwen3:32b')).rejects.toMatchObject({
         code: 'ETIMEDOUT',
       });
 
@@ -242,7 +242,7 @@ describe('OllamaProvider retry functionality', () => {
 
       mockChat.mockResolvedValue(successStream);
 
-      const promise = provider.createStreamingResponse(messages, []);
+      const promise = provider.createStreamingResponse(messages, [], 'qwen3:32b');
 
       // Wait for first attempt to fail
       await vi.advanceTimersByTimeAsync(0);
@@ -284,7 +284,7 @@ describe('OllamaProvider retry functionality', () => {
         streamingStarted = true;
       });
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow(
+      await expect(provider.createStreamingResponse(messages, [], 'qwen3:32b')).rejects.toThrow(
         'Connection lost'
       );
 

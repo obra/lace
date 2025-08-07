@@ -71,9 +71,7 @@ describe('OpenAIProvider', () => {
       expect(provider.providerName).toBe('openai');
     });
 
-    it('should have correct default model', () => {
-      expect(provider.defaultModel).toBe('gpt-4o');
-    });
+    // defaultModel removed - providers are now model-agnostic
 
     it('should support streaming', () => {
       expect(provider.supportsStreaming).toBe(true);
@@ -103,7 +101,7 @@ describe('OpenAIProvider', () => {
     it('should create non-streaming response correctly', async () => {
       const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-      const response = await provider.createResponse(messages, [mockTool]);
+      const response = await provider.createResponse(messages, [mockTool], 'gpt-4o');
 
       expect(response.content).toBe('Test response');
       expect(response.toolCalls).toEqual([]);
@@ -154,7 +152,7 @@ describe('OpenAIProvider', () => {
       });
 
       const messages = [{ role: 'user' as const, content: 'Use tool' }];
-      const response = await provider.createResponse(messages, [mockTool]);
+      const response = await provider.createResponse(messages, [mockTool], 'gpt-4o');
 
       expect(response.content).toBe('Using tool');
       expect(response.toolCalls).toEqual([
@@ -173,7 +171,7 @@ describe('OpenAIProvider', () => {
         { role: 'assistant' as const, content: 'Assistant message' },
       ];
 
-      await provider.createResponse(messages, []);
+      await provider.createResponse(messages, [], 'gpt-4o');
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
@@ -200,7 +198,7 @@ describe('OpenAIProvider', () => {
       });
 
       const messages = [{ role: 'user' as const, content: 'Test' }];
-      const response = await provider.createResponse(messages, []);
+      const response = await provider.createResponse(messages, [], 'gpt-4o');
 
       expect(response.content).toBe('');
     });
@@ -213,7 +211,7 @@ describe('OpenAIProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Test' }];
 
-      await expect(provider.createResponse(messages, [])).rejects.toThrow(
+      await expect(provider.createResponse(messages, [], 'gpt-4o')).rejects.toThrow(
         'No message in OpenAI response'
       );
     });
@@ -272,7 +270,7 @@ describe('OpenAIProvider', () => {
       );
 
       const messages = [{ role: 'user' as const, content: 'Stream this' }];
-      const response = await provider.createStreamingResponse(messages, [mockTool]);
+      const response = await provider.createStreamingResponse(messages, [mockTool], 'gpt-4o');
 
       expect(response.content).toBe('Hello world!');
       expect(response.toolCalls).toEqual([]);
@@ -326,7 +324,7 @@ describe('OpenAIProvider', () => {
       );
 
       const messages = [{ role: 'user' as const, content: 'Stream tokens' }];
-      await provider.createStreamingResponse(messages, []);
+      await provider.createStreamingResponse(messages, [], 'gpt-4o');
 
       expect(tokenEvents).toEqual(['Token ', 'stream ', 'test']);
     });
@@ -359,7 +357,7 @@ describe('OpenAIProvider', () => {
       );
 
       const messages = [{ role: 'user' as const, content: 'Complete test' }];
-      await provider.createStreamingResponse(messages, []);
+      await provider.createStreamingResponse(messages, [], 'gpt-4o');
 
       expect(completeEvents).toHaveLength(1);
       expect(completeEvents[0].response.content).toBe('Final content');
@@ -384,7 +382,9 @@ describe('OpenAIProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Error test' }];
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow('Stream failed');
+      await expect(provider.createStreamingResponse(messages, [], 'gpt-4o')).rejects.toThrow(
+        'Stream failed'
+      );
 
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0].message).toBe('Stream failed');
@@ -441,7 +441,7 @@ describe('OpenAIProvider', () => {
       );
 
       const messages = [{ role: 'user' as const, content: 'Stream with tools' }];
-      const response = await provider.createStreamingResponse(messages, [mockTool]);
+      const response = await provider.createStreamingResponse(messages, [mockTool], 'gpt-4o');
 
       expect(response.content).toBe('Using tool via stream');
       expect(response.toolCalls).toEqual([
@@ -455,10 +455,9 @@ describe('OpenAIProvider', () => {
   });
 
   describe('configuration handling', () => {
-    it('should use custom model when provided', async () => {
+    it('should use model passed as parameter', async () => {
       const customProvider = new OpenAIProvider({
         apiKey: 'test-key',
-        model: 'gpt-4o',
       });
 
       mockCreate.mockResolvedValue({
@@ -471,7 +470,7 @@ describe('OpenAIProvider', () => {
         usage: {},
       });
 
-      await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
+      await customProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'gpt-4o');
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
@@ -498,7 +497,7 @@ describe('OpenAIProvider', () => {
         usage: {},
       });
 
-      await customProvider.createResponse([{ role: 'user', content: 'Test' }], []);
+      await customProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'gpt-4o');
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
@@ -524,7 +523,7 @@ describe('OpenAIProvider', () => {
         usage: {},
       });
 
-      await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], []);
+      await noSystemProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'gpt-4o');
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
@@ -561,7 +560,11 @@ describe('OpenAIProvider', () => {
           usage: {},
         });
 
-        const response = await provider.createResponse([{ role: 'user', content: 'Test' }], []);
+        const response = await provider.createResponse(
+          [{ role: 'user', content: 'Test' }],
+          [],
+          'gpt-4o-mini'
+        );
         expect(response.stopReason).toBe(expected);
       }
     });
@@ -574,7 +577,7 @@ describe('OpenAIProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Error test' }];
 
-      await expect(provider.createResponse(messages, [])).rejects.toThrow('API Error');
+      await expect(provider.createResponse(messages, [], 'gpt-4o')).rejects.toThrow('API Error');
     });
 
     it('should handle streaming setup errors', async () => {
@@ -585,7 +588,7 @@ describe('OpenAIProvider', () => {
 
       const messages = [{ role: 'user' as const, content: 'Stream error test' }];
 
-      await expect(provider.createStreamingResponse(messages, [])).rejects.toThrow(
+      await expect(provider.createStreamingResponse(messages, [], 'gpt-4o')).rejects.toThrow(
         'Stream setup failed'
       );
     });

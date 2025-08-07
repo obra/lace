@@ -11,6 +11,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { createFetchMock } from '@/test-utils/mock-fetch';
+import { asThreadId, asAssigneeId } from '@/types/core';
 
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
@@ -99,7 +100,7 @@ describe('LaceApp Task Sidebar Integration', () => {
     vi.clearAllMocks();
     
     // Mock fetch using the new utility that handles superjson properly
-    global.fetch = vi.fn(createFetchMock({
+    global.fetch = vi.fn().mockImplementation(createFetchMock({
       '/api/projects': { 
         projects: [{
           id: 'test-project',
@@ -125,7 +126,7 @@ describe('LaceApp Task Sidebar Integration', () => {
     // Default hash router mock with session
     vi.mocked(useHashRouter).mockReturnValue({
       project: 'test-project',
-      session: 'test-session',
+      session: asThreadId('test-session'),
       agent: null,
       setProject: vi.fn(),
       setSession: vi.fn(),
@@ -149,6 +150,10 @@ describe('LaceApp Task Sidebar Integration', () => {
       deleteTask: vi.fn(),
       addNote: vi.fn(),
       refetch: vi.fn(),
+      handleTaskCreated: vi.fn(),
+      handleTaskUpdated: vi.fn(),
+      handleTaskDeleted: vi.fn(),
+      handleTaskNoteAdded: vi.fn(),
     });
   });
 
@@ -194,9 +199,9 @@ describe('LaceApp Task Sidebar Integration', () => {
           prompt: 'Test',
           status: 'pending' as const,
           priority: 'high' as const,
-          assignedTo: 'human',
-          createdBy: 'test-user',
-          threadId: 'test-session',
+          assignedTo: asAssigneeId('human'),
+          createdBy: asThreadId('test-user'),
+          threadId: asThreadId('test-session'),
           createdAt: new Date(),
           updatedAt: new Date(),
           notes: [],
@@ -212,6 +217,10 @@ describe('LaceApp Task Sidebar Integration', () => {
       deleteTask: vi.fn(),
       addNote: vi.fn(),
       refetch: vi.fn(),
+      handleTaskCreated: vi.fn(),
+      handleTaskUpdated: vi.fn(),
+      handleTaskDeleted: vi.fn(),
+      handleTaskNoteAdded: vi.fn(),
     };
     
     vi.mocked(useTaskManager).mockReturnValue(mockTaskManager);

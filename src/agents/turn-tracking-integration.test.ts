@@ -10,7 +10,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
 
 // Mock provider for controlled testing
@@ -43,13 +43,10 @@ class MockIntegrationProvider extends BaseMockProvider {
     return 'mock-integration';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
-  }
-
   async createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     this.abortSignal = signal;
@@ -100,6 +97,7 @@ class MockIntegrationProvider extends BaseMockProvider {
   async createStreamingResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
+    _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     this.abortSignal = signal;
@@ -144,12 +142,13 @@ class MockIntegrationProvider extends BaseMockProvider {
 }
 
 describe('Turn Tracking Provider Integration Tests', () => {
+  const _tempLaceDir = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
 
   beforeEach(() => {
-    setupTestPersistence();
+    // setupTestPersistence replaced by setupCoreTest
     toolExecutor = new ToolExecutor();
 
     // Set up auto-approval callback so tools actually execute and emit turn_complete
@@ -166,7 +165,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
-    teardownTestPersistence();
+    // Test cleanup handled by setupCoreTest
   });
 
   describe('Complete turn lifecycle tests', () => {
@@ -191,6 +190,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       // Track turn lifecycle events
       const turnEvents: Array<{ type: string; metrics?: CurrentTurnMetrics }> = [];
@@ -237,6 +242,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       // Track token usage updates
       const tokenUpdates: Array<{
         usage: { promptTokens: number; completionTokens: number; totalTokens: number };
@@ -273,6 +284,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       // Track state changes
       const stateChanges: Array<{ from: string; to: string }> = [];
       agent.on('state_change', ({ from, to }) => stateChanges.push({ from, to }));
@@ -308,6 +325,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       // Track streaming tokens
       const streamingTokens: string[] = [];
       agent.on('agent_token', ({ token }) => streamingTokens.push(token));
@@ -342,6 +365,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       // Track abort events
       const abortEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -424,6 +453,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       // Track turn lifecycle events
       const turnEvents: Array<{ type: string; metrics?: CurrentTurnMetrics }> = [];
       agent.on('turn_start', ({ metrics }) => turnEvents.push({ type: 'start', metrics }));
@@ -469,6 +504,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       // Track all progress events and measure timing
       const progressEvents: Array<{ timestamp: number; metrics: CurrentTurnMetrics }> = [];
@@ -520,6 +561,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       // Track progress and token updates
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
@@ -574,6 +621,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
       });
       await agent.start();
 
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
+
       // Track error and turn events
       const errorEvents: Array<{ error: Error }> = [];
       const turnEvents: Array<{ type: string }> = [];
@@ -615,6 +668,12 @@ describe('Turn Tracking Provider Integration Tests', () => {
         tools: [],
       });
       await agent.start();
+
+      // Set model metadata for the agent (required for model-agnostic providers)
+      agent.updateThreadMetadata({
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      });
 
       // Act
       const messagePromise = agent.sendMessage('Test without abort signal');

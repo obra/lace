@@ -14,30 +14,60 @@ import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessi
 import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
 import { GET as streamEvents } from '@/app/api/events/stream/route';
 import type { SessionInfo, ThreadId } from '@/types/core';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
 // Use real EventStreamManager for integration testing
 import { EventStreamManager } from '@/lib/event-stream-manager';
 
 describe('Full Conversation Flow', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let addConnectionSpy: ReturnType<typeof vi.spyOn>;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
     vi.clearAllMocks();
 
+    // Clear caches to ensure fresh state
+    Session.clearProviderCache();
+
     // Set up spies on real EventStreamManager
-    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection');
-    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
+    addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection') as ReturnType<
+      typeof vi.spyOn
+    >;
+    broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast') as ReturnType<
+      typeof vi.spyOn
+    >;
 
     // Set up environment
     process.env.ANTHROPIC_KEY = 'test-key';
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create test provider instances
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-sonnet-4-20250514'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o-mini', 'gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     sessionService = getSessionService();
   });
@@ -49,9 +79,11 @@ describe('Full Conversation Flow', () => {
     // Clean up spies
     addConnectionSpy?.mockRestore();
     broadcastSpy?.mockRestore();
+    // Clean up provider instances
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    cleanupTestProviderDefaults();
     // Wait a moment for any pending operations to abort
     await new Promise((resolve) => setTimeout(resolve, 20));
-    teardownTestPersistence();
   });
 
   it('should complete full session workflow', async () => {
@@ -73,10 +105,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: sessionName,
-          configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -105,8 +135,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: agentName,
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -170,10 +200,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Multi-Agent Session',
-          configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -192,8 +220,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'pm',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -210,8 +238,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'architect',
-          provider: 'anthropic',
-          model: 'claude-sonnet-4-20250514',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-sonnet-4-20250514',
         }),
         headers: { 'Content-Type': 'application/json' },
       }
@@ -259,10 +287,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 1',
-          configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -276,10 +302,8 @@ describe('Full Conversation Flow', () => {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 2',
-          configuration: {
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
-          },
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
         headers: { 'Content-Type': 'application/json' },
       }),

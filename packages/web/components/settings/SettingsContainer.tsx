@@ -4,10 +4,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { SettingsModal } from './SettingsModal';
+import { Modal } from '@/components/ui/Modal';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';
+import { ProvidersPanel } from './panels/ProvidersPanel';
 
 interface SettingsContainerProps {
   children: (props: { onOpenSettings: () => void }) => React.ReactNode;
@@ -54,20 +55,43 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
     <UserSettingsPanel />
   ), []);
 
+  const providersPanel = useMemo(() => (
+    <ProvidersPanel />
+  ), []);
+
+
+  // Tab configuration with icons
+  const tabConfig = [
+    { id: 'providers', label: 'Providers', icon: '🔗' },
+    { id: 'ui', label: 'UI', icon: '🎨' },
+    { id: 'user', label: 'User', icon: '👤' },
+  ];
+
   return (
     <>
       {children(childrenProps)}
       
-      <SettingsModal isOpen={isOpen} onClose={handleCloseSettings}>
-        <SettingsTabs defaultTab="ui">
-          <div data-tab="ui">
-            {uiSettingsPanel}
-          </div>
-          <div data-tab="user">
-            {userSettingsPanel}
-          </div>
-        </SettingsTabs>
-      </SettingsModal>
+      <Modal 
+        isOpen={isOpen} 
+        onClose={handleCloseSettings}
+        title="Configuration"
+        size="full"
+        className="w-[80vw] h-[80vh] max-w-none max-h-none lg:w-[80vw] lg:h-[80vh] md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh]"
+      >
+        <div className="h-[calc(80vh-8rem)] -m-4 flex flex-col">
+          <SettingsTabs defaultTab="providers" tabs={tabConfig}>
+            <div data-tab="providers" className="flex-1 overflow-y-auto p-4">
+              {providersPanel}
+            </div>
+            <div data-tab="ui" className="flex-1 overflow-y-auto p-4">
+              {uiSettingsPanel}
+            </div>
+            <div data-tab="user" className="flex-1 overflow-y-auto p-4">
+              {userSettingsPanel}
+            </div>
+          </SettingsTabs>
+        </div>
+      </Modal>
     </>
   );
 }

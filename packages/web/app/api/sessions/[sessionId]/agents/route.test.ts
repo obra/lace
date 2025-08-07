@@ -7,7 +7,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 // Mock server-only module
@@ -24,16 +28,16 @@ vi.mock('@/lib/server/approval-manager', () => ({
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
-import type { ApiAgent } from '@/types/api';
+import type { AgentInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 
 // Response types
 interface AgentResponse {
-  agent: ApiAgent;
+  agent: AgentInfo;
 }
 
 interface AgentsListResponse {
-  agents: ApiAgent[];
+  agents: AgentInfo[];
 }
 
 interface ErrorResponse {
@@ -43,35 +47,50 @@ interface ErrorResponse {
 // Note: parseResponse is imported from @/lib/serialization
 
 describe('Agent Spawning API E2E Tests', () => {
+  const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
   let testProject: Project;
   let sessionId: string;
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
 
   beforeEach(async () => {
-    setupTestPersistence();
-
     // Set up environment for session service
     process.env = {
       ...process.env,
       ANTHROPIC_KEY: 'test-key',
+      OPENAI_API_KEY: 'test-openai-key',
       LACE_DB_PATH: ':memory:',
     };
+
+    // Create test provider instances
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
 
     // Create real project and session using the session service
     testProject = Project.create(
       'Agent Spawning E2E Test Project',
       '/test/path',
       'Test project for agent spawning E2E testing',
-      {}
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     sessionService = getSessionService();
-    const session = await sessionService.createSession(
-      'Agent Test Session',
-      'anthropic',
-      'claude-3-5-haiku-20241022',
-      testProject.getId()
-    );
+    const session = await sessionService.createSession('Agent Test Session', testProject.getId());
     sessionId = session.id as string;
   });
 
@@ -81,18 +100,22 @@ describe('Agent Spawning API E2E Tests', () => {
       await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
-    teardownTestPersistence();
+
+    // Cleanup test provider instances
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+
+    vi.clearAllMocks();
   });
 
   describe('POST /api/sessions/{sessionId}/agents', () => {
-    it('should spawn agent with real session service', async () => {
+    it('should spawn agent with real session service using provider instances', async () => {
       const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'architect',
-          provider: 'anthropic',
-          model: 'claude-sonnet-4-20250514',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-sonnet-20241022',
         }),
       });
 
@@ -105,23 +128,22 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(data.agent).toMatchObject({
         name: 'architect',
         provider: 'anthropic',
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         status: 'idle',
       });
 
       // ThreadId should follow sessionId.N pattern
       expect(data.agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
-      expect(data.agent.createdAt).toBeDefined();
     });
 
-    it('should support different provider/model combinations', async () => {
+    it('should support different provider instances and models', async () => {
       const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'openai-agent',
-          provider: 'openai',
-          model: 'gpt-4',
+          providerInstanceId: openaiInstanceId,
+          modelId: 'gpt-4o',
         }),
       });
 
@@ -130,7 +152,7 @@ describe('Agent Spawning API E2E Tests', () => {
 
       const data = await parseResponse<AgentResponse>(response);
       expect(data.agent.provider).toBe('openai');
-      expect(data.agent.model).toBe('gpt-4');
+      expect(data.agent.model).toBe('gpt-4o');
       expect(data.agent.name).toBe('openai-agent');
     });
 
@@ -139,8 +161,8 @@ describe('Agent Spawning API E2E Tests', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -157,8 +179,8 @@ describe('Agent Spawning API E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: '',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -176,8 +198,8 @@ describe('Agent Spawning API E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'agent1',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -193,8 +215,8 @@ describe('Agent Spawning API E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'agent2',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -209,8 +231,8 @@ describe('Agent Spawning API E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'test',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -233,8 +255,8 @@ describe('Agent Spawning API E2E Tests', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: 'test',
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
+            providerInstanceId: anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
           }),
         }
       );
@@ -247,6 +269,58 @@ describe('Agent Spawning API E2E Tests', () => {
       const data = await parseResponse<ErrorResponse>(response);
       expect(data.error).toBe('Session not found');
     });
+
+    it('should return 400 for missing required fields', async () => {
+      // Test missing providerInstanceId
+      const request1 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Missing Provider Instance',
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response1 = await POST(request1, { params: Promise.resolve({ sessionId }) });
+      expect(response1.status).toBe(400);
+
+      const data1 = await parseResponse<ErrorResponse>(response1);
+      expect(data1.error).toBe('Invalid request body');
+
+      // Test missing modelId
+      const request2 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Missing Model ID',
+          providerInstanceId: anthropicInstanceId,
+        }),
+      });
+
+      const response2 = await POST(request2, { params: Promise.resolve({ sessionId }) });
+      expect(response2.status).toBe(400);
+
+      const data2 = await parseResponse<ErrorResponse>(response2);
+      expect(data2.error).toBe('Invalid request body');
+    });
+
+    it('should return 400 for non-existent provider instance', async () => {
+      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Non-existent Instance Agent',
+          providerInstanceId: 'non-existent-instance',
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      expect(response.status).toBe(400);
+
+      const data = await parseResponse<ErrorResponse>(response);
+      expect(data.error).toBe("Provider instance 'non-existent-instance' not found");
+    });
   });
 
   describe('GET /api/sessions/{sessionId}/agents', () => {
@@ -257,8 +331,8 @@ describe('Agent Spawning API E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'test-agent',
-          provider: 'anthropic',
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
         }),
       });
 
@@ -302,7 +376,6 @@ describe('Agent Spawning API E2E Tests', () => {
         expect(agent.provider).toBeDefined();
         expect(agent.model).toBeDefined();
         expect(agent.status).toBeDefined();
-        expect(agent.createdAt).toBeDefined();
       });
     });
 
@@ -346,8 +419,8 @@ describe('Agent Spawning API E2E Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'integration-agent',
-          provider: 'anthropic',
-          model: 'claude-sonnet-4-20250514',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-sonnet-20241022',
         }),
       });
 

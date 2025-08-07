@@ -16,12 +16,19 @@ import { ToolExecutor } from '~/tools/executor';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
-import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { BashTool } from '~/tools/implementations/bash';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -36,11 +43,15 @@ class MockProvider extends BaseMockProvider {
     return 'mock';
   }
 
-  get defaultModel(): string {
-    return 'mock-model';
+  get supportsStreaming(): boolean {
+    return false;
   }
 
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<ProviderResponse> {
     return Promise.resolve(this.mockResponse);
   }
 }
@@ -72,29 +83,39 @@ class MockTool extends Tool {
 }
 
 describe('Enhanced Agent', () => {
-  const tempDirContext = useTempLaceDir();
+  const tempLaceDirContext = setupCoreTest();
   let mockProvider: MockProvider;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let agent: Agent;
   let session: Session;
   let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
-    setupTestPersistence();
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Agent Instance',
+      apiKey: 'test-anthropic-key',
+    });
 
     // Create real project and session for proper context
     project = Project.create(
       'Agent Test Project',
       'Project for agent testing',
-      tempDirContext.tempDir,
-      {}
+      tempLaceDirContext.tempDir,
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
 
     session = Session.create({
       name: 'Agent Test Session',
-      provider: 'anthropic',
-      model: 'claude-3-5-haiku-20241022',
       projectId: project.getId(),
     });
 
@@ -144,13 +165,18 @@ describe('Enhanced Agent', () => {
     return provider;
   }
 
-  afterEach(() => {
+  afterEach(async () => {
     if (agent) {
       agent.removeAllListeners(); // Prevent EventEmitter memory leaks
       agent.stop();
     }
-    threadManager.close();
-    teardownTestPersistence();
+    if (threadManager) {
+      threadManager.close();
+    }
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
     // Clear mock references to prevent circular references
     mockProvider = null as unknown as MockProvider;
     toolExecutor = null as unknown as ToolExecutor;
@@ -169,7 +195,15 @@ describe('Enhanced Agent', () => {
       tools: [],
     };
 
-    return new Agent({ ...defaultConfig, ...config });
+    const agent = new Agent({ ...defaultConfig, ...config });
+
+    // Set model metadata for the agent (required for model-agnostic providers)
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
+    return agent;
   }
 
   describe('constructor and basic properties', () => {
