@@ -1,7 +1,7 @@
 // ABOUTME: Tests for ToolExecutor with new schema-based tools
 // ABOUTME: Validates that new Tool classes work with existing executor infrastructure
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
@@ -13,9 +13,16 @@ import { clearProcessTempDirCache } from '~/config/lace-dir';
 import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import type { ToolContext, ToolResult } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 
 describe('ToolExecutor with new schema-based tools', () => {
   const tempDir = createTestTempDir();
+  const tempLaceDirContext = setupCoreTest();
+  let providerInstanceId: string;
 
   // Create an approval callback that auto-approves for tests
   const autoApprovalCallback: ApprovalCallback = {
@@ -185,8 +192,37 @@ describe('ToolExecutor with new schema-based tools', () => {
   describe('ToolExecutor temp directory management', () => {
     let toolExecutor: ToolExecutor;
     let mockTool: MockTool;
+    let session: Session;
+    let project: Project;
 
-    beforeEach(() => {
+    beforeEach(async () => {
+      setupTestProviderDefaults();
+      Session.clearProviderCache();
+
+      // Create provider instance
+      providerInstanceId = await createTestProviderInstance({
+        catalogId: 'anthropic',
+        models: ['claude-3-5-haiku-20241022'],
+        displayName: 'Test ToolExecutor Instance',
+        apiKey: 'test-anthropic-key',
+      });
+
+      // Create real project and session
+      project = Project.create(
+        'Test Project',
+        'Project for temp directory testing',
+        tempLaceDirContext.tempDir,
+        {
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }
+      );
+
+      session = Session.create({
+        name: 'Test Session',
+        projectId: project.getId(),
+      });
+
       toolExecutor = new ToolExecutor();
       mockTool = new MockTool();
       toolExecutor.registerTool(mockTool.name, mockTool);
@@ -194,10 +230,17 @@ describe('ToolExecutor with new schema-based tools', () => {
       clearProcessTempDirCache();
     });
 
+    afterEach(async () => {
+      cleanupTestProviderDefaults();
+      await cleanupTestProviderInstances([providerInstanceId]);
+    });
+
     it('should provide temp directory to tools', async () => {
-      const context = createMockToolContext();
-      context.sessionId = 'test-session';
-      context.projectId = 'test-project';
+      const context: ToolContext = {
+        sessionId: session.getId(),
+        projectId: project.getId(),
+        session: session,
+      };
 
       await toolExecutor.executeTool(
         { id: 'test-temp-1', name: 'mock_tool', arguments: { input: 'test' } },
@@ -211,9 +254,11 @@ describe('ToolExecutor with new schema-based tools', () => {
     });
 
     it('should create unique tool call IDs', async () => {
-      const context = createMockToolContext();
-      context.sessionId = 'test-session';
-      context.projectId = 'test-project';
+      const context: ToolContext = {
+        sessionId: session.getId(),
+        projectId: project.getId(),
+        session: session,
+      };
 
       await toolExecutor.executeTool(
         { id: 'test-temp-2a', name: 'mock_tool', arguments: { input: 'test1' } },
@@ -233,9 +278,11 @@ describe('ToolExecutor with new schema-based tools', () => {
     });
 
     it('should create temp directories that exist', async () => {
-      const context = createMockToolContext();
-      context.sessionId = 'test-session';
-      context.projectId = 'test-project';
+      const context: ToolContext = {
+        sessionId: session.getId(),
+        projectId: project.getId(),
+        session: session,
+      };
 
       await toolExecutor.executeTool(
         { id: 'test-temp-3', name: 'mock_tool', arguments: { input: 'test' } },
@@ -246,10 +293,11 @@ describe('ToolExecutor with new schema-based tools', () => {
       expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
     });
 
-    it('should throw error when session ID missing', async () => {
-      const context = createMockToolContext();
-      context.projectId = 'test-project';
-      // No sessionId
+    it('should throw error when session context missing', async () => {
+      const context: ToolContext = {
+        projectId: project.getId(),
+        // No sessionId and no session - should fail temp directory creation
+      };
 
       const result = await toolExecutor.executeTool(
         { id: 'test-temp-4', name: 'mock_tool', arguments: { input: 'test' } },
@@ -257,11 +305,14 @@ describe('ToolExecutor with new schema-based tools', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Session ID and Project ID required');
+      expect(result.content[0].text).toContain('session context required for security policy enforcement');
     });
 
+
     it('should work without temp directories when session/project missing', async () => {
-      const context = createMockToolContext();
+      const context: ToolContext = {
+        session: session,
+      };
       // No sessionId or projectId - should work but not create temp directories
 
       await toolExecutor.executeTool(

@@ -252,6 +252,23 @@ export class Session {
     }));
   }
 
+  /**
+   * Synchronous session lookup from registry only (no database)
+   * Used by ToolExecutor for temp directory creation during tool execution
+   */
+  static getByIdSync(sessionId: ThreadId): Session | null {
+    const existingSession = Session._sessionRegistry.get(sessionId);
+    if (existingSession && !existingSession._destroyed) {
+      return existingSession;
+    }
+
+    if (existingSession && existingSession._destroyed) {
+      Session._sessionRegistry.delete(sessionId);
+    }
+
+    return null;
+  }
+
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 

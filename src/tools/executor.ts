@@ -106,7 +106,7 @@ export class ToolExecutor {
     }
 
     // Get session instance and use its temp directory method
-    const session = Session.getById(context.sessionId);
+    const session = Session.getByIdSync(context.sessionId);
     if (!session) {
       throw new Error(`Session not found: ${context.sessionId}`);
     }

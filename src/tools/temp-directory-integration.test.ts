@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for temp directory functionality across all layers
 // ABOUTME: Tests the complete flow from process temp to tool-call directories
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getProcessTempDir, clearProcessTempDirCache } from '~/config/lace-dir';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
@@ -13,6 +13,9 @@ import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ToolContext, ToolResult } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
 
 // Test tool for integration testing
 class IntegrationTestTool extends Tool {
@@ -38,10 +41,41 @@ class IntegrationTestTool extends Tool {
 }
 
 describe('Temp Directory Integration', () => {
+  const tempLaceDirContext = setupCoreTest();
   let toolExecutor: ToolExecutor;
   let integrationTool: IntegrationTestTool;
+  let session: Session;
+  let project: Project;
+  let providerInstanceId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    Session.clearProviderCache();
+
+    // Create provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Integration Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create real project and session
+    project = Project.create(
+      'Integration Test Project',
+      'Project for integration testing',
+      tempLaceDirContext.tempDir,
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
+
+    session = Session.create({
+      name: 'Integration Test Session',
+      projectId: project.getId(),
+    });
+
     toolExecutor = new ToolExecutor();
     integrationTool = new IntegrationTestTool();
     toolExecutor.registerTool(integrationTool.name, integrationTool);
@@ -51,10 +85,16 @@ describe('Temp Directory Integration', () => {
     clearProcessTempDirCache();
   });
 
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+  });
+
   it('should create proper directory hierarchy through ToolExecutor', async () => {
     const context: ToolContext = {
-      sessionId: 'integration-session',
-      projectId: 'integration-project',
+      sessionId: session.getId(),
+      projectId: project.getId(),
+      session: session,
     };
 
     await toolExecutor.executeTool(
@@ -72,12 +112,12 @@ describe('Temp Directory Integration', () => {
 
     // Verify the hierarchy exists - we can verify the paths contain the expected structure
     const toolTempDir = receivedContext!.toolTempDir!;
-    const projectTempDir = Project.getProjectTempDir(context.projectId!);
+    const projectTempDir = Project.getProjectTempDir(project.getId());
     const processTempDir = getProcessTempDir();
 
-    // Verify directory hierarchy without needing session instance
-    expect(toolTempDir).toContain(`session-${context.sessionId}`);
-    expect(toolTempDir).toContain(`project-${context.projectId}`);
+    // Verify directory hierarchy
+    expect(toolTempDir).toContain(`session-${session.getId()}`);
+    expect(toolTempDir).toContain(`project-${project.getId()}`);
     expect(toolTempDir).toContain(projectTempDir);
     expect(toolTempDir).toContain(processTempDir);
 
@@ -89,8 +129,9 @@ describe('Temp Directory Integration', () => {
 
   it('should handle file operations through ToolExecutor', async () => {
     const context: ToolContext = {
-      sessionId: 'file-ops-session',
-      projectId: 'file-ops-project',
+      sessionId: session.getId(),
+      projectId: project.getId(),
+      session: session,
     };
 
     await toolExecutor.executeTool(
@@ -122,8 +163,9 @@ describe('Temp Directory Integration', () => {
 
   it('should maintain stability across ToolExecutor instances', async () => {
     const context: ToolContext = {
-      sessionId: 'stability-session',
-      projectId: 'stability-project',
+      sessionId: session.getId(),
+      projectId: project.getId(),
+      session: session,
     };
 
     // Execute with first ToolExecutor instance
