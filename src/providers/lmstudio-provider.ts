@@ -57,10 +57,6 @@ export class LMStudioProvider extends AIProvider {
     return 'lmstudio';
   }
 
-  get defaultModel(): string {
-    return 'qwen/qwen3-30b-a3b';
-  }
-
   get supportsStreaming(): boolean {
     return true;
   }
@@ -107,21 +103,22 @@ export class LMStudioProvider extends AIProvider {
   async createResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        await this._ensureModelLoaded(this.modelName);
+        await this._ensureModelLoaded(model);
 
         logger.debug('Creating LMStudio response with native tool calling', {
           provider: 'lmstudio',
-          model: this.modelName,
+          model,
           messageCount: messages.length,
           toolCount: tools.length,
           toolNames: tools.map((t) => t.name),
         });
 
-        return this._createResponseWithNativeToolCalling(messages, tools, this.modelName, signal);
+        return this._createResponseWithNativeToolCalling(messages, tools, model, signal);
       },
       { signal }
     );
@@ -626,6 +623,7 @@ export class LMStudioProvider extends AIProvider {
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
@@ -633,20 +631,19 @@ export class LMStudioProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const modelId = this.modelName;
-        await this._ensureModelLoaded(modelId);
+        await this._ensureModelLoaded(model);
         modelLoaded = true; // Mark model as loaded to prevent retries after this point
 
         logger.debug('Creating streaming LMStudio response with native tool calling', {
           provider: 'lmstudio',
-          model: modelId,
+          model,
           messageCount: messages.length,
           toolCount: tools.length,
           toolNames: tools.map((t) => t.name),
         });
 
         // Use the same native tool calling method with streaming callback
-        return this._createResponseWithNativeToolCalling(messages, tools, modelId, signal, () => {
+        return this._createResponseWithNativeToolCalling(messages, tools, model, signal, () => {
           streamingStarted = true;
         });
       },

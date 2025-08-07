@@ -65,87 +65,14 @@ export class OpenAIProvider extends AIProvider {
     return 'openai';
   }
 
-  get defaultModel(): string {
-    return 'gpt-4o';
-  }
-
   get supportsStreaming(): boolean {
     return true;
-  }
-
-  get contextWindow(): number {
-    const model = this.modelName.toLowerCase();
-
-    // GPT-4.1 series with 1M token context
-    if (model.includes('gpt-4.1')) {
-      return 1000000;
-    }
-
-    // GPT-4o and GPT-4-turbo models
-    if (model.includes('gpt-4o') || model.includes('gpt-4-turbo')) {
-      return 128000;
-    }
-
-    // O-series models
-    if (model === 'o3' || model === 'o3-pro') {
-      return 200000;
-    }
-    if (model === 'o4-mini' || model.includes('o4-mini')) {
-      return 128000;
-    }
-    if (model === 'o1' || model === 'o1-preview') {
-      return 200000;
-    }
-    if (model === 'o1-mini') {
-      return 128000;
-    }
-
-    // GPT-3.5-turbo variants
-    if (model.includes('gpt-3.5-turbo-16k')) {
-      return 16384;
-    }
-    if (model.includes('gpt-3.5-turbo')) {
-      return 16384; // Latest versions support 16k
-    }
-
-    // Legacy GPT-4
-    if (model === 'gpt-4') {
-      return 8192;
-    }
-
-    // Fallback to base implementation
-    return super.contextWindow;
-  }
-
-  get maxCompletionTokens(): number {
-    const model = this.modelName.toLowerCase();
-
-    // O-series models have larger output limits
-    if (model === 'o3' || model === 'o3-pro') {
-      return 100000;
-    }
-    if (model === 'o4-mini' || model.includes('o4-mini')) {
-      return 65536;
-    }
-    if (model === 'o1' || model === 'o1-preview') {
-      return 100000;
-    }
-    if (model === 'o1-mini') {
-      return 65536;
-    }
-
-    // GPT-4o models
-    if (model.includes('gpt-4o')) {
-      return 16384;
-    }
-
-    // Most other models default to 4096
-    return this._config.maxTokens || 4096;
   }
 
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: Tool[],
+    model: string,
     stream: boolean
   ): OpenAI.Chat.ChatCompletionCreateParams {
     // Convert our enhanced generic messages to OpenAI format
@@ -173,7 +100,7 @@ export class OpenAIProvider extends AIProvider {
     }));
 
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
-      model: this.modelName,
+      model,
       messages: messagesWithSystem,
       max_tokens: this._config.maxTokens || 4000,
       stream,
@@ -186,11 +113,12 @@ export class OpenAIProvider extends AIProvider {
   async createResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, false);
+        const requestPayload = this._createRequestPayload(messages, tools, model, false);
 
         logger.debug('Sending request to OpenAI', {
           provider: 'openai',
@@ -259,6 +187,7 @@ export class OpenAIProvider extends AIProvider {
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
@@ -266,7 +195,7 @@ export class OpenAIProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, true);
+        const requestPayload = this._createRequestPayload(messages, tools, model, true);
 
         logger.debug('Sending streaming request to OpenAI', {
           provider: 'openai',
