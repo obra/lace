@@ -149,6 +149,56 @@ describe('fileEditRenderer', () => {
       expect(container.querySelector('.border-base-300')).toBeTruthy();
     });
 
+    it('should render diff with applied edits summary for multiple edits', () => {
+      const result: ToolResult = {
+        content: [{ type: 'text', text: 'Successfully applied 3 edits' }],
+        isError: false,
+        metadata: {
+          diff: {
+            beforeContext: 'line 1\nline 2',
+            afterContext: 'line 5\nline 6',
+            oldContent: 'line 1\nline 2\nold line 3\nold line 4\nline 5\nline 6',
+            newContent: 'line 1\nline 2\nnew line 3\nnew line 4\nline 5\nline 6',
+            startLine: 1,
+          },
+          path: '/test/file.ts',
+          edits_applied: [
+            {
+              old_text: 'version": "0.0.1"',
+              new_text: 'version": "0.0.2"',
+              occurrences_replaced: 1,
+            },
+            {
+              old_text: 'test:unit": "npm test"',
+              new_text: 'test:unit": "npm test",\n    "test:debug": "vitest --verbose"',
+              occurrences_replaced: 1,
+            },
+            {
+              old_text: 'vitest": "^3.0.0"',
+              new_text: 'vitest": "^3.0.0",\n    "nodemon": "^2.0.0"',
+              occurrences_replaced: 1,
+            },
+          ],
+          total_replacements: 3,
+        },
+      };
+
+      const rendered = fileEditRenderer.renderResult!(result);
+      const { container } = render(React.createElement('div', null, rendered));
+
+      // Should render FileDiffViewer component
+      expect(container.querySelector('.border-base-300')).toBeTruthy();
+
+      // Should also show applied edits summary
+      expect(container.textContent).toContain('Applied 3 edits');
+      expect(container.textContent).toContain('(3 total replacements)');
+      expect(container.textContent).toContain('Edit 1:');
+      expect(container.textContent).toContain('Edit 2:');
+      expect(container.textContent).toContain('Edit 3:');
+      expect(container.textContent).toContain('version": "0.0.1"');
+      expect(container.textContent).toContain('version": "0.0.2"');
+    });
+
     it('should render dry run mode', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Dry run completed. Would apply 2 edits to /src/app.ts' }],

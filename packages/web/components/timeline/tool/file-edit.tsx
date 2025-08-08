@@ -181,7 +181,7 @@ export const fileEditRenderer: ToolRenderer = {
       }
       
       return (
-        <div className="bg-base-100/50">
+        <div className="bg-base-100/50 space-y-3">
           <FileDiffViewer
             diff={fileDiff}
             viewMode="unified"
@@ -190,6 +190,33 @@ export const fileEditRenderer: ToolRenderer = {
             maxLines={20}
             className="shadow-sm"
           />
+          
+          {/* Show applied edits summary when we have multiple edits */}
+          {resultMetadata.edits_applied && resultMetadata.edits_applied.length > 1 && (
+            <div className="bg-success/5 border border-success/20 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FontAwesomeIcon icon={faFileEdit} className="w-4 h-4 text-success flex-shrink-0" />
+                <span className="text-success font-medium text-sm">
+                  Applied {resultMetadata.edits_applied.length} edits
+                  {resultMetadata.total_replacements && ` (${resultMetadata.total_replacements} total replacements)`}
+                </span>
+              </div>
+              {resultMetadata.edits_applied.length <= 5 && (
+                <div className="space-y-1">
+                  {resultMetadata.edits_applied.map((edit, i) => (
+                    <div key={i} className="text-xs font-mono text-success/60 bg-success/5 rounded p-2">
+                      <span className="text-success/50">Edit {i + 1}:</span> {edit.old_text.substring(0, 40)}{edit.old_text.length > 40 ? '...' : ''}
+                      <br />
+                      <span className="text-success/50">→</span> {edit.new_text.substring(0, 40)}{edit.new_text.length > 40 ? '...' : ''}
+                      {edit.occurrences_replaced > 1 && (
+                        <span className="text-success/40"> ({edit.occurrences_replaced} occurrences)</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }
