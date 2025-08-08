@@ -1,10 +1,11 @@
-// ABOUTME: Tests for schema-based file edit tool with exact text replacement
-// ABOUTME: Validates text replacement, multi-field validation, and error handling with Zod
+// ABOUTME: Integration tests for file edit tool with file protection
+// ABOUTME: Tests text replacement, validation, and file read protection mechanism
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, rm, mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { FileEditTool } from '~/tools/implementations/file-edit';
+import { ApprovalDecision } from '~/tools/approval-types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
@@ -18,7 +19,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import type { ToolContext } from '~/tools/types';
 
-describe('FileEditTool with schema validation', () => {
+describe('FileEditTool Integration Tests', () => {
   const _tempLaceDir = setupCoreTest();
   let tool: FileEditTool;
   let providerInstanceId: string;
@@ -27,12 +28,10 @@ describe('FileEditTool with schema validation', () => {
   let context: ToolContext;
   const testDir = join(process.cwd(), 'test-temp-file-edit-schema');
   const testFile = join(testDir, 'test.txt');
-  const readFiles = new Set<string>(); // Track files we've "read" in tests
-
   beforeEach(async () => {
     setupTestProviderDefaults();
+
     Session.clearProviderCache();
-    readFiles.clear();
 
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -53,17 +52,32 @@ describe('FileEditTool with schema validation', () => {
       projectId: project.getId(),
     });
 
+    // Set approval callback to allow all tools (needed for tests)
+    session.getAgent(session.getId())!.toolExecutor.setApprovalCallback({
+      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+    });
+
     // Get the coordinator agent
-    agent = session.getAgent(session.getId());
-    if (!agent) {
-      throw new Error('Failed to get agent from session');
-    }
+    agent = session.getAgent(session.getId())!;
 
-    // Mock hasFileBeenRead to use our test tracking
-    agent.hasFileBeenRead = (filePath: string) => readFiles.has(filePath);
+    // Get tools from agent's toolExecutor (so events are properly recorded)
+    tool = agent.toolExecutor.getTool('file_edit') as FileEditTool;
 
-    // Create tools
-    tool = new FileEditTool();
+    // For most tests (except file protection tests), mock hasFileBeenRead to return true
+    // This allows us to test FileEditTool functionality without the complexity of event tracking
+    const originalHasFileBeenRead = agent.hasFileBeenRead.bind(agent);
+    agent.hasFileBeenRead = (path: string) => {
+      // Only apply mock for non-protection tests
+      if (
+        path === testFile ||
+        path.includes('test-temp-file-edit-schema') ||
+        path.includes('temp-cwd-edit-test.txt') ||
+        path.includes('temp-rel-edit-test.txt')
+      ) {
+        return true;
+      }
+      return originalHasFileBeenRead(path);
+    };
 
     // Create context with real agent
     context = {
@@ -78,6 +92,67 @@ describe('FileEditTool with schema validation', () => {
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
     await rm(testDir, { recursive: true, force: true });
+
+    // Clean up environment variable
+  });
+
+  describe('File Protection Mechanism', () => {
+    it('should require file to be read before editing', async () => {
+      await writeFile(testFile, 'original content');
+
+      // Restore original hasFileBeenRead for this test
+      agent!.hasFileBeenRead = () => false;
+
+      // Try to edit without reading first
+      const result = await tool.execute(
+        {
+          path: testFile,
+          old_text: 'original content',
+          new_text: 'new content',
+        },
+        context
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("exists but hasn't been read");
+      expect(result.content[0].text).toContain('Use file_read to examine');
+    });
+
+    it('should allow edit after file has been read', async () => {
+      await writeFile(testFile, 'original content');
+
+      // hasFileBeenRead is mocked to return true in beforeEach
+      // so edit should work
+      const result = await tool.execute(
+        {
+          path: testFile,
+          old_text: 'original content',
+          new_text: 'new content',
+        },
+        context
+      );
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Successfully replaced text');
+    });
+
+    it('should not require read for non-existent files', async () => {
+      const nonExistentFile = join(testDir, 'does-not-exist.txt');
+
+      // Should fail with file not found, not protection error
+      const result = await tool.execute(
+        {
+          path: nonExistentFile,
+          old_text: 'any',
+          new_text: 'text',
+        },
+        context
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File not found');
+      expect(result.content[0].text).not.toContain("hasn't been read");
+    });
   });
 
   describe('Tool metadata', () => {
@@ -149,9 +224,7 @@ describe('FileEditTool with schema validation', () => {
     it('should accept empty old_text for insertions at beginning', async () => {
       await writeFile(testFile, '');
 
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
+      // hasFileBeenRead is mocked to return true, so protection is bypassed
       const result = await tool.execute(
         {
           path: testFile,
@@ -182,10 +255,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should accept valid parameters', async () => {
       await writeFile(testFile, 'Hello World');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -209,10 +278,6 @@ describe('FileEditTool with schema validation', () => {
   console.log('Hello, World!');
 }`;
       await writeFile(testFile, originalContent);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -229,10 +294,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should handle single character replacements', async () => {
       await writeFile(testFile, 'abc');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -248,10 +309,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should handle empty string replacement (deletion)', async () => {
       await writeFile(testFile, 'Hello, World!');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -267,10 +324,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should handle insertion with unique old_text', async () => {
       await writeFile(testFile, 'World');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -293,10 +346,6 @@ describe('FileEditTool with schema validation', () => {
   return a + b;
 }`;
       await writeFile(testFile, originalContent);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -317,10 +366,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should handle entire file replacement', async () => {
       await writeFile(testFile, 'old content');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -337,10 +382,6 @@ describe('FileEditTool with schema validation', () => {
     it('should preserve exact whitespace in replacements', async () => {
       const originalContent = '  function() {\n    return true;\n  }';
       await writeFile(testFile, originalContent);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -358,10 +399,6 @@ describe('FileEditTool with schema validation', () => {
   describe('Error conditions', () => {
     it('should fail when text is not found', async () => {
       await writeFile(testFile, 'Hello World');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -378,10 +415,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should fail when multiple matches exist', async () => {
       await writeFile(testFile, 'foo bar foo');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -417,10 +450,6 @@ describe('FileEditTool with schema validation', () => {
   describe('Enhanced error messages', () => {
     it('should provide file preview when no matches found', async () => {
       await writeFile(testFile, 'Line 1\nLine 2\nLine 3');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -438,10 +467,6 @@ describe('FileEditTool with schema validation', () => {
     it('should provide match location info for multiple matches', async () => {
       const content = 'function test() {\n  return test;\n}\nconst test = 42;';
       await writeFile(testFile, content);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -458,10 +483,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should provide helpful guidance for AI recovery', async () => {
       await writeFile(testFile, 'Some content here');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -479,10 +500,6 @@ describe('FileEditTool with schema validation', () => {
   describe('Line change reporting', () => {
     it('should report single line changes', async () => {
       await writeFile(testFile, 'single line');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -499,10 +516,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should report line count changes', async () => {
       await writeFile(testFile, 'line 1\nline 2');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -518,10 +531,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should report line increases', async () => {
       await writeFile(testFile, 'short');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -539,10 +548,6 @@ describe('FileEditTool with schema validation', () => {
   describe('Structured output with helpers', () => {
     it('should use createResult for successful edits', async () => {
       await writeFile(testFile, 'Hello World');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -583,10 +588,6 @@ describe('FileEditTool with schema validation', () => {
     it('should handle files with special characters', async () => {
       const content = 'Text with "quotes" and $pecial char$';
       await writeFile(testFile, content);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -603,10 +604,6 @@ describe('FileEditTool with schema validation', () => {
     it('should handle unicode characters', async () => {
       const content = 'Hello 世界 🌍';
       await writeFile(testFile, content);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -624,10 +621,6 @@ describe('FileEditTool with schema validation', () => {
       const largeOldText = 'x'.repeat(1000);
       const largeNewText = 'y'.repeat(2000);
       await writeFile(testFile, `start ${largeOldText} end`);
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -643,10 +636,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should handle empty files', async () => {
       await writeFile(testFile, '');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -662,10 +651,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should handle files with only whitespace', async () => {
       await writeFile(testFile, '   \n\t\n   ');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -683,10 +668,6 @@ describe('FileEditTool with schema validation', () => {
   describe('Cross-field validation edge cases', () => {
     it('should handle old_text same as new_text', async () => {
       await writeFile(testFile, 'same text');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -702,10 +683,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should validate old_text against actual file content', async () => {
       await writeFile(testFile, 'actual content');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile,
@@ -728,7 +705,6 @@ describe('FileEditTool with schema validation', () => {
       await writeFile(absoluteTestFile, 'Content for relative edit');
 
       // Mark file as read for test purposes
-      readFiles.add(absoluteTestFile);
 
       const result = await tool.execute(
         {
@@ -745,10 +721,6 @@ describe('FileEditTool with schema validation', () => {
 
     it('should use absolute paths directly even when working directory is provided', async () => {
       await writeFile(testFile, 'absolute path content');
-
-      // Mark file as read for test purposes
-      readFiles.add(testFile);
-
       const result = await tool.execute(
         {
           path: testFile, // absolute path
@@ -770,7 +742,9 @@ describe('FileEditTool with schema validation', () => {
 
       try {
         // Mark file as read for test purposes
-        readFiles.add(absoluteFile);
+        // For file protection to work properly, we need to disable it in tests
+        // since we're testing the tool directly without going through the full agent flow.
+        // The file protection feature is tested separately in integration tests.
 
         const result = await tool.execute(
           {

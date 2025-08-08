@@ -52,8 +52,7 @@ describe('Task-Based DelegateTool Integration', () => {
     // Create delegate tool and inject TaskManager
     delegateTool = new DelegateTool();
 
-    const agent = testSetup.session.getAgent(testSetup.session.getId());
-    if (!agent) throw new Error('Failed to get agent');
+    const agent = testSetup.session.getAgent(testSetup.session.getId())!;
 
     context = {
       agent, // Access to threadId and session via agent

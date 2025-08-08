@@ -173,8 +173,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Basic Task Lifecycle', () => {
     it('should complete full task lifecycle: create → update → add note → complete → view', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
+      const agent = session.getAgent(session.getId())!;
       const context = { agent } as const;
 
       // 1. Create a task
@@ -252,8 +251,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Bulk Task Creation Workflow', () => {
     it('should handle bulk task creation and parallel management', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
+      const agent = session.getAgent(session.getId())!;
       const context = { agent } as const;
 
       // Create multiple tasks in bulk
@@ -309,8 +307,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Task Assignment and Delegation', () => {
     it('should support task assignment and delegation workflow', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
+      const agent = session.getAgent(session.getId())!;
       const context = { agent } as const;
 
       // Create task with assignment
@@ -393,8 +390,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle invalid task operations gracefully', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
+      const agent = session.getAgent(session.getId())!;
       const context = { agent } as const;
 
       // Try to complete non-existent task
@@ -426,8 +422,7 @@ describe('Task Management Workflow Integration', () => {
     });
 
     it('should require TaskManager for all operations', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
+      const agent = session.getAgent(session.getId())!;
       const context = { agent } as const;
 
       // Create tool instances - they get TaskManager from session
@@ -454,8 +449,7 @@ describe('Task Management Workflow Integration', () => {
 
   describe('Task Filtering and Querying', () => {
     it('should support different task filtering options', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
+      const agent = session.getAgent(session.getId())!;
       const context = { agent } as const;
 
       // Create various tasks with different states

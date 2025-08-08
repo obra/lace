@@ -943,7 +943,7 @@ describe('Enhanced Agent', () => {
           arguments: { action: 'test' },
         },
         expect.objectContaining({
-          agent: expect.any(Object) as unknown,
+          agent: expect.any(Agent) as unknown,
           workingDirectory: expect.any(String) as string,
         }) as ToolContext
       );
