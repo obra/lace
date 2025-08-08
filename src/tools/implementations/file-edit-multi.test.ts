@@ -26,7 +26,7 @@ describe('FileEditTool Multi', () => {
   });
 
   describe('Single Edit Operations', () => {
-    it.skip('should replace single occurrence by default', async () => {
+    it('should replace single occurrence by default', async () => {
       // Write test first, then implement
       await writeFile(testFile, 'Hello World', 'utf-8');
 
