@@ -1685,8 +1685,10 @@ export class Agent extends EventEmitter {
   }
 
   async compact(threadId: string): Promise<void> {
-    // TODO: Use a configurable strategy once registry is set up
-    await this._threadManager.compact(threadId, 'trim-tool-results');
+    // Use the AI-powered summarization strategy for better compaction
+    await this._threadManager.compact(threadId, 'summarize', {
+      provider: this._provider,
+    });
   }
 
   createDelegateAgent(

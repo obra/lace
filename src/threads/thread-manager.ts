@@ -509,10 +509,10 @@ export class ThreadManager {
       throw new Error(`Thread ${threadId} not found`);
     }
 
-    // Create compaction context
+    // Create compaction context with params merged in
     const context = {
       threadId,
-      params,
+      ...(params as object),
     };
 
     // Run compaction strategy
