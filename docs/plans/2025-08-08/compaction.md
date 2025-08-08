@@ -548,14 +548,34 @@ async generateSummary(promptContent: string, events: ThreadEvent[]): Promise<str
 - `d0f5372c`: feat: implement AI-powered conversation summarization strategy
 - `72945241`: refactor: redesign compaction to use conversation LLM instead of sidebar
 
-### Task 2.3: Add Compaction Interface Integration
+### Task 2.3: Add Compaction Interface Integration ✅ **COMPLETED**
 **Goal**: Connect compaction to terminal interface for user feedback.
 
-**Status**: Pending - Not explicitly requested by user yet.
+**Status**: ✅ **COMPLETED** - Committed in `a259e24b`
 
-**Files to modify**:
-- `src/interfaces/terminal/terminal-interface.tsx` - Add compaction status display
-- `src/interfaces/terminal/components/CompactionStatus.tsx` - New component for status
+**Files created/modified**:
+- `src/interfaces/compaction-handler.ts` - Handler for compaction events with display interface
+- `src/interfaces/compaction-handler.test.ts` - Comprehensive test suite (9 tests)
+- `src/interfaces/non-interactive-interface.ts` - Integrated CompactionHandler
+
+**Implementation Highlights**:
+- **CompactionHandler**: Listens to agent events and detects compaction operations
+- **CompactionDisplay Interface**: Abstraction for different UI implementations
+- **ConsoleCompactionDisplay**: CLI implementation with emoji-enhanced messages
+- **Event Detection**: Identifies `/compact` commands and tracks compaction lifecycle
+
+**User Experience**:
+- 🔄 "Compacting conversation to reduce size..." when compaction starts
+- ✅ "Compaction complete! Reduced from X to Y events (Z% reduction)" on success
+- ❌ "Compaction failed: [error message]" on failure
+
+**Test Coverage**:
+- Compaction start detection
+- Regular message filtering
+- Compaction completion handling
+- Error handling
+- Event listener cleanup
+- Console display messages
 
 ---
 
