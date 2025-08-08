@@ -368,7 +368,7 @@ describe('Token aggregation', () => {
 
 ---
 
-## Phase 2: Manual Compaction Command
+## Phase 2: Manual Compaction Command ✅ **COMPLETED**
 
 ### Task 2.1: Add /compact Command Detection ✅ **COMPLETED**
 **Goal**: Detect when user sends "/compact" and trigger compaction instead of processing as message.
@@ -483,40 +483,85 @@ describe('Agent command handling', () => {
 
 ---
 
-### Task 2.2: Create Basic Compaction Logic
+### Task 2.2: Create Basic Compaction Logic ✅ **COMPLETED**
 **Goal**: Implement thread summarization and event replacement for more efficient compaction.
 
-**Current status**: Task 2.1 uses the existing 'trim-tool-results' strategy. This task will enhance compaction with better strategies.
+**Status**: ✅ **COMPLETED** - Committed in `d0f5372c` and refined in `72945241`
 
-**Files to implement**:
-- `src/threads/compaction/summarize-strategy.ts` - New AI-powered summarization strategy
-- `src/threads/compaction/summarize-strategy.test.ts` - Test the summarization logic
+**Files implemented**:
+- `src/threads/compaction/summarize-strategy.ts` - AI-powered summarization strategy with in-conversation approach
+- `src/threads/compaction/summarize-strategy.test.ts` - Comprehensive test suite (7 tests)
+- `src/threads/compaction/registry.ts` - Updated to include SummarizeCompactionStrategy
+- `src/agents/agent.ts` - Added generateSummary() method for in-conversation summaries
 
-**Implementation approach**:
-1. Create SummarizeCompactionStrategy that uses AI to create conversation summaries
-2. Replace old events with summary events to reduce token count
-3. Preserve critical information (tool calls, recent context)
-4. Test with various conversation scenarios
+**Implementation Highlights**:
 
-**Test first** (`src/threads/compaction/summarize-strategy.test.ts`):
+**Original Design (Sidebar Approach)**:
+- Separate AI call outside conversation context
+- Lost nuance and conversation understanding
+- Required additional API tokens
+
+**Redesigned (In-Conversation Approach)** - Committed in `72945241`:
 ```typescript
-it('should create summary from conversation events', async () => {
-  const events = [
-    { type: 'USER_MESSAGE', data: 'Help me write a function' },
-    { type: 'AGENT_MESSAGE', data: { content: 'I can help with that...' } },
-    { params: Promise.resolve({ threadId: 'test-thread' }) }
+// Agent now provides a public method for summaries
+async generateSummary(promptContent: string, events: ThreadEvent[]): Promise<string> {
+  const messages = this._buildConversationFromEvents(events);
+  messages.push({ role: 'user', content: promptContent });
+  
+  const response = await this._provider.createResponse(
+    messages,
+    [],
+    this.model || 'default'
   );
   
-  expect(response.status).toBe(202);
-  // Verify command was accepted
-});
+  return response.content;
+}
 ```
 
-**Commit**: `test: add web API test for /compact command`
+**Key Features**:
+- ✅ Conversation LLM generates its own summary with full context
+- ✅ Event count-based recent event preservation (last 2 events when >3 total)
+- ✅ Comprehensive summarization prompt with structured sections
+- ✅ Backward compatibility with provider-only fallback
+- ✅ Complete test coverage including edge cases
+
+**Summarization Prompt Structure**:
+1. User's Primary Request and Intent
+2. Current Status (completed/pending)
+3. Key Technical Context
+4. Code Changes Made
+5. Issues Encountered and Solutions
+6. User Preferences and Patterns
+7. Important Context for Continuation
+8. Working State
+
+**Test Coverage**:
+- Basic summarization with mixed event types
+- Recent event preservation by count
+- Tool call/result handling
+- Error handling for missing agent/provider
+- Empty event list handling
+- COMPACTION event filtering
+- Provider-only fallback compatibility
+
+**Commits**:
+- `d0f5372c`: feat: implement AI-powered conversation summarization strategy
+- `72945241`: refactor: redesign compaction to use conversation LLM instead of sidebar
+
+### Task 2.3: Add Compaction Interface Integration
+**Goal**: Connect compaction to terminal interface for user feedback.
+
+**Status**: Pending - Not explicitly requested by user yet.
+
+**Files to modify**:
+- `src/interfaces/terminal/terminal-interface.tsx` - Add compaction status display
+- `src/interfaces/terminal/components/CompactionStatus.tsx` - New component for status
 
 ---
 
-## Phase 3: AI-Powered Compaction Strategy
+## Phase 3: AI-Powered Compaction Strategy ✅ **PARTIALLY COMPLETED**
+
+**Note**: The AI-powered summarization has been implemented as part of Phase 2, Task 2.2. The SummarizeCompactionStrategy uses the conversation's own LLM to generate summaries, which is more effective than the originally planned separate AI strategy.
 
 ### Task 3.1: Create AI Summarization Strategy
 **Goal**: Implement strategy where model summarizes its own conversation.
