@@ -35,8 +35,12 @@ describe('FileEditTool actual file modification', () => {
     // Perform the edit
     const result = await tool.execute({
       path: testFile,
-      old_text: 'World',
-      new_text: 'Universe',
+      edits: [
+        {
+          old_text: 'World',
+          new_text: 'Universe',
+        },
+      ],
     });
 
     // Check the tool reports success
@@ -61,13 +65,17 @@ line 5`;
     // Try to replace text that appears twice - should fail
     const result = await tool.execute({
       path: testFile,
-      old_text: 'line 2',
-      new_text: 'modified line',
+      edits: [
+        {
+          old_text: 'line 2',
+          new_text: 'modified line',
+        },
+      ],
     });
 
     // Should error because text appears multiple times
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Expected 1 occurrences but found 2');
+    expect(result.content[0].text).toContain('Expected 1 occurrence but found 2');
 
     // File should NOT be modified
     const content = await readFile(testFile, 'utf-8');
@@ -85,9 +93,13 @@ line 5`;
 
     const result = await tool.execute({
       path: testFile,
-      old_text: `  console.log('Hello');
+      edits: [
+        {
+          old_text: `  console.log('Hello');
   console.log('World');`,
-      new_text: `  console.log('Hello World');`,
+          new_text: `  console.log('Hello World');`,
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
@@ -107,8 +119,12 @@ line 5`;
 
     const result = await tool.execute({
       path: testFile,
-      old_text: 'Second line',
-      new_text: 'Modified line',
+      edits: [
+        {
+          old_text: 'Second line',
+          new_text: 'Modified line',
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
@@ -123,12 +139,16 @@ line 5`;
 
     const result = await tool.execute({
       path: testFile,
-      old_text: 'Goodbye',
-      new_text: 'Hello',
+      edits: [
+        {
+          old_text: 'Goodbye',
+          new_text: 'Hello',
+        },
+      ],
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('No matches found');
+    expect(result.content[0].text).toContain('Could not find exact text');
 
     // File should remain unchanged
     const afterEdit = await readFile(testFile, 'utf-8');

@@ -39,8 +39,12 @@ line 10`;
 
     const result = await tool.execute({
       path: testFile,
-      old_text: 'line 5\nline 6',
-      new_text: 'modified line 5\nmodified line 6',
+      edits: [
+        {
+          old_text: 'line 5\nline 6',
+          new_text: 'modified line 5\nmodified line 6',
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
@@ -70,8 +74,12 @@ fifth line`;
 
     const result = await tool.execute({
       path: testFile,
-      old_text: 'first line',
-      new_text: 'modified first line',
+      edits: [
+        {
+          old_text: 'first line',
+          new_text: 'modified first line',
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
@@ -95,8 +103,12 @@ last line`;
 
     const result = await tool.execute({
       path: testFile,
-      old_text: 'last line',
-      new_text: 'modified last line',
+      edits: [
+        {
+          old_text: 'last line',
+          new_text: 'modified last line',
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
@@ -124,11 +136,15 @@ function bar() {
 
     const result = await tool.execute({
       path: testFile,
-      old_text: `  console.log('hello');
+      edits: [
+        {
+          old_text: `  console.log('hello');
   console.log('world');
   return true;`,
-      new_text: `  console.log('hello world');
+          new_text: `  console.log('hello world');
   return false;`,
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
@@ -147,14 +163,25 @@ function bar() {
 
     const result = await tool.execute({
       path: testFile,
-      old_text: 'original',
-      new_text: 'modified',
+      edits: [
+        {
+          old_text: 'original',
+          new_text: 'modified',
+        },
+      ],
     });
 
     expect(result.isError).toBe(false);
     expect(result.metadata?.path).toBe(testFile);
-    expect(result.metadata?.oldText).toBe('original');
-    expect(result.metadata?.newText).toBe('modified');
+    const editsApplied = result.metadata?.edits_applied as
+      | Array<{ old_text: string; new_text: string; occurrences_replaced: number }>
+      | undefined;
+    expect(editsApplied).toHaveLength(1);
+    if (editsApplied && editsApplied.length > 0) {
+      const firstEdit = editsApplied[0];
+      expect(firstEdit.old_text).toBe('original');
+      expect(firstEdit.new_text).toBe('modified');
+    }
   });
 
   describe('Multi-Edit API', () => {
@@ -229,20 +256,25 @@ function bar() {
       expect(content).toBe(originalContent);
     });
 
-    it('should work with old API format in dry run mode', async () => {
+    it('should include diff context in dry run mode', async () => {
       const originalContent = 'Hello World';
       await fs.writeFile(testFile, originalContent, 'utf-8');
 
       const result = await tool.execute({
         path: testFile,
         dry_run: true,
-        old_text: 'World',
-        new_text: 'Universe',
+        edits: [
+          {
+            old_text: 'World',
+            new_text: 'Universe',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Dry run');
       expect(result.metadata?.dry_run).toBe(true);
+      expect(result.metadata?.diff).toBeDefined();
 
       // File should not be modified
       const content = await fs.readFile(testFile, 'utf-8');
@@ -265,7 +297,7 @@ function bar() {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('No matches found');
+      expect(result.content[0].text).toContain('Could not find exact text');
     });
 
     it('should handle file not found', async () => {
