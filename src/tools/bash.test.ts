@@ -499,7 +499,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       expect(output.exitCode).toBe(0);
 
       // Should have truncation info showing skipped lines
-      expect(output.truncated.stdout.total).toBeGreaterThan(200);
+      expect(output.truncated.stdout.total).toBe(200);
       expect(output.truncated.stdout.skipped).toBeGreaterThan(0);
 
       // Preview should contain early lines (head)
