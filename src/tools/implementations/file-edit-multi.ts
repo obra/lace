@@ -47,18 +47,36 @@ export class FileEditTool extends Tool {
       throw error;
     }
 
-    // Apply single edit (minimal implementation)
-    const edit = args.edits[0];
-    const occurrences = content.split(edit.old_text).length - 1;
-    const expectedOccurrences = edit.occurrences ?? 1;
+    // Validate all edits first
+    let workingContent = content;
+    for (let i = 0; i < args.edits.length; i++) {
+      const edit = args.edits[i];
+      const occurrences = workingContent.split(edit.old_text).length - 1;
+      const expectedOccurrences = edit.occurrences ?? 1;
 
-    if (occurrences !== expectedOccurrences) {
-      return this.createError(
-        `Expected ${expectedOccurrences} occurrences but found ${occurrences}`
-      );
+      if (occurrences === 0) {
+        return this.createError(
+          `Edit ${i + 1} of ${args.edits.length}: No matches found for "${edit.old_text}"`
+        );
+      }
+
+      if (occurrences !== expectedOccurrences) {
+        return this.createError(
+          `Edit ${i + 1} of ${args.edits.length}: Expected ${expectedOccurrences} occurrences but found ${occurrences}`
+        );
+      }
+
+      // Simulate the edit for next validation
+      workingContent = workingContent.split(edit.old_text).join(edit.new_text);
     }
 
-    const newContent = content.replace(edit.old_text, edit.new_text);
+    // Apply all edits
+    workingContent = content;
+    for (const edit of args.edits) {
+      workingContent = workingContent.split(edit.old_text).join(edit.new_text);
+    }
+
+    const newContent = workingContent;
 
     // Write file
     try {
@@ -69,6 +87,6 @@ export class FileEditTool extends Tool {
       );
     }
 
-    return this.createResult('Successfully replaced text');
+    return this.createResult(`Successfully applied ${args.edits.length} edits`);
   }
 }

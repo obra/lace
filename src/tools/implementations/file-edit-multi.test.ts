@@ -67,4 +67,29 @@ describe('FileEditTool Multi', () => {
       expect(content).toBe('foo bar foo baz foo');
     });
   });
+
+  describe('Multiple Edit Operations', () => {
+    it('should apply multiple edits sequentially', async () => {
+      await writeFile(testFile, 'const a = 1;\nconst b = 2;', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'const',
+            new_text: 'let',
+            occurrences: 2,
+          },
+          {
+            old_text: 'let a',
+            new_text: 'let x',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      const content = await readFile(testFile, 'utf-8');
+      expect(content).toBe('let x = 1;\nlet b = 2;');
+    });
+  });
 });
