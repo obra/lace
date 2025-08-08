@@ -47,7 +47,9 @@ describe('Compaction Integration', () => {
         isError: false,
       })
     );
-    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Found 5 files'));
+    expectEventAdded(
+      threadManager.addEvent(threadId, 'AGENT_MESSAGE', { content: 'Found 5 files' })
+    );
 
     expect(threadManager.getAllEvents(threadId)).toHaveLength(4);
 
@@ -82,7 +84,7 @@ describe('Compaction Integration', () => {
       })
     );
     expect(workingEvents[3]).toEqual(
-      expect.objectContaining({ type: 'AGENT_MESSAGE', data: 'Found 5 files' })
+      expect.objectContaining({ type: 'AGENT_MESSAGE', data: { content: 'Found 5 files' } })
     );
     expect(workingEvents[4]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
   });
@@ -102,7 +104,7 @@ describe('Compaction Integration', () => {
 
     // Add more events after compaction
     expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'What next?'));
-    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Let me help'));
+    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', { content: 'Let me help' }));
 
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
@@ -134,7 +136,7 @@ describe('Compaction Integration', () => {
       expect.objectContaining({ type: 'USER_MESSAGE', data: 'What next?' })
     );
     expect(workingEvents[4]).toEqual(
-      expect.objectContaining({ type: 'AGENT_MESSAGE', data: 'Let me help' })
+      expect.objectContaining({ type: 'AGENT_MESSAGE', data: { content: 'Let me help' } })
     );
   });
 

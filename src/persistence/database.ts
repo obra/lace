@@ -3,7 +3,14 @@
 
 import Database from 'better-sqlite3';
 import { getLaceDbPath } from '~/config/lace-dir';
-import { Thread, ThreadEvent, ThreadEventType, ThreadId, AssigneeId } from '~/threads/types';
+import {
+  Thread,
+  ThreadEvent,
+  ThreadEventType,
+  ThreadId,
+  AssigneeId,
+  AgentMessageData,
+} from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
 import {
   Task,
@@ -27,11 +34,13 @@ function createThreadEventFromDb(
 
   switch (type) {
     case 'USER_MESSAGE':
-    case 'AGENT_MESSAGE':
     case 'LOCAL_SYSTEM_MESSAGE':
     case 'SYSTEM_PROMPT':
     case 'USER_SYSTEM_PROMPT':
       return { ...baseEvent, type, data: data as string };
+
+    case 'AGENT_MESSAGE':
+      return { ...baseEvent, type, data: data as AgentMessageData };
 
     case 'TOOL_CALL':
       return { ...baseEvent, type, data: data as ToolCall };

@@ -39,6 +39,19 @@ interface BaseThreadEvent {
   timestamp: Date;
 }
 
+// Token usage interface for tracking API consumption
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+// Agent message data with optional token usage
+export interface AgentMessageData {
+  content: string;
+  tokenUsage?: TokenUsage;
+}
+
 // Discriminated union for type-safe event handling
 export type ThreadEvent =
   | (BaseThreadEvent & {
@@ -47,7 +60,7 @@ export type ThreadEvent =
     })
   | (BaseThreadEvent & {
       type: 'AGENT_MESSAGE';
-      data: string;
+      data: AgentMessageData;
     })
   | (BaseThreadEvent & {
       type: 'TOOL_CALL';

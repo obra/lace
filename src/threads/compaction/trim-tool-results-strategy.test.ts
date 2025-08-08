@@ -30,7 +30,7 @@ describe('TrimToolResultsStrategy', () => {
           threadId: 'test-thread',
           type: 'AGENT_MESSAGE',
           timestamp: new Date(),
-          data: 'Hi there',
+          data: { content: 'Hi there' },
         },
       ];
 

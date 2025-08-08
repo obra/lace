@@ -144,7 +144,7 @@ describe('Agent Thread Events', () => {
       expect(eventSpy).toHaveBeenNthCalledWith(2, {
         event: expect.objectContaining({
           type: 'AGENT_MESSAGE',
-          data: 'First response',
+          data: { content: 'First response' },
         }) as ThreadEvent,
         threadId,
       });

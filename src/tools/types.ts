@@ -63,6 +63,11 @@ export interface ToolResult {
   content: ContentBlock[];
   isError: boolean; // Keep required (clearer than MCP's optional)
   metadata?: Record<string, unknown>; // For delegation threadId, etc.
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export function createToolResult(

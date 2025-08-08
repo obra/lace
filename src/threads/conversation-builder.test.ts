@@ -17,7 +17,7 @@ describe('conversation-builder', () => {
       threadId: 'test-thread',
       type: 'AGENT_MESSAGE',
       timestamp: new Date('2024-01-01T10:01:00Z'),
-      data: 'Hi there',
+      data: { content: 'Hi there' },
     },
     {
       id: 'e3',
@@ -49,7 +49,7 @@ describe('conversation-builder', () => {
               threadId: 'test-thread',
               type: 'AGENT_MESSAGE',
               timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: 'Summary: User said hello, I replied',
+              data: { content: 'Summary: User said hello, I replied' },
             },
           ],
         },
@@ -60,7 +60,7 @@ describe('conversation-builder', () => {
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: 'I am fine',
+        data: { content: 'I am fine' },
       };
 
       const eventsWithCompaction = [...mockEvents, compactionEvent, newEvent];
@@ -88,7 +88,7 @@ describe('conversation-builder', () => {
               threadId: 'test-thread',
               type: 'AGENT_MESSAGE',
               timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: 'First summary',
+              data: { content: 'First summary' },
             },
           ],
         },
@@ -108,7 +108,7 @@ describe('conversation-builder', () => {
               threadId: 'test-thread',
               type: 'AGENT_MESSAGE',
               timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: 'Second summary',
+              data: { content: 'Second summary' },
             },
           ],
         },
@@ -304,7 +304,7 @@ describe('conversation-builder', () => {
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: 'After malformed compaction',
+        data: { content: 'After malformed compaction' },
       };
 
       const events = [...mockEvents, malformedCompactionEvent, newEvent];
@@ -331,7 +331,7 @@ describe('conversation-builder', () => {
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: 'After invalid compaction',
+        data: { content: 'After invalid compaction' },
       };
 
       const events = [...mockEvents, invalidCompactionEvent, newEvent];

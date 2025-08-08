@@ -15,6 +15,7 @@ import {
   ToolApprovalRequestData,
   ThreadId,
   asThreadId,
+  AgentMessageData,
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
@@ -40,6 +41,11 @@ export interface AgentConfig {
 interface AgentMessageResult {
   content: string;
   toolCalls: ProviderToolCall[];
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
@@ -549,8 +555,17 @@ export class Agent extends EventEmitter {
 
       // Process agent response
       if (response.content) {
-        // Store raw content (with thinking blocks) for model context
-        this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', response.content);
+        // Store raw content (with thinking blocks) for model context with token usage
+        this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', {
+          content: response.content,
+          tokenUsage: response.usage
+            ? {
+                promptTokens: response.usage.promptTokens,
+                completionTokens: response.usage.completionTokens,
+                totalTokens: response.usage.totalTokens,
+              }
+            : undefined,
+        });
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -743,6 +758,7 @@ export class Agent extends EventEmitter {
       return {
         content: processedResponse.content,
         toolCalls: processedResponse.toolCalls,
+        usage: processedResponse.usage,
       };
     } finally {
       // Clean up event listeners
@@ -837,6 +853,7 @@ export class Agent extends EventEmitter {
       return {
         content: processedResponse.content,
         toolCalls: processedResponse.toolCalls,
+        usage: processedResponse.usage,
       };
     } finally {
       // Clean up retry event listeners
@@ -1229,7 +1246,7 @@ export class Agent extends EventEmitter {
         // IMPORTANT: Keep raw content (including thinking blocks) for model context
         const message: ProviderMessage = {
           role: 'assistant',
-          content: event.data,
+          content: event.data.content,
         };
 
         if (toolCallsForThisMessage.length > 0) {
@@ -1692,6 +1709,7 @@ export class Agent extends EventEmitter {
     type: string,
     data:
       | string
+      | AgentMessageData
       | ToolCall
       | ToolResult
       | CompactionData
