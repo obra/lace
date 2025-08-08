@@ -9,7 +9,6 @@ import {
 } from '~/persistence/database';
 import { Thread, ThreadEvent, ThreadEventType, ThreadEventData } from '~/threads/types';
 import { logger } from '~/utils/logger';
-import { estimateTokens } from '~/utils/token-estimation';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
 import { registerDefaultStrategies } from '~/threads/compaction/registry';
@@ -530,75 +529,6 @@ export class ThreadManager {
     // 5. The thread cache remains consistent with successful database state
     const compactionData = compactionEvent.data as CompactionData;
     this.addEvent(threadId, 'COMPACTION', compactionData);
-  }
-
-  oldCompact(threadId: string): void {
-    const thread = this.getThread(threadId);
-    if (!thread) return;
-
-    let compactedCount = 0;
-    let totalTokensSaved = 0;
-
-    // Modify the actual events in memory - that's it
-    for (const event of thread.events) {
-      if (event.type === 'TOOL_RESULT') {
-        const toolResult = event.data;
-        const originalText = toolResult.content?.[0]?.text || '';
-        const originalTokens = this._estimateTokens(originalText);
-
-        const truncatedText = this._truncateToolResult(originalText);
-        if (toolResult.content && toolResult.content[0]) {
-          toolResult.content[0].text = truncatedText;
-        }
-        const newTokens = this._estimateTokens(truncatedText);
-
-        if (newTokens < originalTokens) {
-          compactedCount++;
-          totalTokensSaved += originalTokens - newTokens;
-        }
-      }
-    }
-
-    logger.info('Thread compacted', {
-      threadId,
-      toolResultsCompacted: compactedCount,
-      approximateTokensSaved: totalTokensSaved,
-    });
-
-    // Add informational message to thread (shown to user but not sent to model)
-    const tokenMessage =
-      totalTokensSaved > 0 ? ` to save about ${totalTokensSaved} tokens` : ' to save tokens';
-
-    const event: ThreadEvent = {
-      id: generateEventId(),
-      threadId,
-      type: 'LOCAL_SYSTEM_MESSAGE',
-      timestamp: new Date(),
-      data: `🗜️ Compacted ${compactedCount} tool results${tokenMessage}.`,
-    };
-
-    thread.events.push(event);
-    thread.updatedAt = new Date();
-
-    // Save the compaction event to persistence
-    try {
-      this._persistence.saveEvent(event);
-    } catch (error) {
-      logger.error('Failed to save compaction event', { error });
-    }
-  }
-
-  private _truncateToolResult(output: string): string {
-    const words = output.split(/\s+/);
-    if (words.length <= 200) return output;
-
-    const truncated = words.slice(0, 200).join(' ');
-    const remaining = words.length - 200;
-    return `${truncated}... [truncated ${remaining} more words of tool output]`;
-  }
-
-  private _estimateTokens(text: string): number {
-    return estimateTokens(text);
   }
 
   clearEvents(threadId: string): void {
