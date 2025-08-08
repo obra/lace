@@ -52,15 +52,16 @@ Examples:
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(context?: ToolContext): TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  private async getTaskManagerFromContext(context?: ToolContext): Promise<TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
     context?: ToolContext
   ): Promise<ToolResult> {
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for delegation');
     }
@@ -88,7 +89,7 @@ Examples:
     context?: ToolContext
   ): Promise<ToolResult> {
     const { title, prompt, expected_response, model } = params;
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       throw new Error('TaskManager is required for delegation');
     }
@@ -105,7 +106,7 @@ Examples:
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,
         assignedTo: assigneeSpec,
-        actor: context?.threadId || 'unknown',
+        actor: context?.agent?.threadId || 'unknown',
       });
 
       // Create task with assignment in single operation
@@ -117,7 +118,7 @@ Examples:
           assignedTo: assigneeSpec,
         },
         {
-          actor: context?.threadId || 'human',
+          actor: context?.agent?.threadId || 'human',
         }
       );
 
@@ -136,7 +137,7 @@ Examples:
       const result = await this.waitForTaskCompletion(
         task.id,
         taskManager,
-        context?.threadId || 'unknown'
+        context?.agent?.threadId || 'unknown'
       );
 
       logger.debug('DelegateTool: Task completed', {

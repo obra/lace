@@ -1,22 +1,17 @@
 // ABOUTME: Tool system type definitions and interfaces
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
-import { ThreadId } from '~/threads/types';
-import type { Session } from '~/sessions/session';
+import type { Agent } from '~/agents/agent';
 
 export interface ToolContext {
-  threadId?: ThreadId;
-  // Add for multi-agent support:
-  parentThreadId?: ThreadId; // Parent thread (session)
   // Working directory for file operations
   workingDirectory?: string;
-  // Session information for policy enforcement - REQUIRED for security
-  sessionId?: string;
-  projectId?: string;
-  session?: Session; // TaskManager accessed via session.getTaskManager()
 
   // Temp directory management - provided by ToolExecutor
-  toolTempDir?: string; // Tool-specific temp directory
+  toolTempDir?: string; // Tool-specific temp directory for bash output
+
+  // Agent reference - provides access to threadId, session, and other context
+  agent?: Agent;
 }
 
 export interface ToolAnnotations {
