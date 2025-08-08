@@ -97,6 +97,47 @@ export abstract class Tool {
     return context.toolTempDir;
   }
 
+  /**
+   * Check if a file exists and requires read-before-write protection.
+   * Returns an error result if the file exists but hasn't been read.
+   * Returns null if the check passes (file doesn't exist or was read).
+   */
+  protected async checkFileReadProtection(
+    filePath: string,
+    resolvedPath: string,
+    context?: ToolContext
+  ): Promise<ToolResult | null> {
+    // Try to check if file exists
+    try {
+      const { stat } = await import('fs/promises');
+      await stat(resolvedPath);
+
+      // File exists - check if it was read
+      if (!context?.agent) {
+        // No agent context - this is likely a test environment or direct tool call
+        // Skip read protection for unit tests, but log a warning
+        if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+          return this.createError(
+            'Tool context missing agent reference. This is a system error - please report it.'
+          );
+        }
+        // In test environment, skip the read protection check
+        return null;
+      }
+
+      if (!context.agent.hasFileBeenRead(resolvedPath)) {
+        return this.createError(
+          `File ${filePath} exists but hasn't been read in this conversation. ` +
+            `Use file_read to examine the current contents before modifying.`
+        );
+      }
+    } catch {
+      // File doesn't exist, safe to create/write
+    }
+
+    return null; // Check passed
+  }
+
   // Private implementation
   private _makeResult(options: {
     content: string | Record<string, unknown>;

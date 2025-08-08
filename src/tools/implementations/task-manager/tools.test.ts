@@ -24,6 +24,7 @@ import {
 } from '~/test-utils/provider-instances';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import type { Agent } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { ProviderRegistry } from '~/providers/registry';
@@ -67,7 +68,7 @@ describe('Enhanced Task Manager Tools', () => {
   let mockProvider: MockProvider;
   let providerInstanceId: string;
 
-  const parentThreadId = asThreadId('lace_20250703_parent');
+  const _parentThreadId = asThreadId('lace_20250703_parent');
   const agent1ThreadId = asThreadId('lace_20250703_parent.1');
   const agent2ThreadId = asThreadId('lace_20250703_parent.2');
 
@@ -123,10 +124,13 @@ describe('Enhanced Task Manager Tools', () => {
     taskAddNoteTool = tools.find((t) => t.name === 'task_add_note') as TaskAddNoteTool;
     taskViewTool = tools.find((t) => t.name === 'task_view') as TaskViewTool;
 
+    const agent = session.getAgent(session.getId());
+    if (!agent) {
+      throw new Error('Failed to get agent from session');
+    }
+
     context = {
-      threadId: session.getId(),
-      parentThreadId: parentThreadId,
-      session, // TaskManager accessed via session.getTaskManager()
+      agent,
     };
   });
 
@@ -145,9 +149,9 @@ describe('Enhanced Task Manager Tools', () => {
       expect(taskCreateTool).toBeDefined();
       expect(taskCreateTool.name).toBe('task_add');
 
-      // Test that tools can access TaskManager via session
-      expect(context.session).toBeDefined();
-      expect(context.session?.getTaskManager()).toBeDefined();
+      // Test that tools can access TaskManager via agent
+      expect(context.agent).toBeDefined();
+      expect(session.getTaskManager()).toBeDefined();
 
       // Test that task creation works with context-based TaskManager
       const result = await taskCreateTool.execute(
@@ -314,7 +318,14 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        { ...context, threadId: agent2ThreadId }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent2ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
     });
 
@@ -323,7 +334,14 @@ describe('Enhanced Task Manager Tools', () => {
         {
           filter: 'mine',
         },
-        { ...context, threadId: agent1ThreadId }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent1ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
 
       expect(result.isError).toBe(false);
@@ -569,7 +587,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Second note',
         },
-        { ...context, threadId: agent2ThreadId }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent2ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
 
       // Verify multiple notes using TaskViewTool
@@ -620,7 +645,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Found some edge cases to consider',
         },
-        { ...context, threadId: agent2ThreadId }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent2ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
     });
 

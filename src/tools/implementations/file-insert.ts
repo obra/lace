@@ -34,6 +34,12 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
       // Validate file exists
       await stat(resolvedPath);
 
+      // Check read-before-write protection
+      const protectionError = await this.checkFileReadProtection(path, resolvedPath, context);
+      if (protectionError) {
+        return protectionError;
+      }
+
       // Read current content
       const currentContent = await readFile(resolvedPath, 'utf-8');
       const lines = currentContent.split('\n');
