@@ -22,16 +22,12 @@ describe('FileEditTool with schema validation', () => {
 
   // Helper function to assert successful edits
   const expectSuccessfulEdit = (
-    result: { isError: boolean; content: { text?: string }[] },
+    result: { isError: boolean; metadata?: Record<string, unknown> },
     editCount?: number
   ) => {
     expect(result.isError).toBe(false);
     if (editCount !== undefined) {
-      expect(result.content[0].text).toContain(
-        `Successfully applied ${editCount} edit${editCount === 1 ? '' : 's'}`
-      );
-    } else {
-      expect(result.content[0].text).toContain('Successfully applied');
+      expect(result.metadata?.total_replacements).toBe(editCount);
     }
   };
 

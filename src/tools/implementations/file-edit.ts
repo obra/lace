@@ -169,9 +169,9 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
     // workingContent already contains all applied edits from validation phase
     const newContent = workingContent;
 
-    // Extract diff context - use full file diff for multi-edit, localized for single edit
+    // Extract diff context - use full file diff for multi-edit or single edit with multiple replacements
     const diffContext =
-      edits.length === 1
+      edits.length === 1 && this.countOccurrences(content, edits[0].old_text) === 1
         ? this.extractDiffContext(content, edits[0].old_text, edits[0].new_text)
         : this.extractFullFileDiffContext(content, newContent);
 
@@ -298,22 +298,45 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
    * Finds line numbers and details where matches occur
    */
   private findMatchLocations(content: string, searchText: string): MatchLocation[] {
-    const lines = content.split('\n');
     const locations: MatchLocation[] = [];
+    const lines = content.split('\n');
 
+    // Build line offset mapping for efficient position conversion
+    const lineOffsets: number[] = [0];
     for (let i = 0; i < lines.length; i++) {
-      let columnIndex = 0;
-      while ((columnIndex = lines[i].indexOf(searchText, columnIndex)) !== -1) {
-        locations.push({
-          line_number: i + 1,
-          column_start: columnIndex + 1,
-          column_end: columnIndex + searchText.length + 1,
-          line_content: lines[i],
-          context_before: i > 0 ? lines[i - 1] : undefined,
-          context_after: i < lines.length - 1 ? lines[i + 1] : undefined,
-        });
-        columnIndex += searchText.length;
+      lineOffsets.push(lineOffsets[i] + lines[i].length + 1); // +1 for newline
+    }
+
+    // Find all matches in the raw content
+    let searchIndex = 0;
+    while ((searchIndex = content.indexOf(searchText, searchIndex)) !== -1) {
+      // Convert absolute position to line and column
+      let lineNumber = 0;
+      for (let i = 0; i < lineOffsets.length - 1; i++) {
+        if (searchIndex >= lineOffsets[i] && searchIndex < lineOffsets[i + 1]) {
+          lineNumber = i;
+          break;
+        }
       }
+
+      const columnStart = searchIndex - lineOffsets[lineNumber] + 1;
+      const columnEnd = columnStart + searchText.length;
+
+      // Get the line content (may span multiple lines)
+      const searchLines = searchText.split('\n');
+      const endLineNumber = lineNumber + searchLines.length - 1;
+      const lineContent = lines.slice(lineNumber, endLineNumber + 1).join('\n');
+
+      locations.push({
+        line_number: lineNumber + 1,
+        column_start: columnStart,
+        column_end: columnEnd,
+        line_content: lineContent,
+        context_before: lineNumber > 0 ? lines[lineNumber - 1] : undefined,
+        context_after: endLineNumber < lines.length - 1 ? lines[endLineNumber + 1] : undefined,
+      });
+
+      searchIndex += searchText.length;
     }
 
     return locations;
