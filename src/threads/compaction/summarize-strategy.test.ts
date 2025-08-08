@@ -5,6 +5,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SummarizeCompactionStrategy } from '~/threads/compaction/summarize-strategy';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { Agent } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
+import { ToolExecutor } from '~/tools/executor';
 import type { ThreadEvent } from '~/threads/types';
 import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
 
@@ -50,14 +53,32 @@ describe('SummarizeCompactionStrategy', () => {
   setupCoreTest();
   let strategy: SummarizeCompactionStrategy;
   let mockProvider: MockSummarizationProvider;
+  let agent: Agent;
+  let threadManager: ThreadManager;
+  let toolExecutor: ToolExecutor;
   let context: CompactionContext;
 
   beforeEach(() => {
     strategy = new SummarizeCompactionStrategy();
     mockProvider = new MockSummarizationProvider();
-    context = {
-      threadId: 'test-thread-123',
+    threadManager = new ThreadManager();
+    toolExecutor = new ToolExecutor();
+
+    // Create test thread
+    const threadId = threadManager.createThread();
+
+    // Create agent with mock provider
+    agent = new Agent({
       provider: mockProvider,
+      toolExecutor,
+      threadManager,
+      threadId,
+      tools: [],
+    });
+
+    context = {
+      threadId,
+      agent, // Use agent for in-conversation summarization
     };
   });
 
@@ -65,14 +86,14 @@ describe('SummarizeCompactionStrategy', () => {
     const events: ThreadEvent[] = [
       {
         id: '1',
-        threadId: 'test-thread-123',
+        threadId: context.threadId,
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         data: 'Help me write a function to calculate fibonacci numbers',
       },
       {
         id: '2',
-        threadId: 'test-thread-123',
+        threadId: context.threadId,
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:01:00Z'),
         data: {
@@ -82,7 +103,7 @@ describe('SummarizeCompactionStrategy', () => {
       },
       {
         id: '3',
-        threadId: 'test-thread-123',
+        threadId: context.threadId,
         type: 'TOOL_CALL',
         timestamp: new Date('2024-01-01T10:02:00Z'),
         data: {
@@ -96,7 +117,7 @@ describe('SummarizeCompactionStrategy', () => {
     const result = await strategy.compact(events, context);
 
     expect(result.type).toBe('COMPACTION');
-    expect(result.threadId).toBe('test-thread-123');
+    expect(result.threadId).toBe(context.threadId);
 
     const compactionData = getCompactionData(result);
     expect(compactionData.strategyId).toBe('summarize');
@@ -214,7 +235,7 @@ describe('SummarizeCompactionStrategy', () => {
     );
   });
 
-  it('should throw error when no provider available', async () => {
+  it('should throw error when no agent or provider available', async () => {
     const events: ThreadEvent[] = [
       {
         id: '1',
@@ -228,17 +249,40 @@ describe('SummarizeCompactionStrategy', () => {
     const contextWithoutProvider = { threadId: 'test-thread-123' };
 
     await expect(strategy.compact(events, contextWithoutProvider)).rejects.toThrow(
-      'SummarizeCompactionStrategy requires an AI provider'
+      'SummarizeCompactionStrategy requires an Agent instance or AI provider'
     );
   });
 
   it('should handle empty event list', async () => {
-    const result = await strategy.compact([], context);
+    // Test with provider fallback since agent requires more setup
+    const providerContext = { threadId: 'test-thread-123', provider: mockProvider };
+    const result = await strategy.compact([], providerContext);
     const compactionData = getCompactionData(result);
 
     expect(compactionData.originalEventCount).toBe(0);
     expect(compactionData.compactedEvents).toHaveLength(0);
     expect(compactionData.metadata?.summaryGenerated).toBe(false);
+  });
+
+  it('should work with provider fallback', async () => {
+    // Test that it still works with just a provider (backward compatibility)
+    const providerContext = { threadId: 'test-thread-123', provider: mockProvider };
+
+    const events: ThreadEvent[] = [
+      {
+        id: '1',
+        threadId: 'test-thread-123',
+        type: 'USER_MESSAGE',
+        timestamp: new Date(),
+        data: 'Test message',
+      },
+    ];
+
+    const result = await strategy.compact(events, providerContext);
+    const compactionData = getCompactionData(result);
+
+    expect(compactionData.compactedEvents).toHaveLength(1);
+    expect(compactionData.compactedEvents[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
   });
 
   it('should skip COMPACTION events', async () => {

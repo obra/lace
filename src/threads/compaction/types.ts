@@ -4,6 +4,7 @@
 import type { ThreadEvent } from '~/threads/types';
 import type { AIProvider } from '~/providers/base-provider';
 import type { ToolExecutor } from '~/tools/executor';
+import type { Agent } from '~/agents/agent';
 
 /**
  * Data structure stored in COMPACTION events
@@ -47,8 +48,10 @@ export interface CompactionStrategy {
 export interface CompactionContext {
   /** The ID of the thread being compacted */
   threadId: string;
-  /** Optional AI provider for strategies that need AI assistance */
+  /** Optional AI provider for strategies that need AI assistance (deprecated - use agent instead) */
   provider?: AIProvider;
+  /** Optional Agent instance for in-conversation summarization */
+  agent?: Agent;
   /** Optional tool executor for strategies that need to use tools */
   toolExecutor?: ToolExecutor;
 }

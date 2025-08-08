@@ -11,8 +11,8 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
   private readonly RECENT_EVENT_COUNT = 2; // Last 2 events (usually 1 exchange)
 
   async compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent> {
-    if (!context.provider) {
-      throw new Error('SummarizeCompactionStrategy requires an AI provider');
+    if (!context.agent && !context.provider) {
+      throw new Error('SummarizeCompactionStrategy requires an Agent instance or AI provider');
     }
 
     if (events.length === 0) {
@@ -33,7 +33,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
 
     // Generate summary for old events if any exist
     if (oldEvents.length > 0) {
-      const summary = await this.generateSummary(oldEvents, context);
+      const summary = await this.generateSummaryInConversation(oldEvents, recentEvents, context);
       const summaryEvent = this.createSummaryEvent(summary, context.threadId);
       compactedEvents.push(summaryEvent);
     }
@@ -64,37 +64,64 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     return { oldEvents, recentEvents };
   }
 
-  private async generateSummary(
-    events: ThreadEvent[],
+  private async generateSummaryInConversation(
+    oldEvents: ThreadEvent[],
+    recentEvents: ThreadEvent[],
     context: CompactionContext
   ): Promise<string> {
-    const conversationText = this.eventsToText(events);
+    const summaryRequest = this.createSummaryRequest(oldEvents, recentEvents);
 
-    const summaryPrompt = `You are creating a summary of a coding conversation that will help you continue the conversation effectively. Include ALL important information needed to provide helpful assistance:
+    if (context.agent) {
+      // Use the agent's full conversation context for better summaries
+      const agent = context.agent;
+      // Pass all events up to the compaction point for context
+      return agent.generateSummary(summaryRequest, [...oldEvents, ...recentEvents]);
+    } else if (context.provider) {
+      // Fallback to provider-only summarization (sidebar approach)
+      const response = await context.provider.createResponse(
+        [{ role: 'user', content: summaryRequest }],
+        [],
+        'default'
+      );
+      return response.content;
+    }
 
-REQUIRED INFORMATION TO PRESERVE:
-1. **Project Context**: What type of project/codebase is being worked on
-2. **Technical Stack**: Languages, frameworks, tools mentioned  
-3. **File Operations**: Files created, modified, or discussed
-4. **Code Solutions**: Functions, classes, or algorithms implemented
-5. **Dependencies**: Libraries, packages, or tools installed/configured
-6. **Issues & Errors**: Problems encountered and their solutions
-7. **User Preferences**: Coding style, patterns, or approaches the user prefers
-8. **Current State**: What was accomplished and what's still needed
-9. **Context Variables**: Important names, paths, or configuration values
+    throw new Error('No agent or provider available for summarization');
+  }
 
-Conversation to summarize:
-${conversationText}
+  private createSummaryRequest(oldEvents: ThreadEvent[], recentEvents: ThreadEvent[]): string {
+    const oldConversation = this.eventsToText(oldEvents);
+    const recentContext = recentEvents.length > 0 ? this.eventsToText(recentEvents) : '';
 
-Provide a comprehensive summary that would allow you to continue helping this user effectively:`;
+    return `[SYSTEM: Conversation Compaction Required]
 
-    const response = await context.provider!.createResponse(
-      [{ role: 'user', content: summaryPrompt }],
-      [], // No tools needed for summarization
-      'default' // Use default model
-    );
+I need you to summarize the older parts of our conversation to reduce context size while preserving all important information. This summary will replace the older messages.
 
-    return response.content;
+## Older Conversation to Summarize
+${oldConversation}
+
+${
+  recentContext
+    ? `## Recent Context (for reference, will be preserved as-is)
+${recentContext}
+
+`
+    : ''
+}## Summary Instructions
+
+Create a comprehensive summary that captures ALL critical information from the older conversation. Structure your summary with these sections:
+
+1. **User's Request**: What I originally asked for and what problem I'm solving
+2. **Current Status**: What's been completed and what remains
+3. **Technical Context**: Project type, tech stack, file structure, dependencies
+4. **Changes Made**: Files created/modified with descriptions
+5. **Issues & Solutions**: Problems encountered and how they were resolved
+6. **Important State**: Variable names, IDs, partial implementations, next steps
+7. **Working Context**: Current branch, uncommitted changes, pending decisions
+
+Be thorough but concise. Focus on actionable information that enables you to continue helping me effectively. Remember: anything not in your summary will be lost.
+
+Provide ONLY the summary, no preamble or explanation.`;
   }
 
   private eventsToText(events: ThreadEvent[]): string {

@@ -1687,8 +1687,32 @@ export class Agent extends EventEmitter {
   async compact(threadId: string): Promise<void> {
     // Use the AI-powered summarization strategy for better compaction
     await this._threadManager.compact(threadId, 'summarize', {
-      provider: this._provider,
+      agent: this,
     });
+  }
+
+  /**
+   * Generate a summary using the current conversation context
+   * Used by compaction strategies to leverage the agent's full context
+   */
+  async generateSummary(promptContent: string, events: ThreadEvent[]): Promise<string> {
+    // Build conversation messages from the provided events
+    const messages = this._buildConversationFromEvents(events);
+
+    // Add the summarization prompt
+    messages.push({
+      role: 'user',
+      content: promptContent,
+    });
+
+    // Get the summary using this agent's provider and model
+    const response = await this._provider.createResponse(
+      messages,
+      [], // No tools for summarization
+      this.model || 'default'
+    );
+
+    return response.content;
   }
 
   createDelegateAgent(
