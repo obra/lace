@@ -45,7 +45,7 @@ export function createFileDiffFromText(
 /**
  * Improved diff algorithm that produces cleaner diffs
  * Uses longest common subsequence approach for better line matching
- * Automatically folds sections with 3+ consecutive unchanged lines
+ * Automatically folds sections with 4+ consecutive unchanged lines
  */
 function computeLineDiff(oldLines: string[], newLines: string[]): DiffLine[] {
   const allDiffLines: DiffLine[] = [];
@@ -171,7 +171,7 @@ function computeLineDiff(oldLines: string[], newLines: string[]): DiffLine[] {
 }
 
 /**
- * Automatically folds sections with 3+ consecutive unchanged lines
+ * Automatically folds sections with 4+ consecutive unchanged lines
  * Keeps the first and last line of each large unchanged section for context
  */
 function applyAutoFolding(diffLines: DiffLine[], foldThreshold: number = 4): DiffLine[] {
@@ -197,8 +197,6 @@ function applyAutoFolding(diffLines: DiffLine[], foldThreshold: number = 4): Dif
         foldedLines.push(diffLines[i]);
 
         // Add fold marker
-        const firstLine = diffLines[i];
-        const lastLine = diffLines[i + unchangedCount - 1];
         const skippedCount = unchangedCount - 2; // -2 because we show first and last
 
         foldedLines.push({

@@ -18,7 +18,7 @@ A unified file editing tool that handles both single and multiple edits to a fil
 
 ```typescript
 interface FileEditArgs {
-  path: string;              // File path (absolute or relative)
+  path: FilePath;            // File path (absolute or relative) with validation
   edits: EditOperation[];    // Array of edit operations (always an array)
   dry_run?: boolean;         // Preview changes without applying (default: false)
 }
@@ -159,9 +159,12 @@ async function executeFileEdit(args: FileEditArgs): Promise<FileEditResult> {
     editSummaries.push(result.summary);
   }
   
-  // 7. Write file once
+  // 7. Write file atomically (temp + fsync + rename)
   try {
-    await writeFile(args.path, workingContent, 'utf-8');
+    const tempPath = `${args.path}.tmp.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+    await writeFile(tempPath, workingContent, 'utf-8');
+    await fsync(tempPath);  // Ensure data is written to disk
+    await rename(tempPath, args.path);  // Atomic replacement
   } catch (error) {
     return createWriteError(args.path, error);
   }
@@ -298,7 +301,7 @@ describe('Occurrence validation', () => {
   it('should replace exact number when specified')
   it('should fail when expected count does not match actual')
   it('should count occurrences correctly across line boundaries')
-  it('should handle overlapping matches correctly')
+  it('should handle non-overlapping matches (overlapping matches not supported)')
   it('should count occurrences after each edit in sequence')
 })
 ```
@@ -502,9 +505,10 @@ export const fixtures = {
 
 1. **Single File Read**: Read entire file once into memory
 2. **Single File Write**: Write entire file once after all edits
-3. **Efficient String Operations**: Use indexOf for searching, not regex
+3. **Efficient String Operations**: Use indexOf for searching (non-overlapping matches), not regex
 4. **Memory Limits**: Refuse to edit files > 100MB
 5. **Edit Limit**: Maximum 1000 edits per operation
+6. **Overlapping Matches**: Not supported - indexOf advances past full match length
 
 ### Security Considerations
 

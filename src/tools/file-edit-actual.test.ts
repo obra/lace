@@ -14,9 +14,8 @@ describe('FileEditTool actual file modification', () => {
 
   beforeEach(async () => {
     tool = new FileEditTool();
-    testDir = (await mkdir(join(tmpdir(), 'file-edit-actual-test-' + Date.now()), {
-      recursive: true,
-    })) as unknown as string;
+    testDir = join(tmpdir(), 'file-edit-actual-test-' + Date.now());
+    await mkdir(testDir, { recursive: true });
     testFile = join(testDir, 'test.txt');
   });
 
