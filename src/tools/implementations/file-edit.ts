@@ -9,8 +9,8 @@ import { FilePath } from '~/tools/schemas/common';
 
 // Define schemas for input validation
 const editOperationSchema = z.object({
-  old_text: z.string(),
-  new_text: z.string(),
+  old_text: z.string(), // Empty string allowed for insertions at beginning
+  new_text: z.string(), // Empty string allowed for deletions
   occurrences: z.number().int().positive().optional(),
 });
 
@@ -77,7 +77,8 @@ Example:
       content = await readFile(resolvedPath, 'utf-8');
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error) {
-        switch (error.code) {
+        const nodeError = error as NodeJS.ErrnoException;
+        switch (nodeError.code) {
           case 'ENOENT':
             return this.createError(`File not found: ${args.path}`);
           case 'EACCES':
@@ -193,7 +194,8 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
       await writeFile(resolvedPath, newContent, 'utf-8');
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error) {
-        switch (error.code) {
+        const nodeError = error as NodeJS.ErrnoException;
+        switch (nodeError.code) {
           case 'EACCES':
             return this.createError(`Permission denied: Cannot write to file ${args.path}`);
           case 'EPERM':
