@@ -256,7 +256,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(taskDetails).toContain('in_progress');
 
       // Should have 2 notes in the output
-      const noteMatches = taskDetails.match(/\d+\. \[lace_20250703_parent\.\d+\]/g);
+      const noteMatches = taskDetails.match(/\d+\. \[lace_\d{8}_[a-z0-9]{6}(\.\d+)?\]/g);
       expect(noteMatches).toHaveLength(2);
     });
   });
@@ -483,7 +483,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(taskDetails).toContain('Note from agent 3');
 
       // Should have 3 notes in the output (each note shows as "N. [author] timestamp")
-      const noteMatches = taskDetails.match(/\d+\. \[lace_20250703_parent\.\d+\]/g);
+      const noteMatches = taskDetails.match(/\d+\. \[lace_\d{8}_[a-z0-9]{6}(\.\d+)?\]/g);
       expect(noteMatches).toHaveLength(3);
     });
   });
