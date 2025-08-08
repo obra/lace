@@ -29,14 +29,27 @@ This plan implements a comprehensive compaction system for Lace to handle contex
 
 ---
 
-## Phase 1: Token Tracking Foundation
+## Phase 1: Token Tracking Foundation ✅ **COMPLETED**
 
-### Task 1.1: Add Token Usage to Event Types
+### Task 1.1: Add Token Usage to Event Types ✅
 **Goal**: Enable events to store token usage data without database changes.
 
-**Files to modify**:
-- `src/threads/types.ts` - Update event type definitions
-- `src/threads/types.test.ts` - Create this file for type tests
+**Status**: ✅ **COMPLETED** - Committed in `760d5087`
+
+**Files modified**:
+- `src/threads/types.ts` - Updated event type definitions with TokenUsage interface and AgentMessageData
+- `src/threads/types.test.ts` - Created comprehensive type tests
+- `src/tools/types.ts` - Added tokenUsage field to ToolResult interface
+- `src/persistence/database.ts` - Updated to handle new AgentMessageData type
+- Multiple test files updated to use new AGENT_MESSAGE format
+
+**Provider Integration**: Works with **provider-agnostic abstraction layer** supporting:
+- **Anthropic Claude** (primary)
+- **OpenAI GPT models**
+- **LMStudio** (local models) 
+- **Ollama** (local models)
+
+Any provider that populates the `usage` field in `ProviderResponse` will automatically have token data tracked.
 
 **Implementation**:
 ```typescript
@@ -118,12 +131,14 @@ npm run test:run src/threads/types.test.ts
 
 ---
 
-### Task 1.2: Store Token Usage in Agent
+### Task 1.2: Store Token Usage in Agent ✅
 **Goal**: When Agent receives responses from providers, store token usage in events.
 
-**Files to modify**:
-- `src/agents/agent.ts` - Update event creation to include token usage
-- `src/agents/agent-token-tracking.test.ts` - Create integration test
+**Status**: ✅ **COMPLETED** - Committed in `7cfd8888`
+
+**Files modified**:
+- `src/agents/agent.ts` - Updated event creation to include token usage from provider responses
+- `src/agents/agent-token-tracking.test.ts` - Created integration test to verify functionality
 
 **Implementation locations in agent.ts**:
 1. Find `_handleProviderResponse` method (~line 700)
@@ -198,12 +213,14 @@ describe('Agent token tracking', () => {
 
 ---
 
-### Task 1.3: Add Token Aggregation Helper
+### Task 1.3: Add Token Aggregation Helper ✅
 **Goal**: Create utility to calculate total tokens used in a conversation.
 
-**Files to create**:
-- `src/threads/token-aggregation.ts` - Token calculation utilities
-- `src/threads/token-aggregation.test.ts` - Tests
+**Status**: ✅ **COMPLETED** - Committed in `760d5087`
+
+**Files created**:
+- `src/threads/token-aggregation.ts` - Token calculation utilities with aggregateTokenUsage() and estimateConversationTokens()
+- `src/threads/token-aggregation.test.ts` - Comprehensive tests covering various scenarios
 
 **Implementation** (`src/threads/token-aggregation.ts`):
 ```typescript
@@ -322,18 +339,46 @@ describe('Token aggregation', () => {
 });
 ```
 
-**Commit**: `feat: add token aggregation utilities for conversation tracking`
+**Key Features**:
+- `aggregateTokenUsage()`: Sums precise token counts from AGENT_MESSAGE and TOOL_RESULT events
+- `estimateConversationTokens()`: Provides fallback estimation when precise data unavailable  
+- Handles mixed scenarios (events with/without token usage)
+- Comprehensive test coverage
+
+**Commit**: `feat: add token aggregation utilities and agent token tracking test`
+
+---
+
+## Phase 1 Summary ✅ **COMPLETED**
+
+**What was delivered**:
+1. ✅ **Token Usage Event Types** - Events can now store precise token consumption data
+2. ✅ **Provider Integration** - All AI providers automatically track tokens if supported 
+3. ✅ **Agent Token Storage** - Agent stores token usage from provider responses in conversation events
+4. ✅ **Aggregation Utilities** - Calculate total tokens used across conversation history
+
+**Breaking Changes Made**:
+- `AGENT_MESSAGE` events now use `{ content: string, tokenUsage?: TokenUsage }` instead of raw strings
+- All existing code updated to use new format
+
+**Provider Support**:
+- **Anthropic Claude**, **OpenAI**, **LMStudio**, **Ollama** - any provider implementing `ProviderResponse.usage`
+
+**Ready for Phase 2**: Foundation is in place for manual `/compact` command and AI-powered compaction strategies.
 
 ---
 
 ## Phase 2: Manual Compaction Command
 
-### Task 2.1: Add /compact Command Detection
+### Task 2.1: Add /compact Command Detection ✅ **COMPLETED**
 **Goal**: Detect when user sends "/compact" and trigger compaction instead of processing as message.
 
-**Files to modify**:
-- `src/agents/agent.ts` - Add command detection in sendMessage
-- `src/agents/agent-commands.test.ts` - Create test for command handling
+**Commit**: `0308d029` - feat: implement /compact command detection in Agent
+
+**Files modified**:
+- `src/agents/agent.ts` - Added command detection in _processMessage
+- `src/agents/agent-commands.test.ts` - Complete test suite for command handling
+- `src/agents/agent-token-tracking.test.ts` - Fixed TypeScript issues
 
 **Implementation in agent.ts**:
 ```typescript
@@ -428,30 +473,37 @@ describe('Agent command handling', () => {
 });
 ```
 
-**Commit**: `feat: add /compact command to trigger manual compaction`
+**What was delivered:**
+- ✅ Command detection in Agent._processMessage() before normal processing
+- ✅ _handleCompactCommand() method with proper event emission
+- ✅ Structured error handling with context information
+- ✅ Complete test suite: 4 test cases covering execution, non-commands, events, errors
+- ✅ Users can now type `/compact` to manually trigger thread compaction
+- ✅ All TypeScript and linting issues resolved
 
 ---
 
-### Task 2.2: Expose Compaction through Web API
-**Goal**: Allow web UI to trigger compaction by sending "/compact" message.
+### Task 2.2: Create Basic Compaction Logic
+**Goal**: Implement thread summarization and event replacement for more efficient compaction.
 
-**Files to check** (no changes needed):
-- `packages/web/app/api/threads/[threadId]/message/route.ts` - Already handles any message
-- `packages/web/hooks/useSessionAPI.ts` - Already can send messages
+**Current status**: Task 2.1 uses the existing 'trim-tool-results' strategy. This task will enhance compaction with better strategies.
 
-**Test manually**:
-1. Start the web server: `npm run dev` (in packages/web)
-2. Open browser to http://localhost:3000
-3. Start a conversation
-4. Type `/compact` and send
-5. Verify compaction message appears
+**Files to implement**:
+- `src/threads/compaction/summarize-strategy.ts` - New AI-powered summarization strategy
+- `src/threads/compaction/summarize-strategy.test.ts` - Test the summarization logic
 
-**Write integration test** (`packages/web/app/api/threads/[threadId]/message/route.test.ts`):
-Add test case to existing file:
+**Implementation approach**:
+1. Create SummarizeCompactionStrategy that uses AI to create conversation summaries
+2. Replace old events with summary events to reduce token count
+3. Preserve critical information (tool calls, recent context)
+4. Test with various conversation scenarios
+
+**Test first** (`src/threads/compaction/summarize-strategy.test.ts`):
 ```typescript
-it('should handle /compact command', async () => {
-  const response = await POST(
-    createMockRequest({ message: '/compact' }),
+it('should create summary from conversation events', async () => {
+  const events = [
+    { type: 'USER_MESSAGE', data: 'Help me write a function' },
+    { type: 'AGENT_MESSAGE', data: { content: 'I can help with that...' } },
     { params: Promise.resolve({ threadId: 'test-thread' }) }
   );
   
