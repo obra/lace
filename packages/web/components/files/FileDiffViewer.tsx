@@ -444,7 +444,7 @@ export default function FileDiffViewer({
   // Handle binary files
   if (diff.isBinary) {
     return (
-      <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`}>
+      <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`} data-testid="file-diff-viewer">
         <div className="bg-base-200 px-4 py-3 border-b border-base-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -464,7 +464,7 @@ export default function FileDiffViewer({
   }
 
   return (
-    <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`}>
+    <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`} data-testid="file-diff-viewer">
       {/* Header */}
       <div className="bg-base-200 px-4 py-3 border-b border-base-300">
         <div className="flex items-center justify-between">

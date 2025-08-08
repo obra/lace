@@ -187,7 +187,7 @@ describe('fileEditRenderer', () => {
       const { container } = render(React.createElement('div', null, rendered));
 
       // Should render single unified FileDiffViewer showing all changes
-      const diffViewers = container.querySelectorAll('.border-base-300');
+      const diffViewers = container.querySelectorAll('[data-testid="file-diff-viewer"]');
       expect(diffViewers.length).toBe(1); // Single unified diff
 
       // Should show content from the unified diff (old and new versions)

@@ -41,25 +41,6 @@ interface MatchLocation {
   context_after?: string;
 }
 
-interface SimilarContent {
-  line_number: number;
-  content: string;
-  similarity_score: number;
-  differences: StringDiff[];
-}
-
-interface StringDiff {
-  type: 'whitespace' | 'case' | 'punctuation' | 'content';
-  expected: string;
-  found: string;
-}
-
-interface SuggestedFix {
-  type: 'USE_EXACT_TEXT' | 'ADJUST_COUNT' | 'ESCAPE_SPECIAL' | 'CHECK_WHITESPACE';
-  suggestion: string;
-  example?: string;
-}
-
 interface _ValidationError {
   type: 'NO_MATCH' | 'WRONG_COUNT' | 'FILE_NOT_FOUND' | 'BINARY_FILE' | 'PERMISSION_DENIED';
   edit_index: number;
@@ -73,7 +54,6 @@ interface _ValidationError {
 
   // For no match errors
   search_text?: string;
-  similar_content?: SimilarContent[];
 }
 
 export class FileEditTool extends Tool {
@@ -119,35 +99,29 @@ Example:
 
     // Validate all edits first
     let workingContent = content;
+    const editResults: { occurrences: number; expectedOccurrences: number }[] = [];
+
     for (let i = 0; i < edits.length; i++) {
       const edit = edits[i];
-      const occurrences = workingContent.split(edit.old_text).length - 1;
+      const occurrences = this.countOccurrences(workingContent, edit.old_text);
       const expectedOccurrences = edit.occurrences ?? 1;
+      editResults.push({ occurrences, expectedOccurrences });
 
       if (occurrences === 0) {
-        const similarContent = this.findSimilarContent(workingContent, edit.old_text);
-        const suggestedFixes = this.generateSuggestedFixes(edit.old_text, similarContent);
+        const filePreview = this.getFilePreview(workingContent, edit.old_text);
 
         const errorMessage = `Edit ${i + 1} of ${edits.length}: Could not find exact text in ${args.path}.
 
 Searched for (between >>>markers<<<):
 >>>${edit.old_text}<<<
 
-${
-  similarContent.length > 0
-    ? `File contains similar content that might be what you're looking for:
+${filePreview}
 
-${similarContent
-  .map(
-    (sc) => `Line ${sc.line_number}: ${sc.content}
-  Difference: ${sc.differences.map((d) => `${d.type} - expected '${d.expected}', found '${d.found}'`).join(', ')}`
-  )
-  .join('\n\n')}
-
-`
-    : ''
-}Suggestions:
-${suggestedFixes.map((fix) => `${fix.suggestion}${fix.example ? '\n  Example: ' + fix.example : ''}`).join('\n')}`;
+Suggestions:
+1. Use file_read to see the exact content, then copy it precisely
+2. Check for tabs vs spaces - copy the exact whitespace from the file
+3. Ensure you include all line breaks in multi-line searches
+4. Match the exact case from the file`;
 
         return this.createError(errorMessage, {
           validation_error: {
@@ -156,14 +130,13 @@ ${suggestedFixes.map((fix) => `${fix.suggestion}${fix.example ? '\n  Example: ' 
             total_edits: edits.length,
             message: errorMessage,
             search_text: edit.old_text,
-            similar_content: similarContent,
           },
         });
       }
 
       if (occurrences !== expectedOccurrences) {
         const locations = this.findMatchLocations(workingContent, edit.old_text);
-        const suggestedFixes: SuggestedFix[] = [
+        const suggestedFixes = [
           {
             type: 'ADJUST_COUNT',
             suggestion: `Update occurrences to ${occurrences} if you want to replace all instances`,
@@ -198,13 +171,13 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
       }
 
       // Simulate the edit for next validation
-      workingContent = workingContent.split(edit.old_text).join(edit.new_text);
+      workingContent = this.replaceAll(workingContent, edit.old_text, edit.new_text);
     }
 
     // Apply all edits
     workingContent = content;
     for (const edit of edits) {
-      workingContent = workingContent.split(edit.old_text).join(edit.new_text);
+      workingContent = this.replaceAll(workingContent, edit.old_text, edit.new_text);
     }
 
     const newContent = workingContent;
@@ -242,15 +215,12 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
       {
         diff: diffContext,
         path: args.path,
-        edits_applied: edits.map((edit) => ({
+        edits_applied: edits.map((edit, index) => ({
           old_text: edit.old_text,
           new_text: edit.new_text,
-          occurrences_replaced: content.split(edit.old_text).length - 1,
+          occurrences_replaced: editResults[index]?.occurrences ?? 0,
         })),
-        total_replacements: edits.reduce(
-          (sum, edit) => sum + (content.split(edit.old_text).length - 1),
-          0
-        ),
+        total_replacements: editResults.reduce((sum, result) => sum + result.occurrences, 0),
       }
     );
   }
@@ -354,143 +324,62 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
   }
 
   /**
-   * Finds similar content to help with typos and near-matches
+   * Gets a simple preview of file content to help with debugging
    */
-  private findSimilarContent(content: string, searchText: string): SimilarContent[] {
+  private getFilePreview(content: string, _searchText?: string): string {
     const lines = content.split('\n');
-    const similar: SimilarContent[] = [];
-    const threshold = 0.7; // Similarity threshold
+    const totalLines = lines.length;
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const similarity = this.calculateSimilarity(searchText, line);
-
-      if (similarity >= threshold && similarity < 1.0) {
-        const differences = this.findStringDifferences(searchText, line);
-        similar.push({
-          line_number: i + 1,
-          content: line,
-          similarity_score: similarity,
-          differences,
-        });
-      }
+    if (totalLines <= 10) {
+      // Small file - show everything with line numbers
+      return `File content (${totalLines} lines):\n${lines.map((line, i) => `${i + 1}: ${line}`).join('\n')}`;
     }
 
-    // Sort by similarity descending and return top 3
-    return similar.sort((a, b) => b.similarity_score - a.similarity_score).slice(0, 3);
+    // Large file - show first few lines and summary
+    const preview = lines
+      .slice(0, 5)
+      .map((line, i) => `${i + 1}: ${line}`)
+      .join('\n');
+    return `File preview (${totalLines} lines total):\n${preview}\n... (${totalLines - 5} more lines)\n\nUse file_read to see the complete file content.`;
   }
 
   /**
-   * Calculates similarity between two strings using simple ratio
+   * Count occurrences without creating large intermediate arrays
    */
-  private calculateSimilarity(str1: string, str2: string): number {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
+  private countOccurrences(text: string, searchText: string): number {
+    if (searchText === '') {
+      return text === '' ? 1 : 0;
+    }
 
-    if (longer.length === 0) return 1.0;
+    let count = 0;
+    let pos = 0;
 
-    const editDistance = this.levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
+    while ((pos = text.indexOf(searchText, pos)) !== -1) {
+      count++;
+      pos += searchText.length;
+    }
+
+    return count;
   }
 
   /**
-   * Calculates Levenshtein distance between two strings
+   * Replace all occurrences without creating large intermediate arrays
    */
-  private levenshteinDistance(str1: string, str2: string): number {
-    const matrix: number[][] = Array(str2.length + 1)
-      .fill(null)
-      .map(() => Array(str1.length + 1).fill(0) as number[]);
-
-    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-
-    for (let j = 1; j <= str2.length; j++) {
-      for (let i = 1; i <= str1.length; i++) {
-        const substitutionCost = str1[i - 1] === str2[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1, // insertion
-          matrix[j - 1][i] + 1, // deletion
-          matrix[j - 1][i - 1] + substitutionCost // substitution
-        );
-      }
+  private replaceAll(text: string, searchText: string, replaceText: string): string {
+    if (searchText === '') {
+      return text === '' ? replaceText : text;
     }
 
-    return matrix[str2.length][str1.length];
-  }
+    let result = '';
+    let lastPos = 0;
+    let pos = 0;
 
-  /**
-   * Finds specific differences between two strings
-   */
-  private findStringDifferences(expected: string, found: string): StringDiff[] {
-    const differences: StringDiff[] = [];
-
-    // Check for whitespace differences
-    if (expected.trim() === found.trim() && expected !== found) {
-      differences.push({
-        type: 'whitespace',
-        expected: expected.replace(/\s/g, '·'), // Show whitespace
-        found: found.replace(/\s/g, '·'),
-      });
+    while ((pos = text.indexOf(searchText, lastPos)) !== -1) {
+      result += text.slice(lastPos, pos) + replaceText;
+      lastPos = pos + searchText.length;
     }
 
-    // Check for case differences
-    if (expected.toLowerCase() === found.toLowerCase() && expected !== found) {
-      differences.push({
-        type: 'case',
-        expected,
-        found,
-      });
-    }
-
-    // If no specific type found, mark as content difference
-    if (differences.length === 0) {
-      differences.push({
-        type: 'content',
-        expected,
-        found,
-      });
-    }
-
-    return differences;
-  }
-
-  /**
-   * Generates suggested fixes based on the error type and similar content
-   */
-  private generateSuggestedFixes(
-    searchText: string,
-    similarContent: SimilarContent[]
-  ): SuggestedFix[] {
-    const fixes: SuggestedFix[] = [
-      {
-        type: 'USE_EXACT_TEXT',
-        suggestion: 'Use file_read to see the exact content, then copy it precisely',
-        example: 'Include all whitespace, tabs, and line breaks exactly as they appear',
-      },
-    ];
-
-    // Add specific suggestions based on similar content
-    if (similarContent.length > 0) {
-      const hasWhitespace = similarContent.some((sc) =>
-        sc.differences.some((d) => d.type === 'whitespace')
-      );
-      const hasCase = similarContent.some((sc) => sc.differences.some((d) => d.type === 'case'));
-
-      if (hasWhitespace) {
-        fixes.push({
-          type: 'CHECK_WHITESPACE',
-          suggestion: 'Check for tabs vs spaces - copy the exact whitespace from the file',
-        });
-      }
-
-      if (hasCase) {
-        fixes.push({
-          type: 'USE_EXACT_TEXT',
-          suggestion: 'Check capitalization - match the exact case from the file',
-        });
-      }
-    }
-
-    return fixes;
+    result += text.slice(lastPos);
+    return result;
   }
 }
