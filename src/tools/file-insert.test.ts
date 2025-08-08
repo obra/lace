@@ -23,7 +23,9 @@ describe('FileInsertTool with schema validation', () => {
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_insert');
-      expect(tool.description).toContain('Insert content into a file');
+      expect(tool.description)
+        .toBe(`Insert content at specific line or append to end, preserves existing content. Use file-write to replace entire file.
+Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
     });
 
     it('should have proper input schema', () => {

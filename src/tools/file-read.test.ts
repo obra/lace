@@ -24,7 +24,9 @@ describe('FileReadTool', () => {
   describe('tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_read');
-      expect(tool.description).toBe('Read file contents with optional line range support');
+      expect(tool.description).toBe(
+        'Read file contents. Full reads limited to 32KB, use line ranges (startLine/endLine) for larger files.'
+      );
       // New tool doesn't have annotations property - that's old interface
     });
 

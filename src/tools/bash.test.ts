@@ -36,7 +36,9 @@ describe('BashTool', () => {
     it('should have correct name and description', () => {
       expect(bashTool.name).toBe('bash');
       expect(bashTool.description).toBe(
-        "Use bash to execute unix commands to achieve the user's goals. Be smart and careful."
+        `Execute shell commands in isolated bash processes. Each call is independent - no state persists between calls.
+Output truncated to first 100 + last 50 lines. Chain commands with && or ; for sequential operations.
+Exit codes shown even for successful tool execution. Working directory persists within session.`
       );
     });
 

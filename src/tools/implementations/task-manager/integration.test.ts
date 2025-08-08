@@ -22,6 +22,7 @@ import {
 } from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import type { Agent } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
@@ -64,6 +65,8 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   // Simulate three agents in a parent thread
   const _parentThreadId = asThreadId('lace_20250703_parent');
+  const agent2ThreadId = asThreadId('lace_20250703_parent.2');
+  const agent3ThreadId = asThreadId('lace_20250703_parent.3');
   let mainAgentContext: ToolContext;
   let agent2Context: ToolContext;
   let agent3Context: ToolContext;
@@ -131,10 +134,18 @@ describe('Multi-Agent Task Manager Integration', () => {
       agent,
     };
     agent2Context = {
-      agent,
+      agent: {
+        ...agent,
+        threadId: agent2ThreadId,
+        getFullSession: agent.getFullSession.bind(agent),
+      } as unknown as Agent,
     };
     agent3Context = {
-      agent,
+      agent: {
+        ...agent,
+        threadId: agent3ThreadId,
+        getFullSession: agent.getFullSession.bind(agent),
+      } as unknown as Agent,
     };
   });
 
@@ -256,7 +267,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(taskDetails).toContain('in_progress');
 
       // Should have 2 notes in the output
-      const noteMatches = taskDetails.match(/\d+\. \[lace_20250703_parent\.\d+\]/g);
+      const noteMatches = taskDetails.match(/\d+\. \[lace_\d{8}_[a-z0-9]{6}\]/g);
       expect(noteMatches).toHaveLength(2);
     });
   });
@@ -483,7 +494,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       expect(taskDetails).toContain('Note from agent 3');
 
       // Should have 3 notes in the output (each note shows as "N. [author] timestamp")
-      const noteMatches = taskDetails.match(/\d+\. \[lace_20250703_parent\.\d+\]/g);
+      const noteMatches = taskDetails.match(/\d+\. \[lace_\d{8}_[a-z0-9]{6}\]/g);
       expect(noteMatches).toHaveLength(3);
     });
   });

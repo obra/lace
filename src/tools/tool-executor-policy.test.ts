@@ -57,6 +57,7 @@ describe('ToolExecutor policy enforcement', () => {
     const mockAgent = {
       threadId: asThreadId('lace_20250101_test03'),
       getSession: () => mockSession,
+      getFullSession: vi.fn().mockResolvedValue(mockSession),
     } as unknown as Agent;
 
     context = {
@@ -124,6 +125,7 @@ describe('ToolExecutor policy enforcement', () => {
   it('should require session context for security policy enforcement', async () => {
     const mockAgentWithoutSession = {
       threadId: asThreadId('lace_20250101_test03'),
+      getFullSession: vi.fn().mockResolvedValue(undefined), // No session available
     } as unknown as Agent;
 
     const contextWithoutSession = {
@@ -134,9 +136,7 @@ describe('ToolExecutor policy enforcement', () => {
     const result = await executor.executeTool(toolCall, contextWithoutSession);
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'session context required for security policy enforcement'
-    );
+    expect(result.content[0].text).toContain('Session not found for policy enforcement');
   });
 
   it('should deny approval when user rejects', async () => {

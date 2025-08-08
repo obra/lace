@@ -318,7 +318,14 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        { ...context, agent: { ...context.agent!, threadId: agent2ThreadId } as unknown as Agent }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent2ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
     });
 
@@ -327,7 +334,14 @@ describe('Enhanced Task Manager Tools', () => {
         {
           filter: 'mine',
         },
-        { ...context, agent: { ...context.agent!, threadId: agent1ThreadId } as unknown as Agent }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent1ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
 
       expect(result.isError).toBe(false);
@@ -573,7 +587,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Second note',
         },
-        { ...context, agent: { ...context.agent!, threadId: agent2ThreadId } as unknown as Agent }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent2ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
 
       // Verify multiple notes using TaskViewTool
@@ -624,7 +645,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Found some edge cases to consider',
         },
-        { ...context, agent: { ...context.agent!, threadId: agent2ThreadId } as unknown as Agent }
+        {
+          ...context,
+          agent: {
+            ...context.agent!,
+            threadId: agent2ThreadId,
+            getFullSession: context.agent!.getFullSession.bind(context.agent),
+          } as unknown as Agent,
+        }
       );
     });
 

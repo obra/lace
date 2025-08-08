@@ -44,7 +44,9 @@ describe('RipgrepSearchTool with schema validation', () => {
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('ripgrep_search');
-      expect(tool.description).toBe('Fast text search across files using ripgrep');
+      expect(tool.description)
+        .toBe(`Search file contents using regex patterns. Use for text search, file-find for name patterns.
+Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`);
     });
 
     it('should have proper input schema', () => {

@@ -97,7 +97,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       // Test with no session context (undefined)
       await expect(toolExecutor.requestToolPermission(toolCall, undefined)).rejects.toThrow(
-        'Tool execution denied: session context required for security policy enforcement'
+        'Tool execution denied: agent context required for security policy enforcement'
       );
 
       // Test with empty context (no session property)
@@ -107,7 +107,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       } as ToolContext;
 
       await expect(toolExecutor.requestToolPermission(toolCall, emptyContext)).rejects.toThrow(
-        'Tool execution denied: session context required for security policy enforcement'
+        'Session not found for policy enforcement'
       );
     });
 

@@ -22,7 +22,9 @@ describe('FileWriteTool with schema validation', () => {
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_write');
-      expect(tool.description).toBe('Write content to a file, creating directories if needed');
+      expect(tool.description)
+        .toBe(`Write content to file, OVERWRITES existing content completely. Use file-insert to preserve content.
+Creates parent directories automatically if needed. Returns file size written.`);
     });
 
     it('should have proper input schema', () => {
