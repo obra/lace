@@ -16,7 +16,8 @@ const fileWriteSchema = z.object({
 
 export class FileWriteTool extends Tool {
   name = 'file_write';
-  description = 'Write content to a file, creating directories if needed';
+  description = `Write content to file, OVERWRITES existing content completely. Use file-insert to preserve content.
+Creates parent directories automatically if needed. Returns file size written.`;
   schema = fileWriteSchema;
   annotations: ToolAnnotations = {
     destructiveHint: true,

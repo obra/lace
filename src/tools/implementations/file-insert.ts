@@ -15,9 +15,8 @@ const fileInsertSchema = z.object({
 
 export class FileInsertTool extends Tool {
   name = 'file_insert';
-  description = `Insert content into a file at a specific line or append to the end.
-Preserves all existing content. Use for adding new functions, imports, or sections.
-Line numbers are 1-based. If no line specified, appends to end of file.`;
+  description = `Insert content at specific line or append to end, preserves existing content. Use file-write to replace entire file.
+Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
   schema = fileInsertSchema;
   annotations: ToolAnnotations = {
     destructiveHint: true,
