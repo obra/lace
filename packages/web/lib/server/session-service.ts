@@ -362,13 +362,7 @@ export class SessionService {
       id: session.getId(),
       name: sessionInfo.name,
       createdAt: sessionInfo.createdAt,
-      agents: agents.map((agent) => ({
-        threadId: agent.threadId,
-        name: agent.name,
-        provider: agent.provider,
-        model: agent.model,
-        status: agent.status,
-      })),
+      agents: agents,
     };
   }
 }

@@ -2,7 +2,6 @@
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
 import { ProviderMessage, ProviderToolCall, ProviderToolResult } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
@@ -148,89 +147,6 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
         ];
       }
     });
-}
-
-/**
- * Converts enhanced ProviderMessage format to LMStudio's simple message format
- * Preserves structure by converting tool calls to JSON blocks instead of bracketed text
- */
-export function convertToLMStudioFormat(
-  messages: ProviderMessage[]
-): Array<{ role: string; content: string }> {
-  return messages.map((msg) => {
-    if (msg.role === 'user' && msg.toolResults && msg.toolResults.length > 0) {
-      // Convert tool results to text descriptions (same as text-only format)
-      const toolResultTexts = msg.toolResults.map((result: ProviderToolResult) => {
-        const outputText = result.content.map((block) => block.text || '').join('\n');
-        if (!result.isError) {
-          return `[Tool result: SUCCESS - ${outputText}]`;
-        } else {
-          return `[Tool result: ERROR - ${outputText}]`;
-        }
-      });
-
-      const combinedContent = [msg.content, ...toolResultTexts].filter(Boolean).join('\n\n');
-
-      return {
-        role: msg.role,
-        content: combinedContent || toolResultTexts.join('\n\n'),
-      };
-    } else if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
-      // Convert tool calls to JSON blocks (NOT bracketed text)
-      const toolCallJsonBlocks = msg.toolCalls.map(
-        (toolCall: ProviderToolCall) =>
-          `\`\`\`json\n{\n  "name": "${toolCall.name}",\n  "arguments": ${JSON.stringify(toolCall.input)}\n}\n\`\`\``
-      );
-
-      const combinedContent = [msg.content, ...toolCallJsonBlocks].filter(Boolean).join('\n\n');
-
-      return {
-        role: msg.role,
-        content: combinedContent || toolCallJsonBlocks.join('\n\n'),
-      };
-    } else {
-      // No tool calls/results, return as-is with content safety
-      return {
-        role: msg.role,
-        content: msg.content || '',
-      };
-    }
-  });
-}
-
-/**
- * Converts Lace Tool format to LMStudio rawTools format
- * Used for native tool calling with LMStudio's .respond() method
- */
-export function convertToLMStudioTools(tools: Tool[]): {
-  type: 'toolArray';
-  tools: LMStudioTool[];
-} {
-  const lmstudioTools: LMStudioTool[] = tools.map((tool) => ({
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.inputSchema,
-    },
-  }));
-
-  return {
-    type: 'toolArray',
-    tools: lmstudioTools,
-  };
-}
-
-/**
- * Type definitions for LMStudio tool format
- */
-interface LMStudioTool {
-  type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-  };
 }
 
 /**

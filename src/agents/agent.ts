@@ -37,7 +37,7 @@ export interface AgentConfig {
   tokenBudget?: TokenBudgetConfig;
 }
 
-export interface AgentResponse {
+interface AgentMessageResult {
   content: string;
   toolCalls: ProviderToolCall[];
 }
@@ -47,10 +47,8 @@ export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
 export interface AgentInfo {
   threadId: ThreadId;
   name: string;
-  provider: string;
-  model: string;
-  providerInstanceId?: string;
-  modelId?: string;
+  providerInstanceId: string;
+  modelId: string;
   status: AgentState;
 }
 
@@ -382,10 +380,8 @@ export class Agent extends EventEmitter {
     return {
       threadId: asThreadId(this._threadId),
       name: this.name,
-      provider: this.provider,
-      model: this.model,
-      providerInstanceId: metadata?.providerInstanceId as string | undefined,
-      modelId: (metadata?.modelId as string) || (metadata?.model as string) || undefined,
+      providerInstanceId: (metadata?.providerInstanceId as string) || 'unknown',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || 'unknown',
       status: this.status,
     };
   }
@@ -506,7 +502,7 @@ export class Agent extends EventEmitter {
       this.emit('agent_thinking_start');
 
       // Get agent response with available tools
-      let response: AgentResponse;
+      let response: AgentMessageResult;
 
       try {
         response = await this._createResponse(
@@ -609,7 +605,7 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     signal?: AbortSignal
-  ): Promise<AgentResponse> {
+  ): Promise<AgentMessageResult> {
     // Default to streaming if provider supports it (unless explicitly disabled)
     const useStreaming =
       this.providerInstance.supportsStreaming && this.providerInstance.config?.streaming !== false;
@@ -625,7 +621,7 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     signal?: AbortSignal
-  ): Promise<AgentResponse> {
+  ): Promise<AgentMessageResult> {
     // Set to streaming state
     this._setState('streaming');
 
@@ -762,7 +758,7 @@ export class Agent extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     signal?: AbortSignal
-  ): Promise<AgentResponse> {
+  ): Promise<AgentMessageResult> {
     // Set up retry event listeners for non-streaming requests
     const retryAttemptListener = ({
       attempt,

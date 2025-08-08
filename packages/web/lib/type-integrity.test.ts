@@ -99,8 +99,8 @@ describe('Type Integrity - Current State', () => {
       const agent: AgentInfo = {
         threadId: agentThreadId,
         name: 'Test Agent',
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
+        providerInstanceId: 'anthropic-instance-1',
+        modelId: 'claude-3-sonnet',
         status: 'idle',
       };
 

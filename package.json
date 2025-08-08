@@ -47,9 +47,6 @@
     "@lmstudio/sdk": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.13.2",
     "better-sqlite3": "^11.10.0",
-    "commander": "^14.0.0",
-    "dotenv": "^16.5.0",
-    "glob": "^11.0.3",
     "marked": "^15.0.12",
     "mustache": "^4.2.0",
     "ollama": "^0.5.16",
@@ -61,7 +58,6 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/marked-terminal": "^6.1.1",
     "@types/mustache": "^4.2.5",
     "@types/node": "^22.16.0",
     "@types/turndown": "^5.0.5",

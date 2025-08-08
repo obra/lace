@@ -8,13 +8,3 @@
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
-
-/**
- * Format token count for display (e.g., 1500 -> "1.5k")
- */
-export function formatTokenCount(count: number): string {
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
-  }
-  return count.toString();
-}

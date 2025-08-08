@@ -5,7 +5,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { logger } from '~/utils/logger';
 
-export interface HAREntry {
+interface HAREntry {
   startedDateTime: string;
   time: number;
   request: HARRequest;
@@ -16,7 +16,7 @@ export interface HAREntry {
   comment?: string;
 }
 
-export interface HARRequest {
+interface HARRequest {
   method: string;
   url: string;
   httpVersion: string;
@@ -29,7 +29,7 @@ export interface HARRequest {
   comment?: string;
 }
 
-export interface HARResponse {
+interface HARResponse {
   status: number;
   statusText: string;
   httpVersion: string;
@@ -42,7 +42,7 @@ export interface HARResponse {
   comment?: string;
 }
 
-export interface HARTimings {
+interface HARTimings {
   blocked?: number;
   dns?: number;
   connect?: number;
@@ -53,13 +53,13 @@ export interface HARTimings {
   comment?: string;
 }
 
-export interface HARHeader {
+interface HARHeader {
   name: string;
   value: string;
   comment?: string;
 }
 
-export interface HARCookie {
+interface HARCookie {
   name: string;
   value: string;
   path?: string;
@@ -70,20 +70,20 @@ export interface HARCookie {
   comment?: string;
 }
 
-export interface HARQueryString {
+interface HARQueryString {
   name: string;
   value: string;
   comment?: string;
 }
 
-export interface HARPostData {
+interface HARPostData {
   mimeType: string;
   params?: HARParam[];
   text?: string;
   comment?: string;
 }
 
-export interface HARParam {
+interface HARParam {
   name: string;
   value?: string;
   fileName?: string;
@@ -91,7 +91,7 @@ export interface HARParam {
   comment?: string;
 }
 
-export interface HARContent {
+interface HARContent {
   size: number;
   compression?: number;
   mimeType: string;
@@ -100,7 +100,7 @@ export interface HARContent {
   comment?: string;
 }
 
-export interface HARLog {
+interface HARLog {
   version: string;
   creator: {
     name: string;

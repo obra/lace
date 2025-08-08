@@ -136,7 +136,7 @@ describe('Session', () => {
       });
 
       const agents = session.getAgents();
-      expect(agents[0]?.model).toBe('claude-3-5-sonnet-20241022');
+      expect(agents[0]?.modelId).toBe('claude-3-5-sonnet-20241022');
     });
 
     it('should create session with openai provider instance', () => {
@@ -150,7 +150,7 @@ describe('Session', () => {
       });
 
       const agents = session.getAgents();
-      expect(agents[0]?.model).toBe('gpt-4o');
+      expect(agents[0]?.modelId).toBe('gpt-4o');
     });
   });
 
@@ -243,8 +243,8 @@ describe('Session', () => {
           expect.objectContaining({
             threadId: session.getId(),
             name: 'Lace', // Coordinator agent is always named "Lace"
-            provider: expect.any(String) as string,
-            model: 'claude-3-5-haiku-20241022',
+            providerInstanceId: expect.any(String) as string,
+            modelId: 'claude-3-5-haiku-20241022',
             status: expect.any(String) as string,
           }),
         ]) as unknown[],
@@ -276,8 +276,8 @@ describe('Session', () => {
       expect(agents[1]).toEqual(
         expect.objectContaining({
           name: 'Test Agent',
-          provider: expect.any(String) as string,
-          model: expect.any(String) as string,
+          providerInstanceId: expect.any(String) as string,
+          modelId: expect.any(String) as string,
           status: expect.any(String) as string,
         })
       );
@@ -303,8 +303,8 @@ describe('Session', () => {
       expect(spawnedAgent).toEqual(
         expect.objectContaining({
           name: 'Claude Sonnet Agent',
-          provider: expect.any(String) as string,
-          model: 'claude-3-5-sonnet-20241022',
+          providerInstanceId: expect.any(String) as string,
+          modelId: 'claude-3-5-sonnet-20241022',
           status: expect.any(String) as string,
         })
       );
@@ -330,8 +330,8 @@ describe('Session', () => {
       expect(spawnedAgent).toEqual(
         expect.objectContaining({
           name: 'GPT Agent',
-          provider: expect.any(String) as string,
-          model: 'gpt-4o',
+          providerInstanceId: expect.any(String) as string,
+          modelId: 'gpt-4o',
           status: expect.any(String) as string,
         })
       );
@@ -353,8 +353,8 @@ describe('Session', () => {
       expect(spawnedAgent).toEqual(
         expect.objectContaining({
           name: 'Default Agent',
-          provider: expect.any(String) as string, // Should fall back to session provider
-          model: 'claude-3-5-haiku-20241022', // Should fall back to session model
+          providerInstanceId: expect.any(String) as string, // Should fall back to session provider
+          modelId: 'claude-3-5-haiku-20241022', // Should fall back to session model
           status: expect.any(String) as string,
         })
       );
@@ -374,8 +374,8 @@ describe('Session', () => {
         expect.objectContaining({
           threadId: session.getId(),
           name: 'Lace', // Coordinator agent is always named "Lace"
-          provider: expect.any(String) as string,
-          model: 'claude-3-5-haiku-20241022',
+          providerInstanceId: expect.any(String) as string,
+          modelId: 'claude-3-5-haiku-20241022',
           status: expect.any(String) as string,
         })
       );
@@ -406,8 +406,8 @@ describe('Session', () => {
       expect(spawnedAgents[0]).toEqual(
         expect.objectContaining({
           name: expect.any(String) as string,
-          provider: expect.any(String) as string,
-          model: expect.any(String) as string,
+          providerInstanceId: expect.any(String) as string,
+          modelId: expect.any(String) as string,
           status: expect.any(String) as string,
         })
       );

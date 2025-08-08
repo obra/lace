@@ -211,9 +211,7 @@ describe('LaceApp agent state handling', () => {
       agents: [{
         threadId: asThreadId('lace_20250101_agent1'),
         name: 'Test Agent',
-        provider: 'anthropic', // Legacy field still needed by AgentInfo type
         providerInstanceId: 'test-anthropic-instance',
-        model: 'claude-3-5-haiku-20241022', // Legacy field still needed by AgentInfo type
         modelId: 'claude-3-5-haiku-20241022',
         status: 'idle' as AgentState,
       }],

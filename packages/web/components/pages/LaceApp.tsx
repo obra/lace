@@ -903,7 +903,7 @@ export const LaceApp = memo(function LaceApp() {
                   {selectedAgent && selectedSessionDetails?.agents ? 
                     (() => {
                       const currentAgent = selectedSessionDetails.agents.find(a => a.threadId === selectedAgent);
-                      return currentAgent ? `${currentAgent.name} - ${currentAgent.model}` : (selectedProject ? currentProject.name : 'Select a Project');
+                      return currentAgent ? `${currentAgent.name} - ${currentAgent.modelId}` : (selectedProject ? currentProject.name : 'Select a Project');
                     })() :
                     (selectedProject ? currentProject.name : 'Select a Project')
                   }

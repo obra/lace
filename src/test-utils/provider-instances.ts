@@ -3,7 +3,6 @@
 
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
-import { ProviderRegistry } from '~/providers/registry';
 import type { ProviderInstance, Credential } from '~/providers/catalog/types';
 import { logger } from '~/utils/logger';
 
@@ -80,80 +79,6 @@ export async function createTestProviderInstance(config: TestProviderConfig): Pr
 }
 
 /**
- * Sets up common test provider instances that tests can use
- * Creates standard Anthropic and OpenAI instances with predictable IDs
- *
- * @returns Promise that resolves to predictable instance IDs for common providers
- */
-export async function setupTestProviderInstances(): Promise<{
-  anthropicInstanceId: string;
-  openaiInstanceId: string;
-}> {
-  logger.debug('Setting up common test provider instances');
-
-  // Create instances sequentially to avoid race conditions
-  const anthropicInstanceId = await createTestProviderInstance({
-    catalogId: 'anthropic',
-    models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
-    displayName: 'Test Anthropic',
-  });
-
-  const openaiInstanceId = await createTestProviderInstance({
-    catalogId: 'openai',
-    models: ['gpt-4o', 'gpt-4o-mini'],
-    displayName: 'Test OpenAI',
-  });
-
-  // Ensure predictable IDs are returned
-  const predictableIds = {
-    anthropicInstanceId,
-    openaiInstanceId,
-  };
-
-  logger.debug('Common test provider instances created', predictableIds);
-
-  return predictableIds;
-}
-
-/**
- * Creates a test provider instance for LMStudio with local endpoint
- *
- * @param models - Models to configure for the instance
- * @param endpoint - Custom endpoint (defaults to localhost:1234)
- * @returns Promise that resolves to the created instance ID
- */
-export async function createTestLMStudioInstance(
-  models: string[] = ['local-model'],
-  endpoint: string = 'http://localhost:1234'
-): Promise<string> {
-  return createTestProviderInstance({
-    catalogId: 'lmstudio',
-    models,
-    displayName: 'Test LMStudio',
-    endpoint,
-  });
-}
-
-/**
- * Creates a test provider instance for Ollama with local endpoint
- *
- * @param models - Models to configure for the instance
- * @param endpoint - Custom endpoint (defaults to localhost:11434)
- * @returns Promise that resolves to the created instance ID
- */
-export async function createTestOllamaInstance(
-  models: string[] = ['llama2'],
-  endpoint: string = 'http://localhost:11434'
-): Promise<string> {
-  return createTestProviderInstance({
-    catalogId: 'ollama',
-    models,
-    displayName: 'Test Ollama',
-    endpoint,
-  });
-}
-
-/**
  * Cleans up test provider instances by removing them from storage
  * Call this in test teardown to avoid polluting other tests
  *
@@ -177,22 +102,6 @@ export async function cleanupTestProviderInstances(instanceIds: string[]): Promi
   }
 
   logger.debug('Test provider instances cleaned up', { instanceIds });
-}
-
-/**
- * Gets all test provider instances currently configured
- * Useful for debugging test setup
- *
- * @returns Promise that resolves to array of test instance IDs
- */
-export async function getTestProviderInstances(): Promise<string[]> {
-  const registry = ProviderRegistry.getInstance();
-  // Registry will auto-initialize when needed
-
-  const instances = await registry.getConfiguredInstances();
-  return instances
-    .filter((instance) => instance.id.startsWith('test-'))
-    .map((instance) => instance.id);
 }
 
 /**

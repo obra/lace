@@ -86,27 +86,3 @@ export async function enableNodeFetchInterception(): Promise<void> {
     interceptorEnabled = false;
   }
 }
-
-export async function disableNodeFetchInterception(): Promise<void> {
-  if (!interceptorEnabled || !originalNodeFetch) {
-    return;
-  }
-
-  try {
-    const nodeFetchModule = await import('node-fetch');
-    if (nodeFetchModule) {
-      nodeFetchModule.default = originalNodeFetch as unknown as typeof nodeFetchModule.default;
-    }
-  } catch {
-    // Ignore errors during cleanup
-  }
-
-  originalNodeFetch = null;
-  interceptorEnabled = false;
-
-  logger.debug('Node-fetch interception disabled');
-}
-
-export function isNodeFetchInterceptionEnabled(): boolean {
-  return interceptorEnabled;
-}

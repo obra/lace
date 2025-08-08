@@ -31,10 +31,8 @@ import { Project } from '@/lib/server/lace-imports';
 import type { AgentInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 
-// Response types
-interface AgentResponse {
-  agent: AgentInfo;
-}
+// Import shared AgentResponse type
+import type { AgentResponse } from '@/types/api';
 
 interface AgentsListResponse {
   agents: AgentInfo[];
@@ -127,8 +125,8 @@ describe('Agent Spawning API E2E Tests', () => {
       // Verify agent was created with correct properties
       expect(data.agent).toMatchObject({
         name: 'architect',
-        provider: 'anthropic',
-        model: 'claude-3-5-sonnet-20241022',
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-sonnet-20241022',
         status: 'idle',
       });
 
@@ -151,8 +149,8 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentResponse>(response);
-      expect(data.agent.provider).toBe('openai');
-      expect(data.agent.model).toBe('gpt-4o');
+      expect(data.agent.providerInstanceId).toBe(openaiInstanceId);
+      expect(data.agent.modelId).toBe('gpt-4o');
       expect(data.agent.name).toBe('openai-agent');
     });
 
@@ -373,8 +371,8 @@ describe('Agent Spawning API E2E Tests', () => {
       data.agents.forEach((agent) => {
         expect(agent.threadId).toBeDefined();
         expect(agent.name).toBeDefined();
-        expect(agent.provider).toBeDefined();
-        expect(agent.model).toBeDefined();
+        expect(agent.providerInstanceId).toBeDefined();
+        expect(agent.modelId).toBeDefined();
         expect(agent.status).toBeDefined();
       });
     });

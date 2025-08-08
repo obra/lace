@@ -558,7 +558,7 @@ export function SessionConfigPanel({
                             <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-primary" />
                             <span className="text-sm font-medium">{agent.name}</span>
                             <span className="text-xs text-base-content/60">
-                              {agent.provider} • {agent.model}
+                              {agent.providerInstanceId} • {agent.modelId}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">

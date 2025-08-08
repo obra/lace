@@ -137,19 +137,3 @@ export function enableWebSocketInterception(): void {
 
   logger.debug('WebSocket interception enabled for HAR recording');
 }
-
-export function disableWebSocketInterception(): void {
-  if (!interceptorEnabled || !originalWebSocket) {
-    return;
-  }
-
-  globalThis.WebSocket = originalWebSocket;
-  originalWebSocket = null;
-  interceptorEnabled = false;
-
-  logger.debug('WebSocket interception disabled');
-}
-
-export function isWebSocketInterceptionEnabled(): boolean {
-  return interceptorEnabled;
-}

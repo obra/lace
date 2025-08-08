@@ -93,10 +93,6 @@ export interface SessionResponse {
   session: SessionInfo;
 }
 
-export interface AgentResponse {
-  agent: AgentInfo;
-}
-
 export interface ProvidersResponse {
   providers: ProviderInfo[];
 }
