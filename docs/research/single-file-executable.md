@@ -16,7 +16,20 @@ The challenge: Package this into a **single distributable file** for end users.
 
 ## Approaches Investigated
 
-### 1. Bun --compile
+### 1. Node.js Single Executable Applications (SEA)
+
+**Status**: ❌ **Failed - SQLite Native Module Issues**
+
+Node.js 20+ includes built-in Single Executable Application support, but it faces critical challenges with native modules like `better-sqlite3`.
+
+#### Challenges Encountered
+- **Native Module Extraction**: SQLite `.node` files must be extracted to disk 
+- **Code Signing Issues**: Extracted files break macOS code signing
+- **Complex Build Process**: Multi-step compilation with `node --experimental-sea-config`
+- **Large File Size**: 111MB+ executables even for simple applications
+- **Runtime Extraction**: No clean way to bundle native modules
+
+### 2. Bun --compile  
 
 **Status**: ✅ **Breakthrough: VFS + Custom Module Resolution Works**
 
@@ -51,12 +64,64 @@ After extensive research and testing, Bun's `--compile` feature can successfully
 
 **Final Implementation Files:**
 - `clean-test/vfs-custom-server.ts` - VFS custom server with module resolution
-- `clean-test/hybrid-server.ts` - Hybrid server (external Next.js + embedded assets)
+- `clean-test/hybrid-server.ts` - Hybrid server (external Next.js + embedded assets)  
 - `clean-test/next-full-vfs.ts` - Complete Next.js VFS (3,393 files, 3,394 lines)
+
+**Key Implementation: VFS Custom Server**
+```typescript
+// Custom module resolution for VFS
+class VFSModuleResolver {
+  static resolveModule(moduleName: string) {
+    const moduleMap: Record<string, string> = {
+      'next': 'dist/server/next.js',  // Main Next.js entry point
+      'next/server': 'server.js',
+    };
+    
+    const vfsKey = moduleMap[moduleName];
+    if (vfsKey && nextVfs[vfsKey]) {
+      // Create CommonJS environment and evaluate module
+      const moduleContent = nextVfs[vfsKey];
+      const moduleExports = {};
+      const module = { exports: moduleExports };
+      
+      const evalFunction = new Function(
+        'module', 'exports', 'require', 'process',
+        moduleContent
+      );
+      evalFunction(module, exports, mockRequire, process);
+      return module.exports.default || module.exports;
+    }
+    throw new Error(`Module ${moduleName} not found in VFS`);
+  }
+}
+```
+
+**VFS Generation Command:**
+```bash
+bunx make-vfs \
+  --dir node_modules/next \
+  --extensions js,json \
+  --content-format string \
+  --outfile next-full-vfs.ts
+# Result: 3,393 Next.js files embedded in TypeScript VFS
+```
 - **Zero temporary files** - everything stays in VFS memory
 
-**Approach 4: Individual File Imports** ❌ **Not Practical**
+**Approach 4: Archive Embedding & Extraction** ✅ **Works but Complex**
+- Embed tar.gz archive of standalone build in executable
+- Extract to temporary directory at runtime
+- Clean up on shutdown
+- Implementation: `bun-ultimate.ts`, `bun-fs-patch.ts`
+
+**Approach 5: Bun Hybrid Launcher** ✅ **Works, Simple**  
+- Small Bun executable that spawns Node.js standalone server
+- Requires `standalone/` directory alongside executable
+- 55MB launcher + standalone directory
+- Implementation: `bun-launcher.ts`, `bun-clean.ts`
+
+**Approach 6: Individual File Imports** ❌ **Not Practical**
 - Would require importing 4,265+ individual files
+- Tested: `bun-explicit-embed.ts`, `bun-wildcard-embed.ts`
 - Creates 8,000+ line TypeScript file with imports
 - Build complexity makes this approach unusable
 
