@@ -149,7 +149,7 @@ describe('fileEditRenderer', () => {
       expect(container.querySelector('.border-base-300')).toBeTruthy();
     });
 
-    it('should render diff with applied edits summary for multiple edits', () => {
+    it('should render unified diff for multi-edit operations', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Successfully applied 3 edits' }],
         isError: false,
@@ -186,17 +186,13 @@ describe('fileEditRenderer', () => {
       const rendered = fileEditRenderer.renderResult!(result);
       const { container } = render(React.createElement('div', null, rendered));
 
-      // Should render FileDiffViewer component
-      expect(container.querySelector('.border-base-300')).toBeTruthy();
+      // Should render single unified FileDiffViewer showing all changes
+      const diffViewers = container.querySelectorAll('.border-base-300');
+      expect(diffViewers.length).toBe(1); // Single unified diff
 
-      // Should also show applied edits summary
-      expect(container.textContent).toContain('Applied 3 edits');
-      expect(container.textContent).toContain('(3 total replacements)');
-      expect(container.textContent).toContain('Edit 1:');
-      expect(container.textContent).toContain('Edit 2:');
-      expect(container.textContent).toContain('Edit 3:');
-      expect(container.textContent).toContain('version": "0.0.1"');
-      expect(container.textContent).toContain('version": "0.0.2"');
+      // Should show content from the unified diff (old and new versions)
+      expect(container.textContent).toContain('old line');
+      expect(container.textContent).toContain('new line');
     });
 
     it('should render dry run mode', () => {

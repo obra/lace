@@ -245,6 +245,12 @@ export function ToolCallDisplay({
                 <strong>Tool:</strong> {tool}
                 {'\n'}
                 <strong>Arguments:</strong> {JSON.stringify(args, null, 2)}
+                {result && (
+                  <>
+                    {'\n\n'}
+                    <strong>Result:</strong> {JSON.stringify(result, null, 2)}
+                  </>
+                )}
               </div>
             </div>
           )}
