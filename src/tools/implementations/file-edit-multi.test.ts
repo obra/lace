@@ -92,4 +92,114 @@ describe('FileEditTool Multi', () => {
       expect(content).toBe('let x = 1;\nlet b = 2;');
     });
   });
+
+  describe('Dry Run Mode', () => {
+    it('should not modify file in dry run mode', async () => {
+      const originalContent = 'Hello World';
+      await writeFile(testFile, originalContent, 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        dry_run: true,
+        edits: [
+          {
+            old_text: 'World',
+            new_text: 'Universe',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Dry run');
+      expect(result.metadata?.dry_run).toBe(true);
+
+      // File should not be modified
+      const content = await readFile(testFile, 'utf-8');
+      expect(content).toBe(originalContent);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty file', async () => {
+      await writeFile(testFile, '', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'bar',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('No matches found');
+    });
+
+    it('should handle file not found', async () => {
+      const result = await tool.execute({
+        path: '/nonexistent/file.txt',
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'bar',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File not found');
+    });
+
+    it('should preserve line endings', async () => {
+      await writeFile(testFile, 'line1\r\nline2\r\nline3', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'line2',
+            new_text: 'modified',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      const content = await readFile(testFile, 'utf-8');
+      expect(content).toBe('line1\r\nmodified\r\nline3');
+    });
+  });
+
+  describe('Performance', () => {
+    it('should handle many edits efficiently', async () => {
+      // Create file with unique patterns for each edit (using letters to avoid substring overlap)
+      const content = Array(10)
+        .fill(null)
+        .map(
+          (_, i) => `line with ${String.fromCharCode(97 + i)}unique${String.fromCharCode(97 + i)}`
+        )
+        .join('\n');
+      await writeFile(testFile, content, 'utf-8');
+
+      // Create 10 different edits, each targeting a unique pattern
+      const edits = Array(10)
+        .fill(null)
+        .map((_, i) => ({
+          old_text: `${String.fromCharCode(97 + i)}unique${String.fromCharCode(97 + i)}`,
+          new_text: `${String.fromCharCode(97 + i)}replaced${String.fromCharCode(97 + i)}`,
+          occurrences: 1,
+        }));
+
+      const start = Date.now();
+      const result = await tool.execute({
+        path: testFile,
+        edits,
+      });
+      const duration = Date.now() - start;
+
+      expect(result.isError).toBe(false);
+      expect(duration).toBeLessThan(1000); // Should complete in under 1 second
+    });
+  });
 });

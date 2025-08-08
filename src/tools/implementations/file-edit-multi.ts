@@ -78,6 +78,18 @@ export class FileEditTool extends Tool {
 
     const newContent = workingContent;
 
+    // Dry run mode
+    if (args.dry_run) {
+      return this.createResult(
+        `Dry run completed. Would apply ${args.edits.length} edit${args.edits.length === 1 ? '' : 's'} to ${args.path}`,
+        {
+          dry_run: true,
+          would_modify: true,
+          edits_to_apply: args.edits,
+        }
+      );
+    }
+
     // Write file
     try {
       await writeFile(resolvedPath, newContent, 'utf-8');
