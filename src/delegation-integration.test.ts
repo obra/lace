@@ -262,9 +262,12 @@ describe('Delegation Integration Tests', () => {
       model: 'anthropic:claude-3-5-haiku-20241022',
     };
 
+    if (!agent) {
+      throw new Error('Failed to get agent from session');
+    }
+
     const result = await delegateToolInstance.execute(delegateInput, {
-      threadId: session.getId(),
-      session, // TaskManager accessed via session.getTaskManager()
+      agent, // Access to threadId via agent.threadId and session via agent.getFullSession()
     });
 
     if (result.isError) {

@@ -102,7 +102,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
       // Test with empty context (no session property)
       const emptyContext = {
-        threadId: agent.threadId,
+        agent,
         workingDirectory: '/tmp',
       } as ToolContext;
 
@@ -119,9 +119,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
-        threadId: agent.threadId,
+        agent,
         workingDirectory: tempLaceDirContext.tempDir,
-        session,
       };
 
       // Should return 'pending' because default policy is 'require-approval'
@@ -141,9 +140,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
-        threadId: agent.threadId,
+        agent,
         workingDirectory: tempLaceDirContext.tempDir,
-        session,
       };
 
       // Should return 'pending' since default policy is 'require-approval'
@@ -153,7 +151,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
     it('should respect explicit tool policies', async () => {
       // Create session with explicit allow policy for file-read
-      const permissiveSession = Session.create({
+      const _permissiveSession = Session.create({
         name: 'Permissive Session',
         projectId: project.getId(),
         configuration: {
@@ -172,9 +170,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
-        threadId: agent.threadId,
+        agent,
         workingDirectory: tempLaceDirContext.tempDir,
-        session: permissiveSession,
       };
 
       // Should be granted immediately without approval
@@ -184,7 +181,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
 
     it('should deny tools with explicit deny policy', async () => {
       // Create session with explicit deny policy for bash
-      const restrictiveSession = Session.create({
+      const _restrictiveSession = Session.create({
         name: 'Restrictive Session',
         projectId: project.getId(),
         configuration: {
@@ -203,9 +200,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
-        threadId: agent.threadId,
+        agent,
         workingDirectory: tempLaceDirContext.tempDir,
-        session: restrictiveSession,
       };
 
       // Should be denied outright
@@ -229,9 +225,8 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
-        threadId: agent.threadId,
+        agent,
         workingDirectory: tempLaceDirContext.tempDir,
-        session,
       };
 
       // Should fail because no approval callback is configured

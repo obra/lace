@@ -97,10 +97,11 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should create proper directory hierarchy through ToolExecutor', async () => {
+    const agent = session.getAgent(session.getId());
+    if (!agent) throw new Error('Failed to get agent');
+
     const context: ToolContext = {
-      sessionId: session.getId(),
-      projectId: project.getId(),
-      session: session,
+      agent,
     };
 
     await toolExecutor.executeTool(
@@ -134,10 +135,11 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should handle file operations through ToolExecutor', async () => {
+    const agent = session.getAgent(session.getId());
+    if (!agent) throw new Error('Failed to get agent');
+
     const context: ToolContext = {
-      sessionId: session.getId(),
-      projectId: project.getId(),
-      session: session,
+      agent,
     };
 
     await toolExecutor.executeTool(
@@ -168,10 +170,11 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should maintain stability across ToolExecutor instances', async () => {
+    const agent = session.getAgent(session.getId());
+    if (!agent) throw new Error('Failed to get agent');
+
     const context: ToolContext = {
-      sessionId: session.getId(),
-      projectId: project.getId(),
-      session: session,
+      agent,
     };
 
     // Execute with first ToolExecutor instance

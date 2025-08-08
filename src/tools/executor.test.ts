@@ -243,10 +243,11 @@ describe('ToolExecutor with new schema-based tools', () => {
     });
 
     it('should provide temp directory to tools', async () => {
+      const agent = session.getAgent(session.getId());
+      if (!agent) throw new Error('Failed to get agent');
+
       const context: ToolContext = {
-        sessionId: session.getId(),
-        projectId: project.getId(),
-        session: session,
+        agent,
       };
 
       await toolExecutor.executeTool(
@@ -261,10 +262,11 @@ describe('ToolExecutor with new schema-based tools', () => {
     });
 
     it('should create unique tool call IDs', async () => {
+      const agent = session.getAgent(session.getId());
+      if (!agent) throw new Error('Failed to get agent');
+
       const context: ToolContext = {
-        sessionId: session.getId(),
-        projectId: project.getId(),
-        session: session,
+        agent,
       };
 
       await toolExecutor.executeTool(
@@ -285,10 +287,11 @@ describe('ToolExecutor with new schema-based tools', () => {
     });
 
     it('should create temp directories that exist', async () => {
+      const agent = session.getAgent(session.getId());
+      if (!agent) throw new Error('Failed to get agent');
+
       const context: ToolContext = {
-        sessionId: session.getId(),
-        projectId: project.getId(),
-        session: session,
+        agent,
       };
 
       await toolExecutor.executeTool(
@@ -300,10 +303,9 @@ describe('ToolExecutor with new schema-based tools', () => {
       expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
     });
 
-    it('should throw error when session context missing', async () => {
+    it('should throw error when agent context missing', async () => {
       const context: ToolContext = {
-        projectId: project.getId(),
-        // No sessionId and no session - should fail temp directory creation
+        // No agent - should fail temp directory creation
       };
 
       const result = await toolExecutor.executeTool(
@@ -313,23 +315,24 @@ describe('ToolExecutor with new schema-based tools', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain(
-        'session context required for security policy enforcement'
+        'agent context required for security policy enforcement'
       );
     });
 
-    it('should work without temp directories when session/project missing', async () => {
-      const context: ToolContext = {
-        session: session,
-      };
-      // No sessionId or projectId - should work but not create temp directories
+    it('should require agent context for security policy enforcement', async () => {
+      const context: ToolContext = {};
+      // No agent - should fail due to security policy
 
-      await toolExecutor.executeTool(
+      const result = await toolExecutor.executeTool(
         { id: 'test-temp-5', name: 'mock_tool', arguments: { input: 'test' } },
         context
       );
 
-      const receivedContext = mockTool.getCapturedContext();
-      expect(receivedContext.toolTempDir).toBeUndefined();
+      // Should fail due to security requirement
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        'agent context required for security policy enforcement'
+      );
     });
   });
 });

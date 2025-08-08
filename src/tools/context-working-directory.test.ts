@@ -17,7 +17,6 @@ describe('ToolContext working directory', () => {
 
   it('should pass working directory in ToolContext', () => {
     const context = createMockToolContext({
-      threadId: 'lace_20240101_test01',
       workingDirectory: '/test/project/path',
     });
 
@@ -26,7 +25,6 @@ describe('ToolContext working directory', () => {
 
   it('should handle undefined working directory', () => {
     const context = createMockToolContext({
-      threadId: 'lace_20240101_test01',
       workingDirectory: undefined,
     });
 
@@ -42,7 +40,6 @@ describe('ToolContext working directory', () => {
     });
 
     const context = createMockToolContext({
-      threadId: 'lace_20240101_test01',
       workingDirectory: '/test/project/path',
     });
 
