@@ -26,26 +26,36 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
       return this.createCompactionEvent([], context, false, 0);
     }
 
-    // Separate old events (to summarize) from recent events (to preserve)
-    const { oldEvents, recentEvents } = this.categorizeEventsByCount(conversationEvents);
+    // Separate events into categories
+    const allUserMessages = conversationEvents.filter((e) => e.type === 'USER_MESSAGE');
+    const nonUserEvents = conversationEvents.filter((e) => e.type !== 'USER_MESSAGE');
+
+    // Determine which non-user events to summarize vs preserve
+    const { oldEvents, recentEvents } = this.categorizeEventsByCount(nonUserEvents);
 
     const compactedEvents: ThreadEvent[] = [];
 
-    // Generate summary for old events if any exist
+    // Generate summary for old non-user events if any exist
+    let summaryLength = 0;
     if (oldEvents.length > 0) {
       const summary = await this.generateSummaryInConversation(oldEvents, recentEvents, context);
+      summaryLength = summary.length;
       const summaryEvent = this.createSummaryEvent(summary, context.threadId);
       compactedEvents.push(summaryEvent);
     }
 
-    // Add recent events unchanged
+    // Preserve ALL user messages (they provide essential context)
+    compactedEvents.push(...allUserMessages);
+
+    // Add recent non-user events unchanged
     compactedEvents.push(...recentEvents);
 
     return this.createCompactionEvent(
       compactedEvents,
       context,
       oldEvents.length > 0,
-      events.length
+      events.length,
+      summaryLength
     );
   }
 
@@ -167,7 +177,8 @@ Provide ONLY the summary, no preamble or explanation.`;
     compactedEvents: ThreadEvent[],
     context: CompactionContext,
     summaryGenerated: boolean,
-    originalEventCount: number
+    originalEventCount: number,
+    summaryLength = 0
   ): ThreadEvent {
     return {
       id: this.generateEventId(),
@@ -182,6 +193,8 @@ Provide ONLY the summary, no preamble or explanation.`;
           summaryGenerated,
           recentEventCount: this.RECENT_EVENT_COUNT,
           strategy: 'ai-powered-summarization',
+          summaryLength,
+          preservedUserMessages: compactedEvents.filter((e) => e.type === 'USER_MESSAGE').length,
         },
       },
     };

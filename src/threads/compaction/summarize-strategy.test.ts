@@ -122,17 +122,22 @@ describe('SummarizeCompactionStrategy', () => {
     const compactionData = getCompactionData(result);
     expect(compactionData.strategyId).toBe('summarize');
     expect(compactionData.originalEventCount).toBe(3);
-    expect(compactionData.compactedEvents).toHaveLength(1);
+    expect(compactionData.compactedEvents).toHaveLength(2); // summary + 1 user message
 
-    // Should create a summary event
+    // Should create a summary event first
     const summaryEvent = compactionData.compactedEvents[0];
     expect(summaryEvent.type).toBe('LOCAL_SYSTEM_MESSAGE');
     expect(summaryEvent.data).toContain('Summary of conversation about writing functions');
+
+    // Should preserve the user message
+    const userEvent = compactionData.compactedEvents[1];
+    expect(userEvent.type).toBe('USER_MESSAGE');
+    expect(userEvent.data).toBe('Help me write a function to calculate fibonacci numbers');
   });
 
   it('should preserve recent events', async () => {
     const events: ThreadEvent[] = [
-      // Old events to be summarized (first 2)
+      // Old events
       {
         id: '1',
         threadId: 'test-thread-123',
@@ -150,46 +155,53 @@ describe('SummarizeCompactionStrategy', () => {
       {
         id: '3',
         threadId: 'test-thread-123',
-        type: 'USER_MESSAGE',
+        type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:02:00Z'),
-        data: 'Old message 2',
+        data: { content: 'Old response 2' },
       },
       {
         id: '4',
         threadId: 'test-thread-123',
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: { content: 'Old response 2' },
+        data: { content: 'Old response 3' },
       },
-      // Recent events to preserve (last 4, but strategy keeps last 4 events)
+      // Recent agent events (last 2)
       {
         id: '5',
         threadId: 'test-thread-123',
-        type: 'USER_MESSAGE',
+        type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:10:00Z'),
-        data: 'Recent message 1',
+        data: { content: 'Recent response 1' },
       },
       {
         id: '6',
         threadId: 'test-thread-123',
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:11:00Z'),
-        data: { content: 'Recent response 1' },
+        data: { content: 'Recent response 2' },
       },
     ];
 
     const result = await strategy.compact(events, context);
     const compactionData = getCompactionData(result);
 
-    expect(compactionData.compactedEvents).toHaveLength(3); // summary + 2 recent events (last 2)
+    expect(compactionData.compactedEvents).toHaveLength(4); // summary + 1 user + 2 recent agent
 
     // First event should be summary
     expect(compactionData.compactedEvents[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
 
-    // Last two events should be preserved
-    expect(compactionData.compactedEvents[1].data).toBe('Recent message 1');
-    const agentMessageData = compactionData.compactedEvents[2].data as { content: string };
-    expect(agentMessageData.content).toBe('Recent response 1');
+    // Should preserve user message
+    const userEvent = compactionData.compactedEvents.find((e) => e.type === 'USER_MESSAGE');
+    expect(userEvent?.data).toBe('Old message 1');
+
+    // Should preserve recent agent events
+    const preservedAgentEvents = compactionData.compactedEvents.filter(
+      (e) => e.type === 'AGENT_MESSAGE'
+    );
+    expect(preservedAgentEvents).toHaveLength(2);
+    expect((preservedAgentEvents[0].data as { content: string }).content).toBe('Recent response 1');
+    expect((preservedAgentEvents[1].data as { content: string }).content).toBe('Recent response 2');
   });
 
   it('should handle tool calls and results appropriately', async () => {
@@ -226,13 +238,19 @@ describe('SummarizeCompactionStrategy', () => {
 
     const result = await strategy.compact(events, context);
 
-    // Should preserve tool interactions
+    // Should preserve user message and summarize tool interactions
     const compactionData = getCompactionData(result);
-    expect(compactionData.compactedEvents).toHaveLength(1); // Just the summary since all are old
+    expect(compactionData.compactedEvents).toHaveLength(2); // summary + user message
+
+    // First should be summary
     expect(compactionData.compactedEvents[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
     expect(compactionData.compactedEvents[0].data).toContain(
       'Summary of conversation about writing functions'
     );
+
+    // Second should be preserved user message
+    expect(compactionData.compactedEvents[1].type).toBe('USER_MESSAGE');
+    expect(compactionData.compactedEvents[1].data).toBe('Create a file');
   });
 
   it('should throw error when no agent or provider available', async () => {
@@ -276,13 +294,22 @@ describe('SummarizeCompactionStrategy', () => {
         timestamp: new Date(),
         data: 'Test message',
       },
+      {
+        id: '2',
+        threadId: 'test-thread-123',
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date(),
+        data: { content: 'Response to test' },
+      },
     ];
 
     const result = await strategy.compact(events, providerContext);
     const compactionData = getCompactionData(result);
 
-    expect(compactionData.compactedEvents).toHaveLength(1);
+    // Should have summary + user message
+    expect(compactionData.compactedEvents).toHaveLength(2);
     expect(compactionData.compactedEvents[0].type).toBe('LOCAL_SYSTEM_MESSAGE');
+    expect(compactionData.compactedEvents[1].type).toBe('USER_MESSAGE');
   });
 
   it('should skip COMPACTION events', async () => {
@@ -305,13 +332,20 @@ describe('SummarizeCompactionStrategy', () => {
         timestamp: new Date('2024-01-01T10:01:00Z'),
         data: 'New message after compaction',
       },
+      {
+        id: '3',
+        threadId: 'test-thread-123',
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date('2024-01-01T10:02:00Z'),
+        data: { content: 'Response' },
+      },
     ];
 
     const result = await strategy.compact(events, context);
     const compactionData = getCompactionData(result);
 
-    // Should only process the USER_MESSAGE, skip the COMPACTION event
-    expect(compactionData.originalEventCount).toBe(2);
-    expect(compactionData.compactedEvents).toHaveLength(1); // Just the summary
+    // Should only process the USER_MESSAGE and AGENT_MESSAGE, skip the COMPACTION event
+    expect(compactionData.originalEventCount).toBe(3);
+    expect(compactionData.compactedEvents).toHaveLength(2); // summary + user message
   });
 });

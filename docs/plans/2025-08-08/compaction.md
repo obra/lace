@@ -579,382 +579,73 @@ async generateSummary(promptContent: string, events: ThreadEvent[]): Promise<str
 
 ---
 
-## Phase 3: AI-Powered Compaction Strategy ✅ **PARTIALLY COMPLETED**
+## Phase 3: Enhanced AI Summarization Strategy ✅ **COMPLETED**
 
-**Note**: The AI-powered summarization has been implemented as part of Phase 2, Task 2.2. The SummarizeCompactionStrategy uses the conversation's own LLM to generate summaries, which is more effective than the originally planned separate AI strategy.
+**Note**: Phase 3 was implemented to enhance the AI-powered summarization from Phase 2 with additional features and improved context preservation.
 
-### Task 3.1: Create AI Summarization Strategy
-**Goal**: Implement strategy where model summarizes its own conversation.
+### Task 3.1: Create AI Summarization Strategy ✅ **COMPLETED**
+**Goal**: Enhance the existing summarization strategy with additional features.
 
-**Files to create**:
-- `src/threads/compaction/ai-summarization-strategy.ts` - New strategy
-- `src/threads/compaction/ai-summarization-strategy.test.ts` - Tests
+**Status**: ✅ **COMPLETED** - Enhanced in latest commits
 
-**Implementation** (`src/threads/compaction/ai-summarization-strategy.ts`):
+**Key enhancement**: Preserve ALL user messages instead of just recent ones. This was implemented based on user feedback that "system prompt will be auto-preserved. ditto user-prompt. and we should preserve ALL user messages."
+
+**Files modified**:
+- `src/threads/compaction/summarize-strategy.ts` - Updated to preserve ALL user messages
+- `src/threads/compaction/enhanced-summarize.test.ts` - Created comprehensive test suite
+- `src/threads/compaction/summarize-strategy.test.ts` - Updated tests for new behavior
+
+**Implementation highlights**:
 ```typescript
-// ABOUTME: AI-powered compaction strategy using self-summarization
-// ABOUTME: Model summarizes its own conversation to preserve context efficiently
+// Key change in summarize-strategy.ts:
+// Separate events into categories
+const allUserMessages = conversationEvents.filter((e) => e.type === 'USER_MESSAGE');
+const nonUserEvents = conversationEvents.filter((e) => e.type !== 'USER_MESSAGE');
 
-import type { ThreadEvent } from '~/threads/types';
-import type { CompactionStrategy, CompactionContext, CompactionData } from '~/threads/compaction/types';
-import type { ProviderMessage } from '~/providers/types';
-import { buildConversationFromEvents } from '~/agents/conversation-builder';
+// Preserve ALL user messages (not just recent ones)
+compactedEvents.push(...allUserMessages);
 
-export class AISummarizationStrategy implements CompactionStrategy {
-  id = 'ai-summarize';
-
-  async compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent> {
-    if (!context.provider) {
-      throw new Error('AI summarization requires a provider');
-    }
-
-    // Build conversation for the model
-    const messages = this.buildMessagesForCompaction(events);
-    
-    // Add self-compaction instruction
-    messages.push({
-      role: 'user',
-      content: this.getCompactionPrompt()
-    });
-
-    // Get model's self-summary
-    const response = await context.provider.createResponse(
-      messages,
-      [], // No tools needed for summarization
-      context.model || 'default',
-      context.signal
-    );
-
-    // Create compacted events
-    const compactedEvents = this.createCompactedEvents(events, response.content);
-
-    // Return compaction event
-    return {
-      id: this.generateEventId(),
-      threadId: context.threadId,
-      type: 'COMPACTION',
-      timestamp: new Date(),
-      data: {
-        strategyId: this.id,
-        originalEventCount: events.length,
-        compactedEvents,
-        metadata: {
-          summaryLength: response.content.length,
-          preservedUserMessages: compactedEvents.filter(e => e.type === 'USER_MESSAGE').length,
-          tokensSaved: response.usage?.totalTokens || 0
-        }
-      } as CompactionData
-    };
-  }
-
-  private buildMessagesForCompaction(events: ThreadEvent[]): ProviderMessage[] {
-    // Convert events to provider messages
-    const messages: ProviderMessage[] = [];
-    
-    for (const event of events) {
-      if (event.type === 'USER_MESSAGE') {
-        messages.push({ role: 'user', content: event.data });
-      } else if (event.type === 'AGENT_MESSAGE') {
-        const content = typeof event.data === 'string' ? event.data : event.data.content;
-        messages.push({ role: 'assistant', content });
-      }
-      // Skip other event types for summarization
-    }
-    
-    return messages;
-  }
-
-  private getCompactionPrompt(): string {
-    return `SYSTEM COMPACTION REQUEST:
-
-Your conversation is approaching token limits and needs to be compacted. Please provide a comprehensive summary that preserves:
-
-1. **User Intent**: What the user originally asked for and any subsequent requests
-2. **Work Completed**: What has been accomplished so far with specific details
-3. **Current State**: The exact current state of any work in progress
-4. **Pending Tasks**: Any tasks that still need to be completed (be specific)
-5. **Important Context**: Key information, decisions, errors encountered, and solutions found
-
-Format your response as a clear, structured summary that you can continue from. Include specific file names, code snippets, and technical details that are essential.
-
-This summary will replace the conversation history, so be thorough but concise.`;
-  }
-
-  private createCompactedEvents(originalEvents: ThreadEvent[], summary: string): ThreadEvent[] {
-    const compactedEvents: ThreadEvent[] = [];
-    
-    // Add system prompt if present
-    const systemPrompt = originalEvents.find(e => e.type === 'SYSTEM_PROMPT');
-    if (systemPrompt) {
-      compactedEvents.push(systemPrompt);
-    }
-
-    // Add summary as agent message
-    compactedEvents.push({
-      id: this.generateEventId(),
-      threadId: originalEvents[0]?.threadId || 'unknown',
-      type: 'AGENT_MESSAGE',
-      timestamp: new Date(),
-      data: {
-        content: `[CONVERSATION SUMMARY]\n\n${summary}`
-      }
-    });
-
-    // Preserve last few user messages for context
-    const recentUserMessages = originalEvents
-      .filter(e => e.type === 'USER_MESSAGE')
-      .slice(-3); // Keep last 3 user messages
-    
-    compactedEvents.push(...recentUserMessages);
-
-    return compactedEvents;
-  }
-
-  private generateEventId(): string {
-    return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-}
+// Only summarize old non-user events
+const { oldEvents, recentEvents } = this.categorizeEventsByCount(nonUserEvents);
 ```
 
-**Test first** (`src/threads/compaction/ai-summarization-strategy.test.ts`):
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { AISummarizationStrategy } from '~/threads/compaction/ai-summarization-strategy';
-import type { ThreadEvent } from '~/threads/types';
-import type { CompactionContext } from '~/threads/compaction/types';
-import { MockProvider } from '~/test-utils/mock-provider';
+**Test coverage added**:
+- Preserve ALL user messages regardless of count
+- Summarize old agent messages but keep recent ones  
+- Track summary length in metadata
+- Avoid duplicating events when preserving
+- Include all enhanced metadata fields
 
-describe('AI Summarization Strategy', () => {
-  let strategy: AISummarizationStrategy;
-  let mockProvider: MockProvider;
-  let context: CompactionContext;
-
-  beforeEach(() => {
-    strategy = new AISummarizationStrategy();
-    mockProvider = new MockProvider({
-      responses: [{
-        content: 'Summary: User asked to create a TODO app. I created the basic structure with React.',
-        toolCalls: [],
-        usage: { promptTokens: 500, completionTokens: 50, totalTokens: 550 }
-      }]
-    });
-    
-    context = {
-      threadId: 'test-thread',
-      provider: mockProvider,
-      model: 'test-model'
-    };
-  });
-
-  it('should create compaction event with AI summary', async () => {
-    const events: ThreadEvent[] = [
-      {
-        id: '1',
-        threadId: 'test-thread',
-        type: 'USER_MESSAGE',
-        timestamp: new Date(),
-        data: 'Create a TODO app'
-      },
-      {
-        id: '2',
-        threadId: 'test-thread',
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date(),
-        data: { content: 'I will create a TODO app for you...' }
-      }
-    ];
-
-    const result = await strategy.compact(events, context);
-
-    expect(result.type).toBe('COMPACTION');
-    expect(result.data.strategyId).toBe('ai-summarize');
-    expect(result.data.compactedEvents).toBeDefined();
-    expect(result.data.compactedEvents.length).toBeGreaterThan(0);
-    
-    // Should include the summary
-    const summaryEvent = result.data.compactedEvents.find(
-      e => e.type === 'AGENT_MESSAGE' && e.data.content.includes('[CONVERSATION SUMMARY]')
-    );
-    expect(summaryEvent).toBeDefined();
-  });
-
-  it('should preserve recent user messages', async () => {
-    const events: ThreadEvent[] = [
-      { id: '1', threadId: 'test', type: 'USER_MESSAGE', timestamp: new Date(), data: 'First' },
-      { id: '2', threadId: 'test', type: 'USER_MESSAGE', timestamp: new Date(), data: 'Second' },
-      { id: '3', threadId: 'test', type: 'USER_MESSAGE', timestamp: new Date(), data: 'Third' },
-      { id: '4', threadId: 'test', type: 'USER_MESSAGE', timestamp: new Date(), data: 'Fourth' }
-    ];
-
-    const result = await strategy.compact(events, context);
-    
-    const preservedUserMessages = result.data.compactedEvents
-      .filter(e => e.type === 'USER_MESSAGE')
-      .map(e => e.data);
-    
-    // Should keep last 3
-    expect(preservedUserMessages).toEqual(['Second', 'Third', 'Fourth']);
-  });
-
-  it('should throw error if no provider in context', async () => {
-    const contextNoProvider: CompactionContext = {
-      threadId: 'test-thread'
-    };
-
-    await expect(
-      strategy.compact([], contextNoProvider)
-    ).rejects.toThrow('AI summarization requires a provider');
-  });
-});
-```
-
-**Commit**: `feat: implement AI-powered self-summarization compaction strategy`
-
----
-
-### Task 3.2: Register AI Strategy
+### Task 3.2: Register AI Strategy ✅ **COMPLETED**
 **Goal**: Add the new strategy to the registry.
 
-**Files to modify**:
-- `src/threads/compaction/registry.ts` - Add new strategy
-- `src/threads/compaction/registry.test.ts` - Create test
+**Status**: ✅ **COMPLETED** - SummarizeCompactionStrategy already registered
 
-**Implementation** (`src/threads/compaction/registry.ts`):
-```typescript
-import { TrimToolResultsStrategy } from '~/threads/compaction/trim-tool-results-strategy';
-import { AISummarizationStrategy } from '~/threads/compaction/ai-summarization-strategy';
-import type { CompactionStrategy } from '~/threads/compaction/types';
+The SummarizeCompactionStrategy was already registered in the registry as part of Phase 2 implementation.
 
-function createDefaultStrategies(): CompactionStrategy[] {
-  return [
-    new TrimToolResultsStrategy(),
-    new AISummarizationStrategy()
-  ];
-}
-```
-
-**Test** (`src/threads/compaction/registry.test.ts`):
-```typescript
-import { describe, it, expect } from 'vitest';
-import { registerDefaultStrategies } from '~/threads/compaction/registry';
-
-describe('Compaction registry', () => {
-  it('should register both default strategies', () => {
-    const registeredStrategies: string[] = [];
-    
-    registerDefaultStrategies((strategy) => {
-      registeredStrategies.push(strategy.id);
-    });
-    
-    expect(registeredStrategies).toContain('trim-tool-results');
-    expect(registeredStrategies).toContain('ai-summarize');
-  });
-});
-```
-
-**Commit**: `feat: register AI summarization strategy in compaction registry`
-
----
-
-### Task 3.3: Update Agent compact() to Use AI Strategy
+### Task 3.3: Update Agent compact() to Use AI Strategy ✅ **COMPLETED**
 **Goal**: Make agent use AI strategy and pass required context.
 
-**Files to modify**:
-- `src/agents/agent.ts` - Update compact method
-- `src/agents/agent-compaction.test.ts` - Create integration test
+**Status**: ✅ **COMPLETED** - Agent already uses SummarizeCompactionStrategy
 
-**Implementation in agent.ts**:
-```typescript
-async compact(threadId: string): Promise<void> {
-  // Create context with provider and tools
-  const context: CompactionContext = {
-    threadId,
-    provider: this._provider,
-    toolExecutor: this._toolExecutor,
-    model: this._model
-  };
-  
-  // Try AI summarization first, fall back to trim if it fails
-  try {
-    await this._threadManager.compact(threadId, 'ai-summarize', context);
-  } catch (error) {
-    logger.warn('AI summarization failed, falling back to trim strategy', { error });
-    await this._threadManager.compact(threadId, 'trim-tool-results', context);
-  }
-}
-```
+The Agent.compact() method was updated in Phase 2 to use the SummarizeCompactionStrategy with the agent's own context.
 
-**Note**: ThreadManager.compact() needs updating to pass context to strategy:
-```typescript
-// In thread-manager.ts, update compact method:
-async compact(threadId: string, strategyId: string, context?: Partial<CompactionContext>): Promise<void> {
-  // ... existing validation ...
-  
-  // Merge provided context with defaults
-  const fullContext: CompactionContext = {
-    threadId,
-    ...context
-  };
-  
-  // Run compaction strategy
-  const compactionEvent = await strategy.compact(thread.events, fullContext);
-  
-  // ... rest of existing implementation
-}
-```
+## Phase 3 Summary ✅ **COMPLETED**
 
-**Test** (`src/agents/agent-compaction.test.ts`):
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { MockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+**What was delivered**:
+1. ✅ **Preserve ALL User Messages** - Changed strategy to preserve all USER_MESSAGE events instead of just recent ones
+2. ✅ **Enhanced Metadata Tracking** - Added preservedUserMessages count and summaryLength to metadata
+3. ✅ **Comprehensive Test Suite** - Created enhanced-summarize.test.ts with 5 test cases
+4. ✅ **Updated Existing Tests** - Fixed summarize-strategy.test.ts to match new behavior
 
-describe('Agent compaction with AI strategy', () => {
-  setupCoreTest();
-  let agent: Agent;
-  let threadManager: ThreadManager;
-  let provider: MockProvider;
-
-  beforeEach(() => {
-    threadManager = new ThreadManager();
-    provider = new MockProvider({
-      responses: [{
-        content: 'Summary of conversation...',
-        toolCalls: [],
-        usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 }
-      }]
-    });
-    
-    agent = new Agent({ provider, threadManager, toolExecutor: null });
-  });
-
-  it('should use AI summarization strategy for compaction', async () => {
-    // Add some events
-    threadManager.addEvent(agent.threadId, 'USER_MESSAGE', 'Build a calculator');
-    threadManager.addEvent(agent.threadId, 'AGENT_MESSAGE', {
-      content: 'I will build a calculator'
-    });
-    
-    // Compact
-    await agent.compact(agent.threadId);
-    
-    // Check for compaction event
-    const events = threadManager.getAllEvents(agent.threadId);
-    const compactionEvent = events.find(e => e.type === 'COMPACTION');
-    
-    expect(compactionEvent).toBeDefined();
-    expect(compactionEvent?.data.strategyId).toBe('ai-summarize');
-  });
-});
-```
-
-**Commit**: `feat: integrate AI summarization into agent compaction`
+**Key Enhancement Based on User Feedback**:
+- User specified: "system prompt will be auto-preserved. ditto user-prompt. and we should preserve ALL user messages."
+- This was implemented to ensure no user context is lost during compaction
+- Only agent responses and tool interactions are summarized
 
 ---
 
-## Phase 4: Automatic Compaction
+## Phase 4: Automatic Compaction (NOT STARTED)
 
 ### Task 4.1: Add Auto-Compaction Trigger
 **Goal**: Automatically compact when approaching token limits.
