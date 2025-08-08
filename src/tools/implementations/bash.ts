@@ -78,7 +78,6 @@ export class BashTool extends Tool {
       let stdoutLineCount = 0;
       let stderrLineCount = 0;
 
-<<<<<<< HEAD
       // Line buffers for handling partial lines at chunk boundaries
       let stdoutLineBuffer = '';
       let stderrLineBuffer = '';
@@ -87,10 +86,6 @@ export class BashTool extends Tool {
       let stdoutTailIndex = 0;
       let stderrTailIndex = 0;
 
-||||||| parent of 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
-      const { stdout, stderr } = await execAsync(command, {
-=======
->>>>>>> 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
       // Execute command with spawn for streaming
       const childProcess = spawn('/bin/bash', ['-c', command], {
         cwd: context?.workingDirectory || process.cwd(),
@@ -100,7 +95,6 @@ export class BashTool extends Tool {
       return new Promise<ToolResult>((resolve) => {
         // Handle stdout
         childProcess.stdout?.on('data', (data: Buffer) => {
-<<<<<<< HEAD
           const result = this.processStreamData(
             data,
             stdoutStream,
@@ -115,17 +109,7 @@ export class BashTool extends Tool {
           stdoutLineCount = result.lineCount;
           stdoutTailIndex = result.tailIndex;
         });
-||||||| parent of 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
-      const result: BashOutput = {
-        stdout: stdout || '',
-        stderr: stderr || '',
-        exitCode: 0,
-      };
-=======
-          const text = data.toString();
->>>>>>> 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
 
-<<<<<<< HEAD
         // Handle stderr
         childProcess.stderr?.on('data', (data: Buffer) => {
           const result = this.processStreamData(
@@ -191,131 +175,6 @@ export class BashTool extends Tool {
           stdoutStream.end(onStreamComplete);
           stderrStream.end(onStreamComplete);
           combinedStream.end(onStreamComplete);
-||||||| parent of 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
-      return this.createResult(result as unknown as Record<string, unknown>);
-=======
-          // Write to files
-          stdoutStream.write(data);
-          combinedStream.write(data);
-
-          // Track lines for head+tail preview
-          const lines = text.split('\n');
-          for (const line of lines) {
-            stdoutLineCount++;
-
-            // Always collect head lines
-            if (stdoutHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
-              stdoutHeadLines.push(line);
-            }
-
-            // Collect tail lines (using rotating buffer)
-            if (stdoutTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
-              stdoutTailLines.push(line);
-            } else {
-              // Rotate tail buffer
-              stdoutTailLines.shift();
-              stdoutTailLines.push(line);
-            }
-          }
-        });
-
-        // Handle stderr
-        childProcess.stderr?.on('data', (data: Buffer) => {
-          const text = data.toString();
-
-          // Write to files
-          stderrStream.write(data);
-          combinedStream.write(data);
-
-          // Track lines for head+tail preview
-          const lines = text.split('\n');
-          for (const line of lines) {
-            stderrLineCount++;
-
-            // Always collect head lines
-            if (stderrHeadLines.length < BashTool.PREVIEW_HEAD_LINES) {
-              stderrHeadLines.push(line);
-            }
-
-            // Collect tail lines (using rotating buffer)
-            if (stderrTailLines.length < BashTool.PREVIEW_TAIL_LINES) {
-              stderrTailLines.push(line);
-            } else {
-              // Rotate tail buffer
-              stderrTailLines.shift();
-              stderrTailLines.push(line);
-            }
-          }
-        });
-
-        // Handle completion
-        childProcess.on('close', (exitCode) => {
-          const runtime = Date.now() - startTime;
-
-          // Close file streams
-          stdoutStream.end();
-          stderrStream.end();
-          combinedStream.end();
-
-          // Generate head+tail previews
-          const stdoutPreview = this.generateHeadTailPreview(
-            stdoutHeadLines,
-            stdoutTailLines,
-            stdoutLineCount
-          );
-          const stderrPreview = this.generateHeadTailPreview(
-            stderrHeadLines,
-            stderrTailLines,
-            stderrLineCount
-          );
-
-          const result: BashOutput = {
-            command,
-            exitCode: exitCode || 0,
-            runtime,
-            stdoutPreview,
-            stderrPreview,
-            truncated: {
-              stdout: {
-                skipped: Math.max(
-                  0,
-                  stdoutLineCount -
-                    stdoutHeadLines.length -
-                    this.getUniqueTailLines(stdoutHeadLines, stdoutTailLines)
-                ),
-                total: stdoutLineCount,
-              },
-              stderr: {
-                skipped: Math.max(
-                  0,
-                  stderrLineCount -
-                    stderrHeadLines.length -
-                    this.getUniqueTailLines(stderrHeadLines, stderrTailLines)
-                ),
-                total: stderrLineCount,
-              },
-            },
-            outputFiles: outputPaths,
-          };
-
-          // Important distinction: Tool success vs Command exit code
-          // - Tool success = "Did the bash tool successfully execute the command?"
-          // - Command exit code = "What was the result of the command itself?"
-          //
-          // Examples:
-          // - ESLint finds issues: Tool success=true, exit code=1, stdout=linting errors
-          // - Git status with changes: Tool success=true, exit code=1, stdout=file list
-          // - Single invalid command: Tool success=false, exit code=127, stderr=command not found
-          // - Command sequence with invalid command: Tool success=true, exit code=0, stderr=command not found
-
-          // Special case: Command not found with exit code 127 and no stdout = tool failure
-          // This handles single nonexistent commands like "nonexistentcommand12345"
-          if (exitCode === 127 && stdoutLineCount === 0) {
-            resolve(this.createError(result as unknown as Record<string, unknown>));
-          } else {
-            resolve(this.createResult(result as unknown as Record<string, unknown>));
-          }
->>>>>>> 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
         });
 
         // Handle process errors (e.g., spawn failures)
@@ -422,7 +281,6 @@ export class BashTool extends Tool {
     return tailLines.filter((line) => !headLinesSet.has(line));
   }
 
-<<<<<<< HEAD
   /**
    * Process stream data with line buffering and circular tail buffer for efficiency
    */
@@ -578,9 +436,6 @@ export class BashTool extends Tool {
     }
   }
 
-||||||| parent of 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
-=======
->>>>>>> 23510cdd (feat: implement PR 2 bash tool output management with smart truncation)
   private getOutputFilePaths(context?: ToolContext): {
     stdout: string;
     stderr: string;
