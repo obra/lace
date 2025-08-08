@@ -21,8 +21,6 @@ describe('BashTool', () => {
 
     // Create ToolContext with temp directory
     toolContext = {
-      sessionId: 'test-session',
-      projectId: 'test-project',
       toolTempDir: testTempDir,
     };
   });
