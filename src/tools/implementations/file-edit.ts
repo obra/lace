@@ -78,7 +78,24 @@ interface _ValidationError {
 
 export class FileEditTool extends Tool {
   name = 'file_edit';
-  description = 'Edit files by making multiple text replacements with occurrence validation';
+  description = `Edit files by making precise text replacements with occurrence validation
+
+* All edits are applied atomically - if any edit fails validation, no changes are made
+* Each edit replaces old_text with new_text exactly once by default
+* Use file_read first to see exact content, then copy text precisely
+
+Notes for the edits parameter:
+* The old_text must match EXACTLY one or more consecutive lines from the file. Be mindful of whitespaces!
+* If old_text is not unique in the file, specify occurrences: N to replace exactly N instances
+* Include enough context in old_text to make it unique if there are multiple similar lines
+* Use dry_run: true to preview changes before applying them
+
+Example:
+[
+  { "old_text": "if (user.isActive) {\\n  return user.name;\\n}", "new_text": "if (user.isActive && user.verified) {\\n  return \`\${user.firstName} \${user.lastName}\`;\\n}" },
+  { "old_text": "console.log('debug')", "new_text": "// console.log('debug')", "occurrences": 5 },
+  { "old_text": "\\t\\t  name:    'test'  ", "new_text": "\\t\\t  name: 'production'" }
+]`;
   schema = fileEditArgsSchema;
 
   annotations: ToolAnnotations = {
@@ -192,11 +209,11 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
 
     const newContent = workingContent;
 
-    // Extract diff context - show full file diff for multiple edits, localized context for single edit
+    // Extract diff context - use full file diff for multi-edit, localized for single edit
     const diffContext =
-      edits.length > 1
-        ? this.extractFullFileDiffContext(content, newContent, args.path)
-        : this.extractDiffContext(content, edits[0].old_text, edits[0].new_text);
+      edits.length === 1
+        ? this.extractDiffContext(content, edits[0].old_text, edits[0].new_text)
+        : this.extractFullFileDiffContext(content, newContent, args.path);
 
     // Dry run mode
     if (args.dry_run) {
