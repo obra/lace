@@ -37,8 +37,9 @@ const bashSchema = z.object({
 
 export class BashTool extends Tool {
   name = 'bash';
-  description =
-    "Use bash to execute unix commands to achieve the user's goals. Be smart and careful.";
+  description = `Execute shell commands in isolated bash processes. Each call is independent - no state persists between calls.
+Output truncated to first 100 + last 50 lines. Chain commands with && or ; for sequential operations.
+Exit codes shown even for successful tool execution. Working directory persists within session.`;
   schema = bashSchema;
   annotations: ToolAnnotations = {
     title: 'Run commands with bash',
