@@ -20,19 +20,29 @@ describe('FileEditTool with schema validation', () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
+  // Helper function to assert successful edits
+  const expectSuccessfulEdit = (
+    result: { isError: boolean; metadata?: Record<string, unknown> },
+    editCount?: number
+  ) => {
+    expect(result.isError).toBe(false);
+    if (editCount !== undefined) {
+      expect(result.metadata?.total_replacements).toBe(editCount);
+    }
+  };
+
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_edit');
-      expect(tool.description).toContain('Edit files by replacing exact text matches');
+      expect(tool.description).toMatch(/edit.*files.*text/i);
     });
 
     it('should have proper input schema', () => {
       const schema = tool.inputSchema;
       expect(schema.type).toBe('object');
       expect(schema.properties.path).toBeDefined();
-      expect(schema.properties.old_text).toBeDefined();
-      expect(schema.properties.new_text).toBeDefined();
-      expect(schema.required).toEqual(['path', 'old_text', 'new_text']);
+      expect(schema.properties.edits).toBeDefined();
+      expect(schema.required).toEqual(['path', 'edits']);
     });
 
     it('should be marked as destructive', () => {
@@ -43,8 +53,7 @@ describe('FileEditTool with schema validation', () => {
   describe('Input validation', () => {
     it('should reject missing path', async () => {
       const result = await tool.execute({
-        old_text: 'old',
-        new_text: 'new',
+        edits: [{ old_text: 'old', new_text: 'new' }],
       });
 
       expect(result.isError).toBe(true);
@@ -55,8 +64,7 @@ describe('FileEditTool with schema validation', () => {
     it('should reject empty path', async () => {
       const result = await tool.execute({
         path: '',
-        old_text: 'old',
-        new_text: 'new',
+        edits: [{ old_text: 'old', new_text: 'new' }],
       });
 
       expect(result.isError).toBe(true);
@@ -67,7 +75,7 @@ describe('FileEditTool with schema validation', () => {
     it('should reject missing old_text', async () => {
       const result = await tool.execute({
         path: testFile,
-        new_text: 'new',
+        edits: [{ new_text: 'new' }],
       });
 
       expect(result.isError).toBe(true);
@@ -78,7 +86,7 @@ describe('FileEditTool with schema validation', () => {
     it('should reject missing new_text', async () => {
       const result = await tool.execute({
         path: testFile,
-        old_text: 'old',
+        edits: [{ old_text: 'old' }],
       });
 
       expect(result.isError).toBe(true);
@@ -91,8 +99,7 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: '',
-        new_text: 'new content',
+        edits: [{ old_text: '', new_text: 'new content' }],
       });
 
       expect(result.isError).toBe(false);
@@ -102,8 +109,7 @@ describe('FileEditTool with schema validation', () => {
       // This test verifies path transformation works
       const result = await tool.execute({
         path: './nonexistent.txt',
-        old_text: 'old',
-        new_text: 'new',
+        edits: [{ old_text: 'old', new_text: 'new' }],
       });
 
       expect(result.isError).toBe(true);
@@ -115,8 +121,7 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'Hello',
-        new_text: 'Hi',
+        edits: [{ old_text: 'Hello', new_text: 'Hi' }],
       });
 
       expect(result.isError).toBe(false);
@@ -124,6 +129,7 @@ describe('FileEditTool with schema validation', () => {
   });
 
   describe('Basic text replacement', () => {
+    // eslint-disable-next-line vitest/expect-expect
     it('should replace exact text match', async () => {
       const originalContent = `function hello() {
   console.log('Hello, World!');
@@ -132,13 +138,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: "console.log('Hello, World!');",
-        new_text: "console.log('Hello, Universe!');",
+        edits: [
+          {
+            old_text: "console.log('Hello, World!');",
+            new_text: "console.log('Hello, Universe!');",
+          },
+        ],
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
-      expect(result.content[0].text).toContain(testFile);
+      expectSuccessfulEdit(result);
+      // Remove file path expectation as it's not in the simplified message
     });
 
     it('should handle single character replacements', async () => {
@@ -146,12 +155,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'b',
-        new_text: 'x',
+        edits: [
+          {
+            old_text: 'b',
+            new_text: 'x',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should handle empty string replacement (deletion)', async () => {
@@ -159,12 +172,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: ', World',
-        new_text: '',
+        edits: [
+          {
+            old_text: ', World',
+            new_text: '',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should handle insertion with unique old_text', async () => {
@@ -172,12 +189,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'World',
-        new_text: 'Hello, World',
+        edits: [
+          {
+            old_text: 'World',
+            new_text: 'Hello, World',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
   });
 
@@ -192,17 +213,21 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: `  const a = 1;
+        edits: [
+          {
+            old_text: `  const a = 1;
   const b = 2;
   return a + b;`,
-        new_text: `  const x = 10;
+            new_text: `  const x = 10;
   const y = 20;
   return x * y;`,
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
-      expect(result.content[0].text).toContain('3 lines');
+      expect(result.content[0].text).toContain('Successfully applied');
+      // Remove line count expectation as it's not in the simplified message
     });
 
     it('should handle entire file replacement', async () => {
@@ -210,12 +235,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'old content',
-        new_text: 'completely new content\nwith multiple lines\nand more text',
+        edits: [
+          {
+            old_text: 'old content',
+            new_text: 'completely new content\nwith multiple lines\nand more text',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should preserve exact whitespace in replacements', async () => {
@@ -224,12 +253,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: '  function() {\n    return true;\n  }',
-        new_text: '  function() {\n    return false;\n  }',
+        edits: [
+          {
+            old_text: '  function() {\n    return true;\n  }',
+            new_text: '  function() {\n    return false;\n  }',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
   });
 
@@ -239,13 +272,17 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'Goodbye World',
-        new_text: 'Hello Universe',
+        edits: [
+          {
+            old_text: 'Goodbye World',
+            new_text: 'Hello Universe',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('No exact matches found');
-      expect(result.content[0].text).toContain('Use file_read to see the exact file content');
+      expect(result.content[0].text).toContain('Could not find exact text');
+      expect(result.content[0].text).toContain('Use file_read to see the exact content');
     });
 
     it('should fail when multiple matches exist', async () => {
@@ -253,20 +290,28 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'foo',
-        new_text: 'baz',
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'baz',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Found 2 matches');
-      expect(result.content[0].text).toContain('Include more surrounding context');
+      expect(result.content[0].text).toContain('Expected 1 occurrence but found 2');
+      expect(result.content[0].text).toContain('Add more context to make old_text unique');
     });
 
     it('should handle file not found error', async () => {
       const result = await tool.execute({
         path: '/nonexistent/file.txt',
-        old_text: 'test',
-        new_text: 'test2',
+        edits: [
+          {
+            old_text: 'test',
+            new_text: 'test2',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
@@ -286,13 +331,17 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'NonexistentText',
-        new_text: 'Replacement',
+        edits: [
+          {
+            old_text: 'NonexistentText',
+            new_text: 'Replacement',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('No exact matches found');
-      expect(result.content[0].text).toContain('3 lines');
+      expect(result.content[0].text).toContain('Could not find exact text');
+      expect(result.content[0].text).toContain('File content (3 lines)');
     });
 
     it('should provide match location info for multiple matches', async () => {
@@ -301,13 +350,17 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'test',
-        new_text: 'example',
+        edits: [
+          {
+            old_text: 'test',
+            new_text: 'example',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Found 3 matches');
-      expect(result.content[0].text).toContain('Matches found at lines');
+      expect(result.content[0].text).toContain('Expected 1 occurrence but found 3');
+      expect(result.content[0].text).toContain('Line 1, column');
     });
 
     it('should provide helpful guidance for AI recovery', async () => {
@@ -315,54 +368,56 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'some content',
-        new_text: 'other content',
+        edits: [
+          {
+            old_text: 'some content',
+            new_text: 'other content',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('copy the text exactly including all whitespace');
+      expect(result.content[0].text).toContain('Use file_read to see the exact content');
     });
   });
 
   describe('Line change reporting', () => {
-    it('should report single line changes', async () => {
+    // eslint-disable-next-line vitest/expect-expect
+    it('should report successful edits', async () => {
       await writeFile(testFile, 'single line');
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'single line',
-        new_text: 'one line',
+        edits: [
+          {
+            old_text: 'single line',
+            new_text: 'one line',
+          },
+        ],
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('1 line');
-      expect(result.content[0].text).not.toContain('→');
+      expectSuccessfulEdit(result, 1);
     });
 
-    it('should report line count changes', async () => {
+    // eslint-disable-next-line vitest/expect-expect
+    it('should report multiple edits', async () => {
       await writeFile(testFile, 'line 1\nline 2');
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'line 1\nline 2',
-        new_text: 'single line',
+        edits: [
+          {
+            old_text: 'line 1',
+            new_text: 'first line',
+          },
+          {
+            old_text: 'line 2',
+            new_text: 'second line',
+          },
+        ],
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('2 lines → 1 line');
-    });
-
-    it('should report line increases', async () => {
-      await writeFile(testFile, 'short');
-
-      const result = await tool.execute({
-        path: testFile,
-        old_text: 'short',
-        new_text: 'much\nlonger\ntext\nhere',
-      });
-
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('1 line → 4 lines');
+      expectSuccessfulEdit(result, 2);
     });
   });
 
@@ -372,19 +427,27 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'Hello',
-        new_text: 'Hi',
+        edits: [
+          {
+            old_text: 'Hello',
+            new_text: 'Hi',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should use createError for validation failures', async () => {
       const result = await tool.execute({
         path: '',
-        old_text: 'old',
-        new_text: 'new',
+        edits: [
+          {
+            old_text: 'old',
+            new_text: 'new',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
@@ -394,8 +457,12 @@ describe('FileEditTool with schema validation', () => {
     it('should use createError for file operation failures', async () => {
       const result = await tool.execute({
         path: '/nonexistent/file.txt',
-        old_text: 'old',
-        new_text: 'new',
+        edits: [
+          {
+            old_text: 'old',
+            new_text: 'new',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
@@ -410,12 +477,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: '"quotes"',
-        new_text: "'quotes'",
+        edits: [
+          {
+            old_text: '"quotes"',
+            new_text: "'quotes'",
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should handle unicode characters', async () => {
@@ -424,12 +495,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: '世界',
-        new_text: 'World',
+        edits: [
+          {
+            old_text: '世界',
+            new_text: 'World',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should handle very large text replacements', async () => {
@@ -439,12 +514,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: largeOldText,
-        new_text: largeNewText,
+        edits: [
+          {
+            old_text: largeOldText,
+            new_text: largeNewText,
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should handle empty files', async () => {
@@ -452,12 +531,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: '',
-        new_text: 'new content',
+        edits: [
+          {
+            old_text: '',
+            new_text: 'new content',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should handle files with only whitespace', async () => {
@@ -465,12 +548,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: '   \n\t\n   ',
-        new_text: 'cleaned content',
+        edits: [
+          {
+            old_text: '   \n\t\n   ',
+            new_text: 'cleaned content',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
   });
 
@@ -480,12 +567,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'same',
-        new_text: 'same',
+        edits: [
+          {
+            old_text: 'same',
+            new_text: 'same',
+          },
+        ],
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should validate old_text against actual file content', async () => {
@@ -493,12 +584,16 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute({
         path: testFile,
-        old_text: 'ACTUAL CONTENT', // Different case
-        new_text: 'new content',
+        edits: [
+          {
+            old_text: 'ACTUAL CONTENT',
+            new_text: 'new content',
+          },
+        ],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('No exact matches found');
+      expect(result.content[0].text).toContain('Could not find exact text');
     });
   });
 
@@ -512,14 +607,18 @@ describe('FileEditTool with schema validation', () => {
       const result = await tool.execute(
         {
           path: relativeTestFile,
-          old_text: 'Content for relative edit',
-          new_text: 'Modified content for relative edit',
+          edits: [
+            {
+              old_text: 'Content for relative edit',
+              new_text: 'Modified content for relative edit',
+            },
+          ],
         },
         { workingDirectory: testDir }
       );
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should use absolute paths directly even when working directory is provided', async () => {
@@ -527,15 +626,19 @@ describe('FileEditTool with schema validation', () => {
 
       const result = await tool.execute(
         {
-          path: testFile, // absolute path
-          old_text: 'absolute path content',
-          new_text: 'modified absolute path content',
+          path: testFile,
+          edits: [
+            {
+              old_text: 'absolute path content',
+              new_text: 'modified absolute path content',
+            },
+          ],
         },
         { workingDirectory: '/some/other/dir' }
       );
 
       expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully replaced text');
+      expect(result.content[0].text).toContain('Successfully applied');
     });
 
     it('should fall back to process.cwd() when no working directory in context', async () => {
@@ -547,12 +650,16 @@ describe('FileEditTool with schema validation', () => {
       try {
         const result = await tool.execute({
           path: relativeFile,
-          old_text: 'CWD edit test content',
-          new_text: 'Modified CWD edit test content',
+          edits: [
+            {
+              old_text: 'CWD edit test content',
+              new_text: 'Modified CWD edit test content',
+            },
+          ],
         });
 
         expect(result.isError).toBe(false);
-        expect(result.content[0].text).toContain('Successfully replaced text');
+        expect(result.content[0].text).toContain('Successfully applied');
       } finally {
         await rm(absoluteFile, { force: true });
       }
@@ -562,8 +669,12 @@ describe('FileEditTool with schema validation', () => {
       const result = await tool.execute(
         {
           path: 'non-existent-relative-edit.txt',
-          old_text: 'test',
-          new_text: 'modified',
+          edits: [
+            {
+              old_text: 'test',
+              new_text: 'modified',
+            },
+          ],
         },
         { workingDirectory: testDir }
       );

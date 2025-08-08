@@ -15,6 +15,7 @@ export interface DiffLine {
   content: string;
   isHighlighted?: boolean;
   highlightedContent?: string;
+  isFolded?: boolean;
 }
 
 export interface DiffChunk {
@@ -220,6 +221,28 @@ export default function FileDiffViewer({
       <div className="overflow-x-auto">
         <div className="font-mono text-sm">
           {processedLines.map((line, index) => {
+            // Special rendering for folded sections
+            if (line.isFolded) {
+              return (
+                <div
+                  key={index}
+                  className="diff-line bg-base-100/50 border-y border-base-300 my-1"
+                >
+                  <div className="flex items-center gap-2 px-4 py-2">
+                    <div className="w-8 text-center">
+                      <FontAwesomeIcon 
+                        icon={faCompress} 
+                        className="text-xs text-base-content/40" 
+                      />
+                    </div>
+                    <div className="flex-1 text-base-content/60 italic text-xs">
+                      {line.content}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             const bgClass = 
               line.type === 'added' ? 'diff-line added' :
               line.type === 'removed' ? 'diff-line removed' :
@@ -265,7 +288,11 @@ export default function FileDiffViewer({
     let newIndex = 0;
 
     processedLines.forEach(line => {
-      if (line.type === 'removed') {
+      if (line.isFolded) {
+        // Folded lines span both columns
+        oldLines.push(line);
+        newLines.push(line);
+      } else if (line.type === 'removed') {
         oldLines.push(line);
         newLines.push(null);
       } else if (line.type === 'added') {
@@ -288,6 +315,26 @@ export default function FileDiffViewer({
             {oldLines.map((line, index) => {
               if (!line) {
                 return <div key={index} className="h-6"></div>;
+              }
+
+              // Special rendering for folded sections
+              if (line.isFolded) {
+                return (
+                  <div
+                    key={index}
+                    className="bg-base-100/50 border-y border-base-300 my-1 py-2"
+                  >
+                    <div className="flex items-center gap-2 px-2">
+                      <FontAwesomeIcon 
+                        icon={faCompress} 
+                        className="text-xs text-base-content/40" 
+                      />
+                      <div className="text-base-content/60 italic text-xs">
+                        {line.content}
+                      </div>
+                    </div>
+                  </div>
+                );
               }
 
               const bgClass = 
@@ -336,6 +383,26 @@ export default function FileDiffViewer({
                 return <div key={index} className="h-6"></div>;
               }
 
+              // Special rendering for folded sections
+              if (line.isFolded) {
+                return (
+                  <div
+                    key={index}
+                    className="bg-base-100/50 border-y border-base-300 my-1 py-2"
+                  >
+                    <div className="flex items-center gap-2 px-2">
+                      <FontAwesomeIcon 
+                        icon={faCompress} 
+                        className="text-xs text-base-content/40" 
+                      />
+                      <div className="text-base-content/60 italic text-xs">
+                        {line.content}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const bgClass = 
                 line.type === 'added' ? 'bg-green-50' :
                 line.isHighlighted ? 'bg-yellow-50' : '';
@@ -377,7 +444,7 @@ export default function FileDiffViewer({
   // Handle binary files
   if (diff.isBinary) {
     return (
-      <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`}>
+      <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`} data-testid="file-diff-viewer">
         <div className="bg-base-200 px-4 py-3 border-b border-base-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -397,7 +464,7 @@ export default function FileDiffViewer({
   }
 
   return (
-    <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`}>
+    <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`} data-testid="file-diff-viewer">
       {/* Header */}
       <div className="bg-base-200 px-4 py-3 border-b border-base-300">
         <div className="flex items-center justify-between">
