@@ -192,8 +192,11 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
 
     const newContent = workingContent;
 
-    // Extract diff context for the first edit (for backward compatibility)
-    const diffContext = this.extractDiffContext(content, edits[0].old_text, edits[0].new_text);
+    // Extract diff context - show full file diff for multiple edits, localized context for single edit
+    const diffContext =
+      edits.length > 1
+        ? this.extractFullFileDiffContext(content, newContent, args.path)
+        : this.extractDiffContext(content, edits[0].old_text, edits[0].new_text);
 
     // Dry run mode
     if (args.dry_run) {
@@ -285,6 +288,26 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
       oldContent,
       newContent,
       startLine: contextStartLine + 1, // Convert to 1-based line numbering
+    };
+  }
+
+  /**
+   * Extracts diff context showing the complete file transformation
+   * This shows all changes made across the entire file, not just one edit
+   */
+  private extractFullFileDiffContext(
+    originalContent: string,
+    newContent: string,
+    _filePath?: string
+  ): FileEditDiffContext {
+    // For multi-edit operations, we want to show the complete transformation
+    // So we use the entire original and new file contents
+    return {
+      beforeContext: '',
+      afterContext: '',
+      oldContent: originalContent,
+      newContent: newContent,
+      startLine: 1,
     };
   }
 

@@ -208,6 +208,52 @@ function bar() {
       expect(content).toBe('let x = 1;\nlet b = 2;');
     });
 
+    it('should show full file diff context for multiple edits', async () => {
+      const originalContent = `{
+  "name": "test-package",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}`;
+
+      await fs.writeFile(testFile, originalContent, 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: '"version": "1.0.0"',
+            new_text: '"version": "1.1.0"',
+          },
+          {
+            old_text: '"test": "jest"',
+            new_text: '"test": "jest",\n    "test:watch": "jest --watch"',
+          },
+          {
+            old_text: '"jest": "^29.0.0"',
+            new_text: '"jest": "^29.0.0",\n    "nodemon": "^3.0.0"',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.metadata?.diff).toBeDefined();
+
+      const diff = result.metadata?.diff as FileEditDiffContext;
+      // For multi-edit, should show entire original and new file content
+      expect(diff.oldContent).toBe(originalContent);
+      expect(diff.newContent).toContain('"version": "1.1.0"');
+      expect(diff.newContent).toContain('"test:watch": "jest --watch"');
+      expect(diff.newContent).toContain('"nodemon": "^3.0.0"');
+      expect(diff.startLine).toBe(1);
+      expect(diff.beforeContext).toBe(''); // Full file diff doesn't use context
+      expect(diff.afterContext).toBe('');
+    });
+
     it('should fail when occurrence count does not match', async () => {
       await fs.writeFile(testFile, 'foo bar foo baz foo', 'utf-8');
 
