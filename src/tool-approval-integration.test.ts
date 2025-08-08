@@ -17,7 +17,7 @@ type CLIOptions = {
   logFile?: string;
   prompt?: string;
   ui?: string;
-  [key: string]: any; // Allow any additional properties for test flexibility
+  [key: string]: unknown; // Keep flexibility while retaining type safety
 };
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';

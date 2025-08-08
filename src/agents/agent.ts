@@ -2,6 +2,7 @@
 // ABOUTME: Core conversation engine that emits events instead of direct I/O for multiple interface support
 
 import { EventEmitter } from 'events';
+import { resolve } from 'path';
 import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
@@ -2253,14 +2254,21 @@ export class Agent extends EventEmitter {
       if (event.type === 'TOOL_CALL' && event.data.name === 'file_read') {
         const toolCallId = event.data.id;
         const args = event.data.arguments;
-        const path = args['path'] as string;
+        const toolPath = args['path'] as string;
+
+        // Only check if both paths exist
+        if (!toolPath) continue;
+
+        // Normalize paths for comparison - resolve to absolute paths
+        const normalizedToolPath = resolve(toolPath);
+        const normalizedFilePath = resolve(filePath);
 
         // Look for corresponding successful TOOL_RESULT
         for (let j = i + 1; j < events.length; j++) {
           const resultEvent = events[j];
           if (resultEvent.type === 'TOOL_RESULT' && resultEvent.data.id === toolCallId) {
             // Found the result for this tool call
-            if (!resultEvent.data.isError && path === filePath) {
+            if (!resultEvent.data.isError && normalizedToolPath === normalizedFilePath) {
               return true;
             }
             break; // Stop looking for this tool call's result

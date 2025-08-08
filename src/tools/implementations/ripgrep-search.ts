@@ -2,14 +2,15 @@
 // ABOUTME: Wraps ripgrep command with Zod validation and structured output
 
 import { z } from 'zod';
-import { exec } from 'child_process';
+import * as childProcess from 'child_process';
 import { promisify } from 'util';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString, FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import { TOOL_LIMITS } from '~/tools/constants';
 
-const execAsync = promisify(exec);
+// Create promisified version of execFile for async/await usage
+const execFileAsync = promisify(childProcess.execFile);
 
 interface SearchMatch {
   path: string;
@@ -79,10 +80,9 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         contextLines,
       });
 
-      const command = `rg ${ripgrepArgs.join(' ')}`;
-
       try {
-        const { stdout } = await execAsync(command, {
+        // Use execFile to prevent shell injection - pass arguments directly
+        const { stdout } = await execFileAsync('rg', ripgrepArgs, {
           cwd: process.cwd(),
           maxBuffer: 10485760, // 10MB buffer
         });
@@ -141,11 +141,11 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     }
 
     if (options.includePattern) {
-      args.push('--glob', `"${options.includePattern}"`);
+      args.push('--glob', options.includePattern);
     }
 
     if (options.excludePattern) {
-      args.push('--glob', `!"${options.excludePattern}"`);
+      args.push('--glob', `!${options.excludePattern}`);
     }
 
     // Note: We don't use --max-count here as it limits per file
@@ -155,9 +155,9 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       args.push('--context', options.contextLines.toString());
     }
 
-    // Add pattern and path (escape quotes in pattern)
-    args.push(`"${options.pattern.replace(/"/g, '\\"')}"`);
-    args.push(`"${options.path}"`);
+    // Add pattern and path (no quotes needed with execFile)
+    args.push(options.pattern);
+    args.push(options.path);
 
     return args;
   }

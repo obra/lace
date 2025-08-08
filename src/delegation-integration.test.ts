@@ -251,7 +251,11 @@ describe('Delegation Integration Tests', () => {
   it('should integrate delegation with DelegateTool', async () => {
     // Get delegate tool from session (it will have proper TaskManager injection)
     const agent = session.getAgent(session.getId());
-    const toolExecutor = agent!.toolExecutor;
+    if (!agent) {
+      throw new Error('Failed to get agent from session');
+    }
+
+    const toolExecutor = agent.toolExecutor;
     const delegateToolInstance = toolExecutor.getTool('delegate') as DelegateTool;
 
     // Test delegation using the real DelegateTool with provider mocking
@@ -261,10 +265,6 @@ describe('Delegation Integration Tests', () => {
       expected_response: 'Brief summary of project structure',
       model: 'anthropic:claude-3-5-haiku-20241022',
     };
-
-    if (!agent) {
-      throw new Error('Failed to get agent from session');
-    }
 
     const result = await delegateToolInstance.execute(delegateInput, {
       agent, // Access to threadId via agent.threadId and session via agent.getFullSession()

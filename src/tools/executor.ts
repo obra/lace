@@ -224,7 +224,7 @@ export class ToolExecutor {
     context?: ToolContext
   ): Promise<ToolResult> {
     // Set up environment for tool execution
-    const originalEnv = process.env;
+    const originalEnv = { ...process.env };
 
     try {
       // Apply project environment variables if agent is available
@@ -265,8 +265,13 @@ export class ToolExecutor {
         call.id
       );
     } finally {
-      // Restore original environment
-      process.env = originalEnv;
+      // Restore original environment - properly restore all keys
+      for (const key in process.env) {
+        if (!(key in originalEnv)) {
+          delete process.env[key];
+        }
+      }
+      Object.assign(process.env, originalEnv);
     }
   }
 }
