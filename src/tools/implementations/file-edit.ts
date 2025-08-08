@@ -40,6 +40,12 @@ The old_text must appear exactly once in the file.`;
       const { old_text, new_text } = args;
       const resolvedPath = this.resolvePath(args.path, context);
 
+      // Check read-before-write protection
+      const protectionError = await this.checkFileReadProtection(args.path, resolvedPath, context);
+      if (protectionError) {
+        return protectionError;
+      }
+
       // Read current content with enhanced error handling
       let content: string;
       try {

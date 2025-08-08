@@ -33,6 +33,12 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
       // Validate file exists
       await stat(resolvedPath);
 
+      // Check read-before-write protection
+      const protectionError = await this.checkFileReadProtection(path, resolvedPath, context);
+      if (protectionError) {
+        return protectionError;
+      }
+
       // Read current content
       const currentContent = await readFile(resolvedPath, 'utf-8');
       const lines = currentContent.split('\n');
