@@ -44,5 +44,27 @@ describe('FileEditTool Multi', () => {
       const content = await readFile(testFile, 'utf-8');
       expect(content).toBe('Hello Universe');
     });
+
+    it('should fail when occurrence count does not match', async () => {
+      await writeFile(testFile, 'foo bar foo baz foo', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'qux',
+            occurrences: 2, // Actually has 3
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Expected 2 occurrences but found 3');
+
+      // File should not be modified
+      const content = await readFile(testFile, 'utf-8');
+      expect(content).toBe('foo bar foo baz foo');
+    });
   });
 });
