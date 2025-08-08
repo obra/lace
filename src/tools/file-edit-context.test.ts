@@ -156,4 +156,181 @@ function bar() {
     expect(result.metadata?.oldText).toBe('original');
     expect(result.metadata?.newText).toBe('modified');
   });
+
+  describe('Multi-Edit API', () => {
+    it('should apply multiple edits sequentially', async () => {
+      await fs.writeFile(testFile, 'const a = 1;\nconst b = 2;', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'const',
+            new_text: 'let',
+            occurrences: 2,
+          },
+          {
+            old_text: 'let a',
+            new_text: 'let x',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      const content = await fs.readFile(testFile, 'utf-8');
+      expect(content).toBe('let x = 1;\nlet b = 2;');
+    });
+
+    it('should fail when occurrence count does not match', async () => {
+      await fs.writeFile(testFile, 'foo bar foo baz foo', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'qux',
+            occurrences: 2, // Actually has 3
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Expected 2 occurrences but found 3');
+
+      // File should not be modified
+      const content = await fs.readFile(testFile, 'utf-8');
+      expect(content).toBe('foo bar foo baz foo');
+    });
+  });
+
+  describe('Dry Run Mode', () => {
+    it('should not modify file in dry run mode', async () => {
+      const originalContent = 'Hello World';
+      await fs.writeFile(testFile, originalContent, 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        dry_run: true,
+        edits: [
+          {
+            old_text: 'World',
+            new_text: 'Universe',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Dry run');
+      expect(result.metadata?.dry_run).toBe(true);
+
+      // File should not be modified
+      const content = await fs.readFile(testFile, 'utf-8');
+      expect(content).toBe(originalContent);
+    });
+
+    it('should work with old API format in dry run mode', async () => {
+      const originalContent = 'Hello World';
+      await fs.writeFile(testFile, originalContent, 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        dry_run: true,
+        old_text: 'World',
+        new_text: 'Universe',
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('Dry run');
+      expect(result.metadata?.dry_run).toBe(true);
+
+      // File should not be modified
+      const content = await fs.readFile(testFile, 'utf-8');
+      expect(content).toBe(originalContent);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty file', async () => {
+      await fs.writeFile(testFile, '', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'bar',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('No matches found');
+    });
+
+    it('should handle file not found', async () => {
+      const result = await tool.execute({
+        path: '/nonexistent/file.txt',
+        edits: [
+          {
+            old_text: 'foo',
+            new_text: 'bar',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('File not found');
+    });
+
+    it('should preserve line endings', async () => {
+      await fs.writeFile(testFile, 'line1\r\nline2\r\nline3', 'utf-8');
+
+      const result = await tool.execute({
+        path: testFile,
+        edits: [
+          {
+            old_text: 'line2',
+            new_text: 'modified',
+          },
+        ],
+      });
+
+      expect(result.isError).toBe(false);
+      const content = await fs.readFile(testFile, 'utf-8');
+      expect(content).toBe('line1\r\nmodified\r\nline3');
+    });
+  });
+
+  describe('Performance', () => {
+    it('should handle many edits efficiently', async () => {
+      // Create file with unique patterns for each edit (using letters to avoid substring overlap)
+      const content = Array(10)
+        .fill(null)
+        .map(
+          (_, i) => `line with ${String.fromCharCode(97 + i)}unique${String.fromCharCode(97 + i)}`
+        )
+        .join('\n');
+      await fs.writeFile(testFile, content, 'utf-8');
+
+      // Create 10 different edits, each targeting a unique pattern
+      const edits = Array(10)
+        .fill(null)
+        .map((_, i) => ({
+          old_text: `${String.fromCharCode(97 + i)}unique${String.fromCharCode(97 + i)}`,
+          new_text: `${String.fromCharCode(97 + i)}replaced${String.fromCharCode(97 + i)}`,
+          occurrences: 1,
+        }));
+
+      const start = Date.now();
+      const result = await tool.execute({
+        path: testFile,
+        edits,
+      });
+      const duration = Date.now() - start;
+
+      expect(result.isError).toBe(false);
+      expect(duration).toBeLessThan(1000); // Should complete in under 1 second
+    });
+  });
 });

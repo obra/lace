@@ -1,17 +1,39 @@
-// ABOUTME: Schema-based search and replace file content with exact string matching
-// ABOUTME: Essential tool for precise code modifications with Zod validation and enhanced error handling
+// ABOUTME: Enhanced file_edit tool with multiple edits and occurrence validation
+// ABOUTME: Supports atomic multi-edit operations with precise occurrence counting
 
 import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
 import { Tool } from '~/tools/tool';
-import { FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { FilePath } from '~/tools/schemas/common';
 
-const fileEditSchema = z.object({
-  path: FilePath,
+// Define schemas for input validation
+const editOperationSchema = z.object({
   old_text: z.string(),
   new_text: z.string(),
+  occurrences: z.number().int().positive().optional(),
 });
+
+// Support both old and new API formats for backward compatibility
+const fileEditArgsSchema = z.union([
+  // New API with edits array
+  z.object({
+    path: FilePath,
+    edits: z.array(editOperationSchema).min(1),
+    dry_run: z.boolean().optional(),
+  }),
+  // Old API for backward compatibility
+  z.object({
+    path: FilePath,
+    old_text: z.string(),
+    new_text: z.string(),
+    dry_run: z.boolean().optional(),
+  }),
+]);
+
+// Export types for use in tests and other files
+export type EditOperation = z.infer<typeof editOperationSchema>;
+export type FileEditArgs = z.infer<typeof fileEditArgsSchema>;
 
 export interface FileEditDiffContext {
   beforeContext: string;
@@ -23,139 +45,109 @@ export interface FileEditDiffContext {
 
 export class FileEditTool extends Tool {
   name = 'file_edit';
-  description = `Edit files by replacing exact text matches. 
-For modifying existing code, configuration, or any file content.
-Requires exact text matching including all whitespace and line breaks.
-The old_text must appear exactly once in the file.`;
-  schema = fileEditSchema;
+  description = 'Edit files by making multiple text replacements with occurrence validation';
+  schema = fileEditArgsSchema;
+
   annotations: ToolAnnotations = {
     destructiveHint: true,
   };
 
-  protected async executeValidated(
-    args: z.infer<typeof fileEditSchema>,
-    context?: ToolContext
-  ): Promise<ToolResult> {
+  protected async executeValidated(args: FileEditArgs, context?: ToolContext): Promise<ToolResult> {
+    const resolvedPath = this.resolvePath(args.path, context);
+
+    // Convert old API format to new format for processing
+    const edits: EditOperation[] =
+      'edits' in args
+        ? args.edits
+        : [
+            {
+              old_text: args.old_text,
+              new_text: args.new_text,
+              occurrences: 1,
+            },
+          ];
+
+    // Read file
+    let content: string;
     try {
-      const { old_text, new_text } = args;
-      const resolvedPath = this.resolvePath(args.path, context);
-
-      // Read current content with enhanced error handling
-      let content: string;
-      try {
-        content = await readFile(resolvedPath, 'utf-8');
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as Error & { code?: string }).code === 'ENOENT') {
-          return this.createError(
-            `File not found: ${args.path}. Ensure the file exists before editing. Check the file path and permissions.`
-          );
-        }
-        throw error;
+      content = await readFile(resolvedPath, 'utf-8');
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        return this.createError(`File not found: ${args.path}`);
       }
+      throw error;
+    }
 
-      // Count occurrences
-      const occurrences = content.split(old_text).length - 1;
+    // Validate all edits first
+    let workingContent = content;
+    for (let i = 0; i < edits.length; i++) {
+      const edit = edits[i];
+      const occurrences = workingContent.split(edit.old_text).length - 1;
+      const expectedOccurrences = edit.occurrences ?? 1;
 
       if (occurrences === 0) {
-        // Enhanced error with file content preview
-        const filePreview = this.createFilePreview(content, old_text);
         return this.createError(
-          `No exact matches found for the specified text in ${args.path}. Use file_read to see the exact file content, then copy the text exactly including all whitespace, tabs, and line breaks. File contains ${this.countLines(content)} lines. ${filePreview}`
+          `Edit ${i + 1} of ${edits.length}: No matches found for "${edit.old_text}"`
         );
       }
 
-      if (occurrences > 1) {
-        // Enhanced error with line number information
-        const matchInfo = this.findMatchLocations(content, old_text);
+      if (occurrences !== expectedOccurrences) {
         return this.createError(
-          `Found ${occurrences} matches for the specified text in ${args.path}. Include more surrounding context (lines before/after) to make old_text unique. Matches found at lines: ${matchInfo}. Include the entire function or block instead of just one line.`
+          `Edit ${i + 1} of ${edits.length}: Expected ${expectedOccurrences} occurrences but found ${occurrences}`
         );
       }
 
-      // Perform replacement
-      const newContent = content.replace(old_text, new_text);
+      // Simulate the edit for next validation
+      workingContent = workingContent.split(edit.old_text).join(edit.new_text);
+    }
 
-      // Write back with enhanced error handling
-      try {
-        await writeFile(resolvedPath, newContent, 'utf-8');
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as Error & { code?: string }).code === 'EACCES') {
-          return this.createError(
-            `Permission denied writing to ${args.path}. Check file permissions or choose a different location. File system error: ${error.message}`
-          );
+    // Apply all edits
+    workingContent = content;
+    for (const edit of edits) {
+      workingContent = workingContent.split(edit.old_text).join(edit.new_text);
+    }
+
+    const newContent = workingContent;
+
+    // Extract diff context for the first edit (for backward compatibility)
+    const diffContext = this.extractDiffContext(content, edits[0].old_text, edits[0].new_text);
+
+    // Dry run mode
+    if (args.dry_run) {
+      return this.createResult(
+        `Dry run completed. Would apply ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${args.path}`,
+        {
+          dry_run: true,
+          would_modify: true,
+          edits_to_apply: edits,
+          diff: diffContext,
         }
-        throw error;
-      }
-
-      // Calculate line information for feedback
-      const oldLines = this.countLines(old_text);
-      const newLines = this.countLines(new_text);
-      const lineInfo = this.formatLineChange(oldLines, newLines);
-
-      // Extract context for the diff display
-      const diffContext = this.extractDiffContext(content, old_text, new_text);
-
-      return this.createResult(`Successfully replaced text in ${args.path} (${lineInfo})`, {
-        diff: diffContext,
-        path: args.path,
-        oldText: old_text,
-        newText: new_text,
-      });
-    } catch (error: unknown) {
-      return this.createError(
-        `File edit operation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the input parameters and try again.`
       );
     }
-  }
 
-  /**
-   * Creates a preview of file content around the expected match location
-   */
-  private createFilePreview(content: string, _searchText: string): string {
-    const lines = content.split('\n');
-    const totalLines = lines.length;
-
-    if (totalLines <= 10) {
-      return `File content preview:\n${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`;
+    // Write file
+    try {
+      await writeFile(resolvedPath, newContent, 'utf-8');
+    } catch (error: unknown) {
+      return this.createError(
+        `Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
 
-    // Show first few lines and last few lines for larger files
-    const preview = lines.slice(0, 3).concat(['...'], lines.slice(-3)).join('\n');
-    return `File content preview:\n${preview}`;
-  }
+    // Create metadata for backward compatibility
+    const metadata = {
+      diff: diffContext,
+      path: args.path,
+      ...(edits.length === 1 && {
+        oldText: edits[0].old_text,
+        newText: edits[0].new_text,
+      }),
+    };
 
-  /**
-   * Finds line numbers where matches occur
-   */
-  private findMatchLocations(content: string, searchText: string): string {
-    const lines = content.split('\n');
-    const matchLines: number[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      if (lines.slice(i).join('\n').startsWith(searchText)) {
-        matchLines.push(i + 1);
-      }
-    }
-
-    return matchLines.length > 0 ? matchLines.join(', ') : 'unknown';
-  }
-
-  /**
-   * Counts the number of lines in text
-   */
-  private countLines(text: string): number {
-    if (text === '') return 0;
-    return text.split('\n').length;
-  }
-
-  /**
-   * Formats line change information
-   */
-  private formatLineChange(oldLines: number, newLines: number): string {
-    if (oldLines === newLines) {
-      return `${oldLines} line${oldLines === 1 ? '' : 's'}`;
-    }
-    return `${oldLines} line${oldLines === 1 ? '' : 's'} → ${newLines} line${newLines === 1 ? '' : 's'}`;
+    return this.createResult(
+      `Successfully applied ${edits.length} edit${edits.length === 1 ? '' : 's'}`,
+      metadata
+    );
   }
 
   /**
@@ -200,7 +192,6 @@ The old_text must appear exactly once in the file.`;
 
     // Build the full content with context for diff display
     const oldContent = [beforeContext, oldText, afterContext].filter(Boolean).join('\n');
-
     const newContent = [beforeContext, newText, afterContext].filter(Boolean).join('\n');
 
     return {

@@ -41,7 +41,7 @@ describe('FileEditTool actual file modification', () => {
 
     // Check the tool reports success
     expect(result.isError).toBe(false);
-    expect(result.content[0].text).toContain('Successfully replaced text');
+    expect(result.content[0].text).toContain('Successfully applied 1 edit');
 
     // CRITICAL: Verify the file was actually modified
     const afterEdit = await readFile(testFile, 'utf-8');
@@ -67,7 +67,7 @@ line 5`;
 
     // Should error because text appears multiple times
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Found 2 matches');
+    expect(result.content[0].text).toContain('Expected 1 occurrences but found 2');
 
     // File should NOT be modified
     const content = await readFile(testFile, 'utf-8');
@@ -128,7 +128,7 @@ line 5`;
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('No exact matches found');
+    expect(result.content[0].text).toContain('No matches found');
 
     // File should remain unchanged
     const afterEdit = await readFile(testFile, 'utf-8');
