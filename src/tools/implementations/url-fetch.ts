@@ -99,8 +99,9 @@ interface RichErrorContext {
 
 export class UrlFetchTool extends Tool {
   name = 'url_fetch';
-  description =
-    'Fetch content from web URLs with intelligent content handling. WARNING: Returned content can be very large and may exceed token limits. Consider delegating URL fetching to a subtask to avoid overwhelming the main conversation.';
+  description = `Fetch web content with automatic HTML-to-markdown conversion. Content under 32KB returned inline, larger saved to temp files.
+No need to delegate for size - tool handles large content automatically. Temp files created for content over 32KB.
+Follows redirects by default. Returns detailed error context for failures.`;
   schema = urlFetchSchema;
   annotations: ToolAnnotations = {
     title: 'URL Fetcher',
