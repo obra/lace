@@ -218,6 +218,12 @@ export class Agent extends EventEmitter {
       currentState: this._state,
     });
 
+    // Check for slash commands
+    if (content.startsWith('/compact')) {
+      await this._handleCompactCommand();
+      return;
+    }
+
     // Start new turn tracking
     this._startTurnTracking(content);
 
@@ -1653,6 +1659,29 @@ export class Agent extends EventEmitter {
 
   getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
     return this._threadManager.getMainAndDelegateEvents(mainThreadId);
+  }
+
+  private async _handleCompactCommand(): Promise<void> {
+    this.emit('agent_thinking_start');
+
+    try {
+      // Use the simple trim strategy for now
+      await this.compact(this._threadId);
+
+      // Add a system message about compaction
+      this._threadManager.addEvent(
+        this._threadId,
+        'LOCAL_SYSTEM_MESSAGE',
+        '✅ Conversation compacted successfully'
+      );
+
+      this.emit('agent_thinking_complete');
+    } catch (error) {
+      this.emit('error', {
+        error: error instanceof Error ? error : new Error('Compaction failed'),
+        context: { operation: 'compact', threadId: this._threadId },
+      });
+    }
   }
 
   async compact(threadId: string): Promise<void> {

@@ -13,10 +13,11 @@ import { ApprovalDecision } from '~/tools/approval-types';
 
 // Mock provider for testing token usage tracking
 class MockProvider extends BaseMockProvider {
+  providerName = 'mock-provider';
   private mockResponse: ProviderResponse;
 
   constructor(response?: Partial<ProviderResponse>) {
-    super();
+    super({});
     this.mockResponse = {
       content: 'Default response',
       toolCalls: [],
@@ -33,7 +34,9 @@ class MockProvider extends BaseMockProvider {
     return Promise.resolve(this.mockResponse);
   }
 
-  supportsStreaming = false;
+  get supportsStreaming() {
+    return false;
+  }
 }
 
 describe('Agent token tracking', () => {
