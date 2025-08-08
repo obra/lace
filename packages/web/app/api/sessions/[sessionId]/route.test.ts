@@ -134,8 +134,8 @@ describe('Session Detail API Route', () => {
             expect.objectContaining({
               threadId: sessionId,
               name: 'Lace', // Coordinator agent is always named "Lace"
-              provider: 'anthropic',
-              model: 'claude-3-5-haiku-20241022',
+              providerInstanceId: expect.any(String) as string,
+              modelId: 'claude-3-5-haiku-20241022',
               status: expect.any(String) as string,
             }),
           ]) as unknown[],

@@ -125,8 +125,8 @@ describe('Agent Spawning API E2E Tests', () => {
       // Verify agent was created with correct properties
       expect(data.agent).toMatchObject({
         name: 'architect',
-        provider: 'anthropic',
-        model: 'claude-3-5-sonnet-20241022',
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-sonnet-20241022',
         status: 'idle',
       });
 

@@ -106,8 +106,8 @@ export async function POST(
     const agentResponse = {
       threadId: agent.threadId,
       name: agent.name,
-      provider: catalogProvider.type,
-      model: body.modelId,
+      providerInstanceId: body.providerInstanceId,
+      modelId: body.modelId,
       status: agent.status,
       createdAt: new Date(),
     };
