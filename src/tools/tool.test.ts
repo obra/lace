@@ -204,8 +204,6 @@ describe('Tool temp directory functionality', () => {
 
   it('should throw error when temp directory not provided', () => {
     const context: ToolContext = {
-      sessionId: 'test-session',
-      projectId: 'test-project',
       // No toolTempDir
     };
 
@@ -216,8 +214,6 @@ describe('Tool temp directory functionality', () => {
 
   it('should get tool temp dir from context', () => {
     const context: ToolContext = {
-      sessionId: 'test-session',
-      projectId: 'test-project',
       toolTempDir: '/tmp/test/tool-call-123',
     };
 
@@ -227,8 +223,6 @@ describe('Tool temp directory functionality', () => {
 
   it('should throw error when tool temp dir not provided', () => {
     const context: ToolContext = {
-      sessionId: 'test-session',
-      projectId: 'test-project',
       // No toolTempDir
     };
 

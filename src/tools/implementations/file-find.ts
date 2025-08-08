@@ -31,7 +31,8 @@ const fileFindSchema = z.object({
 
 export class FileFindTool extends Tool {
   name = 'file_find';
-  description = 'Find files by name pattern or glob';
+  description = `Find files by name pattern using glob syntax (* and ?). Use ripgrep-search for content search.
+Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
   schema = fileFindSchema;
   annotations: ToolAnnotations = {
     readOnlyHint: true,

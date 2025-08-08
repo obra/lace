@@ -71,6 +71,12 @@ Example:
     const resolvedPath = this.resolvePath(args.path, context);
     const edits = args.edits;
 
+    // Check read-before-write protection
+    const protectionError = await this.checkFileReadProtection(args.path, resolvedPath, context);
+    if (protectionError) {
+      return protectionError;
+    }
+
     // Read file
     let content: string;
     try {

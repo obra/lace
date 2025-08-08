@@ -83,8 +83,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        agent: session.getAgent(session.getId())!,
       }
     );
 
@@ -101,8 +100,7 @@ describe('Bulk Task Creation', () => {
         tasks: [],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        agent: session.getAgent(session.getId())!,
       }
     );
 
@@ -122,8 +120,7 @@ describe('Bulk Task Creation', () => {
         tasks,
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        agent: session.getAgent(session.getId())!,
       }
     );
 
@@ -143,8 +140,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        agent: session.getAgent(session.getId())!,
       }
     );
 
@@ -172,8 +168,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        agent: session.getAgent(session.getId())!,
       }
     );
 
@@ -194,7 +189,7 @@ describe('Bulk Task Creation', () => {
             title: 'Delegated Task',
             prompt: 'Work for subagent',
             priority: 'medium' as const,
-            assignedTo: session.getId(), // Assign to current session instead of spawning agent
+            assignedTo: session.getAgent(session.getId())!.threadId, // Assign to current session instead of spawning agent
           },
           {
             title: 'Low Priority Task',
@@ -205,15 +200,16 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        agent: session.getAgent(session.getId())!,
       }
     );
 
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toContain('Created 3 tasks');
     expect(result.content[0].text).toContain('High Priority Task');
-    expect(result.content[0].text).toContain(`Delegated Task → ${session.getId()}`);
+    expect(result.content[0].text).toContain(
+      `Delegated Task → ${session.getAgent(session.getId())!.threadId}`
+    );
     expect(result.content[0].text).toContain('Low Priority Task');
   });
 });

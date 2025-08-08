@@ -2,6 +2,7 @@
 // ABOUTME: Core conversation engine that emits events instead of direct I/O for multiple interface support
 
 import { EventEmitter } from 'events';
+import { resolve } from 'path';
 import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
@@ -971,10 +972,8 @@ export class Agent extends EventEmitter {
       }
 
       const toolContext = {
-        threadId: asThreadId(this._threadId),
-        parentThreadId: asThreadId(this._getParentThreadId()),
         workingDirectory,
-        session, // REQUIRED for security policy enforcement
+        agent: this,
       };
 
       // First: Check permission
@@ -1058,10 +1057,8 @@ export class Agent extends EventEmitter {
       }
 
       const toolContext = {
-        threadId: asThreadId(this._threadId),
-        parentThreadId: asThreadId(this._getParentThreadId()),
         workingDirectory,
-        session, // REQUIRED for security policy enforcement
+        agent: this,
       };
 
       // Find the tool and execute directly (permission already granted via approval)
@@ -2237,5 +2234,49 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  /**
+   * Check if a file has been read in the current conversation (since last compaction).
+   * Used by file modification tools to prevent accidental overwrites.
+   *
+   * @param filePath - The exact path to check (no normalization performed)
+   * @returns true if the file was successfully read, false otherwise
+   */
+  public hasFileBeenRead(filePath: string): boolean {
+    const events = this._threadManager.getEvents(this._threadId);
+
+    // Walk through events looking for successful file_read tool calls
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+
+      // Find TOOL_CALL events for file_read
+      if (event.type === 'TOOL_CALL' && event.data.name === 'file_read') {
+        const toolCallId = event.data.id;
+        const args = event.data.arguments;
+        const toolPath = args['path'] as string;
+
+        // Only check if both paths exist
+        if (!toolPath) continue;
+
+        // Normalize paths for comparison - resolve to absolute paths
+        const normalizedToolPath = resolve(toolPath);
+        const normalizedFilePath = resolve(filePath);
+
+        // Look for corresponding successful TOOL_RESULT
+        for (let j = i + 1; j < events.length; j++) {
+          const resultEvent = events[j];
+          if (resultEvent.type === 'TOOL_RESULT' && resultEvent.data.id === toolCallId) {
+            // Found the result for this tool call
+            if (!resultEvent.data.isError && normalizedToolPath === normalizedFilePath) {
+              return true;
+            }
+            break; // Stop looking for this tool call's result
+          }
+        }
+      }
+    }
+
+    return false;
   }
 }

@@ -943,8 +943,7 @@ describe('Enhanced Agent', () => {
           arguments: { action: 'test' },
         },
         expect.objectContaining({
-          threadId: expect.any(String) as string,
-          parentThreadId: expect.any(String) as string,
+          agent: expect.any(Agent) as unknown,
           workingDirectory: expect.any(String) as string,
         }) as ToolContext
       );

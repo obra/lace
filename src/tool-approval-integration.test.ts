@@ -17,7 +17,7 @@ type CLIOptions = {
   logFile?: string;
   prompt?: string;
   ui?: string;
-  [key: string]: any; // Allow any additional properties for test flexibility
+  [key: string]: unknown; // Keep flexibility while retaining type safety
 };
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
@@ -34,7 +34,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { ThreadId } from '~/threads/types';
+import type { Agent } from '~/agents/agent';
 
 // Mock approval interface for testing
 class MockApprovalInterface implements ApprovalCallback {
@@ -85,6 +85,7 @@ describe('Tool Approval System Integration', () => {
   let project: Project;
   let toolContext: ToolContext;
   let providerInstanceId: string;
+  let agent: Agent | null;
 
   beforeEach(async () => {
     // setupTestPersistence replaced by setupCoreTest
@@ -121,13 +122,17 @@ describe('Tool Approval System Integration', () => {
       projectId: project.getId(),
     });
 
-    // Create tool context with session for security policy enforcement
+    // Get agent from session for context
+    agent = session.getAgent(session.getId());
+    if (!agent) {
+      throw new Error('Failed to get agent from session');
+    }
+
+    // Create tool context with agent reference
     toolContext = {
-      threadId: 'lace_20250101_test02' as ThreadId,
-      parentThreadId: 'lace_20250101_parent' as ThreadId,
       workingDirectory: tempLaceDirContext.tempDir,
       toolTempDir: tempLaceDirContext.tempDir, // Required for bash tool output management
-      session, // REQUIRED for security policy enforcement
+      agent, // Provides access to threadId and session
     };
 
     toolExecutor = new ToolExecutor();
