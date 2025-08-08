@@ -41,21 +41,6 @@ interface MatchLocation {
   context_after?: string;
 }
 
-interface _ValidationError {
-  type: 'NO_MATCH' | 'WRONG_COUNT' | 'FILE_NOT_FOUND' | 'BINARY_FILE' | 'PERMISSION_DENIED';
-  edit_index: number;
-  total_edits: number;
-  message: string;
-
-  // For occurrence errors
-  expected_occurrences?: number;
-  actual_occurrences?: number;
-  match_locations?: MatchLocation[];
-
-  // For no match errors
-  search_text?: string;
-}
-
 export class FileEditTool extends Tool {
   name = 'file_edit';
   description = `Edit files by making precise text replacements with occurrence validation
@@ -91,8 +76,15 @@ Example:
     try {
       content = await readFile(resolvedPath, 'utf-8');
     } catch (error: unknown) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-        return this.createError(`File not found: ${args.path}`);
+      if (error instanceof Error && 'code' in error) {
+        switch (error.code) {
+          case 'ENOENT':
+            return this.createError(`File not found: ${args.path}`);
+          case 'EACCES':
+            return this.createError(`Permission denied: Cannot read file ${args.path}`);
+          case 'EPERM':
+            return this.createError(`Operation not permitted: Cannot access file ${args.path}`);
+        }
       }
       throw error;
     }
@@ -174,19 +166,14 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
       workingContent = this.replaceAll(workingContent, edit.old_text, edit.new_text);
     }
 
-    // Apply all edits
-    workingContent = content;
-    for (const edit of edits) {
-      workingContent = this.replaceAll(workingContent, edit.old_text, edit.new_text);
-    }
-
+    // workingContent already contains all applied edits from validation phase
     const newContent = workingContent;
 
     // Extract diff context - use full file diff for multi-edit, localized for single edit
     const diffContext =
       edits.length === 1
         ? this.extractDiffContext(content, edits[0].old_text, edits[0].new_text)
-        : this.extractFullFileDiffContext(content, newContent, args.path);
+        : this.extractFullFileDiffContext(content, newContent);
 
     // Dry run mode
     if (args.dry_run) {
@@ -205,6 +192,16 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
     try {
       await writeFile(resolvedPath, newContent, 'utf-8');
     } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error) {
+        switch (error.code) {
+          case 'EACCES':
+            return this.createError(`Permission denied: Cannot write to file ${args.path}`);
+          case 'EPERM':
+            return this.createError(`Operation not permitted: Cannot write to file ${args.path}`);
+          case 'ENOSPC':
+            return this.createError(`No space left on device: Cannot write to file ${args.path}`);
+        }
+      }
       return this.createError(
         `Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -284,8 +281,7 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
    */
   private extractFullFileDiffContext(
     originalContent: string,
-    newContent: string,
-    _filePath?: string
+    newContent: string
   ): FileEditDiffContext {
     // For multi-edit operations, we want to show the complete transformation
     // So we use the entire original and new file contents
@@ -348,6 +344,8 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
    */
   private countOccurrences(text: string, searchText: string): number {
     if (searchText === '') {
+      // Empty searchText is only allowed for empty files (insertion at beginning of empty file)
+      // For non-empty files, require a specific insertion point
       return text === '' ? 1 : 0;
     }
 
@@ -369,17 +367,6 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
     if (searchText === '') {
       return text === '' ? replaceText : text;
     }
-
-    let result = '';
-    let lastPos = 0;
-    let pos = 0;
-
-    while ((pos = text.indexOf(searchText, lastPos)) !== -1) {
-      result += text.slice(lastPos, pos) + replaceText;
-      lastPos = pos + searchText.length;
-    }
-
-    result += text.slice(lastPos);
-    return result;
+    return text.replaceAll(searchText, replaceText);
   }
 }

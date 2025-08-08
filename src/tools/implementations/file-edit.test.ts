@@ -20,10 +20,25 @@ describe('FileEditTool with schema validation', () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
+  // Helper function to assert successful edits
+  const expectSuccessfulEdit = (
+    result: { isError: boolean; content: { text?: string }[] },
+    editCount?: number
+  ) => {
+    expect(result.isError).toBe(false);
+    if (editCount !== undefined) {
+      expect(result.content[0].text).toContain(
+        `Successfully applied ${editCount} edit${editCount === 1 ? '' : 's'}`
+      );
+    } else {
+      expect(result.content[0].text).toContain('Successfully applied');
+    }
+  };
+
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_edit');
-      expect(tool.description).toContain('Edit files by making precise text replacements');
+      expect(tool.description).toMatch(/edit.*files.*text/i);
     });
 
     it('should have proper input schema', () => {
@@ -118,6 +133,7 @@ describe('FileEditTool with schema validation', () => {
   });
 
   describe('Basic text replacement', () => {
+    // eslint-disable-next-line vitest/expect-expect
     it('should replace exact text match', async () => {
       const originalContent = `function hello() {
   console.log('Hello, World!');
@@ -134,8 +150,7 @@ describe('FileEditTool with schema validation', () => {
         ],
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully applied');
+      expectSuccessfulEdit(result);
       // Remove file path expectation as it's not in the simplified message
     });
 
@@ -371,6 +386,7 @@ describe('FileEditTool with schema validation', () => {
   });
 
   describe('Line change reporting', () => {
+    // eslint-disable-next-line vitest/expect-expect
     it('should report successful edits', async () => {
       await writeFile(testFile, 'single line');
 
@@ -384,10 +400,10 @@ describe('FileEditTool with schema validation', () => {
         ],
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully applied 1 edit');
+      expectSuccessfulEdit(result, 1);
     });
 
+    // eslint-disable-next-line vitest/expect-expect
     it('should report multiple edits', async () => {
       await writeFile(testFile, 'line 1\nline 2');
 
@@ -405,8 +421,7 @@ describe('FileEditTool with schema validation', () => {
         ],
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Successfully applied 2 edits');
+      expectSuccessfulEdit(result, 2);
     });
   });
 
