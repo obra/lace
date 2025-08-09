@@ -219,7 +219,7 @@ describe('Compaction Integration Test', () => {
 
     expect(compactionStartEvents.length).toBe(1);
     expect(compactionStartEvents[0]).toMatchObject({
-      eventType: 'thread',
+      eventType: 'session',
       scope: {
         projectId,
         sessionId,
@@ -230,7 +230,7 @@ describe('Compaction Integration Test', () => {
         threadId: sessionId,
         data: {
           strategy: 'summarize',
-          message: expect.stringContaining('compact'),
+          auto: false,
         },
       },
     });
@@ -245,7 +245,7 @@ describe('Compaction Integration Test', () => {
 
     expect(compactionCompleteEvents.length).toBe(1);
     expect(compactionCompleteEvents[0]).toMatchObject({
-      eventType: 'thread',
+      eventType: 'session',
       data: {
         type: 'COMPACTION_COMPLETE',
         threadId: sessionId,

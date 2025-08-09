@@ -43,9 +43,9 @@ describe('Compaction SSE Events', () => {
   });
 
   it('should emit COMPACTION_START when agent emits compaction_start event', () => {
-    const _threadId = 'test-thread-123';
-    const sessionId = 'test-session-456';
-    const projectId = 'test-project-789';
+    const _threadId = 'lace_20250809_abc123';
+    const sessionId = 'lace_20250809_def456';
+    const projectId = 'proj_789abc';
 
     // Set up session service with project ID
     (sessionService as { projectId?: string }).projectId = projectId;
@@ -61,7 +61,7 @@ describe('Compaction SSE Events', () => {
     // Verify COMPACTION_START was broadcast
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'thread',
+        eventType: 'session',
         scope: expect.objectContaining({
           projectId,
           sessionId,
@@ -78,9 +78,9 @@ describe('Compaction SSE Events', () => {
   });
 
   it('should emit COMPACTION_COMPLETE when agent emits compaction_complete event', () => {
-    const _threadId = 'test-thread-123';
-    const sessionId = 'test-session-456';
-    const projectId = 'test-project-789';
+    const _threadId = 'lace_20250809_abc123';
+    const sessionId = 'lace_20250809_def456';
+    const projectId = 'proj_789abc';
 
     (sessionService as { projectId?: string }).projectId = projectId;
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));
@@ -93,7 +93,7 @@ describe('Compaction SSE Events', () => {
     // Verify COMPACTION_COMPLETE was broadcast
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'thread',
+        eventType: 'session',
         scope: expect.objectContaining({
           projectId,
           sessionId,
@@ -109,8 +109,8 @@ describe('Compaction SSE Events', () => {
   });
 
   it('should handle manual compact command SSE events', () => {
-    const sessionId = 'test-session-456';
-    const projectId = 'test-project-789';
+    const sessionId = 'lace_20250809_def456';
+    const projectId = 'proj_789abc';
 
     (sessionService as { projectId?: string }).projectId = projectId;
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));
@@ -152,8 +152,8 @@ describe('Compaction SSE Events', () => {
   });
 
   it('should differentiate between auto and manual compaction events', () => {
-    const sessionId = 'test-session-456';
-    const projectId = 'test-project-789';
+    const sessionId = 'lace_20250809_def456';
+    const projectId = 'proj_789abc';
 
     (sessionService as { projectId?: string }).projectId = projectId;
     sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));

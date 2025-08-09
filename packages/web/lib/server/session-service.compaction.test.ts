@@ -98,17 +98,17 @@ describe('SessionService compaction event streaming', () => {
       'session_123' as ThreadId
     );
 
-    // Simulate agent emitting thinking start event for compaction
+    // Simulate agent emitting compaction start event
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
-      'agent_thinking_start',
+      'compaction_start',
       {
-        message: 'Compacting conversation to save space...',
+        auto: true,
       }
     );
 
     // Verify broadcast was called with COMPACTION_START event
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
-      eventType: 'thread',
+      eventType: 'session',
       scope: {
         projectId: 'project_123',
         sessionId: 'session_123',
@@ -120,7 +120,7 @@ describe('SessionService compaction event streaming', () => {
         timestamp: expect.any(Date),
         data: {
           strategy: 'summarize',
-          message: 'Compacting conversation to save space...',
+          auto: true,
         },
       },
     });
@@ -136,9 +136,9 @@ describe('SessionService compaction event streaming', () => {
 
     // First emit start to set compaction in progress
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
-      'agent_thinking_start',
+      'compaction_start',
       {
-        message: 'Compacting conversation to save space...',
+        auto: false,
       }
     );
 
@@ -147,13 +147,15 @@ describe('SessionService compaction event streaming', () => {
 
     // Then emit complete
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
-      'agent_thinking_complete',
-      {}
+      'compaction_complete',
+      {
+        success: true,
+      }
     );
 
     // Verify broadcast was called with COMPACTION_COMPLETE event
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
-      eventType: 'thread',
+      eventType: 'session',
       scope: {
         projectId: 'project_123',
         sessionId: 'session_123',
@@ -178,17 +180,17 @@ describe('SessionService compaction event streaming', () => {
       'session_123' as ThreadId
     );
 
-    // Simulate auto-compaction message
+    // Simulate auto-compaction event
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
-      'agent_thinking_start',
+      'compaction_start',
       {
-        message: 'Approaching token limit, compacting conversation...',
+        auto: true, // This indicates auto-compaction
       }
     );
 
     // Verify broadcast was called
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
-      eventType: 'thread',
+      eventType: 'session',
       scope: {
         projectId: 'project_123',
         sessionId: 'session_123',
@@ -200,7 +202,7 @@ describe('SessionService compaction event streaming', () => {
         timestamp: expect.any(Date),
         data: {
           strategy: 'summarize',
-          message: 'Approaching token limit, compacting conversation...',
+          auto: true, // Auto-compaction flag
         },
       },
     });
