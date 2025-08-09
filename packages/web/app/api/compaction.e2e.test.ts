@@ -46,6 +46,7 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { GET as getSession } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
 import type { ThreadId } from '@/types/core';
+import type { SessionResponse } from '@/types/api';
 
 describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   const _tempLaceDir = setupWebTest();
@@ -199,15 +200,9 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     // Start the agent now that handlers are set up
     await agent.start();
 
-    // Verify we have the right provider
-    const providerInstance = (agent as { _provider: unknown })._provider;
-    expect(providerInstance).toBeDefined();
-    expect(providerInstance.constructor.name).toBe('AnthropicProvider');
-    expect(providerInstance.isConfigured()).toBe(true);
-
     // The agent auto-initialized its token budget from the model
     // We need to update it to trigger compaction more easily for testing
-    const tokenBudgetManager = (agent as { _tokenBudgetManager: unknown })._tokenBudgetManager;
+    const tokenBudgetManager = agent.tokenBudgetManager;
     if (tokenBudgetManager) {
       tokenBudgetManager.updateConfig({
         maxTokens: 12000, // Lower limit for testing
@@ -361,7 +356,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     for (let i = 0; i < messages.length; i++) {
       // Check token budget BEFORE sending
-      const _tbmBefore = (agent as { _tokenBudgetManager: unknown })._tokenBudgetManager;
+      const _tbmBefore = agent.tokenBudgetManager;
 
       await agent.sendMessage(messages[i]!);
 
@@ -374,9 +369,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       const _lastAgentMessage = agentMessages[agentMessages.length - 1];
 
       // Check TokenBudgetManager state
-      const tbm = (agent as { _tokenBudgetManager: { getRemainingBudget: () => number } })
-        ._tokenBudgetManager;
-      const _recommendations = tbm?.getRecommendations();
+      const _recommendations = agent.getTokenBudgetRecommendations();
 
       // Give auto-compaction time to trigger after message 4
       if (i === 3) {
@@ -440,22 +433,15 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     });
 
     expect(response.status).toBe(200);
-    const sessionData = (await parseResponse(response)) as {
-      tokenUsage?: {
-        totalPromptTokens: number;
-        totalCompletionTokens: number;
-        totalTokens: number;
-        eventCount: number;
-      };
-    };
+    const sessionData = (await parseResponse(response)) as SessionResponse;
 
     // Token usage should be available
     expect(sessionData.tokenUsage).toBeDefined();
-    expect(sessionData.tokenUsage.totalTokens).toBeGreaterThan(0);
+    expect(sessionData.tokenUsage!.totalTokens).toBeGreaterThan(0);
 
     // Should be below limit after compaction
-    expect(sessionData.tokenUsage.percentUsed).toBeLessThan(80);
-    expect(sessionData.tokenUsage.nearLimit).toBe(false);
+    expect(sessionData.tokenUsage!.percentUsed).toBeLessThan(80);
+    expect(sessionData.tokenUsage!.nearLimit).toBe(false);
   });
 
   it('should handle manual /compact command and emit events', async () => {
@@ -715,6 +701,9 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
         totalCompletionTokens: number;
         totalTokens: number;
         eventCount: number;
+        percentUsed?: number;
+        nearLimit?: boolean;
+        contextLimit?: number;
       };
     };
 

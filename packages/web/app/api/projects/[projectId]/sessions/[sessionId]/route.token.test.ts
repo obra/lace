@@ -1,59 +1,87 @@
 // ABOUTME: Tests for token usage information in session API responses
 // ABOUTME: Verifies that token statistics are correctly included when fetching sessions
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
-import { Project } from '@/lib/server/lace-imports';
-import type { ThreadEvent } from '~/threads/types';
+import {
+  Project,
+  Session,
+  cleanupTestProviderInstances,
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
-
-// Mock the imports
-vi.mock('@/lib/server/lace-imports', () => ({
-  Project: {
-    getById: vi.fn(),
-  },
-  Session: {
-    getById: vi.fn(),
-  },
-}));
-
-vi.mock('~/threads/thread-manager', () => ({
-  ThreadManager: vi.fn().mockImplementation(() => ({
-    getEvents: vi.fn(),
-  })),
-}));
-
-vi.mock('~/threads/token-aggregation', () => ({
-  aggregateTokenUsage: vi.fn(),
-}));
+import type { ThreadEvent } from '~/threads/types';
+import { mkdtemp, rm } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 describe('Session API Token Usage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let testProjectId: string;
+  let testProject: InstanceType<typeof Project>;
+  let cleanupFunctions: Array<() => void | Promise<void>> = [];
+  let tempDir: string;
+
+  beforeEach(async () => {
+    // Create a temporary directory for the test
+    tempDir = await mkdtemp(join(tmpdir(), 'lace-test-'));
+    cleanupFunctions.push(async () => await rm(tempDir, { recursive: true, force: true }));
+
+    // Set up test provider defaults
+    await setupTestProviderDefaults();
+
+    // Create a test project with the temp directory
+    testProject = Project.create('Test Project', tempDir);
+    testProjectId = testProject.getId();
+    cleanupFunctions.push(() => testProject.delete());
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
+  afterEach(async () => {
+    // Clean up in reverse order
+    for (const cleanup of cleanupFunctions.reverse()) {
+      await cleanup();
+    }
+    cleanupFunctions = [];
+
+    // Clean up provider instances and defaults
+    await cleanupTestProviderInstances([]);
+    await cleanupTestProviderDefaults();
+
+    // Clear any sessions from the registry
+    Session.clearRegistry();
   });
 
   it('should include token usage statistics in session response', async () => {
-    const mockThreadId = 'thread_123';
-    const mockSessionId = 'session_123';
-    const mockProjectId = 'project_123';
+    // Create a real session with a real project
+    const session = Session.create({
+      name: 'Test Session',
+      projectId: testProjectId,
+      configuration: {
+        providerInstanceId: 'anthropic-default',
+        modelId: 'claude-3-5-haiku-20241022',
+      },
+    });
+    cleanupFunctions.push(() => session.destroy());
 
-    // Mock thread events with token usage
-    const mockEvents: ThreadEvent[] = [
+    const sessionId = session.getId();
+    const agent = session.getAgent(sessionId);
+    if (!agent) throw new Error('Agent not found');
+    const threadManager = agent.threadManager;
+    const threadId = sessionId; // Main agent thread ID is same as session ID
+
+    // Add real events with token usage to the thread
+    const events: ThreadEvent[] = [
       {
         id: 'evt_1',
-        threadId: mockThreadId,
+        threadId,
         type: 'USER_MESSAGE',
         timestamp: new Date(),
         data: 'Hello',
       },
       {
         id: 'evt_2',
-        threadId: mockThreadId,
+        threadId,
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
         data: {
@@ -67,7 +95,7 @@ describe('Session API Token Usage', () => {
       },
       {
         id: 'evt_3',
-        threadId: mockThreadId,
+        threadId,
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
         data: {
@@ -81,80 +109,31 @@ describe('Session API Token Usage', () => {
       },
     ];
 
-    const mockThreadManager = {
-      getEvents: vi.fn().mockReturnValue(mockEvents),
-    };
+    // Add events to the thread
+    for (const event of events) {
+      threadManager.addEvent(event.threadId, event.type, event.data);
+    }
 
-    const mockAgent = {
-      threadId: mockThreadId,
-      threadManager: mockThreadManager,
-      tokenBudget: {
-        maxTokens: 12000,
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
-    };
-
-    const mockSessionInstance = {
-      getId: vi.fn().mockReturnValue(mockSessionId),
-      getAgent: vi.fn().mockReturnValue(mockAgent),
-    };
-
-    const mockSession = {
-      id: mockSessionId,
-      name: 'Test Session',
-      createdAt: new Date(),
-      agents: [],
-    };
-
-    const mockProject = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-    };
-
-    vi.mocked(Project.getById).mockReturnValue(
-      mockProject as {
-        getSession: () => {
-          id: string;
-          name: string;
-          createdAt: Date;
-          agents: unknown[];
-        };
-      }
-    );
-
-    // Mock Session.getById
-    const { Session } = await import('@/lib/server/lace-imports');
-    vi.mocked(Session.getById).mockResolvedValue(
-      mockSessionInstance as {
-        getId: () => string;
-        getAgent: () => unknown;
-      }
-    );
-
-    // Mock aggregateTokenUsage
-    const { aggregateTokenUsage } = await import('~/threads/token-aggregation');
-    vi.mocked(aggregateTokenUsage).mockReturnValue({
-      totalPromptTokens: 300,
-      totalCompletionTokens: 125,
-      totalTokens: 425,
-      eventCount: 2,
-    });
-
+    // Make the API request
     const request = new NextRequest(
-      'http://localhost:3000/api/projects/project_123/sessions/session_123'
+      `http://localhost:3000/api/projects/${testProjectId}/sessions/${sessionId}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ projectId: mockProjectId, sessionId: mockSessionId }),
+      params: Promise.resolve({ projectId: testProjectId, sessionId }),
     });
 
     expect(response.status).toBe(200);
 
     const body = (await parseResponse(response)) as {
+      session?: unknown;
       tokenUsage?: {
         totalPromptTokens: number;
         totalCompletionTokens: number;
         totalTokens: number;
         eventCount: number;
+        percentUsed: number;
+        nearLimit: boolean;
+        contextLimit: number;
       };
     };
 
@@ -163,37 +142,47 @@ describe('Session API Token Usage', () => {
 
     // Check that token usage is included
     expect(body.tokenUsage).toBeDefined();
-    expect(body.tokenUsage).toEqual({
-      totalPromptTokens: 300,
-      totalCompletionTokens: 125,
-      totalTokens: 425,
-      eventCount: 2,
-      percentUsed: expect.any(Number),
-      nearLimit: false,
-      contextLimit: 12000,
-    });
-
+    expect(body.tokenUsage?.totalPromptTokens).toBe(300);
+    expect(body.tokenUsage?.totalCompletionTokens).toBe(125);
+    expect(body.tokenUsage?.totalTokens).toBe(425);
+    expect(body.tokenUsage?.eventCount).toBe(2);
+    expect(body.tokenUsage?.nearLimit).toBe(false);
+    // Note: contextLimit defaults to 200000 when tokenBudgetManager is not configured
+    expect(body.tokenUsage?.contextLimit).toBe(200000);
     // Verify percentage calculation
-    expect(body.tokenUsage.percentUsed).toBeCloseTo(3.54, 1); // 425/12000 * 100
+    expect(body.tokenUsage?.percentUsed).toBeCloseTo(0.2125, 2); // 425/200000 * 100
   });
 
   it('should handle sessions without token usage data', async () => {
-    const mockSessionId = 'session_123';
-    const mockProjectId = 'project_123';
-    const mockThreadId = 'thread_123';
+    // Create a real session
+    const session = Session.create({
+      name: 'Test Session Without Token Usage',
+      projectId: testProjectId,
+      configuration: {
+        providerInstanceId: 'anthropic-default',
+        modelId: 'claude-3-5-haiku-20241022',
+      },
+    });
+    cleanupFunctions.push(() => session.destroy());
 
-    // Mock events without token usage
-    const mockEvents: ThreadEvent[] = [
+    const sessionId = session.getId();
+    const agent = session.getAgent(sessionId);
+    if (!agent) throw new Error('Agent not found');
+    const threadManager = agent.threadManager;
+    const threadId = sessionId;
+
+    // Add events without token usage
+    const events: ThreadEvent[] = [
       {
         id: 'evt_1',
-        threadId: mockThreadId,
+        threadId,
         type: 'USER_MESSAGE',
         timestamp: new Date(),
         data: 'Hello',
       },
       {
         id: 'evt_2',
-        threadId: mockThreadId,
+        threadId,
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
         data: {
@@ -203,70 +192,17 @@ describe('Session API Token Usage', () => {
       },
     ];
 
-    const mockThreadManager = {
-      getEvents: vi.fn().mockReturnValue(mockEvents),
-    };
+    // Add events to the thread
+    for (const event of events) {
+      threadManager.addEvent(event.threadId, event.type, event.data);
+    }
 
-    const mockAgent = {
-      threadId: mockThreadId,
-      threadManager: mockThreadManager,
-      tokenBudget: {
-        maxTokens: 12000,
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
-    };
-
-    const mockSessionInstance = {
-      getId: vi.fn().mockReturnValue(mockSessionId),
-      getAgent: vi.fn().mockReturnValue(mockAgent),
-    };
-
-    const mockSession = {
-      id: mockSessionId,
-      name: 'Test Session',
-      createdAt: new Date(),
-      agents: [],
-    };
-
-    const mockProject = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-    };
-
-    vi.mocked(Project.getById).mockReturnValue(
-      mockProject as {
-        getSession: () => {
-          id: string;
-          name: string;
-          createdAt: Date;
-          agents: unknown[];
-        };
-      }
-    );
-
-    // Mock Session.getById
-    const { Session } = await import('@/lib/server/lace-imports');
-    vi.mocked(Session.getById).mockResolvedValue(
-      mockSessionInstance as {
-        getId: () => string;
-        getAgent: () => unknown;
-      }
-    );
-
-    // Mock aggregateTokenUsage to return zeros
-    const { aggregateTokenUsage } = await import('~/threads/token-aggregation');
-    vi.mocked(aggregateTokenUsage).mockReturnValue({
-      totalPromptTokens: 0,
-      totalCompletionTokens: 0,
-      totalTokens: 0,
-      eventCount: 0,
-    });
-
+    // Make the API request
     const request = new NextRequest(
-      'http://localhost:3000/api/projects/project_123/sessions/session_123'
+      `http://localhost:3000/api/projects/${testProjectId}/sessions/${sessionId}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ projectId: mockProjectId, sessionId: mockSessionId }),
+      params: Promise.resolve({ projectId: testProjectId, sessionId }),
     });
 
     expect(response.status).toBe(200);
@@ -282,97 +218,58 @@ describe('Session API Token Usage', () => {
 
     // Token usage should still be present but with zero values
     expect(body.tokenUsage).toBeDefined();
-    expect(body.tokenUsage.totalTokens).toBe(0);
-    expect(body.tokenUsage.eventCount).toBe(0);
+    expect(body.tokenUsage?.totalTokens).toBe(0);
+    expect(body.tokenUsage?.eventCount).toBe(0);
   });
 
   it('should mark nearLimit as true when approaching token limit', async () => {
-    const mockSessionId = 'session_123';
-    const mockProjectId = 'project_123';
-    const mockThreadId = 'thread_123';
+    // Create a real session
+    const session = Session.create({
+      name: 'Test Session Near Limit',
+      projectId: testProjectId,
+      configuration: {
+        providerInstanceId: 'anthropic-default',
+        modelId: 'claude-3-5-haiku-20241022',
+      },
+    });
+    cleanupFunctions.push(() => session.destroy());
 
-    // Mock events with high token usage
-    const mockEvents: ThreadEvent[] = [
+    const sessionId = session.getId();
+    const agent = session.getAgent(sessionId);
+    if (!agent) throw new Error('Agent not found');
+    const threadManager = agent.threadManager;
+    const threadId = sessionId;
+
+    // Add events with very high token usage
+    // Default context limit is 200000, so we need > 160000 tokens to trigger nearLimit
+    const events: ThreadEvent[] = [
       {
         id: 'evt_1',
-        threadId: mockThreadId,
+        threadId,
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
         data: {
           content: 'Large response',
           tokenUsage: {
-            promptTokens: 8000,
-            completionTokens: 2000,
-            totalTokens: 10000,
+            promptTokens: 150000,
+            completionTokens: 20000,
+            totalTokens: 170000,
           },
         },
       },
     ];
 
-    const mockThreadManager = {
-      getEvents: vi.fn().mockReturnValue(mockEvents),
-    };
+    // Add events to the thread
+    for (const event of events) {
+      threadManager.addEvent(event.threadId, event.type, event.data);
+    }
 
-    const mockAgent = {
-      threadId: mockThreadId,
-      threadManager: mockThreadManager,
-      tokenBudget: {
-        maxTokens: 12000,
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
-    };
-
-    const mockSessionInstance = {
-      getId: vi.fn().mockReturnValue(mockSessionId),
-      getAgent: vi.fn().mockReturnValue(mockAgent),
-    };
-
-    const mockSession = {
-      id: mockSessionId,
-      name: 'Test Session',
-      createdAt: new Date(),
-      agents: [],
-    };
-
-    const mockProject = {
-      getSession: vi.fn().mockReturnValue(mockSession),
-    };
-
-    vi.mocked(Project.getById).mockReturnValue(
-      mockProject as {
-        getSession: () => {
-          id: string;
-          name: string;
-          createdAt: Date;
-          agents: unknown[];
-        };
-      }
-    );
-
-    // Mock Session.getById
-    const { Session } = await import('@/lib/server/lace-imports');
-    vi.mocked(Session.getById).mockResolvedValue(
-      mockSessionInstance as {
-        getId: () => string;
-        getAgent: () => unknown;
-      }
-    );
-
-    // Mock aggregateTokenUsage with high usage
-    const { aggregateTokenUsage } = await import('~/threads/token-aggregation');
-    vi.mocked(aggregateTokenUsage).mockReturnValue({
-      totalPromptTokens: 8000,
-      totalCompletionTokens: 2000,
-      totalTokens: 10000,
-      eventCount: 1,
-    });
-
+    // Make the API request
     const request = new NextRequest(
-      'http://localhost:3000/api/projects/project_123/sessions/session_123'
+      `http://localhost:3000/api/projects/${testProjectId}/sessions/${sessionId}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ projectId: mockProjectId, sessionId: mockSessionId }),
+      params: Promise.resolve({ projectId: testProjectId, sessionId }),
     });
 
     const body = (await parseResponse(response)) as {
@@ -381,11 +278,13 @@ describe('Session API Token Usage', () => {
         totalCompletionTokens: number;
         totalTokens: number;
         eventCount: number;
+        nearLimit: boolean;
+        percentUsed: number;
       };
     };
 
-    // Should be marked as near limit (10000 > 12000 * 0.8)
-    expect(body.tokenUsage.nearLimit).toBe(true);
-    expect(body.tokenUsage.percentUsed).toBeCloseTo(83.33, 1); // 10000/12000 * 100
+    // Should be marked as near limit (170000 > 200000 * 0.8)
+    expect(body.tokenUsage?.nearLimit).toBe(true);
+    expect(body.tokenUsage?.percentUsed).toBeCloseTo(85, 1); // 170000/200000 * 100
   });
 });
