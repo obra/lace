@@ -8,6 +8,31 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
+
+// Mock server-only module first
+vi.mock('server-only', () => ({}));
+
+// IMPORTANT: Unmock the Anthropic SDK to allow real HTTP requests
+// The global mock in test-setup.ts prevents MSW from working
+vi.unmock('@anthropic-ai/sdk');
+
+// Setup MSW server before any other imports
+const server = setupServer();
+
+// Start MSW server immediately to intercept all requests
+beforeAll(() => {
+  server.listen({
+    onUnhandledRequest: (req) => {
+      console.log('[MSW] Unhandled request:', req.method, req.url);
+    },
+  });
+});
+
+afterAll(() => {
+  server.close();
+});
+
+// Now import everything else after MSW is set up
 import { NextRequest } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { getSessionService } from '@/lib/server/session-service';
@@ -24,12 +49,6 @@ import { parseResponse } from '@/lib/serialization';
 import { GET as getSession } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
 import type { ThreadId } from '@/types/core';
 
-// Mock server-only module
-vi.mock('server-only', () => ({}));
-
-// MSW server for mocking AI provider APIs
-const server = setupServer();
-
 describe('Compaction E2E Test with MSW', () => {
   const _tempLaceDir = setupWebTest();
   let projectId: string;
@@ -39,18 +58,13 @@ describe('Compaction E2E Test with MSW', () => {
   let streamedEvents: any[] = [];
   let originalBroadcast: any;
 
-  beforeAll(() => {
-    server.listen({ onUnhandledRequest: 'bypass' });
-  });
-
-  afterAll(() => {
-    server.close();
-  });
-
   beforeEach(async () => {
     // Reset MSW handlers
     server.resetHandlers();
     streamedEvents = [];
+
+    // Set up environment for Anthropic SDK
+    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
 
     // Setup test providers
     setupTestProviderDefaults();
@@ -59,7 +73,7 @@ describe('Compaction E2E Test with MSW', () => {
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-sonnet-20241022'],
-      apiKey: 'test-key',
+      apiKey: 'test-anthropic-key',
     });
 
     // Create project and session
@@ -129,12 +143,11 @@ describe('Compaction E2E Test with MSW', () => {
       throw new Error('Failed to get session agent');
     }
 
-    // Debug: Check what provider is being used
-    console.log('[TEST] Agent provider:', {
-      providerName: (agent as any).provider?.providerName,
-      isConfigured: (agent as any).provider?.isConfigured(),
-      supportsStreaming: (agent as any).provider?.supportsStreaming,
-    });
+    // Verify we have the right provider
+    const providerInstance = (agent as any)._provider;
+    expect(providerInstance).toBeDefined();
+    expect(providerInstance.constructor.name).toBe('AnthropicProvider');
+    expect(providerInstance.isConfigured()).toBe(true);
 
     // Update the agent's token budget to make compaction easier to trigger
     agent.tokenBudget = {
@@ -144,7 +157,8 @@ describe('Compaction E2E Test with MSW', () => {
     };
 
     // Add listeners to debug what's happening
-    agent.on('agent_thinking_start', ({ message }: { message?: string }) => {
+    agent.on('agent_thinking_start', (data?: { message?: string }) => {
+      const message = data?.message;
       console.log('[TEST] Agent thinking start:', message);
       if (message && message.includes('compact')) {
         compactionRequested = true;
@@ -155,9 +169,23 @@ describe('Compaction E2E Test with MSW', () => {
       console.log('[TEST] Agent thinking complete');
     });
 
+    agent.on('error', ({ error }: { error: Error }) => {
+      console.log('[TEST] Agent error:', error.message);
+    });
+
+    // Mock token counting endpoint with proper structure
+    server.use(
+      http.post('https://api.anthropic.com/v1/messages/count_tokens', async () => {
+        return HttpResponse.json({
+          input_token_count: 100, // Correct field name for Anthropic API
+        });
+      })
+    );
+
     // Mock Anthropic API responses
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
+        console.log('[MSW] Intercepting Anthropic API request');
         const body = (await request.json()) as any;
         messageCount++;
         console.log(`[MSW] Intercepted request ${messageCount}:`, {
@@ -168,25 +196,32 @@ describe('Compaction E2E Test with MSW', () => {
 
         // First few messages: normal responses with increasing token usage
         if (messageCount <= 3) {
-          return HttpResponse.json({
-            id: `msg_${messageCount}`,
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: `Response ${messageCount}: This is a test response that simulates conversation.`,
+          return HttpResponse.json(
+            {
+              id: `msg_${messageCount}`,
+              type: 'message',
+              role: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: `Response ${messageCount}: This is a test response that simulates conversation.`,
+                },
+              ],
+              model: 'claude-3-5-sonnet-20241022',
+              stop_reason: 'end_turn',
+              stop_sequence: null,
+              usage: {
+                input_tokens: 1000 * messageCount, // Simulate growing context
+                output_tokens: 100,
               },
-            ],
-            model: 'claude-3-5-sonnet-20241022',
-            stop_reason: 'end_turn',
-            stop_sequence: null,
-            usage: {
-              input_tokens: 1000 * messageCount, // Simulate growing context
-              output_tokens: 100,
-              total_tokens: 1000 * messageCount + 100,
             },
-          });
+            {
+              status: 200,
+              headers: {
+                'content-type': 'application/json',
+              },
+            }
+          );
         }
 
         // Fourth message: High token usage to trigger compaction
@@ -292,6 +327,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`,
         type: lastEvent?.type,
         hasUsage: !!(lastEvent as any)?.usage,
         usage: (lastEvent as any)?.usage,
+        content: lastEvent?.type === 'AGENT_MESSAGE' ? (lastEvent.data as any).content : undefined,
       });
     }
 
@@ -301,6 +337,14 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`,
       '[TEST] Event types:',
       streamedEvents.map((e) => e.data?.type)
     );
+
+    // Check what LOCAL_SYSTEM_MESSAGE says
+    const localSystemMessages = streamedEvents.filter(
+      (e) => e.data?.type === 'LOCAL_SYSTEM_MESSAGE'
+    );
+    localSystemMessages.forEach((msg) => {
+      console.log('[TEST] LOCAL_SYSTEM_MESSAGE:', msg.data?.data?.content);
+    });
 
     // Check that compaction events were emitted
     const compactionStartEvents = streamedEvents.filter((e) => e.data?.type === 'COMPACTION_START');
