@@ -410,8 +410,7 @@ export class Agent extends EventEmitter {
 
   get model(): string {
     const metadata = this.getThreadMetadata();
-    // Check both 'model' and 'modelId' for backwards compatibility
-    return (metadata?.model as string) || (metadata?.modelId as string) || 'unknown-model';
+    return (metadata?.modelId as string) || 'unknown-model';
   }
 
   /**
@@ -463,7 +462,7 @@ export class Agent extends EventEmitter {
       threadId: asThreadId(this._threadId),
       name: this.name,
       providerInstanceId: (metadata?.providerInstanceId as string) || 'unknown',
-      modelId: (metadata?.modelId as string) || (metadata?.model as string) || 'unknown',
+      modelId: (metadata?.modelId as string) || 'unknown',
       status: this.status,
     };
   }
@@ -535,7 +534,7 @@ export class Agent extends EventEmitter {
 
       // Debug logging for provider configuration
       const metadata = this.getThreadMetadata();
-      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      const modelId = metadata?.modelId as string;
 
       logger.info('🎯 AGENT PROVIDER CALL', {
         threadId: this._threadId,
@@ -543,7 +542,6 @@ export class Agent extends EventEmitter {
         providerName: this.providerInstance.providerName,
         modelId,
         metadataProvider: metadata?.provider as string,
-        metadataModel: metadata?.model as string,
         metadataModelId: metadata?.modelId as string,
         metadataProviderInstanceId: metadata?.providerInstanceId as string,
       });
@@ -796,7 +794,7 @@ export class Agent extends EventEmitter {
     try {
       // Get model from thread metadata
       const metadata = this.getThreadMetadata();
-      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      const modelId = metadata?.modelId as string;
       if (!modelId) {
         throw new Error('No model configured for agent');
       }
@@ -896,7 +894,7 @@ export class Agent extends EventEmitter {
     try {
       // Get model from thread metadata
       const metadata = this.getThreadMetadata();
-      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      const modelId = metadata?.modelId as string;
       if (!modelId) {
         throw new Error('No model configured for agent');
       }
