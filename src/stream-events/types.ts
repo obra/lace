@@ -97,7 +97,9 @@ export interface SessionEventData {
     | 'TOOL_APPROVAL_REQUEST'
     | 'TOOL_APPROVAL_RESPONSE'
     | 'LOCAL_SYSTEM_MESSAGE'
-    | 'AGENT_STATE_CHANGE';
+    | 'AGENT_STATE_CHANGE'
+    | 'COMPACTION_START'
+    | 'COMPACTION_COMPLETE';
   threadId: ThreadId;
   timestamp: Date; // Date object - CONSISTENT with SessionEvent interface, SuperJSON handles serialization
   data: unknown; // Legacy - specific to session system
