@@ -34,6 +34,8 @@ export const UI_EVENT_TYPES = [
   'AGENT_STREAMING',
   'AGENT_STATE_CHANGE',
   'COMPACTION',
+  'COMPACTION_START',
+  'COMPACTION_COMPLETE',
 ] as const;
 
 export type UIEventType = (typeof UI_EVENT_TYPES)[number];
@@ -130,6 +132,26 @@ export type SessionEvent =
         agentId: ThreadId;
         from: string;
         to: string;
+      };
+    }
+  | {
+      type: 'COMPACTION_START';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: {
+        strategy: string;
+        message?: string;
+      };
+    }
+  | {
+      type: 'COMPACTION_COMPLETE';
+      threadId: ThreadId;
+      timestamp: Date;
+      data: {
+        success: boolean;
+        tokensSaved?: number;
+        originalEventCount?: number;
+        compactedEventCount?: number;
       };
     };
 

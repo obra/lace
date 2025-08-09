@@ -145,6 +145,63 @@ export class SessionService {
       });
     });
 
+    // Track compaction state
+    let isCompacting = false;
+
+    // Handle compaction start events
+    agent.on('agent_thinking_start', ({ message }: { message?: string }) => {
+      // Check if this is a compaction operation
+      if (message && (message.includes('compact') || message.includes('Compact'))) {
+        isCompacting = true;
+        logger.debug(`[SESSION_SERVICE] Agent ${threadId} starting compaction: ${message}`);
+
+        // Broadcast COMPACTION_START event
+        sseManager.broadcast({
+          eventType: 'thread',
+          scope: {
+            projectId: this.projectId,
+            sessionId,
+            threadId,
+          },
+          data: {
+            type: 'COMPACTION_START',
+            threadId,
+            timestamp: new Date(),
+            data: {
+              strategy: 'summarize',
+              message,
+            },
+          },
+        });
+      }
+    });
+
+    // Handle compaction complete events
+    agent.on('agent_thinking_complete', () => {
+      if (isCompacting) {
+        isCompacting = false;
+        logger.debug(`[SESSION_SERVICE] Agent ${threadId} completed compaction`);
+
+        // Broadcast COMPACTION_COMPLETE event
+        sseManager.broadcast({
+          eventType: 'thread',
+          scope: {
+            projectId: this.projectId,
+            sessionId,
+            threadId,
+          },
+          data: {
+            type: 'COMPACTION_COMPLETE',
+            threadId,
+            timestamp: new Date(),
+            data: {
+              success: true,
+            },
+          },
+        });
+      }
+    });
+
     agent.on(
       'tool_call_start',
       ({ toolName, input, callId }: { toolName: string; input: unknown; callId: string }) => {
