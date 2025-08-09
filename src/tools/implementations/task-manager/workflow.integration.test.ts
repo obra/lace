@@ -50,6 +50,20 @@ class MockProvider extends BaseMockProvider {
     return 4096;
   }
 
+  getAvailableModels() {
+    return [
+      {
+        id: 'mock-model',
+        displayName: 'Mock Model',
+        description: 'Model for testing',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+        isDefault: true,
+      },
+    ];
+  }
+
   async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     // Look for task assignment message
     const taskMessage = messages.find(
@@ -315,7 +329,7 @@ describe('Task Management Workflow Integration', () => {
               title: 'Analyze security vulnerabilities',
               prompt: 'Review codebase for common security issues and provide recommendations',
               priority: 'high',
-              assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+              assignedTo: 'new:mock/mock-model',
             },
           ],
         },
@@ -480,7 +494,7 @@ describe('Task Management Workflow Integration', () => {
               title: 'Assigned task',
               prompt: 'This will be assigned',
               priority: 'high',
-              assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+              assignedTo: 'new:mock/mock-model',
             },
           ],
         },
