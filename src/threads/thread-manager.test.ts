@@ -93,4 +93,22 @@ describe('ThreadManager', () => {
       }).toThrow('Thread non-existent-thread not found');
     });
   });
+
+  describe('delegate thread creation', () => {
+    it('should set sessionId on delegate threads', () => {
+      const mainThreadId = 'lace_20250809_main';
+
+      // Create main thread with sessionId
+      threadManager.createThread(mainThreadId);
+      const mainThread = threadManager.getThread(mainThreadId);
+      mainThread!.sessionId = 'session_123';
+      threadManager.saveThread(mainThread!);
+
+      // Create delegate thread
+      const delegateThread = threadManager.createDelegateThreadFor(mainThreadId);
+
+      // Delegate should have same sessionId as parent
+      expect(delegateThread.sessionId).toBe('session_123');
+    });
+  });
 });
