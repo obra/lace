@@ -77,6 +77,8 @@ export interface AgentEvents {
   agent_thinking_start: [];
   agent_token: [{ token: string }]; // Raw tokens including thinking block content during streaming
   agent_thinking_complete: [];
+  compaction_start: [{ auto: boolean }];
+  compaction_complete: [{ success: boolean }];
   agent_response_complete: [{ content: string }]; // Clean content with thinking blocks removed
   tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
@@ -137,6 +139,11 @@ export class Agent extends EventEmitter {
     return asThreadId(this._threadId);
   }
 
+  // Public access to token budget manager for testing
+  get tokenBudgetManager(): TokenBudgetManager | null {
+    return this._tokenBudgetManager;
+  }
+
   // Public access to thread manager for approval system
   get threadManager(): ThreadManager {
     return this._threadManager;
@@ -146,7 +153,7 @@ export class Agent extends EventEmitter {
     return this._isRunning;
   }
   private readonly _stopReasonHandler: StopReasonHandler;
-  private readonly _tokenBudgetManager: TokenBudgetManager | null;
+  private _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
   private _isRunning = false;
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
@@ -177,9 +184,15 @@ export class Agent extends EventEmitter {
     this._threadId = config.threadId;
     this._tools = config.tools;
     this._stopReasonHandler = new StopReasonHandler();
-    this._tokenBudgetManager = config.tokenBudget
-      ? new TokenBudgetManager(config.tokenBudget)
-      : null;
+    
+    // Initialize token budget manager based on config or auto-detect from model
+    if (config.tokenBudget) {
+      // Use provided token budget config
+      this._tokenBudgetManager = new TokenBudgetManager(config.tokenBudget);
+    } else {
+      // Will be initialized lazily when we know the model
+      this._tokenBudgetManager = null;
+    }
 
     // Listen for tool approval responses
     this.on('thread_event_added', ({ event }) => {
@@ -301,6 +314,10 @@ export class Agent extends EventEmitter {
     }
 
     this._isRunning = true;
+    
+    // Initialize token budget if not already done
+    this._initializeTokenBudget();
+    
     logger.info('AGENT: Started', {
       threadId: this._threadId,
       provider: this._provider.providerName,
@@ -389,6 +406,45 @@ export class Agent extends EventEmitter {
     const metadata = this.getThreadMetadata();
     // Check both 'model' and 'modelId' for backwards compatibility
     return (metadata?.model as string) || (metadata?.modelId as string) || 'unknown-model';
+  }
+
+  /**
+   * Initialize token budget manager based on the model's context window
+   */
+  private _initializeTokenBudget(): void {
+    // Skip if already initialized or explicitly disabled
+    if (this._tokenBudgetManager) return;
+    
+    const modelId = this.model;
+    if (!modelId || modelId === 'unknown-model') {
+      logger.debug('Cannot initialize token budget: model not specified');
+      return;
+    }
+
+    // Get model info from provider
+    const models = this._provider.getAvailableModels();
+    const modelInfo = models.find(m => m.id === modelId);
+    
+    if (!modelInfo) {
+      logger.debug('Cannot initialize token budget: model info not found', { modelId });
+      return;
+    }
+
+    // Create token budget config based on model's context window
+    const tokenBudget = {
+      maxTokens: modelInfo.contextWindow,
+      reserveTokens: Math.min(2000, Math.floor(modelInfo.contextWindow * 0.05)), // Reserve 5% or 2000 tokens
+      warningThreshold: 0.8, // Warn at 80% usage
+    };
+
+    logger.info('Initializing token budget from model info', {
+      modelId,
+      contextWindow: modelInfo.contextWindow,
+      maxTokens: tokenBudget.maxTokens,
+      reserveTokens: tokenBudget.reserveTokens,
+    });
+
+    this._tokenBudgetManager = new TokenBudgetManager(tokenBudget);
   }
 
   get status(): AgentState {
@@ -1483,16 +1539,24 @@ export class Agent extends EventEmitter {
         });
 
         try {
+          // Emit compaction event
+          this.emit('compaction_start', { auto: true });
+
           await this.compact(this._threadId);
           this._autoCompactConfig.lastCompactionTime = now;
 
           // Reset token budget after compaction
           this._tokenBudgetManager.reset();
+
+          // Emit compaction complete event
+          this.emit('compaction_complete', { success: true });
         } catch (error) {
           logger.error('Auto-compaction failed', {
             threadId: this._threadId,
             error: error instanceof Error ? error.message : String(error),
           });
+          // Emit thinking complete even on failure
+          this.emit('agent_thinking_complete');
           // Don't throw - continue conversation even if compaction fails
         }
       }
@@ -1707,10 +1771,10 @@ export class Agent extends EventEmitter {
   }
 
   private async _handleCompactCommand(): Promise<void> {
-    this.emit('agent_thinking_start');
+    this.emit('compaction_start', { auto: false });
 
     try {
-      // Use the simple trim strategy for now
+      // Use the AI-powered summarization strategy
       await this.compact(this._threadId);
 
       // Add a system message about compaction
@@ -1720,8 +1784,9 @@ export class Agent extends EventEmitter {
         '✅ Conversation compacted successfully'
       );
 
-      this.emit('agent_thinking_complete');
+      this.emit('compaction_complete', { success: true });
     } catch (error) {
+      this.emit('compaction_complete', { success: false });
       this.emit('error', {
         error: error instanceof Error ? error : new Error('Compaction failed'),
         context: { operation: 'compact', threadId: this._threadId },

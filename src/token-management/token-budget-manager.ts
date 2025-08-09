@@ -25,6 +25,13 @@ export class TokenBudgetManager {
   }
 
   /**
+   * Gets the current configuration
+   */
+  get config(): Readonly<TokenBudgetConfig> {
+    return this._config;
+  }
+
+  /**
    * Records token usage from a provider response
    */
   recordUsage(response: ProviderResponse): void {

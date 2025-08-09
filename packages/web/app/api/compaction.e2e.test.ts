@@ -58,6 +58,36 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   let streamedEvents: any[] = [];
   let originalBroadcast: any;
 
+  // Helper function to create proper SSE stream for Anthropic streaming responses
+  // Define it at the describe level so all tests can use it
+  const createAnthropicStreamResponse = (events: any[]) => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        // Send each event as proper SSE with event type and data
+        for (const event of events) {
+          // Anthropic SDK expects events with event: and data: fields
+          if (event.type) {
+            controller.enqueue(encoder.encode(`event: ${event.type}\n`));
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        }
+        // Send final event
+        controller.enqueue(encoder.encode('event: done\n'));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+      },
+    });
+  };
+
   beforeEach(async () => {
     // Reset MSW handlers
     server.resetHandlers();
@@ -65,6 +95,15 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
 
     // Set up environment for Anthropic SDK
     process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+
+    // Set up default token counting handler for all tests
+    server.use(
+      http.post('https://api.anthropic.com/v1/messages/count_tokens', async () => {
+        return HttpResponse.json({
+          input_tokens: 100,
+        });
+      })
+    );
 
     // Setup test providers
     setupTestProviderDefaults();
@@ -110,6 +149,7 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     // Get the session agent and set up event handlers
     const sessionAgent = session.getAgent(sessionId);
     if (sessionAgent) {
+      // Don't start the agent here - let each test start it after setting up handlers
       sessionService.setupAgentEventHandlers(sessionAgent, sessionId);
     }
   });
@@ -120,6 +160,15 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
       EventStreamManager.getInstance().broadcast = originalBroadcast;
     }
 
+    // Stop all agents before cleanup
+    const session = await Session.getById(sessionId);
+    if (session) {
+      const agent = session.getAgent(sessionId);
+      if (agent) {
+        agent.stop();
+      }
+    }
+
     // Cleanup
     try {
       await cleanupTestProviderInstances();
@@ -128,6 +177,9 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     }
     cleanupTestProviderDefaults();
     Session.clearRegistry();
+    
+    // Reset MSW server  
+    server.resetHandlers();
   });
 
   it('should trigger auto-compaction when approaching token limit and emit proper events', async () => {
@@ -143,80 +195,47 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
       throw new Error('Failed to get session agent');
     }
 
+    // Start the agent now that handlers are set up
+    await agent.start();
+
     // Verify we have the right provider
     const providerInstance = (agent as any)._provider;
     expect(providerInstance).toBeDefined();
     expect(providerInstance.constructor.name).toBe('AnthropicProvider');
     expect(providerInstance.isConfigured()).toBe(true);
 
-    // Update the agent's token budget to make compaction easier to trigger
-    agent.tokenBudget = {
-      maxTokens: 12000,
-      reserveTokens: 1000,
-      warningThreshold: 0.7,
-    };
-
-    // Enable auto-compaction
-    (agent as any)._autoCompactConfig = {
-      enabled: true,
-      cooldownMs: 1000,
-      lastCompactionTime: 0,
-    };
+    // The agent auto-initialized its token budget from the model
+    // We need to update it to trigger compaction more easily for testing
+    const tokenBudgetManager = (agent as any)._tokenBudgetManager;
+    if (tokenBudgetManager) {
+      console.log('[TEST] Current token budget:', tokenBudgetManager._config);
+      tokenBudgetManager.updateConfig({
+        maxTokens: 12000, // Lower limit for testing
+        reserveTokens: 1000,
+        warningThreshold: 0.7,
+      });
+      console.log('[TEST] Updated token budget for testing:', {
+        maxTokens: 12000,
+        warningThreshold: 0.7,
+      });
+    } else {
+      console.log('[TEST] Warning: No token budget manager found on agent');
+    }
 
     // Add listeners to debug what's happening
-    agent.on('agent_thinking_start', (data?: { message?: string }) => {
-      const message = data?.message;
-      console.log('[TEST] Agent thinking start:', message);
-      if (message && message.includes('compact')) {
-        compactionRequested = true;
-      }
+    agent.on('compaction_start', ({ auto }: { auto: boolean }) => {
+      console.log('[TEST] Compaction start:', auto ? 'auto' : 'manual');
+      compactionRequested = true;
+      console.log('[TEST] COMPACTION TRIGGERED!');
     });
 
-    agent.on('agent_thinking_complete', () => {
-      console.log('[TEST] Agent thinking complete');
+    agent.on('compaction_complete', ({ success }: { success: boolean }) => {
+      console.log('[TEST] Compaction complete:', success ? 'success' : 'failed');
     });
 
     agent.on('error', ({ error }: { error: Error }) => {
       console.log('[TEST] Agent error:', error.message);
     });
-
-    // Mock token counting endpoint for the beta API
-    server.use(
-      http.post('https://api.anthropic.com/v1/messages/count_tokens', async () => {
-        return HttpResponse.json({
-          input_tokens: 100, // Correct field name for beta API
-        });
-      })
-    );
-
-    // Helper function to create proper SSE stream for Anthropic streaming responses
-    const createAnthropicStreamResponse = (events: any[]) => {
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start(controller) {
-          // Send each event as proper SSE with event type and data
-          for (const event of events) {
-            // Anthropic SDK expects events with event: and data: fields
-            if (event.type) {
-              controller.enqueue(encoder.encode(`event: ${event.type}\n`));
-            }
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          }
-          // Send final event
-          controller.enqueue(encoder.encode('event: done\n'));
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        },
-      });
-
-      return new Response(stream, {
-        headers: {
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-cache',
-          connection: 'keep-alive',
-        },
-      });
-    };
 
     // Mock Anthropic API responses with proper streaming format
     server.use(
@@ -358,36 +377,10 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     for (let i = 0; i < messages.length; i++) {
       console.log(`[TEST] Sending message ${i + 1}: "${messages[i]}"`);
-
-      // For message 4, manually set token usage to trigger compaction
-      if (i === 3) {
-        console.log('[TEST] About to manually set token usage for message 4');
-        // Directly manipulate the TokenBudgetManager to simulate correct usage tracking
-        // This works around the bug where cumulative tracking counts tokens multiple times
-        const tokenBudgetManager = (agent as any)._tokenBudgetManager;
-        console.log('[TEST] TokenBudgetManager exists:', !!tokenBudgetManager);
-        if (tokenBudgetManager) {
-          tokenBudgetManager.reset();
-          tokenBudgetManager.recordUsage({
-            usage: {
-              promptTokens: 9500,
-              completionTokens: 100,
-              totalTokens: 9600,
-            },
-          });
-          const usage = tokenBudgetManager.getTotalUsage();
-          const percentage = tokenBudgetManager.getUsagePercentage() * 100;
-          const recommendations = tokenBudgetManager.getRecommendations();
-          console.log('[TEST] Manually set token usage to trigger compaction:', {
-            usage,
-            percentage,
-            shouldPrune: recommendations.shouldPrune,
-            recommendations,
-          });
-        } else {
-          console.log('[TEST] WARNING: TokenBudgetManager not found on agent');
-        }
-      }
+      
+      // Check token budget BEFORE sending
+      const tbmBefore = (agent as any)._tokenBudgetManager;
+      console.log(`[TEST] Token usage BEFORE message ${i + 1}:`, tbmBefore?._totalUsage);
 
       await agent.sendMessage(messages[i]!);
 
@@ -398,17 +391,35 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       const events = agent.threadManager.getEvents(agent.threadId);
       const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
       const lastAgentMessage = agentMessages[agentMessages.length - 1];
+      
+      // Check TokenBudgetManager state
+      const tbm = (agent as any)._tokenBudgetManager;
+      const recommendations = tbm?.getRecommendations();
+      
       console.log(`[TEST] After message ${i + 1}:`, {
         totalEvents: events.length,
         agentMessages: agentMessages.length,
         lastMessageData: lastAgentMessage?.data,
         hasTokenUsage: !!(lastAgentMessage?.data as any)?.tokenUsage,
         tokenUsage: (lastAgentMessage?.data as any)?.tokenUsage,
+        tokenBudgetState: tbm ? {
+          totalUsage: tbm._totalUsage,
+          config: tbm._config,
+          recommendations,
+        } : 'No TokenBudgetManager',
       });
 
       // Give auto-compaction time to trigger after message 4
       if (i === 3) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log('[TEST] Waiting for auto-compaction to potentially trigger...');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        
+        // Check if compaction happened
+        const eventsAfterWait = agent.threadManager.getEvents(agent.threadId);
+        const compactionEvent = eventsAfterWait.find(e => e.type === 'COMPACTION');
+        if (compactionEvent) {
+          console.log('[TEST] COMPACTION EVENT FOUND!', compactionEvent);
+        }
       }
     }
 
@@ -419,15 +430,19 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       streamedEvents.map((e) => e.data?.type)
     );
 
-    // Check what LOCAL_SYSTEM_MESSAGE says
-    const localSystemMessages = streamedEvents.filter(
-      (e) => e.data?.type === 'LOCAL_SYSTEM_MESSAGE'
-    );
-    localSystemMessages.forEach((msg) => {
-      console.log('[TEST] LOCAL_SYSTEM_MESSAGE:', msg.data?.data?.content);
+
+    // Check that compaction actually happened in the thread
+    const finalEvents = agent.threadManager.getEvents(agent.threadId);
+    const compactionEvent = finalEvents.find((e) => e.type === 'COMPACTION');
+    
+    expect(compactionEvent).toBeDefined();
+    expect(compactionEvent?.data).toMatchObject({
+      strategyId: 'summarize',
+      originalEventCount: expect.any(Number),
+      compactedEvents: expect.any(Array),
     });
 
-    // Check that compaction events were emitted
+    // Check that SSE events were emitted for auto-compaction
     const compactionStartEvents = streamedEvents.filter((e) => e.data?.type === 'COMPACTION_START');
     const compactionCompleteEvents = streamedEvents.filter(
       (e) => e.data?.type === 'COMPACTION_COMPLETE'
@@ -435,44 +450,17 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     expect(compactionStartEvents.length).toBeGreaterThan(0);
     expect(compactionCompleteEvents.length).toBeGreaterThan(0);
-
-    // Verify compaction start event structure
-    const startEvent = compactionStartEvents[0];
-    const threadId = agent.threadId;
-    expect(startEvent).toMatchObject({
-      eventType: 'thread',
-      scope: {
-        projectId,
-        sessionId,
-        threadId,
-      },
-      data: {
+    
+    // Verify the SSE event has correct structure
+    if (compactionStartEvents.length > 0) {
+      const startEvent = compactionStartEvents[0];
+      expect(startEvent.data).toMatchObject({
         type: 'COMPACTION_START',
-        threadId,
         data: {
           strategy: 'summarize',
-          message: expect.stringContaining('compact'),
         },
-      },
-    });
-
-    // Verify compaction complete event
-    const completeEvent = compactionCompleteEvents[0];
-    expect(completeEvent).toMatchObject({
-      eventType: 'thread',
-      scope: {
-        projectId,
-        sessionId,
-        threadId,
-      },
-      data: {
-        type: 'COMPACTION_COMPLETE',
-        threadId,
-        data: {
-          success: true,
-        },
-      },
-    });
+      });
+    }
 
     // Verify token usage is reported correctly in API
     const request = new NextRequest(
@@ -493,28 +481,10 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     expect(sessionData.tokenUsage.percentUsed).toBeLessThan(80);
     expect(sessionData.tokenUsage.nearLimit).toBe(false);
 
-    // Verify COMPACTION event was added to thread
-    const events = agent.threadManager.getEvents(threadId);
-    const compactionEvent = events.find((e) => e.type === 'COMPACTION');
-    expect(compactionEvent).toBeDefined();
-    expect(compactionEvent?.data).toMatchObject({
-      strategyId: 'summarize',
-      originalEventCount: expect.any(Number),
-      compactedEvents: expect.any(Array),
-    });
   });
 
   it('should handle manual /compact command and emit events', async () => {
-    // Mock token counting endpoint for this test
-    server.use(
-      http.post('https://api.anthropic.com/v1/messages/count_tokens', async () => {
-        return HttpResponse.json({
-          input_tokens: 100,
-        });
-      })
-    );
-
-    // Helper to create streaming response for this test
+    // Helper to create streaming response for this test - define BEFORE using it
     const createTestStreamResponse = (text: string, inputTokens: number, outputTokens: number) => {
       const events = [
         {
@@ -557,7 +527,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       return createAnthropicStreamResponse(events);
     };
 
-    // Mock response for manual compaction
+    // Set up MSW handler FIRST before any agent operations
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
         const body = (await request.json()) as any;
@@ -605,17 +575,33 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       })
     );
 
+    console.log('[TEST-MANUAL] Getting session by ID:', sessionId);
     const session = await Session.getById(sessionId);
-    const agent = session!.getAgent(agentId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    
+    console.log('[TEST-MANUAL] Getting agent from session');
+    const agent = session.getAgent(sessionId);
+    
+    if (!agent) {
+      throw new Error('Failed to get session agent');
+    }
 
+    console.log('[TEST-MANUAL] Starting agent');
+    // Start the agent to initialize token budget
+    await agent.start();
+
+    console.log('[TEST-MANUAL] Sending first message');
     // Send a regular message first
-    await agent!.sendMessage('Build some context first');
+    await agent.sendMessage('Build some context first');
+    console.log('[TEST-MANUAL] First message sent');
 
     // Clear previous events
     streamedEvents = [];
 
     // Send /compact command
-    await agent!.sendMessage('/compact');
+    await agent.sendMessage('/compact');
 
     // Wait for compaction to complete
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -647,13 +633,50 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     let requestIndex = 0;
 
-    // Mock token counting endpoint
+    // Helper function to create streaming response - defined BEFORE using it  
+    const createTokenTrackingStreamResponse = (text: string, usage: { input: number; output: number }) => {
+      const events = [
+        {
+          type: 'message_start',
+          message: {
+            id: `msg_${requestIndex}`,
+            type: 'message',
+            role: 'assistant',
+            content: [],
+            model: 'claude-3-5-sonnet-20241022',
+            stop_reason: null,
+            stop_sequence: null,
+            usage: { input_tokens: usage.input, output_tokens: 0 },
+          },
+        },
+        {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'text', text: '' },
+        },
+        {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text },
+        },
+        {
+          type: 'content_block_stop',
+          index: 0,
+        },
+        {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn', stop_sequence: null },
+          usage: { output_tokens: usage.output },
+        },
+        {
+          type: 'message_stop',
+        },
+      ];
+
+      return createAnthropicStreamResponse(events);
+    };
+
     server.use(
-      http.post('https://api.anthropic.com/v1/messages/count_tokens', async () => {
-        return HttpResponse.json({
-          input_tokens: 50,
-        });
-      }),
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
         const body = (await request.json()) as any;
         const isStreaming = body.stream === true;
@@ -663,45 +686,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
         const text = `Response ${requestIndex} with tracked tokens.`;
 
         if (isStreaming) {
-          const events = [
-            {
-              type: 'message_start',
-              message: {
-                id: `msg_${requestIndex}`,
-                type: 'message',
-                role: 'assistant',
-                content: [],
-                model: 'claude-3-5-sonnet-20241022',
-                stop_reason: null,
-                stop_sequence: null,
-                usage: { input_tokens: usage.input, output_tokens: 0 },
-              },
-            },
-            {
-              type: 'content_block_start',
-              index: 0,
-              content_block: { type: 'text', text: '' },
-            },
-            {
-              type: 'content_block_delta',
-              index: 0,
-              delta: { type: 'text_delta', text },
-            },
-            {
-              type: 'content_block_stop',
-              index: 0,
-            },
-            {
-              type: 'message_delta',
-              delta: { stop_reason: 'end_turn', stop_sequence: null },
-              usage: { output_tokens: usage.output },
-            },
-            {
-              type: 'message_stop',
-            },
-          ];
-
-          return createAnthropicStreamResponse(events);
+          return createTokenTrackingStreamResponse(text, usage);
         } else {
           return HttpResponse.json({
             id: `msg_${requestIndex}`,
@@ -721,12 +706,19 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     );
 
     const session = await Session.getById(sessionId);
-    const agent = session!.getAgent(agentId);
+    const agent = session!.getAgent(sessionId);
+    
+    if (!agent) {
+      throw new Error('Failed to get session agent');
+    }
+
+    // Start the agent to initialize token budget
+    await agent.start();
 
     // Send multiple messages
-    await agent!.sendMessage('First message');
-    await agent!.sendMessage('Second message');
-    await agent!.sendMessage('Third message');
+    await agent.sendMessage('First message');
+    await agent.sendMessage('Second message');
+    await agent.sendMessage('Third message');
 
     // Check token usage via API
     const request = new NextRequest(

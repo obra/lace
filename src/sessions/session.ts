@@ -204,7 +204,9 @@ export class Session {
     });
     const providerInstance = Session.resolveProviderInstance(providerInstanceId);
 
-    // Create agent
+    // Agent will auto-initialize token budget based on model
+
+    // Create agent with token budget for auto-compaction
     const sessionAgent = new Agent({
       provider: providerInstance,
       toolExecutor,
@@ -367,7 +369,7 @@ export class Session {
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor);
 
-    // Create agent with existing thread
+    // Create agent with existing thread - it will auto-initialize token budget based on model
     const sessionAgent = new Agent({
       provider: providerInstance,
       toolExecutor,
@@ -430,6 +432,7 @@ export class Session {
         );
 
         // Create agent for this delegate thread with its own provider
+        // Agent will auto-initialize token budget based on its model
         const delegateAgent = new Agent({
           provider: delegateProviderInstance,
           toolExecutor,
