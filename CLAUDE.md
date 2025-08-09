@@ -379,3 +379,4 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
 
  **Use type-aware tools**  
    Employ `ts-jest` or similar to verify snapshots and mocks against your TS types.
+- always use tempdir utilities when making temp dirs in tests
