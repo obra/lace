@@ -587,6 +587,9 @@ export class ThreadManager {
 
   // Cleanup
   close(): void {
+    // WARNING: This clears the GLOBAL cache and closes the GLOBAL persistence
+    // affecting ALL ThreadManager instances. This should only be called when
+    // the entire application is shutting down, not when individual agents stop.
     // Clear process-local cache
     processLocalThreadCache.clear();
     this._persistence.close();

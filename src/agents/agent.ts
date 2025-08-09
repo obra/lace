@@ -354,7 +354,8 @@ export class Agent extends EventEmitter {
       });
     }
 
-    this._threadManager.close();
+    // DO NOT close ThreadManager - it's shared by all agents in the session!
+    // this._threadManager.close();  // This would affect ALL agents
     logger.info('AGENT: Stopped', { threadId: this._threadId });
   }
 
