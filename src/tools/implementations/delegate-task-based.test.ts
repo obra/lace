@@ -84,7 +84,7 @@ describe('Task-Based DelegateTool Integration', () => {
           title: 'Integration Test Task',
           prompt: 'Complete this integration test',
           expected_response: 'Test completed successfully',
-          model: 'anthropic:claude-3-5-haiku-20241022',
+          model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
         },
         context
       );
@@ -165,7 +165,7 @@ describe('Task-Based DelegateTool Integration', () => {
           title: 'This will be blocked',
           prompt: 'This task will fail',
           expected_response: 'Error',
-          model: 'anthropic:claude-3-5-haiku-20241022',
+          model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
         },
         context
       );

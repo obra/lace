@@ -64,7 +64,7 @@ describe('DelegateTool', () => {
   it('should have correct metadata', () => {
     expect(tool.name).toBe('delegate');
     expect(tool.annotations?.openWorldHint).toBe(true);
-    expect(tool.inputSchema.required).toEqual(['title', 'prompt', 'expected_response']);
+    expect(tool.inputSchema.required).toEqual(['title', 'prompt', 'expected_response', 'model']);
   });
 
   it('should delegate a simple task with default model', async () => {
@@ -75,7 +75,7 @@ describe('DelegateTool', () => {
         title: 'Analyze test failures',
         prompt: 'Look at the failing tests and identify common patterns',
         expected_response: 'A list of failure patterns',
-        model: 'anthropic:claude-3-5-haiku-20241022',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       },
       context
     );
@@ -94,7 +94,7 @@ describe('DelegateTool', () => {
         title: 'Test custom model',
         prompt: 'Use custom model for delegation',
         expected_response: 'Custom response',
-        model: 'openai:gpt-4',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       },
       context
     );
@@ -112,7 +112,7 @@ describe('DelegateTool', () => {
         title: 'List files',
         prompt: 'List the files in the current directory',
         expected_response: 'List of files',
-        model: 'anthropic:claude-3-5-haiku-20241022',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       },
       context
     );
@@ -131,7 +131,7 @@ describe('DelegateTool', () => {
         title: 'Format test',
         prompt: 'Test system prompt formatting',
         expected_response: 'Formatted response',
-        model: 'anthropic:claude-3-5-haiku-20241022',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       },
       context
     );
@@ -164,7 +164,7 @@ describe('DelegateTool', () => {
         title: 'Multi-response test',
         prompt: 'Generate multiple responses',
         expected_response: 'Combined responses',
-        model: 'anthropic:claude-3-5-haiku-20241022',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       },
       context
     );
@@ -181,7 +181,7 @@ describe('DelegateTool', () => {
         title: 'Metadata test',
         prompt: 'Test metadata inclusion',
         expected_response: 'Response with metadata',
-        model: 'anthropic:claude-3-5-haiku-20241022',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       },
       context
     );
@@ -192,7 +192,7 @@ describe('DelegateTool', () => {
   });
 
   it('should accept valid model formats', async () => {
-    const validModels = ['anthropic:claude-3-5-haiku-20241022', 'openai:gpt-4'];
+    const validModels = [`${providerInstanceId}:claude-3-5-haiku-20241022`];
 
     for (const model of validModels) {
       testSetup.setMockResponses(['Valid model response']);

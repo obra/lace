@@ -134,14 +134,6 @@ describe('Task Management Workflow Integration', () => {
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
-    // Create a real provider instance for testing
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
       displayName: 'Test Task Workflow Instance',
       apiKey: 'test-anthropic-key',
     });
@@ -366,7 +358,7 @@ describe('Task Management Workflow Integration', () => {
       const reassignResult = await taskUpdateTool.execute(
         {
           taskId: validDelegateTaskId,
-          assignTo: `new:${providerInstanceId}/claude-sonnet-4-20250514`,
+          assignTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
           status: 'in_progress',
         },
         context
@@ -392,7 +384,7 @@ describe('Task Management Workflow Integration', () => {
         title: 'Analyze security vulnerabilities',
         prompt: 'Review codebase for common security issues and provide recommendations',
         expected_response: 'List of vulnerabilities with specific remediation steps',
-        model: 'anthropic:claude-sonnet-4-20250514',
+        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
       });
 
       expect(delegateResult.isError).toBe(false);

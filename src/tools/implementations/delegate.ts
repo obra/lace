@@ -131,7 +131,7 @@ Examples:
       logger.debug('DelegateTool: Created task for delegation', {
         taskId: task.id,
         title,
-        model: `${providerName}/${modelName}`,
+        model: `${providerInstanceId}:${modelName}`,
       });
 
       // Wait for task completion via events

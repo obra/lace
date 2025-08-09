@@ -267,7 +267,7 @@ describe('Multi-Agent Task Manager Integration', () => {
   describe('New agent assignment workflow', () => {
     it('should handle task assignment to new agent specification', async () => {
       // Create task assigned to a new agent spec
-      const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
+      const newAgentSpec = createNewAgentSpec(providerInstanceId, 'claude-3-5-haiku-20241022');
       const createResult = await createTool.execute(
         {
           tasks: [
