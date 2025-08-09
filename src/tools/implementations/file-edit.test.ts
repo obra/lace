@@ -100,10 +100,10 @@ describe('FileEditTool Integration Tests', () => {
 
   // Helper function to assert successful edits
   const expectSuccessfulEdit = (
-    result: { isError: boolean; metadata?: Record<string, unknown> },
+    result: { status: string; metadata?: Record<string, unknown> },
     editCount?: number
   ) => {
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     if (editCount !== undefined) {
       expect(result.metadata?.total_replacements).toBe(editCount);
     }
@@ -130,7 +130,7 @@ describe('FileEditTool Integration Tests', () => {
         { ...context, signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain("exists but hasn't been read");
       expect(result.content[0].text).toContain('Use file_read to examine');
     });
@@ -153,7 +153,7 @@ describe('FileEditTool Integration Tests', () => {
         { ...context, signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -174,7 +174,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
       expect(result.content[0].text).not.toContain("hasn't been read");
     });
@@ -202,7 +202,7 @@ describe('FileEditTool Integration Tests', () => {
         },
         context
       );
-      expect(result1.isError).toBe(false);
+      expect(result1.status).toBe('completed');
 
       // Should fail for testFile2 (not marked as read)
       const result2 = await tool.execute(
@@ -217,7 +217,7 @@ describe('FileEditTool Integration Tests', () => {
         },
         context
       );
-      expect(result2.isError).toBe(true);
+      expect(result2.status).toBe('failed');
       expect(result2.content[0].text).toContain("exists but hasn't been read");
     });
   });
@@ -250,7 +250,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('path');
     });
@@ -264,7 +264,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
@@ -278,7 +278,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('old_text');
     });
@@ -292,7 +292,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('new_text');
     });
@@ -308,7 +308,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
 
     it('should transform relative paths to absolute', async () => {
@@ -321,7 +321,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
 
@@ -336,7 +336,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
@@ -381,7 +381,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -401,7 +401,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -421,7 +421,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
   });
@@ -452,7 +452,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
       // Remove line count expectation as it's not in the simplified message
     });
@@ -473,7 +473,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -494,7 +494,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
   });
@@ -516,7 +516,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Could not find exact text');
       expect(result.content[0].text).toContain('Use file_read to see the exact content');
     });
@@ -537,7 +537,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Expected 1 occurrence but found 2');
       expect(result.content[0].text).toContain('Add more context to make old_text unique');
     });
@@ -556,7 +556,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
 
@@ -584,7 +584,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Could not find exact text');
       expect(result.content[0].text).toContain('File content (3 lines)');
     });
@@ -606,7 +606,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Expected 1 occurrence but found 3');
       expect(result.content[0].text).toContain('Line 1, column');
     });
@@ -627,7 +627,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Use file_read to see the exact content');
     });
   });
@@ -695,7 +695,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -713,7 +713,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -731,7 +731,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
   });
@@ -754,7 +754,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -775,7 +775,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -797,7 +797,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -817,7 +817,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -837,7 +837,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
   });
@@ -859,7 +859,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -879,7 +879,7 @@ describe('FileEditTool Integration Tests', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Could not find exact text');
     });
   });
@@ -904,7 +904,7 @@ describe('FileEditTool Integration Tests', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -924,7 +924,7 @@ describe('FileEditTool Integration Tests', () => {
         { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully applied');
     });
 
@@ -948,7 +948,7 @@ describe('FileEditTool Integration Tests', () => {
           context
         );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('Successfully applied');
       } finally {
         await rm(absoluteFile, { force: true });
@@ -969,7 +969,7 @@ describe('FileEditTool Integration Tests', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
       expect(result.content[0].text).toContain('non-existent-relative-edit.txt');
     });

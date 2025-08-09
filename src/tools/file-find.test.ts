@@ -67,7 +67,7 @@ describe('FileFindTool with schema validation', () => {
     it('should reject missing pattern', async () => {
       const result = await tool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('pattern');
       expect(result.content[0].text).toContain('Required');
@@ -76,7 +76,7 @@ describe('FileFindTool with schema validation', () => {
     it('should reject empty pattern', async () => {
       const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
@@ -90,7 +90,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -103,7 +103,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -116,7 +116,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be an integer');
     });
@@ -130,7 +130,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -143,7 +143,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     });
   });
@@ -158,7 +158,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
@@ -171,7 +171,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('app.test.ts');
       expect(result.content[0].text).not.toContain('app.js');
@@ -186,7 +186,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('app.js');
       expect(result.content[0].text).toContain('app.test.ts');
@@ -203,7 +203,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('package.json');
       // Check that no standalone directory names appear (without file extensions or paths)
@@ -227,7 +227,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('src');
       expect(result.content[0].text).toContain('tests');
       expect(result.content[0].text).not.toContain('README.md'); // Should not include files
@@ -243,7 +243,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).not.toContain('Button.tsx'); // Should not find files in deeper directories
     });
 
@@ -257,7 +257,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Button.tsx');
     });
 
@@ -271,7 +271,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found'); // Should not find README.md with different case
     });
 
@@ -285,7 +285,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
@@ -299,7 +299,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).not.toContain('.hidden');
       expect(result.content[0].text).not.toContain('.gitignore');
     });
@@ -315,7 +315,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('.gitignore');
     });
 
@@ -329,7 +329,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0]).toBeDefined();
       expect(result.content[0].text).toBeDefined();
       const lines = result.content[0].text!.split('\n').filter((line) => line.trim());
@@ -351,7 +351,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toMatch(/README\.md.*\(/); // Should have size in parentheses
     });
 
@@ -365,7 +365,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('src');
       expect(result.content[0].text).not.toMatch(/src.*\(/); // Should not have size in parentheses
     });
@@ -381,14 +381,14 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
     });
 
     it('should use createError for validation failures', async () => {
       const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -401,7 +401,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found matching pattern');
       expect(result.content[0].text).toContain('*.nonexistent');
     });
@@ -415,7 +415,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory not found');
     });
   });
@@ -430,7 +430,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('app.js');
     });
@@ -446,7 +446,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('package.json');
     });
 
@@ -462,7 +462,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     });
   });
@@ -480,7 +480,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('relative-file.txt');
     });
 
@@ -490,7 +490,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
@@ -508,7 +508,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     }, 10000);
 
@@ -518,7 +518,7 @@ describe('FileFindTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory not found');
       expect(result.content[0].text).toContain('non-existent-dir');
     });

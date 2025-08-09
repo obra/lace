@@ -35,7 +35,7 @@ describe('Tool base class', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${absolutePath}`);
     });
 
@@ -49,7 +49,7 @@ describe('Tool base class', () => {
         { signal: new AbortController().signal, workingDirectory: workingDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${expected}`);
     });
 
@@ -62,7 +62,7 @@ describe('Tool base class', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${expected}`);
     });
 
@@ -75,7 +75,7 @@ describe('Tool base class', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${expected}`);
     });
   });

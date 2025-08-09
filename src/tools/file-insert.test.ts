@@ -51,7 +51,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('path');
       expect(result.content[0].text).toContain('Required');
@@ -63,7 +63,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
@@ -74,7 +74,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
       expect(result.content[0].text).toContain('Required');
@@ -89,7 +89,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
     });
@@ -104,7 +104,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be an integer');
     });
@@ -119,7 +119,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be positive');
     });
@@ -134,7 +134,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be positive');
     });
@@ -153,7 +153,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
       );
 
       // Should not fail validation (may fail if line number is out of range)
-      if (result.isError) {
+      if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
     });
@@ -175,7 +175,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Appended to end of file');
       expect(result.content[0].text).toContain(testFile);
 
@@ -198,7 +198,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toBe(originalContent + '\n' + insertContent);
@@ -220,7 +220,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Inserted after line 2');
 
       const newContent = await readFile(testFile, 'utf-8');
@@ -247,7 +247,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('+2 lines');
 
       const newContent = await readFile(testFile, 'utf-8');
@@ -272,7 +272,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('+1 line');
       expect(result.content[0].text).not.toContain('+1 lines');
     });
@@ -292,7 +292,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Line number');
       expect(result.content[0].text).toContain('out of range');
     });
@@ -312,7 +312,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Appended to end of file');
       expect(result.content[0].text).toContain(testFile);
       expect(result.content[0].text).toContain('+1 line');
@@ -321,7 +321,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
     it('should use createError for validation failures', async () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -334,7 +334,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
   });
@@ -354,7 +354,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toBe(originalContent);
@@ -372,7 +372,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toBe('first content');
@@ -394,7 +394,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toContain('世界! 🚀 Émojis');
@@ -431,7 +431,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Inserted after line 1');
 
       const newContent = await readFile(absoluteTestFile, 'utf-8');
@@ -450,7 +450,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Appended to end of file');
 
       const newContent = await readFile(testFile, 'utf-8');
@@ -472,7 +472,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
           { signal: new AbortController().signal }
         );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('Appended to end of file');
 
         const newContent = await readFile(absoluteFile, 'utf-8');
@@ -491,7 +491,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
   });

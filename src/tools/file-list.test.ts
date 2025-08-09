@@ -68,7 +68,7 @@ describe('FileListTool with schema validation', () => {
     it('should reject empty path', async () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Path cannot be empty');
     });
@@ -82,7 +82,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -95,7 +95,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be an integer');
     });
@@ -109,7 +109,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -121,7 +121,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
@@ -134,7 +134,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('package.json');
       expect(result.content[0].text).toContain('src/');
@@ -149,7 +149,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toMatch(/README\.md.*\(\d+ bytes\)/);
       expect(result.content[0].text).toMatch(/package\.json.*\(\d+ bytes\)/);
     });
@@ -162,7 +162,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).not.toContain('.hidden');
     });
 
@@ -175,7 +175,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('.hidden/');
     });
   });
@@ -190,7 +190,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).not.toContain('package.json');
     });
@@ -204,7 +204,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('package.json');
       expect(result.content[0].text).not.toContain('README.md');
     });
@@ -218,7 +218,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should not match README.md (6 chars) but would match shorter .md files
       expect(result.content[0].text).not.toContain('README.md');
     });
@@ -234,7 +234,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('Button.tsx');
       expect(result.content[0].text).toContain('app.test.ts');
@@ -250,7 +250,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).not.toContain('Button.tsx'); // Should not go deep enough for components/
     });
@@ -265,7 +265,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       // Check for tree structure characters
       expect(output).toMatch(/[├└]/); // Tree characters
@@ -285,7 +285,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should see summary format for directories with many files
       expect(result.content[0].text).toMatch(/\(\d+ files; \d+ dirs\)/);
     });
@@ -299,7 +299,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // node_modules should be summarized regardless of threshold
       expect(result.content[0].text).toMatch(/node_modules.*\(\d+ files; \d+ dirs\)/);
     });
@@ -316,7 +316,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should have truncation message
       expect(result.content[0].text).toContain('Results limited to 3');
     });
@@ -330,7 +330,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).not.toContain('Results limited to');
     });
   });
@@ -344,14 +344,14 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
     it('should use createError for validation failures', async () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -363,7 +363,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory not found');
     });
 
@@ -378,7 +378,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     });
   });
@@ -394,7 +394,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       // Should have tree structure
@@ -412,7 +412,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('app.js');
       expect(result.content[0].text).toContain('Button.tsx');
@@ -432,7 +432,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     });
 
@@ -444,7 +444,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('not a directory');
     });
 
@@ -456,7 +456,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0]).toBeDefined();
       expect(result.content[0].text).toBeDefined();
       const output = result.content[0].text!;
@@ -498,7 +498,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('relative-file.txt');
     });
 
@@ -508,7 +508,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
@@ -525,7 +525,7 @@ describe('FileListTool with schema validation', () => {
           { signal: new AbortController().signal }
         );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('cwd-test.txt');
       } finally {
         await mkdir(tempDirPath, { recursive: true }).catch(() => {});
@@ -546,7 +546,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory not found');
       expect(result.content[0].text).toContain('non-existent-relative-dir');
     });
@@ -557,7 +557,7 @@ describe('FileListTool with schema validation', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('src/');
     });

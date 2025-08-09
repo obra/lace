@@ -50,7 +50,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('path');
       expect(result.content[0].text).toContain('Required');
@@ -62,7 +62,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
@@ -73,7 +73,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
       expect(result.content[0].text).toContain('Required');
@@ -88,7 +88,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
     });
@@ -103,7 +103,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('createDirs');
     });
@@ -120,7 +120,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       // Should not fail validation (may fail with file system error in test env)
-      if (result.isError) {
+      if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
     });
@@ -136,7 +136,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       // Should create directories by default
-      if (!result.isError) {
+      if (result.status === 'completed') {
         const written = await readFile(testFile, 'utf-8');
         expect(written).toBe('test content');
       }
@@ -153,7 +153,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
       expect(result.content[0].text).toContain(testFile);
 
@@ -178,7 +178,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(newContent);
@@ -193,7 +193,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -216,7 +216,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory does not exist');
     });
   });
@@ -231,7 +231,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
       expect(result.content[0].text).toContain(`${content.length} bytes`);
       expect(result.content[0].text).toContain(testFile);
@@ -240,7 +240,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
     it('should use createError for validation failures', async () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -256,7 +256,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory does not exist');
       expect(result.content[0].text).toContain('createDirs to true');
     });
@@ -272,7 +272,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe('');
@@ -287,7 +287,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -303,7 +303,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -318,7 +318,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('1.5 KB');
     });
   });
@@ -334,7 +334,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
 
       // Verify the file was created in the working directory
@@ -352,7 +352,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
 
       // Verify the file was created at the absolute path
@@ -371,7 +371,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           { signal: new AbortController().signal }
         );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('Successfully wrote');
 
         // Verify the file was created in the current working directory
@@ -393,7 +393,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
 
       // Verify the file was created in the nested structure within working directory

@@ -74,7 +74,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     it('should reject missing pattern', async () => {
       const result = await tool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('pattern');
     });
@@ -82,7 +82,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     it('should reject empty pattern', async () => {
       const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
@@ -96,7 +96,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -109,7 +109,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -122,7 +122,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -135,7 +135,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -148,7 +148,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
@@ -162,7 +162,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('Found');
@@ -181,7 +181,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No matches found for pattern: nonexistentpattern');
     });
 
@@ -194,7 +194,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toMatch(/\d+: function hello/);
     });
@@ -207,7 +207,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should not error out, even if no matches found in current directory
     });
   });
@@ -232,10 +232,10 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(caseInsensitive.isError).toBe(false);
+      expect(caseInsensitive.status).toBe('completed');
       expect(caseInsensitive.content[0].text).toContain('Found');
 
-      expect(caseSensitive.isError).toBe(false);
+      expect(caseSensitive.status).toBe('completed');
       expect(caseSensitive.content[0].text).toContain('No matches found');
     });
 
@@ -249,7 +249,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('file1.ts');
@@ -267,7 +267,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('file1.ts');
@@ -297,8 +297,8 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(wholeWord.isError).toBe(false);
-      expect(partialWord.isError).toBe(false);
+      expect(wholeWord.status).toBe('completed');
+      expect(partialWord.status).toBe('completed');
 
       expect(partialWord.content[0].text).toContain('partial.txt');
       expect(partialWord.content[0].text).toContain('whole.txt');
@@ -316,7 +316,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       // Should find console.log matches
       expect(output).toContain('console.log');
@@ -343,7 +343,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0]).toBeDefined();
       expect(result.content[0].text).toBeDefined();
       const output = result.content[0].text!;
@@ -367,7 +367,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).not.toContain('Results limited to');
     });
@@ -381,7 +381,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should not error, default should be applied
     });
   });
@@ -396,7 +396,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('file1.ts:');
@@ -413,7 +413,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toMatch(/Found \d+ match(es)?:/);
     });
@@ -427,7 +427,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('Found 1 match:');
       expect(output).not.toContain('matches');
@@ -444,7 +444,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Search operation failed');
     });
 
@@ -459,7 +459,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('$10.50');
     });
@@ -475,7 +475,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
 
     it('should handle binary files gracefully', async () => {
@@ -490,7 +490,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
@@ -504,7 +504,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Found');
     });
 
@@ -517,14 +517,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No matches found');
     });
 
     it('should use createError for validation failures', async () => {
       const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -554,7 +554,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('workfile.txt');
       expect(output).toContain('working directory test content');
@@ -577,7 +577,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('absolute path test');
     });
@@ -595,7 +595,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('"hello world"');
     });
@@ -611,7 +611,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('file1.ts');
       expect(output).toContain('file2.js');
@@ -628,7 +628,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should work without context lines
     });
   });
