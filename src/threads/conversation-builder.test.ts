@@ -300,7 +300,7 @@ describe('conversation-builder', () => {
       );
     });
 
-    it('should keep first TOOL_RESULT event when multiple have different statuses', () => {
+    it('should keep higher precedence status when multiple TOOL_RESULT events have same ID', () => {
       const events: ThreadEvent[] = [
         {
           id: 'evt1',
@@ -339,13 +339,13 @@ describe('conversation-builder', () => {
 
       const result = buildWorkingConversation(events);
 
-      // Should keep only the first result (completed - first encountered)
+      // Should keep the failed result (highest precedence: failed > aborted > completed)
       const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
       expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
-        'Completed result'
+        'Failed result'
       );
-      expect((toolResults[0].data as { status: string }).status).toBe('completed');
+      expect((toolResults[0].data as { status: string }).status).toBe('failed');
     });
 
     it('should test deduplication with failed status first', () => {
@@ -413,13 +413,72 @@ describe('conversation-builder', () => {
 
       const result = buildWorkingConversation(events);
 
-      // Should keep only the first result (aborted - first encountered)
+      // Should keep the aborted result (aborted > completed)
       const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
       expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
         'Aborted result'
       );
       expect((toolResults[0].data as { status: string }).status).toBe('aborted');
+    });
+
+    it('should prioritize denied status over all others', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Failed result' }],
+            status: 'failed',
+          },
+        },
+        {
+          id: 'evt3',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:03:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Denied result' }],
+            status: 'denied',
+          },
+        },
+        {
+          id: 'evt4',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:04:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Aborted result' }],
+            status: 'aborted',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep the denied result (denied > failed > aborted > completed)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Denied result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('denied');
     });
   });
 

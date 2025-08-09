@@ -23,7 +23,10 @@ const ripgrepSearchSchema = z.object({
   path: FilePath.default('.'),
   caseSensitive: z.boolean().default(false),
   wholeWord: z.boolean().default(false),
-  literal: z.boolean().default(false).describe('Treat pattern as literal string instead of regex'),
+  literal: z
+    .boolean()
+    .default(true)
+    .describe('Treat pattern as literal string (true) or as regex (false)'),
   includePattern: z.string().optional(),
   excludePattern: z.string().optional(),
   maxResults: z

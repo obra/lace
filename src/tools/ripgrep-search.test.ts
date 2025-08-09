@@ -455,7 +455,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         {
           pattern: '$10.50',
           path: testDir,
-          literal: true, // Use literal search for special characters
+          // literal: true is now the default
         },
         { signal: new AbortController().signal }
       );
