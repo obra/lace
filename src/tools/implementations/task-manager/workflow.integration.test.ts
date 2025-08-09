@@ -50,7 +50,7 @@ class MockProvider extends BaseMockProvider {
     return 4096;
   }
 
-  getAvailableModels() {
+  getAvailableModels = () => {
     return [
       {
         id: 'claude-3-5-haiku-20241022',
@@ -71,7 +71,7 @@ class MockProvider extends BaseMockProvider {
         isDefault: false,
       },
     ];
-  }
+  };
 
   async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     // Look for task assignment message

@@ -40,8 +40,22 @@ class MockProvider extends BaseMockProvider {
   }
 
   get defaultModel(): string {
-    return 'mock-model';
+    return 'claude-3-5-haiku-20241022';
   }
+
+  getAvailableModels = () => {
+    return [
+      {
+        id: 'claude-3-5-haiku-20241022',
+        displayName: 'Claude 3.5 Haiku',
+        description: 'Model for testing',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+        isDefault: true,
+      },
+    ];
+  };
 
   createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
     return Promise.resolve({
@@ -209,7 +223,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should create task with new agent assignment', async () => {
-      const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
+      const newAgentSpec = createNewAgentSpec(providerInstanceId, 'claude-3-5-haiku-20241022');
 
       const result = await taskCreateTool.execute(
         {
@@ -483,7 +497,7 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should assign to new agent spec', async () => {
-      const newAgentSpec = createNewAgentSpec('openai', 'gpt-4');
+      const newAgentSpec = createNewAgentSpec(providerInstanceId, 'claude-3-5-haiku-20241022');
 
       const result = await taskUpdateTool.execute(
         {
