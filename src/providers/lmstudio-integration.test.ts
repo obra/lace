@@ -98,7 +98,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
           {
             id: 'call_1',
             content: [{ type: 'text' as const, text: 'Mock executed: {"action":"initial"}' }],
-            isError: false,
+            status: 'completed' as const,
           },
         ],
       },

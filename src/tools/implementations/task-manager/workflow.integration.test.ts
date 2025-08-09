@@ -190,7 +190,7 @@ describe('Task Management Workflow Integration', () => {
         context
       );
 
-      expect(createResult.isError).toBe(false);
+      expect(createResult.status).toBe('completed');
       expect(createResult.content[0].text).toContain('Created task');
       const taskIdMatch = createResult.content[0].text?.match(/task (\w+):/);
       expect(taskIdMatch).not.toBeNull();
@@ -198,7 +198,7 @@ describe('Task Management Workflow Integration', () => {
 
       // 2. List tasks to verify creation
       const listResult = await taskListTool.execute({ filter: 'thread' }, context);
-      expect(listResult.isError).toBe(false);
+      expect(listResult.status).toBe('completed');
       expect(listResult.content[0].text).toContain('Implement user authentication');
       expect(listResult.content[0].text).toContain('[high]');
 
@@ -210,7 +210,7 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(updateResult.isError).toBe(false);
+      expect(updateResult.status).toBe('completed');
       expect(updateResult.content[0].text).toContain('status to in_progress');
 
       // 4. Add progress note
@@ -221,12 +221,12 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(noteResult.isError).toBe(false);
+      expect(noteResult.status).toBe('completed');
       expect(noteResult.content[0].text).toContain('Added note to task');
 
       // 5. View task details
       const viewResult = await taskViewTool.execute({ taskId: validTaskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       expect(viewResult.content[0].text).toContain('Status: in_progress');
       expect(viewResult.content[0].text).toContain('JWT middleware');
 
@@ -238,12 +238,12 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(completeResult.isError).toBe(false);
+      expect(completeResult.status).toBe('completed');
       expect(completeResult.content[0].text).toContain('Completed task');
 
       // 7. Verify completion in final view
       const finalViewResult = await taskViewTool.execute({ taskId: validTaskId }, context);
-      expect(finalViewResult.isError).toBe(false);
+      expect(finalViewResult.status).toBe('completed');
       expect(finalViewResult.content[0].text).toContain('Status: completed');
       expect(finalViewResult.content[0].text).toContain('Authentication system completed');
     });
@@ -283,12 +283,12 @@ describe('Task Management Workflow Integration', () => {
         context
       );
 
-      expect(bulkCreateResult.isError).toBe(false);
+      expect(bulkCreateResult.status).toBe('completed');
       expect(bulkCreateResult.content[0].text).toContain('Created 4 tasks');
 
       // Verify all tasks are listed
       const listResult = await taskListTool.execute({ filter: 'thread' }, context);
-      expect(listResult.isError).toBe(false);
+      expect(listResult.status).toBe('completed');
       expect(listResult.content[0].text).toContain('Tasks (thread): 4 found');
       expect(listResult.content[0].text).toContain('Setup database schema');
       expect(listResult.content[0].text).toContain('Implement password hashing');
@@ -325,7 +325,7 @@ describe('Task Management Workflow Integration', () => {
         context
       );
 
-      expect(createResult.isError).toBe(false);
+      expect(createResult.status).toBe('completed');
       // After agent spawning, the assignment should show the delegate thread ID
       expect(createResult.content[0].text).toMatch(/assigned to \w+\.\d+/);
 
@@ -335,7 +335,7 @@ describe('Task Management Workflow Integration', () => {
 
       // View task to confirm assignment
       const viewResult = await taskViewTool.execute({ taskId: validDelegateTaskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       // After agent spawning, the assignment should show the delegate thread ID
       expect(viewResult.content[0].text).toMatch(/Assigned to: \w+\.\d+/);
 
@@ -348,13 +348,13 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(reassignResult.isError).toBe(false);
+      expect(reassignResult.status).toBe('completed');
       // Task update should also trigger agent spawning, showing the delegate thread ID
       expect(reassignResult.content[0].text).toMatch(/assigned to \w+\.\d+/);
 
       // Mock delegation tool execution (delegation would normally create subthreads)
       vi.spyOn(delegateTool, 'execute').mockResolvedValueOnce({
-        isError: false,
+        status: 'completed' as const,
         content: [
           {
             type: 'text',
@@ -377,7 +377,7 @@ describe('Task Management Workflow Integration', () => {
         }
       );
 
-      expect(delegateResult.isError).toBe(false);
+      expect(delegateResult.status).toBe('completed');
       expect(delegateResult.content[0].text).toContain('Security analysis completed');
       expect(delegateResult.content[0].text).toContain('SQL injection');
 
@@ -389,7 +389,7 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(completeResult.isError).toBe(false);
+      expect(completeResult.status).toBe('completed');
     });
   });
 
@@ -406,12 +406,12 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(completeResult.isError).toBe(true);
+      expect(completeResult.status).toBe('failed');
       expect(completeResult.content[0].text).toContain('Failed to complete task');
 
       // Try to view non-existent task
       const viewResult = await taskViewTool.execute({ taskId: 'nonexistent_task' }, context);
-      expect(viewResult.isError).toBe(true);
+      expect(viewResult.status).toBe('failed');
       expect(viewResult.content[0].text).toContain('not found');
 
       // Try to update with invalid assignee format
@@ -422,7 +422,7 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(updateResult.isError).toBe(true);
+      expect(updateResult.status).toBe('failed');
       expect(updateResult.content[0].text).toContain('Invalid assignee format');
     });
 
@@ -447,7 +447,7 @@ describe('Task Management Workflow Integration', () => {
 
       // The test name is misleading - tools now get TaskManager from session
       // So this should succeed
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Created task');
     });
   });
@@ -470,7 +470,7 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(task1Result.isError).toBe(false);
+      expect(task1Result.status).toBe('completed');
 
       const task2Result = await taskCreateTool.execute(
         {
@@ -484,7 +484,7 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(task2Result.isError).toBe(false);
+      expect(task2Result.status).toBe('completed');
 
       const task3Result = await taskCreateTool.execute(
         {
@@ -498,17 +498,17 @@ describe('Task Management Workflow Integration', () => {
         },
         context
       );
-      expect(task3Result.isError).toBe(false);
+      expect(task3Result.status).toBe('completed');
 
       // Get all tasks
       const allTasks = await taskListTool.execute({ filter: 'all' }, context);
-      expect(allTasks.isError).toBe(false);
+      expect(allTasks.status).toBe('completed');
       // Should have all 3 tasks (note: assigned task may be auto-started due to agent spawning)
       expect(allTasks.content[0].text).toContain('Tasks (all): 3 found');
 
       // Get thread tasks (should be same as all in this test)
       const threadTasks = await taskListTool.execute({ filter: 'thread' }, context);
-      expect(threadTasks.isError).toBe(false);
+      expect(threadTasks.status).toBe('completed');
       expect(threadTasks.content[0].text).toContain('Tasks (thread): 3 found');
 
       // Verify priority sorting (high -> medium -> low)

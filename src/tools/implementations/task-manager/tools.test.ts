@@ -167,7 +167,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0]?.text).toContain('Created task');
     });
   });
@@ -187,7 +187,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('Created task');
       expect(result.content?.[0]?.text).toContain('Implement authentication');
     });
@@ -208,7 +208,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('Code review');
       expect(result.content?.[0]?.text).toContain('assigned to');
     });
@@ -230,10 +230,10 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      if (result.isError) {
+      if (result.status === 'failed') {
         console.error('Task creation failed:', result.content?.[0]?.text);
       }
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // After agent spawning, the task should be assigned to the spawned agent thread ID
       expect(result.content?.[0]?.text).toContain('Research task');
       expect(result.content?.[0]?.text).toContain('assigned to');
@@ -254,7 +254,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Validation failed');
     });
 
@@ -272,7 +272,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Invalid assignee format');
     });
   });
@@ -347,7 +347,7 @@ describe('Enhanced Task Manager Tools', () => {
         }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const text = result.content?.[0]?.text || '';
       expect(text).toContain('Task 2'); // Assigned to agent1
       expect(text).not.toContain('Task 3'); // Assigned to agent2
@@ -361,7 +361,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const text = result.content?.[0]?.text || '';
       expect(text).toContain('Task 1');
       expect(text).toContain('Task 2');
@@ -376,7 +376,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const text = result.content?.[0]?.text || '';
       expect(text).toContain('Task 1');
       expect(text).toContain('Task 2');
@@ -450,12 +450,12 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('in_progress');
 
       // Verify using TaskViewTool
       const viewResult = await taskViewTool.execute({ taskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       expect(viewResult.content?.[0]?.text).toContain('in_progress');
     });
 
@@ -468,7 +468,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Validation failed');
     });
 
@@ -481,7 +481,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('not found');
     });
 
@@ -494,12 +494,12 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('assigned to');
 
       // Verify reassignment using TaskViewTool
       const viewResult = await taskViewTool.execute({ taskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       expect(viewResult.content?.[0]?.text).toContain(agent2ThreadId);
     });
 
@@ -514,7 +514,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // After agent spawning, assignment should be to delegate thread ID
       expect(result.content?.[0]?.text).toContain('assigned to');
       expect(result.content?.[0]?.text).toMatch(/assigned to \w+\.\d+/);
@@ -529,7 +529,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Invalid assignee format');
     });
   });
@@ -562,12 +562,12 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('Added note');
 
       // Verify note was added using TaskViewTool
       const viewResult = await taskViewTool.execute({ taskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('Started working on this task');
       expect(taskDetails).toContain(session.getId()); // Note author should be session ID
@@ -603,7 +603,7 @@ describe('Enhanced Task Manager Tools', () => {
 
       // Verify multiple notes using TaskViewTool
       const viewResult = await taskViewTool.execute({ taskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('First note');
       expect(taskDetails).toContain('Second note');
@@ -664,7 +664,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should view task details', async () => {
       const result = await taskViewTool.execute({ taskId }, context);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const text = result.content?.[0]?.text || '';
       expect(text).toContain('Complex task');
       expect(text).toContain('This is a complex task');
@@ -683,7 +683,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('not found');
     });
   });
@@ -716,12 +716,12 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('Completed task');
 
       // Verify completion using TaskViewTool
       const viewResult = await taskViewTool.execute({ taskId }, context);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       expect(viewResult.content?.[0]?.text).toContain('completed');
     });
 
@@ -734,7 +734,7 @@ describe('Enhanced Task Manager Tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('not found');
     });
   });
@@ -758,7 +758,7 @@ describe('Enhanced Task Manager Tools', () => {
         );
 
         // Basic result validation
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content?.[0]?.text).toContain('UI Test Task');
 
         // CRITICAL: Verify structured task data exists in metadata for single task
@@ -802,7 +802,7 @@ describe('Enhanced Task Manager Tools', () => {
         );
 
         // Basic result validation
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content?.[0]?.text).toContain('Created 2 tasks');
 
         // CRITICAL: Verify structured tasks array exists in metadata
@@ -839,7 +839,7 @@ describe('Enhanced Task Manager Tools', () => {
           context
         );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
 
         // Text should mention assignment
         expect(result.content?.[0]?.text).toContain(`assigned to ${agent2ThreadId}`);

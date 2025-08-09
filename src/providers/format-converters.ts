@@ -158,7 +158,7 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
       // Convert tool results to text descriptions
       const toolResultTexts = msg.toolResults.map((result) => {
         const outputText = result.content.map((block) => block.text || '').join('\n');
-        if (!result.isError) {
+        if (result.status === 'completed') {
           return `[Tool result: SUCCESS - ${outputText}]`;
         } else {
           return `[Tool result: ERROR - ${outputText}]`;

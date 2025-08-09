@@ -1194,7 +1194,7 @@ export class Agent extends EventEmitter {
     // Check all TOOL_RESULT events after the last AGENT_MESSAGE
     for (let i = lastAgentMessageIndex + 1; i < events.length; i++) {
       if (events[i].type === 'TOOL_RESULT') {
-        const result = events[i].data;
+        const result = events[i].data as ToolResult;
         if (result.status === 'aborted' || result.status === 'denied') {
           return false; // Don't continue if any tool was denied or aborted
         }
@@ -2330,7 +2330,8 @@ export class Agent extends EventEmitter {
           const resultEvent = events[j];
           if (resultEvent.type === 'TOOL_RESULT' && resultEvent.data.id === toolCallId) {
             // Found the result for this tool call
-            if (!resultEvent.data.isError && normalizedToolPath === normalizedFilePath) {
+            const toolResult = resultEvent.data as ToolResult;
+            if (toolResult.status === 'completed' && normalizedToolPath === normalizedFilePath) {
               return true;
             }
             break; // Stop looking for this tool call's result

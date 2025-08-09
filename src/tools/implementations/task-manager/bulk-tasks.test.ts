@@ -88,7 +88,7 @@ describe('Bulk Task Creation', () => {
       }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Created 3 tasks');
     expect(result.content[0].text).toContain('Task 1');
     expect(result.content[0].text).toContain('Task 2');
@@ -106,7 +106,7 @@ describe('Bulk Task Creation', () => {
       }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('at least 1');
   });
 
@@ -127,7 +127,7 @@ describe('Bulk Task Creation', () => {
       }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Cannot create more than 20 tasks at once');
   });
 
@@ -148,7 +148,7 @@ describe('Bulk Task Creation', () => {
       }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Created task');
     expect(result.content[0].text).toContain('Single Task');
   });
@@ -177,7 +177,7 @@ describe('Bulk Task Creation', () => {
       }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Invalid assignee format');
   });
 
@@ -210,7 +210,7 @@ describe('Bulk Task Creation', () => {
       }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Created 3 tasks');
     expect(result.content[0].text).toContain('High Priority Task');
     expect(result.content[0].text).toContain(
