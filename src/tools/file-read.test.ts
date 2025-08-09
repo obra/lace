@@ -49,7 +49,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       expect(result.content[0].text).toBe(testContent);
@@ -65,7 +65,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('Line 2\nLine 3\nLine 4');
     });
 
@@ -78,7 +78,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
     });
 
@@ -91,7 +91,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('Line 1\nLine 2');
     });
   });
@@ -100,7 +100,7 @@ describe('FileReadTool', () => {
     it('should handle missing path parameter', async () => {
       const result = await tool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('path: Required');
     });
@@ -108,7 +108,7 @@ describe('FileReadTool', () => {
     it('should handle empty path parameter', async () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
@@ -119,7 +119,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
 
@@ -132,7 +132,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Line 10 exceeds file length');
       expect(result.content[0].text).toContain('Use a line number between 1 and 5');
     });
@@ -147,7 +147,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
     });
 
@@ -164,7 +164,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File is too large');
       expect(result.content[0].text).toContain(
         'Use startLine and endLine parameters for ranged reads'
@@ -188,7 +188,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Line 500');
       expect(result.content[0].text).toContain('Line 505');
     });
@@ -203,7 +203,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Range too large (101 lines)');
       expect(result.content[0].text).toContain('Use smaller ranges (max 100 lines per read)');
     });
@@ -219,7 +219,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('');
     });
 
@@ -232,7 +232,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('Only line');
     });
   });
@@ -249,7 +249,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('Content from relative path');
     });
 
@@ -259,7 +259,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(testContent);
     });
 
@@ -275,7 +275,7 @@ describe('FileReadTool', () => {
           { signal: new AbortController().signal }
         );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toBe('CWD test content');
       } finally {
         await rm(absoluteFile, { force: true });
@@ -288,7 +288,7 @@ describe('FileReadTool', () => {
         { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
       expect(result.content[0].text).toContain('non-existent-relative.txt');
     });

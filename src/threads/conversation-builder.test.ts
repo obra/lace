@@ -160,14 +160,22 @@ describe('conversation-builder', () => {
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result 1' }], status: 'completed' },
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Result 1' }],
+            status: 'completed',
+          },
         },
         {
           id: 'evt3',
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:02:00Z'),
-          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result 2' }], status: 'completed' },
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Result 2' }],
+            status: 'completed',
+          },
         },
       ];
 
@@ -188,14 +196,22 @@ describe('conversation-builder', () => {
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result A' }], status: 'completed' },
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Result A' }],
+            status: 'completed',
+          },
         },
         {
           id: 'evt2',
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:02:00Z'),
-          data: { id: 'tool-456', content: [{ type: 'text', text: 'Result B' }], status: 'completed' },
+          data: {
+            id: 'tool-456',
+            content: [{ type: 'text', text: 'Result B' }],
+            status: 'completed',
+          },
         },
       ];
 

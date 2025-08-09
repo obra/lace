@@ -40,7 +40,7 @@ Follows redirects by default. Returns detailed error context for failures.`
     it('should reject missing URL', async () => {
       const result = await tool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Required');
     });
@@ -48,7 +48,7 @@ Follows redirects by default. Returns detailed error context for failures.`
     it('should reject empty URL', async () => {
       const result = await tool.execute({ url: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
@@ -59,7 +59,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Invalid URL format');
     });
@@ -70,7 +70,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -84,7 +84,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       for (const url of validUrls) {
         const result = await tool.execute({ url }, { signal: new AbortController().signal });
         // Should get network error, not validation error
-        if (result.isError) {
+        if (result.status === 'failed') {
           expect(result.content[0].text).not.toContain('Validation failed');
         }
       }
@@ -99,7 +99,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('timeout');
     });
@@ -113,7 +113,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('maxSize');
     });
@@ -127,7 +127,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('method');
     });
@@ -146,7 +146,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       // May fail with network error, but should not fail validation
-      if (result.isError) {
+      if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
     });
@@ -238,7 +238,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         true
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Content should be structured text, not JSON
       expect(result.content[0].text).toContain('Content from https://example.com');
       expect(result.content[0].text).toContain('test content');
@@ -250,7 +250,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -263,7 +263,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         false
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Content not returned (returnContent=false)');
       expect(result.content[0].text).not.toContain('# Test');
     });
@@ -279,7 +279,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       // Should get either timeout or network error depending on environment
       expect(result.content[0].text).toMatch(/(timeout|network|NETWORK ERROR|TIMEOUT ERROR)/i);
     }, 10000);
@@ -292,7 +292,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toMatch(/(network|NETWORK ERROR)/i);
     }, 10000);
 
@@ -302,7 +302,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       const errorText = result.content[0].text;
 
       // Schema validation errors come from base Tool class, not the rich error handler

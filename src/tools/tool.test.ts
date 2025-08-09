@@ -19,7 +19,7 @@ class TestTool extends Tool {
   executeValidated(args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
     return Promise.resolve({
       content: [{ type: 'text' as const, text: `Got: ${args.required}` }],
-      isError: false,
+      status: 'completed',
     });
   }
 }
@@ -32,7 +32,7 @@ describe('Tool with schema validation', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toBe('Got: hello');
   });
 
@@ -43,7 +43,7 @@ describe('Tool with schema validation', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toBe('Got: hello');
   });
 
@@ -51,7 +51,7 @@ describe('Tool with schema validation', () => {
     const tool = new TestTool();
     const result = await tool.execute({ optional: 123 }, { signal: new AbortController().signal }); // missing required field
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Validation failed');
     expect(result.content[0].text).toContain('required');
   });
@@ -63,7 +63,7 @@ describe('Tool with schema validation', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Validation failed');
     expect(result.content[0].text).toContain('optional');
   });
@@ -72,7 +72,7 @@ describe('Tool with schema validation', () => {
     const tool = new TestTool();
     const result = await tool.execute({ required: '' }, { signal: new AbortController().signal });
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Validation failed');
   });
 
@@ -91,7 +91,7 @@ describe('Tool with schema validation', () => {
     const tool = new TestTool();
     const result = await tool.execute({ required: null }, { signal: new AbortController().signal });
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Validation failed');
     expect(result.content[0].text).toContain('Check parameter types and values');
   });
@@ -120,7 +120,7 @@ class ComplexTestTool extends Tool {
   executeValidated(_args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
     return Promise.resolve({
       content: [{ type: 'text' as const, text: 'validation passed' }],
-      isError: false,
+      status: 'completed',
     });
   }
 }
@@ -137,7 +137,7 @@ describe('Tool with complex validation', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('endLine must be >= startLine');
   });
 
@@ -152,7 +152,7 @@ describe('Tool with complex validation', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
   });
 
   it('reports the correct path for cross-field validation errors', async () => {
@@ -166,7 +166,7 @@ describe('Tool with complex validation', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('endLine: endLine must be >= startLine');
   });
 });
