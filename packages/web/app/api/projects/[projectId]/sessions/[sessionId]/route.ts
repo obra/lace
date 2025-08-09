@@ -7,6 +7,7 @@ import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import { aggregateTokenUsage } from '~/threads/token-aggregation';
+import { asThreadId } from '@/types/core';
 
 const UpdateSessionSchema = z.object({
   name: z.string().min(1).optional(),
@@ -38,7 +39,7 @@ export async function GET(
     try {
       // Get the session instance to access agents and thread manager
       const { Session } = await import('@/lib/server/lace-imports');
-      const sessionInstance = await Session.getById(sessionId);
+      const sessionInstance = await Session.getById(asThreadId(sessionId));
       if (sessionInstance) {
         // Get the main agent's thread manager to access events
         const mainAgent = sessionInstance.getAgent(sessionInstance.getId());
@@ -47,8 +48,8 @@ export async function GET(
           const tokenSummary = aggregateTokenUsage(events);
 
           // Get token budget configuration
-          const tokenBudget = mainAgent.tokenBudget;
-          const contextLimit = tokenBudget?.maxTokens || 200000; // Default to 200k if not configured
+          const tokenBudgetManager = mainAgent.tokenBudgetManager;
+          const contextLimit = tokenBudgetManager?.config?.maxTokens || 200000; // Default to 200k if not configured
 
           tokenUsage = {
             ...tokenSummary,
