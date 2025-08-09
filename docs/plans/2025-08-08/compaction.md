@@ -790,69 +790,59 @@ The system now automatically compacts conversations when approaching token limit
 
 ---
 
-## Phase 5: API and Web UI Integration (SKIPPED - Out of Scope)
+## Phase 5: API and Web UI Integration ✅ **COMPLETED**
 
-**Note**: Phase 5 involves modifications to the web package which is outside the scope of the core Lace package. This would be implemented separately in the web interface codebase.
-
-### Task 5.1: Add Token Info to API Responses (NOT IMPLEMENTED)
+### Task 5.1: Add Token Info to API Responses ✅ **COMPLETED**
 **Goal**: Include token usage in session/thread API responses.
 
-**Files to modify**:
-- `packages/web/app/api/sessions/[sessionId]/route.ts` - Add token info
-- `packages/web/types/api.ts` - Update types
+**Status**: ✅ **COMPLETED** - Committed in `681ff8f1`
 
-**Implementation in types/api.ts**:
-```typescript
-export interface SessionResponse {
-  session: SessionInfo;
-  tokenUsage?: {
-    totalPromptTokens: number;
-    totalCompletionTokens: number;
-    totalTokens: number;
-    percentUsed: number;
-    nearLimit: boolean;
-  };
-}
-```
+**Files implemented**:
+- `packages/web/app/api/projects/[projectId]/sessions/[sessionId]/route.ts` - Added token usage calculation
+- `packages/web/types/api.ts` - Updated SessionResponse type with tokenUsage field
+- `packages/web/app/api/projects/[projectId]/sessions/[sessionId]/route.token.test.ts` - Comprehensive tests
 
-**Implementation in route.ts**:
-```typescript
-// In GET handler:
-import { aggregateTokenUsage } from '@/lib/server/token-utils';
+**Key Features**:
+- Token usage summary includes totalPromptTokens, totalCompletionTokens, totalTokens, eventCount
+- Calculates percentUsed based on model's context limit
+- nearLimit flag when usage exceeds 80% of context limit
+- Graceful failure handling - token calculation errors don't fail the request
 
-const events = agent.getEvents();
-const tokenSummary = aggregateTokenUsage(events);
-
-const response: SessionResponse = {
-  session: sessionInfo,
-  tokenUsage: {
-    ...tokenSummary,
-    percentUsed: (tokenSummary.totalTokens / contextLimit) * 100,
-    nearLimit: tokenSummary.totalTokens > contextLimit * 0.8
-  }
-};
-```
-
-**Commit**: `feat: expose token usage statistics in API responses`
+**Commit**: `feat: add token usage statistics to session API responses`
 
 ---
 
-### Task 5.2: Add Compaction Status to SSE Events
+### Task 5.2: Add Compaction Status to SSE Events ✅ **COMPLETED**
 **Goal**: Emit events when compaction starts/completes.
 
-**Files to modify**:
-- `src/agents/agent.ts` - Already emits thinking events
-- `packages/web/types/web-sse.ts` - Add compaction event types
+**Status**: ✅ **COMPLETED** - Committed in `f32f8734`
 
-**Implementation in web-sse.ts**:
-```typescript
-export type SessionEvent = 
-  | { type: 'COMPACTION_START'; threadId: ThreadId; timestamp: Date; data: { strategy: string } }
-  | { type: 'COMPACTION_COMPLETE'; threadId: ThreadId; timestamp: Date; data: { tokensSaved: number } }
-  | // ... existing types
-```
+**Files implemented**:
+- `packages/web/lib/server/session-service.ts` - Added compaction event handlers
+- `packages/web/types/web-sse.ts` - Added COMPACTION_START and COMPACTION_COMPLETE event types
+- `packages/web/lib/server/session-service.compaction.test.ts` - Comprehensive tests
+
+**Key Features**:
+- Listens to agent_thinking_start/complete events to detect compaction
+- Emits COMPACTION_START when compaction begins with strategy and message
+- Emits COMPACTION_COMPLETE when compaction finishes with success status
+- Tracks compaction state to avoid false positives from non-compaction thinking events
+- Full test coverage for manual and auto-compaction scenarios
 
 **Commit**: `feat: add compaction status to SSE event stream`
+
+## Phase 5 Summary ✅ **COMPLETED**
+
+**What was delivered**:
+1. ✅ **Token Usage in API** - Session API responses now include comprehensive token statistics
+2. ✅ **Real-time Compaction Events** - SSE stream emits COMPACTION_START and COMPACTION_COMPLETE events
+3. ✅ **Web UI Integration** - Full integration with web package for token monitoring and compaction status
+
+The web UI can now:
+- Display current token usage and percentage of context limit used
+- Warn users when approaching token limits (>80% usage)
+- Show real-time notifications when compaction is in progress
+- Notify users when compaction completes successfully
 
 ---
 
