@@ -100,6 +100,7 @@ describe('Temp Directory Integration', () => {
     const agent = session.getAgent(session.getId())!;
 
     const context: ToolContext = {
+      signal: new AbortController().signal,
       agent,
     };
 
@@ -137,6 +138,7 @@ describe('Temp Directory Integration', () => {
     const agent = session.getAgent(session.getId())!;
 
     const context: ToolContext = {
+      signal: new AbortController().signal,
       agent,
     };
 
@@ -171,6 +173,7 @@ describe('Temp Directory Integration', () => {
     const agent = session.getAgent(session.getId())!;
 
     const context: ToolContext = {
+      signal: new AbortController().signal,
       agent,
     };
 

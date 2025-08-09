@@ -16,7 +16,7 @@ class TestTool extends Tool {
     optional: z.number().optional(),
   });
 
-  executeValidated(args: z.infer<typeof this.schema>, _context?: ToolContext): Promise<ToolResult> {
+  executeValidated(args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
     return Promise.resolve({
       content: [{ type: 'text' as const, text: `Got: ${args.required}` }],
       isError: false,
@@ -27,7 +27,10 @@ class TestTool extends Tool {
 describe('Tool with schema validation', () => {
   it('validates and executes with valid parameters', async () => {
     const tool = new TestTool();
-    const result = await tool.execute({ required: 'hello' }, undefined);
+    const result = await tool.execute(
+      { required: 'hello' },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('Got: hello');
@@ -35,7 +38,10 @@ describe('Tool with schema validation', () => {
 
   it('handles optional parameters correctly', async () => {
     const tool = new TestTool();
-    const result = await tool.execute({ required: 'hello', optional: 42 }, undefined);
+    const result = await tool.execute(
+      { required: 'hello', optional: 42 },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('Got: hello');
@@ -43,7 +49,7 @@ describe('Tool with schema validation', () => {
 
   it('returns validation errors for invalid parameters', async () => {
     const tool = new TestTool();
-    const result = await tool.execute({ optional: 123 }, undefined); // missing required field
+    const result = await tool.execute({ optional: 123 }, { signal: new AbortController().signal }); // missing required field
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Validation failed');
@@ -52,7 +58,10 @@ describe('Tool with schema validation', () => {
 
   it('validates parameter types correctly', async () => {
     const tool = new TestTool();
-    const result = await tool.execute({ required: 'hello', optional: 'not-a-number' }, undefined);
+    const result = await tool.execute(
+      { required: 'hello', optional: 'not-a-number' },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Validation failed');
@@ -61,7 +70,7 @@ describe('Tool with schema validation', () => {
 
   it('rejects empty strings for required string fields', async () => {
     const tool = new TestTool();
-    const result = await tool.execute({ required: '' }, undefined);
+    const result = await tool.execute({ required: '' }, { signal: new AbortController().signal });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Validation failed');
@@ -80,7 +89,7 @@ describe('Tool with schema validation', () => {
 
   it('provides helpful validation error messages', async () => {
     const tool = new TestTool();
-    const result = await tool.execute({ required: null }, undefined);
+    const result = await tool.execute({ required: null }, { signal: new AbortController().signal });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Validation failed');
@@ -108,7 +117,7 @@ class ComplexTestTool extends Tool {
       }
     );
 
-  executeValidated(_args: z.infer<typeof this.schema>): Promise<ToolResult> {
+  executeValidated(_args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
     return Promise.resolve({
       content: [{ type: 'text' as const, text: 'validation passed' }],
       isError: false,
@@ -119,11 +128,14 @@ class ComplexTestTool extends Tool {
 describe('Tool with complex validation', () => {
   it('validates cross-field constraints', async () => {
     const tool = new ComplexTestTool();
-    const result = await tool.execute({
-      startLine: 5,
-      endLine: 3, // Invalid: end before start
-      content: 'test',
-    });
+    const result = await tool.execute(
+      {
+        startLine: 5,
+        endLine: 3, // Invalid: end before start
+        content: 'test',
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('endLine must be >= startLine');
@@ -131,22 +143,28 @@ describe('Tool with complex validation', () => {
 
   it('passes when cross-field constraints are met', async () => {
     const tool = new ComplexTestTool();
-    const result = await tool.execute({
-      startLine: 3,
-      endLine: 5,
-      content: 'test',
-    });
+    const result = await tool.execute(
+      {
+        startLine: 3,
+        endLine: 5,
+        content: 'test',
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
   });
 
   it('reports the correct path for cross-field validation errors', async () => {
     const tool = new ComplexTestTool();
-    const result = await tool.execute({
-      startLine: 10,
-      endLine: 5,
-      content: 'test',
-    });
+    const result = await tool.execute(
+      {
+        startLine: 10,
+        endLine: 5,
+        content: 'test',
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('endLine: endLine must be >= startLine');
@@ -163,7 +181,7 @@ class TempDirectoryTestTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof this.schema>,
-    _context?: ToolContext
+    _context: ToolContext
   ): Promise<ToolResult> {
     return Promise.resolve(this.createResult(`Test executed: ${args.message}`));
   }
@@ -193,6 +211,7 @@ describe('Tool temp directory functionality', () => {
 
   it('should get output file paths from temp directory', () => {
     const context: ToolContext = {
+      signal: new AbortController().signal,
       toolTempDir: '/tmp/test/tool-temp-dir',
     };
 
@@ -204,6 +223,7 @@ describe('Tool temp directory functionality', () => {
 
   it('should throw error when temp directory not provided', () => {
     const context: ToolContext = {
+      signal: new AbortController().signal,
       // No toolTempDir
     };
 
@@ -214,6 +234,7 @@ describe('Tool temp directory functionality', () => {
 
   it('should get tool temp dir from context', () => {
     const context: ToolContext = {
+      signal: new AbortController().signal,
       toolTempDir: '/tmp/test/tool-call-123',
     };
 
@@ -223,6 +244,7 @@ describe('Tool temp directory functionality', () => {
 
   it('should throw error when tool temp dir not provided', () => {
     const context: ToolContext = {
+      signal: new AbortController().signal,
       // No toolTempDir
     };
 

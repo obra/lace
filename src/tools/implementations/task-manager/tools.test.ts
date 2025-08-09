@@ -130,6 +130,7 @@ describe('Enhanced Task Manager Tools', () => {
     }
 
     context = {
+      signal: new AbortController().signal,
       agent,
     };
   });
@@ -320,6 +321,7 @@ describe('Enhanced Task Manager Tools', () => {
         },
         {
           ...context,
+          signal: new AbortController().signal,
           agent: {
             ...context.agent!,
             threadId: agent2ThreadId,
@@ -336,6 +338,7 @@ describe('Enhanced Task Manager Tools', () => {
         },
         {
           ...context,
+          signal: new AbortController().signal,
           agent: {
             ...context.agent!,
             threadId: agent1ThreadId,
@@ -589,6 +592,7 @@ describe('Enhanced Task Manager Tools', () => {
         },
         {
           ...context,
+          signal: new AbortController().signal,
           agent: {
             ...context.agent!,
             threadId: agent2ThreadId,
@@ -647,6 +651,7 @@ describe('Enhanced Task Manager Tools', () => {
         },
         {
           ...context,
+          signal: new AbortController().signal,
           agent: {
             ...context.agent!,
             threadId: agent2ThreadId,

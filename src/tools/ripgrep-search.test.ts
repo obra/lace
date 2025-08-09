@@ -72,7 +72,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   describe('Input validation', () => {
     it('should reject missing pattern', async () => {
-      const result = await tool.execute({});
+      const result = await tool.execute({}, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -80,7 +80,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should reject empty pattern', async () => {
-      const result = await tool.execute({ pattern: '' });
+      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -88,50 +88,65 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should reject invalid maxResults', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        maxResults: -1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          maxResults: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject excessive maxResults', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        maxResults: 10000,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          maxResults: 10000,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject negative contextLines', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        contextLines: -1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          contextLines: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject excessive contextLines', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        contextLines: 20,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          contextLines: 20,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should accept valid parameters with defaults', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
     });
@@ -139,10 +154,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   describe('Basic search functionality', () => {
     it('should find matches in multiple files', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -155,20 +173,26 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should return no matches message when pattern not found', async () => {
-      const result = await tool.execute({
-        pattern: 'nonexistentpattern',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'nonexistentpattern',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No matches found for pattern: nonexistentpattern');
     });
 
     it('should include line numbers in results', async () => {
-      const result = await tool.execute({
-        pattern: 'function hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'function hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -176,9 +200,12 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should use current directory as default path', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       // Should not error out, even if no matches found in current directory
@@ -187,17 +214,23 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   describe('Search options', () => {
     it('should respect case sensitivity', async () => {
-      const caseInsensitive = await tool.execute({
-        pattern: 'HELLO',
-        path: testDir,
-        caseSensitive: false,
-      });
+      const caseInsensitive = await tool.execute(
+        {
+          pattern: 'HELLO',
+          path: testDir,
+          caseSensitive: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      const caseSensitive = await tool.execute({
-        pattern: 'HELLO',
-        path: testDir,
-        caseSensitive: true,
-      });
+      const caseSensitive = await tool.execute(
+        {
+          pattern: 'HELLO',
+          path: testDir,
+          caseSensitive: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(caseInsensitive.isError).toBe(false);
       expect(caseInsensitive.content[0].text).toContain('Found');
@@ -207,11 +240,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should filter by include pattern', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        includePattern: '*.ts',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          includePattern: '*.ts',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -222,11 +258,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should filter by exclude pattern', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        excludePattern: '*.test.txt',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          excludePattern: '*.test.txt',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -240,17 +279,23 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       await writeFile(join(testDir, 'partial.txt'), 'hellofriend');
       await writeFile(join(testDir, 'whole.txt'), 'hello world');
 
-      const wholeWord = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        wholeWord: true,
-      });
+      const wholeWord = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          wholeWord: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      const partialWord = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        wholeWord: false,
-      });
+      const partialWord = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          wholeWord: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(wholeWord.isError).toBe(false);
       expect(partialWord.isError).toBe(false);
@@ -262,11 +307,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should add context lines when requested', async () => {
-      const result = await tool.execute({
-        pattern: 'console.log',
-        path: testDir,
-        contextLines: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'console.log',
+          path: testDir,
+          contextLines: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -286,11 +334,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         );
       }
 
-      const result = await tool.execute({
-        pattern: 'uniquepattern',
-        path: testDir,
-        maxResults: 10,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'uniquepattern',
+          path: testDir,
+          maxResults: 10,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0]).toBeDefined();
@@ -307,11 +358,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should not show truncation message when under limit', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        maxResults: 100,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          maxResults: 100,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -319,10 +373,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should use default maxResults when not specified', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       // Should not error, default should be applied
@@ -331,10 +388,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   describe('Output formatting', () => {
     it('should group results by file', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -345,10 +405,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should show match count in header', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -356,10 +419,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should handle single match correctly', async () => {
-      const result = await tool.execute({
-        pattern: 'nested hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'nested hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -370,10 +436,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   describe('Error handling scenarios', () => {
     it('should handle non-existent directory', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: '/non/existent/directory',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: '/non/existent/directory',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Search operation failed');
@@ -382,10 +451,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     it('should handle special regex characters in pattern', async () => {
       await writeFile(join(testDir, 'special.txt'), 'Price: $10.50\nEmail: test@example.com');
 
-      const result = await tool.execute({
-        pattern: '$10.50',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '$10.50',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -395,10 +467,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     it('should handle empty files gracefully', async () => {
       await writeFile(join(testDir, 'empty.txt'), '');
 
-      const result = await tool.execute({
-        pattern: 'anything',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'anything',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
     });
@@ -407,10 +482,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       const binaryContent = Buffer.from([0x00, 0x01, 0x02, 0x03, 0xff, 0xfe]);
       await writeFile(join(testDir, 'binary.bin'), binaryContent);
 
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
     });
@@ -418,27 +496,33 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   describe('Structured output with helpers', () => {
     it('should use createResult for successful searches', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Found');
     });
 
     it('should use createResult for no matches found', async () => {
-      const result = await tool.execute({
-        pattern: 'nonexistent',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'nonexistent',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No matches found');
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ pattern: '' });
+      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -465,6 +549,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
           path: '.',
         },
         {
+          signal: new AbortController().signal,
           workingDirectory: subDir,
         }
       );
@@ -487,6 +572,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
           path: testDir,
         },
         {
+          signal: new AbortController().signal,
           workingDirectory: subDir,
         }
       );
@@ -501,10 +587,13 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     it('should handle quotes in search pattern', async () => {
       await writeFile(join(testDir, 'quotes.txt'), 'He said "hello world" to me');
 
-      const result = await tool.execute({
-        pattern: '"hello world"',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '"hello world"',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -512,12 +601,15 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should handle complex include/exclude combinations', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        includePattern: '*.{ts,js}',
-        excludePattern: '*.test.*',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          includePattern: '*.{ts,js}',
+          excludePattern: '*.test.*',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const output = result.content[0].text;
@@ -527,11 +619,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     });
 
     it('should handle zero context lines explicitly', async () => {
-      const result = await tool.execute({
-        pattern: 'console.log',
-        path: testDir,
-        contextLines: 0,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'console.log',
+          path: testDir,
+          contextLines: 0,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       // Should work without context lines

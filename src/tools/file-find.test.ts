@@ -65,7 +65,7 @@ describe('FileFindTool with schema validation', () => {
 
   describe('Input validation', () => {
     it('should reject missing pattern', async () => {
-      const result = await tool.execute({});
+      const result = await tool.execute({}, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -74,7 +74,7 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should reject empty pattern', async () => {
-      const result = await tool.execute({ pattern: '' });
+      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -82,30 +82,39 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should reject invalid type enum', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        type: 'invalid',
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          type: 'invalid',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject negative maxDepth', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        maxDepth: -1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          maxDepth: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject non-integer maxDepth', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        maxDepth: 1.5,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          maxDepth: 1.5,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -113,20 +122,26 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should reject excessive maxResults', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        maxResults: 10000,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          maxResults: 10000,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should accept valid parameters with defaults', async () => {
-      const result = await tool.execute({
-        pattern: '*.nonexistent',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.nonexistent',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
@@ -135,20 +150,26 @@ describe('FileFindTool with schema validation', () => {
 
   describe('File search operations', () => {
     it('should find files by exact name', async () => {
-      const result = await tool.execute({
-        pattern: 'README.md',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'README.md',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('README.md');
     });
 
     it('should find files by wildcard pattern', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('app.ts');
@@ -157,10 +178,13 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should find files by complex pattern', async () => {
-      const result = await tool.execute({
-        pattern: 'app.*',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'app.*',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('app.ts');
@@ -169,12 +193,15 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should respect type=file filter', async () => {
-      const result = await tool.execute({
-        pattern: '*',
-        path: testDir,
-        type: 'file',
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*',
+          path: testDir,
+          type: 'file',
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('README.md');
@@ -190,12 +217,15 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should respect type=directory filter', async () => {
-      const result = await tool.execute({
-        pattern: '*',
-        path: testDir,
-        type: 'directory',
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*',
+          path: testDir,
+          type: 'directory',
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('src');
@@ -204,55 +234,70 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should respect maxDepth parameter', async () => {
-      const result = await tool.execute({
-        pattern: '*.tsx',
-        path: testDir,
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.tsx',
+          path: testDir,
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).not.toContain('Button.tsx'); // Should not find files in deeper directories
     });
 
     it('should find files in deep directories with sufficient maxDepth', async () => {
-      const result = await tool.execute({
-        pattern: '*.tsx',
-        path: testDir,
-        maxDepth: 5,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.tsx',
+          path: testDir,
+          maxDepth: 5,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Button.tsx');
     });
 
     it('should handle case sensitivity', async () => {
-      const result = await tool.execute({
-        pattern: 'readme.md',
-        path: testDir,
-        caseSensitive: true,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'readme.md',
+          path: testDir,
+          caseSensitive: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found'); // Should not find README.md with different case
     });
 
     it('should handle case insensitive search by default', async () => {
-      const result = await tool.execute({
-        pattern: 'readme.md',
-        path: testDir,
-        caseSensitive: false,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'readme.md',
+          path: testDir,
+          caseSensitive: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('README.md');
     });
 
     it('should exclude hidden files by default', async () => {
-      const result = await tool.execute({
-        pattern: '*',
-        path: testDir,
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*',
+          path: testDir,
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).not.toContain('.hidden');
@@ -260,23 +305,29 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should include hidden files when requested', async () => {
-      const result = await tool.execute({
-        pattern: '.*',
-        path: testDir,
-        includeHidden: true,
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '.*',
+          path: testDir,
+          includeHidden: true,
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('.gitignore');
     });
 
     it('should respect maxResults limit', async () => {
-      const result = await tool.execute({
-        pattern: '*',
-        path: testDir,
-        maxResults: 2,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*',
+          path: testDir,
+          maxResults: 2,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0]).toBeDefined();
@@ -291,22 +342,28 @@ describe('FileFindTool with schema validation', () => {
 
   describe('File size display', () => {
     it('should show file sizes for files', async () => {
-      const result = await tool.execute({
-        pattern: 'README.md',
-        path: testDir,
-        type: 'file',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'README.md',
+          path: testDir,
+          type: 'file',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toMatch(/README\.md.*\(/); // Should have size in parentheses
     });
 
     it('should not show sizes for directories', async () => {
-      const result = await tool.execute({
-        pattern: 'src',
-        path: testDir,
-        type: 'directory',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'src',
+          path: testDir,
+          type: 'directory',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('src');
@@ -316,27 +373,33 @@ describe('FileFindTool with schema validation', () => {
 
   describe('Structured output with helpers', () => {
     it('should use createResult for successful searches', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('app.ts');
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ pattern: '' });
+      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should provide helpful message when no files found', async () => {
-      const result = await tool.execute({
-        pattern: '*.nonexistent',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.nonexistent',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found matching pattern');
@@ -344,10 +407,13 @@ describe('FileFindTool with schema validation', () => {
     });
 
     it('should handle directory not found error', async () => {
-      const result = await tool.execute({
-        pattern: '*.ts',
-        path: '/nonexistent/directory',
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          path: '/nonexistent/directory',
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Directory not found');
@@ -356,10 +422,13 @@ describe('FileFindTool with schema validation', () => {
 
   describe('Pattern matching edge cases', () => {
     it('should handle question mark wildcard', async () => {
-      const result = await tool.execute({
-        pattern: 'app.?s',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'app.?s',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('app.ts');
@@ -369,10 +438,13 @@ describe('FileFindTool with schema validation', () => {
     it('should handle escaped special characters', async () => {
       // This would test patterns with literal dots, brackets, etc.
       // For this test, we'll verify the tool can handle normal patterns
-      const result = await tool.execute({
-        pattern: 'package.json',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'package.json',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('package.json');
@@ -382,10 +454,13 @@ describe('FileFindTool with schema validation', () => {
       const emptyDir = join(testDir, 'empty');
       await mkdir(emptyDir);
 
-      const result = await tool.execute({
-        pattern: '*',
-        path: emptyDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '*',
+          path: emptyDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
@@ -402,7 +477,7 @@ describe('FileFindTool with schema validation', () => {
 
       const result = await tool.execute(
         { pattern: 'relative-file.txt', path: subDir },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
       expect(result.isError).toBe(false);
@@ -412,7 +487,7 @@ describe('FileFindTool with schema validation', () => {
     it('should use absolute paths directly even when working directory is provided', async () => {
       const result = await tool.execute(
         { pattern: 'README.md', path: testDir }, // absolute path
-        { workingDirectory: '/some/other/dir' }
+        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
       expect(result.isError).toBe(false);
@@ -424,11 +499,14 @@ describe('FileFindTool with schema validation', () => {
       // but it's complex to do safely in tests, so we'll just verify
       // the tool works with relative paths when no context is provided
       // Use maxDepth: 1 to limit the search to the current directory only (minimum allowed depth)
-      const result = await tool.execute({
-        pattern: 'non-existent-file.txt',
-        path: '.',
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'non-existent-file.txt',
+          path: '.',
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('No files found');
@@ -437,7 +515,7 @@ describe('FileFindTool with schema validation', () => {
     it('should handle non-existent relative paths with working directory context', async () => {
       const result = await tool.execute(
         { pattern: '*', path: 'non-existent-dir' },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
       expect(result.isError).toBe(true);

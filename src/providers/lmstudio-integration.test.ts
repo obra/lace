@@ -19,7 +19,7 @@ class MockTool extends Tool {
 
   protected async executeValidated(
     _args: { action: string; value?: string },
-    _context?: ToolContext
+    _context: ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve(this.createResult(`Mock executed: ${JSON.stringify(_args)}`));
   }
@@ -35,7 +35,7 @@ class FailingTool extends Tool {
 
   protected async executeValidated(
     _args: { message: string },
-    _context?: ToolContext
+    _context: ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve(this.createError('Simulated failure'));
   }
@@ -124,7 +124,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
 
       protected async executeValidated(
         args: { operation: string; target: string; options?: any },
-        _context?: ToolContext
+        _context: ToolContext
       ): Promise<ToolResult> {
         return await Promise.resolve(
           this.createResult(`Complex operation completed: ${JSON.stringify(args)}`)
@@ -243,7 +243,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
 
       protected async executeValidated(
         args: { location: string },
-        _context?: ToolContext
+        _context: ToolContext
       ): Promise<ToolResult> {
         return await Promise.resolve(this.createResult(`Weather in ${args.location}: Sunny, 72°F`));
       }

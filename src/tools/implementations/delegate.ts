@@ -59,8 +59,11 @@ Examples:
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for delegation');

@@ -41,7 +41,7 @@ export abstract class Tool {
   }
 
   // Public execute method that handles validation
-  async execute(args: unknown, context?: ToolContext): Promise<ToolResult> {
+  async execute(args: unknown, context: ToolContext): Promise<ToolResult> {
     try {
       const validated = this.schema.parse(args) as ReturnType<this['schema']['parse']>;
       return await this.executeValidated(validated, context);
@@ -56,7 +56,7 @@ export abstract class Tool {
   // Implement this in subclasses with validated args
   protected abstract executeValidated(
     args: ReturnType<this['schema']['parse']>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult>;
 
   // Output helpers for consistent result construction
@@ -74,6 +74,21 @@ export abstract class Tool {
     metadata?: Record<string, unknown>
   ): ToolResult {
     return this._makeResult({ content, metadata, isError: true });
+  }
+
+  protected createCancellationResult(
+    partialOutput?: string,
+    metadata?: Record<string, unknown>
+  ): ToolResult {
+    const message = partialOutput
+      ? `Tool execution cancelled by user.\n\nPartial output:\n${partialOutput}`
+      : 'Tool execution cancelled by user.';
+
+    return this._makeResult({
+      content: message,
+      metadata: { ...metadata, cancelledByUser: true },
+      isError: true,
+    });
   }
 
   // Path resolution helper for file operations

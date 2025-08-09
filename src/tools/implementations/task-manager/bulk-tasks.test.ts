@@ -83,6 +83,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       }
     );
@@ -100,6 +101,7 @@ describe('Bulk Task Creation', () => {
         tasks: [],
       },
       {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       }
     );
@@ -120,6 +122,7 @@ describe('Bulk Task Creation', () => {
         tasks,
       },
       {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       }
     );
@@ -140,6 +143,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       }
     );
@@ -168,6 +172,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       }
     );
@@ -200,6 +205,7 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       }
     );

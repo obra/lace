@@ -133,6 +133,7 @@ describe('Tool Approval System Integration', () => {
       workingDirectory: tempLaceDirContext.tempDir,
       toolTempDir: tempLaceDirContext.tempDir, // Required for bash tool output management
       agent, // Provides access to threadId and session
+      signal: new AbortController().signal,
     };
 
     toolExecutor = new ToolExecutor();

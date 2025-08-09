@@ -37,15 +37,18 @@ line 10`;
 
     await fs.writeFile(testFile, content, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'line 5\nline 6',
-          new_text: 'modified line 5\nmodified line 6',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'line 5\nline 6',
+            new_text: 'modified line 5\nmodified line 6',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.metadata).toBeDefined();
@@ -72,15 +75,18 @@ fifth line`;
 
     await fs.writeFile(testFile, content, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'first line',
-          new_text: 'modified first line',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'first line',
+            new_text: 'modified first line',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.metadata?.diff).toBeDefined();
@@ -101,15 +107,18 @@ last line`;
 
     await fs.writeFile(testFile, content, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'last line',
-          new_text: 'modified last line',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'last line',
+            new_text: 'modified last line',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.metadata?.diff).toBeDefined();
@@ -134,18 +143,21 @@ function bar() {
 
     await fs.writeFile(testFile, content, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: `  console.log('hello');
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: `  console.log('hello');
   console.log('world');
   return true;`,
-          new_text: `  console.log('hello world');
+            new_text: `  console.log('hello world');
   return false;`,
-        },
-      ],
-    });
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.metadata?.diff).toBeDefined();
@@ -161,15 +173,18 @@ function bar() {
     const content = 'original content';
     await fs.writeFile(testFile, content, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'original',
-          new_text: 'modified',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'original',
+            new_text: 'modified',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
     expect(result.metadata?.path).toBe(testFile);
@@ -188,20 +203,23 @@ function bar() {
     it('should apply multiple edits sequentially', async () => {
       await fs.writeFile(testFile, 'const a = 1;\nconst b = 2;', 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        edits: [
-          {
-            old_text: 'const',
-            new_text: 'let',
-            occurrences: 2,
-          },
-          {
-            old_text: 'let a',
-            new_text: 'let x',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          edits: [
+            {
+              old_text: 'const',
+              new_text: 'let',
+              occurrences: 2,
+            },
+            {
+              old_text: 'let a',
+              new_text: 'let x',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const content = await fs.readFile(testFile, 'utf-8');
@@ -222,23 +240,26 @@ function bar() {
 
       await fs.writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        edits: [
-          {
-            old_text: '"version": "1.0.0"',
-            new_text: '"version": "1.1.0"',
-          },
-          {
-            old_text: '"test": "jest"',
-            new_text: '"test": "jest",\n    "test:watch": "jest --watch"',
-          },
-          {
-            old_text: '"jest": "^29.0.0"',
-            new_text: '"jest": "^29.0.0",\n    "nodemon": "^3.0.0"',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          edits: [
+            {
+              old_text: '"version": "1.0.0"',
+              new_text: '"version": "1.1.0"',
+            },
+            {
+              old_text: '"test": "jest"',
+              new_text: '"test": "jest",\n    "test:watch": "jest --watch"',
+            },
+            {
+              old_text: '"jest": "^29.0.0"',
+              new_text: '"jest": "^29.0.0",\n    "nodemon": "^3.0.0"',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.metadata?.diff).toBeDefined();
@@ -257,16 +278,19 @@ function bar() {
     it('should fail when occurrence count does not match', async () => {
       await fs.writeFile(testFile, 'foo bar foo baz foo', 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        edits: [
-          {
-            old_text: 'foo',
-            new_text: 'qux',
-            occurrences: 2, // Actually has 3
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          edits: [
+            {
+              old_text: 'foo',
+              new_text: 'qux',
+              occurrences: 2, // Actually has 3
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Expected 2 occurrences but found 3');
@@ -282,16 +306,19 @@ function bar() {
       const originalContent = 'Hello World';
       await fs.writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        dry_run: true,
-        edits: [
-          {
-            old_text: 'World',
-            new_text: 'Universe',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          dry_run: true,
+          edits: [
+            {
+              old_text: 'World',
+              new_text: 'Universe',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Dry run');
@@ -306,16 +333,19 @@ function bar() {
       const originalContent = 'Hello World';
       await fs.writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        dry_run: true,
-        edits: [
-          {
-            old_text: 'World',
-            new_text: 'Universe',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          dry_run: true,
+          edits: [
+            {
+              old_text: 'World',
+              new_text: 'Universe',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain('Dry run');
@@ -332,30 +362,36 @@ function bar() {
     it('should handle empty file', async () => {
       await fs.writeFile(testFile, '', 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        edits: [
-          {
-            old_text: 'foo',
-            new_text: 'bar',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          edits: [
+            {
+              old_text: 'foo',
+              new_text: 'bar',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Could not find exact text');
     });
 
     it('should handle file not found', async () => {
-      const result = await tool.execute({
-        path: '/nonexistent/file.txt',
-        edits: [
-          {
-            old_text: 'foo',
-            new_text: 'bar',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: '/nonexistent/file.txt',
+          edits: [
+            {
+              old_text: 'foo',
+              new_text: 'bar',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('File not found');
@@ -364,15 +400,18 @@ function bar() {
     it('should preserve line endings', async () => {
       await fs.writeFile(testFile, 'line1\r\nline2\r\nline3', 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        edits: [
-          {
-            old_text: 'line2',
-            new_text: 'modified',
-          },
-        ],
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          edits: [
+            {
+              old_text: 'line2',
+              new_text: 'modified',
+            },
+          ],
+        },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       const content = await fs.readFile(testFile, 'utf-8');
@@ -401,10 +440,13 @@ function bar() {
         }));
 
       const start = Date.now();
-      const result = await tool.execute({
-        path: testFile,
-        edits,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          edits,
+        },
+        { signal: new AbortController().signal }
+      );
       const duration = Date.now() - start;
 
       expect(result.isError).toBe(false);

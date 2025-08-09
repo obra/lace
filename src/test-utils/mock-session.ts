@@ -66,5 +66,6 @@ export function createMockToolContext(
     workingDirectory: overrides.workingDirectory,
     toolTempDir: overrides.toolTempDir,
     agent: mockAgent,
+    signal: new AbortController().signal,
   };
 }

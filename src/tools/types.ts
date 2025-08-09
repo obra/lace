@@ -4,6 +4,9 @@
 import type { Agent } from '~/agents/agent';
 
 export interface ToolContext {
+  // Execution control - required for cancellation
+  signal: AbortSignal;
+
   // Working directory for file operations
   workingDirectory?: string;
 

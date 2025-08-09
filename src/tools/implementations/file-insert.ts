@@ -24,8 +24,11 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileInsertSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { path, content, line } = args;
       const resolvedPath = this.resolvePath(path, context);

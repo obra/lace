@@ -129,6 +129,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     // This tests are really testing task management within a single session
     // with different actors (threadIds) working on shared tasks
     mainAgentContext = {
+      signal: new AbortController().signal,
       agent,
     };
 
@@ -136,9 +137,11 @@ describe('Multi-Agent Task Manager Integration', () => {
     // The task manager uses threadId from the task context to track
     // who created/updated tasks, not from the agent
     agent2Context = {
+      signal: new AbortController().signal,
       agent,
     };
     agent3Context = {
+      signal: new AbortController().signal,
       agent,
     };
   });
@@ -321,6 +324,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     it('should share tasks between threads in the same session', async () => {
       // Create a different parent thread context
       const otherAgentContext: ToolContext = {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       };
 
@@ -400,6 +404,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       const listTool2 = toolExecutor2.getTool('task_list') as TaskListTool;
 
       const session2Context = {
+        signal: new AbortController().signal,
         agent: session2.getAgent(session2.getId())!,
       };
 

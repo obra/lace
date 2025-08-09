@@ -174,7 +174,7 @@ describe('Task Management Workflow Integration', () => {
   describe('Basic Task Lifecycle', () => {
     it('should complete full task lifecycle: create → update → add note → complete → view', async () => {
       const agent = session.getAgent(session.getId())!;
-      const context = { agent } as const;
+      const context = { signal: new AbortController().signal, agent } as const;
 
       // 1. Create a task
       const createResult = await taskCreateTool.execute(
@@ -252,7 +252,7 @@ describe('Task Management Workflow Integration', () => {
   describe('Bulk Task Creation Workflow', () => {
     it('should handle bulk task creation and parallel management', async () => {
       const agent = session.getAgent(session.getId())!;
-      const context = { agent } as const;
+      const context = { signal: new AbortController().signal, agent } as const;
 
       // Create multiple tasks in bulk
       const bulkCreateResult = await taskCreateTool.execute(
@@ -308,7 +308,7 @@ describe('Task Management Workflow Integration', () => {
   describe('Task Assignment and Delegation', () => {
     it('should support task assignment and delegation workflow', async () => {
       const agent = session.getAgent(session.getId())!;
-      const context = { agent } as const;
+      const context = { signal: new AbortController().signal, agent } as const;
 
       // Create task with assignment
       const createResult = await taskCreateTool.execute(
@@ -365,12 +365,17 @@ describe('Task Management Workflow Integration', () => {
       });
 
       // Simulate delegation execution
-      const delegateResult = await delegateTool.execute({
-        title: 'Analyze security vulnerabilities',
-        prompt: 'Review codebase for common security issues and provide recommendations',
-        expected_response: 'List of vulnerabilities with specific remediation steps',
-        model: 'anthropic:claude-sonnet-4-20250514',
-      });
+      const delegateResult = await delegateTool.execute(
+        {
+          title: 'Analyze security vulnerabilities',
+          prompt: 'Review codebase for common security issues and provide recommendations',
+          expected_response: 'List of vulnerabilities with specific remediation steps',
+          model: 'anthropic:claude-sonnet-4-20250514',
+        },
+        {
+          signal: new AbortController().signal,
+        }
+      );
 
       expect(delegateResult.isError).toBe(false);
       expect(delegateResult.content[0].text).toContain('Security analysis completed');
@@ -391,7 +396,7 @@ describe('Task Management Workflow Integration', () => {
   describe('Error Handling and Edge Cases', () => {
     it('should handle invalid task operations gracefully', async () => {
       const agent = session.getAgent(session.getId())!;
-      const context = { agent } as const;
+      const context = { signal: new AbortController().signal, agent } as const;
 
       // Try to complete non-existent task
       const completeResult = await taskCompleteTool.execute(
@@ -423,7 +428,7 @@ describe('Task Management Workflow Integration', () => {
 
     it('should require TaskManager for all operations', async () => {
       const agent = session.getAgent(session.getId())!;
-      const context = { agent } as const;
+      const context = { signal: new AbortController().signal, agent } as const;
 
       // Create tool instances - they get TaskManager from session
       const toolWithoutManager = new TaskCreateTool();
@@ -450,7 +455,7 @@ describe('Task Management Workflow Integration', () => {
   describe('Task Filtering and Querying', () => {
     it('should support different task filtering options', async () => {
       const agent = session.getAgent(session.getId())!;
-      const context = { agent } as const;
+      const context = { signal: new AbortController().signal, agent } as const;
 
       // Create various tasks with different states
       const task1Result = await taskCreateTool.execute(

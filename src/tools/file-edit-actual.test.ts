@@ -32,15 +32,18 @@ describe('FileEditTool actual file modification', () => {
     expect(beforeEdit).toBe('Hello World');
 
     // Perform the edit
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'World',
-          new_text: 'Universe',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'World',
+            new_text: 'Universe',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     // Check the tool reports success
     expect(result.isError).toBe(false);
@@ -62,15 +65,18 @@ line 5`;
     await writeFile(testFile, originalContent, 'utf-8');
 
     // Try to replace text that appears twice - should fail
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'line 2',
-          new_text: 'modified line',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'line 2',
+            new_text: 'modified line',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     // Should error because text appears multiple times
     expect(result.isError).toBe(true);
@@ -90,16 +96,19 @@ line 5`;
 
     await writeFile(testFile, originalContent, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: `  console.log('Hello');
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: `  console.log('Hello');
   console.log('World');`,
-          new_text: `  console.log('Hello World');`,
-        },
-      ],
-    });
+            new_text: `  console.log('Hello World');`,
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
 
@@ -116,15 +125,18 @@ line 5`;
     const originalContent = 'First line\r\nSecond line\r\nThird line';
     await writeFile(testFile, originalContent, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'Second line',
-          new_text: 'Modified line',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'Second line',
+            new_text: 'Modified line',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(false);
 
@@ -136,15 +148,18 @@ line 5`;
     const originalContent = 'Hello World';
     await writeFile(testFile, originalContent, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'Goodbye',
-          new_text: 'Hello',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'Goodbye',
+            new_text: 'Hello',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Could not find exact text');

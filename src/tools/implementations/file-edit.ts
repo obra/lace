@@ -67,7 +67,11 @@ Example:
     destructiveHint: true,
   };
 
-  protected async executeValidated(args: FileEditArgs, context?: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(args: FileEditArgs, context: ToolContext): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+
     const resolvedPath = this.resolvePath(args.path, context);
     const edits = args.edits;
 

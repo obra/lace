@@ -67,8 +67,11 @@ export class FileListTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileListSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { path, pattern, includeHidden, recursive, maxDepth, summaryThreshold, maxResults } =
         args;

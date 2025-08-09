@@ -139,8 +139,11 @@ Follows redirects by default. Returns detailed error context for failures.`;
 
   protected async executeValidated(
     args: z.infer<typeof urlFetchSchema>,
-    _context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     return await this.performFetch(args);
   }
 

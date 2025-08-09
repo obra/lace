@@ -55,6 +55,7 @@ describe('Task-Based DelegateTool Integration', () => {
     const agent = testSetup.session.getAgent(testSetup.session.getId())!;
 
     context = {
+      signal: new AbortController().signal,
       agent, // Access to threadId and session via agent
     };
   });

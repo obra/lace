@@ -124,6 +124,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
+        signal: new AbortController().signal,
         agent,
         workingDirectory: tempLaceDirContext.tempDir,
       };
@@ -145,6 +146,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
+        signal: new AbortController().signal,
         agent,
         workingDirectory: tempLaceDirContext.tempDir,
       };
@@ -181,6 +183,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
+        signal: new AbortController().signal,
         agent: permissiveAgent,
         workingDirectory: tempLaceDirContext.tempDir,
       };
@@ -220,6 +223,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
+        signal: new AbortController().signal,
         agent: restrictiveAgent,
         workingDirectory: tempLaceDirContext.tempDir,
       };
@@ -245,6 +249,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       const toolContext: ToolContext = {
+        signal: new AbortController().signal,
         agent,
         workingDirectory: tempLaceDirContext.tempDir,
       };

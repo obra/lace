@@ -52,8 +52,11 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   protected async executeValidated(
     args: z.infer<typeof ripgrepSearchSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const {
         pattern,

@@ -41,8 +41,11 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileFindSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { pattern, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
 

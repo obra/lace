@@ -21,6 +21,7 @@ describe('BashTool', () => {
 
     // Create ToolContext with temp directory
     toolContext = {
+      signal: new AbortController().signal,
       toolTempDir: testTempDir,
     };
   });
@@ -58,7 +59,10 @@ Exit codes shown even for successful tool execution. Working directory persists 
 
   describe('Input validation', () => {
     it('should reject empty command', async () => {
-      const result = await bashTool.execute({ command: '' });
+      const result = await bashTool.execute(
+        { command: '' },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
@@ -66,14 +70,17 @@ Exit codes shown even for successful tool execution. Working directory persists 
     });
 
     it('should reject non-string command', async () => {
-      const result = await bashTool.execute({ command: 123 });
+      const result = await bashTool.execute(
+        { command: 123 },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject missing command', async () => {
-      const result = await bashTool.execute({});
+      const result = await bashTool.execute({}, { signal: new AbortController().signal });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');

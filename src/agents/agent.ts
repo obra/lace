@@ -147,6 +147,8 @@ export class Agent extends EventEmitter {
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
   private _progressTimer: number | null = null;
   private _abortController: AbortController | null = null;
+  private _toolAbortController: AbortController | null = null;
+  private _activeToolCalls: Map<string, ToolCall> = new Map();
   private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
@@ -317,6 +319,9 @@ export class Agent extends EventEmitter {
   }
 
   abort(): boolean {
+    let aborted = false;
+
+    // Abort LLM streaming/response generation
     if (this._abortController && this._currentTurnMetrics) {
       this._abortController.abort();
       this._clearProgressTimer();
@@ -330,9 +335,25 @@ export class Agent extends EventEmitter {
       this._currentTurnMetrics = null;
       this._abortController = null;
       this._setState('idle');
-      return true; // Successfully aborted
+      aborted = true;
     }
-    return false; // Nothing to abort
+
+    // Abort all active tool executions
+    if (this._toolAbortController) {
+      this._toolAbortController.abort();
+
+      // Tools will detect the abort signal and return their own cancellation results
+      // We don't emit here to avoid duplicates
+
+      // Clear tracking immediately
+      this._activeToolCalls.clear();
+      this._toolAbortController = null;
+      // Don't reset _pendingToolCount here - let the tools complete normally
+      this._setState('idle');
+      aborted = true;
+    }
+
+    return aborted;
   }
 
   // State access (read-only)
@@ -855,6 +876,9 @@ export class Agent extends EventEmitter {
       toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name })),
     });
 
+    // Create abort controller for tool execution
+    this._toolAbortController = new AbortController();
+
     // Initialize tool batch tracking
     this._pendingToolCount = toolCalls.length;
     this._hasRejectionsInBatch = false;
@@ -872,6 +896,9 @@ export class Agent extends EventEmitter {
         name: providerToolCall.name,
         arguments: providerToolCall.input,
       };
+
+      // Track active tool call
+      this._activeToolCalls.set(toolCall.id, toolCall);
 
       // Add tool call to thread
       this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
@@ -972,6 +999,7 @@ export class Agent extends EventEmitter {
       }
 
       const toolContext = {
+        signal: this._toolAbortController?.signal ?? new AbortController().signal,
         workingDirectory,
         agent: this,
       };
@@ -985,6 +1013,9 @@ export class Agent extends EventEmitter {
 
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {
+          // Remove from active tools (it completed)
+          this._activeToolCalls.delete(toolCall.id);
+
           // Add result and update tracking
           this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
           this.emit('tool_call_complete', {
@@ -1018,6 +1049,9 @@ export class Agent extends EventEmitter {
 
       // Only handle error if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
+        // Remove from active tools
+        this._activeToolCalls.delete(toolCall.id);
+
         const errorResult: ToolResult = {
           id: toolCall.id,
           isError: true,
@@ -1057,6 +1091,7 @@ export class Agent extends EventEmitter {
       }
 
       const toolContext = {
+        signal: this._toolAbortController?.signal ?? new AbortController().signal,
         workingDirectory,
         agent: this,
       };
@@ -1076,6 +1111,9 @@ export class Agent extends EventEmitter {
 
       // Only add events if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
+        // Remove from active tools (it completed)
+        this._activeToolCalls.delete(toolCall.id);
+
         // Add result and update tracking
         this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
         this.emit('tool_call_complete', {
@@ -1104,6 +1142,9 @@ export class Agent extends EventEmitter {
 
       // Only handle error if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
+        // Remove from active tools
+        this._activeToolCalls.delete(toolCall.id);
+
         const errorResult: ToolResult = {
           id: toolCall.id,
           isError: true,
@@ -1131,6 +1172,10 @@ export class Agent extends EventEmitter {
   }
 
   private _handleBatchComplete(): void {
+    // Clean up tool execution state
+    this._toolAbortController = null;
+    this._activeToolCalls.clear();
+
     if (this._hasRejectionsInBatch) {
       // Has rejections - wait for user input
       this._setState('idle');

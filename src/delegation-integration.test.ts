@@ -267,6 +267,7 @@ describe('Delegation Integration Tests', () => {
     };
 
     const result = await delegateToolInstance.execute(delegateInput, {
+      signal: new AbortController().signal,
       agent, // Access to threadId via agent.threadId and session via agent.getFullSession()
     });
 

@@ -70,10 +70,7 @@ class MockTool extends Tool {
     super();
   }
 
-  executeValidated(
-    _args: z.infer<typeof this.schema>,
-    _context?: ToolContext
-  ): Promise<ToolResult> {
+  executeValidated(_args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
     // Return a fresh copy to avoid ID mutation issues
     return Promise.resolve({
       ...this.result,

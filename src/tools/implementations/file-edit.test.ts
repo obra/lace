@@ -84,6 +84,7 @@ describe('FileEditTool Integration Tests', () => {
     context = {
       workingDirectory: process.cwd(),
       agent,
+      signal: new AbortController().signal,
     };
 
     await mkdir(testDir, { recursive: true });
@@ -126,7 +127,7 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        context
+        { ...context, signal: new AbortController().signal }
       );
 
       expect(result.isError).toBe(true);
@@ -149,7 +150,7 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        context
+        { ...context, signal: new AbortController().signal }
       );
 
       expect(result.isError).toBe(false);
@@ -900,7 +901,7 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
       expect(result.isError).toBe(false);
@@ -920,7 +921,7 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        { workingDirectory: '/some/other/dir' }
+        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
       expect(result.isError).toBe(false);
@@ -965,7 +966,7 @@ describe('FileEditTool Integration Tests', () => {
             },
           ],
         },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
       expect(result.isError).toBe(true);

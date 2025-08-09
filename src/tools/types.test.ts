@@ -27,7 +27,10 @@ class TestTool extends Tool {
     openWorldHint: false,
   };
 
-  protected async executeValidated(): Promise<ToolResult> {
+  protected async executeValidated(
+    _args: any,
+    _context: import('~/tools/types').ToolContext
+  ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'test' }],
       isError: false,
@@ -43,7 +46,10 @@ class SimpleTool extends Tool {
     param: z.string(),
   });
 
-  protected async executeValidated(): Promise<ToolResult> {
+  protected async executeValidated(
+    _args: any,
+    _context: import('~/tools/types').ToolContext
+  ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'simple' }],
       isError: false,
@@ -83,7 +89,10 @@ describe('Tool Class with MCP Annotations', () => {
 
     it('should execute with validated arguments', async () => {
       const tool = new TestTool();
-      const result = await tool.execute({ input: 'test value' });
+      const result = await tool.execute(
+        { input: 'test value' },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('test');
@@ -91,7 +100,10 @@ describe('Tool Class with MCP Annotations', () => {
 
     it('should validate arguments and return errors for invalid input', async () => {
       const tool = new TestTool();
-      const result = await tool.execute({ invalid: 'test' });
+      const result = await tool.execute(
+        { invalid: 'test' },
+        { signal: new AbortController().signal }
+      );
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');

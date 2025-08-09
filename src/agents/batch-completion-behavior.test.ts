@@ -41,7 +41,7 @@ class ConfigurableTool extends Tool {
 
   protected executeValidated(
     args: z.infer<typeof this.schema>,
-    _context?: ToolContext
+    _context: ToolContext
   ): Promise<ToolResult> {
     if (this.shouldFail) {
       return Promise.resolve(this.createError('Simulated tool execution failure'));

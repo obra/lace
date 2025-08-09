@@ -404,7 +404,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
         protected executeValidated(
           args: { text: string },
-          _context?: ToolContext
+          _context: ToolContext
         ): Promise<ToolResult> {
           return Promise.resolve(this.createResult(`Processed: ${args.text}`));
         }

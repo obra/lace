@@ -61,6 +61,7 @@ describe('ToolExecutor policy enforcement', () => {
     } as unknown as Agent;
 
     context = {
+      signal: new AbortController().signal,
       workingDirectory: '/project/path',
       agent: mockAgent,
     };
@@ -129,6 +130,7 @@ describe('ToolExecutor policy enforcement', () => {
     } as unknown as Agent;
 
     const contextWithoutSession = {
+      signal: new AbortController().signal,
       agent: mockAgentWithoutSession,
     };
 

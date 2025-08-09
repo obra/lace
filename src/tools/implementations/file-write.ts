@@ -25,8 +25,11 @@ Creates parent directories automatically if needed. Returns file size written.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileWriteSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { content, createDirs } = args;
       const resolvedPath = this.resolvePath(args.path, context);

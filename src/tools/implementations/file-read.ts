@@ -41,8 +41,11 @@ export class FileReadTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileReadSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     // Resolve path using working directory from context
     const resolvedPath = this.resolvePath(args.path, context);
 

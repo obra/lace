@@ -192,7 +192,7 @@ export class ToolExecutor {
     }
   }
 
-  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, context: ToolContext): Promise<ToolResult> {
     // 1. Check if tool exists
     const tool = this.tools.get(call.name);
     if (!tool) {
@@ -221,7 +221,7 @@ export class ToolExecutor {
   private async executeToolDirect(
     tool: Tool,
     call: ToolCall,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
     // Set up environment for tool execution
     const originalEnv = { ...process.env };

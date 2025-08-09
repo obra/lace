@@ -48,6 +48,7 @@ describe('DelegateTool', () => {
     tool = toolExecutor.getTool('delegate') as DelegateTool;
 
     context = {
+      signal: new AbortController().signal,
       agent: agent!, // Access to threadId and session via agent
     };
   });
