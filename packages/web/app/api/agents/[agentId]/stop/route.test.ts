@@ -115,22 +115,20 @@ describe('/api/agents/[agentId]/stop', () => {
 
     const result = await POST(mockRequest, { params });
 
-    expect(mockCreateErrorResponse).toHaveBeenCalledWith(
-      'Invalid agent ID format',
-      400,
-      { code: 'VALIDATION_FAILED' }
-    );
+    expect(mockCreateErrorResponse).toHaveBeenCalledWith('Invalid agent ID format', 400, {
+      code: 'VALIDATION_FAILED',
+    });
     expect(result).toBe(mockErrorResponse);
   });
 
   it('should return error for malformed session ID in agent ID', async () => {
-    // Mock the isValidThreadId to pass for agent but fail for session  
+    // Mock the isValidThreadId to pass for agent but fail for session
     const agentId = 'lace_20250801_abc123.1';
     const params = Promise.resolve({ agentId });
 
     // We need to mock the validation to simulate edge case
     // Let's use a different approach and test a real edge case
-    
+
     // Test case: valid agent format but when we extract session ID, it fails validation
     // This is hard to test with current implementation, so let's test server error instead
     const mockSessionService: MockSessionService = {
@@ -144,11 +142,9 @@ describe('/api/agents/[agentId]/stop', () => {
 
     const result = await POST(mockRequest, { params });
 
-    expect(mockCreateErrorResponse).toHaveBeenCalledWith(
-      'Invalid session format',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    expect(mockCreateErrorResponse).toHaveBeenCalledWith('Invalid session format', 500, {
+      code: 'INTERNAL_SERVER_ERROR',
+    });
     expect(result).toBe(mockErrorResponse);
   });
 
@@ -168,11 +164,9 @@ describe('/api/agents/[agentId]/stop', () => {
     const result = await POST(mockRequest, { params });
 
     expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20250801_xyz789');
-    expect(mockCreateErrorResponse).toHaveBeenCalledWith(
-      'Session not found',
-      404,
-      { code: 'RESOURCE_NOT_FOUND' }
-    );
+    expect(mockCreateErrorResponse).toHaveBeenCalledWith('Session not found', 404, {
+      code: 'RESOURCE_NOT_FOUND',
+    });
     expect(result).toBe(mockErrorResponse);
   });
 
@@ -196,11 +190,9 @@ describe('/api/agents/[agentId]/stop', () => {
     const result = await POST(mockRequest, { params });
 
     expect(mockSession.getAgent).toHaveBeenCalledWith(agentId);
-    expect(mockCreateErrorResponse).toHaveBeenCalledWith(
-      'Agent not found',
-      404,
-      { code: 'RESOURCE_NOT_FOUND' }
-    );
+    expect(mockCreateErrorResponse).toHaveBeenCalledWith('Agent not found', 404, {
+      code: 'RESOURCE_NOT_FOUND',
+    });
     expect(result).toBe(mockErrorResponse);
   });
 
@@ -219,11 +211,9 @@ describe('/api/agents/[agentId]/stop', () => {
 
     const result = await POST(mockRequest, { params });
 
-    expect(mockCreateErrorResponse).toHaveBeenCalledWith(
-      'Database connection failed',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
+    expect(mockCreateErrorResponse).toHaveBeenCalledWith('Database connection failed', 500, {
+      code: 'INTERNAL_SERVER_ERROR',
+    });
     expect(result).toBe(mockErrorResponse);
   });
 });
