@@ -96,9 +96,16 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       // Test with no agent context (undefined)
-      await expect(toolExecutor.requestToolPermission(toolCall, undefined)).rejects.toThrow(
-        'Tool execution denied: agent context required for security policy enforcement'
-      );
+      const result = await toolExecutor.requestToolPermission(toolCall, undefined);
+      expect(result).toMatchObject({
+        status: 'denied',
+        content: [
+          {
+            type: 'text',
+            text: 'Tool execution denied: agent context required for security policy enforcement',
+          },
+        ],
+      });
 
       // Test with agent that has no session
       const mockAgentWithNoSession = {
@@ -111,9 +118,11 @@ describe('ToolExecutor Security with Real Session Context', () => {
         workingDirectory: '/tmp',
       } as ToolContext;
 
-      await expect(toolExecutor.requestToolPermission(toolCall, emptyContext)).rejects.toThrow(
-        'Session not found for policy enforcement'
-      );
+      const emptyResult = await toolExecutor.requestToolPermission(toolCall, emptyContext);
+      expect(emptyResult).toMatchObject({
+        status: 'denied',
+        content: [{ type: 'text', text: 'Session not found for policy enforcement' }],
+      });
     });
 
     it('should require approval by default when session context is provided', async () => {
@@ -229,9 +238,14 @@ describe('ToolExecutor Security with Real Session Context', () => {
       };
 
       // Should be denied outright
-      await expect(
-        restrictiveAgent.toolExecutor.requestToolPermission(toolCall, toolContext)
-      ).rejects.toThrow("Tool 'bash' execution denied by policy");
+      const denyResult = await restrictiveAgent.toolExecutor.requestToolPermission(
+        toolCall,
+        toolContext
+      );
+      expect(denyResult).toMatchObject({
+        status: 'denied',
+        content: [{ type: 'text', text: "Tool 'bash' execution denied by policy" }],
+      });
     });
   });
 
