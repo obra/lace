@@ -767,14 +767,13 @@ export class Session {
 
     // If no threadId provided, create a delegate thread
     const targetThreadId =
-      config.threadId ||
-      this._sessionAgent.threadManager.createDelegateThreadFor(this._sessionId).id;
+      config.threadId || this._threadManager.createDelegateThreadFor(this._sessionId).id;
 
     // Create agent with metadata
     const agent = new Agent({
       provider: providerInstance,
       toolExecutor: agentToolExecutor,
-      threadManager: this._sessionAgent.threadManager,
+      threadManager: this._threadManager,
       threadId: targetThreadId,
       tools: agentToolExecutor.getAllTools(),
       metadata: {

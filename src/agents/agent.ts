@@ -906,6 +906,9 @@ export class Agent extends EventEmitter {
       const metadata = this.getThreadMetadata();
       const modelId = metadata?.modelId as string;
       if (!modelId) {
+        console.error('DEBUG: No model configured - metadata:', JSON.stringify(metadata, null, 2));
+        console.error('DEBUG: threadId:', this._threadId);
+        console.error('DEBUG: thread exists:', !!this._threadManager.getThread(this._threadId));
         throw new Error('No model configured for agent');
       }
 
