@@ -182,126 +182,162 @@ describe('Compaction E2E Test with MSW', () => {
       })
     );
 
-    // Mock Anthropic API responses
+    // Helper function to create proper SSE stream for Anthropic streaming responses
+    const createAnthropicStreamResponse = (events: any[]) => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          // Send each event as proper SSE with event type and data
+          for (const event of events) {
+            // Anthropic SDK expects events with event: and data: fields
+            if (event.type) {
+              controller.enqueue(encoder.encode(`event: ${event.type}\n`));
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          }
+          // Send final event
+          controller.enqueue(encoder.encode('event: done\n'));
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          connection: 'keep-alive',
+        },
+      });
+    };
+
+    // Mock Anthropic API responses with proper streaming format
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
         console.log('[MSW] Intercepting Anthropic API request');
         const body = (await request.json()) as any;
+        const isStreaming = body.stream === true;
         messageCount++;
         console.log(`[MSW] Intercepted request ${messageCount}:`, {
           url: request.url,
+          isStreaming,
           hasMessages: !!body.messages,
           messageCount: body.messages?.length,
         });
 
-        // First few messages: normal responses with increasing token usage
+        // Build response based on message count and context
+        let responseText = '';
+        let inputTokens = 100;
+        let outputTokens = 50;
+
         if (messageCount <= 3) {
-          return HttpResponse.json(
-            {
-              id: `msg_${messageCount}`,
-              type: 'message',
-              role: 'assistant',
-              content: [
-                {
-                  type: 'text',
-                  text: `Response ${messageCount}: This is a test response that simulates conversation.`,
-                },
-              ],
-              model: 'claude-3-5-sonnet-20241022',
-              stop_reason: 'end_turn',
-              stop_sequence: null,
-              usage: {
-                input_tokens: 1000 * messageCount, // Simulate growing context
-                output_tokens: 100,
-              },
-            },
-            {
-              status: 200,
-              headers: {
-                'content-type': 'application/json',
-              },
-            }
-          );
-        }
-
-        // Fourth message: High token usage to trigger compaction
-        if (messageCount === 4 && !shouldTriggerCompaction) {
+          responseText = `Response ${messageCount}: This is a test response that simulates conversation.`;
+          inputTokens = 1000 * messageCount;
+          outputTokens = 100;
+        } else if (messageCount === 4 && !shouldTriggerCompaction) {
           shouldTriggerCompaction = true;
-          return HttpResponse.json({
-            id: 'msg_4',
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: 'This response pushes us close to the token limit.',
-              },
-            ],
-            model: 'claude-3-5-sonnet-20241022',
-            stop_reason: 'end_turn',
-            stop_sequence: null,
-            usage: {
-              input_tokens: 9500, // This will trigger compaction at 80% of 12000
-              output_tokens: 100,
-              total_tokens: 9600,
-            },
-          });
-        }
-
-        // Compaction summary request (identified by specific prompt pattern)
-        if (
+          responseText = 'This response pushes us close to the token limit.';
+          inputTokens = 9500; // Trigger compaction at 80% of 12000
+          outputTokens = 100;
+        } else if (
           body.messages?.some(
             (m: any) => m.content?.includes('summarize') || m.content?.includes('compacting')
           )
         ) {
-          return HttpResponse.json({
-            id: 'msg_compact',
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: `Summary: The conversation involved testing the compaction system with multiple messages to simulate token usage growth.
+          responseText = `Summary: The conversation involved testing the compaction system with multiple messages to simulate token usage growth.
 
 Key points:
 1. Initial messages established context
 2. Token usage gradually increased
 3. System is functioning normally
 
-Technical context: Testing auto-compaction trigger at 80% threshold.`,
+Technical context: Testing auto-compaction trigger at 80% threshold.`;
+          inputTokens = 500;
+          outputTokens = 100;
+        } else {
+          responseText = 'Continuing after compaction with reduced context.';
+          inputTokens = 1000;
+          outputTokens = 50;
+        }
+
+        // Handle streaming vs non-streaming responses
+        if (isStreaming) {
+          // Create streaming SSE response that matches Anthropic's actual API format
+          const streamEvents = [
+            {
+              type: 'message_start',
+              message: {
+                id: `msg_${messageCount}`,
+                type: 'message',
+                role: 'assistant',
+                content: [],
+                model: 'claude-3-5-sonnet-20241022',
+                stop_reason: null,
+                stop_sequence: null,
+                usage: {
+                  input_tokens: inputTokens,
+                  output_tokens: 0,
+                },
+              },
+            },
+            {
+              type: 'content_block_start',
+              index: 0,
+              content_block: {
+                type: 'text',
+                text: '',
+              },
+            },
+            // Split text into chunks for realistic streaming
+            ...responseText.split(' ').map((word, i, arr) => ({
+              type: 'content_block_delta',
+              index: 0,
+              delta: {
+                type: 'text_delta',
+                text: i === arr.length - 1 ? word : word + ' ',
+              },
+            })),
+            {
+              type: 'content_block_stop',
+              index: 0,
+            },
+            {
+              type: 'message_delta',
+              delta: {
+                stop_reason: 'end_turn',
+                stop_sequence: null,
+              },
+              usage: {
+                output_tokens: outputTokens,
+              },
+            },
+            {
+              type: 'message_stop',
+            },
+          ];
+
+          return createAnthropicStreamResponse(streamEvents);
+        } else {
+          // Non-streaming response
+          return HttpResponse.json({
+            id: `msg_${messageCount}`,
+            type: 'message',
+            role: 'assistant',
+            content: [
+              {
+                type: 'text',
+                text: responseText,
               },
             ],
             model: 'claude-3-5-sonnet-20241022',
             stop_reason: 'end_turn',
             stop_sequence: null,
             usage: {
-              input_tokens: 500,
-              output_tokens: 100,
-              total_tokens: 600,
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
             },
           });
         }
-
-        // Post-compaction response
-        return HttpResponse.json({
-          id: 'msg_after_compact',
-          type: 'message',
-          role: 'assistant',
-          content: [
-            {
-              type: 'text',
-              text: 'Continuing after compaction with reduced context.',
-            },
-          ],
-          model: 'claude-3-5-sonnet-20241022',
-          stop_reason: 'end_turn',
-          stop_sequence: null,
-          usage: {
-            input_tokens: 1000, // Much lower after compaction
-            output_tokens: 50,
-            total_tokens: 1050,
-          },
-        });
       })
     );
 
@@ -424,10 +460,54 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`,
   });
 
   it('should handle manual /compact command and emit events', async () => {
+    // Helper to create streaming response for this test
+    const createTestStreamResponse = (text: string, inputTokens: number, outputTokens: number) => {
+      const events = [
+        {
+          type: 'message_start',
+          message: {
+            id: 'msg_manual',
+            type: 'message',
+            role: 'assistant',
+            content: [],
+            model: 'claude-3-5-sonnet-20241022',
+            stop_reason: null,
+            stop_sequence: null,
+            usage: { input_tokens: inputTokens, output_tokens: 0 },
+          },
+        },
+        {
+          type: 'content_block_start',
+          index: 0,
+          content_block: { type: 'text', text: '' },
+        },
+        {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text },
+        },
+        {
+          type: 'content_block_stop',
+          index: 0,
+        },
+        {
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn', stop_sequence: null },
+          usage: { output_tokens: outputTokens },
+        },
+        {
+          type: 'message_stop',
+        },
+      ];
+
+      return createAnthropicStreamResponse(events);
+    };
+
     // Mock response for manual compaction
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
         const body = (await request.json()) as any;
+        const isStreaming = body.stream === true;
 
         // Check if this is a summarization request
         if (
@@ -435,47 +515,39 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`,
             (m: any) => m.content?.includes('summarize') || m.content?.includes('compacting')
           )
         ) {
-          return HttpResponse.json({
-            id: 'msg_manual_compact',
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: 'Summary: Manual compaction test completed successfully.',
-              },
-            ],
-            model: 'claude-3-5-sonnet-20241022',
-            stop_reason: 'end_turn',
-            stop_sequence: null,
-            usage: {
-              input_tokens: 200,
-              output_tokens: 50,
-              total_tokens: 250,
-            },
-          });
+          const text = 'Summary: Manual compaction test completed successfully.';
+          if (isStreaming) {
+            return createTestStreamResponse(text, 200, 50);
+          } else {
+            return HttpResponse.json({
+              id: 'msg_manual_compact',
+              type: 'message',
+              role: 'assistant',
+              content: [{ type: 'text', text }],
+              model: 'claude-3-5-sonnet-20241022',
+              stop_reason: 'end_turn',
+              stop_sequence: null,
+              usage: { input_tokens: 200, output_tokens: 50 },
+            });
+          }
         }
 
         // Regular response
-        return HttpResponse.json({
-          id: 'msg_regular',
-          type: 'message',
-          role: 'assistant',
-          content: [
-            {
-              type: 'text',
-              text: 'Regular response to build some context.',
-            },
-          ],
-          model: 'claude-3-5-sonnet-20241022',
-          stop_reason: 'end_turn',
-          stop_sequence: null,
-          usage: {
-            input_tokens: 500,
-            output_tokens: 50,
-            total_tokens: 550,
-          },
-        });
+        const text = 'Regular response to build some context.';
+        if (isStreaming) {
+          return createTestStreamResponse(text, 500, 50);
+        } else {
+          return HttpResponse.json({
+            id: 'msg_regular',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text }],
+            model: 'claude-3-5-sonnet-20241022',
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: { input_tokens: 500, output_tokens: 50 },
+          });
+        }
       })
     );
 
@@ -522,29 +594,69 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`,
     let requestIndex = 0;
 
     server.use(
-      http.post('https://api.anthropic.com/v1/messages', async () => {
+      http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
+        const body = (await request.json()) as any;
+        const isStreaming = body.stream === true;
         const usage = tokenUsages[requestIndex] || { input: 100, output: 50 };
         requestIndex++;
 
-        return HttpResponse.json({
-          id: `msg_${requestIndex}`,
-          type: 'message',
-          role: 'assistant',
-          content: [
+        const text = `Response ${requestIndex} with tracked tokens.`;
+
+        if (isStreaming) {
+          const events = [
             {
-              type: 'text',
-              text: `Response ${requestIndex} with tracked tokens.`,
+              type: 'message_start',
+              message: {
+                id: `msg_${requestIndex}`,
+                type: 'message',
+                role: 'assistant',
+                content: [],
+                model: 'claude-3-5-sonnet-20241022',
+                stop_reason: null,
+                stop_sequence: null,
+                usage: { input_tokens: usage.input, output_tokens: 0 },
+              },
             },
-          ],
-          model: 'claude-3-5-sonnet-20241022',
-          stop_reason: 'end_turn',
-          stop_sequence: null,
-          usage: {
-            input_tokens: usage.input,
-            output_tokens: usage.output,
-            total_tokens: usage.input + usage.output,
-          },
-        });
+            {
+              type: 'content_block_start',
+              index: 0,
+              content_block: { type: 'text', text: '' },
+            },
+            {
+              type: 'content_block_delta',
+              index: 0,
+              delta: { type: 'text_delta', text },
+            },
+            {
+              type: 'content_block_stop',
+              index: 0,
+            },
+            {
+              type: 'message_delta',
+              delta: { stop_reason: 'end_turn', stop_sequence: null },
+              usage: { output_tokens: usage.output },
+            },
+            {
+              type: 'message_stop',
+            },
+          ];
+
+          return createAnthropicStreamResponse(events);
+        } else {
+          return HttpResponse.json({
+            id: `msg_${requestIndex}`,
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text }],
+            model: 'claude-3-5-sonnet-20241022',
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: {
+              input_tokens: usage.input,
+              output_tokens: usage.output,
+            },
+          });
+        }
       })
     );
 
