@@ -185,7 +185,7 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Check that tool was marked as cancelled
     expect(toolCompletedCount).toBe(1);
-    expect((toolResults[0] as ToolResult).isError).toBe(true);
+    expect((toolResults[0] as ToolResult).status).toBe('aborted');
     expect((toolResults[0] as ToolResult).content[0].text).toContain('cancelled by user');
   });
 
@@ -246,7 +246,7 @@ describe('Agent Tool Abort Functionality', () => {
     // All tools should be cancelled
     expect(toolResults.length).toBe(3);
     toolResults.forEach((result: ToolResult) => {
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('aborted');
       expect(result.content[0].text).toContain('cancelled by user');
     });
   });
@@ -303,7 +303,7 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Tool should be cancelled
     expect(toolResult).not.toBeNull();
-    expect(toolResult!.isError).toBe(true);
+    expect(toolResult!.status).toBe('aborted');
     expect(toolResult!.content[0].text).toContain('cancelled by user');
 
     // Should have partial progress info
@@ -366,13 +366,13 @@ describe('Agent Tool Abort Functionality', () => {
     // Fast tool should have completed successfully
     const fastResult = toolResults.get('call_fast');
     expect(fastResult).toBeDefined();
-    expect(fastResult!.isError).toBe(false);
+    expect(fastResult!.status).toBe('completed');
     expect(fastResult!.content[0].text).toContain('Fast tool completed');
 
     // Slow tool should be cancelled
     const slowResult = toolResults.get('call_slow');
     expect(slowResult).toBeDefined();
-    expect(slowResult!.isError).toBe(true);
+    expect(slowResult!.status).toBe('aborted');
     expect(slowResult!.content[0].text).toContain('cancelled by user');
   });
 
@@ -428,18 +428,20 @@ describe('Agent Tool Abort Functionality', () => {
     await expect(firstMessagePromise).resolves.not.toThrow();
 
     expect(firstResult).not.toBeNull();
-    expect(firstResult!.isError).toBe(true);
+    expect(firstResult!.status).toBe('aborted');
     expect(firstResult!.content[0].text).toContain('cancelled');
 
-    // Update provider for second execution with new thread
-    agent.stop();
+    // Don't call agent.stop() as it closes the threadManager's database
+    // Just abort and clear the agent state
+    agent.abort();
 
-    // Create new thread for second execution
-    const secondThreadId = threadManager.generateThreadId();
-    threadManager.createThread(secondThreadId, session.getId());
+    // Create new threadManager for second execution to avoid database issues
+    const secondThreadManager = new ThreadManager();
+    const secondThreadId = secondThreadManager.generateThreadId();
+    secondThreadManager.createThread(secondThreadId, session.getId());
 
     // Set thread metadata immediately after creation
-    threadManager.updateThreadMetadata(secondThreadId, {
+    secondThreadManager.updateThreadMetadata(secondThreadId, {
       modelId: 'test-model',
       providerInstanceId: 'test-instance',
     });
@@ -448,7 +450,7 @@ describe('Agent Tool Abort Functionality', () => {
     agent = new Agent({
       provider,
       toolExecutor,
-      threadManager,
+      threadManager: secondThreadManager,
       threadId: secondThreadId,
       tools: [slowTool],
     });
@@ -467,7 +469,7 @@ describe('Agent Tool Abort Functionality', () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     expect(secondResult).not.toBeNull();
-    expect(secondResult!.isError).toBe(false);
+    expect(secondResult!.status).toBe('completed');
     expect(secondResult!.content[0].text).toContain('Second message completed');
   });
 
@@ -509,8 +511,16 @@ describe('Agent Tool Abort Functionality', () => {
     });
 
     const stateChanges: string[] = [];
-    agent.on('state_change', ({ to }) => {
+    const agentEvents: string[] = [];
+    agent.on('state_change', ({ from, to }) => {
       stateChanges.push(to);
+      agentEvents.push(`state: ${from} -> ${to}`);
+    });
+    agent.on('tool_call_complete', ({ callId }) => {
+      agentEvents.push(`tool_complete: ${callId}`);
+    });
+    agent.on('conversation_complete', () => {
+      agentEvents.push('conversation_complete');
     });
 
     await agent.start();
@@ -532,6 +542,9 @@ describe('Agent Tool Abort Functionality', () => {
 
     // State should have changed from tool_execution (either to idle or thinking for followup)
     const finalState = stateChanges[stateChanges.length - 1];
+    // Debug: log all events to understand the flow
+    console.log('All events:', agentEvents);
+    console.log('State changes:', stateChanges);
     expect(['idle', 'thinking']).toContain(finalState);
 
     // Check thread events for proper TOOL_RESULT events
@@ -541,7 +554,7 @@ describe('Agent Tool Abort Functionality', () => {
     // Should have 3 cancellation results
     expect(toolResults.length).toBe(3);
     toolResults.forEach((event) => {
-      expect(event.data.isError).toBe(true);
+      expect(event.data.status).toBe('aborted');
       expect(event.data.content[0].text).toContain('cancelled by user');
     });
   });

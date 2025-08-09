@@ -273,7 +273,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     expect(toolResultEvent).toBeDefined();
 
     const toolResult = toolResultEvent?.data as ToolResult;
-    expect(toolResult.isError).toBe(true);
+    expect(toolResult.status).toBe('denied');
   });
 
   it('should handle multiple concurrent tool calls', async () => {

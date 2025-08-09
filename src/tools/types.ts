@@ -56,22 +56,29 @@ export interface ContentBlock {
   uri?: string;
 }
 
+export type ToolResultStatus = 'completed' | 'failed' | 'aborted' | 'denied';
+
 export interface ToolResult {
   id?: string; // Optional - set by tools if they have it
   content: ContentBlock[];
-  isError: boolean; // Keep required (clearer than MCP's optional)
+  status: ToolResultStatus;
   metadata?: Record<string, unknown>; // For delegation threadId, etc.
 }
 
+// Helper to check if a result indicates an error
+export function isToolError(result: ToolResult): boolean {
+  return result.status !== 'completed';
+}
+
 export function createToolResult(
-  isError: boolean,
+  status: ToolResultStatus,
   content: ContentBlock[],
   id?: string,
   metadata?: Record<string, unknown>
 ): ToolResult {
   return {
     content,
-    isError,
+    status,
     ...(id && { id }),
     ...(metadata && { metadata }),
   };
@@ -82,7 +89,7 @@ export function createSuccessResult(
   id?: string,
   metadata?: Record<string, unknown>
 ): ToolResult {
-  return createToolResult(false, content, id, metadata);
+  return createToolResult('completed', content, id, metadata);
 }
 
 export function createErrorResult(
@@ -91,7 +98,7 @@ export function createErrorResult(
   metadata?: Record<string, unknown>
 ): ToolResult {
   if (typeof input === 'string') {
-    return createToolResult(true, [{ type: 'text', text: input }], id, metadata);
+    return createToolResult('failed', [{ type: 'text', text: input }], id, metadata);
   }
-  return createToolResult(true, input, id, metadata);
+  return createToolResult('failed', input, id, metadata);
 }

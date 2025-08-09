@@ -149,6 +149,7 @@ export class Agent extends EventEmitter {
   private _abortController: AbortController | null = null;
   private _toolAbortController: AbortController | null = null;
   private _activeToolCalls: Map<string, ToolCall> = new Map();
+  private _isAborted = false;
   private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
@@ -156,7 +157,6 @@ export class Agent extends EventEmitter {
 
   // Simple tool batch tracking
   private _pendingToolCount = 0;
-  private _hasRejectionsInBatch = false;
 
   constructor(config: AgentConfig) {
     super();
@@ -881,7 +881,6 @@ export class Agent extends EventEmitter {
 
     // Initialize tool batch tracking
     this._pendingToolCount = toolCalls.length;
-    this._hasRejectionsInBatch = false;
 
     for (const providerToolCall of toolCalls) {
       logger.debug('AGENT: Creating tool call event', {
@@ -958,11 +957,10 @@ export class Agent extends EventEmitter {
       // Create error result for denied tool
       const errorResult: ToolResult = {
         id: toolCallId,
-        isError: true,
+        status: 'denied',
         content: [{ type: 'text', text: 'Tool execution denied by user' }],
       };
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
-      this._hasRejectionsInBatch = true;
     } else if (decision === ApprovalDecision.ALLOW_SESSION) {
       // Update session tool policy for session-wide approval
       void this._updateSessionToolPolicy(toolCall.name, 'allow');
@@ -1026,8 +1024,8 @@ export class Agent extends EventEmitter {
 
           // Update batch tracking
           this._pendingToolCount--;
-          // Note: Tool execution errors should NOT set _hasRejectionsInBatch
-          // Only user denials should pause conversation - tool failures should continue
+          // Note: Tool execution errors should continue the conversation
+          // Only user denials/aborts should pause - tool failures should continue
 
           if (this._pendingToolCount === 0) {
             this._handleBatchComplete();
@@ -1054,7 +1052,7 @@ export class Agent extends EventEmitter {
 
         const errorResult: ToolResult = {
           id: toolCall.id,
-          isError: true,
+          status: 'failed',
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
         this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
@@ -1068,8 +1066,8 @@ export class Agent extends EventEmitter {
 
         // Update batch tracking for errors
         this._pendingToolCount--;
-        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
-        // Only user denials should pause conversation - tool failures should continue
+        // Note: Tool execution errors should continue the conversation
+        // Only user denials/aborts should pause - tool failures should continue
 
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();
@@ -1124,8 +1122,8 @@ export class Agent extends EventEmitter {
 
         // Update batch tracking
         this._pendingToolCount--;
-        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
-        // Only user denials should pause conversation - tool failures should continue
+        // Note: Tool execution errors should continue the conversation
+        // Only user denials/aborts should pause - tool failures should continue
 
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();
@@ -1147,7 +1145,7 @@ export class Agent extends EventEmitter {
 
         const errorResult: ToolResult = {
           id: toolCall.id,
-          isError: true,
+          status: 'failed',
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
         this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
@@ -1161,8 +1159,8 @@ export class Agent extends EventEmitter {
 
         // Update batch tracking for errors
         this._pendingToolCount--;
-        // Note: Tool execution errors should NOT set _hasRejectionsInBatch
-        // Only user denials should pause conversation - tool failures should continue
+        // Note: Tool execution errors should continue the conversation
+        // Only user denials/aborts should pause - tool failures should continue
 
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();
@@ -1171,17 +1169,52 @@ export class Agent extends EventEmitter {
     }
   }
 
+  /**
+   * Determine if the conversation should continue after a batch of tools completes.
+   * Returns false if any tools were denied or aborted, indicating user intervention.
+   *
+   * This method is called from _handleBatchComplete() when all tools in the current
+   * batch have finished executing (_pendingToolCount reaches 0).
+   */
+  private _shouldContinueAfterToolBatch(): boolean {
+    // Get all events to check the most recent tool results
+    const events = this._threadManager.getEvents(this._threadId);
+
+    // Count backwards to find all TOOL_RESULT events from this batch
+    // They should be the most recent TOOL_RESULT events, appearing after
+    // the most recent AGENT_MESSAGE
+    let lastAgentMessageIndex = -1;
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'AGENT_MESSAGE') {
+        lastAgentMessageIndex = i;
+        break;
+      }
+    }
+
+    // Check all TOOL_RESULT events after the last AGENT_MESSAGE
+    for (let i = lastAgentMessageIndex + 1; i < events.length; i++) {
+      if (events[i].type === 'TOOL_RESULT') {
+        const result = events[i].data;
+        if (result.status === 'aborted' || result.status === 'denied') {
+          return false; // Don't continue if any tool was denied or aborted
+        }
+      }
+    }
+
+    return true; // Continue if all tools completed successfully
+  }
+
   private _handleBatchComplete(): void {
     // Clean up tool execution state
     this._toolAbortController = null;
     this._activeToolCalls.clear();
 
-    if (this._hasRejectionsInBatch) {
-      // Has rejections - wait for user input
+    if (!this._shouldContinueAfterToolBatch()) {
+      // Has rejections/aborts - wait for user input
       this._setState('idle');
       // Don't auto-continue conversation
     } else {
-      // All approved - auto-continue conversation
+      // All tools completed successfully - auto-continue conversation
       this._completeTurn();
       this._setState('idle');
 
@@ -1331,7 +1364,7 @@ export class Agent extends EventEmitter {
             existingUserMessage.toolResults!.push({
               id: toolResult.id || '',
               content: toolResult.content,
-              isError: toolResult.isError,
+              isError: toolResult.status !== 'completed',
             });
           } else {
             // Create a new user message with this tool result
@@ -1342,7 +1375,7 @@ export class Agent extends EventEmitter {
                 {
                   id: toolResult.id || '',
                   content: toolResult.content,
-                  isError: toolResult.isError,
+                  isError: toolResult.status !== 'completed',
                 },
               ],
             });
@@ -1379,7 +1412,7 @@ export class Agent extends EventEmitter {
                 {
                   id: toolResult.id || '',
                   content: toolResult.content,
-                  isError: toolResult.isError,
+                  isError: toolResult.status !== 'completed',
                 },
               ],
             });

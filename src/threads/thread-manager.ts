@@ -198,6 +198,8 @@ export class ThreadManager {
     try {
       // Use synchronous version to maintain createThread signature
       this._persistence.saveThread(thread);
+      // Update process-local cache with the new thread
+      processLocalThreadCache.set(actualThreadId, thread);
     } catch (error) {
       logger.error('Failed to save thread', { error });
     }
