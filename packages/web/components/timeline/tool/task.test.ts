@@ -35,7 +35,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     test('should create formatted summary for task creation', () => {
@@ -66,7 +66,7 @@ describe('Task Tool Renderers', () => {
     test('should return failure display name for errors', () => {
       const errorResult: ToolResult = {
         content: [{ type: 'text', text: 'Error creating task' }],
-        isError: true,
+        status: 'failed' as const,
       };
       const displayName = taskRenderers.task_add.getDisplayName?.('task_add', errorResult);
       expect(displayName).toBe('Failed to create task');
@@ -110,7 +110,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     test('should create formatted summary for task listing', () => {
@@ -156,7 +156,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     test('should create formatted summary for task completion', () => {
@@ -196,7 +196,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     test('should create formatted summary for task updates', () => {
@@ -234,7 +234,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     test('should create formatted summary for adding notes', () => {
@@ -281,7 +281,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     test('should create formatted summary for task viewing', () => {
@@ -312,7 +312,7 @@ describe('Task Tool Renderers', () => {
           }),
         },
       ],
-      isError: true,
+      status: 'failed' as const,
     };
 
     test('should detect errors correctly', () => {

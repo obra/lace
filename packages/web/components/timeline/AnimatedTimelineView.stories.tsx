@@ -73,7 +73,7 @@ const sampleEntries: TimelineEntry[] = [
 │ • framer-motion: 95KB                                      │
 │ • lodash: 70KB (consider tree-shaking)                     │
 └─────────────────────────────────────────────────────────────┘` }],
-      isError: false,
+      status: 'completed' as const,
     },
     timestamp: new Date(Date.now() - 3300000),
   },
@@ -147,7 +147,7 @@ const longConversation: TimelineEntry[] = [
 - Image optimization settings  
 - Tree shaking configuration
 - Compression middleware` }],
-      isError: false,
+      status: 'completed' as const,
     },
     timestamp: new Date(Date.now() - 2800000),
   },
@@ -388,7 +388,7 @@ export const PerformanceTest: Story = {
         tool: 'bash',
         result: {
           content: [{ type: 'text', text: `Command output for message ${i + 1}` }],
-          isError: false,
+          status: 'completed' as const,
         },
       }),
     })) as TimelineEntry[],

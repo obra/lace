@@ -29,7 +29,7 @@ describe('Delegate Tool Renderer', () => {
         }),
       },
     ],
-    isError: false,
+    status: 'completed' as const,
   };
 
   const mockErrorResult: ToolResult = {
@@ -45,7 +45,7 @@ describe('Delegate Tool Renderer', () => {
         }),
       },
     ],
-    isError: false, // Will be detected by status
+    status: 'completed' as const, // Will be detected by status
   };
 
   const mockTimeoutResult: ToolResult = {
@@ -61,7 +61,7 @@ describe('Delegate Tool Renderer', () => {
         }),
       },
     ],
-    isError: false,
+    status: 'completed' as const,
   };
 
   describe('getSummary', () => {
@@ -117,7 +117,7 @@ describe('Delegate Tool Renderer', () => {
     test('should handle legacy plain text output', () => {
       const legacyResult = {
         content: [{ type: 'text', text: 'Delegation completed successfully' }],
-        isError: false,
+        status: 'completed' as const,
       } as ToolResult;
       const isError = delegateRenderer.isError?.(legacyResult);
       expect(isError).toBe(false);
@@ -134,7 +134,7 @@ describe('Delegate Tool Renderer', () => {
             }),
           },
         ],
-        isError: true, // Explicitly flagged as error
+        status: 'failed' as const, // Explicitly flagged as error
       };
       const isError = delegateRenderer.isError?.(flaggedError);
       expect(isError).toBe(true);
@@ -163,7 +163,7 @@ describe('Delegate Tool Renderer', () => {
     test('should handle empty content', () => {
       const emptyResult: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = delegateRenderer.renderResult?.(emptyResult);
       expect(resultNode).toBeDefined();
@@ -177,7 +177,7 @@ describe('Delegate Tool Renderer', () => {
             text: 'Task delegated to subagent. Waiting for completion...',
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = delegateRenderer.renderResult?.(legacyResult);
       expect(resultNode).toBeDefined();
@@ -197,7 +197,7 @@ describe('Delegate Tool Renderer', () => {
             }),
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = delegateRenderer.renderResult?.(detailedResult);
       expect(resultNode).toBeDefined();
@@ -215,7 +215,7 @@ describe('Delegate Tool Renderer', () => {
             }),
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = delegateRenderer.renderResult?.(inProgressResult);
       expect(resultNode).toBeDefined();

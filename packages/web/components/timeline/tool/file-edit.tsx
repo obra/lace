@@ -38,7 +38,7 @@ export const fileEditRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     // Trust the tool's own error flag
-    return result.isError;
+    return result.status !== 'completed';
   },
 
   renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {

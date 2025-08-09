@@ -24,7 +24,7 @@ describe('Task Metadata Event Format Bug', () => {
     const toolResult: ToolResult = {
       content: [{ type: 'text', text: 'Task created successfully' }],
       metadata: taskMetadata,
-      isError: false,
+      status: 'completed' as const,
     };
 
     // Real-time events (how session-service.ts supposedly sends them after my fix)
@@ -110,7 +110,7 @@ describe('Task Metadata Event Format Bug', () => {
     const toolResult: ToolResult = {
       content: [{ type: 'text', text: 'Task created successfully' }],
       metadata: taskMetadata,
-      isError: false,
+      status: 'completed' as const,
     };
 
     // Real-time events (old broken format before my fix)

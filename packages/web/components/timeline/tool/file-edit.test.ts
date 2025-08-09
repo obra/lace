@@ -47,7 +47,7 @@ describe('fileEditRenderer', () => {
     it('should return true for error results', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Error message' }],
-        isError: true,
+        status: 'failed' as const,
       };
       expect(fileEditRenderer.isError!(result)).toBe(true);
     });
@@ -55,7 +55,7 @@ describe('fileEditRenderer', () => {
     it('should return false for success results', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Success' }],
-        isError: false,
+        status: 'completed' as const,
       };
       expect(fileEditRenderer.isError!(result)).toBe(false);
     });
@@ -65,7 +65,7 @@ describe('fileEditRenderer', () => {
     it('should render validation error with enhanced details', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Edit 1 of 2: Expected 1 occurrence but found 3' }],
-        isError: true,
+        status: 'failed' as const,
         metadata: {
           validation_error: {
             type: 'WRONG_COUNT',
@@ -95,7 +95,7 @@ describe('fileEditRenderer', () => {
     it('should render NO_MATCH error with similar content', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Could not find exact text' }],
-        isError: true,
+        status: 'failed' as const,
         metadata: {
           validation_error: {
             type: 'NO_MATCH',
@@ -121,7 +121,7 @@ describe('fileEditRenderer', () => {
     it('should render diff when enhanced metadata is available', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Successfully applied 1 edit' }],
-        isError: false,
+        status: 'completed' as const,
         metadata: {
           diff: {
             beforeContext: 'line 1\nline 2',
@@ -152,7 +152,7 @@ describe('fileEditRenderer', () => {
     it('should render unified diff for multi-edit operations', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Successfully applied 3 edits' }],
-        isError: false,
+        status: 'completed' as const,
         metadata: {
           diff: {
             beforeContext: 'line 1\nline 2',
@@ -198,7 +198,7 @@ describe('fileEditRenderer', () => {
     it('should render dry run mode', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Dry run completed. Would apply 2 edits to /src/app.ts' }],
-        isError: false,
+        status: 'completed' as const,
         metadata: {
           dry_run: true,
           edits_applied: [
@@ -218,7 +218,7 @@ describe('fileEditRenderer', () => {
     it('should show success with multiple edits applied', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Successfully applied 3 edits' }],
-        isError: false,
+        status: 'completed' as const,
         metadata: {
           edits_applied: [
             { old_text: 'const', new_text: 'let', occurrences_replaced: 5 },
@@ -245,7 +245,7 @@ describe('fileEditRenderer', () => {
         'This is a very long string that should be truncated when displayed in the UI because it would make the interface too cluttered and hard to read';
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Successfully applied 1 edit' }],
-        isError: false,
+        status: 'completed' as const,
         metadata: {
           edits_applied: [{ old_text: longText, new_text: 'short', occurrences_replaced: 1 }],
           total_replacements: 1,
@@ -262,7 +262,7 @@ describe('fileEditRenderer', () => {
     it('should handle empty content gracefully', () => {
       const result: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
 
       const rendered = fileEditRenderer.renderResult!(result);
@@ -274,7 +274,7 @@ describe('fileEditRenderer', () => {
     it('should correctly adjust line numbers when startLine > 1', () => {
       const result: ToolResult = {
         content: [{ type: 'text', text: 'Successfully applied 1 edit' }],
-        isError: false,
+        status: 'completed' as const,
         metadata: {
           diff: {
             beforeContext: 'line 10',

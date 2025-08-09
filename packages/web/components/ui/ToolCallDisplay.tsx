@@ -84,12 +84,12 @@ function createDefaultToolSummary(toolName: string, args: unknown): string {
 };
 
 function isDefaultError(result: ToolResult): boolean {
-  return Boolean(result?.isError);
+  return result?.status === 'failed';
 }
 
 function createDefaultResultRenderer(result: ToolResult): React.ReactNode {
   const textContent = result.content.map(block => block.text ?? '').join('');
-  const isError = Boolean(result.isError);
+  const isError = result.status === 'failed';
   
   return (
     <ExpandableResult 

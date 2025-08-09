@@ -90,7 +90,7 @@ const taskAddRenderer: ToolRenderer = {
       return 'Creating task';
     }
     
-    if (result.isError) {
+    if (result.status !== 'completed') {
       return 'Failed to create task';
     }
     
@@ -125,7 +125,7 @@ const taskAddRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -135,7 +135,7 @@ const taskAddRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors only
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string; code?: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3 mt-2">
@@ -241,7 +241,7 @@ const taskListRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -251,7 +251,7 @@ const taskListRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors first
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">
@@ -337,7 +337,7 @@ const taskCompleteRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -347,7 +347,7 @@ const taskCompleteRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="alert alert-error">
@@ -442,7 +442,7 @@ const taskUpdateRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -452,7 +452,7 @@ const taskUpdateRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="alert alert-error">
@@ -550,7 +550,7 @@ const taskAddNoteRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -634,7 +634,7 @@ const taskViewRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;

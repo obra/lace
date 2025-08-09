@@ -156,7 +156,7 @@ This component demonstrates TypeScript typing, React hooks, and props handling.`
     content: 'file-write executed',
     result: {
       content: [{ type: 'text', text: 'Successfully created MyComponent.tsx' }],
-      isError: false,
+      status: 'completed' as const,
     },
     timestamp: new Date(Date.now() - 1700000),
   },

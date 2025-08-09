@@ -145,7 +145,7 @@ export const delegateRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     // Check for failed or timeout status in structured output
     try {
@@ -158,7 +158,7 @@ export const delegateRenderer: ToolRenderer = {
       // Fallback to isError flag
     }
     
-    return result.isError ?? false;
+    return result.status !== 'completed';
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
@@ -176,7 +176,7 @@ export const delegateRenderer: ToolRenderer = {
     if (typeof parsed === 'string') {
       return (
         <div className={`font-mono text-sm whitespace-pre-wrap rounded-lg p-3 ${
-          result.isError 
+          result.status !== 'completed' 
             ? 'text-error bg-error/10 border border-error/20' 
             : 'text-base-content/80 bg-base-200 border border-base-300'
         }`}>
@@ -205,7 +205,7 @@ export const delegateRenderer: ToolRenderer = {
       startedAt?: string;
     };
 
-    const isError = data.status === 'failed' || data.status === 'timeout' || result.isError;
+    const isError = data.status === 'failed' || data.status === 'timeout' || result.status !== 'completed';
     const isInProgress = data.status === 'in_progress';
     const isCompleted = data.status === 'completed';
 
