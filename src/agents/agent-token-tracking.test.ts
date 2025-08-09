@@ -7,7 +7,7 @@ import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
-import { ToolResult } from '~/tools/types';
+import { ToolResult, ToolContext } from '~/tools/types';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
@@ -206,7 +206,16 @@ describe('Agent Token Tracking Integration', () => {
           test: z.string().optional(),
         });
 
-        protected executeValidated(): Promise<ToolResult> {
+        protected executeValidated(
+          _args: z.infer<typeof this.schema>,
+          context?: ToolContext
+        ): Promise<ToolResult> {
+          if (context?.signal?.aborted) {
+            return Promise.resolve({
+              content: [{ type: 'text', text: 'Tool execution aborted' }],
+              status: 'aborted' as const,
+            });
+          }
           return Promise.resolve({
             content: [{ type: 'text', text: 'Tool executed successfully' }],
             status: 'completed' as const,
@@ -316,7 +325,16 @@ describe('Agent Token Tracking Integration', () => {
         description = 'Test tool';
         schema = z.object({});
 
-        protected executeValidated(): Promise<ToolResult> {
+        protected executeValidated(
+          _args: z.infer<typeof this.schema>,
+          context?: ToolContext
+        ): Promise<ToolResult> {
+          if (context?.signal?.aborted) {
+            return Promise.resolve({
+              content: [{ type: 'text', text: 'Tool execution aborted' }],
+              status: 'aborted' as const,
+            });
+          }
           return Promise.resolve({
             content: [{ type: 'text', text: 'Tool result' }],
             status: 'completed' as const,

@@ -299,6 +299,128 @@ describe('conversation-builder', () => {
         'Compacted result'
       );
     });
+
+    it('should keep first TOOL_RESULT event when multiple have different statuses', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Aborted result' }],
+            status: 'aborted',
+          },
+        },
+        {
+          id: 'evt3',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:03:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Failed result' }],
+            status: 'failed',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep only the first result (completed - first encountered)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Completed result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('completed');
+    });
+
+    it('should test deduplication with failed status first', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-456',
+            content: [{ type: 'text', text: 'Failed result' }],
+            status: 'failed',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-456',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep only the first result (failed - first encountered)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Failed result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('failed');
+    });
+
+    it('should test deduplication with aborted status first', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-789',
+            content: [{ type: 'text', text: 'Aborted result' }],
+            status: 'aborted',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-789',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep only the first result (aborted - first encountered)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Aborted result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('aborted');
+    });
   });
 
   describe('malformed compaction data handling', () => {

@@ -45,7 +45,7 @@ describe('Delegate Tool Renderer', () => {
         }),
       },
     ],
-    status: 'completed' as const, // Will be detected by status
+    status: 'failed' as const,
   };
 
   const mockTimeoutResult: ToolResult = {
@@ -61,7 +61,7 @@ describe('Delegate Tool Renderer', () => {
         }),
       },
     ],
-    status: 'completed' as const,
+    status: 'failed' as const,
   };
 
   describe('getSummary', () => {

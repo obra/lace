@@ -97,7 +97,10 @@ Example:
             return this.createError(`Operation not permitted: Cannot access file ${args.path}`);
         }
       }
-      throw error;
+      // Return error for unexpected read errors instead of throwing
+      return this.createError(
+        `Unexpected error reading file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
 
     // Validate all edits first
@@ -105,6 +108,11 @@ Example:
     const editResults: { occurrences: number; expectedOccurrences: number }[] = [];
 
     for (let i = 0; i < edits.length; i++) {
+      // Check for abort signal during validation loop
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
       const edit = edits[i];
       const occurrences = this.countOccurrences(workingContent, edit.old_text);
       const expectedOccurrences = edit.occurrences ?? 1;
@@ -197,6 +205,11 @@ ${suggestedFixes.map((fix, idx) => `${idx + 1}. ${fix.suggestion}`).join('\n')}`
           diff: diffContext,
         }
       );
+    }
+
+    // Check for abort before writing
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
     }
 
     // Write file

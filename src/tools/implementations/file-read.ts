@@ -131,8 +131,10 @@ export class FileReadTool extends Tool {
         );
       }
 
-      // Re-throw unexpected errors
-      throw error;
+      // Return error for unexpected errors instead of throwing
+      return this.createError(
+        `Unexpected error reading file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 

@@ -94,10 +94,26 @@ describe('fileWriteRenderer', () => {
       expect(fileWriteRenderer.isError?.(mockSuccessResult)).toBe(false);
     });
 
-    test('should detect error from content text patterns', () => {
+    test('should detect aborted status as error', () => {
+      const abortedResult: ToolResult = {
+        content: [{ type: 'text', text: 'File write was aborted' }],
+        status: 'aborted' as const,
+      };
+      expect(fileWriteRenderer.isError?.(abortedResult)).toBe(true);
+    });
+
+    test('should detect denied status as error', () => {
+      const deniedResult: ToolResult = {
+        content: [{ type: 'text', text: 'File write was denied by user' }],
+        status: 'denied' as const,
+      };
+      expect(fileWriteRenderer.isError?.(deniedResult)).toBe(true);
+    });
+
+    test('should prioritize completed status over content-based error detection', () => {
       const contentErrorResult: ToolResult = {
         content: [{ type: 'text', text: 'Failed to write file: ENOSPC' }],
-        status: 'completed' as const, // Will be detected by content analysis
+        status: 'completed' as const, // Status precedence - content-based error detection ignored when status is 'completed'
       };
       expect(fileWriteRenderer.isError?.(contentErrorResult)).toBe(false);
     });

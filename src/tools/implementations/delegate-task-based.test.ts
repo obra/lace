@@ -175,5 +175,27 @@ describe('Task-Based DelegateTool Integration', () => {
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('blocked');
     });
+
+    it('should handle aborted signal during execution', async () => {
+      const abortController = new AbortController();
+      abortController.abort(); // Signal is already aborted
+
+      const abortedContext: ToolContext = {
+        signal: abortController.signal,
+        agent: context.agent,
+      };
+
+      const result = await delegateTool.execute(
+        {
+          title: 'Aborted Task',
+          prompt: 'This task should be aborted',
+          expected_response: 'Should not complete',
+          model: 'anthropic:claude-3-5-haiku-20241022',
+        },
+        abortedContext
+      );
+
+      expect(result.status).toBe('aborted');
+    });
   });
 });

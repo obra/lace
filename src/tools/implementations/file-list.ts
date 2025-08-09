@@ -97,16 +97,20 @@ export class FileListTool extends Tool {
       }
 
       const resultCounter = { count: 0, truncated: false };
-      const tree = await this.buildTree(resolvedPath, {
-        pattern,
-        includeHidden,
-        recursive,
-        maxDepth,
-        summaryThreshold,
-        maxResults,
-        currentDepth: 0,
-        resultCounter,
-      });
+      const tree = await this.buildTree(
+        resolvedPath,
+        {
+          pattern,
+          includeHidden,
+          recursive,
+          maxDepth,
+          summaryThreshold,
+          maxResults,
+          currentDepth: 0,
+          resultCounter,
+        },
+        context.signal
+      );
 
       // If tree has no children, return "No files found"
       let output = '';
@@ -123,6 +127,10 @@ export class FileListTool extends Tool {
 
       return this.createResult(output);
     } catch (error: unknown) {
+      // Handle cancellation
+      if (error instanceof Error && error.message === 'Aborted') {
+        return this.createCancellationResult();
+      }
       return this.handleFileSystemError(error, args.path);
     }
   }
@@ -138,8 +146,14 @@ export class FileListTool extends Tool {
       maxResults: number;
       currentDepth: number;
       resultCounter: { count: number; truncated: boolean };
-    }
+    },
+    signal?: AbortSignal
   ): Promise<TreeNode> {
+    // Check for abort signal
+    if (signal?.aborted) {
+      throw new Error('Aborted');
+    }
+
     const dirName = dirPath.split('/').pop() || dirPath;
     const node: TreeNode = {
       name: dirName,
@@ -159,7 +173,7 @@ export class FileListTool extends Tool {
 
       if (shouldSummarize) {
         // Count files and directories recursively
-        const counts = await this.countFilesAndDirs(dirPath);
+        const counts = await this.countFilesAndDirs(dirPath, signal);
         node.type = 'summary';
         node.summary = counts;
         node.children = undefined;
@@ -186,10 +200,14 @@ export class FileListTool extends Tool {
           if (options.pattern && !this.matchesPattern(item, options.pattern)) {
             // Still need to traverse if recursive, but don't include in output
             if (options.recursive && options.currentDepth < options.maxDepth) {
-              const childNode = await this.buildTree(fullPath, {
-                ...options,
-                currentDepth: options.currentDepth + 1,
-              });
+              const childNode = await this.buildTree(
+                fullPath,
+                {
+                  ...options,
+                  currentDepth: options.currentDepth + 1,
+                },
+                signal
+              );
               // Only include if it has matching children
               if (childNode.children && childNode.children.length > 0) {
                 children.push(childNode);
@@ -200,10 +218,14 @@ export class FileListTool extends Tool {
           }
 
           if (options.recursive && options.currentDepth < options.maxDepth) {
-            const childNode = await this.buildTree(fullPath, {
-              ...options,
-              currentDepth: options.currentDepth + 1,
-            });
+            const childNode = await this.buildTree(
+              fullPath,
+              {
+                ...options,
+                currentDepth: options.currentDepth + 1,
+              },
+              signal
+            );
             children.push(childNode);
             options.resultCounter.count++;
           } else {
@@ -251,7 +273,15 @@ export class FileListTool extends Tool {
     return node;
   }
 
-  private async countFilesAndDirs(dirPath: string): Promise<{ files: number; dirs: number }> {
+  private async countFilesAndDirs(
+    dirPath: string,
+    signal?: AbortSignal
+  ): Promise<{ files: number; dirs: number }> {
+    // Check for abort signal
+    if (signal?.aborted) {
+      throw new Error('Aborted');
+    }
+
     let fileCount = 0;
     let dirCount = 0;
 
@@ -259,13 +289,17 @@ export class FileListTool extends Tool {
       const items = await readdir(dirPath);
 
       for (const item of items) {
+        // Check abort signal periodically during loop
+        if (signal?.aborted) {
+          throw new Error('Aborted');
+        }
         const fullPath = join(dirPath, item);
         try {
           const stats = await stat(fullPath);
           if (stats.isDirectory()) {
             dirCount++;
             // Recursively count subdirectories
-            const subCounts = await this.countFilesAndDirs(fullPath);
+            const subCounts = await this.countFilesAndDirs(fullPath, signal);
             fileCount += subCounts.files;
             dirCount += subCounts.dirs;
           } else {

@@ -258,31 +258,27 @@ export class ToolExecutor {
     call: ToolCall,
     context: ToolContext
   ): Promise<ToolResult> {
-    // Set up environment for tool execution
-    const originalEnv = { ...process.env };
-
     try {
-      // Apply project environment variables if agent is available
+      // Create enhanced context with environment and temp directory
+      let toolContext: ToolContext = context || {};
+
+      // Merge project environment variables if agent is available
       if (context?.agent) {
         const session = await context.agent.getFullSession();
         const projectId = session?.getProjectId();
+
+        // Create merged environment for subprocess execution
         if (projectId) {
           const projectEnv = this.envManager.getMergedEnvironment(projectId);
-          Object.assign(process.env, projectEnv);
+          toolContext.processEnv = { ...process.env, ...projectEnv };
         }
-      }
 
-      // Create enhanced context with temp directory information
-      let toolContext: ToolContext = context || {};
-
-      // Create temp directories if agent is available
-      if (context?.agent) {
         // Use the LLM-provided tool call ID and create temp directory
         const toolTempDir = await this.createToolTempDirectory(call.id, context);
 
         // Enhanced context with temp directory information
         toolContext = {
-          ...context,
+          ...toolContext,
           toolTempDir,
         };
       }
@@ -299,14 +295,6 @@ export class ToolExecutor {
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
-    } finally {
-      // Restore original environment - properly restore all keys
-      for (const key in process.env) {
-        if (!(key in originalEnv)) {
-          delete process.env[key];
-        }
-      }
-      Object.assign(process.env, originalEnv);
     }
   }
 }

@@ -69,7 +69,6 @@ export const bashRenderer: ToolRenderer = {
     const hasStdout = stdout && stdout.trim();
     const hasStderr = stderr && stderr.trim();
     const hasNonZeroExit = exitCode != null && exitCode !== 0;
-    const isError = result.status !== 'completed' || hasNonZeroExit;
 
     return (
       <div className="space-y-2">

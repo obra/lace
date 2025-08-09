@@ -15,6 +15,9 @@ export interface ToolContext {
 
   // Agent reference - provides access to threadId, session, and other context
   agent?: Agent;
+
+  // Environment variables for subprocess execution
+  processEnv?: NodeJS.ProcessEnv;
 }
 
 export interface ToolAnnotations {

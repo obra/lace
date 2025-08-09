@@ -559,19 +559,20 @@ const taskAddNoteRenderer: ToolRenderer = {
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
     
-    if (!parsed) {
+    // Check for error statuses first
+    if (result.status === 'failed' || result.status === 'denied' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+      const error = parsed as { error: string };
       return (
-        <div className="text-sm text-base-content/60 italic">
-          Note added to task
+        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
+          <div className="text-error text-sm">{error?.error || `Failed to add note (${result.status})`}</div>
         </div>
       );
     }
     
-    if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
-      const error = parsed as { error: string };
+    if (!parsed) {
       return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="text-error text-sm">{error.error}</div>
+        <div className="text-sm text-base-content/60 italic">
+          Note added to task
         </div>
       );
     }

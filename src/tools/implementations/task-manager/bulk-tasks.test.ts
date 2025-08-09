@@ -218,4 +218,27 @@ describe('Bulk Task Creation', () => {
     );
     expect(result.content[0].text).toContain('Low Priority Task');
   });
+
+  it('should handle aborted signal during execution', async () => {
+    const abortController = new AbortController();
+    abortController.abort(); // Signal is already aborted
+
+    const result = await tool.execute(
+      {
+        tasks: [
+          {
+            title: 'Aborted Task',
+            prompt: 'This task should be aborted',
+            priority: 'medium' as const,
+          },
+        ],
+      },
+      {
+        signal: abortController.signal,
+        agent: session.getAgent(session.getId())!,
+      }
+    );
+
+    expect(result.status).toBe('aborted');
+  });
 });

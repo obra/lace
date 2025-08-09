@@ -158,7 +158,7 @@ describe('Agent Tool Abort Functionality', () => {
     });
 
     let toolCompletedCount = 0;
-    const toolResults: any[] = [];
+    const toolResults: ToolResult[] = [];
 
     agent.on('tool_call_complete', ({ result }) => {
       toolCompletedCount++;
@@ -185,8 +185,8 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Check that tool was marked as cancelled
     expect(toolCompletedCount).toBe(1);
-    expect((toolResults[0] as ToolResult).status).toBe('aborted');
-    expect((toolResults[0] as ToolResult).content[0].text).toContain('cancelled by user');
+    expect(toolResults[0].status).toBe('aborted');
+    expect(toolResults[0].content[0].text).toContain('cancelled by user');
   });
 
   it('should abort multiple tools in a batch', async () => {
@@ -542,9 +542,6 @@ describe('Agent Tool Abort Functionality', () => {
 
     // State should have changed from tool_execution (either to idle or thinking for followup)
     const finalState = stateChanges[stateChanges.length - 1];
-    // Debug: log all events to understand the flow
-    console.log('All events:', agentEvents);
-    console.log('State changes:', stateChanges);
     expect(['idle', 'thinking']).toContain(finalState);
 
     // Check thread events for proper TOOL_RESULT events

@@ -28,7 +28,7 @@ class TestTool extends Tool {
   };
 
   protected async executeValidated(
-    _args: any,
+    _args: z.infer<typeof this.schema>,
     _context: import('~/tools/types').ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve({
@@ -47,7 +47,7 @@ class SimpleTool extends Tool {
   });
 
   protected async executeValidated(
-    _args: any,
+    _args: z.infer<typeof this.schema>,
     _context: import('~/tools/types').ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve({

@@ -38,6 +38,11 @@ describe('FileFindTool with schema validation', () => {
     await tempDir.cleanup();
   });
 
+  // Helper function for context generation
+  function createTestContext(signal: AbortSignal): { signal: AbortSignal } {
+    return { signal };
+  }
+
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_find');
@@ -535,6 +540,21 @@ describe('FileFindTool with schema validation', () => {
       // This test would need a way to simulate file system errors
       // For now, just verify the tool handles errors gracefully
       expect(tool.name).toBe('file_find');
+    });
+
+    it('should handle already-aborted signal', async () => {
+      const abortController = new AbortController();
+      abortController.abort(); // Signal is already aborted
+
+      const result = await tool.execute(
+        {
+          pattern: '*.ts',
+          path: testDir,
+        },
+        createTestContext(abortController.signal)
+      );
+
+      expect(result.status).toBe('aborted');
     });
   });
 });

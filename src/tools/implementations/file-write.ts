@@ -47,7 +47,7 @@ Creates parent directories automatically if needed. Returns file size written.`;
       }
 
       // Write the file
-      await writeFile(resolvedPath, content, 'utf-8');
+      await writeFile(resolvedPath, content, 'utf8');
 
       return this.createResult(
         `Successfully wrote ${this.formatFileSize(content.length)} to ${resolvedPath}`

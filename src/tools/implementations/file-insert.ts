@@ -69,6 +69,11 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
         operation = `Inserted after line ${line}`;
       }
 
+      // Check for abort before writing
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
       // Write back
       await writeFile(resolvedPath, newContent, 'utf-8');
 

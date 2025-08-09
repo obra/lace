@@ -96,6 +96,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       const childProcess = spawn('/bin/bash', ['-c', command], {
         cwd: context?.workingDirectory || process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: context?.processEnv || process.env,
       });
 
       return new Promise<ToolResult>((resolve) => {
@@ -207,6 +208,8 @@ Exit codes shown even for successful tool execution. Working directory persists 
                   .filter(Boolean)
                   .join('\n\n');
 
+                // Ensure abort listener is cleaned up (though it should already be cleaned up)
+                context.signal.removeEventListener('abort', abortHandler);
                 resolve(this.createCancellationResult(partialOutput));
               } else {
                 this.completeExecution(
@@ -489,6 +492,9 @@ Exit codes shown even for successful tool execution. Working directory persists 
     // This handles single nonexistent commands like "nonexistentcommand12345"
     if (exitCode === 127 && stdoutLineCount === 0) {
       resolve(this.createError(result as unknown as Record<string, unknown>));
+    } else if (exitCode === null) {
+      // Process was terminated by signal (e.g., SIGKILL, SIGTERM)
+      resolve(this.createCancellationResult());
     } else {
       resolve(this.createResult(result as unknown as Record<string, unknown>));
     }

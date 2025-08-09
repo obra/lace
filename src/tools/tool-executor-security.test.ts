@@ -113,10 +113,11 @@ describe('ToolExecutor Security with Real Session Context', () => {
         getFullSession: () => Promise.resolve(null),
       } as unknown as Agent;
 
-      const emptyContext = {
+      const emptyContext: ToolContext = {
+        signal: new AbortController().signal,
         agent: mockAgentWithNoSession,
         workingDirectory: '/tmp',
-      } as ToolContext;
+      };
 
       const emptyResult = await toolExecutor.requestToolPermission(toolCall, emptyContext);
       expect(emptyResult).toMatchObject({

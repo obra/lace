@@ -33,6 +33,16 @@ const DelegateStatusBadge: React.FC<{ status: string }> = ({ status }) => {
       icon: faExclamationTriangle,
       label: 'Failed'
     },
+    denied: { 
+      style: 'bg-error/10 text-error border-error/20',
+      icon: faExclamationTriangle,
+      label: 'Denied'
+    },
+    aborted: { 
+      style: 'bg-warning/10 text-warning border-warning/20',
+      icon: faExclamationTriangle,
+      label: 'Aborted'
+    },
     timeout: { 
       style: 'bg-warning/10 text-warning border-warning/20',
       icon: faClock,

@@ -1031,10 +1031,34 @@ export class Agent extends EventEmitter {
             this._handleBatchComplete();
           }
         }
-      } else {
+      } else if (permission === 'pending') {
         // Permission pending - approval request was created
         // Don't decrement pending count yet - wait for approval response
         return;
+      } else {
+        // Permission was denied - we got a ToolResult back
+        const result = permission;
+
+        // Only add events if thread still exists
+        if (this._threadManager.getThread(this._threadId)) {
+          // Remove from active tools (it was denied)
+          this._activeToolCalls.delete(toolCall.id);
+
+          // Add result and update tracking
+          this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+          this.emit('tool_call_complete', {
+            toolName: toolCall.name,
+            result,
+            callId: toolCall.id,
+          });
+
+          // Update batch tracking
+          this._pendingToolCount--;
+
+          if (this._pendingToolCount === 0) {
+            this._handleBatchComplete();
+          }
+        }
       }
     } catch (error: unknown) {
       // Handle permission/execution errors

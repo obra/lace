@@ -57,6 +57,7 @@ export class MockSlowTool extends Tool {
       // Handle abort signal
       const abortHandler = () => {
         clearInterval(intervalId);
+        signal.removeEventListener('abort', abortHandler);
         const finalElapsed = Date.now() - startTime;
         const progress = Math.min(100, Math.floor((finalElapsed / delay) * 100));
         resolve(
