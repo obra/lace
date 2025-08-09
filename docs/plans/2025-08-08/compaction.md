@@ -645,14 +645,22 @@ The Agent.compact() method was updated in Phase 2 to use the SummarizeCompaction
 
 ---
 
-## Phase 4: Automatic Compaction (NOT STARTED)
+## Phase 4: Automatic Compaction ✅ **COMPLETED**
 
-### Task 4.1: Add Auto-Compaction Trigger
+### Task 4.1: Add Auto-Compaction Trigger ✅ **COMPLETED**
 **Goal**: Automatically compact when approaching token limits.
 
-**Files to modify**:
-- `src/agents/agent.ts` - Add threshold checking after messages
-- `src/agents/agent-auto-compact.test.ts` - Create test
+**Status**: ✅ **COMPLETED** - Committed in `48e8643d`
+
+**Files implemented**:
+- `src/agents/agent.ts` - Added auto-compaction configuration and _checkAutoCompaction() method
+- `src/agents/agent-auto-compact.test.ts` - Comprehensive test suite with 4 test cases
+
+**Key Features**:
+- 80% threshold trigger (configurable via TokenBudget)
+- 60-second cooldown between compactions
+- Graceful failure handling - continues conversation even if compaction fails
+- Integrates with TokenBudgetManager's shouldPrune recommendation
 
 **Implementation in agent.ts**:
 ```typescript
@@ -770,11 +778,23 @@ describe('Agent auto-compaction', () => {
 
 **Commit**: `feat: add automatic compaction when approaching token limits`
 
+## Phase 4 Summary ✅ **COMPLETED**
+
+**What was delivered**:
+1. ✅ **Automatic Compaction Trigger** - Compacts at 80% token limit threshold
+2. ✅ **Cooldown Period** - Prevents excessive compaction with 60-second cooldown
+3. ✅ **Graceful Failure Handling** - Continues conversation even if compaction fails
+4. ✅ **TokenBudgetManager Integration** - Uses existing token budget recommendations
+
+The system now automatically compacts conversations when approaching token limits, preventing context window overflow without user intervention.
+
 ---
 
-## Phase 5: API and Web UI Integration
+## Phase 5: API and Web UI Integration (SKIPPED - Out of Scope)
 
-### Task 5.1: Add Token Info to API Responses
+**Note**: Phase 5 involves modifications to the web package which is outside the scope of the core Lace package. This would be implemented separately in the web interface codebase.
+
+### Task 5.1: Add Token Info to API Responses (NOT IMPLEMENTED)
 **Goal**: Include token usage in session/thread API responses.
 
 **Files to modify**:
