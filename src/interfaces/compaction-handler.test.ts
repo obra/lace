@@ -17,6 +17,22 @@ class MockCompactionDisplay implements CompactionDisplay {
   onCompactionError = vi.fn();
 }
 
+// Concrete mock provider for testing
+class MockProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
+
+  get providerName(): string {
+    return 'mock';
+  }
+
+  createResponse = vi.fn().mockResolvedValue({
+    content: 'Mock response',
+    toolCalls: [],
+  });
+}
+
 describe('CompactionHandler', () => {
   setupCoreTest();
   let agent: Agent;
@@ -27,8 +43,7 @@ describe('CompactionHandler', () => {
   beforeEach(() => {
     threadManager = new ThreadManager();
     const threadId = threadManager.createThread();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const provider: BaseMockProvider = new BaseMockProvider({});
+    const provider = new MockProvider();
     const toolExecutor = new ToolExecutor();
 
     agent = new Agent({

@@ -87,20 +87,20 @@ describe('Agent command handling', () => {
     expect(agent['_provider'].createResponse).toHaveBeenCalled();
   });
 
-  it('should emit thinking events during compaction', async () => {
-    const thinkingStartSpy = vi.fn();
-    const thinkingCompleteSpy = vi.fn();
+  it('should emit compaction events during compaction', async () => {
+    const compactionStartSpy = vi.fn();
+    const compactionCompleteSpy = vi.fn();
 
-    agent.on('agent_thinking_start', thinkingStartSpy);
-    agent.on('agent_thinking_complete', thinkingCompleteSpy);
+    agent.on('compaction_start', compactionStartSpy);
+    agent.on('compaction_complete', compactionCompleteSpy);
 
     // Mock compact method to resolve successfully
     vi.spyOn(agent, 'compact').mockResolvedValue();
 
     await agent.sendMessage('/compact');
 
-    expect(thinkingStartSpy).toHaveBeenCalled();
-    expect(thinkingCompleteSpy).toHaveBeenCalled();
+    expect(compactionStartSpy).toHaveBeenCalled();
+    expect(compactionCompleteSpy).toHaveBeenCalled();
   });
 
   it('should handle compact command errors gracefully', async () => {

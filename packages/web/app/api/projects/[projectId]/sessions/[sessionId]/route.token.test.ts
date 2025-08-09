@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { Project } from '@/lib/server/lace-imports';
-import { ThreadManager } from '~/threads/thread-manager';
 import type { ThreadEvent } from '~/threads/types';
 import { parseResponse } from '@/lib/serialization';
 
@@ -112,11 +111,25 @@ describe('Session API Token Usage', () => {
       getSession: vi.fn().mockReturnValue(mockSession),
     };
 
-    vi.mocked(Project.getById).mockReturnValue(mockProject as any);
+    vi.mocked(Project.getById).mockReturnValue(
+      mockProject as {
+        getSession: () => {
+          id: string;
+          name: string;
+          createdAt: Date;
+          agents: unknown[];
+        };
+      }
+    );
 
     // Mock Session.getById
     const { Session } = await import('@/lib/server/lace-imports');
-    vi.mocked(Session.getById).mockResolvedValue(mockSessionInstance as any);
+    vi.mocked(Session.getById).mockResolvedValue(
+      mockSessionInstance as {
+        getId: () => string;
+        getAgent: () => unknown;
+      }
+    );
 
     // Mock aggregateTokenUsage
     const { aggregateTokenUsage } = await import('~/threads/token-aggregation');
@@ -136,7 +149,14 @@ describe('Session API Token Usage', () => {
 
     expect(response.status).toBe(200);
 
-    const body = await parseResponse(response);
+    const body = (await parseResponse(response)) as {
+      tokenUsage?: {
+        totalPromptTokens: number;
+        totalCompletionTokens: number;
+        totalTokens: number;
+        eventCount: number;
+      };
+    };
 
     // Check that session is present
     expect(body.session).toBeDefined();
@@ -213,11 +233,25 @@ describe('Session API Token Usage', () => {
       getSession: vi.fn().mockReturnValue(mockSession),
     };
 
-    vi.mocked(Project.getById).mockReturnValue(mockProject as any);
+    vi.mocked(Project.getById).mockReturnValue(
+      mockProject as {
+        getSession: () => {
+          id: string;
+          name: string;
+          createdAt: Date;
+          agents: unknown[];
+        };
+      }
+    );
 
     // Mock Session.getById
     const { Session } = await import('@/lib/server/lace-imports');
-    vi.mocked(Session.getById).mockResolvedValue(mockSessionInstance as any);
+    vi.mocked(Session.getById).mockResolvedValue(
+      mockSessionInstance as {
+        getId: () => string;
+        getAgent: () => unknown;
+      }
+    );
 
     // Mock aggregateTokenUsage to return zeros
     const { aggregateTokenUsage } = await import('~/threads/token-aggregation');
@@ -237,7 +271,14 @@ describe('Session API Token Usage', () => {
 
     expect(response.status).toBe(200);
 
-    const body = await parseResponse(response);
+    const body = (await parseResponse(response)) as {
+      tokenUsage?: {
+        totalPromptTokens: number;
+        totalCompletionTokens: number;
+        totalTokens: number;
+        eventCount: number;
+      };
+    };
 
     // Token usage should still be present but with zero values
     expect(body.tokenUsage).toBeDefined();
@@ -298,11 +339,25 @@ describe('Session API Token Usage', () => {
       getSession: vi.fn().mockReturnValue(mockSession),
     };
 
-    vi.mocked(Project.getById).mockReturnValue(mockProject as any);
+    vi.mocked(Project.getById).mockReturnValue(
+      mockProject as {
+        getSession: () => {
+          id: string;
+          name: string;
+          createdAt: Date;
+          agents: unknown[];
+        };
+      }
+    );
 
     // Mock Session.getById
     const { Session } = await import('@/lib/server/lace-imports');
-    vi.mocked(Session.getById).mockResolvedValue(mockSessionInstance as any);
+    vi.mocked(Session.getById).mockResolvedValue(
+      mockSessionInstance as {
+        getId: () => string;
+        getAgent: () => unknown;
+      }
+    );
 
     // Mock aggregateTokenUsage with high usage
     const { aggregateTokenUsage } = await import('~/threads/token-aggregation');
@@ -320,7 +375,14 @@ describe('Session API Token Usage', () => {
       params: Promise.resolve({ projectId: mockProjectId, sessionId: mockSessionId }),
     });
 
-    const body = await parseResponse(response);
+    const body = (await parseResponse(response)) as {
+      tokenUsage?: {
+        totalPromptTokens: number;
+        totalCompletionTokens: number;
+        totalTokens: number;
+        eventCount: number;
+      };
+    };
 
     // Should be marked as near limit (10000 > 12000 * 0.8)
     expect(body.tokenUsage.nearLimit).toBe(true);
