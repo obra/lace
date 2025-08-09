@@ -30,8 +30,8 @@ describe('Compaction Integration Test', () => {
   let projectId: string;
   let sessionId: ThreadId;
   let providerInstanceId: string;
-  let streamedEvents: any[] = [];
-  let originalBroadcast: any;
+  let streamedEvents: unknown[] = [];
+  let originalBroadcast: EventStreamManager['broadcast'] | undefined;
 
   beforeEach(async () => {
     streamedEvents = [];
@@ -67,10 +67,13 @@ describe('Compaction Integration Test', () => {
     // Intercept SSE broadcasts to capture events
     const eventManager = EventStreamManager.getInstance();
     originalBroadcast = eventManager.broadcast;
-    eventManager.broadcast = vi.fn((event: any) => {
+    const mockBroadcast = vi.fn((event) => {
       streamedEvents.push(event);
-      return originalBroadcast.call(eventManager, event);
+      if (originalBroadcast) {
+        return originalBroadcast.call(eventManager, event);
+      }
     });
+    eventManager.broadcast = mockBroadcast as typeof eventManager.broadcast;
 
     // Register session with event manager and setup agent event handlers
     const sessionService = getSessionService();
@@ -91,8 +94,8 @@ describe('Compaction Integration Test', () => {
 
     // Cleanup
     try {
-      await cleanupTestProviderInstances();
-    } catch (e) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    } catch (_e) {
       // Ignore cleanup errors
     }
     cleanupTestProviderDefaults();
@@ -111,7 +114,7 @@ describe('Compaction Integration Test', () => {
     // Note: This will fail with test provider but create events
     try {
       await agent.sendMessage('Build some context first');
-    } catch (e) {
+    } catch (_e) {
       // Expected to fail with test provider
     }
 
@@ -125,7 +128,9 @@ describe('Compaction Integration Test', () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Verify compaction start event was emitted (with fixed event handler)
-    const compactionStartEvents = streamedEvents.filter((e) => e.data?.type === 'COMPACTION_START');
+    const _compactionStartEvents = streamedEvents.filter(
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+    );
 
     // We expect 0 events since the handler won't match due to missing message
     // But the LOCAL_SYSTEM_MESSAGE should be added
@@ -173,7 +178,14 @@ describe('Compaction Integration Test', () => {
     });
 
     expect(response.status).toBe(200);
-    const sessionData = await parseResponse(response);
+    const sessionData = (await parseResponse(response)) as {
+      tokenUsage?: {
+        totalPromptTokens: number;
+        totalCompletionTokens: number;
+        totalTokens: number;
+        eventCount: number;
+      };
+    };
 
     // Verify token usage is calculated correctly
     expect(sessionData.tokenUsage).toBeDefined();
@@ -195,13 +207,15 @@ describe('Compaction Integration Test', () => {
 
     // Ensure session service has the projectId set for this test
     const sessionService = getSessionService();
-    (sessionService as any).projectId = projectId;
+    (sessionService as { projectId?: string }).projectId = projectId;
 
     // Simulate a compaction with the right event structure
-    agent.emit('agent_thinking_start', { message: 'Starting compaction...' });
+    agent.emit('compaction_start', { auto: false });
 
     // Check that compaction start event was emitted
-    const compactionStartEvents = streamedEvents.filter((e) => e.data?.type === 'COMPACTION_START');
+    const compactionStartEvents = streamedEvents.filter(
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+    );
 
     expect(compactionStartEvents.length).toBe(1);
     expect(compactionStartEvents[0]).toMatchObject({
@@ -222,11 +236,11 @@ describe('Compaction Integration Test', () => {
     });
 
     // Simulate compaction complete
-    agent.emit('agent_thinking_complete');
+    agent.emit('compaction_complete', { success: true });
 
     // Check that compaction complete event was emitted
     const compactionCompleteEvents = streamedEvents.filter(
-      (e) => e.data?.type === 'COMPACTION_COMPLETE'
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_COMPLETE'
     );
 
     expect(compactionCompleteEvents.length).toBe(1);

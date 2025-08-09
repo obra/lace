@@ -22,9 +22,7 @@ const server = setupServer();
 // Start MSW server immediately to intercept all requests
 beforeAll(() => {
   server.listen({
-    onUnhandledRequest: (req) => {
-      console.log('[MSW] Unhandled request:', req.method, req.url);
-    },
+    onUnhandledRequest: (_req) => {},
   });
 });
 
@@ -55,20 +53,20 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   let sessionId: ThreadId;
   let agentId: ThreadId;
   let providerInstanceId: string;
-  let streamedEvents: any[] = [];
-  let originalBroadcast: any;
+  let streamedEvents: unknown[] = [];
+  let originalBroadcast: EventStreamManager['broadcast'] | undefined;
 
   // Helper function to create proper SSE stream for Anthropic streaming responses
   // Define it at the describe level so all tests can use it
-  const createAnthropicStreamResponse = (events: any[]) => {
+  const createAnthropicStreamResponse = (events: unknown[]) => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
         // Send each event as proper SSE with event type and data
         for (const event of events) {
           // Anthropic SDK expects events with event: and data: fields
-          if (event.type) {
-            controller.enqueue(encoder.encode(`event: ${event.type}\n`));
+          if ((event as { type?: string }).type) {
+            controller.enqueue(encoder.encode(`event: ${(event as { type: string }).type}\n`));
           }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         }
@@ -137,10 +135,13 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     // Intercept SSE broadcasts to capture events
     const eventManager = EventStreamManager.getInstance();
     originalBroadcast = eventManager.broadcast;
-    eventManager.broadcast = vi.fn((event: any) => {
+    const mockBroadcast = vi.fn((event) => {
       streamedEvents.push(event);
-      return originalBroadcast.call(eventManager, event);
+      if (originalBroadcast) {
+        return originalBroadcast.call(eventManager, event);
+      }
     });
+    eventManager.broadcast = mockBroadcast as typeof eventManager.broadcast;
 
     // Register session with event manager and setup agent event handlers
     const sessionService = getSessionService();
@@ -171,21 +172,21 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
 
     // Cleanup
     try {
-      await cleanupTestProviderInstances();
-    } catch (e) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    } catch (_e) {
       // Ignore cleanup errors
     }
     cleanupTestProviderDefaults();
     Session.clearRegistry();
-    
-    // Reset MSW server  
+
+    // Reset MSW server
     server.resetHandlers();
   });
 
   it('should trigger auto-compaction when approaching token limit and emit proper events', async () => {
     let messageCount = 0;
     let shouldTriggerCompaction = false;
-    let compactionRequested = false;
+    let _compactionRequested = false;
 
     // Get the session's agent which already has proper provider configuration
     const session = await Session.getById(sessionId);
@@ -199,57 +200,40 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     await agent.start();
 
     // Verify we have the right provider
-    const providerInstance = (agent as any)._provider;
+    const providerInstance = (agent as { _provider: unknown })._provider;
     expect(providerInstance).toBeDefined();
     expect(providerInstance.constructor.name).toBe('AnthropicProvider');
     expect(providerInstance.isConfigured()).toBe(true);
 
     // The agent auto-initialized its token budget from the model
     // We need to update it to trigger compaction more easily for testing
-    const tokenBudgetManager = (agent as any)._tokenBudgetManager;
+    const tokenBudgetManager = (agent as { _tokenBudgetManager: unknown })._tokenBudgetManager;
     if (tokenBudgetManager) {
-      console.log('[TEST] Current token budget:', tokenBudgetManager._config);
       tokenBudgetManager.updateConfig({
         maxTokens: 12000, // Lower limit for testing
         reserveTokens: 1000,
         warningThreshold: 0.7,
       });
-      console.log('[TEST] Updated token budget for testing:', {
-        maxTokens: 12000,
-        warningThreshold: 0.7,
-      });
-    } else {
-      console.log('[TEST] Warning: No token budget manager found on agent');
     }
 
     // Add listeners to debug what's happening
-    agent.on('compaction_start', ({ auto }: { auto: boolean }) => {
-      console.log('[TEST] Compaction start:', auto ? 'auto' : 'manual');
-      compactionRequested = true;
-      console.log('[TEST] COMPACTION TRIGGERED!');
+    agent.on('compaction_start', ({ auto: _auto }: { auto: boolean }) => {
+      _compactionRequested = true;
     });
 
-    agent.on('compaction_complete', ({ success }: { success: boolean }) => {
-      console.log('[TEST] Compaction complete:', success ? 'success' : 'failed');
-    });
+    agent.on('compaction_complete', ({ success: _success }: { success: boolean }) => {});
 
-    agent.on('error', ({ error }: { error: Error }) => {
-      console.log('[TEST] Agent error:', error.message);
-    });
+    agent.on('error', ({ error: _error }: { error: Error }) => {});
 
     // Mock Anthropic API responses with proper streaming format
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-        console.log('[MSW] Intercepting Anthropic API request');
-        const body = (await request.json()) as any;
+        const body = (await request.json()) as {
+          stream?: boolean;
+          messages?: Array<{ content?: string }>;
+        };
         const isStreaming = body.stream === true;
         messageCount++;
-        console.log(`[MSW] Intercepted request ${messageCount}:`, {
-          url: request.url,
-          isStreaming,
-          hasMessages: !!body.messages,
-          messageCount: body.messages?.length,
-        });
 
         // Build response based on message count and context
         let responseText = '';
@@ -267,7 +251,7 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
           outputTokens = 100;
         } else if (
           body.messages?.some(
-            (m: any) => m.content?.includes('summarize') || m.content?.includes('compacting')
+            (m) => m.content?.includes('summarize') || m.content?.includes('compacting')
           )
         ) {
           responseText = `Summary: The conversation involved testing the compaction system with multiple messages to simulate token usage growth.
@@ -376,11 +360,8 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     ];
 
     for (let i = 0; i < messages.length; i++) {
-      console.log(`[TEST] Sending message ${i + 1}: "${messages[i]}"`);
-      
       // Check token budget BEFORE sending
-      const tbmBefore = (agent as any)._tokenBudgetManager;
-      console.log(`[TEST] Token usage BEFORE message ${i + 1}:`, tbmBefore?._totalUsage);
+      const _tbmBefore = (agent as { _tokenBudgetManager: unknown })._tokenBudgetManager;
 
       await agent.sendMessage(messages[i]!);
 
@@ -390,51 +371,29 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       // Check current token usage and state
       const events = agent.threadManager.getEvents(agent.threadId);
       const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
-      const lastAgentMessage = agentMessages[agentMessages.length - 1];
-      
+      const _lastAgentMessage = agentMessages[agentMessages.length - 1];
+
       // Check TokenBudgetManager state
-      const tbm = (agent as any)._tokenBudgetManager;
-      const recommendations = tbm?.getRecommendations();
-      
-      console.log(`[TEST] After message ${i + 1}:`, {
-        totalEvents: events.length,
-        agentMessages: agentMessages.length,
-        lastMessageData: lastAgentMessage?.data,
-        hasTokenUsage: !!(lastAgentMessage?.data as any)?.tokenUsage,
-        tokenUsage: (lastAgentMessage?.data as any)?.tokenUsage,
-        tokenBudgetState: tbm ? {
-          totalUsage: tbm._totalUsage,
-          config: tbm._config,
-          recommendations,
-        } : 'No TokenBudgetManager',
-      });
+      const tbm = (agent as { _tokenBudgetManager: { getRemainingBudget: () => number } })
+        ._tokenBudgetManager;
+      const _recommendations = tbm?.getRecommendations();
 
       // Give auto-compaction time to trigger after message 4
       if (i === 3) {
-        console.log('[TEST] Waiting for auto-compaction to potentially trigger...');
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        
+
         // Check if compaction happened
         const eventsAfterWait = agent.threadManager.getEvents(agent.threadId);
-        const compactionEvent = eventsAfterWait.find(e => e.type === 'COMPACTION');
+        const compactionEvent = eventsAfterWait.find((e) => e.type === 'COMPACTION');
         if (compactionEvent) {
-          console.log('[TEST] COMPACTION EVENT FOUND!', compactionEvent);
         }
       }
     }
 
-    console.log('[TEST] All messages sent. Compaction requested:', compactionRequested);
-    console.log('[TEST] Streamed events count:', streamedEvents.length);
-    console.log(
-      '[TEST] Event types:',
-      streamedEvents.map((e) => e.data?.type)
-    );
-
-
     // Check that compaction actually happened in the thread
     const finalEvents = agent.threadManager.getEvents(agent.threadId);
     const compactionEvent = finalEvents.find((e) => e.type === 'COMPACTION');
-    
+
     expect(compactionEvent).toBeDefined();
     expect(compactionEvent?.data).toMatchObject({
       strategyId: 'summarize',
@@ -443,17 +402,27 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     });
 
     // Check that SSE events were emitted for auto-compaction
-    const compactionStartEvents = streamedEvents.filter((e) => e.data?.type === 'COMPACTION_START');
+    const compactionStartEvents = streamedEvents.filter(
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+    );
     const compactionCompleteEvents = streamedEvents.filter(
-      (e) => e.data?.type === 'COMPACTION_COMPLETE'
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_COMPLETE'
     );
 
     expect(compactionStartEvents.length).toBeGreaterThan(0);
     expect(compactionCompleteEvents.length).toBeGreaterThan(0);
-    
+
     // Verify the SSE event has correct structure
     if (compactionStartEvents.length > 0) {
-      const startEvent = compactionStartEvents[0];
+      const startEvent = compactionStartEvents[0] as {
+        data: {
+          data: {
+            strategy: string;
+            message: string;
+            auto: boolean;
+          };
+        };
+      };
       expect(startEvent.data).toMatchObject({
         type: 'COMPACTION_START',
         data: {
@@ -471,7 +440,14 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     });
 
     expect(response.status).toBe(200);
-    const sessionData = await parseResponse(response);
+    const sessionData = (await parseResponse(response)) as {
+      tokenUsage?: {
+        totalPromptTokens: number;
+        totalCompletionTokens: number;
+        totalTokens: number;
+        eventCount: number;
+      };
+    };
 
     // Token usage should be available
     expect(sessionData.tokenUsage).toBeDefined();
@@ -480,7 +456,6 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     // Should be below limit after compaction
     expect(sessionData.tokenUsage.percentUsed).toBeLessThan(80);
     expect(sessionData.tokenUsage.nearLimit).toBe(false);
-
   });
 
   it('should handle manual /compact command and emit events', async () => {
@@ -530,13 +505,16 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     // Set up MSW handler FIRST before any agent operations
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-        const body = (await request.json()) as any;
+        const body = (await request.json()) as {
+          stream?: boolean;
+          messages?: Array<{ content?: string }>;
+        };
         const isStreaming = body.stream === true;
 
         // Check if this is a summarization request
         if (
           body.messages?.some(
-            (m: any) => m.content?.includes('summarize') || m.content?.includes('compacting')
+            (m) => m.content?.includes('summarize') || m.content?.includes('compacting')
           )
         ) {
           const text = 'Summary: Manual compaction test completed successfully.';
@@ -575,27 +553,22 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       })
     );
 
-    console.log('[TEST-MANUAL] Getting session by ID:', sessionId);
     const session = await Session.getById(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
-    
-    console.log('[TEST-MANUAL] Getting agent from session');
+
     const agent = session.getAgent(sessionId);
-    
+
     if (!agent) {
       throw new Error('Failed to get session agent');
     }
 
-    console.log('[TEST-MANUAL] Starting agent');
     // Start the agent to initialize token budget
     await agent.start();
 
-    console.log('[TEST-MANUAL] Sending first message');
     // Send a regular message first
     await agent.sendMessage('Build some context first');
-    console.log('[TEST-MANUAL] First message sent');
 
     // Clear previous events
     streamedEvents = [];
@@ -607,9 +580,11 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Verify compaction events were emitted
-    const compactionStartEvents = streamedEvents.filter((e) => e.data?.type === 'COMPACTION_START');
+    const compactionStartEvents = streamedEvents.filter(
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+    );
     const compactionCompleteEvents = streamedEvents.filter(
-      (e) => e.data?.type === 'COMPACTION_COMPLETE'
+      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_COMPLETE'
     );
 
     expect(compactionStartEvents.length).toBe(1);
@@ -633,8 +608,11 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     let requestIndex = 0;
 
-    // Helper function to create streaming response - defined BEFORE using it  
-    const createTokenTrackingStreamResponse = (text: string, usage: { input: number; output: number }) => {
+    // Helper function to create streaming response - defined BEFORE using it
+    const createTokenTrackingStreamResponse = (
+      text: string,
+      usage: { input: number; output: number }
+    ) => {
       const events = [
         {
           type: 'message_start',
@@ -678,7 +656,10 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     server.use(
       http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-        const body = (await request.json()) as any;
+        const body = (await request.json()) as {
+          stream?: boolean;
+          messages?: Array<{ content?: string }>;
+        };
         const isStreaming = body.stream === true;
         const usage = tokenUsages[requestIndex] || { input: 100, output: 50 };
         requestIndex++;
@@ -707,7 +688,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     const session = await Session.getById(sessionId);
     const agent = session!.getAgent(sessionId);
-    
+
     if (!agent) {
       throw new Error('Failed to get session agent');
     }
@@ -728,7 +709,14 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       params: Promise.resolve({ projectId, sessionId }),
     });
 
-    const sessionData = await parseResponse(response);
+    const sessionData = (await parseResponse(response)) as {
+      tokenUsage?: {
+        totalPromptTokens: number;
+        totalCompletionTokens: number;
+        totalTokens: number;
+        eventCount: number;
+      };
+    };
 
     // Verify cumulative token counts
     const expectedTotalInput = tokenUsages.reduce((sum, u) => sum + u.input, 0);
