@@ -114,7 +114,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 1',
             prompt: 'First parallel task',
             expected_response: 'Task result',
-            model: 'anthropic:claude-sonnet-4-20250514',
+            model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
           },
           context
         ),
@@ -123,7 +123,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 2',
             prompt: 'Second parallel task',
             expected_response: 'Task result',
-            model: 'anthropic:claude-sonnet-4-20250514',
+            model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
           },
           context
         ),
@@ -132,7 +132,7 @@ describe('Task-Based DelegateTool Integration', () => {
             title: 'Task 3',
             prompt: 'Third parallel task',
             expected_response: 'Task result',
-            model: 'anthropic:claude-sonnet-4-20250514',
+            model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
           },
           context
         ),

@@ -259,7 +259,7 @@ describe('Delegation Integration Tests', () => {
       title: 'Code Analysis',
       prompt: 'Analyze the project structure and identify key patterns',
       expected_response: 'Brief summary of project structure',
-      model: 'anthropic:claude-3-5-haiku-20241022',
+      model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
     };
 
     const result = await delegateToolInstance.execute(delegateInput, {
