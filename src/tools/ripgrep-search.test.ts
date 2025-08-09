@@ -448,13 +448,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       expect(result.content[0].text).toContain('Search operation failed');
     });
 
-    it('should handle special regex characters in pattern', async () => {
+    it('should handle special regex characters in pattern with literal search', async () => {
       await writeFile(join(testDir, 'special.txt'), 'Price: $10.50\nEmail: test@example.com');
 
       const result = await tool.execute(
         {
           pattern: '$10.50',
           path: testDir,
+          literal: true, // Use literal search for special characters
         },
         { signal: new AbortController().signal }
       );
@@ -462,6 +463,24 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('$10.50');
+    });
+
+    it('should support regex patterns when literal is false', async () => {
+      await writeFile(join(testDir, 'regex.txt'), 'test123\ntest456\nhello world');
+
+      const result = await tool.execute(
+        {
+          pattern: 'test\\d+', // regex pattern
+          path: testDir,
+          literal: false,
+        },
+        { signal: new AbortController().signal }
+      );
+
+      expect(result.status).toBe('completed');
+      const output = result.content[0].text;
+      expect(output).toContain('test123');
+      expect(output).toContain('test456');
     });
 
     it('should handle empty files gracefully', async () => {

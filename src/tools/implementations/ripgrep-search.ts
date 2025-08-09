@@ -23,6 +23,7 @@ const ripgrepSearchSchema = z.object({
   path: FilePath.default('.'),
   caseSensitive: z.boolean().default(false),
   wholeWord: z.boolean().default(false),
+  literal: z.boolean().default(false).describe('Treat pattern as literal string instead of regex'),
   includePattern: z.string().optional(),
   excludePattern: z.string().optional(),
   maxResults: z
@@ -63,6 +64,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         path,
         caseSensitive,
         wholeWord,
+        literal,
         includePattern,
         excludePattern,
         maxResults,
@@ -77,6 +79,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         path: resolvedPath,
         caseSensitive,
         wholeWord,
+        literal,
         includePattern,
         excludePattern,
         maxResults,
@@ -128,6 +131,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     path: string;
     caseSensitive: boolean;
     wholeWord: boolean;
+    literal: boolean;
     includePattern?: string;
     excludePattern?: string;
     maxResults: number;
@@ -141,6 +145,10 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
     if (options.wholeWord) {
       args.push('--word-regexp');
+    }
+
+    if (options.literal) {
+      args.push('--fixed-strings');
     }
 
     if (options.includePattern) {

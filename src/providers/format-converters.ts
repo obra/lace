@@ -93,11 +93,13 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
       if (msg.role === 'user') {
         if (msg.toolResults && msg.toolResults.length > 0) {
           // OpenAI uses separate messages with role 'tool' for each tool result
-          const toolMessages = msg.toolResults.map((result) => ({
-            role: 'tool',
-            tool_call_id: result.id || '',
-            content: result.content.map((block) => block.text || '').join('\n'),
-          }));
+          const toolMessages = msg.toolResults
+            .filter((result) => result.id) // Only include results with valid IDs
+            .map((result) => ({
+              role: 'tool',
+              tool_call_id: result.id!, // Safe to use ! since we filtered
+              content: result.content.map((block) => block.text || '').join('\n'),
+            }));
 
           // If there's also text content, include the user message first
           if (msg.content && msg.content.trim()) {
