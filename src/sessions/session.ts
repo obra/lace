@@ -866,17 +866,31 @@ export class Session {
       model: string,
       task
     ) => {
+      // The 'provider' parameter should now be a provider instance ID (e.g., 'pi_abc123')
+      // Validate that it's a real provider instance ID by trying to resolve it
+      let providerInstance: AIProvider;
+      try {
+        providerInstance = Session.resolveProviderInstance(provider);
+      } catch (error) {
+        throw new Error(
+          `Invalid provider instance ID: ${provider}. Task assignments must use provider instance IDs (e.g., 'new:pi_abc123/model-name'). Error: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
+      if (!providerInstance || !providerInstance.isConfigured()) {
+        throw new Error(
+          `Provider instance ${provider} is not properly configured. Task assignments must use valid provider instance IDs.`
+        );
+      }
+
       // Create a more descriptive agent name based on the task
       const agentName = `task-${task.id.split('_').pop()}`;
 
-      // Use the new spawnAgent method - convert old provider/model strings to provider instance
-      // TODO: Update TaskManager to use provider instances directly
-      // For now, we need to find a provider instance that supports the requested model
-      // We'll use the session's provider instance ID for simplicity
+      // Spawn agent with the specified provider instance and model
       const agent = this.spawnAgent({
         name: agentName,
+        providerInstanceId: provider, // Use the provider instance ID directly
         modelId: model, // Pass the model from the task assignment
-        // providerInstanceId will be inherited from session
       });
 
       // Start the agent to ensure token budget is initialized
