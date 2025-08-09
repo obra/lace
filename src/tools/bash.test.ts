@@ -64,7 +64,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
@@ -75,14 +75,14 @@ Exit codes shown even for successful tool execution. Working directory persists 
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject missing command', async () => {
       const result = await bashTool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Required');
     });
@@ -92,7 +92,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     it('should execute simple commands successfully', async () => {
       const result = await bashTool.execute({ command: 'echo "hello world"' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -108,7 +108,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     it('should handle commands with no output', async () => {
       const result = await bashTool.execute({ command: 'true' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -125,7 +125,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       const result = await bashTool.execute({ command: 'false' }, toolContext);
 
       // Tool should succeed because it executed the command successfully
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // Command failed, but tool succeeded
@@ -141,7 +141,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false); // Tool executed successfully
+      expect(result.status).toBe('completed'); // Tool executed successfully
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // grep found no matches
@@ -158,7 +158,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false); // Tool ran the "linter"
+      expect(result.status).toBe('completed'); // Tool ran the "linter"
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // "Linter" found issues
@@ -177,7 +177,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       );
 
       // Based on observed behavior: single nonexistent command = tool failure
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('not found');
       expect(result.content[0].text).toContain('nonexistentcommand12345');
 
@@ -196,7 +196,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       );
 
       // Based on observed behavior: command in sequence = tool success
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.stdoutPreview).toContain('before');
@@ -214,7 +214,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false); // Command executed (even though it failed)
+      expect(result.status).toBe('completed'); // Command executed (even though it failed)
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(126);
@@ -234,7 +234,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -251,7 +251,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -279,7 +279,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -292,7 +292,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     it('should always return valid JSON in output field', async () => {
       const result = await bashTool.execute({ command: 'echo "test"' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(() => JSON.parse(result.content[0].text!) as unknown).not.toThrow();
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
@@ -315,7 +315,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.stdoutPreview).toBe('{"test": "value", "number": 42}\n');
@@ -338,7 +338,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false); // ✅ Tool completed (not ❌ Tool failed)
+      expect(result.status).toBe('completed'); // ✅ Tool completed (not ❌ Tool failed)
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // ESLint found issues
@@ -350,7 +350,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       // Observed: 'false' command shows as ✅ Tool completed
       const result = await bashTool.execute({ command: 'false' }, toolContext);
 
-      expect(result.isError).toBe(false); // ✅ Tool completed
+      expect(result.status).toBe('completed'); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1);
@@ -363,7 +363,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       // Observed: 'echo' commands show as ✅ Tool completed
       const result = await bashTool.execute({ command: 'echo "hello"' }, toolContext);
 
-      expect(result.isError).toBe(false); // ✅ Tool completed
+      expect(result.status).toBe('completed'); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -381,7 +381,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false); // ✅ Tool completed
+      expect(result.status).toBe('completed'); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // grep found no matches
@@ -398,7 +398,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false); // ✅ Tool completed (what I observed)
+      expect(result.status).toBe('completed'); // ✅ Tool completed (what I observed)
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.stdoutPreview).toContain('Testing');
@@ -418,7 +418,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         },
         toolContext
       );
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       // Now execute a command with context pointing to that directory
       const contextWithWorkingDir = { ...toolContext, workingDirectory: '/tmp/test-bash-tool' };
@@ -427,7 +427,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         contextWithWorkingDir
       );
 
-      expect(pwdResult.isError).toBe(false);
+      expect(pwdResult.status).toBe('completed');
 
       const output = JSON.parse(pwdResult.content[0].text!) as BashOutput;
 
@@ -440,7 +440,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     it('should use process.cwd() when no context provided', async () => {
       const result = await bashTool.execute({ command: 'pwd' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
 
@@ -453,7 +453,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       const contextWithoutWorkingDir = { ...toolContext }; // No workingDirectory property
       const result = await bashTool.execute({ command: 'pwd' }, contextWithoutWorkingDir);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
 
@@ -471,7 +471,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         },
         toolContext
       );
-      expect(setupResult.isError).toBe(false);
+      expect(setupResult.status).toBe('completed');
 
       // Use context to set working directory and test relative path
       const contextWithWorkingDir = { ...toolContext, workingDirectory: '/tmp/test-bash-relative' };
@@ -480,7 +480,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         contextWithWorkingDir
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
 
@@ -500,7 +500,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -532,7 +532,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -563,7 +563,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);

@@ -50,7 +50,7 @@ line 10`;
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.metadata).toBeDefined();
     expect(result.metadata?.diff).toBeDefined();
 
@@ -88,7 +88,7 @@ fifth line`;
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.metadata?.diff).toBeDefined();
 
     const diff = result.metadata?.diff as FileEditDiffContext;
@@ -120,7 +120,7 @@ last line`;
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.metadata?.diff).toBeDefined();
 
     const diff = result.metadata?.diff as FileEditDiffContext;
@@ -159,7 +159,7 @@ function bar() {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.metadata?.diff).toBeDefined();
 
     const diff = result.metadata?.diff as FileEditDiffContext;
@@ -186,7 +186,7 @@ function bar() {
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.metadata?.path).toBe(testFile);
     const editsApplied = result.metadata?.edits_applied as
       | Array<{ old_text: string; new_text: string; occurrences_replaced: number }>
@@ -221,7 +221,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const content = await fs.readFile(testFile, 'utf-8');
       expect(content).toBe('let x = 1;\nlet b = 2;');
     });
@@ -261,7 +261,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.metadata?.diff).toBeDefined();
 
       const diff = result.metadata?.diff as FileEditDiffContext;
@@ -292,7 +292,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Expected 2 occurrences but found 3');
 
       // File should not be modified
@@ -320,7 +320,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Dry run');
       expect(result.metadata?.dry_run).toBe(true);
 
@@ -347,7 +347,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Dry run');
       expect(result.metadata?.dry_run).toBe(true);
       expect(result.metadata?.diff).toBeDefined();
@@ -375,7 +375,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Could not find exact text');
     });
 
@@ -393,7 +393,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('File not found');
     });
 
@@ -413,7 +413,7 @@ function bar() {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const content = await fs.readFile(testFile, 'utf-8');
       expect(content).toBe('line1\r\nmodified\r\nline3');
     });
@@ -449,7 +449,7 @@ function bar() {
       );
       const duration = Date.now() - start;
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(duration).toBeLessThan(1000); // Should complete in under 1 second
     });
   });

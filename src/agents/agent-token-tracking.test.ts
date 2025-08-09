@@ -209,7 +209,7 @@ describe('Agent Token Tracking Integration', () => {
         protected executeValidated(): Promise<ToolResult> {
           return Promise.resolve({
             content: [{ type: 'text', text: 'Tool executed successfully' }],
-            isError: false,
+            status: 'completed' as const,
           });
         }
       }
@@ -319,7 +319,7 @@ describe('Agent Token Tracking Integration', () => {
         protected executeValidated(): Promise<ToolResult> {
           return Promise.resolve({
             content: [{ type: 'text', text: 'Tool result' }],
-            isError: false,
+            status: 'completed' as const,
           });
         }
       }

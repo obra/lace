@@ -214,7 +214,7 @@ describe('Tool Batch Completion Behavior', () => {
     // Should have tool result with error
     const toolResultEvent = events.find((e) => e.type === 'TOOL_RESULT');
     expect(toolResultEvent).toBeDefined();
-    expect((toolResultEvent?.data as ToolResult).isError).toBe(true);
+    expect((toolResultEvent?.data as ToolResult).status).not.toBe('completed');
 
     // Conversation should have continued (agent should have made another request to provider)
     const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
@@ -262,7 +262,7 @@ describe('Tool Batch Completion Behavior', () => {
     // Should have tool result with error (from denial)
     const toolResultEvent = events.find((e) => e.type === 'TOOL_RESULT');
     expect(toolResultEvent).toBeDefined();
-    expect((toolResultEvent?.data as ToolResult).isError).toBe(true);
+    expect((toolResultEvent?.data as ToolResult).status).not.toBe('completed');
     expect((toolResultEvent?.data as ToolResult).content).toEqual([
       { type: 'text', text: 'Tool execution denied by user' },
     ]);
@@ -330,8 +330,8 @@ describe('Tool Batch Completion Behavior', () => {
     expect(toolResults).toHaveLength(2);
 
     // One success, one failure
-    const successResult = toolResults.find((e) => !e.data.isError);
-    const failureResult = toolResults.find((e) => e.data.isError);
+    const successResult = toolResults.find((e) => e.data.status === 'completed');
+    const failureResult = toolResults.find((e) => e.data.status !== 'completed');
 
     expect(successResult).toBeDefined();
     expect(failureResult).toBeDefined();

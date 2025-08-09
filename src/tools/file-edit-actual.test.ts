@@ -46,7 +46,7 @@ describe('FileEditTool actual file modification', () => {
     );
 
     // Check the tool reports success
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Successfully applied 1 edit');
 
     // CRITICAL: Verify the file was actually modified
@@ -79,7 +79,7 @@ line 5`;
     );
 
     // Should error because text appears multiple times
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('Expected 1 occurrence but found 2');
 
     // File should NOT be modified
@@ -110,7 +110,7 @@ line 5`;
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
 
     // Verify the actual file content changed
     const afterEdit = await readFile(testFile, 'utf-8');
@@ -138,7 +138,7 @@ line 5`;
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
 
     const afterEdit = await readFile(testFile, 'utf-8');
     expect(afterEdit).toBe('First line\r\nModified line\r\nThird line');
@@ -161,7 +161,7 @@ line 5`;
       { signal: new AbortController().signal }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('Could not find exact text');
 
     // File should remain unchanged

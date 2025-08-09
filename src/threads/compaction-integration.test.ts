@@ -44,7 +44,7 @@ describe('Compaction Integration', () => {
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call1',
         content: [{ type: 'text', text: 'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt' }],
-        isError: false,
+        status: 'completed',
       })
     );
     expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Found 5 files'));
@@ -77,7 +77,7 @@ describe('Compaction Integration', () => {
               text: 'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]',
             },
           ],
-          isError: false,
+          status: 'completed',
         }) as unknown,
       })
     );
@@ -94,7 +94,7 @@ describe('Compaction Integration', () => {
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call-hello',
         content: [{ type: 'text', text: 'line1\nline2\nline3\nline4\nline5' }],
-        isError: false,
+        status: 'completed',
       })
     );
 
@@ -125,7 +125,7 @@ describe('Compaction Integration', () => {
           content: [
             { type: 'text', text: 'line1\nline2\nline3\n[results truncated to save space.]' },
           ],
-          isError: false,
+          status: 'completed',
         }) as unknown,
       })
     );
@@ -145,7 +145,7 @@ describe('Compaction Integration', () => {
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call-first',
         content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
-        isError: false,
+        status: 'completed',
       })
     );
 
@@ -158,7 +158,7 @@ describe('Compaction Integration', () => {
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call-second',
         content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
-        isError: false,
+        status: 'completed',
       })
     );
 
@@ -181,7 +181,7 @@ describe('Compaction Integration', () => {
         data: expect.objectContaining({
           id: 'call-first',
           content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
-          isError: false,
+          status: 'completed',
         }) as unknown,
       })
     );
@@ -195,7 +195,7 @@ describe('Compaction Integration', () => {
         data: expect.objectContaining({
           id: 'call-second',
           content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
-          isError: false,
+          status: 'completed',
         }) as unknown,
       })
     );
@@ -216,7 +216,7 @@ describe('Compaction Integration', () => {
           content: [
             { type: 'text', text: 'long\nresult\nhere\n[results truncated to save space.]' },
           ],
-          isError: false,
+          status: 'completed',
         }) as unknown,
       })
     );
@@ -231,7 +231,7 @@ describe('Compaction Integration', () => {
           content: [
             { type: 'text', text: 'another\nlong\nresult\n[results truncated to save space.]' },
           ],
-          isError: false,
+          status: 'completed',
         }) as unknown,
       })
     );
@@ -268,7 +268,7 @@ describe('Compaction Integration', () => {
       newThreadManager.addEvent(newThreadId, 'TOOL_RESULT', {
         id: 'call-auto',
         content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
-        isError: false,
+        status: 'completed',
       })
     );
 
@@ -285,7 +285,7 @@ describe('Compaction Integration', () => {
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call-order',
         content: [{ type: 'text', text: 'long\ntool\nresult\nwith\nmany\nlines' }],
-        isError: false,
+        status: 'completed',
       })
     );
     expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message'));

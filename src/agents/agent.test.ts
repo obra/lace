@@ -214,7 +214,7 @@ describe('Enhanced Agent', () => {
     });
 
     it('should return copy of tools to prevent mutation', () => {
-      const tools = [new MockTool({ isError: false, content: [] })];
+      const tools = [new MockTool({ status: 'completed', content: [] })];
       agent = createAgent({ tools });
 
       const returnedTools = agent.getAvailableTools();
@@ -376,7 +376,7 @@ describe('Enhanced Agent', () => {
 
     beforeEach(async () => {
       mockTool = new MockTool({
-        isError: false,
+        status: 'completed',
         content: [{ type: 'text', text: 'Tool executed successfully' }],
       });
 
@@ -472,8 +472,8 @@ describe('Enhanced Agent', () => {
       ).toBe('call_123');
       expect(
         (toolEvents[1].data as { toolName: string; result: ToolResult; callId: string }).result
-          .isError
-      ).toBe(false);
+          .status
+      ).toBe('completed');
     });
 
     it('should transition to tool_execution state during tool calls', async () => {
@@ -506,13 +506,13 @@ describe('Enhanced Agent', () => {
       expect(toolResults).toHaveLength(1);
       const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_123');
-      expect(toolResult.isError).toBe(false);
+      expect(toolResult.status).toBe('completed');
       expect(toolResult.content[0].text).toBe('Tool executed successfully');
     });
 
     it('should handle tool execution errors gracefully', async () => {
       const failingTool = new MockTool({
-        isError: true,
+        status: 'failed',
         content: [{ type: 'text', text: 'Tool failed' }],
       });
 
@@ -520,7 +520,7 @@ describe('Enhanced Agent', () => {
 
       const errorEvents: Array<{ toolName: string; result: ToolResult; callId: string }> = [];
       agent.on('tool_call_complete', (data) => {
-        if (data.result.isError) {
+        if (data.result.status !== 'completed') {
           errorEvents.push(data);
         }
       });
@@ -531,7 +531,7 @@ describe('Enhanced Agent', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(errorEvents).toHaveLength(1);
-      expect(errorEvents[0].result.isError).toBe(true);
+      expect(errorEvents[0].result.status).not.toBe('completed');
       expect(errorEvents[0].result.content[0].text).toBe('Tool failed');
     });
 
@@ -691,7 +691,7 @@ describe('Enhanced Agent', () => {
 
     beforeEach(() => {
       mockTool = new MockTool({
-        isError: false,
+        status: 'completed',
         content: [{ type: 'text', text: 'Tool executed successfully' }],
       });
 
@@ -750,7 +750,7 @@ describe('Enhanced Agent', () => {
 
       const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_1');
-      expect(toolResult.isError).toBe(false);
+      expect(toolResult.status).toBe('completed');
 
       // Restore auto-approval callback for other tests
       const autoApprovalCallback: ApprovalCallback = {
@@ -796,7 +796,7 @@ describe('Enhanced Agent', () => {
 
       const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_1');
-      expect(toolResult.isError).toBe(true);
+      expect(toolResult.status).not.toBe('completed');
       expect(toolResult.content[0].text).toBe('Tool execution denied by user');
     });
 
@@ -852,11 +852,11 @@ describe('Enhanced Agent', () => {
       toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(3);
 
-      const successResults = toolResults.filter((r) => !r.data.isError);
+      const successResults = toolResults.filter((r) => r.data.status === 'completed');
       expect(successResults).toHaveLength(2);
 
       const errorResult = toolResults.find((r) => r.data.id === 'call_3');
-      expect((errorResult?.data as ToolResult).isError).toBe(true);
+      expect((errorResult?.data as ToolResult).status).not.toBe('completed');
     });
 
     it('should emit tool_call_complete events when tools execute', async () => {
@@ -904,7 +904,7 @@ describe('Enhanced Agent', () => {
       expect(toolCompleteEvents).toHaveLength(1);
       expect(toolCompleteEvents[0].toolName).toBe('mock_tool');
       expect(toolCompleteEvents[0].callId).toBe('call_1');
-      expect(toolCompleteEvents[0].result.isError).toBe(false);
+      expect(toolCompleteEvents[0].result.status).toBe('completed');
     });
 
     it('should attempt tool execution immediately instead of creating approval requests directly', async () => {
@@ -1001,7 +1001,7 @@ describe('Enhanced Agent', () => {
       // Mock ToolExecutor to return completed result
       const completedResult = {
         id: 'call_complete',
-        isError: false,
+        status: 'completed' as const,
         isPending: false,
         content: [{ type: 'text' as const, text: 'Tool completed successfully' }],
       };
@@ -1231,7 +1231,7 @@ describe('Enhanced Agent', () => {
       threadManager.addEvent(agent.getThreadId(), 'TOOL_RESULT', {
         id: 'missing-call-id',
         content: [{ type: 'text', text: 'Some output' }],
-        isError: false,
+        status: 'completed' as const,
       });
 
       // Should not throw error - orphaned tool results are now skipped
@@ -1306,11 +1306,11 @@ describe('Enhanced Agent', () => {
   describe('multiple tool calls', () => {
     beforeEach(async () => {
       const tool1 = new MockTool({
-        isError: false,
+        status: 'completed',
         content: [{ type: 'text', text: 'Tool 1 result' }],
       });
       const tool2 = new MockTool({
-        isError: false,
+        status: 'completed',
         content: [{ type: 'text', text: 'Tool 2 result' }],
       });
 
@@ -1881,7 +1881,7 @@ describe('Enhanced Agent', () => {
 
       // Create a tool that will be called
       const mockTool = new MockTool({
-        isError: false,
+        status: 'completed',
         content: [{ type: 'text', text: 'Tool executed successfully' }],
       });
 
@@ -1964,7 +1964,7 @@ describe('Enhanced Agent', () => {
       const existingResult: ToolResult = {
         id: 'tool-123',
         content: [{ type: 'text', text: 'Already executed - preventing duplicate' }],
-        isError: false,
+        status: 'completed' as const,
       };
 
       agent.threadManager.addEvent(agent.threadId, 'TOOL_RESULT', existingResult);
@@ -2021,7 +2021,7 @@ describe('Enhanced Agent', () => {
       executeSpy.mockResolvedValue({
         id: 'tool-456',
         content: [{ type: 'text', text: 'Tool executed successfully' }],
-        isError: false,
+        status: 'completed' as const,
       });
 
       // Send approval response (this should execute normally)
