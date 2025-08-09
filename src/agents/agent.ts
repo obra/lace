@@ -2330,7 +2330,7 @@ export class Agent extends EventEmitter {
           const resultEvent = events[j];
           if (resultEvent.type === 'TOOL_RESULT' && resultEvent.data.id === toolCallId) {
             // Found the result for this tool call
-            const toolResult = resultEvent.data as ToolResult;
+            const toolResult = resultEvent.data;
             if (toolResult.status === 'completed' && normalizedToolPath === normalizedFilePath) {
               return true;
             }
