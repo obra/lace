@@ -92,7 +92,9 @@ describe('Agent Thread Events', () => {
       expect(eventSpy).toHaveBeenNthCalledWith(2, {
         event: expect.objectContaining({
           type: 'AGENT_MESSAGE',
-          data: expect.any(String) as string,
+          data: expect.objectContaining({
+            content: expect.any(String) as string,
+          }) as { content: string; tokenUsage?: any },
         }) as ThreadEvent,
         threadId: expect.any(String) as string,
       });
@@ -123,7 +125,7 @@ describe('Agent Thread Events', () => {
       threadManager.clearEvents(threadId);
 
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message');
-      threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'First response');
+      threadManager.addEvent(threadId, 'AGENT_MESSAGE', { content: 'First response' });
       threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message');
 
       const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();

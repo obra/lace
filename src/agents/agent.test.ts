@@ -30,6 +30,16 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 
+// Type for AGENT_MESSAGE event data
+type AgentMessageData = {
+  content: string;
+  tokenUsage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+};
+
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
@@ -318,7 +328,7 @@ describe('Enhanced Agent', () => {
       const events = threadManager.getEvents(agent.getThreadId());
       const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
       expect(agentMessages).toHaveLength(1);
-      expect(agentMessages[0].data).toBe('Test response');
+      expect((agentMessages[0].data as AgentMessageData).content).toBe('Test response');
     });
 
     it('should handle think blocks correctly', async () => {
@@ -345,7 +355,9 @@ describe('Enhanced Agent', () => {
       // Verify that raw content (with thinking blocks) is stored in thread for model context
       const events = threadManager.getEvents(agent.getThreadId());
       const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
-      expect(agentMessage?.data).toBe('<think>I need to process this</think>This is my response');
+      expect((agentMessage?.data as AgentMessageData).content).toBe(
+        '<think>I need to process this</think>This is my response'
+      );
     });
 
     it('should handle empty message correctly', async () => {
@@ -1220,7 +1232,7 @@ describe('Enhanced Agent', () => {
     it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
       threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
       threadManager.addEvent(agent.getThreadId(), 'LOCAL_SYSTEM_MESSAGE', 'System info message');
-      threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', 'Response');
+      threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', { content: 'Response' });
 
       const history = agent.buildThreadMessages();
 
@@ -1575,7 +1587,7 @@ describe('Enhanced Agent', () => {
         const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
-        expect(agentMessages[0].data).toBe(
+        expect((agentMessages[0].data as AgentMessageData).content).toBe(
           '<think>I need to think about this</think>Here is my response'
         );
 
@@ -1634,7 +1646,7 @@ describe('Enhanced Agent', () => {
         const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
-        expect(agentMessages[0].data).toBe('Non-streaming response');
+        expect((agentMessages[0].data as AgentMessageData).content).toBe('Non-streaming response');
       });
     });
 
