@@ -871,13 +871,37 @@ export class Session {
 
       // Use the new spawnAgent method - convert old provider/model strings to provider instance
       // TODO: Update TaskManager to use provider instances directly
+      // For now, we need to find a provider instance that supports the requested model
+      // We'll use the session's provider instance ID for simplicity
       const agent = this.spawnAgent({
         name: agentName,
-        // For now, inherit from session since task system doesn't have provider instances yet
+        modelId: model, // Pass the model from the task assignment
+        // providerInstanceId will be inherited from session
+      });
+
+      // Start the agent to ensure token budget is initialized
+      await agent.start();
+
+      // Add error handler to prevent unhandled errors
+      agent.on('error', (error) => {
+        logger.error('Spawned agent error', {
+          threadId: agent.threadId,
+          task: task.id,
+          error: error.error || error,
+        });
       });
 
       // Send initial task notification to the new agent
-      await this.sendTaskNotification(agent, task);
+      try {
+        await this.sendTaskNotification(agent, task);
+      } catch (error) {
+        logger.error('Failed to send task notification to spawned agent', {
+          threadId: agent.threadId,
+          task: task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Don't fail task creation if agent fails - the task is still created
+      }
 
       return asThreadId(agent.threadId);
     };
