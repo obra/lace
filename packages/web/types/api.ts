@@ -94,6 +94,15 @@ export interface SessionsResponse {
 
 export interface SessionResponse {
   session: SessionInfo;
+  tokenUsage?: {
+    totalPromptTokens: number;
+    totalCompletionTokens: number;
+    totalTokens: number;
+    eventCount: number;
+    contextLimit: number;
+    percentUsed: number;
+    nearLimit: boolean;
+  };
 }
 
 export interface AgentResponse {
