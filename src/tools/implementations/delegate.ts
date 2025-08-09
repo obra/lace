@@ -10,15 +10,16 @@ import type { Task, TaskContext } from '~/tasks/types';
 import { isNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
-// Model format validation
+// Model format validation - requires provider instance ID
 const ModelFormat = z.string().refine(
   (value) => {
-    const [providerName, modelName] = value.split(':');
-    return providerName && modelName;
+    const [providerInstanceId, modelName] = value.split(':');
+    // Provider instance IDs typically start with 'pi_'
+    return providerInstanceId && modelName;
   },
   {
     message:
-      'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3-5-haiku-20241022")',
+      'Invalid model format. Use "providerInstanceId:model" (e.g., "pi_abc123:claude-3-5-haiku-20241022")',
   }
 );
 
@@ -30,8 +31,8 @@ const delegateSchema = z.object({
   expected_response: NonEmptyString.describe(
     'Description of the expected format/content of the response (guides the subagent)'
   ),
-  model: ModelFormat.default('anthropic:claude-3-5-haiku-20241022').describe(
-    'Provider and model in format "provider:model"'
+  model: ModelFormat.describe(
+    'Provider instance ID and model in format "providerInstanceId:model" (e.g., "pi_abc123:claude-3-5-haiku-20241022")'
   ),
 });
 
@@ -93,11 +94,12 @@ Examples:
       throw new Error('TaskManager is required for delegation');
     }
 
-    // Parse provider:model format
-    const [providerName, modelName] = model.split(':');
+    // Parse providerInstanceId:model format
+    const [providerInstanceId, modelName] = model.split(':');
 
     try {
-      const assigneeSpec = `new:${providerName}/${modelName}`;
+      // Create assignment spec using provider instance ID
+      const assigneeSpec = `new:${providerInstanceId}/${modelName}`;
       if (!isNewAgentSpec(assigneeSpec)) {
         throw new Error(`Invalid assignee spec format: ${assigneeSpec}`);
       }
