@@ -245,8 +245,9 @@ export class ThreadManager {
     };
 
     // Save thread to database without changing current thread
+    // Use this.saveThread to ensure cache is updated
     try {
-      this._persistence.saveThread(thread);
+      this.saveThread(thread);
     } catch (error) {
       logger.error('Failed to save delegate thread', { error });
     }
