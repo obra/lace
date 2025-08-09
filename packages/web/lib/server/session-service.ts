@@ -12,6 +12,8 @@ import { logger } from '~/utils/logger';
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates
   private registeredAgents = new WeakSet<Agent>();
+  // Project ID context for events
+  projectId?: string;
 
   constructor() {}
 
@@ -145,20 +147,20 @@ export class SessionService {
       });
     });
 
-    // Handle compaction start events  
+    // Handle compaction start events
     agent.on('compaction_start', ({ auto }: { auto: boolean }) => {
       logger.debug(`[SESSION_SERVICE] Agent ${threadId} starting compaction (auto: ${auto})`);
 
       // Broadcast COMPACTION_START event
       sseManager.broadcast({
-        eventType: 'thread',
+        eventType: 'session' as const,
         scope: {
           projectId: this.projectId,
           sessionId,
           threadId,
         },
         data: {
-          type: 'COMPACTION_START',
+          type: 'COMPACTION_START' as const,
           threadId,
           timestamp: new Date(),
           data: {
@@ -171,18 +173,20 @@ export class SessionService {
 
     // Handle compaction complete events
     agent.on('compaction_complete', ({ success }: { success: boolean }) => {
-      logger.debug(`[SESSION_SERVICE] Agent ${threadId} completed compaction (success: ${success})`);
+      logger.debug(
+        `[SESSION_SERVICE] Agent ${threadId} completed compaction (success: ${success})`
+      );
 
       // Broadcast COMPACTION_COMPLETE event
       sseManager.broadcast({
-        eventType: 'thread',
+        eventType: 'session' as const,
         scope: {
           projectId: this.projectId,
           sessionId,
           threadId,
         },
         data: {
-          type: 'COMPACTION_COMPLETE',
+          type: 'COMPACTION_COMPLETE' as const,
           threadId,
           timestamp: new Date(),
           data: {
