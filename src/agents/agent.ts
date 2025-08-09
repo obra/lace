@@ -1361,23 +1361,13 @@ export class Agent extends EventEmitter {
 
           if (existingUserMessage) {
             // Add this tool result to the existing user message
-            existingUserMessage.toolResults!.push({
-              id: toolResult.id || '',
-              content: toolResult.content,
-              isError: toolResult.status !== 'completed',
-            });
+            existingUserMessage.toolResults!.push(toolResult);
           } else {
             // Create a new user message with this tool result
             messages.push({
               role: 'user',
               content: '',
-              toolResults: [
-                {
-                  id: toolResult.id || '',
-                  content: toolResult.content,
-                  isError: toolResult.status !== 'completed',
-                },
-              ],
+              toolResults: [toolResult],
             });
           }
         } else {
@@ -1408,13 +1398,7 @@ export class Agent extends EventEmitter {
             messages.push({
               role: 'user',
               content: '',
-              toolResults: [
-                {
-                  id: toolResult.id || '',
-                  content: toolResult.content,
-                  isError: toolResult.status !== 'completed',
-                },
-              ],
+              toolResults: [toolResult],
             });
           } else {
             // Truly orphaned tool result - no corresponding tool call found

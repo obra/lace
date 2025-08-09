@@ -1,7 +1,7 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage, ProviderToolCall, ProviderToolResult } from '~/providers/base-provider';
+import { ProviderMessage, ProviderToolCall } from '~/providers/base-provider';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
@@ -14,14 +14,13 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
       if (msg.role === 'user') {
         // User messages can have tool results
         if (msg.toolResults && msg.toolResults.length > 0) {
-          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map(
-            (result: ProviderToolResult) => ({
-              type: 'tool_result',
-              tool_use_id: result.id,
-              content: result.content.map((block) => block.text || '').join('\n'),
-              ...(result.isError ? { is_error: true } : {}),
-            })
-          );
+          const content: Anthropic.ToolResultBlockParam[] = msg.toolResults.map((result) => ({
+            type: 'tool_result',
+            tool_use_id: result.id || '',
+            content: result.content.map((block) => block.text || '').join('\n'),
+            // Convert our status to Anthropic's is_error flag
+            ...(result.status !== 'completed' ? { is_error: true } : {}),
+          }));
 
           // If there's also text content, add it
           if (msg.content && msg.content.trim()) {
@@ -94,9 +93,9 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
       if (msg.role === 'user') {
         if (msg.toolResults && msg.toolResults.length > 0) {
           // OpenAI uses separate messages with role 'tool' for each tool result
-          const toolMessages = msg.toolResults.map((result: ProviderToolResult) => ({
+          const toolMessages = msg.toolResults.map((result) => ({
             role: 'tool',
-            tool_call_id: result.id,
+            tool_call_id: result.id || '',
             content: result.content.map((block) => block.text || '').join('\n'),
           }));
 
