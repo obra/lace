@@ -36,6 +36,11 @@ export interface AgentConfig {
   threadId: string;
   tools: Tool[];
   tokenBudget?: TokenBudgetConfig;
+  metadata?: {
+    name: string;
+    modelId: string;
+    providerInstanceId: string;
+  };
 }
 
 interface AgentMessageResult {
@@ -192,6 +197,11 @@ export class Agent extends EventEmitter {
     } else {
       // Will be initialized lazily when we know the model
       this._tokenBudgetManager = null;
+    }
+
+    // Set metadata if provided
+    if (config.metadata) {
+      this.updateThreadMetadata(config.metadata);
     }
 
     // Listen for tool approval responses

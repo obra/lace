@@ -239,6 +239,32 @@ describe('Enhanced Agent', () => {
       agent = createAgent();
       expect(agent.getCurrentState()).toBe('idle');
     });
+
+    it('should set thread metadata during construction', () => {
+      const testThreadId = threadManager.generateThreadId();
+      threadManager.createThread(testThreadId, session.getId());
+
+      const metadata = {
+        name: 'TestAgent',
+        modelId: 'test-model',
+        providerInstanceId: 'pi_test123',
+      };
+
+      agent = new Agent({
+        provider: mockProvider,
+        toolExecutor,
+        threadManager,
+        threadId: testThreadId,
+        tools: [],
+        metadata, // NEW parameter
+      });
+
+      // Verify metadata was set
+      const threadMetadata = agent.getThreadMetadata();
+      expect(threadMetadata?.name).toBe('TestAgent');
+      expect(threadMetadata?.modelId).toBe('test-model');
+      expect(threadMetadata?.providerInstanceId).toBe('pi_test123');
+    });
   });
 
   describe('start/stop lifecycle', () => {
