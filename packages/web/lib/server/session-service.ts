@@ -149,7 +149,8 @@ export class SessionService {
     let isCompacting = false;
 
     // Handle compaction start events
-    agent.on('agent_thinking_start', ({ message }: { message?: string }) => {
+    agent.on('agent_thinking_start', (data?: { message?: string }) => {
+      const message = data?.message;
       // Check if this is a compaction operation
       if (message && (message.includes('compact') || message.includes('Compact'))) {
         isCompacting = true;
