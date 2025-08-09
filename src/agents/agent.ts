@@ -161,6 +161,14 @@ export class Agent extends EventEmitter {
   private _pendingToolCount = 0;
   private _hasRejectionsInBatch = false;
 
+  // Auto-compaction configuration
+  private _autoCompactConfig = {
+    enabled: true,
+    threshold: 0.8, // Compact at 80% of limit
+    cooldownMs: 60000, // Don't compact again for 1 minute
+    lastCompactionTime: 0,
+  };
+
   constructor(config: AgentConfig) {
     super();
     this._provider = config.provider;
@@ -580,6 +588,9 @@ export class Agent extends EventEmitter {
         this.emit('agent_thinking_complete');
         this.emit('agent_response_complete', { content: cleanedContent });
       }
+
+      // Check if auto-compaction is needed after processing response
+      await this._checkAutoCompaction();
 
       // Handle tool calls
       if (response.toolCalls && response.toolCalls.length > 0) {
@@ -1451,6 +1462,40 @@ export class Agent extends EventEmitter {
     if (this._progressTimer) {
       clearInterval(this._progressTimer);
       this._progressTimer = null;
+    }
+  }
+
+  private async _checkAutoCompaction(): Promise<void> {
+    if (!this._autoCompactConfig.enabled) return;
+
+    // Check cooldown
+    const now = Date.now();
+    if (now - this._autoCompactConfig.lastCompactionTime < this._autoCompactConfig.cooldownMs) {
+      return;
+    }
+
+    // Check if we should compact based on token budget
+    if (this._tokenBudgetManager) {
+      const recommendations = this._tokenBudgetManager.getRecommendations();
+      if (recommendations.shouldPrune) {
+        logger.info('Auto-compacting due to token limit approaching', {
+          threadId: this._threadId,
+        });
+
+        try {
+          await this.compact(this._threadId);
+          this._autoCompactConfig.lastCompactionTime = now;
+
+          // Reset token budget after compaction
+          this._tokenBudgetManager.reset();
+        } catch (error) {
+          logger.error('Auto-compaction failed', {
+            threadId: this._threadId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Don't throw - continue conversation even if compaction fails
+        }
+      }
     }
   }
 
