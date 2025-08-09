@@ -7,12 +7,21 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { AIProvider } from '~/providers/base-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import type { ProviderResponse, ProviderMessage } from '~/providers/types';
+import type {
+  ProviderResponse,
+  ProviderMessage,
+  ModelInfo,
+  ProviderInfo,
+} from '~/providers/base-provider';
 
 // Mock provider with configurable responses
 class MockAutoCompactProvider extends AIProvider {
   private responses: ProviderResponse[];
   private responseIndex = 0;
+
+  get providerName(): string {
+    return 'mock-auto-compact';
+  }
 
   constructor(config: { responses: ProviderResponse[] }) {
     super({
@@ -30,7 +39,6 @@ class MockAutoCompactProvider extends AIProvider {
     _model: string
   ): Promise<ProviderResponse> {
     if (this.responseIndex < this.responses.length) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const response = this.responses[this.responseIndex];
       this.responseIndex++;
       return Promise.resolve(response);
@@ -41,16 +49,23 @@ class MockAutoCompactProvider extends AIProvider {
     });
   }
 
-  getProviderInfo() {
+  getProviderInfo(): ProviderInfo {
     return {
       name: 'MockProvider',
-      version: '1.0.0',
-      capabilities: { streaming: false, functions: true },
+      displayName: 'Mock Provider',
+      requiresApiKey: false,
     };
   }
 
-  getAvailableModels() {
-    return ['test-model'];
+  getAvailableModels(): ModelInfo[] {
+    return [
+      {
+        id: 'test-model',
+        displayName: 'Test Model',
+        contextWindow: 128000,
+        maxOutputTokens: 4096,
+      },
+    ];
   }
 
   isConfigured() {
@@ -81,6 +96,7 @@ describe('Agent auto-compaction', () => {
             completionTokens: 2000,
             totalTokens: 10000, // This will trigger compaction at 80%
           },
+          toolCalls: [],
         },
       ],
     });
@@ -123,6 +139,7 @@ describe('Agent auto-compaction', () => {
             completionTokens: 500,
             totalTokens: 1500, // Well below threshold
           },
+          toolCalls: [],
         },
       ],
     });
@@ -161,10 +178,12 @@ describe('Agent auto-compaction', () => {
         {
           content: 'Response 1',
           usage: { promptTokens: 8000, completionTokens: 2000, totalTokens: 10000 },
+          toolCalls: [],
         },
         {
           content: 'Response 2',
           usage: { promptTokens: 8000, completionTokens: 2000, totalTokens: 10000 },
+          toolCalls: [],
         },
       ],
     });
@@ -205,6 +224,7 @@ describe('Agent auto-compaction', () => {
         {
           content: 'Response despite compaction failure',
           usage: { promptTokens: 8000, completionTokens: 2000, totalTokens: 10000 },
+          toolCalls: [],
         },
       ],
     });
@@ -238,6 +258,8 @@ describe('Agent auto-compaction', () => {
     const events = threadManager.getEvents(agent.threadId);
     const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
     expect(agentMessage).toBeDefined();
-    expect(agentMessage?.data).toHaveProperty('content', 'Response despite compaction failure');
+    if (agentMessage?.type === 'AGENT_MESSAGE') {
+      expect(agentMessage.data).toHaveProperty('content', 'Response despite compaction failure');
+    }
   });
 });

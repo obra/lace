@@ -142,7 +142,7 @@ describe('Agent Token Budget Auto-Initialization', () => {
 
     const tokenBudgetManager = agent.tokenBudgetManager;
     expect(tokenBudgetManager).toBeDefined();
-    
+
     const config = tokenBudgetManager!.config;
     expect(config.maxTokens).toBe(8192); // test-model-small context window
     expect(config.reserveTokens).toBe(Math.floor(8192 * 0.05)); // 5% since it's less than 2000
@@ -170,7 +170,7 @@ describe('Agent Token Budget Auto-Initialization', () => {
 
     const tokenBudgetManager = agent.tokenBudgetManager;
     expect(tokenBudgetManager).toBeDefined();
-    
+
     const config = tokenBudgetManager!.config;
     expect(config.maxTokens).toBe(200000); // test-model-huge context window
     expect(config.reserveTokens).toBe(2000); // Capped at 2000 even though 5% would be 10000
@@ -279,13 +279,13 @@ describe('Agent Token Budget Auto-Initialization', () => {
     // Start multiple times
     await agent.start();
     const firstManager = agent.tokenBudgetManager;
-    
+
     // Send a message which might also call start internally
     vi.spyOn(provider, 'createResponse').mockResolvedValueOnce({
       content: 'Response',
       toolCalls: [],
     });
-    
+
     await agent.sendMessage('test');
     const secondManager = agent.tokenBudgetManager;
 

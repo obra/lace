@@ -245,8 +245,8 @@ describe('Agent Token Budget Integration', () => {
     expect(agent.getTokenBudgetStatus()!.totalUsed).toBe(0);
   });
 
-  it('should work normally without token budget configuration', async () => {
-    // Create a new session without token budget
+  it('should auto-initialize token budget based on model context window', async () => {
+    // Create a new session without explicit token budget config
     const noBudgetProject = Project.create(
       'No Budget Project',
       '/test/no-budget',
@@ -254,7 +254,7 @@ describe('Agent Token Budget Integration', () => {
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
-        // No tokenBudget config
+        // No tokenBudget config - should auto-initialize
       }
     );
 
@@ -284,9 +284,11 @@ describe('Agent Token Budget Integration', () => {
 
     await agentNoBudget.sendMessage('Test');
 
-    // Budget methods should return null when budget tracking is disabled
-    expect(agentNoBudget.getTokenBudgetStatus()).toBeNull();
-    expect(agentNoBudget.getTokenBudgetRecommendations()).toBeNull();
+    // Agent should have auto-initialized token budget based on model's context window
+    const status = agentNoBudget.getTokenBudgetStatus();
+    expect(status).toBeDefined();
+    expect(status?.maxTokens).toBe(200000); // claude-3-5-haiku-20241022 context window
+    expect(status?.totalUsed).toBe(500);
 
     // Clean up
     noBudgetSession.destroy();
