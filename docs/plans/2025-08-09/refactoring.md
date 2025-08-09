@@ -127,11 +127,11 @@ was available."
 - Use proper interfaces for all parameters
 - The metadata parameter is optional ONLY while you update all callers - it will become required
 
-### Task 2: Update ThreadManager to set sessionId on delegate threads
+### Task 2: Update ThreadManager to set sessionId on delegate threads ✅ COMPLETED
 
 **Files to modify:**
-- `src/threads/thread-manager.ts`
-- `src/threads/thread-manager.test.ts`
+- `src/threads/thread-manager.ts` (already implemented)
+- `src/threads/thread-manager.test.ts` (added test)
 
 **What to do:**
 

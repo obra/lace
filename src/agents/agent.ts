@@ -1840,34 +1840,6 @@ export class Agent extends EventEmitter {
     return response.content;
   }
 
-  createDelegateAgent(
-    toolExecutor: ToolExecutor,
-    provider?: AIProvider,
-    tokenBudget?: TokenBudgetConfig
-  ): Agent {
-    // Use this agent's thread ID as parent (not ThreadManager's current thread)
-    const parentThreadId = this._threadId;
-    if (!parentThreadId) {
-      throw new Error('No active thread for delegation');
-    }
-
-    // Create delegate thread
-    const delegateThread = this._threadManager.createDelegateThreadFor(parentThreadId);
-    const delegateThreadId = delegateThread.id;
-
-    // Create new Agent instance for the delegate thread
-    const delegateAgent = new Agent({
-      provider: provider || this._provider, // Use provided provider or fallback to parent's provider
-      toolExecutor,
-      threadManager: this._threadManager,
-      threadId: delegateThreadId,
-      tools: toolExecutor.getAllTools(),
-      tokenBudget,
-    });
-
-    return delegateAgent;
-  }
-
   /**
    * Add a system message to the current thread
    * Used for error messages, notifications, etc.

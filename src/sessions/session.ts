@@ -54,14 +54,18 @@ export class Session {
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
   private _taskManager: TaskManager;
+  private _threadManager: ThreadManager;
   private _destroyed = false;
   private _projectId?: string;
   private _providerCache?: unknown; // Cached provider instance
 
-  constructor(sessionAgent: Agent, projectId?: string) {
+  constructor(sessionAgent: Agent, projectId?: string, threadManager?: ThreadManager) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
     this._projectId = projectId;
+
+    // Use provided ThreadManager or get it from the sessionAgent
+    this._threadManager = threadManager || sessionAgent.threadManager;
 
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
@@ -213,17 +217,19 @@ export class Session {
       threadManager,
       threadId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: 'Lace', // Always name the coordinator agent "Lace"
+        providerInstanceId: providerInstanceId,
+        modelId: modelId,
+      },
     });
 
     // Mark the agent's thread as a session thread
     sessionAgent.updateThreadMetadata({
       isSession: true,
-      name: 'Lace', // Always name the coordinator agent "Lace"
-      providerInstanceId: providerInstanceId,
-      modelId: modelId,
     });
 
-    const session = new Session(sessionAgent, options.projectId);
+    const session = new Session(sessionAgent, options.projectId, threadManager);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -376,6 +382,11 @@ export class Session {
       threadManager,
       threadId: sessionId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: sessionData.name || 'Session Coordinator',
+        providerInstanceId: providerInstanceId,
+        modelId: modelId,
+      },
     });
 
     logger.debug(`Starting session agent for ${sessionId}`);
@@ -383,7 +394,7 @@ export class Session {
     await sessionAgent.start();
     logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
 
-    const session = new Session(sessionAgent, sessionData.projectId);
+    const session = new Session(sessionAgent, sessionData.projectId, threadManager);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -439,6 +450,11 @@ export class Session {
           threadManager,
           threadId: delegateThreadId,
           tools: toolExecutor.getAllTools(),
+          metadata: {
+            name: (delegateThread.metadata?.name as string) || 'Delegate Agent',
+            providerInstanceId: delegateProviderInstanceId,
+            modelId: delegateModelId,
+          },
         });
 
         // Start the delegate agent
@@ -701,7 +717,12 @@ export class Session {
     };
   }
 
-  spawnAgent(config: { name?: string; providerInstanceId?: string; modelId?: string }): Agent {
+  spawnAgent(config: {
+    threadId?: string;
+    name?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+  }): Agent {
     const agentName = config.name?.trim() || 'Lace';
 
     // If no provider instance specified, inherit from session
@@ -744,16 +765,24 @@ export class Session {
     const delegateTool = new DelegateTool();
     agentToolExecutor.registerTool('delegate', delegateTool);
 
-    // Create delegate agent with the appropriate provider instance and its own toolExecutor
-    const agent = this._sessionAgent.createDelegateAgent(agentToolExecutor, providerInstance);
+    // If no threadId provided, create a delegate thread
+    const targetThreadId =
+      config.threadId ||
+      this._sessionAgent.threadManager.createDelegateThreadFor(this._sessionId).id;
 
-    // Store the agent metadata
-    agent.updateThreadMetadata({
-      name: agentName, // Use processed name
-      isAgent: true,
-      parentSessionId: this._sessionId,
-      providerInstanceId: targetProviderInstanceId,
-      modelId: targetModelId,
+    // Create agent with metadata
+    const agent = new Agent({
+      provider: providerInstance,
+      toolExecutor: agentToolExecutor,
+      threadManager: this._sessionAgent.threadManager,
+      threadId: targetThreadId,
+      tools: agentToolExecutor.getAllTools(),
+      metadata: {
+        // Set metadata in constructor
+        name: agentName,
+        modelId: targetModelId,
+        providerInstanceId: targetProviderInstanceId,
+      },
     });
 
     // Set up approval callback for spawned agent (inherit from session agent)
