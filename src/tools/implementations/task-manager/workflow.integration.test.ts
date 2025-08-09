@@ -39,7 +39,7 @@ class MockProvider extends BaseMockProvider {
   }
 
   get defaultModel(): string {
-    return 'mock-model';
+    return 'claude-3-5-haiku-20241022';
   }
 
   get contextWindow(): number {
@@ -53,13 +53,22 @@ class MockProvider extends BaseMockProvider {
   getAvailableModels() {
     return [
       {
-        id: 'mock-model',
-        displayName: 'Mock Model',
+        id: 'claude-3-5-haiku-20241022',
+        displayName: 'Claude 3.5 Haiku',
         description: 'Model for testing',
         contextWindow: 200000,
         maxOutputTokens: 4096,
         capabilities: ['function-calling'],
         isDefault: true,
+      },
+      {
+        id: 'claude-sonnet-4-20250514',
+        displayName: 'Claude Sonnet 4',
+        description: 'Model for testing',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+        isDefault: false,
       },
     ];
   }
@@ -321,7 +330,7 @@ describe('Task Management Workflow Integration', () => {
     it('should support task assignment and delegation workflow', async () => {
       const context = { threadId: session.getId(), session } as const;
 
-      // Create task with assignment
+      // Create task with assignment using the provider instance ID
       const createResult = await taskCreateTool.execute(
         {
           tasks: [
@@ -329,13 +338,16 @@ describe('Task Management Workflow Integration', () => {
               title: 'Analyze security vulnerabilities',
               prompt: 'Review codebase for common security issues and provide recommendations',
               priority: 'high',
-              assignedTo: 'new:mock/mock-model',
+              assignedTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
             },
           ],
         },
         context
       );
 
+      if (createResult.isError) {
+        console.error('Task creation failed:', createResult.content[0].text);
+      }
       expect(createResult.isError).toBe(false);
       // After agent spawning, the assignment should show the delegate thread ID
       expect(createResult.content[0].text).toMatch(/assigned to \w+\.\d+/);
@@ -354,7 +366,7 @@ describe('Task Management Workflow Integration', () => {
       const reassignResult = await taskUpdateTool.execute(
         {
           taskId: validDelegateTaskId,
-          assignTo: 'new:anthropic/claude-sonnet-4-20250514',
+          assignTo: `new:${providerInstanceId}/claude-sonnet-4-20250514`,
           status: 'in_progress',
         },
         context
@@ -494,12 +506,15 @@ describe('Task Management Workflow Integration', () => {
               title: 'Assigned task',
               prompt: 'This will be assigned',
               priority: 'high',
-              assignedTo: 'new:mock/mock-model',
+              assignedTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
             },
           ],
         },
         context
       );
+      if (task3Result.isError) {
+        console.error('Task 3 creation failed:', task3Result.content[0].text);
+      }
       expect(task3Result.isError).toBe(false);
 
       // Get all tasks
