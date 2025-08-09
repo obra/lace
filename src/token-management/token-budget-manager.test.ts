@@ -276,4 +276,73 @@ describe('TokenBudgetManager', () => {
       expect(zeroBudgetManager.isNearLimit()).toBe(true);
     });
   });
+
+  describe('TokenBudgetManager compaction handling', () => {
+    it('should recalculate usage after compaction', () => {
+      const manager = new TokenBudgetManager({
+        maxTokens: 10000,
+        reserveTokens: 1000,
+        warningThreshold: 0.8,
+      });
+
+      // Record some usage
+      manager.recordUsage({
+        content: 'Test response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 3000,
+          completionTokens: 2000,
+          totalTokens: 5000,
+        },
+      });
+
+      // Should have 5000 tokens used
+      expect(manager.getTotalUsage()).toBe(5000);
+
+      // Handle compaction - pass the tokens in the summary
+      manager.handleCompaction(500); // Summary uses 500 tokens
+
+      // Should now only have 500 tokens used (just the summary)
+      expect(manager.getTotalUsage()).toBe(500);
+      expect(manager.getPromptTokens()).toBe(500);
+      expect(manager.getCompletionTokens()).toBe(0);
+    });
+
+    it('should track post-compaction usage correctly', () => {
+      const manager = new TokenBudgetManager({
+        maxTokens: 10000,
+        reserveTokens: 1000,
+        warningThreshold: 0.8,
+      });
+
+      // Pre-compaction usage
+      manager.recordUsage({
+        content: 'Pre-compaction response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 4000,
+          completionTokens: 3000,
+          totalTokens: 7000,
+        },
+      });
+
+      // Compact
+      manager.handleCompaction(500);
+      expect(manager.getTotalUsage()).toBe(500);
+
+      // Add post-compaction usage
+      manager.recordUsage({
+        content: 'Post-compaction response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 200,
+          completionTokens: 100,
+          totalTokens: 300,
+        },
+      });
+
+      // Should be summary + new usage
+      expect(manager.getTotalUsage()).toBe(800);
+    });
+  });
 });
