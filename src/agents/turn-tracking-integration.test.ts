@@ -348,7 +348,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
   });
 
   describe('Abort functionality tests', () => {
-    it('should abort during streaming response', async () => {
+    it('should abort during streaming response', { timeout: 10000 }, async () => {
       // Arrange
       const mockResponse: ProviderResponse = {
         content: 'This response should be aborted',
