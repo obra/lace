@@ -203,12 +203,12 @@ allowing agent methods like _getSession() to work correctly for
 delegate agents."
 ```
 
-### Task 3: Move createDelegateAgent logic to Session class
+### Task 3: Move createDelegateAgent logic to Session class ✅ COMPLETED
 
 **Files to modify:**
-- `src/sessions/session.ts`
-- `src/agents/agent.ts`
-- `src/sessions/session.test.ts`
+- `src/sessions/session.ts` (updated)
+- `src/agents/agent.ts` (removed createDelegateAgent method)
+- `src/sessions/session.test.ts` (added tests)
 
 **What to do:**
 

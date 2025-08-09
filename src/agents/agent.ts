@@ -2276,15 +2276,8 @@ export class Agent extends EventEmitter {
       let sessionConfig: AgentConfiguration = {};
       let projectConfig: AgentConfiguration = {};
 
-      // Get session configuration if thread has a sessionId or parentSessionId
-      let sessionId = thread.sessionId;
-      if (!sessionId) {
-        // Check thread metadata for parentSessionId (for delegate agents)
-        const metadata = this._threadManager.getThread(this._threadId)?.metadata;
-        if (metadata && metadata.parentSessionId) {
-          sessionId = metadata.parentSessionId as string;
-        }
-      }
+      // Get session configuration if thread has a sessionId
+      const sessionId = thread.sessionId;
 
       if (sessionId) {
         const sessionData = Session.getSession(sessionId);
