@@ -184,7 +184,7 @@ export class Agent extends EventEmitter {
     this._threadId = config.threadId;
     this._tools = config.tools;
     this._stopReasonHandler = new StopReasonHandler();
-    
+
     // Initialize token budget manager based on config or auto-detect from model
     if (config.tokenBudget) {
       // Use provided token budget config
@@ -314,10 +314,10 @@ export class Agent extends EventEmitter {
     }
 
     this._isRunning = true;
-    
+
     // Initialize token budget if not already done
     this._initializeTokenBudget();
-    
+
     logger.info('AGENT: Started', {
       threadId: this._threadId,
       provider: this._provider.providerName,
@@ -327,6 +327,12 @@ export class Agent extends EventEmitter {
   stop(): void {
     this._isRunning = false;
     this._clearProgressTimer();
+
+    // Abort any in-progress processing
+    if (this._abortController) {
+      this.abort();
+    }
+
     this._setState('idle');
 
     // Clean up provider resources
@@ -414,7 +420,7 @@ export class Agent extends EventEmitter {
   private _initializeTokenBudget(): void {
     // Skip if already initialized or explicitly disabled
     if (this._tokenBudgetManager) return;
-    
+
     const modelId = this.model;
     if (!modelId || modelId === 'unknown-model') {
       logger.debug('Cannot initialize token budget: model not specified');
@@ -423,8 +429,8 @@ export class Agent extends EventEmitter {
 
     // Get model info from provider
     const models = this._provider.getAvailableModels();
-    const modelInfo = models.find(m => m.id === modelId);
-    
+    const modelInfo = models.find((m) => m.id === modelId);
+
     if (!modelInfo) {
       logger.debug('Cannot initialize token budget: model info not found', { modelId });
       return;
@@ -1733,7 +1739,8 @@ export class Agent extends EventEmitter {
   updateThreadMetadata(metadata: Record<string, unknown>): void {
     const thread = this._threadManager.getThread(this._threadId);
     if (thread) {
-      thread.metadata = { ...thread.metadata, ...metadata };
+      // Initialize metadata if it doesn't exist
+      thread.metadata = { ...(thread.metadata || {}), ...metadata };
       // Update timestamp
       thread.updatedAt = new Date();
       // Save through ThreadManager
