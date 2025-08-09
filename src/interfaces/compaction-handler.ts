@@ -67,9 +67,12 @@ export class CompactionHandler {
    * Clean up event listeners
    */
   cleanup(): void {
-    this.agent.removeAllListeners('agent_thinking_start');
-    this.agent.removeAllListeners('agent_thinking_complete');
-    this.agent.removeAllListeners('error');
+    // Only remove listeners if the agent has the removeAllListeners method
+    if (typeof this.agent.removeAllListeners === 'function') {
+      this.agent.removeAllListeners('agent_thinking_start');
+      this.agent.removeAllListeners('agent_thinking_complete');
+      this.agent.removeAllListeners('error');
+    }
   }
 }
 
