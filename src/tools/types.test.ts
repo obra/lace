@@ -33,7 +33,7 @@ class TestTool extends Tool {
   ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'test' }],
-      isError: false,
+      status: 'completed',
     });
   }
 }
@@ -52,7 +52,7 @@ class SimpleTool extends Tool {
   ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'simple' }],
-      isError: false,
+      status: 'completed',
     });
   }
 }
@@ -94,7 +94,7 @@ describe('Tool Class with MCP Annotations', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('test');
     });
 
@@ -105,7 +105,7 @@ describe('Tool Class with MCP Annotations', () => {
         { signal: new AbortController().signal }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
   });
@@ -114,15 +114,15 @@ describe('Tool Class with MCP Annotations', () => {
 describe('ToolResult utility functions', () => {
   describe('createToolResult', () => {
     it('should create a basic ToolResult', () => {
-      const result = createToolResult(false, [{ type: 'text', text: 'success' }]);
+      const result = createToolResult('completed', [{ type: 'text', text: 'success' }]);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content).toHaveLength(1);
       expect(result.content[0].text).toBe('success');
     });
 
     it('should include optional id and metadata', () => {
-      const result = createToolResult(false, [{ type: 'text', text: 'success' }], 'test-id', {
+      const result = createToolResult('completed', [{ type: 'text', text: 'success' }], 'test-id', {
         custom: 'data',
       });
 
@@ -135,7 +135,7 @@ describe('ToolResult utility functions', () => {
     it('should create a success result', () => {
       const result = createSuccessResult([{ type: 'text', text: 'success' }]);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe('success');
     });
   });
@@ -144,14 +144,14 @@ describe('ToolResult utility functions', () => {
     it('should create error result from string', () => {
       const result = createErrorResult('Something went wrong');
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toBe('Something went wrong');
     });
 
     it('should create error result from content blocks', () => {
       const result = createErrorResult([{ type: 'text', text: 'Custom error' }]);
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toBe('Custom error');
     });
   });
