@@ -27,16 +27,16 @@ const AgentMessageEventDataSchema = z.object({
   content: z.string(),
 });
 
-const ToolCallEventDataSchema = z.object({
+const ToolCallSchema = z.object({
   id: z.string(),
   name: z.string(),
-  arguments: z.unknown().optional(),
+  arguments: z.record(z.unknown()),
 });
 
 const ToolResultSchema = z.unknown() as unknown as z.ZodType<ToolResult>;
 
 const ToolAggregatedEventDataSchema = z.object({
-  call: ToolCallEventDataSchema,
+  call: ToolCallSchema,
   result: ToolResultSchema.optional(),
   toolName: z.string(),
   toolId: z.string().optional(),
@@ -111,7 +111,7 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('TOOL_CALL'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: ToolCallEventDataSchema,
+    data: ToolCallSchema,
   }),
   z.object({
     type: z.literal('TOOL_RESULT'),

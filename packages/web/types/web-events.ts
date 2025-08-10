@@ -1,7 +1,13 @@
 // ABOUTME: Shared event data structures used by both API and SSE streaming
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
-import type { ThreadEventType, ToolResult, AgentMessageData, ToolAnnotations } from '@/types/core';
+import type {
+  ThreadEventType,
+  ToolResult,
+  AgentMessageData,
+  ToolAnnotations,
+  ToolCall,
+} from '@/types/core';
 import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
 // Event data structures shared between API and SSE streaming
@@ -15,14 +21,10 @@ export interface AgentMessageEventData {
   content: string;
 }
 
-export interface ToolCallEventData {
-  id: string;
-  name: string;
-  arguments?: unknown;
-}
+// NOTE: ToolCall is imported from core, replaces ToolCallEventData
 
 export interface ToolAggregatedEventData {
-  call: ToolCallEventData;
+  call: ToolCall;
   result?: ToolResult;
   toolName: string;
   toolId?: string;

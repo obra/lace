@@ -6,7 +6,7 @@
 
 import type { AgentInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
-import type { ToolCallEventData } from '@/types/web-events';
+import type { ToolCall } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import type { ToolResult } from '@/types/core';
 import type { TimelineEntry } from '@/types/web-events';
@@ -170,7 +170,7 @@ function processToolCallAggregation(events: SessionEvent[]): SessionEvent[] {
       threadId: call.threadId,
       timestamp: call.timestamp,
       data: {
-        call: call.data as ToolCallEventData,
+        call: call.data as ToolCall,
         result: result?.data as ToolResult | undefined,
         toolName: callData?.toolName || callData?.name || 'unknown',
         toolId: callData?.id,
@@ -264,7 +264,7 @@ function convertEvent(
         agent: agent,
         // Add extra metadata for rich rendering - match ToolAggregatedEventData structure
         metadata: {
-          call: toolData.call as ToolCallEventData,
+          call: toolData.call as ToolCall,
           result: toolData.result,
           toolName: toolData.toolName || 'Unknown Tool',
           toolId: toolData.toolId,
