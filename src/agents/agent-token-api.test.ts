@@ -13,6 +13,10 @@ class MockProvider extends BaseMockProvider {
   private responses: ProviderResponse[];
   private currentIndex = 0;
 
+  get providerName(): string {
+    return 'mock-provider';
+  }
+
   constructor(options: { responses: ProviderResponse[] }) {
     super({});
     this.responses = options.responses;
@@ -60,7 +64,7 @@ describe('Agent getTokenUsage API', () => {
     agent = new Agent({
       provider,
       threadManager,
-      toolExecutor: new ToolExecutor([]),
+      toolExecutor: new ToolExecutor(),
       threadId: 'test-thread',
       tools: [],
       tokenBudget: {
@@ -114,7 +118,7 @@ describe('Agent getTokenUsage API', () => {
     const agentNoBudget = new Agent({
       provider: new MockProvider({ responses: [] }),
       threadManager,
-      toolExecutor: new ToolExecutor([]),
+      toolExecutor: new ToolExecutor(),
       threadId: 'test-thread-no-budget',
       tools: [],
       // No tokenBudget specified
