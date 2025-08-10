@@ -2428,6 +2428,7 @@ export class Agent extends EventEmitter {
   getTokenUsage(): AgentTokenUsage {
     if (this._tokenBudgetManager) {
       const budget = this._tokenBudgetManager.getBudgetStatus();
+      const usageInfo = this._tokenBudgetManager.getUsageInfo();
       return {
         totalPromptTokens: budget.promptTokens,
         totalCompletionTokens: budget.completionTokens,
@@ -2435,6 +2436,7 @@ export class Agent extends EventEmitter {
         contextLimit: budget.maxTokens,
         percentUsed: budget.usagePercentage * 100,
         nearLimit: budget.warningTriggered,
+        eventCount: usageInfo.eventCount,
       };
     }
 
@@ -2446,6 +2448,7 @@ export class Agent extends EventEmitter {
       contextLimit: 200000, // Default context limit
       percentUsed: 0,
       nearLimit: false,
+      eventCount: 0,
     };
   }
 }

@@ -36,30 +36,28 @@ export async function GET(
     // Get token usage information if available
     let tokenUsage = undefined;
     try {
-      // Get the session instance to access agents and thread manager
+      // Get the session instance to access agents
       const { Session } = await import('@/lib/server/lace-imports');
       const sessionInstance = await Session.getById(asThreadId(sessionId));
       if (sessionInstance) {
-        // Get the main agent's thread manager to access events
         const mainAgent = sessionInstance.getAgent(sessionInstance.getId());
-        if (mainAgent && mainAgent.tokenBudgetManager) {
-          // Get token usage directly from the TokenBudgetManager (single source of truth)
-          const budgetStatus = mainAgent.tokenBudgetManager.getBudgetStatus();
-          const contextLimit = mainAgent.tokenBudgetManager.config.maxTokens;
-
+        if (mainAgent) {
+          // Use the agent's token usage API instead of accessing internals
+          const agentUsage = mainAgent.getTokenUsage();
           tokenUsage = {
-            promptTokens: budgetStatus.promptTokens,
-            completionTokens: budgetStatus.completionTokens,
-            totalTokens: budgetStatus.totalUsed,
-            contextLimit,
-            percentUsed: budgetStatus.usagePercentage * 100,
-            nearLimit: budgetStatus.warningTriggered,
+            totalPromptTokens: agentUsage.totalPromptTokens,
+            totalCompletionTokens: agentUsage.totalCompletionTokens,
+            totalTokens: agentUsage.totalTokens,
+            contextLimit: agentUsage.contextLimit,
+            percentUsed: agentUsage.percentUsed,
+            nearLimit: agentUsage.nearLimit,
+            eventCount: agentUsage.eventCount || 0,
           };
         }
       }
     } catch (tokenError) {
       // Log but don't fail the request if token calculation fails
-      console.warn('Failed to calculate token usage:', tokenError);
+      console.warn('Failed to get token usage:', tokenError);
     }
 
     return createSuperjsonResponse({ session, tokenUsage });
