@@ -198,7 +198,15 @@ export class SessionService {
 
     agent.on(
       'tool_call_start',
-      ({ toolName, input, callId }: { toolName: string; input: unknown; callId: string }) => {
+      ({
+        toolName,
+        input,
+        callId,
+      }: {
+        toolName: string;
+        input: Record<string, unknown>;
+        callId: string;
+      }) => {
         const event: SessionEvent = {
           type: 'TOOL_CALL',
           threadId,

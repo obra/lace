@@ -7,7 +7,6 @@ import { EVENT_TYPES } from '@/types/core';
 // Import shared event data structures
 import type {
   UserMessageEventData,
-  AgentMessageEventData,
   ToolAggregatedEventData,
   LocalSystemMessageEventData,
   SystemPromptEventData,
@@ -19,8 +18,8 @@ import type {
   AgentStreamingData,
 } from './web-events';
 
-// Import ToolCall from core instead of the deprecated ToolCallEventData
-import type { ToolCall } from '@/types/core';
+// Import core types instead of duplicated web types
+import type { ToolCall, AgentMessageData } from '@/types/core';
 
 // Import ToolResult for TOOL_RESULT events
 import type { ToolResult } from '@/types/core';
@@ -58,7 +57,7 @@ export type SessionEvent =
       type: 'AGENT_MESSAGE';
       threadId: ThreadId;
       timestamp: Date;
-      data: AgentMessageEventData;
+      data: AgentMessageData;
     }
   | {
       type: 'TOOL_CALL';

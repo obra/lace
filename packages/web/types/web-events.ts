@@ -17,9 +17,7 @@ export interface UserMessageEventData {
   content: string;
 }
 
-export interface AgentMessageEventData {
-  content: string;
-}
+// NOTE: AgentMessageData is imported from core, replaces AgentMessageEventData
 
 // NOTE: ToolCall is imported from core, replaces ToolCallEventData
 

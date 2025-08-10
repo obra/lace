@@ -23,8 +23,15 @@ const UserMessageEventDataSchema = z.object({
   content: z.string(),
 });
 
-const AgentMessageEventDataSchema = z.object({
+const AgentMessageDataSchema = z.object({
   content: z.string(),
+  tokenUsage: z
+    .object({
+      promptTokens: z.number(),
+      completionTokens: z.number(),
+      totalTokens: z.number(),
+    })
+    .optional(),
 });
 
 const ToolCallSchema = z.object({
@@ -105,7 +112,7 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('AGENT_MESSAGE'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: AgentMessageEventDataSchema,
+    data: AgentMessageDataSchema,
   }),
   z.object({
     type: z.literal('TOOL_CALL'),
