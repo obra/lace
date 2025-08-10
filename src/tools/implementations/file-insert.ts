@@ -77,7 +77,7 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
       // Write back
       await writeFile(resolvedPath, newContent, 'utf-8');
 
-      const addedLines = content.split('\n').length;
+      const addedLines = content === '' ? 0 : content.split('\n').length;
 
       return this.createResult(
         `${operation} in ${resolvedPath} (+${addedLines} line${addedLines === 1 ? '' : 's'})`

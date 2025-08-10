@@ -42,15 +42,31 @@ Creates parent directories automatically if needed. Returns file size written.`;
 
       // Create parent directories if requested
       if (createDirs) {
+        // Check abort before mkdir
+        if (context.signal.aborted) {
+          return this.createCancellationResult();
+        }
+
         const dir = dirname(resolvedPath);
         await mkdir(dir, { recursive: true });
+
+        // Check abort after mkdir
+        if (context.signal.aborted) {
+          return this.createCancellationResult();
+        }
       }
 
       // Write the file
       await writeFile(resolvedPath, content, 'utf8');
 
+      // Check abort before returning success
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
+      const byteLength = Buffer.byteLength(content, 'utf8');
       return this.createResult(
-        `Successfully wrote ${this.formatFileSize(content.length)} to ${resolvedPath}`
+        `Successfully wrote ${this.formatFileSize(byteLength)} to ${resolvedPath}`
       );
     } catch (error: unknown) {
       return this.handleFileSystemError(error, args.path);

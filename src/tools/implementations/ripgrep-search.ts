@@ -94,6 +94,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         const { stdout } = await execFileAsync('rg', ripgrepArgs, {
           cwd: process.cwd(),
           maxBuffer: 10485760, // 10MB buffer
+          signal: context.signal,
         });
 
         const matches = this.parseRipgrepOutput(stdout, maxResults);

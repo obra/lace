@@ -16,7 +16,10 @@ class TestTool extends Tool {
     optional: z.number().optional(),
   });
 
-  executeValidated(args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
+  protected executeValidated(
+    args: z.infer<typeof this.schema>,
+    _context: ToolContext
+  ): Promise<ToolResult> {
     return Promise.resolve({
       content: [{ type: 'text' as const, text: `Got: ${args.required}` }],
       status: 'completed',
@@ -117,7 +120,10 @@ class ComplexTestTool extends Tool {
       }
     );
 
-  executeValidated(_args: z.infer<typeof this.schema>, _context: ToolContext): Promise<ToolResult> {
+  protected executeValidated(
+    _args: z.infer<typeof this.schema>,
+    _context: ToolContext
+  ): Promise<ToolResult> {
     return Promise.resolve({
       content: [{ type: 'text' as const, text: 'validation passed' }],
       status: 'completed',

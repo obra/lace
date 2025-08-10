@@ -107,14 +107,6 @@ describe('Task Management Workflow Integration', () => {
     setupTestProviderDefaults();
     Session.clearProviderCache();
 
-    // Create test provider instance
-    providerInstanceId = await createTestProviderInstance({
-      catalogId: 'anthropic',
-      models: ['claude-3-5-haiku-20241022'],
-      displayName: 'Test Anthropic Instance',
-      apiKey: 'test-anthropic-key',
-    });
-
     // Create a real provider instance for testing
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

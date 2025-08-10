@@ -53,13 +53,16 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       case 'completed': return 'success';
       case 'in_progress': return 'primary';
       case 'cancelled': return 'outline';
+      case 'failed': return 'error';
+      case 'aborted': return 'warning';
+      case 'denied': return 'outline';
       default: return 'default';
     }
   };
   
   return (
     <Badge variant={getVariant(status)} size="xs">
-      {status.replace('_', ' ')}
+      {status.replaceAll('_', ' ')}
     </Badge>
   );
 };
@@ -560,7 +563,7 @@ const taskAddNoteRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Check for error statuses first
-    if (result.status === 'failed' || result.status === 'denied' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status === 'failed' || result.status === 'denied' || result.status === 'aborted' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">

@@ -157,18 +157,18 @@ export const delegateRenderer: ToolRenderer = {
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
     
-    // Check for failed or timeout status in structured output
+    // Check for error statuses in structured output
     try {
       const parsed = parseToolResult(result);
       if (typeof parsed === 'object' && parsed !== null && 'status' in parsed) {
         const status = (parsed as { status?: string }).status;
-        return status === 'failed' || status === 'timeout';
+        return status === 'failed' || status === 'timeout' || status === 'aborted' || status === 'denied';
       }
     } catch {
-      // Fallback to isError flag
+      // Fallback to result status check
     }
     
-    return result.status !== 'completed';
+    return false;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
@@ -184,13 +184,14 @@ export const delegateRenderer: ToolRenderer = {
     
     // Handle legacy plain text output
     if (typeof parsed === 'string') {
+      const statusText = result.status !== 'completed' ? result.status.toUpperCase() : parsed;
       return (
         <div className={`font-mono text-sm whitespace-pre-wrap rounded-lg p-3 ${
           result.status !== 'completed' 
             ? 'text-error bg-error/10 border border-error/20' 
             : 'text-base-content/80 bg-base-200 border border-base-300'
         }`}>
-          {parsed}
+          {result.status !== 'completed' ? statusText : parsed}
         </div>
       );
     }

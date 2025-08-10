@@ -242,35 +242,31 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should validate required fields', async () => {
-      const result = await taskCreateTool.execute(
-        {
-          tasks: [
-            {
-              title: '',
-              prompt: 'Some prompt',
-            },
-          ],
-        } as any,
-        context
-      );
+      const invalidInput: unknown = {
+        tasks: [
+          {
+            title: '',
+            prompt: 'Some prompt',
+          },
+        ],
+      };
+      const result = await taskCreateTool.execute(invalidInput, context);
 
       expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Validation failed');
     });
 
     it('should reject invalid assignee format', async () => {
-      const result = await taskCreateTool.execute(
-        {
-          tasks: [
-            {
-              title: 'Test task',
-              prompt: 'Do something',
-              assignedTo: 'invalid-format',
-            },
-          ],
-        } as any,
-        context
-      );
+      const invalidInput: unknown = {
+        tasks: [
+          {
+            title: 'Test task',
+            prompt: 'Do something',
+            assignedTo: 'invalid-format',
+          },
+        ],
+      };
+      const result = await taskCreateTool.execute(invalidInput, context);
 
       expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Invalid assignee format');

@@ -334,7 +334,6 @@ export class Agent extends EventEmitter {
 
       this._currentTurnMetrics = null;
       this._abortController = null;
-      this._setState('idle');
       aborted = true;
     }
 
@@ -349,8 +348,12 @@ export class Agent extends EventEmitter {
       this._activeToolCalls.clear();
       this._toolAbortController = null;
       // Don't reset _pendingToolCount here - let the tools complete normally
-      this._setState('idle');
       aborted = true;
+    }
+
+    if (aborted) {
+      this._isAborted = true;
+      this._setState('idle');
     }
 
     return aborted;
