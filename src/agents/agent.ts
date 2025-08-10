@@ -149,7 +149,6 @@ export class Agent extends EventEmitter {
   private _abortController: AbortController | null = null;
   private _toolAbortController: AbortController | null = null;
   private _activeToolCalls: Map<string, ToolCall> = new Map();
-  private _isAborted = false;
   private _lastStreamingTokenCount = 0; // Track last cumulative token count from streaming
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
@@ -352,7 +351,6 @@ export class Agent extends EventEmitter {
     }
 
     if (aborted) {
-      this._isAborted = true;
       this._setState('idle');
     }
 
@@ -963,6 +961,8 @@ export class Agent extends EventEmitter {
         status: 'denied',
         content: [{ type: 'text', text: 'Tool execution denied by user' }],
       };
+      // Remove from active tools tracking (it was denied)
+      this._activeToolCalls.delete(toolCallId);
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
     } else if (decision === ApprovalDecision.ALLOW_SESSION) {
       // Update session tool policy for session-wide approval
@@ -1000,7 +1000,7 @@ export class Agent extends EventEmitter {
       }
 
       const toolContext = {
-        signal: this._toolAbortController?.signal ?? new AbortController().signal,
+        signal: this._getToolAbortSignal(),
         workingDirectory,
         agent: this,
       };
@@ -1116,7 +1116,7 @@ export class Agent extends EventEmitter {
       }
 
       const toolContext = {
-        signal: this._toolAbortController?.signal ?? new AbortController().signal,
+        signal: this._getToolAbortSignal(),
         workingDirectory,
         agent: this,
       };
@@ -1544,6 +1544,24 @@ export class Agent extends EventEmitter {
     // Extract parent thread ID by removing hierarchical suffix
     const dotIndex = this._threadId.indexOf('.');
     return dotIndex > 0 ? this._threadId.substring(0, dotIndex) : this._threadId;
+  }
+
+  // Helper to get tool abort signal, ensuring it's aborted if agent is already aborted
+  private _getToolAbortSignal(): AbortSignal {
+    if (this._toolAbortController) {
+      return this._toolAbortController.signal;
+    }
+
+    // Create a new controller
+    const controller = new AbortController();
+
+    // If the agent was already aborted, immediately abort the new controller
+    // This happens when abort() was called and set _toolAbortController to null
+    if (this._abortController?.signal.aborted) {
+      controller.abort('Agent was aborted');
+    }
+
+    return controller.signal;
   }
 
   // Token tracking helper methods
