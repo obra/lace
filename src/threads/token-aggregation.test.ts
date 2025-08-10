@@ -168,4 +168,273 @@ describe('Token aggregation', () => {
     const estimated = estimateConversationTokens([]);
     expect(estimated).toBe(0);
   });
+
+  describe('Token aggregation with compaction', () => {
+    it('should only count events after compaction plus summary', () => {
+      const events: ThreadEvent[] = [
+        // Original events (before compaction) - these should be ignored
+        {
+          id: '1',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01'),
+          data: {
+            content: 'Old response 1',
+            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+          },
+        },
+        {
+          id: '2',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-02'),
+          data: {
+            content: 'Old response 2',
+            tokenUsage: { promptTokens: 800, completionTokens: 400, totalTokens: 1200 },
+          },
+        },
+        // Compaction event - contains summary
+        {
+          id: 'compaction-1',
+          threadId: 'test',
+          type: 'COMPACTION',
+          timestamp: new Date('2024-01-03'),
+          data: {
+            strategyId: 'summarize',
+            originalEventCount: 2,
+            compactedEvents: [
+              {
+                id: 'summary',
+                threadId: 'test',
+                type: 'AGENT_MESSAGE' as const,
+                timestamp: new Date('2024-01-03'),
+                data: {
+                  content: 'Summary of conversation',
+                  tokenUsage: { promptTokens: 300, completionTokens: 200, totalTokens: 500 },
+                },
+              },
+            ],
+          },
+        },
+        // Post-compaction events - these should be counted
+        {
+          id: '3',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-04'),
+          data: {
+            content: 'New response 1',
+            tokenUsage: { promptTokens: 150, completionTokens: 100, totalTokens: 250 },
+          },
+        },
+        {
+          id: '4',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-05'),
+          data: {
+            content: 'New response 2',
+            tokenUsage: { promptTokens: 200, completionTokens: 150, totalTokens: 350 },
+          },
+        },
+      ];
+
+      const result = aggregateTokenUsage(events);
+
+      // Should be summary (300+200) + post-compaction events (150+100+200+150)
+      expect(result).toEqual({
+        totalPromptTokens: 650, // 300 (summary) + 150 + 200
+        totalCompletionTokens: 450, // 200 (summary) + 100 + 150
+        totalTokens: 1100, // 500 (summary) + 250 + 350
+        eventCount: 3, // 1 summary + 2 post-compaction events
+      });
+    });
+
+    it('should handle multiple compactions correctly', () => {
+      const events: ThreadEvent[] = [
+        // First batch of events
+        {
+          id: '1',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01'),
+          data: {
+            content: 'Old response 1',
+            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+          },
+        },
+        // First compaction
+        {
+          id: 'compaction-1',
+          threadId: 'test',
+          type: 'COMPACTION',
+          timestamp: new Date('2024-01-02'),
+          data: {
+            strategyId: 'summarize',
+            originalEventCount: 1,
+            compactedEvents: [
+              {
+                id: 's1',
+                threadId: 'test',
+                type: 'AGENT_MESSAGE' as const,
+                timestamp: new Date('2024-01-02'),
+                data: {
+                  content: 'First summary',
+                  tokenUsage: { promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+                },
+              },
+            ],
+          },
+        },
+        // Events after first compaction
+        {
+          id: '2',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-03'),
+          data: {
+            content: 'Middle response',
+            tokenUsage: { promptTokens: 300, completionTokens: 200, totalTokens: 500 },
+          },
+        },
+        // Second compaction
+        {
+          id: 'compaction-2',
+          threadId: 'test',
+          type: 'COMPACTION',
+          timestamp: new Date('2024-01-04'),
+          data: {
+            strategyId: 'summarize',
+            originalEventCount: 2,
+            compactedEvents: [
+              {
+                id: 's2',
+                threadId: 'test',
+                type: 'AGENT_MESSAGE' as const,
+                timestamp: new Date('2024-01-04'),
+                data: {
+                  content: 'Second summary',
+                  tokenUsage: { promptTokens: 150, completionTokens: 75, totalTokens: 225 },
+                },
+              },
+            ],
+          },
+        },
+        // Final events
+        {
+          id: '3',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-05'),
+          data: {
+            content: 'Final response',
+            tokenUsage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+          },
+        },
+      ];
+
+      const result = aggregateTokenUsage(events);
+
+      // Should only count the latest summary (150+75) + post-compaction events (100+50)
+      expect(result).toEqual({
+        totalPromptTokens: 250, // 150 (latest summary) + 100
+        totalCompletionTokens: 125, // 75 (latest summary) + 50
+        totalTokens: 375, // 225 (latest summary) + 150
+        eventCount: 2, // 1 latest summary + 1 post-compaction event
+      });
+    });
+
+    it('should handle compaction with no post-compaction events', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: '1',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01'),
+          data: {
+            content: 'Original response',
+            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+          },
+        },
+        {
+          id: 'compaction-1',
+          threadId: 'test',
+          type: 'COMPACTION',
+          timestamp: new Date('2024-01-02'),
+          data: {
+            strategyId: 'summarize',
+            originalEventCount: 1,
+            compactedEvents: [
+              {
+                id: 'summary',
+                threadId: 'test',
+                type: 'AGENT_MESSAGE' as const,
+                timestamp: new Date('2024-01-02'),
+                data: {
+                  content: 'Summary',
+                  tokenUsage: { promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+                },
+              },
+            ],
+          },
+        },
+      ];
+
+      const result = aggregateTokenUsage(events);
+
+      // Should only count the summary
+      expect(result).toEqual({
+        totalPromptTokens: 200,
+        totalCompletionTokens: 100,
+        totalTokens: 300,
+        eventCount: 1,
+      });
+    });
+
+    it('should handle empty compacted events', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: '1',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01'),
+          data: {
+            content: 'Original response',
+            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+          },
+        },
+        {
+          id: 'compaction-1',
+          threadId: 'test',
+          type: 'COMPACTION',
+          timestamp: new Date('2024-01-02'),
+          data: {
+            strategyId: 'delete',
+            originalEventCount: 1,
+            compactedEvents: [], // Empty summary
+          },
+        },
+        {
+          id: '2',
+          threadId: 'test',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-03'),
+          data: {
+            content: 'New response',
+            tokenUsage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+          },
+        },
+      ];
+
+      const result = aggregateTokenUsage(events);
+
+      // Should only count post-compaction events
+      expect(result).toEqual({
+        totalPromptTokens: 100,
+        totalCompletionTokens: 50,
+        totalTokens: 150,
+        eventCount: 1,
+      });
+    });
+  });
 });
