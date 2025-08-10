@@ -6,7 +6,6 @@ import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
-import { aggregateTokenUsage } from '~/threads/token-aggregation';
 import { asThreadId } from '@/types/core';
 
 const UpdateSessionSchema = z.object({
@@ -43,19 +42,18 @@ export async function GET(
       if (sessionInstance) {
         // Get the main agent's thread manager to access events
         const mainAgent = sessionInstance.getAgent(sessionInstance.getId());
-        if (mainAgent) {
-          const events = mainAgent.threadManager.getEvents(mainAgent.threadId);
-          const tokenSummary = aggregateTokenUsage(events);
-
-          // Get token budget configuration
-          const tokenBudgetManager = mainAgent.tokenBudgetManager;
-          const contextLimit = tokenBudgetManager?.config?.maxTokens || 200000; // Default to 200k if not configured
+        if (mainAgent && mainAgent.tokenBudgetManager) {
+          // Get token usage directly from the TokenBudgetManager (single source of truth)
+          const budgetStatus = mainAgent.tokenBudgetManager.getBudgetStatus();
+          const contextLimit = mainAgent.tokenBudgetManager.config.maxTokens;
 
           tokenUsage = {
-            ...tokenSummary,
+            promptTokens: budgetStatus.promptTokens,
+            completionTokens: budgetStatus.completionTokens,
+            totalTokens: budgetStatus.totalUsed,
             contextLimit,
-            percentUsed: (tokenSummary.totalTokens / contextLimit) * 100,
-            nearLimit: tokenSummary.totalTokens > contextLimit * 0.8,
+            percentUsed: budgetStatus.usagePercentage * 100,
+            nearLimit: budgetStatus.warningTriggered,
           };
         }
       }

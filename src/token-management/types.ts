@@ -31,6 +31,25 @@ export interface BudgetRecommendations {
   warningMessage?: string;
 }
 
+export interface TokenUsageInfo {
+  // Current usage
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+
+  // Context limits
+  maxTokens: number;
+  availableTokens: number;
+
+  // Status
+  percentUsed: number;
+  nearLimit: boolean;
+
+  // Tracking
+  eventCount: number;
+  lastCompactionAt?: Date;
+}
+
 export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;

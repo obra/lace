@@ -1815,6 +1815,31 @@ export class Agent extends EventEmitter {
     await this._threadManager.compact(threadId, 'summarize', {
       agent: this,
     });
+
+    // Get the latest compaction event to find token count
+    const events = this._threadManager.getEvents(threadId);
+    const compactionEvent = events.findLast((e) => e.type === 'COMPACTION');
+
+    if (compactionEvent && this._tokenBudgetManager) {
+      const compactionData = compactionEvent.data;
+
+      // Calculate approximate token count from compacted events
+      // This is a rough estimate - each event's content length / 4 (average chars per token)
+      let summaryTokens = 0;
+      for (const event of compactionData.compactedEvents) {
+        if (typeof event.data === 'string') {
+          summaryTokens += Math.ceil(event.data.length / 4);
+        } else if (typeof event.data === 'object' && event.data && 'content' in event.data) {
+          const content = (event.data as { content?: string }).content;
+          if (content) {
+            summaryTokens += Math.ceil(content.length / 4);
+          }
+        }
+      }
+
+      // Reset token budget to just the summary's token count
+      this._tokenBudgetManager.handleCompaction(summaryTokens);
+    }
   }
 
   /**

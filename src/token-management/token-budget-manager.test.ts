@@ -345,4 +345,77 @@ describe('TokenBudgetManager', () => {
       expect(manager.getTotalUsage()).toBe(800);
     });
   });
+
+  describe('TokenBudgetManager usage info', () => {
+    it('should return comprehensive usage information', () => {
+      const manager = new TokenBudgetManager({
+        maxTokens: 10000,
+        reserveTokens: 1000,
+        warningThreshold: 0.8,
+      });
+
+      manager.recordUsage({
+        content: 'Test response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 3000,
+          completionTokens: 2000,
+          totalTokens: 5000,
+        },
+      });
+
+      const info = manager.getUsageInfo();
+
+      expect(info).toEqual({
+        promptTokens: 3000,
+        completionTokens: 2000,
+        totalTokens: 5000,
+        maxTokens: 10000,
+        availableTokens: 4000, // 10000 - 1000 reserve - 5000 used
+        percentUsed: 50,
+        nearLimit: false,
+        eventCount: 1,
+        lastCompactionAt: undefined,
+      });
+    });
+
+    it('should track compaction timestamp', () => {
+      const manager = new TokenBudgetManager({
+        maxTokens: 10000,
+        reserveTokens: 1000,
+        warningThreshold: 0.8,
+      });
+
+      const beforeCompaction = new Date();
+      manager.handleCompaction(500);
+      const afterCompaction = new Date();
+
+      const info = manager.getUsageInfo();
+      expect(info.lastCompactionAt).toBeDefined();
+      expect(info.lastCompactionAt!.getTime()).toBeGreaterThanOrEqual(beforeCompaction.getTime());
+      expect(info.lastCompactionAt!.getTime()).toBeLessThanOrEqual(afterCompaction.getTime());
+    });
+
+    it('should handle empty/zero state correctly', () => {
+      const manager = new TokenBudgetManager({
+        maxTokens: 1000,
+        reserveTokens: 100,
+        warningThreshold: 0.8,
+      });
+
+      const info = manager.getUsageInfo();
+
+      expect(info).toEqual({
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        maxTokens: 1000,
+        availableTokens: 900, // 1000 - 100 reserve
+        percentUsed: 0,
+        nearLimit: false,
+        eventCount: 0,
+        lastCompactionAt: undefined,
+      });
+    });
+  });
 });
