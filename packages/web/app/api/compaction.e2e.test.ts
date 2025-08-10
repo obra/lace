@@ -696,7 +696,6 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
           totalPromptTokens: number;
           totalCompletionTokens: number;
           totalTokens: number;
-          eventCount: number;
           percentUsed?: number;
           nearLimit?: boolean;
           contextLimit?: number;
@@ -712,7 +711,6 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       totalPromptTokens: expectedTotalInput,
       totalCompletionTokens: expectedTotalOutput,
       totalTokens: expectedTotalInput + expectedTotalOutput,
-      eventCount: 3,
     });
   });
 });

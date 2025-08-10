@@ -101,7 +101,6 @@ describe('Agent API', () => {
       contextLimit: 200000,
       percentUsed: 0,
       nearLimit: false,
-      eventCount: 0,
     });
   });
 
@@ -135,7 +134,6 @@ describe('Agent API', () => {
           contextLimit: 200000,
           percentUsed: 0,
           nearLimit: false,
-          eventCount: 0,
         },
         createdAt: expect.any(Date) as Date,
       });
@@ -206,7 +204,6 @@ describe('Agent API', () => {
         contextLimit: 200000,
         percentUsed: 0.75,
         nearLimit: false,
-        eventCount: 5,
       };
 
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(mockTokenUsage);
@@ -230,7 +227,6 @@ describe('Agent API', () => {
         contextLimit: 200000,
         percentUsed: 0,
         nearLimit: false,
-        eventCount: 0,
       };
 
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(defaultTokenUsage);
@@ -302,7 +298,6 @@ describe('Agent API', () => {
           contextLimit: 200000,
           percentUsed: 0,
           nearLimit: false,
-          eventCount: 0,
         },
         createdAt: expect.any(Date) as Date,
       });

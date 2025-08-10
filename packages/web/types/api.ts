@@ -105,8 +105,6 @@ export interface AgentResponse {
       contextLimit: number;
       percentUsed: number;
       nearLimit: boolean;
-      eventCount: number;
-      lastCompactionAt?: Date;
     };
   };
 }

@@ -9,8 +9,6 @@ export interface TokenUsageData {
   contextLimit: number;
   percentUsed: number;
   nearLimit: boolean;
-  eventCount: number;
-  lastCompactionAt?: Date;
 }
 
 interface TokenUsageDisplayProps {
@@ -87,11 +85,6 @@ export default function TokenUsageDisplay({
 
       {/* Right side: Compaction status */}
       <div className="flex items-center gap-2">
-        {tokenUsage.lastCompactionAt && (
-          <span className="text-base-content/50">
-            Last compacted: {tokenUsage.lastCompactionAt.toLocaleTimeString()}
-          </span>
-        )}
         <span className={`text-base-content/60 ${tokenUsage.percentUsed >= 80 ? 'text-warning' : ''}`}>
           {compactionDistance}
         </span>

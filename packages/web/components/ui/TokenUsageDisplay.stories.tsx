@@ -21,7 +21,6 @@ const lowUsageData: TokenUsageData = {
   contextLimit: 128000,
   percentUsed: 1.6,
   nearLimit: false,
-  eventCount: 5,
 };
 
 const moderateUsageData: TokenUsageData = {
@@ -31,7 +30,6 @@ const moderateUsageData: TokenUsageData = {
   contextLimit: 128000,
   percentUsed: 39.1,
   nearLimit: false,
-  eventCount: 25,
 };
 
 const highUsageData: TokenUsageData = {
@@ -41,8 +39,6 @@ const highUsageData: TokenUsageData = {
   contextLimit: 128000,
   percentUsed: 78.1,
   nearLimit: true,
-  eventCount: 45,
-  lastCompactionAt: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
 };
 
 const criticalUsageData: TokenUsageData = {
@@ -52,8 +48,6 @@ const criticalUsageData: TokenUsageData = {
   contextLimit: 128000,
   percentUsed: 89.8,
   nearLimit: true,
-  eventCount: 67,
-  lastCompactionAt: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
 };
 
 const largeScaleUsageData: TokenUsageData = {
@@ -63,8 +57,6 @@ const largeScaleUsageData: TokenUsageData = {
   contextLimit: 2000000,
   percentUsed: 100.0,
   nearLimit: true,
-  eventCount: 150,
-  lastCompactionAt: new Date(Date.now() - 30 * 1000), // 30 seconds ago
 };
 
 export const Loading: Story = {

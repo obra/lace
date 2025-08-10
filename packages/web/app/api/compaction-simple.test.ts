@@ -176,7 +176,6 @@ describe('Compaction Integration Test', () => {
           totalPromptTokens: number;
           totalCompletionTokens: number;
           totalTokens: number;
-          eventCount: number;
           contextLimit: number;
           percentUsed: number;
           nearLimit: boolean;
@@ -189,7 +188,6 @@ describe('Compaction Integration Test', () => {
     expect(agentData.agent.tokenUsage).toHaveProperty('totalPromptTokens');
     expect(agentData.agent.tokenUsage).toHaveProperty('totalCompletionTokens');
     expect(agentData.agent.tokenUsage).toHaveProperty('totalTokens');
-    expect(agentData.agent.tokenUsage).toHaveProperty('eventCount');
     expect(agentData.agent.tokenUsage).toHaveProperty('contextLimit');
     expect(agentData.agent.tokenUsage).toHaveProperty('percentUsed');
     expect(agentData.agent.tokenUsage).toHaveProperty('nearLimit');
@@ -198,7 +196,6 @@ describe('Compaction Integration Test', () => {
     expect(typeof agentData.agent.tokenUsage!.totalPromptTokens).toBe('number');
     expect(typeof agentData.agent.tokenUsage!.totalCompletionTokens).toBe('number');
     expect(typeof agentData.agent.tokenUsage!.totalTokens).toBe('number');
-    expect(typeof agentData.agent.tokenUsage!.eventCount).toBe('number');
     expect(typeof agentData.agent.tokenUsage!.contextLimit).toBe('number');
     expect(typeof agentData.agent.tokenUsage!.percentUsed).toBe('number');
     expect(typeof agentData.agent.tokenUsage!.nearLimit).toBe('boolean');

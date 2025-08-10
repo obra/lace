@@ -82,8 +82,6 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
           contextLimit: threadData.contextLimit,
           percentUsed: threadData.percentUsed,
           nearLimit: threadData.nearLimit,
-          eventCount: 0, // Remove vanity metric
-          lastCompactionAt: undefined, // Remove vanity metric
         };
 
         console.log('[useAgentTokenUsage] Setting token usage:', completeTokenUsage);

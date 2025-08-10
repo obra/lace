@@ -166,7 +166,14 @@ describe('Token Usage Integration Tests', () => {
       content: 'First test response',
       tokenUsage: {
         message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
-        thread: { totalPromptTokens: 100, totalCompletionTokens: 50, totalTokens: 150, contextLimit: 200000, percentUsed: 0.1, nearLimit: false }
+        thread: {
+          totalPromptTokens: 100,
+          totalCompletionTokens: 50,
+          totalTokens: 150,
+          contextLimit: 200000,
+          percentUsed: 0.1,
+          nearLimit: false,
+        },
       },
     });
 
@@ -174,7 +181,14 @@ describe('Token Usage Integration Tests', () => {
       content: 'Second test response',
       tokenUsage: {
         message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
-        thread: { totalPromptTokens: 300, totalCompletionTokens: 125, totalTokens: 425, contextLimit: 200000, percentUsed: 0.2, nearLimit: false },
+        thread: {
+          totalPromptTokens: 300,
+          totalCompletionTokens: 125,
+          totalTokens: 425,
+          contextLimit: 200000,
+          percentUsed: 0.2,
+          nearLimit: false,
+        },
       },
     });
 
@@ -200,7 +214,6 @@ describe('Token Usage Integration Tests', () => {
     expect(tokenUsage.totalCompletionTokens).toBeGreaterThanOrEqual(0);
     expect(tokenUsage.totalTokens).toBeGreaterThanOrEqual(0);
     expect(tokenUsage.contextLimit).toBeGreaterThan(0); // Should have a context limit
-    expect(tokenUsage.eventCount).toBeGreaterThanOrEqual(0);
   });
 
   it('should handle agents with no token usage gracefully', async () => {
@@ -216,7 +229,6 @@ describe('Token Usage Integration Tests', () => {
     // Should return default values, not undefined
     expect(agentData.agent.tokenUsage).toBeDefined();
     expect(agentData.agent.tokenUsage?.totalTokens).toBe(0);
-    expect(agentData.agent.tokenUsage?.eventCount).toBe(0);
     expect(agentData.agent.tokenUsage?.contextLimit).toBeGreaterThan(0);
     expect(agentData.agent.tokenUsage?.nearLimit).toBe(false);
   });
@@ -237,7 +249,14 @@ describe('Token Usage Integration Tests', () => {
       content: 'Pre-compaction response',
       tokenUsage: {
         message: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
-        thread: { totalPromptTokens: 1000, totalCompletionTokens: 500, totalTokens: 1500, contextLimit: 200000, percentUsed: 0.75, nearLimit: false }
+        thread: {
+          totalPromptTokens: 1000,
+          totalCompletionTokens: 500,
+          totalTokens: 1500,
+          contextLimit: 200000,
+          percentUsed: 0.75,
+          nearLimit: false,
+        },
       },
     });
 

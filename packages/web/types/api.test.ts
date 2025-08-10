@@ -39,7 +39,6 @@ describe('API Type Definitions', () => {
           contextLimit: 200000,
           percentUsed: 0.75,
           nearLimit: false,
-          eventCount: 10,
         },
       },
     };
