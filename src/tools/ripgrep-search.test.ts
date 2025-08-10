@@ -44,7 +44,9 @@ describe('RipgrepSearchTool with schema validation', () => {
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('ripgrep_search');
-      expect(tool.description).toBe('Fast text search across files using ripgrep');
+      expect(tool.description)
+        .toBe(`Search file contents using regex patterns. Use for text search, file-find for name patterns.
+Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`);
     });
 
     it('should have proper input schema', () => {
@@ -70,79 +72,97 @@ describe('RipgrepSearchTool with schema validation', () => {
 
   describe('Input validation', () => {
     it('should reject missing pattern', async () => {
-      const result = await tool.execute({});
+      const result = await tool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('pattern');
     });
 
     it('should reject empty pattern', async () => {
-      const result = await tool.execute({ pattern: '' });
+      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
 
     it('should reject invalid maxResults', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        maxResults: -1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          maxResults: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject excessive maxResults', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        maxResults: 10000,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          maxResults: 10000,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject negative contextLines', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        contextLines: -1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          contextLines: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject excessive contextLines', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        contextLines: 20,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          contextLines: 20,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should accept valid parameters with defaults', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
   describe('Basic search functionality', () => {
     it('should find matches in multiple files', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('Found');
@@ -153,65 +173,83 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
 
     it('should return no matches message when pattern not found', async () => {
-      const result = await tool.execute({
-        pattern: 'nonexistentpattern',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'nonexistentpattern',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No matches found for pattern: nonexistentpattern');
     });
 
     it('should include line numbers in results', async () => {
-      const result = await tool.execute({
-        pattern: 'function hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'function hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toMatch(/\d+: function hello/);
     });
 
     it('should use current directory as default path', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should not error out, even if no matches found in current directory
     });
   });
 
   describe('Search options', () => {
     it('should respect case sensitivity', async () => {
-      const caseInsensitive = await tool.execute({
-        pattern: 'HELLO',
-        path: testDir,
-        caseSensitive: false,
-      });
+      const caseInsensitive = await tool.execute(
+        {
+          pattern: 'HELLO',
+          path: testDir,
+          caseSensitive: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      const caseSensitive = await tool.execute({
-        pattern: 'HELLO',
-        path: testDir,
-        caseSensitive: true,
-      });
+      const caseSensitive = await tool.execute(
+        {
+          pattern: 'HELLO',
+          path: testDir,
+          caseSensitive: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(caseInsensitive.isError).toBe(false);
+      expect(caseInsensitive.status).toBe('completed');
       expect(caseInsensitive.content[0].text).toContain('Found');
 
-      expect(caseSensitive.isError).toBe(false);
+      expect(caseSensitive.status).toBe('completed');
       expect(caseSensitive.content[0].text).toContain('No matches found');
     });
 
     it('should filter by include pattern', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        includePattern: '*.ts',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          includePattern: '*.ts',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('file1.ts');
@@ -220,13 +258,16 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
 
     it('should filter by exclude pattern', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        excludePattern: '*.test.txt',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          excludePattern: '*.test.txt',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('file1.ts');
@@ -238,20 +279,26 @@ describe('RipgrepSearchTool with schema validation', () => {
       await writeFile(join(testDir, 'partial.txt'), 'hellofriend');
       await writeFile(join(testDir, 'whole.txt'), 'hello world');
 
-      const wholeWord = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        wholeWord: true,
-      });
+      const wholeWord = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          wholeWord: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      const partialWord = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        wholeWord: false,
-      });
+      const partialWord = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          wholeWord: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(wholeWord.isError).toBe(false);
-      expect(partialWord.isError).toBe(false);
+      expect(wholeWord.status).toBe('completed');
+      expect(partialWord.status).toBe('completed');
 
       expect(partialWord.content[0].text).toContain('partial.txt');
       expect(partialWord.content[0].text).toContain('whole.txt');
@@ -260,13 +307,16 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
 
     it('should add context lines when requested', async () => {
-      const result = await tool.execute({
-        pattern: 'console.log',
-        path: testDir,
-        contextLines: 1,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'console.log',
+          path: testDir,
+          contextLines: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       // Should find console.log matches
       expect(output).toContain('console.log');
@@ -284,13 +334,16 @@ describe('RipgrepSearchTool with schema validation', () => {
         );
       }
 
-      const result = await tool.execute({
-        pattern: 'uniquepattern',
-        path: testDir,
-        maxResults: 10,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'uniquepattern',
+          path: testDir,
+          maxResults: 10,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0]).toBeDefined();
       expect(result.content[0].text).toBeDefined();
       const output = result.content[0].text!;
@@ -305,36 +358,45 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
 
     it('should not show truncation message when under limit', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        maxResults: 100,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          maxResults: 100,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).not.toContain('Results limited to');
     });
 
     it('should use default maxResults when not specified', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should not error, default should be applied
     });
   });
 
   describe('Output formatting', () => {
     it('should group results by file', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       expect(output).toContain('file1.ts:');
@@ -343,23 +405,29 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
 
     it('should show match count in header', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toMatch(/Found \d+ match(es)?:/);
     });
 
     it('should handle single match correctly', async () => {
-      const result = await tool.execute({
-        pattern: 'nested hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'nested hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('Found 1 match:');
       expect(output).not.toContain('matches');
@@ -368,77 +436,114 @@ describe('RipgrepSearchTool with schema validation', () => {
 
   describe('Error handling scenarios', () => {
     it('should handle non-existent directory', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: '/non/existent/directory',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: '/non/existent/directory',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Search operation failed');
     });
 
-    it('should handle special regex characters in pattern', async () => {
+    it('should handle special regex characters in pattern with literal search', async () => {
       await writeFile(join(testDir, 'special.txt'), 'Price: $10.50\nEmail: test@example.com');
 
-      const result = await tool.execute({
-        pattern: '$10.50',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '$10.50',
+          path: testDir,
+          // literal: true is now the default
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('$10.50');
+    });
+
+    it('should support regex patterns when literal is false', async () => {
+      await writeFile(join(testDir, 'regex.txt'), 'test123\ntest456\nhello world');
+
+      const result = await tool.execute(
+        {
+          pattern: 'test\\d+', // regex pattern
+          path: testDir,
+          literal: false,
+        },
+        { signal: new AbortController().signal }
+      );
+
+      expect(result.status).toBe('completed');
+      const output = result.content[0].text;
+      expect(output).toContain('test123');
+      expect(output).toContain('test456');
     });
 
     it('should handle empty files gracefully', async () => {
       await writeFile(join(testDir, 'empty.txt'), '');
 
-      const result = await tool.execute({
-        pattern: 'anything',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'anything',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
 
     it('should handle binary files gracefully', async () => {
       const binaryContent = Buffer.from([0x00, 0x01, 0x02, 0x03, 0xff, 0xfe]);
       await writeFile(join(testDir, 'binary.bin'), binaryContent);
 
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
   describe('Structured output with helpers', () => {
     it('should use createResult for successful searches', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Found');
     });
 
     it('should use createResult for no matches found', async () => {
-      const result = await tool.execute({
-        pattern: 'nonexistent',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'nonexistent',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No matches found');
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ pattern: '' });
+      const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -463,11 +568,12 @@ describe('RipgrepSearchTool with schema validation', () => {
           path: '.',
         },
         {
+          signal: new AbortController().signal,
           workingDirectory: subDir,
         }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('workfile.txt');
       expect(output).toContain('working directory test content');
@@ -485,11 +591,12 @@ describe('RipgrepSearchTool with schema validation', () => {
           path: testDir,
         },
         {
+          signal: new AbortController().signal,
           workingDirectory: subDir,
         }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('absolute path test');
     });
@@ -499,25 +606,31 @@ describe('RipgrepSearchTool with schema validation', () => {
     it('should handle quotes in search pattern', async () => {
       await writeFile(join(testDir, 'quotes.txt'), 'He said "hello world" to me');
 
-      const result = await tool.execute({
-        pattern: '"hello world"',
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          pattern: '"hello world"',
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('"hello world"');
     });
 
     it('should handle complex include/exclude combinations', async () => {
-      const result = await tool.execute({
-        pattern: 'hello',
-        path: testDir,
-        includePattern: '*.{ts,js}',
-        excludePattern: '*.test.*',
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'hello',
+          path: testDir,
+          includePattern: '*.{ts,js}',
+          excludePattern: '*.test.*',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       expect(output).toContain('file1.ts');
       expect(output).toContain('file2.js');
@@ -525,13 +638,16 @@ describe('RipgrepSearchTool with schema validation', () => {
     });
 
     it('should handle zero context lines explicitly', async () => {
-      const result = await tool.execute({
-        pattern: 'console.log',
-        path: testDir,
-        contextLines: 0,
-      });
+      const result = await tool.execute(
+        {
+          pattern: 'console.log',
+          path: testDir,
+          contextLines: 0,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should work without context lines
     });
   });

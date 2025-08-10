@@ -32,7 +32,7 @@ const fileReadSchema = z
 
 export class FileReadTool extends Tool {
   name = 'file_read';
-  description = 'Read file contents with optional line range support';
+  description = `Read file contents. Full reads limited to 32KB, use line ranges (startLine/endLine) for larger files.`;
   schema = fileReadSchema;
   annotations = {
     readOnlyHint: true,
@@ -41,8 +41,11 @@ export class FileReadTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof fileReadSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     // Resolve path using working directory from context
     const resolvedPath = this.resolvePath(args.path, context);
 
@@ -128,8 +131,10 @@ export class FileReadTool extends Tool {
         );
       }
 
-      // Re-throw unexpected errors
-      throw error;
+      // Return error for unexpected errors instead of throwing
+      return this.createError(
+        `Unexpected error reading file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 

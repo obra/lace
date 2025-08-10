@@ -53,13 +53,16 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       case 'completed': return 'success';
       case 'in_progress': return 'primary';
       case 'cancelled': return 'outline';
+      case 'failed': return 'error';
+      case 'aborted': return 'warning';
+      case 'denied': return 'outline';
       default: return 'default';
     }
   };
   
   return (
     <Badge variant={getVariant(status)} size="xs">
-      {status.replace('_', ' ')}
+      {status.replaceAll('_', ' ')}
     </Badge>
   );
 };
@@ -90,7 +93,7 @@ const taskAddRenderer: ToolRenderer = {
       return 'Creating task';
     }
     
-    if (result.isError) {
+    if (result.status !== 'completed') {
       return 'Failed to create task';
     }
     
@@ -125,7 +128,7 @@ const taskAddRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -135,7 +138,7 @@ const taskAddRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors only
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string; code?: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3 mt-2">
@@ -241,7 +244,7 @@ const taskListRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -251,7 +254,7 @@ const taskListRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors first
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">
@@ -337,7 +340,7 @@ const taskCompleteRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -347,7 +350,7 @@ const taskCompleteRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="alert alert-error">
@@ -442,7 +445,7 @@ const taskUpdateRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -452,7 +455,7 @@ const taskUpdateRenderer: ToolRenderer = {
     const parsed = parseToolResult(result);
     
     // Handle errors
-    if (result.isError || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
       const error = parsed as { error: string };
       return (
         <div className="alert alert-error">
@@ -550,7 +553,7 @@ const taskAddNoteRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
@@ -559,19 +562,20 @@ const taskAddNoteRenderer: ToolRenderer = {
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
     
-    if (!parsed) {
+    // Check for error statuses first
+    if (result.status === 'failed' || result.status === 'denied' || result.status === 'aborted' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+      const error = parsed as { error: string };
       return (
-        <div className="text-sm text-base-content/60 italic">
-          Note added to task
+        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
+          <div className="text-error text-sm">{error?.error || `Failed to add note (${result.status})`}</div>
         </div>
       );
     }
     
-    if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
-      const error = parsed as { error: string };
+    if (!parsed) {
       return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="text-error text-sm">{error.error}</div>
+        <div className="text-sm text-base-content/60 italic">
+          Note added to task
         </div>
       );
     }
@@ -634,7 +638,7 @@ const taskViewRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;

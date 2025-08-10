@@ -239,11 +239,14 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     const conversationPromise = agent.sendMessage('Please run rm -rf /');
 
-    // Wait for approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    const events = threadManager.getEvents(agent.threadId);
-    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    // Wait for approval request with polling
+    let approvalRequestEvent;
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const events = threadManager.getEvents(agent.threadId);
+      approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      if (approvalRequestEvent) break;
+    }
     expect(approvalRequestEvent).toBeDefined();
 
     // Simulate user denial
@@ -259,13 +262,18 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Wait for conversation to complete
     await conversationPromise;
 
-    // Verify tool execution was denied
-    const finalEvents = threadManager.getEvents(agent.threadId);
-    const toolResultEvent = finalEvents.find((e) => e.type === 'TOOL_RESULT');
+    // Wait for tool result to be processed
+    let toolResultEvent;
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const finalEvents = threadManager.getEvents(agent.threadId);
+      toolResultEvent = finalEvents.find((e) => e.type === 'TOOL_RESULT');
+      if (toolResultEvent) break;
+    }
     expect(toolResultEvent).toBeDefined();
 
     const toolResult = toolResultEvent?.data as ToolResult;
-    expect(toolResult.isError).toBe(true);
+    expect(toolResult.status).toBe('denied');
   });
 
   it('should handle multiple concurrent tool calls', async () => {
@@ -287,11 +295,15 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     const conversationPromise = agent.sendMessage('Please run ls and pwd');
 
-    // Wait for first approval request (tool calls are processed sequentially)
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    let events = threadManager.getEvents(agent.threadId);
-    const firstApprovalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    // Wait for first approval request with polling
+    let firstApprovalRequest;
+    let events;
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      events = threadManager.getEvents(agent.threadId);
+      firstApprovalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      if (firstApprovalRequest) break;
+    }
     expect(firstApprovalRequest).toBeDefined();
 
     // Approve first tool call to allow second one to be processed
@@ -304,11 +316,14 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
 
-    // Wait for second approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    events = threadManager.getEvents(agent.threadId);
-    const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    // Wait for second approval request with polling
+    let approvalRequests;
+    for (let i = 0; i < 100; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      events = threadManager.getEvents(agent.threadId);
+      approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+      if (approvalRequests.length >= 2) break;
+    }
     expect(approvalRequests).toHaveLength(2);
 
     // Approve second tool call

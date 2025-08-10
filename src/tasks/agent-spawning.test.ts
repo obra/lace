@@ -96,7 +96,10 @@ describe('Agent Spawning', () => {
         expect(mockAgentCreator).toHaveBeenCalledWith(
           testCase.expectedProvider,
           testCase.expectedModel,
-          expect.any(Object)
+          expect.objectContaining({
+            title: expect.any(String) as unknown,
+            prompt: expect.any(String) as unknown,
+          })
         );
       }
     });

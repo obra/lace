@@ -15,9 +15,8 @@ const fileInsertSchema = z.object({
 
 export class FileInsertTool extends Tool {
   name = 'file_insert';
-  description = `Insert content into a file at a specific line or append to the end.
-Preserves all existing content. Use for adding new functions, imports, or sections.
-Line numbers are 1-based. If no line specified, appends to end of file.`;
+  description = `Insert content at specific line or append to end, preserves existing content. Use file-write to replace entire file.
+Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
   schema = fileInsertSchema;
   annotations: ToolAnnotations = {
     destructiveHint: true,
@@ -25,14 +24,23 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileInsertSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { path, content, line } = args;
       const resolvedPath = this.resolvePath(path, context);
 
       // Validate file exists
       await stat(resolvedPath);
+
+      // Check read-before-write protection
+      const protectionError = await this.checkFileReadProtection(path, resolvedPath, context);
+      if (protectionError) {
+        return protectionError;
+      }
 
       // Read current content
       const currentContent = await readFile(resolvedPath, 'utf-8');
@@ -61,10 +69,15 @@ Line numbers are 1-based. If no line specified, appends to end of file.`;
         operation = `Inserted after line ${line}`;
       }
 
+      // Check for abort before writing
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
       // Write back
       await writeFile(resolvedPath, newContent, 'utf-8');
 
-      const addedLines = content.split('\n').length;
+      const addedLines = content === '' ? 0 : content.split('\n').length;
 
       return this.createResult(
         `${operation} in ${resolvedPath} (+${addedLines} line${addedLines === 1 ? '' : 's'})`

@@ -197,6 +197,8 @@ export class ThreadManager {
     try {
       // Use synchronous version to maintain createThread signature
       this._persistence.saveThread(thread);
+      // Update process-local cache with the new thread
+      processLocalThreadCache.set(actualThreadId, thread);
     } catch (error) {
       logger.error('Failed to save thread', { error });
     }
@@ -216,11 +218,7 @@ export class ThreadManager {
     };
 
     // Save thread to database immediately
-    try {
-      this._persistence.saveThread(thread);
-    } catch (error) {
-      logger.error('Failed to save thread with metadata', { threadId, error });
-    }
+    this.saveThread(thread);
 
     return thread;
   }
@@ -251,6 +249,7 @@ export class ThreadManager {
     } catch (error) {
       logger.error('Failed to save delegate thread', { error });
     }
+
 
     return thread;
   }

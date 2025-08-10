@@ -54,7 +54,7 @@ const mockSessionEvents: SessionEvent[] = [
     timestamp: new Date('2025-07-21T10:31:15Z'),
     data: {
       content: [{ type: 'text', text: 'interface User { id: number; name: string; }' }],
-      isError: false,
+      status: 'completed' as const,
     },
   },
   {
@@ -140,7 +140,7 @@ describe('convertSessionEventsToTimeline', () => {
               text: expect.stringContaining('interface User'),
             }),
           ]),
-          isError: false,
+          status: 'completed' as const,
         }),
         timestamp: new Date('2025-07-21T10:31:00Z'), // Uses TOOL_CALL timestamp
         agent: 'Claude',

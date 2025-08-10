@@ -160,14 +160,22 @@ describe('conversation-builder', () => {
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result 1' }], isError: false },
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Result 1' }],
+            status: 'completed',
+          },
         },
         {
           id: 'evt3',
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:02:00Z'),
-          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result 2' }], isError: false },
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Result 2' }],
+            status: 'completed',
+          },
         },
       ];
 
@@ -188,14 +196,22 @@ describe('conversation-builder', () => {
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: { id: 'tool-123', content: [{ type: 'text', text: 'Result A' }], isError: false },
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Result A' }],
+            status: 'completed',
+          },
         },
         {
           id: 'evt2',
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:02:00Z'),
-          data: { id: 'tool-456', content: [{ type: 'text', text: 'Result B' }], isError: false },
+          data: {
+            id: 'tool-456',
+            content: [{ type: 'text', text: 'Result B' }],
+            status: 'completed',
+          },
         },
       ];
 
@@ -213,7 +229,7 @@ describe('conversation-builder', () => {
           threadId: 'thread-1',
           type: 'TOOL_RESULT',
           timestamp: new Date('2024-01-01T10:01:00Z'),
-          data: { content: [{ type: 'text', text: 'Result without ID' }], isError: false }, // Missing id field
+          data: { content: [{ type: 'text', text: 'Result without ID' }], status: 'completed' }, // Missing id field
         },
         {
           id: 'evt2',
@@ -223,7 +239,7 @@ describe('conversation-builder', () => {
           data: {
             id: 'tool-123',
             content: [{ type: 'text', text: 'Valid result' }],
-            isError: false,
+            status: 'completed',
           },
         },
       ];
@@ -254,7 +270,7 @@ describe('conversation-builder', () => {
               data: {
                 id: 'tool-999',
                 content: [{ type: 'text', text: 'Compacted result' }],
-                isError: false,
+                status: 'completed',
               },
             },
           ],
@@ -269,7 +285,7 @@ describe('conversation-builder', () => {
         data: {
           id: 'tool-999',
           content: [{ type: 'text', text: 'Duplicate result' }],
-          isError: false,
+          status: 'completed',
         },
       };
 
@@ -282,6 +298,187 @@ describe('conversation-builder', () => {
       expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
         'Compacted result'
       );
+    });
+
+    it('should keep higher precedence status when multiple TOOL_RESULT events have same ID', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Aborted result' }],
+            status: 'aborted',
+          },
+        },
+        {
+          id: 'evt3',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:03:00Z'),
+          data: {
+            id: 'tool-123',
+            content: [{ type: 'text', text: 'Failed result' }],
+            status: 'failed',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep the failed result (highest precedence: failed > aborted > completed)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Failed result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('failed');
+    });
+
+    it('should test deduplication with failed status first', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-456',
+            content: [{ type: 'text', text: 'Failed result' }],
+            status: 'failed',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-456',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep only the first result (failed - first encountered)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Failed result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('failed');
+    });
+
+    it('should test deduplication with aborted status first', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-789',
+            content: [{ type: 'text', text: 'Aborted result' }],
+            status: 'aborted',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-789',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep the aborted result (aborted > completed)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Aborted result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('aborted');
+    });
+
+    it('should prioritize denied status over all others', () => {
+      const events: ThreadEvent[] = [
+        {
+          id: 'evt1',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Completed result' }],
+            status: 'completed',
+          },
+        },
+        {
+          id: 'evt2',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Failed result' }],
+            status: 'failed',
+          },
+        },
+        {
+          id: 'evt3',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:03:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Denied result' }],
+            status: 'denied',
+          },
+        },
+        {
+          id: 'evt4',
+          threadId: 'thread-1',
+          type: 'TOOL_RESULT',
+          timestamp: new Date('2024-01-01T10:04:00Z'),
+          data: {
+            id: 'tool-999',
+            content: [{ type: 'text', text: 'Aborted result' }],
+            status: 'aborted',
+          },
+        },
+      ];
+
+      const result = buildWorkingConversation(events);
+
+      // Should keep the denied result (denied > failed > aborted > completed)
+      const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
+      expect(toolResults).toHaveLength(1);
+      expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
+        'Denied result'
+      );
+      expect((toolResults[0].data as { status: string }).status).toBe('denied');
     });
   });
 

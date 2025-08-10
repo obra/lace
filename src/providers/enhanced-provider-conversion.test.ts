@@ -33,7 +33,7 @@ describe('Provider-Specific Format Conversion', () => {
         {
           id: 'toolu_123',
           content: [{ type: 'text', text: 'export interface Tool { ... }' }],
-          isError: false,
+          status: 'completed',
         },
       ],
     },
@@ -134,7 +134,7 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_789',
               content: [{ type: 'text', text: 'total 24\ndrwxr-xr-x  5 user  staff  160 ...' }],
-              isError: false,
+              status: 'completed',
             },
           ],
         },
@@ -165,7 +165,7 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_error',
               content: [{ type: 'text', text: 'Permission denied' }],
-              isError: true,
+              status: 'failed',
             },
           ],
         },
@@ -272,7 +272,7 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_error',
               content: [{ type: 'text', text: 'Command not found' }],
-              isError: true,
+              status: 'failed',
             },
           ],
         },
@@ -319,12 +319,12 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_file1',
               content: [{ type: 'text', text: 'Content 1' }],
-              isError: false,
+              status: 'completed',
             },
             {
               id: 'toolu_file2',
               content: [{ type: 'text', text: 'Content 2' }],
-              isError: false,
+              status: 'completed',
             },
           ],
         },

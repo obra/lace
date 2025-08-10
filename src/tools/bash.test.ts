@@ -21,8 +21,7 @@ describe('BashTool', () => {
 
     // Create ToolContext with temp directory
     toolContext = {
-      sessionId: 'test-session',
-      projectId: 'test-project',
+      signal: new AbortController().signal,
       toolTempDir: testTempDir,
     };
   });
@@ -38,7 +37,9 @@ describe('BashTool', () => {
     it('should have correct name and description', () => {
       expect(bashTool.name).toBe('bash');
       expect(bashTool.description).toBe(
-        "Use bash to execute unix commands to achieve the user's goals. Be smart and careful."
+        `Execute shell commands in isolated bash processes. Each call is independent - no state persists between calls.
+Output truncated to first 100 + last 50 lines. Chain commands with && or ; for sequential operations.
+Exit codes shown even for successful tool execution. Working directory persists within session.`
       );
     });
 
@@ -58,24 +59,30 @@ describe('BashTool', () => {
 
   describe('Input validation', () => {
     it('should reject empty command', async () => {
-      const result = await bashTool.execute({ command: '' });
+      const result = await bashTool.execute(
+        { command: '' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
 
     it('should reject non-string command', async () => {
-      const result = await bashTool.execute({ command: 123 });
+      const result = await bashTool.execute(
+        { command: 123 },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject missing command', async () => {
-      const result = await bashTool.execute({});
+      const result = await bashTool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Required');
     });
@@ -85,7 +92,7 @@ describe('BashTool', () => {
     it('should execute simple commands successfully', async () => {
       const result = await bashTool.execute({ command: 'echo "hello world"' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -101,7 +108,7 @@ describe('BashTool', () => {
     it('should handle commands with no output', async () => {
       const result = await bashTool.execute({ command: 'true' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -118,7 +125,7 @@ describe('BashTool', () => {
       const result = await bashTool.execute({ command: 'false' }, toolContext);
 
       // Tool should succeed because it executed the command successfully
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // Command failed, but tool succeeded
@@ -134,7 +141,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false); // Tool executed successfully
+      expect(result.status).toBe('completed'); // Tool executed successfully
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // grep found no matches
@@ -151,7 +158,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false); // Tool ran the "linter"
+      expect(result.status).toBe('completed'); // Tool ran the "linter"
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // "Linter" found issues
@@ -170,7 +177,7 @@ describe('BashTool', () => {
       );
 
       // Based on observed behavior: single nonexistent command = tool failure
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('not found');
       expect(result.content[0].text).toContain('nonexistentcommand12345');
 
@@ -189,7 +196,7 @@ describe('BashTool', () => {
       );
 
       // Based on observed behavior: command in sequence = tool success
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.stdoutPreview).toContain('before');
@@ -207,7 +214,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false); // Command executed (even though it failed)
+      expect(result.status).toBe('completed'); // Command executed (even though it failed)
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(126);
@@ -227,7 +234,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -244,7 +251,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -272,7 +279,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -285,7 +292,7 @@ describe('BashTool', () => {
     it('should always return valid JSON in output field', async () => {
       const result = await bashTool.execute({ command: 'echo "test"' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(() => JSON.parse(result.content[0].text!) as unknown).not.toThrow();
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
@@ -308,7 +315,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.stdoutPreview).toBe('{"test": "value", "number": 42}\n');
@@ -331,7 +338,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false); // ✅ Tool completed (not ❌ Tool failed)
+      expect(result.status).toBe('completed'); // ✅ Tool completed (not ❌ Tool failed)
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // ESLint found issues
@@ -343,7 +350,7 @@ describe('BashTool', () => {
       // Observed: 'false' command shows as ✅ Tool completed
       const result = await bashTool.execute({ command: 'false' }, toolContext);
 
-      expect(result.isError).toBe(false); // ✅ Tool completed
+      expect(result.status).toBe('completed'); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1);
@@ -356,7 +363,7 @@ describe('BashTool', () => {
       // Observed: 'echo' commands show as ✅ Tool completed
       const result = await bashTool.execute({ command: 'echo "hello"' }, toolContext);
 
-      expect(result.isError).toBe(false); // ✅ Tool completed
+      expect(result.status).toBe('completed'); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -374,7 +381,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false); // ✅ Tool completed
+      expect(result.status).toBe('completed'); // ✅ Tool completed
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(1); // grep found no matches
@@ -391,7 +398,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false); // ✅ Tool completed (what I observed)
+      expect(result.status).toBe('completed'); // ✅ Tool completed (what I observed)
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.stdoutPreview).toContain('Testing');
@@ -411,7 +418,7 @@ describe('BashTool', () => {
         },
         toolContext
       );
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       // Now execute a command with context pointing to that directory
       const contextWithWorkingDir = { ...toolContext, workingDirectory: '/tmp/test-bash-tool' };
@@ -420,7 +427,7 @@ describe('BashTool', () => {
         contextWithWorkingDir
       );
 
-      expect(pwdResult.isError).toBe(false);
+      expect(pwdResult.status).toBe('completed');
 
       const output = JSON.parse(pwdResult.content[0].text!) as BashOutput;
 
@@ -433,7 +440,7 @@ describe('BashTool', () => {
     it('should use process.cwd() when no context provided', async () => {
       const result = await bashTool.execute({ command: 'pwd' }, toolContext);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
 
@@ -446,7 +453,7 @@ describe('BashTool', () => {
       const contextWithoutWorkingDir = { ...toolContext }; // No workingDirectory property
       const result = await bashTool.execute({ command: 'pwd' }, contextWithoutWorkingDir);
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
 
@@ -464,7 +471,7 @@ describe('BashTool', () => {
         },
         toolContext
       );
-      expect(setupResult.isError).toBe(false);
+      expect(setupResult.status).toBe('completed');
 
       // Use context to set working directory and test relative path
       const contextWithWorkingDir = { ...toolContext, workingDirectory: '/tmp/test-bash-relative' };
@@ -473,7 +480,7 @@ describe('BashTool', () => {
         contextWithWorkingDir
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
 
@@ -493,7 +500,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -525,7 +532,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);
@@ -556,7 +563,7 @@ describe('BashTool', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.exitCode).toBe(0);

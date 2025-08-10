@@ -136,7 +136,7 @@ const mockToolEntry: TimelineEntry = {
   tool: 'file-search',
   result: {
     content: [{ type: 'text', text: 'Found 5 Python files:\n- main.py\n- utils.py\n- models.py\n- tests.py\n- config.py' }],
-    isError: false,
+    status: 'completed' as const,
   },
   link: undefined,
   title: undefined,

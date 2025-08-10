@@ -2,14 +2,15 @@
 // ABOUTME: Wraps ripgrep command with Zod validation and structured output
 
 import { z } from 'zod';
-import { exec } from 'child_process';
+import * as childProcess from 'child_process';
 import { promisify } from 'util';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString, FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import { TOOL_LIMITS } from '~/tools/constants';
 
-const execAsync = promisify(exec);
+// Create promisified version of execFile for async/await usage
+const execFileAsync = promisify(childProcess.execFile);
 
 interface SearchMatch {
   path: string;
@@ -22,6 +23,10 @@ const ripgrepSearchSchema = z.object({
   path: FilePath.default('.'),
   caseSensitive: z.boolean().default(false),
   wholeWord: z.boolean().default(false),
+  literal: z
+    .boolean()
+    .default(true)
+    .describe('Treat pattern as literal string (true) or as regex (false)'),
   includePattern: z.string().optional(),
   excludePattern: z.string().optional(),
   maxResults: z
@@ -40,7 +45,8 @@ const ripgrepSearchSchema = z.object({
 
 export class RipgrepSearchTool extends Tool {
   name = 'ripgrep_search';
-  description = 'Fast text search across files using ripgrep';
+  description = `Search file contents using regex patterns. Use for text search, file-find for name patterns.
+Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`;
   schema = ripgrepSearchSchema;
   annotations: ToolAnnotations = {
     readOnlyHint: true,
@@ -50,14 +56,18 @@ export class RipgrepSearchTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof ripgrepSearchSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const {
         pattern,
         path,
         caseSensitive,
         wholeWord,
+        literal,
         includePattern,
         excludePattern,
         maxResults,
@@ -72,18 +82,19 @@ export class RipgrepSearchTool extends Tool {
         path: resolvedPath,
         caseSensitive,
         wholeWord,
+        literal,
         includePattern,
         excludePattern,
         maxResults,
         contextLines,
       });
 
-      const command = `rg ${ripgrepArgs.join(' ')}`;
-
       try {
-        const { stdout } = await execAsync(command, {
+        // Use execFile to prevent shell injection - pass arguments directly
+        const { stdout } = await execFileAsync('rg', ripgrepArgs, {
           cwd: process.cwd(),
           maxBuffer: 10485760, // 10MB buffer
+          signal: context.signal,
         });
 
         const matches = this.parseRipgrepOutput(stdout, maxResults);
@@ -124,6 +135,7 @@ export class RipgrepSearchTool extends Tool {
     path: string;
     caseSensitive: boolean;
     wholeWord: boolean;
+    literal: boolean;
     includePattern?: string;
     excludePattern?: string;
     maxResults: number;
@@ -139,12 +151,16 @@ export class RipgrepSearchTool extends Tool {
       args.push('--word-regexp');
     }
 
+    if (options.literal) {
+      args.push('--fixed-strings');
+    }
+
     if (options.includePattern) {
-      args.push('--glob', `"${options.includePattern}"`);
+      args.push('--glob', options.includePattern);
     }
 
     if (options.excludePattern) {
-      args.push('--glob', `!"${options.excludePattern}"`);
+      args.push('--glob', `!${options.excludePattern}`);
     }
 
     // Note: We don't use --max-count here as it limits per file
@@ -154,9 +170,9 @@ export class RipgrepSearchTool extends Tool {
       args.push('--context', options.contextLines.toString());
     }
 
-    // Add pattern and path (escape quotes in pattern)
-    args.push(`"${options.pattern.replace(/"/g, '\\"')}"`);
-    args.push(`"${options.path}"`);
+    // Add pattern and path (no quotes needed with execFile)
+    args.push(options.pattern);
+    args.push(options.path);
 
     return args;
   }

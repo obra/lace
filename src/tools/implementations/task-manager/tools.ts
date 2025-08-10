@@ -79,28 +79,32 @@ Bulk planning: task_add({ tasks: [
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(
+  private async getTaskManagerFromContext(
     context?: ToolContext
-  ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof createTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.threadId) {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
 
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for task creation');
     }
 
     try {
       const taskContext = {
-        actor: context.threadId,
+        actor: context.agent.threadId,
         isHuman: false,
       };
 
@@ -195,28 +199,32 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(
+  private async getTaskManagerFromContext(
     context?: ToolContext
-  ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof listTasksSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.threadId) {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
 
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for task listing');
     }
 
     try {
       const taskContext = {
-        actor: context.threadId,
+        actor: context.agent.threadId,
         isHuman: false,
       };
 
@@ -299,34 +307,38 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(
+  private async getTaskManagerFromContext(
     context?: ToolContext
-  ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof completeTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.threadId) {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
 
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for task completion');
     }
 
     try {
       const taskContext = {
-        actor: context.threadId,
+        actor: context.agent.threadId,
         isHuman: false,
       };
 
       logger.debug('TaskCompleteTool: Starting task completion', {
         taskId: args.id,
-        actor: context.threadId,
+        actor: context.agent.threadId,
       });
 
       // Add the completion message as a note first
@@ -390,21 +402,25 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(
+  private async getTaskManagerFromContext(
     context?: ToolContext
-  ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof updateTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.threadId) {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
 
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for task updates');
     }
@@ -416,7 +432,7 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
 
     try {
       const taskContext = {
-        actor: context.threadId,
+        actor: context.agent.threadId,
         isHuman: false,
       };
 
@@ -491,28 +507,32 @@ Notes become part of permanent task history - write for future readers.`;
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(
+  private async getTaskManagerFromContext(
     context?: ToolContext
-  ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof addNoteSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.threadId) {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
 
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for adding notes');
     }
 
     try {
       const taskContext = {
-        actor: context.threadId,
+        actor: context.agent.threadId,
         isHuman: false,
       };
 
@@ -558,28 +578,32 @@ Example: task_view({ taskId: "task_123" })`;
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(
+  private async getTaskManagerFromContext(
     context?: ToolContext
-  ): import('~/tasks/task-manager').TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    if (!context?.threadId) {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
 
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for viewing tasks');
     }
 
     try {
       const taskContext = {
-        actor: context.threadId,
+        actor: context.agent.threadId,
         isHuman: false,
       };
 

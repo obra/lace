@@ -34,16 +34,6 @@ vi.mock('fs/promises', () => ({
   readdir: vi.fn(),
 }));
 
-// - Process operations are mocked to avoid spawning real processes
-vi.mock('child_process', () => ({
-  default: {
-    spawn: vi.fn(),
-    exec: vi.fn(),
-  },
-  spawn: vi.fn(),
-  exec: vi.fn(),
-}));
-
 // - Network operations are mocked to avoid external requests
 vi.mock('node-fetch', () => vi.fn());
 

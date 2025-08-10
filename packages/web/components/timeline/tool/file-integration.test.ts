@@ -85,7 +85,7 @@ describe('File Tool Renderer Integration', () => {
         const renderer = getToolRenderer(toolName);
         const errorResult = {
           content: [{ type: 'text' as const, text: 'Permission denied' }],
-          isError: true,
+          status: 'failed' as const,
         };
         expect(renderer.isError?.(errorResult)).toBe(true);
       });

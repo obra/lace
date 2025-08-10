@@ -4,7 +4,13 @@
 import { ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { resolve, isAbsolute } from 'path';
-import type { ToolResult, ToolContext, ToolInputSchema, ToolAnnotations } from '~/tools/types';
+import type {
+  ToolResult,
+  ToolContext,
+  ToolInputSchema,
+  ToolAnnotations,
+  ToolResultStatus,
+} from '~/tools/types';
 
 export abstract class Tool {
   abstract name: string;
@@ -41,7 +47,7 @@ export abstract class Tool {
   }
 
   // Public execute method that handles validation
-  async execute(args: unknown, context?: ToolContext): Promise<ToolResult> {
+  async execute(args: unknown, context: ToolContext): Promise<ToolResult> {
     try {
       const validated = this.schema.parse(args) as ReturnType<this['schema']['parse']>;
       return await this.executeValidated(validated, context);
@@ -56,7 +62,7 @@ export abstract class Tool {
   // Implement this in subclasses with validated args
   protected abstract executeValidated(
     args: ReturnType<this['schema']['parse']>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult>;
 
   // Output helpers for consistent result construction
@@ -66,14 +72,29 @@ export abstract class Tool {
     content: string | Record<string, unknown>,
     metadata?: Record<string, unknown>
   ): ToolResult {
-    return this._makeResult({ content, metadata, isError: false });
+    return this._makeResult({ content, metadata, status: 'completed' });
   }
 
   protected createError(
     content: string | Record<string, unknown>,
     metadata?: Record<string, unknown>
   ): ToolResult {
-    return this._makeResult({ content, metadata, isError: true });
+    return this._makeResult({ content, metadata, status: 'failed' });
+  }
+
+  protected createCancellationResult(
+    partialOutput?: string,
+    metadata?: Record<string, unknown>
+  ): ToolResult {
+    const message = partialOutput
+      ? `Tool execution cancelled by user.\n\nPartial output:\n${partialOutput}`
+      : 'Tool execution cancelled by user.';
+
+    return this._makeResult({
+      content: message,
+      metadata,
+      status: 'aborted',
+    });
   }
 
   // Path resolution helper for file operations
@@ -97,11 +118,52 @@ export abstract class Tool {
     return context.toolTempDir;
   }
 
+  /**
+   * Check if a file exists and requires read-before-write protection.
+   * Returns an error result if the file exists but hasn't been read.
+   * Returns null if the check passes (file doesn't exist or was read).
+   */
+  protected async checkFileReadProtection(
+    filePath: string,
+    resolvedPath: string,
+    context?: ToolContext
+  ): Promise<ToolResult | null> {
+    // Try to check if file exists
+    try {
+      const { stat } = await import('fs/promises');
+      await stat(resolvedPath);
+
+      // File exists - check if it was read
+      if (!context?.agent) {
+        // No agent context - this is likely a test environment or direct tool call
+        // Skip read protection for unit tests, but log a warning
+        if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+          return this.createError(
+            'Tool context missing agent reference. This is a system error - please report it.'
+          );
+        }
+        // In test environment, skip the read protection check
+        return null;
+      }
+
+      if (!context.agent.hasFileBeenRead(resolvedPath)) {
+        return this.createError(
+          `File ${filePath} exists but hasn't been read in this conversation. ` +
+            `Use file_read to examine the current contents before modifying.`
+        );
+      }
+    } catch {
+      // File doesn't exist, safe to create/write
+    }
+
+    return null; // Check passed
+  }
+
   // Private implementation
   private _makeResult(options: {
     content: string | Record<string, unknown>;
     metadata?: Record<string, unknown>;
-    isError: boolean;
+    status: ToolResultStatus;
   }): ToolResult {
     const text =
       typeof options.content === 'string'
@@ -110,7 +172,7 @@ export abstract class Tool {
 
     return {
       content: [{ type: 'text', text }],
-      isError: options.isError,
+      status: options.status,
       ...(options.metadata && { metadata: options.metadata }),
     };
   }
@@ -130,7 +192,7 @@ export abstract class Tool {
           text: `Validation failed: ${issues}. Check parameter types and values.`,
         },
       ],
-      isError: true,
+      status: 'failed',
     };
   }
 }

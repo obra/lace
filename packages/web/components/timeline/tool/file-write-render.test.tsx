@@ -15,7 +15,7 @@ describe('fileWriteRenderer visual rendering', () => {
           text: 'Successfully wrote 1.2 KB to /home/user/documents/Button.tsx',
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     const rendered = fileWriteRenderer.renderResult?.(successResult);
@@ -40,7 +40,7 @@ describe('fileWriteRenderer visual rendering', () => {
           text: 'Permission denied writing to /protected/system.conf. Check file permissions or choose a different location.',
         },
       ],
-      isError: true,
+      status: 'failed' as const,
     };
 
     const rendered = fileWriteRenderer.renderResult?.(errorResult);
@@ -60,7 +60,7 @@ describe('fileWriteRenderer visual rendering', () => {
   test('should handle empty content gracefully', () => {
     const emptyResult: ToolResult = {
       content: [],
-      isError: false,
+      status: 'completed' as const,
     };
 
     const rendered = fileWriteRenderer.renderResult?.(emptyResult);
@@ -78,7 +78,7 @@ describe('fileWriteRenderer visual rendering', () => {
           text: 'Successfully wrote 2.5 MB to /very/long/path/to/project/src/components/ComplexComponent.tsx',
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     const rendered = fileWriteRenderer.renderResult?.(detailedResult);

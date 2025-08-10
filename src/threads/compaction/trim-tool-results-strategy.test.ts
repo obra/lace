@@ -54,7 +54,7 @@ describe('TrimToolResultsStrategy', () => {
           data: {
             id: 'tool-call-1',
             content: [{ type: 'text' as const, text: longResult }],
-            isError: false,
+            status: 'completed',
           } satisfies ToolResult,
         },
       ];
@@ -81,7 +81,7 @@ describe('TrimToolResultsStrategy', () => {
           data: {
             id: 'tool-call-2',
             content: [{ type: 'text' as const, text: shortResult }],
-            isError: false,
+            status: 'completed',
           } satisfies ToolResult,
         },
       ];
@@ -103,7 +103,7 @@ describe('TrimToolResultsStrategy', () => {
             text: 'line1\nline2\nline3\nline4\nline5',
           },
         ],
-        isError: false,
+        status: 'completed',
         id: 'tool-123',
       };
 
@@ -124,7 +124,7 @@ describe('TrimToolResultsStrategy', () => {
       expect(compactedData.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
-      expect(compactedData.isError).toBe(false);
+      expect(compactedData.status).toBe('completed');
       expect(compactedData.id).toBe('tool-123');
     });
 
@@ -138,7 +138,7 @@ describe('TrimToolResultsStrategy', () => {
           data: {
             id: 'tool-call-3',
             content: [{ type: 'text' as const, text: 'line1\nline2\nline3\nline4' }],
-            isError: false,
+            status: 'completed',
           } satisfies ToolResult,
         },
         {
@@ -172,7 +172,7 @@ describe('TrimToolResultsStrategy', () => {
             uri: 'http://example.com/image.png',
           },
         ],
-        isError: false,
+        status: 'completed',
       };
 
       const events: ThreadEvent[] = [
@@ -201,7 +201,7 @@ describe('TrimToolResultsStrategy', () => {
     it('handles tool results with no content', async () => {
       const toolResult: ToolResult = {
         content: [],
-        isError: true,
+        status: 'failed',
         metadata: { errorMessage: 'Tool failed' },
       };
 

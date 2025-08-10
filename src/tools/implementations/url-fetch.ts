@@ -99,8 +99,9 @@ interface RichErrorContext {
 
 export class UrlFetchTool extends Tool {
   name = 'url_fetch';
-  description =
-    'Fetch content from web URLs with intelligent content handling. WARNING: Returned content can be very large and may exceed token limits. Consider delegating URL fetching to a subtask to avoid overwhelming the main conversation.';
+  description = `Fetch web content with automatic HTML-to-markdown conversion. Content under 32KB returned inline, larger saved to temp files.
+No need to delegate for size - tool handles large content automatically. Temp files created for content over 32KB.
+Follows redirects by default. Returns detailed error context for failures.`;
   schema = urlFetchSchema;
   annotations: ToolAnnotations = {
     title: 'URL Fetcher',
@@ -138,9 +139,12 @@ export class UrlFetchTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof urlFetchSchema>,
-    _context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    return await this.performFetch(args);
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    return await this.performFetch(args, context.signal);
   }
 
   validateUrl(url: string): void {
@@ -188,7 +192,10 @@ export class UrlFetchTool extends Tool {
     process.on('SIGTERM', cleanup);
   }
 
-  private async performFetch(params: z.infer<typeof urlFetchSchema>): Promise<ToolResult> {
+  private async performFetch(
+    params: z.infer<typeof urlFetchSchema>,
+    abortSignal?: AbortSignal
+  ): Promise<ToolResult> {
     const {
       url,
       method,
@@ -204,9 +211,18 @@ export class UrlFetchTool extends Tool {
       start: Date.now(),
     };
 
-    // Set up fetch options with timeout
+    // Set up fetch options with timeout and abort signal handling
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    // Handle external abort signal
+    if (abortSignal?.aborted) {
+      clearTimeout(timeoutId);
+      return this.createCancellationResult();
+    }
+
+    const abortHandler = () => controller.abort();
+    abortSignal?.addEventListener('abort', abortHandler);
 
     const fetchOptions: {
       method: string;
@@ -231,6 +247,7 @@ export class UrlFetchTool extends Tool {
     try {
       const response = await fetch(url, fetchOptions);
       clearTimeout(timeoutId);
+      abortSignal?.removeEventListener('abort', abortHandler);
 
       timing.total = Date.now() - timing.start;
 
@@ -346,10 +363,15 @@ export class UrlFetchTool extends Tool {
       return await this.handleLargeContent(buffer, contentType, url, actualSize, returnContent);
     } catch (error) {
       clearTimeout(timeoutId);
+      abortSignal?.removeEventListener('abort', abortHandler);
       timing.total = Date.now() - timing.start;
 
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
+          // Check if it was external cancellation vs timeout
+          if (abortSignal?.aborted) {
+            return this.createCancellationResult();
+          }
           return this.createRichError({
             error: {
               type: 'timeout',
@@ -479,9 +501,53 @@ export class UrlFetchTool extends Tool {
     );
   }
 
-  private createRichError(context: RichErrorContext): ToolResult {
-    const errorDetails = {
+  private redactSensitiveHeaders(context: RichErrorContext): RichErrorContext {
+    const sensitiveHeaders = [
+      'authorization',
+      'cookie',
+      'x-api-key',
+      'x-auth-token',
+      'bearer',
+      'api-key',
+      'access-token',
+      'refresh-token',
+      'session-id',
+      'x-session-token',
+      'auth-token',
+    ];
+
+    const redactHeaders = (headers: Record<string, string>): Record<string, string> => {
+      const redacted = { ...headers };
+      for (const [key, value] of Object.entries(redacted)) {
+        const lowerKey = key.toLowerCase();
+        if (sensitiveHeaders.some((sensitive) => lowerKey.includes(sensitive))) {
+          redacted[key] = value.length > 0 ? '[REDACTED]' : '';
+        }
+      }
+      return redacted;
+    };
+
+    return {
       ...context,
+      request: {
+        ...context.request,
+        headers: redactHeaders(context.request.headers),
+      },
+      response: context.response
+        ? {
+            ...context.response,
+            headers: redactHeaders(context.response.headers),
+          }
+        : undefined,
+    };
+  }
+
+  private createRichError(context: RichErrorContext): ToolResult {
+    // Redact sensitive headers before creating error details
+    const sanitizedContext = this.redactSensitiveHeaders(context);
+
+    const errorDetails = {
+      ...sanitizedContext,
       // Add timestamp for debugging
       timestamp: new Date().toISOString(),
     };

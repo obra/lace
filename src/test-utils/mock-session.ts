@@ -2,13 +2,15 @@
 // ABOUTME: Provides standardized mock objects for session-based tests
 
 import { ToolContext } from '~/tools/types';
-import { asThreadId } from '~/threads/types';
 import { Session } from '~/sessions/session';
+import type { Agent } from '~/agents/agent';
 
 interface MockSession {
   getToolPolicy: (toolName: string) => 'allow' | 'require-approval' | 'deny';
   getEffectiveConfiguration: () => Record<string, unknown>;
   getId: () => string;
+  getProjectId: () => string | undefined;
+  getSessionTempDir: () => string;
   [key: string]: unknown;
 }
 
@@ -22,6 +24,8 @@ export function createMockSession(
     getToolPolicy?: (toolName: string) => 'allow' | 'require-approval' | 'deny';
     getEffectiveConfiguration?: () => Record<string, unknown>;
     getId?: () => string;
+    getProjectId?: () => string | undefined;
+    getSessionTempDir?: () => string;
     [key: string]: unknown;
   } = {}
 ): MockSession {
@@ -29,29 +33,39 @@ export function createMockSession(
     getToolPolicy: overrides.getToolPolicy || (() => 'require-approval'),
     getEffectiveConfiguration: overrides.getEffectiveConfiguration || (() => ({})),
     getId: overrides.getId || (() => 'lace_20250101_sess01'),
+    getProjectId: overrides.getProjectId || (() => 'mock-project-id'),
+    getSessionTempDir: overrides.getSessionTempDir || (() => '/tmp/mock-session-temp-dir'),
     ...overrides,
   };
 }
 
 /**
- * Creates a complete ToolContext for testing with mock session
+ * Creates a complete ToolContext for testing
  * @param overrides - Optional overrides for context properties
- * @returns A ToolContext with all required properties including mock session
+ * @returns A ToolContext with mock agent containing session access
  */
 export function createMockToolContext(
   overrides: {
-    threadId?: string;
     workingDirectory?: string;
-    projectId?: string;
-    parentThreadId?: string;
+    toolTempDir?: string;
     session?: Session;
+    agent?: Agent;
   } = {}
 ): ToolContext {
+  const mockSession = overrides.session || (createMockSession() as unknown as Session);
+
+  // Create minimal mock agent if not provided
+  const mockAgent =
+    overrides.agent ||
+    ({
+      threadId: 'lace_20250101_test01',
+      getFullSession: () => mockSession,
+    } as unknown as Agent);
+
   return {
-    threadId: asThreadId(overrides.threadId || 'lace_20250101_test01'),
-    workingDirectory: overrides.workingDirectory, // Allow explicitly undefined
-    projectId: overrides.projectId,
-    parentThreadId: overrides.parentThreadId ? asThreadId(overrides.parentThreadId) : undefined,
-    session: overrides.session || (createMockSession() as unknown as Session),
+    workingDirectory: overrides.workingDirectory,
+    toolTempDir: overrides.toolTempDir,
+    agent: mockAgent,
+    signal: new AbortController().signal,
   };
 }

@@ -53,15 +53,19 @@ Examples:
   };
 
   // Get TaskManager from session context
-  private getTaskManagerFromContext(context?: ToolContext): TaskManager | null {
-    return context?.session?.getTaskManager() || null;
+  private async getTaskManagerFromContext(context?: ToolContext): Promise<TaskManager | null> {
+    const session = await context?.agent?.getFullSession();
+    return session?.getTaskManager() || null;
   }
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    const taskManager = this.getTaskManagerFromContext(context);
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for delegation');
     }
@@ -89,7 +93,7 @@ Examples:
     context?: ToolContext
   ): Promise<ToolResult> {
     const { title, prompt, expected_response, model } = params;
-    const taskManager = this.getTaskManagerFromContext(context);
+    const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       throw new Error('TaskManager is required for delegation');
     }
@@ -107,7 +111,7 @@ Examples:
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,
         assignedTo: assigneeSpec,
-        actor: context?.threadId || 'unknown',
+        actor: context?.agent?.threadId || 'unknown',
       });
 
       // Create task with assignment in single operation
@@ -119,7 +123,7 @@ Examples:
           assignedTo: assigneeSpec,
         },
         {
-          actor: context?.threadId || 'human',
+          actor: context?.agent?.threadId || 'human',
         }
       );
 
@@ -138,7 +142,8 @@ Examples:
       const result = await this.waitForTaskCompletion(
         task.id,
         taskManager,
-        context?.threadId || 'unknown'
+        context?.agent?.threadId || 'unknown',
+        context?.signal
       );
 
       logger.debug('DelegateTool: Task completed', {
@@ -151,6 +156,10 @@ Examples:
         taskId: task.id,
       });
     } catch (error: unknown) {
+      // Handle cancellation
+      if (error instanceof Error && error.message === 'Aborted') {
+        return this.createCancellationResult();
+      }
       return this.createError(
         `Task-based delegation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
       );
@@ -171,7 +180,8 @@ Please complete the task and provide your response in the expected format.`;
   private async waitForTaskCompletion(
     taskId: string,
     taskManager: TaskManager,
-    creatorThreadId: string
+    creatorThreadId: string,
+    signal?: AbortSignal
   ): Promise<string> {
     logger.debug('DelegateTool: Starting to wait for task completion', {
       taskId,
@@ -193,17 +203,32 @@ Please complete the task and provide your response in the expected format.`;
           if (event.task.status === 'completed') {
             logger.debug('DelegateTool: Task completed, resolving', { taskId });
             taskManager.off('task:updated', handleTaskUpdate);
+            signal?.removeEventListener('abort', abortHandler);
             const response = this.extractResponseFromTask(event.task);
             resolve(response);
           } else if (event.task.status === 'blocked') {
             logger.debug('DelegateTool: Task blocked, rejecting', { taskId });
             taskManager.off('task:updated', handleTaskUpdate);
+            signal?.removeEventListener('abort', abortHandler);
             reject(new Error(`Task ${taskId} is blocked`));
           }
         }
       };
 
+      const abortHandler = () => {
+        logger.debug('DelegateTool: Task aborted', { taskId });
+        taskManager.off('task:updated', handleTaskUpdate);
+        reject(new Error('Aborted'));
+      };
+
+      // Check if already aborted
+      if (signal?.aborted) {
+        reject(new Error('Aborted'));
+        return;
+      }
+
       taskManager.on('task:updated', handleTaskUpdate);
+      signal?.addEventListener('abort', abortHandler);
       logger.debug('DelegateTool: Registered task update handler', {
         taskId,
       });

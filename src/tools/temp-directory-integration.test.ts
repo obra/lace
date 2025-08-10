@@ -35,7 +35,7 @@ class IntegrationTestTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof this.schema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
     this.capturedContext = context;
     return Promise.resolve(this.createResult(`Integration test: ${args.content}`));
@@ -69,8 +69,8 @@ describe('Temp Directory Integration', () => {
     // Create real project and session
     project = Project.create(
       'Integration Test Project',
-      'Project for integration testing',
       tempLaceDirContext.tempDir,
+      'Project for integration testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -97,10 +97,11 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should create proper directory hierarchy through ToolExecutor', async () => {
+    const agent = session.getAgent(session.getId())!;
+
     const context: ToolContext = {
-      sessionId: session.getId(),
-      projectId: project.getId(),
-      session: session,
+      signal: new AbortController().signal,
+      agent,
     };
 
     await toolExecutor.executeTool(
@@ -134,10 +135,11 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should handle file operations through ToolExecutor', async () => {
+    const agent = session.getAgent(session.getId())!;
+
     const context: ToolContext = {
-      sessionId: session.getId(),
-      projectId: project.getId(),
-      session: session,
+      signal: new AbortController().signal,
+      agent,
     };
 
     await toolExecutor.executeTool(
@@ -168,10 +170,11 @@ describe('Temp Directory Integration', () => {
   });
 
   it('should maintain stability across ToolExecutor instances', async () => {
+    const agent = session.getAgent(session.getId())!;
+
     const context: ToolContext = {
-      sessionId: session.getId(),
-      projectId: project.getId(),
-      session: session,
+      signal: new AbortController().signal,
+      agent,
     };
 
     // Execute with first ToolExecutor instance

@@ -82,7 +82,7 @@ describe('LMStudioProvider', () => {
 
         protected async executeValidated(
           _args: { input: string },
-          _context?: ToolContext
+          _context: ToolContext
         ): Promise<ToolResult> {
           return await Promise.resolve(this.createResult('test result'));
         }

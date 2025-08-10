@@ -17,7 +17,7 @@ type CLIOptions = {
   logFile?: string;
   prompt?: string;
   ui?: string;
-  [key: string]: any; // Allow any additional properties for test flexibility
+  [key: string]: unknown; // Keep flexibility while retaining type safety
 };
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
@@ -34,7 +34,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { ThreadId } from '~/threads/types';
+import type { Agent } from '~/agents/agent';
 
 // Mock approval interface for testing
 class MockApprovalInterface implements ApprovalCallback {
@@ -85,6 +85,7 @@ describe('Tool Approval System Integration', () => {
   let project: Project;
   let toolContext: ToolContext;
   let providerInstanceId: string;
+  let agent: Agent | null;
 
   beforeEach(async () => {
     // setupTestPersistence replaced by setupCoreTest
@@ -121,13 +122,18 @@ describe('Tool Approval System Integration', () => {
       projectId: project.getId(),
     });
 
-    // Create tool context with session for security policy enforcement
+    // Get agent from session for context
+    agent = session.getAgent(session.getId());
+    if (!agent) {
+      throw new Error('Failed to get agent from session');
+    }
+
+    // Create tool context with agent reference
     toolContext = {
-      threadId: 'lace_20250101_test02' as ThreadId,
-      parentThreadId: 'lace_20250101_parent' as ThreadId,
       workingDirectory: tempLaceDirContext.tempDir,
       toolTempDir: tempLaceDirContext.tempDir, // Required for bash tool output management
-      session, // REQUIRED for security policy enforcement
+      agent, // Provides access to threadId and session
+      signal: new AbortController().signal,
     };
 
     toolExecutor = new ToolExecutor();
@@ -159,7 +165,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('test');
       expect(mockInterface.callLog).toHaveLength(1);
       expect(mockInterface.callLog[0]).toEqual({
@@ -177,7 +183,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Tool execution denied by approval policy');
       expect(mockInterface.callLog).toHaveLength(1);
     });
@@ -189,7 +195,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain(
         'Tool execution requires approval but no approval callback is configured'
       );
@@ -223,7 +229,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('auto-approved');
       expect(mockInterface.callLog).toHaveLength(0); // Interface should not be called
     });
@@ -253,7 +259,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Tool execution denied by approval policy');
       expect(mockInterface.callLog).toHaveLength(0); // Interface should not be called
     });
@@ -289,7 +295,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('safe content');
       expect(mockInterface.callLog).toHaveLength(0); // Interface should not be called
 
@@ -325,7 +331,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('interface decision');
       expect(mockInterface.callLog).toHaveLength(1); // Interface should be called
     });
@@ -359,7 +365,7 @@ describe('Tool Approval System Integration', () => {
         createToolCall('bash', { command: 'echo "first"' }),
         toolContext
       );
-      expect(firstResult.isError).toBe(false);
+      expect(firstResult.status).toBe('completed');
       expect(firstResult.content[0].text).toContain('first');
       expect(mockInterface.callLog).toHaveLength(1);
 
@@ -368,7 +374,7 @@ describe('Tool Approval System Integration', () => {
         createToolCall('bash', { command: 'echo "second"' }),
         toolContext
       );
-      expect(secondResult.isError).toBe(false);
+      expect(secondResult.status).toBe('completed');
       expect(secondResult.content[0].text).toContain('second');
       expect(mockInterface.callLog).toHaveLength(1); // Should not increase
     });
@@ -402,7 +408,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Tool execution denied by approval policy');
       expect(mockInterface.callLog).toHaveLength(0); // Interface should not be called
     });
@@ -432,14 +438,14 @@ describe('Tool Approval System Integration', () => {
         createToolCall('bash', { command: 'echo "blocked"' }),
         toolContext
       );
-      expect(bashResult.isError).toBe(true);
+      expect(bashResult.status).not.toBe('completed');
 
       // Test file_read (should be blocked despite read-only)
       const fileReadResult = await toolExecutor.executeTool(
         createToolCall('file_read', { path: 'test.txt' }),
         toolContext
       );
-      expect(fileReadResult.isError).toBe(true);
+      expect(fileReadResult.status).not.toBe('completed');
 
       expect(mockInterface.callLog).toHaveLength(0);
     });
@@ -460,7 +466,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('Approval system failed');
     });
 
@@ -472,7 +478,7 @@ describe('Tool Approval System Integration', () => {
         toolContext
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain("Tool 'unknown_tool' not found");
       expect(mockInterface.callLog).toHaveLength(0); // Should not call approval for unknown tools
     });

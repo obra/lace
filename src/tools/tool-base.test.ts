@@ -30,9 +30,12 @@ describe('Tool base class', () => {
   describe('resolvePath method', () => {
     it('should return absolute paths as-is', async () => {
       const absolutePath = '/absolute/path/file.txt';
-      const result = await tool.execute({ path: absolutePath });
+      const result = await tool.execute(
+        { path: absolutePath },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${absolutePath}`);
     });
 
@@ -41,9 +44,12 @@ describe('Tool base class', () => {
       const workingDir = '/working/directory';
       const expected = join(workingDir, relativePath);
 
-      const result = await tool.execute({ path: relativePath }, { workingDirectory: workingDir });
+      const result = await tool.execute(
+        { path: relativePath },
+        { signal: new AbortController().signal, workingDirectory: workingDir }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${expected}`);
     });
 
@@ -51,9 +57,12 @@ describe('Tool base class', () => {
       const relativePath = 'relative/file.txt';
       const expected = join(process.cwd(), relativePath);
 
-      const result = await tool.execute({ path: relativePath });
+      const result = await tool.execute(
+        { path: relativePath },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${expected}`);
     });
 
@@ -61,9 +70,12 @@ describe('Tool base class', () => {
       const relativePath = 'relative/file.txt';
       const expected = join(process.cwd(), relativePath);
 
-      const result = await tool.execute({ path: relativePath }, undefined);
+      const result = await tool.execute(
+        { path: relativePath },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toBe(`Resolved path: ${expected}`);
     });
   });

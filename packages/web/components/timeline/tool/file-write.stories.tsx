@@ -131,7 +131,7 @@ export const FileWriteSuccess: Story = {
           text: 'Successfully wrote 1.2 KB to /home/user/projects/lace/src/components/Button.tsx',
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     return (
@@ -156,7 +156,7 @@ export const FileWriteError: Story = {
           text: 'Permission denied writing to /etc/system/config.conf. Check file permissions or choose a different location. File system error: EACCES',
         },
       ],
-      isError: true,
+      status: 'failed' as const,
     };
 
     return (
@@ -181,7 +181,7 @@ export const LargeFileWrite: Story = {
           text: 'Successfully wrote 15.7 MB to /home/user/data/datasets/machine-learning-training-data.json',
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     return (
@@ -206,7 +206,7 @@ export const LongPathWrite: Story = {
           text: 'Successfully wrote 847 bytes to /very/deeply/nested/directory/structure/with/many/levels/and/subdirectories/final-component.tsx',
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     return (
@@ -231,7 +231,7 @@ export const DiskSpaceError: Story = {
           text: 'Insufficient disk space to write file. Free up disk space and try again. File system error: ENOSPC',
         },
       ],
-      isError: true,
+      status: 'failed' as const,
     };
 
     return (
@@ -256,7 +256,7 @@ export const DirectoryError: Story = {
           text: 'Path /home/user/documents is a directory, not a file. Specify a file path instead of a directory path.',
         },
       ],
-      isError: true,
+      status: 'failed' as const,
     };
 
     return (
@@ -276,7 +276,7 @@ export const EmptyContent: Story = {
   render: () => {
     const emptyResult: ToolResult = {
       content: [],
-      isError: false,
+      status: 'completed' as const,
     };
 
     return (
@@ -301,7 +301,7 @@ export const SmallFileWrite: Story = {
           text: 'Successfully wrote 47 bytes to package.json',
         },
       ],
-      isError: false,
+      status: 'completed' as const,
     };
 
     return (
@@ -324,35 +324,35 @@ export const AllVariants: Story = {
         title: 'Success - Regular File',
         result: {
           content: [{ type: 'text' as const, text: 'Successfully wrote 2.1 KB to src/components/Header.tsx' }],
-          isError: false,
+          status: 'completed' as const,
         },
       },
       {
         title: 'Success - Large File',
         result: {
           content: [{ type: 'text' as const, text: 'Successfully wrote 8.9 MB to assets/images/hero-background.jpg' }],
-          isError: false,
+          status: 'completed' as const,
         },
       },
       {
         title: 'Error - Permission Denied',
         result: {
           content: [{ type: 'text' as const, text: 'Permission denied writing to /root/config.txt. Check file permissions or choose a different location.' }],
-          isError: true,
+          status: 'failed' as const,
         },
       },
       {
         title: 'Error - Disk Full',
         result: {
           content: [{ type: 'text' as const, text: 'Insufficient disk space to write file. Free up disk space and try again. File system error: ENOSPC' }],
-          isError: true,
+          status: 'failed' as const,
         },
       },
       {
         title: 'Success - Small File',
         result: {
           content: [{ type: 'text' as const, text: 'Successfully wrote 128 bytes to .gitignore' }],
-          isError: false,
+          status: 'completed' as const,
         },
       },
     ];

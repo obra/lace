@@ -56,7 +56,7 @@ e4f5g6h fix: resolve memory leak in timeline component
 i7j8k9l refactor: reorganize component structure
 m1n2o3p docs: update API documentation
 q4r5s6t test: add integration tests for auth flow` }],
-    isError: false,
+    status: 'completed' as const,
   },
   timestamp: new Date(Date.now() - 3400000),
 };
@@ -216,7 +216,7 @@ export const BashToolMessage: Story = {
       content: 'find src/ -name "*.tsx" -type f | wc -l',
       result: {
         content: [{ type: 'text', text: '47' }],
-        isError: false,
+        status: 'completed' as const,
       },
     },
     index: 0,
@@ -252,7 +252,7 @@ export const ComplexToolMessage: Story = {
     "framer-motion": "^10.16.0"
   }
 }` }],
-        isError: false,
+        status: 'completed' as const,
       },
     },
     index: 0,

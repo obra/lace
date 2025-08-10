@@ -7,6 +7,7 @@ import { ToolContext } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { asThreadId } from '~/threads/types';
 import { Session } from '~/sessions/session';
+import type { Agent } from '~/agents/agent';
 import { Project } from '~/projects/project';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
@@ -16,14 +17,13 @@ import { setupCoreTest } from '~/test-utils/core-test-setup';
 describe('ToolExecutor policy enforcement', () => {
   const _tempLaceDir = setupCoreTest();
   let executor: ToolExecutor;
-  let project: Project;
-  let projectId: string;
+  let _project: Project;
   let context: ToolContext;
   let mockSession: Session;
 
   beforeEach(() => {
     // Create a test project with tool policies
-    project = Project.create('Test Project', '/project/path', 'A test project', {
+    _project = Project.create('Test Project', '/project/path', 'A test project', {
       provider: 'anthropic',
       model: 'claude-3-sonnet',
       tools: ['file-read', 'file-write', 'bash'],
@@ -33,7 +33,6 @@ describe('ToolExecutor policy enforcement', () => {
         bash: 'deny',
       },
     });
-    projectId = project.getId();
 
     // Create executor and register tools
     executor = new ToolExecutor();
@@ -54,13 +53,17 @@ describe('ToolExecutor policy enforcement', () => {
       }),
     } as unknown as Session;
 
-    context = {
+    // Create a mock agent with the needed threadId
+    const mockAgent = {
       threadId: asThreadId('lace_20250101_test03'),
-      parentThreadId: asThreadId('lace_20250101_sess01'),
+      getSession: () => mockSession,
+      getFullSession: vi.fn().mockResolvedValue(mockSession),
+    } as unknown as Agent;
+
+    context = {
+      signal: new AbortController().signal,
       workingDirectory: '/project/path',
-      sessionId: 'lace_20250101_sess01',
-      projectId: projectId,
-      session: mockSession,
+      agent: mockAgent,
     };
   });
 
@@ -104,7 +107,7 @@ describe('ToolExecutor policy enforcement', () => {
     const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
     const result = await executor.executeTool(toolCall, context);
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('execution denied by policy');
   });
 
@@ -116,22 +119,26 @@ describe('ToolExecutor policy enforcement', () => {
     const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
     const result = await executor.executeTool(toolCall, context);
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('not allowed in current configuration');
   });
 
   it('should require session context for security policy enforcement', async () => {
-    const contextWithoutSession = {
+    const mockAgentWithoutSession = {
       threadId: asThreadId('lace_20250101_test03'),
+      getFullSession: vi.fn().mockResolvedValue(undefined), // No session available
+    } as unknown as Agent;
+
+    const contextWithoutSession = {
+      signal: new AbortController().signal,
+      agent: mockAgentWithoutSession,
     };
 
     const toolCall = { id: 'test-id', name: 'file-read', arguments: { file_path: '/test.txt' } };
     const result = await executor.executeTool(toolCall, contextWithoutSession);
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'session context required for security policy enforcement'
-    );
+    expect(result.status).toBe('denied');
+    expect(result.content[0].text).toContain('Session not found for policy enforcement');
   });
 
   it('should deny approval when user rejects', async () => {
@@ -151,7 +158,7 @@ describe('ToolExecutor policy enforcement', () => {
     const result = await executor.executeTool(toolCall, context);
 
     expect(mockApprovalCallback.requestApproval).toHaveBeenCalled();
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('Tool execution denied by approval policy');
   });
 });

@@ -37,8 +37,9 @@ const bashSchema = z.object({
 
 export class BashTool extends Tool {
   name = 'bash';
-  description =
-    "Use bash to execute unix commands to achieve the user's goals. Be smart and careful.";
+  description = `Execute shell commands in isolated bash processes. Each call is independent - no state persists between calls.
+Output truncated to first 100 + last 50 lines. Chain commands with && or ; for sequential operations.
+Exit codes shown even for successful tool execution. Working directory persists within session.`;
   schema = bashSchema;
   annotations: ToolAnnotations = {
     title: 'Run commands with bash',
@@ -53,15 +54,20 @@ export class BashTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof bashSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
     return await this.executeCommand(args.command, context);
   }
 
-  private async executeCommand(command: string, context?: ToolContext): Promise<ToolResult> {
+  private async executeCommand(command: string, context: ToolContext): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
+      // Check if already aborted
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
       // Get temp file paths from ToolExecutor
       const outputPaths = this.getOutputFilePaths(context);
 
@@ -90,9 +96,33 @@ export class BashTool extends Tool {
       const childProcess = spawn('/bin/bash', ['-c', command], {
         cwd: context?.workingDirectory || process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: context?.processEnv || process.env,
       });
 
       return new Promise<ToolResult>((resolve) => {
+        let cancelled = false;
+        let processKilled = false;
+
+        // Handle abort signal
+        const abortHandler = () => {
+          cancelled = true;
+          if (!processKilled) {
+            processKilled = true;
+            // First try SIGTERM
+            childProcess.kill('SIGTERM');
+
+            // Give it 2 seconds to exit gracefully
+            setTimeout(() => {
+              if (!childProcess.killed) {
+                // Force kill if still running
+                childProcess.kill('SIGKILL');
+              }
+            }, 2000);
+          }
+        };
+
+        context.signal.addEventListener('abort', abortHandler);
+
         // Handle stdout
         childProcess.stdout?.on('data', (data: Buffer) => {
           const result = this.processStreamData(
@@ -131,6 +161,9 @@ export class BashTool extends Tool {
         childProcess.on('close', (exitCode) => {
           const runtime = Date.now() - startTime;
 
+          // Clean up abort handler
+          context.signal.removeEventListener('abort', abortHandler);
+
           // Process any remaining partial lines with circular buffer
           stdoutLineCount = this.processRemainingLines(
             stdoutLineBuffer,
@@ -155,19 +188,44 @@ export class BashTool extends Tool {
             streamsCompleted++;
             if (streamsCompleted === totalStreams) {
               // All streams are closed, safe to proceed with file paths
-              this.completeExecution(
-                command,
-                exitCode || 0,
-                runtime,
-                stdoutHeadLines,
-                stderrHeadLines,
-                stdoutTailLines,
-                stderrTailLines,
-                stdoutLineCount,
-                stderrLineCount,
-                outputPaths,
-                resolve
-              );
+              if (cancelled) {
+                // Generate partial output preview for cancellation
+                const stdoutPreview = this.generateHeadTailPreview(
+                  stdoutHeadLines,
+                  stdoutTailLines,
+                  stdoutLineCount
+                );
+                const stderrPreview = this.generateHeadTailPreview(
+                  stderrHeadLines,
+                  stderrTailLines,
+                  stderrLineCount
+                );
+
+                const partialOutput = [
+                  stdoutPreview && `stdout:\n${stdoutPreview}`,
+                  stderrPreview && `stderr:\n${stderrPreview}`,
+                ]
+                  .filter(Boolean)
+                  .join('\n\n');
+
+                // Ensure abort listener is cleaned up (though it should already be cleaned up)
+                context.signal.removeEventListener('abort', abortHandler);
+                resolve(this.createCancellationResult(partialOutput));
+              } else {
+                this.completeExecution(
+                  command,
+                  exitCode || 0,
+                  runtime,
+                  stdoutHeadLines,
+                  stderrHeadLines,
+                  stdoutTailLines,
+                  stderrTailLines,
+                  stdoutLineCount,
+                  stderrLineCount,
+                  outputPaths,
+                  resolve
+                );
+              }
             }
           };
 
@@ -180,6 +238,9 @@ export class BashTool extends Tool {
         // Handle process errors (e.g., spawn failures)
         childProcess.on('error', (error) => {
           const runtime = Date.now() - startTime;
+
+          // Clean up abort handler
+          context.signal.removeEventListener('abort', abortHandler);
 
           // Close file streams
           stdoutStream.end();
@@ -431,6 +492,9 @@ export class BashTool extends Tool {
     // This handles single nonexistent commands like "nonexistentcommand12345"
     if (exitCode === 127 && stdoutLineCount === 0) {
       resolve(this.createError(result as unknown as Record<string, unknown>));
+    } else if (exitCode === null) {
+      // Process was terminated by signal (e.g., SIGKILL, SIGTERM)
+      resolve(this.createCancellationResult());
     } else {
       resolve(this.createResult(result as unknown as Record<string, unknown>));
     }

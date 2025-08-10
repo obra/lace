@@ -23,7 +23,7 @@ export const bashRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    if (result.isError) return true;
+    if (result.status !== 'completed') return true;
     
     // Check for non-zero exit code in structured output  
     try {
@@ -31,7 +31,7 @@ export const bashRenderer: ToolRenderer = {
       const bashOutput = JSON.parse(rawOutput) as { exitCode?: number };
       return bashOutput.exitCode != null && bashOutput.exitCode !== 0;
     } catch {
-      return result.isError ?? false;
+      return result.status !== 'completed';
     }
   },
 
@@ -56,7 +56,7 @@ export const bashRenderer: ToolRenderer = {
       // Fallback to raw output if not structured
       return (
         <div className={`font-mono text-sm whitespace-pre-wrap ${
-          result.isError 
+          result.status !== 'completed' 
             ? 'text-error bg-error/10 border border-error/20' 
             : 'text-base-content/80 bg-base-200 border border-base-300'
         } rounded-lg p-3`}>
@@ -69,7 +69,6 @@ export const bashRenderer: ToolRenderer = {
     const hasStdout = stdout && stdout.trim();
     const hasStderr = stderr && stderr.trim();
     const hasNonZeroExit = exitCode != null && exitCode !== 0;
-    const isError = result.isError || hasNonZeroExit;
 
     return (
       <div className="space-y-2">

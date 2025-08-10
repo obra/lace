@@ -2,7 +2,7 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { ContentBlock } from '~/tools/types';
+import { ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 
 export interface ProviderConfig {
@@ -394,15 +394,11 @@ export interface ProviderToolCall {
   input: Record<string, unknown>;
 }
 
-export interface ProviderToolResult {
-  id: string;
-  content: ContentBlock[]; // Rich content instead of string
-  isError: boolean; // Align with our naming
-}
+// Use ToolResult directly from types.ts instead of maintaining a separate type
 
 export interface ProviderMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   toolCalls?: ProviderToolCall[]; // For assistant messages with tool calls
-  toolResults?: ProviderToolResult[]; // For user messages with tool results
+  toolResults?: ToolResult[]; // For user messages with tool results - using our internal type
 }

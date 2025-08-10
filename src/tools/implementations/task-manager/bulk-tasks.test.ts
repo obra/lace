@@ -83,12 +83,12 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        signal: new AbortController().signal,
+        agent: session.getAgent(session.getId())!,
       }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Created 3 tasks');
     expect(result.content[0].text).toContain('Task 1');
     expect(result.content[0].text).toContain('Task 2');
@@ -101,12 +101,12 @@ describe('Bulk Task Creation', () => {
         tasks: [],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        signal: new AbortController().signal,
+        agent: session.getAgent(session.getId())!,
       }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('at least 1');
   });
 
@@ -122,12 +122,12 @@ describe('Bulk Task Creation', () => {
         tasks,
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        signal: new AbortController().signal,
+        agent: session.getAgent(session.getId())!,
       }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Cannot create more than 20 tasks at once');
   });
 
@@ -143,12 +143,12 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        signal: new AbortController().signal,
+        agent: session.getAgent(session.getId())!,
       }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Created task');
     expect(result.content[0].text).toContain('Single Task');
   });
@@ -172,12 +172,12 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        signal: new AbortController().signal,
+        agent: session.getAgent(session.getId())!,
       }
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Invalid assignee format');
   });
 
@@ -194,7 +194,7 @@ describe('Bulk Task Creation', () => {
             title: 'Delegated Task',
             prompt: 'Work for subagent',
             priority: 'medium' as const,
-            assignedTo: session.getId(), // Assign to current session instead of spawning agent
+            assignedTo: session.getAgent(session.getId())!.threadId, // Assign to current session instead of spawning agent
           },
           {
             title: 'Low Priority Task',
@@ -205,15 +205,40 @@ describe('Bulk Task Creation', () => {
         ],
       },
       {
-        threadId: session.getId(),
-        session, // TaskManager is accessed via session.getTaskManager()
+        signal: new AbortController().signal,
+        agent: session.getAgent(session.getId())!,
       }
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Created 3 tasks');
     expect(result.content[0].text).toContain('High Priority Task');
-    expect(result.content[0].text).toContain(`Delegated Task → ${session.getId()}`);
+    expect(result.content[0].text).toContain(
+      `Delegated Task → ${session.getAgent(session.getId())!.threadId}`
+    );
     expect(result.content[0].text).toContain('Low Priority Task');
+  });
+
+  it('should handle aborted signal during execution', async () => {
+    const abortController = new AbortController();
+    abortController.abort(); // Signal is already aborted
+
+    const result = await tool.execute(
+      {
+        tasks: [
+          {
+            title: 'Aborted Task',
+            prompt: 'This task should be aborted',
+            priority: 'medium' as const,
+          },
+        ],
+      },
+      {
+        signal: abortController.signal,
+        agent: session.getAgent(session.getId())!,
+      }
+    );
+
+    expect(result.status).toBe('aborted');
   });
 });

@@ -20,7 +20,7 @@ describe('fileReadRenderer', () => {
         text: 'import React from "react";\n\nexport const Button = ({ children, onClick, variant = "primary" }) => {\n  return (\n    <button\n      onClick={onClick}\n      className={`btn btn-${variant}`}\n    >\n      {children}\n    </button>\n  );\n};',
       },
     ],
-    isError: false,
+    status: 'completed' as const,
     metadata: {
       totalLines: 25,
       linesReturned: 10,
@@ -35,7 +35,7 @@ describe('fileReadRenderer', () => {
         text: '// Large file content truncated for display...\nconst config = {\n  api: "https://api.example.com",\n  timeout: 5000\n};',
       },
     ],
-    isError: false,
+    status: 'completed' as const,
     metadata: {
       totalLines: 500,
       linesReturned: 100,
@@ -50,7 +50,7 @@ describe('fileReadRenderer', () => {
         text: 'File not found: /nonexistent/file.txt\n\nSimilar files: /home/user/file.txt, /home/user/files.txt',
       },
     ],
-    isError: true,
+    status: 'failed' as const,
   };
 
   describe('getSummary', () => {
@@ -108,7 +108,7 @@ describe('fileReadRenderer', () => {
     test('should only trust isError flag for error detection', () => {
       const contentErrorResult: ToolResult = {
         content: [{ type: 'text', text: 'Permission denied accessing file' }],
-        isError: false, // Tool says it's not an error, so we trust it
+        status: 'completed' as const, // Tool says it's not an error, so we trust it
       };
       expect(fileReadRenderer.isError?.(contentErrorResult)).toBe(false);
     });
@@ -116,7 +116,7 @@ describe('fileReadRenderer', () => {
     test('should handle missing content gracefully', () => {
       const emptyResult: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
       expect(fileReadRenderer.isError?.(emptyResult)).toBe(false);
     });
@@ -141,7 +141,7 @@ describe('fileReadRenderer', () => {
     test('should handle empty result content', () => {
       const emptyResult: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
       const result = fileReadRenderer.renderResult?.(emptyResult);
       expect(result).toBeDefined();
@@ -163,7 +163,7 @@ describe('fileReadRenderer', () => {
             text: 'function hello() {\n  console.log("Hello, world!");\n}',
           },
         ],
-        isError: false,
+        status: 'completed' as const,
         metadata: { fileSize: '256 bytes', totalLines: 3, linesReturned: 3 },
       };
       const result = fileReadRenderer.renderResult?.(codeResult);
@@ -174,7 +174,7 @@ describe('fileReadRenderer', () => {
       const largeContent = 'x'.repeat(5000);
       const largeResult: ToolResult = {
         content: [{ type: 'text', text: largeContent }],
-        isError: false,
+        status: 'completed' as const,
         metadata: { fileSize: '5.0 KB', totalLines: 100, linesReturned: 100 },
       };
       const result = fileReadRenderer.renderResult?.(largeResult);
