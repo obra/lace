@@ -100,7 +100,14 @@ describe('SummarizeCompactionStrategy', () => {
           content: 'I can help you write a fibonacci function. Here are a few approaches...',
           tokenUsage: {
             message: { promptTokens: 100, completionTokens: 200, totalTokens: 300 },
-            thread: { totalPromptTokens: 100, totalCompletionTokens: 200, totalTokens: 300, contextLimit: 200000, percentUsed: 0.15, nearLimit: false }
+            thread: {
+              totalPromptTokens: 100,
+              totalCompletionTokens: 200,
+              totalTokens: 300,
+              contextLimit: 200000,
+              percentUsed: 0.15,
+              nearLimit: false,
+            },
           },
         },
       },

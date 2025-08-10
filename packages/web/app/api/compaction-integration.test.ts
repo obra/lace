@@ -165,18 +165,16 @@ describe('Token Usage Integration Tests', () => {
     agent.threadManager.addEvent(sessionId, 'AGENT_MESSAGE', {
       content: 'First test response',
       tokenUsage: {
-        promptTokens: 100,
-        completionTokens: 50,
-        totalTokens: 150,
+        message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+        thread: { totalPromptTokens: 100, totalCompletionTokens: 50, totalTokens: 150, contextLimit: 200000, percentUsed: 0.1, nearLimit: false }
       },
     });
 
     agent.threadManager.addEvent(sessionId, 'AGENT_MESSAGE', {
       content: 'Second test response',
       tokenUsage: {
-        promptTokens: 200,
-        completionTokens: 75,
-        totalTokens: 275,
+        message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
+        thread: { totalPromptTokens: 300, totalCompletionTokens: 125, totalTokens: 425, contextLimit: 200000, percentUsed: 0.2, nearLimit: false },
       },
     });
 
@@ -238,9 +236,8 @@ describe('Token Usage Integration Tests', () => {
     agent.threadManager.addEvent(sessionId, 'AGENT_MESSAGE', {
       content: 'Pre-compaction response',
       tokenUsage: {
-        promptTokens: 1000,
-        completionTokens: 500,
-        totalTokens: 1500,
+        message: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+        thread: { totalPromptTokens: 1000, totalCompletionTokens: 500, totalTokens: 1500, contextLimit: 200000, percentUsed: 0.75, nearLimit: false }
       },
     });
 

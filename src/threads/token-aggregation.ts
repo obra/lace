@@ -23,22 +23,25 @@ export function aggregateTokenUsage(events: ThreadEvent[]): TokenSummary {
   }
 
   // Helper function to extract tokens from CombinedTokenUsage or old format
-  const extractTokens = (tokenUsage: unknown): { promptTokens: number; completionTokens: number } => {
+  const extractTokens = (
+    tokenUsage: unknown
+  ): { promptTokens: number; completionTokens: number } => {
     if (!tokenUsage || typeof tokenUsage !== 'object') {
       return { promptTokens: 0, completionTokens: 0 };
     }
-    
+
     const usage = tokenUsage as Record<string, unknown>;
-    
+
     // Handle new CombinedTokenUsage format - use message tokens for aggregation
     if (usage.message && typeof usage.message === 'object') {
       const message = usage.message as Record<string, unknown>;
       return {
         promptTokens: typeof message.promptTokens === 'number' ? message.promptTokens : 0,
-        completionTokens: typeof message.completionTokens === 'number' ? message.completionTokens : 0,
+        completionTokens:
+          typeof message.completionTokens === 'number' ? message.completionTokens : 0,
       };
-    } 
-    
+    }
+
     // Old format fallback
     return {
       promptTokens: typeof usage.promptTokens === 'number' ? usage.promptTokens : 0,

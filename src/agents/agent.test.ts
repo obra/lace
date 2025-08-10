@@ -371,9 +371,12 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Test');
 
       expect(thinkingComplete).toHaveBeenCalled();
-      expect(responseComplete).toHaveBeenCalledWith({
-        content: 'This is my response',
-      });
+      expect(responseComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'This is my response',
+          tokenUsage: expect.any(Object) as Record<string, unknown>,
+        })
+      );
 
       // Verify that raw content (with thinking blocks) is stored in thread for model context
       const events = threadManager.getEvents(agent.getThreadId());

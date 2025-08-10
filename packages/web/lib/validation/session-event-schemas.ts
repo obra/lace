@@ -27,9 +27,21 @@ const AgentMessageDataSchema = z.object({
   content: z.string(),
   tokenUsage: z
     .object({
-      promptTokens: z.number(),
-      completionTokens: z.number(),
-      totalTokens: z.number(),
+      message: z
+        .object({
+          promptTokens: z.number(),
+          completionTokens: z.number(),
+          totalTokens: z.number(),
+        })
+        .optional(),
+      thread: z.object({
+        totalPromptTokens: z.number(),
+        totalCompletionTokens: z.number(),
+        totalTokens: z.number(),
+        contextLimit: z.number(),
+        percentUsed: z.number(),
+        nearLimit: z.boolean(),
+      }),
     })
     .optional(),
 });

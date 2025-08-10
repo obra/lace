@@ -13,9 +13,9 @@ export interface TokenBudgetConfig {
  * For individual message/request token counts
  */
 export interface MessageTokenUsage {
-  promptTokens: number;        // Tokens in this specific message's prompt
-  completionTokens: number;    // Tokens in this specific message's completion  
-  totalTokens: number;         // promptTokens + completionTokens for this message
+  promptTokens: number; // Tokens in this specific message's prompt
+  completionTokens: number; // Tokens in this specific message's completion
+  totalTokens: number; // promptTokens + completionTokens for this message
 }
 
 /**
@@ -26,7 +26,7 @@ export interface ThreadTokenUsage {
   totalPromptTokens: number;
   totalCompletionTokens: number;
   totalTokens: number;
-  
+
   // Context management
   contextLimit: number;
   percentUsed: number;
@@ -37,8 +37,8 @@ export interface ThreadTokenUsage {
  * For contexts needing both message and thread token usage
  */
 export interface CombinedTokenUsage {
-  message?: MessageTokenUsage;    // Current message token usage
-  thread: ThreadTokenUsage;       // Thread-level cumulative usage
+  message?: MessageTokenUsage; // Current message token usage
+  thread: ThreadTokenUsage; // Thread-level cumulative usage
 }
 
 export interface BudgetStatus {
@@ -58,7 +58,6 @@ export interface BudgetRecommendations {
   maxRequestSize: number;
   warningMessage?: string;
 }
-
 
 export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';

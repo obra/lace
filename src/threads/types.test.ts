@@ -14,15 +14,21 @@ describe('ThreadEvent token usage', () => {
       data: {
         content: 'Hello',
         tokenUsage: {
-          promptTokens: 100,
-          completionTokens: 50,
-          totalTokens: 150,
+          message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+          thread: {
+            totalPromptTokens: 100,
+            totalCompletionTokens: 50,
+            totalTokens: 150,
+            contextLimit: 200000,
+            percentUsed: 0.1,
+            nearLimit: false,
+          },
         },
       },
     };
 
     expect(event.data.tokenUsage).toBeDefined();
-    expect(event.data.tokenUsage?.totalTokens).toBe(150);
+    expect(event.data.tokenUsage?.thread.totalTokens).toBe(150);
   });
 
   it('should allow AGENT_MESSAGE without token usage', () => {
@@ -49,15 +55,21 @@ describe('ThreadEvent token usage', () => {
         content: [{ type: 'text', text: 'Tool output' }],
         status: 'completed',
         tokenUsage: {
-          promptTokens: 50,
-          completionTokens: 25,
-          totalTokens: 75,
+          message: { promptTokens: 50, completionTokens: 25, totalTokens: 75 },
+          thread: {
+            totalPromptTokens: 50,
+            totalCompletionTokens: 25,
+            totalTokens: 75,
+            contextLimit: 200000,
+            percentUsed: 0.1,
+            nearLimit: false,
+          },
         },
       },
     };
 
     expect(event.data.tokenUsage).toBeDefined();
-    expect(event.data.tokenUsage?.promptTokens).toBe(50);
+    expect(event.data.tokenUsage?.message?.promptTokens).toBe(50);
   });
 
   it('should allow TOOL_RESULT without token usage', () => {

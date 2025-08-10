@@ -395,11 +395,14 @@ describe('Agent token tracking', () => {
 
     expect(agentMessage).toBeDefined();
     expect(agentMessage?.data).toHaveProperty('tokenUsage');
+    // Verify the new CombinedTokenUsage structure contains expected message data
     expect(agentMessage?.data.tokenUsage).toEqual(
       expect.objectContaining({
-        promptTokens: 100,
-        completionTokens: 50,
-        totalTokens: 150,
+        message: expect.objectContaining({
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+        }) as Record<string, unknown>,
       })
     );
 
@@ -411,7 +414,7 @@ describe('Agent token tracking', () => {
     expect(typeof agentMessage?.data.tokenUsage?.thread.contextLimit).toBe('number');
     expect(typeof agentMessage?.data.tokenUsage?.thread.percentUsed).toBe('number');
     expect(typeof agentMessage?.data.tokenUsage?.thread.nearLimit).toBe('boolean');
-    
+
     // If message usage exists, verify its structure
     if (agentMessage?.data.tokenUsage?.message) {
       const message = agentMessage.data.tokenUsage.message;

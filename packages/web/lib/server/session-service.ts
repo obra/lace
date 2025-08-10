@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolCall, ToolResult, TokenUsage } from '@/types/core';
+import type { ThreadEvent, ToolCall, ToolResult, CombinedTokenUsage } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
@@ -113,7 +113,7 @@ export class SessionService {
 
     agent.on(
       'agent_response_complete',
-      ({ content, tokenUsage }: { content: string; tokenUsage?: TokenUsage }) => {
+      ({ content, tokenUsage }: { content: string; tokenUsage?: CombinedTokenUsage }) => {
         logger.debug(
           `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
         );

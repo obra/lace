@@ -73,17 +73,17 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         const tokenUsageData = event.data.tokenUsage;
         console.log('[useAgentTokenUsage] Processing token usage data:', tokenUsageData);
 
-        // Transform core TokenUsage to AgentTokenUsage by providing defaults for any missing fields
+        // Transform CombinedTokenUsage to AgentTokenUsage by extracting thread-level data
+        const threadData = tokenUsageData.thread;
         const completeTokenUsage: AgentTokenUsage = {
-          totalPromptTokens: tokenUsageData.totalPromptTokens ?? tokenUsageData.promptTokens,
-          totalCompletionTokens:
-            tokenUsageData.totalCompletionTokens ?? tokenUsageData.completionTokens,
-          totalTokens: tokenUsageData.totalTokens ?? tokenUsageData.totalTokens,
-          contextLimit: tokenUsageData.contextLimit ?? 200000,
-          percentUsed: tokenUsageData.percentUsed ?? 0,
-          nearLimit: tokenUsageData.nearLimit ?? false,
-          eventCount: tokenUsageData.eventCount ?? 0,
-          lastCompactionAt: tokenUsageData.lastCompactionAt,
+          totalPromptTokens: threadData.totalPromptTokens,
+          totalCompletionTokens: threadData.totalCompletionTokens,
+          totalTokens: threadData.totalTokens,
+          contextLimit: threadData.contextLimit,
+          percentUsed: threadData.percentUsed,
+          nearLimit: threadData.nearLimit,
+          eventCount: 0, // Remove vanity metric
+          lastCompactionAt: undefined, // Remove vanity metric
         };
 
         console.log('[useAgentTokenUsage] Setting token usage:', completeTokenUsage);

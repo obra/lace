@@ -79,7 +79,6 @@ export interface CurrentTurnMetrics {
   };
 }
 
-
 // Event type definitions for TypeScript
 export interface AgentEvents {
   agent_thinking_start: [];

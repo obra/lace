@@ -258,9 +258,17 @@ export class TokenBudgetManager {
     // Add token usage from compacted events (the summary)
     for (const event of compactionData.compactedEvents) {
       if (event.type === 'AGENT_MESSAGE' && event.data.tokenUsage) {
-        this._totalUsage.promptTokens += event.data.tokenUsage.promptTokens;
-        this._totalUsage.completionTokens += event.data.tokenUsage.completionTokens;
-        this._totalUsage.totalTokens += event.data.tokenUsage.totalTokens;
+        const usage = event.data.tokenUsage;
+        // Handle new CombinedTokenUsage format - use message tokens for individual message counts
+        const messageTokens = usage.message || {
+          promptTokens: usage.thread?.totalPromptTokens || 0,
+          completionTokens: usage.thread?.totalCompletionTokens || 0,
+          totalTokens: usage.thread?.totalTokens || 0,
+        };
+
+        this._totalUsage.promptTokens += messageTokens.promptTokens;
+        this._totalUsage.completionTokens += messageTokens.completionTokens;
+        this._totalUsage.totalTokens += messageTokens.totalTokens;
       }
     }
 

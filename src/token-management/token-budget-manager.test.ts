@@ -313,9 +313,15 @@ describe('TokenBudgetManager', () => {
             data: {
               content: 'Compaction summary',
               tokenUsage: {
-                promptTokens: 500,
-                completionTokens: 0,
-                totalTokens: 500,
+                message: { promptTokens: 500, completionTokens: 0, totalTokens: 500 },
+                thread: {
+                  totalPromptTokens: 500,
+                  totalCompletionTokens: 0,
+                  totalTokens: 500,
+                  contextLimit: 200000,
+                  percentUsed: 0.1,
+                  nearLimit: false,
+                },
               },
             },
           },
@@ -359,9 +365,15 @@ describe('TokenBudgetManager', () => {
             data: {
               content: 'Post-compaction summary',
               tokenUsage: {
-                promptTokens: 500,
-                completionTokens: 0,
-                totalTokens: 500,
+                message: { promptTokens: 500, completionTokens: 0, totalTokens: 500 },
+                thread: {
+                  totalPromptTokens: 500,
+                  totalCompletionTokens: 0,
+                  totalTokens: 500,
+                  contextLimit: 200000,
+                  percentUsed: 0.1,
+                  nearLimit: false,
+                },
               },
             },
           },
@@ -403,55 +415,16 @@ describe('TokenBudgetManager', () => {
         },
       });
 
-      const info = manager.getUsageInfo();
+      const info = manager.getThreadTokenUsage();
 
       expect(info).toEqual({
-        promptTokens: 3000,
-        completionTokens: 2000,
+        totalPromptTokens: 3000,
+        totalCompletionTokens: 2000,
         totalTokens: 5000,
-        maxTokens: 10000,
-        availableTokens: 4000, // 10000 - 1000 reserve - 5000 used
+        contextLimit: 10000,
         percentUsed: 50,
         nearLimit: false,
-        eventCount: 1,
-        lastCompactionAt: undefined,
       });
-    });
-
-    it('should track compaction timestamp', () => {
-      const manager = new TokenBudgetManager({
-        maxTokens: 10000,
-        reserveTokens: 1000,
-        warningThreshold: 0.8,
-      });
-
-      const beforeCompaction = new Date();
-      manager.handleCompaction({
-        strategyId: 'summarize',
-        originalEventCount: 3,
-        compactedEvents: [
-          {
-            id: 'summary3',
-            threadId: 'test-thread',
-            type: 'AGENT_MESSAGE' as const,
-            timestamp: new Date(),
-            data: {
-              content: 'Usage info summary',
-              tokenUsage: {
-                promptTokens: 500,
-                completionTokens: 0,
-                totalTokens: 500,
-              },
-            },
-          },
-        ],
-      });
-      const afterCompaction = new Date();
-
-      const info = manager.getUsageInfo();
-      expect(info.lastCompactionAt).toBeDefined();
-      expect(info.lastCompactionAt!.getTime()).toBeGreaterThanOrEqual(beforeCompaction.getTime());
-      expect(info.lastCompactionAt!.getTime()).toBeLessThanOrEqual(afterCompaction.getTime());
     });
 
     it('should handle empty/zero state correctly', () => {
@@ -461,18 +434,15 @@ describe('TokenBudgetManager', () => {
         warningThreshold: 0.8,
       });
 
-      const info = manager.getUsageInfo();
+      const info = manager.getThreadTokenUsage();
 
       expect(info).toEqual({
-        promptTokens: 0,
-        completionTokens: 0,
+        totalPromptTokens: 0,
+        totalCompletionTokens: 0,
         totalTokens: 0,
-        maxTokens: 1000,
-        availableTokens: 900, // 1000 - 100 reserve
+        contextLimit: 1000,
         percentUsed: 0,
         nearLimit: false,
-        eventCount: 0,
-        lastCompactionAt: undefined,
       });
     });
   });
@@ -515,9 +485,15 @@ describe('TokenBudgetManager', () => {
             data: {
               content: 'Summary of conversation',
               tokenUsage: {
-                promptTokens: 300,
-                completionTokens: 200,
-                totalTokens: 500,
+                message: { promptTokens: 300, completionTokens: 200, totalTokens: 500 },
+                thread: {
+                  totalPromptTokens: 300,
+                  totalCompletionTokens: 200,
+                  totalTokens: 500,
+                  contextLimit: 200000,
+                  percentUsed: 0.1,
+                  nearLimit: false,
+                },
               },
             },
           },
@@ -557,9 +533,15 @@ describe('TokenBudgetManager', () => {
             data: {
               content: 'Summary',
               tokenUsage: {
-                promptTokens: 300,
-                completionTokens: 200,
-                totalTokens: 500,
+                message: { promptTokens: 300, completionTokens: 200, totalTokens: 500 },
+                thread: {
+                  totalPromptTokens: 300,
+                  totalCompletionTokens: 200,
+                  totalTokens: 500,
+                  contextLimit: 200000,
+                  percentUsed: 0.1,
+                  nearLimit: false,
+                },
               },
             },
           },

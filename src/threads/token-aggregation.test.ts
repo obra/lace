@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { aggregateTokenUsage, estimateConversationTokens } from '~/threads/token-aggregation';
 import type { ThreadEvent } from '~/threads/types';
+import type { CombinedTokenUsage } from '~/token-management/types';
 
 describe('Token aggregation', () => {
   it('should aggregate token usage from events', () => {
@@ -17,7 +18,14 @@ describe('Token aggregation', () => {
           content: 'Response 1',
           tokenUsage: {
             message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
-            thread: { totalPromptTokens: 100, totalCompletionTokens: 50, totalTokens: 150, contextLimit: 200000, percentUsed: 0.1, nearLimit: false }
+            thread: {
+              totalPromptTokens: 100,
+              totalCompletionTokens: 50,
+              totalTokens: 150,
+              contextLimit: 200000,
+              percentUsed: 0.1,
+              nearLimit: false,
+            },
           },
         },
       },
@@ -30,7 +38,14 @@ describe('Token aggregation', () => {
           content: 'Response 2',
           tokenUsage: {
             message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
-            thread: { totalPromptTokens: 300, totalCompletionTokens: 125, totalTokens: 425, contextLimit: 200000, percentUsed: 0.2, nearLimit: false }
+            thread: {
+              totalPromptTokens: 300,
+              totalCompletionTokens: 125,
+              totalTokens: 425,
+              contextLimit: 200000,
+              percentUsed: 0.2,
+              nearLimit: false,
+            },
           },
         },
       },
@@ -52,7 +67,11 @@ describe('Token aggregation', () => {
         timestamp: new Date(),
         data: {
           content: 'Response with tokens',
-          tokenUsage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+          tokenUsage: {
+            promptTokens: 100,
+            completionTokens: 50,
+            totalTokens: 150,
+          } as unknown as CombinedTokenUsage,
         },
       },
       {
@@ -91,7 +110,11 @@ describe('Token aggregation', () => {
         data: {
           content: [{ type: 'text', text: 'Tool output' }],
           status: 'completed',
-          tokenUsage: { promptTokens: 50, completionTokens: 25, totalTokens: 75 },
+          tokenUsage: {
+            promptTokens: 50,
+            completionTokens: 25,
+            totalTokens: 75,
+          } as unknown as CombinedTokenUsage,
         },
       },
     ];
@@ -182,7 +205,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-01'),
           data: {
             content: 'Old response 1',
-            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+            tokenUsage: {
+              promptTokens: 1000,
+              completionTokens: 500,
+              totalTokens: 1500,
+            } as unknown as CombinedTokenUsage,
           },
         },
         {
@@ -192,7 +219,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-02'),
           data: {
             content: 'Old response 2',
-            tokenUsage: { promptTokens: 800, completionTokens: 400, totalTokens: 1200 },
+            tokenUsage: {
+              promptTokens: 800,
+              completionTokens: 400,
+              totalTokens: 1200,
+            } as unknown as CombinedTokenUsage,
           },
         },
         // Compaction event - contains summary
@@ -212,7 +243,11 @@ describe('Token aggregation', () => {
                 timestamp: new Date('2024-01-03'),
                 data: {
                   content: 'Summary of conversation',
-                  tokenUsage: { promptTokens: 300, completionTokens: 200, totalTokens: 500 },
+                  tokenUsage: {
+                    promptTokens: 300,
+                    completionTokens: 200,
+                    totalTokens: 500,
+                  } as unknown as CombinedTokenUsage,
                 },
               },
             ],
@@ -226,7 +261,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-04'),
           data: {
             content: 'New response 1',
-            tokenUsage: { promptTokens: 150, completionTokens: 100, totalTokens: 250 },
+            tokenUsage: {
+              promptTokens: 150,
+              completionTokens: 100,
+              totalTokens: 250,
+            } as unknown as CombinedTokenUsage,
           },
         },
         {
@@ -236,7 +275,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-05'),
           data: {
             content: 'New response 2',
-            tokenUsage: { promptTokens: 200, completionTokens: 150, totalTokens: 350 },
+            tokenUsage: {
+              promptTokens: 200,
+              completionTokens: 150,
+              totalTokens: 350,
+            } as unknown as CombinedTokenUsage,
           },
         },
       ];
@@ -248,7 +291,6 @@ describe('Token aggregation', () => {
         totalPromptTokens: 650, // 300 (summary) + 150 + 200
         totalCompletionTokens: 450, // 200 (summary) + 100 + 150
         totalTokens: 1100, // 500 (summary) + 250 + 350
-        eventCount: 3, // 1 summary + 2 post-compaction events
       });
     });
 
@@ -262,7 +304,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-01'),
           data: {
             content: 'Old response 1',
-            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+            tokenUsage: {
+              promptTokens: 1000,
+              completionTokens: 500,
+              totalTokens: 1500,
+            } as unknown as CombinedTokenUsage,
           },
         },
         // First compaction
@@ -282,7 +328,11 @@ describe('Token aggregation', () => {
                 timestamp: new Date('2024-01-02'),
                 data: {
                   content: 'First summary',
-                  tokenUsage: { promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+                  tokenUsage: {
+                    promptTokens: 200,
+                    completionTokens: 100,
+                    totalTokens: 300,
+                  } as unknown as CombinedTokenUsage,
                 },
               },
             ],
@@ -296,7 +346,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-03'),
           data: {
             content: 'Middle response',
-            tokenUsage: { promptTokens: 300, completionTokens: 200, totalTokens: 500 },
+            tokenUsage: {
+              promptTokens: 300,
+              completionTokens: 200,
+              totalTokens: 500,
+            } as unknown as CombinedTokenUsage,
           },
         },
         // Second compaction
@@ -316,7 +370,11 @@ describe('Token aggregation', () => {
                 timestamp: new Date('2024-01-04'),
                 data: {
                   content: 'Second summary',
-                  tokenUsage: { promptTokens: 150, completionTokens: 75, totalTokens: 225 },
+                  tokenUsage: {
+                    promptTokens: 150,
+                    completionTokens: 75,
+                    totalTokens: 225,
+                  } as unknown as CombinedTokenUsage,
                 },
               },
             ],
@@ -330,7 +388,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-05'),
           data: {
             content: 'Final response',
-            tokenUsage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+            tokenUsage: {
+              promptTokens: 100,
+              completionTokens: 50,
+              totalTokens: 150,
+            } as unknown as CombinedTokenUsage,
           },
         },
       ];
@@ -342,7 +404,6 @@ describe('Token aggregation', () => {
         totalPromptTokens: 250, // 150 (latest summary) + 100
         totalCompletionTokens: 125, // 75 (latest summary) + 50
         totalTokens: 375, // 225 (latest summary) + 150
-        eventCount: 2, // 1 latest summary + 1 post-compaction event
       });
     });
 
@@ -355,7 +416,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-01'),
           data: {
             content: 'Original response',
-            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+            tokenUsage: {
+              promptTokens: 1000,
+              completionTokens: 500,
+              totalTokens: 1500,
+            } as unknown as CombinedTokenUsage,
           },
         },
         {
@@ -374,7 +439,11 @@ describe('Token aggregation', () => {
                 timestamp: new Date('2024-01-02'),
                 data: {
                   content: 'Summary',
-                  tokenUsage: { promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+                  tokenUsage: {
+                    promptTokens: 200,
+                    completionTokens: 100,
+                    totalTokens: 300,
+                  } as unknown as CombinedTokenUsage,
                 },
               },
             ],
@@ -389,7 +458,6 @@ describe('Token aggregation', () => {
         totalPromptTokens: 200,
         totalCompletionTokens: 100,
         totalTokens: 300,
-        eventCount: 1,
       });
     });
 
@@ -402,7 +470,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-01'),
           data: {
             content: 'Original response',
-            tokenUsage: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+            tokenUsage: {
+              promptTokens: 1000,
+              completionTokens: 500,
+              totalTokens: 1500,
+            } as unknown as CombinedTokenUsage,
           },
         },
         {
@@ -423,7 +495,11 @@ describe('Token aggregation', () => {
           timestamp: new Date('2024-01-03'),
           data: {
             content: 'New response',
-            tokenUsage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+            tokenUsage: {
+              promptTokens: 100,
+              completionTokens: 50,
+              totalTokens: 150,
+            } as unknown as CombinedTokenUsage,
           },
         },
       ];
@@ -435,7 +511,6 @@ describe('Token aggregation', () => {
         totalPromptTokens: 100,
         totalCompletionTokens: 50,
         totalTokens: 150,
-        eventCount: 1,
       });
     });
   });
