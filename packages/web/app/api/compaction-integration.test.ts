@@ -33,7 +33,7 @@ describe('Token Usage Integration Tests', () => {
   let sessionId: ThreadId;
   let providerInstanceId: string;
   let streamedEvents: unknown[] = [];
-  let originalBroadcast: ((event: unknown) => void) | null = null;
+  let originalBroadcast: EventStreamManager['broadcast'] | undefined;
 
   beforeEach(async () => {
     await setupTestProviderDefaults();
@@ -73,7 +73,7 @@ describe('Token Usage Integration Tests', () => {
     // Intercept SSE broadcasts to capture events
     const eventManager = EventStreamManager.getInstance();
     originalBroadcast = eventManager.broadcast;
-    const mockBroadcast = vi.fn((event) => {
+    const mockBroadcast = vi.fn((event: unknown) => {
       streamedEvents.push(event);
       if (originalBroadcast) {
         return originalBroadcast.call(eventManager, event);
