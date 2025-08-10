@@ -7,18 +7,38 @@ export interface TokenBudgetConfig {
   reserveTokens: number; // Tokens to keep in reserve for final responses
 }
 
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
+// NEW CANONICAL TYPES - Single source of truth for token usage
+
+/**
+ * For individual message/request token counts
+ */
+export interface MessageTokenUsage {
+  promptTokens: number;        // Tokens in this specific message's prompt
+  completionTokens: number;    // Tokens in this specific message's completion  
+  totalTokens: number;         // promptTokens + completionTokens for this message
+}
+
+/**
+ * For cumulative thread-level token tracking
+ */
+export interface ThreadTokenUsage {
+  // Cumulative totals across all messages in thread
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
   totalTokens: number;
-  // New comprehensive fields (optional for compatibility)
-  totalPromptTokens?: number;
-  totalCompletionTokens?: number;
-  contextLimit?: number;
-  percentUsed?: number;
-  nearLimit?: boolean;
-  eventCount?: number;
-  lastCompactionAt?: Date;
+  
+  // Context management
+  contextLimit: number;
+  percentUsed: number;
+  nearLimit: boolean;
+}
+
+/**
+ * For contexts needing both message and thread token usage
+ */
+export interface CombinedTokenUsage {
+  message?: MessageTokenUsage;    // Current message token usage
+  thread: ThreadTokenUsage;       // Thread-level cumulative usage
 }
 
 export interface BudgetStatus {
@@ -39,24 +59,6 @@ export interface BudgetRecommendations {
   warningMessage?: string;
 }
 
-export interface TokenUsageInfo {
-  // Current usage
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-
-  // Context limits
-  maxTokens: number;
-  availableTokens: number;
-
-  // Status
-  percentUsed: number;
-  nearLimit: boolean;
-
-  // Tracking
-  eventCount: number;
-  lastCompactionAt?: Date;
-}
 
 export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';

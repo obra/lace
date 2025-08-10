@@ -21,7 +21,7 @@ import {
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
-import type { TokenUsage } from '~/token-management/types';
+import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
 import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
@@ -79,16 +79,6 @@ export interface CurrentTurnMetrics {
   };
 }
 
-export interface AgentTokenUsage {
-  totalPromptTokens: number;
-  totalCompletionTokens: number;
-  totalTokens: number;
-  contextLimit: number;
-  percentUsed: number;
-  nearLimit: boolean;
-  eventCount?: number;
-  lastCompactionAt?: Date;
-}
 
 // Event type definitions for TypeScript
 export interface AgentEvents {
@@ -97,7 +87,7 @@ export interface AgentEvents {
   agent_thinking_complete: [];
   compaction_start: [{ auto: boolean }];
   compaction_complete: [{ success: boolean }];
-  agent_response_complete: [{ content: string; tokenUsage?: TokenUsage }]; // Clean content with thinking blocks removed, plus token usage
+  agent_response_complete: [{ content: string; tokenUsage?: CombinedTokenUsage }]; // Clean content with thinking blocks removed, plus token usage
   tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
   state_change: [{ from: AgentState; to: AgentState }];
@@ -678,42 +668,29 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context with token usage
-        const comprehensiveTokenUsage = this.getTokenUsage();
+        const threadTokenUsage = this.getTokenUsage();
 
-        const agentMessageTokenUsage = response.usage
+        const agentMessageTokenUsage: CombinedTokenUsage = response.usage
           ? {
-              // Use API response for individual call tokens, comprehensive data for totals
-              promptTokens: response.usage.promptTokens,
-              completionTokens: response.usage.completionTokens,
-              totalTokens: response.usage.totalTokens,
-              // Add comprehensive data from TokenBudgetManager (ensure all fields are present)
-              totalPromptTokens: comprehensiveTokenUsage.totalPromptTokens,
-              totalCompletionTokens: comprehensiveTokenUsage.totalCompletionTokens,
-              contextLimit: comprehensiveTokenUsage.contextLimit,
-              percentUsed: comprehensiveTokenUsage.percentUsed,
-              nearLimit: comprehensiveTokenUsage.nearLimit,
-              eventCount: comprehensiveTokenUsage.eventCount ?? 0,
-              lastCompactionAt: comprehensiveTokenUsage.lastCompactionAt,
+              // Current message token usage from provider
+              message: {
+                promptTokens: response.usage.promptTokens,
+                completionTokens: response.usage.completionTokens,
+                totalTokens: response.usage.totalTokens,
+              },
+              // Thread-level cumulative usage
+              thread: threadTokenUsage,
             }
           : {
-              // Fallback: provide both individual and comprehensive data
-              promptTokens: 0,
-              completionTokens: 0,
-              totalTokens: 0,
-              totalPromptTokens: comprehensiveTokenUsage.totalPromptTokens,
-              totalCompletionTokens: comprehensiveTokenUsage.totalCompletionTokens,
-              contextLimit: comprehensiveTokenUsage.contextLimit,
-              percentUsed: comprehensiveTokenUsage.percentUsed,
-              nearLimit: comprehensiveTokenUsage.nearLimit,
-              eventCount: comprehensiveTokenUsage.eventCount ?? 0,
-              lastCompactionAt: comprehensiveTokenUsage.lastCompactionAt,
+              // Fallback: no message usage data available
+              thread: threadTokenUsage,
             };
 
         logger.debug('Creating AGENT_MESSAGE event with token usage', {
           threadId: this._threadId,
           hasProviderUsage: !!response.usage,
           providerUsage: response.usage,
-          comprehensiveTokenUsage,
+          threadTokenUsage,
           finalTokenUsage: agentMessageTokenUsage,
         });
 
@@ -2579,10 +2556,9 @@ export class Agent extends EventEmitter {
   /**
    * Gets current token usage information for this agent
    */
-  getTokenUsage(): AgentTokenUsage {
+  getTokenUsage(): ThreadTokenUsage {
     if (this._tokenBudgetManager) {
       const budget = this._tokenBudgetManager.getBudgetStatus();
-      const usageInfo = this._tokenBudgetManager.getUsageInfo();
       return {
         totalPromptTokens: budget.promptTokens,
         totalCompletionTokens: budget.completionTokens,
@@ -2590,7 +2566,6 @@ export class Agent extends EventEmitter {
         contextLimit: budget.maxTokens,
         percentUsed: budget.usagePercentage * 100,
         nearLimit: budget.warningTriggered,
-        eventCount: usageInfo.eventCount,
       };
     }
 
@@ -2602,7 +2577,6 @@ export class Agent extends EventEmitter {
       contextLimit: 200000, // Default context limit
       percentUsed: 0,
       nearLimit: false,
-      eventCount: 0,
     };
   }
 

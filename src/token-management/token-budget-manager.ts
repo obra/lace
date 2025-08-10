@@ -5,19 +5,17 @@ import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import {
   TokenBudgetConfig,
-  TokenUsage,
+  MessageTokenUsage,
+  ThreadTokenUsage,
   BudgetStatus,
   BudgetRecommendations,
   ConversationMessage,
-  TokenUsageInfo,
 } from '~/token-management/types';
 import type { CompactionData } from '~/threads/compaction/types';
 
 export class TokenBudgetManager {
   private readonly _config: TokenBudgetConfig;
-  private _totalUsage: TokenUsage;
-  private _eventCount: number;
-  private _lastCompactionAt?: Date;
+  private _totalUsage: MessageTokenUsage;
 
   constructor(config: TokenBudgetConfig) {
     this._config = { ...config };
@@ -26,8 +24,6 @@ export class TokenBudgetManager {
       completionTokens: 0,
       totalTokens: 0,
     };
-    this._eventCount = 0;
-    this._lastCompactionAt = undefined;
   }
 
   /**
@@ -56,7 +52,6 @@ export class TokenBudgetManager {
     this._totalUsage.promptTokens += promptTokens;
     this._totalUsage.completionTokens += completionTokens;
     this._totalUsage.totalTokens += totalTokens;
-    this._eventCount += 1;
 
     logger.debug('Token usage recorded', {
       currentRequest: { promptTokens, completionTokens, totalTokens },
@@ -145,21 +140,17 @@ export class TokenBudgetManager {
   /**
    * Gets comprehensive token usage information
    */
-  getUsageInfo(): TokenUsageInfo {
-    const availableTokens = this.getAvailableTokens();
+  getThreadTokenUsage(): ThreadTokenUsage {
     const percentUsed = Math.round(this.getUsagePercentage() * 100);
     const nearLimit = this.isNearLimit();
 
     return {
-      promptTokens: this._totalUsage.promptTokens,
-      completionTokens: this._totalUsage.completionTokens,
+      totalPromptTokens: this._totalUsage.promptTokens,
+      totalCompletionTokens: this._totalUsage.completionTokens,
       totalTokens: this._totalUsage.totalTokens,
-      maxTokens: this._config.maxTokens,
-      availableTokens,
+      contextLimit: this._config.maxTokens,
       percentUsed,
       nearLimit,
-      eventCount: this._eventCount,
-      lastCompactionAt: this._lastCompactionAt,
     };
   }
 
@@ -224,8 +215,6 @@ export class TokenBudgetManager {
       completionTokens: 0,
       totalTokens: 0,
     };
-    this._eventCount = 0;
-    this._lastCompactionAt = undefined;
 
     logger.debug('Token budget reset', {
       config: this._config,
@@ -274,8 +263,6 @@ export class TokenBudgetManager {
         this._totalUsage.totalTokens += event.data.tokenUsage.totalTokens;
       }
     }
-
-    this._lastCompactionAt = new Date();
 
     logger.debug('Token budget reset after compaction', {
       compactionStrategy: compactionData.strategyId,

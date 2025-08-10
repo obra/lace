@@ -10,7 +10,11 @@ export type {
   Thread,
   AgentMessageData,
 } from '~/threads/types';
-export type { TokenUsage } from '~/token-management/types';
+export type { 
+  MessageTokenUsage, 
+  ThreadTokenUsage, 
+  CombinedTokenUsage
+} from '~/token-management/types';
 
 export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 

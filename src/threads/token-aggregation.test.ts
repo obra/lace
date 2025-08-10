@@ -15,7 +15,10 @@ describe('Token aggregation', () => {
         timestamp: new Date(),
         data: {
           content: 'Response 1',
-          tokenUsage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+          tokenUsage: {
+            message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+            thread: { totalPromptTokens: 100, totalCompletionTokens: 50, totalTokens: 150, contextLimit: 200000, percentUsed: 0.1, nearLimit: false }
+          },
         },
       },
       {
@@ -25,7 +28,10 @@ describe('Token aggregation', () => {
         timestamp: new Date(),
         data: {
           content: 'Response 2',
-          tokenUsage: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
+          tokenUsage: {
+            message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
+            thread: { totalPromptTokens: 300, totalCompletionTokens: 125, totalTokens: 425, contextLimit: 200000, percentUsed: 0.2, nearLimit: false }
+          },
         },
       },
     ];
@@ -35,7 +41,6 @@ describe('Token aggregation', () => {
     expect(summary.totalPromptTokens).toBe(300);
     expect(summary.totalCompletionTokens).toBe(125);
     expect(summary.totalTokens).toBe(425);
-    expect(summary.eventCount).toBe(2);
   });
 
   it('should handle mixed events with and without token usage', () => {
@@ -74,7 +79,6 @@ describe('Token aggregation', () => {
     expect(summary.totalPromptTokens).toBe(100);
     expect(summary.totalCompletionTokens).toBe(50);
     expect(summary.totalTokens).toBe(150);
-    expect(summary.eventCount).toBe(1); // Only one event had token usage
   });
 
   it('should aggregate token usage from TOOL_RESULT events', () => {
@@ -97,7 +101,6 @@ describe('Token aggregation', () => {
     expect(summary.totalPromptTokens).toBe(50);
     expect(summary.totalCompletionTokens).toBe(25);
     expect(summary.totalTokens).toBe(75);
-    expect(summary.eventCount).toBe(1);
   });
 
   it('should estimate tokens when usage data not available', () => {
@@ -161,7 +164,6 @@ describe('Token aggregation', () => {
     expect(summary.totalPromptTokens).toBe(0);
     expect(summary.totalCompletionTokens).toBe(0);
     expect(summary.totalTokens).toBe(0);
-    expect(summary.eventCount).toBe(0);
   });
 
   it('should return zero estimation for empty event list', () => {

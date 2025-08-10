@@ -4,7 +4,7 @@
 import { ToolCall, ToolResult } from '~/tools/types';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ApprovalDecision } from '~/tools/approval-types';
-import type { TokenUsage } from '~/token-management/types';
+import type { CombinedTokenUsage } from '~/token-management/types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [
@@ -43,7 +43,7 @@ interface BaseThreadEvent {
 // Agent message data with optional token usage
 export interface AgentMessageData {
   content: string;
-  tokenUsage?: TokenUsage;
+  tokenUsage?: CombinedTokenUsage;
 }
 
 // Discriminated union for type-safe event handling

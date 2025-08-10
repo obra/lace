@@ -403,13 +403,22 @@ describe('Agent token tracking', () => {
       })
     );
 
-    // Verify comprehensive fields exist with correct types
-    expect(typeof agentMessage?.data.tokenUsage?.totalPromptTokens).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.totalCompletionTokens).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.contextLimit).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.percentUsed).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.nearLimit).toBe('boolean');
-    expect(typeof agentMessage?.data.tokenUsage?.eventCount).toBe('number');
+    // Verify new CombinedTokenUsage structure exists
+    expect(agentMessage?.data.tokenUsage).toBeDefined();
+    expect(agentMessage?.data.tokenUsage?.thread).toBeDefined();
+    expect(typeof agentMessage?.data.tokenUsage?.thread.totalPromptTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.totalCompletionTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.contextLimit).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.percentUsed).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.nearLimit).toBe('boolean');
+    
+    // If message usage exists, verify its structure
+    if (agentMessage?.data.tokenUsage?.message) {
+      const message = agentMessage.data.tokenUsage.message;
+      expect(typeof message.promptTokens).toBe('number');
+      expect(typeof message.completionTokens).toBe('number');
+      expect(typeof message.totalTokens).toBe('number');
+    }
   });
 
   describe('token estimation fallback', () => {
@@ -488,20 +497,26 @@ describe('Agent token tracking', () => {
     const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
 
     expect(agentMessage).toBeDefined();
-    expect(agentMessage?.data.tokenUsage).toEqual(
+    expect(agentMessage?.data.tokenUsage?.thread).toEqual(
       expect.objectContaining({
-        promptTokens: 0,
-        completionTokens: 0,
+        totalPromptTokens: 0,
+        totalCompletionTokens: 0,
         totalTokens: 0,
+        contextLimit: expect.any(Number) as number,
+        percentUsed: expect.any(Number) as number,
+        nearLimit: expect.any(Boolean) as boolean,
       })
     );
 
-    // Verify comprehensive fields exist with correct types even without provider usage
-    expect(typeof agentMessage?.data.tokenUsage?.totalPromptTokens).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.totalCompletionTokens).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.contextLimit).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.percentUsed).toBe('number');
-    expect(typeof agentMessage?.data.tokenUsage?.nearLimit).toBe('boolean');
-    expect(typeof agentMessage?.data.tokenUsage?.eventCount).toBe('number');
+    // Verify new CombinedTokenUsage structure exists even without provider usage
+    expect(agentMessage?.data.tokenUsage?.thread).toBeDefined();
+    const thread = agentMessage?.data.tokenUsage?.thread;
+    if (thread) {
+      expect(typeof thread.totalPromptTokens).toBe('number');
+      expect(typeof thread.totalCompletionTokens).toBe('number');
+      expect(typeof thread.contextLimit).toBe('number');
+      expect(typeof thread.percentUsed).toBe('number');
+      expect(typeof thread.nearLimit).toBe('boolean');
+    }
   });
 });
