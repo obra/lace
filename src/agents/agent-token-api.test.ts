@@ -44,6 +44,7 @@ describe('Agent getTokenUsage API', () => {
   let agent: Agent;
   let threadManager: ThreadManager;
   let provider: MockProvider;
+  let threadId: string;
 
   beforeEach(async () => {
     threadManager = new ThreadManager();
@@ -61,20 +62,28 @@ describe('Agent getTokenUsage API', () => {
       ],
     });
 
+    // Create thread properly like the working tests
+    threadId = threadManager.createThread();
+
     agent = new Agent({
       provider,
       threadManager,
       toolExecutor: new ToolExecutor(),
-      threadId: 'test-thread',
+      threadId,
       tools: [],
       metadata: {
         name: 'Test Agent',
-        modelId: 'claude-3-5-haiku-20241022',
+        modelId: 'test-model',
         providerInstanceId: 'test-provider-instance',
       },
     });
 
     await agent.start();
+
+    // Set model metadata for the agent
+    agent.updateThreadMetadata({
+      modelId: 'test-model',
+    });
   });
 
   it('should return token usage information', async () => {
@@ -102,18 +111,26 @@ describe('Agent getTokenUsage API', () => {
   });
 
   it('should calculate token usage directly from thread events', () => {
+    // Create another thread for the direct agent
+    const directThreadId = threadManager.createThread();
+
     // Create agent that uses direct token tracking
     const directAgent = new Agent({
       provider: new MockProvider({ responses: [] }),
       threadManager,
       toolExecutor: new ToolExecutor(),
-      threadId: 'test-thread-direct',
+      threadId: directThreadId,
       tools: [],
       metadata: {
         name: 'Direct Agent',
-        modelId: 'claude-3-5-haiku-20241022',
+        modelId: 'test-model',
         providerInstanceId: 'test-provider-instance',
       },
+    });
+
+    // Set model metadata for the direct agent
+    directAgent.updateThreadMetadata({
+      modelId: 'test-model',
     });
 
     const usage = directAgent.getTokenUsage();

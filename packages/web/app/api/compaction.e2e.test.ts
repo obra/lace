@@ -229,13 +229,13 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
 
         if (messageCount <= 3) {
           responseText = `Response ${messageCount}: This is a test response that simulates conversation.`;
-          inputTokens = 1000 * messageCount;
-          outputTokens = 100;
+          inputTokens = 30000 * messageCount; // Build up token usage
+          outputTokens = 5000;
         } else if (messageCount === 4 && !shouldTriggerCompaction) {
           shouldTriggerCompaction = true;
           responseText = 'This response pushes us close to the token limit.';
-          inputTokens = 9500; // Trigger compaction at 80% of 12000
-          outputTokens = 100;
+          inputTokens = 160000; // Trigger compaction at 80% of 200000 (claude-3-5-sonnet context window)
+          outputTokens = 5000;
         } else if (
           body.messages?.some(
             (m) => m.content?.includes('summarize') || m.content?.includes('compacting')
