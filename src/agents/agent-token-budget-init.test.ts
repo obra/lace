@@ -8,6 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { AIProvider, ProviderResponse, ModelInfo, ProviderInfo } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import type { ProviderMessage } from '~/providers/base-provider';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 class TestProviderWithModels extends AIProvider {
   get providerName(): string {
@@ -62,6 +63,7 @@ class TestProviderWithModels extends AIProvider {
 }
 
 describe('Agent Token Budget Auto-Initialization', () => {
+  setupCoreTest();
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
   let provider: TestProviderWithModels;
