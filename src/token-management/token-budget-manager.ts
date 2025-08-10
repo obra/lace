@@ -9,11 +9,14 @@ import {
   BudgetStatus,
   BudgetRecommendations,
   ConversationMessage,
+  TokenUsageInfo,
 } from '~/token-management/types';
 
 export class TokenBudgetManager {
   private readonly _config: TokenBudgetConfig;
   private _totalUsage: TokenUsage;
+  private _eventCount: number;
+  private _lastCompactionAt?: Date;
 
   constructor(config: TokenBudgetConfig) {
     this._config = { ...config };
@@ -22,6 +25,8 @@ export class TokenBudgetManager {
       completionTokens: 0,
       totalTokens: 0,
     };
+    this._eventCount = 0;
+    this._lastCompactionAt = undefined;
   }
 
   /**
@@ -50,6 +55,7 @@ export class TokenBudgetManager {
     this._totalUsage.promptTokens += promptTokens;
     this._totalUsage.completionTokens += completionTokens;
     this._totalUsage.totalTokens += totalTokens;
+    this._eventCount += 1;
 
     logger.debug('Token usage recorded', {
       currentRequest: { promptTokens, completionTokens, totalTokens },
@@ -136,6 +142,27 @@ export class TokenBudgetManager {
   }
 
   /**
+   * Gets comprehensive token usage information
+   */
+  getUsageInfo(): TokenUsageInfo {
+    const availableTokens = this.getAvailableTokens();
+    const percentUsed = Math.round(this.getUsagePercentage() * 100);
+    const nearLimit = this.isNearLimit();
+
+    return {
+      promptTokens: this._totalUsage.promptTokens,
+      completionTokens: this._totalUsage.completionTokens,
+      totalTokens: this._totalUsage.totalTokens,
+      maxTokens: this._config.maxTokens,
+      availableTokens,
+      percentUsed,
+      nearLimit,
+      eventCount: this._eventCount,
+      lastCompactionAt: this._lastCompactionAt,
+    };
+  }
+
+  /**
    * Estimates token count for conversation messages
    */
   estimateConversationTokens(messages: ConversationMessage[]): number {
@@ -196,6 +223,8 @@ export class TokenBudgetManager {
       completionTokens: 0,
       totalTokens: 0,
     };
+    this._eventCount = 0;
+    this._lastCompactionAt = undefined;
 
     logger.debug('Token budget reset', {
       config: this._config,
@@ -221,5 +250,29 @@ export class TokenBudgetManager {
         budgetStatus: this.getBudgetStatus(),
       });
     }
+  }
+
+  /**
+   * Handles compaction by resetting token counts to the summary's token count.
+   * This is called when conversation history is compacted into a summary.
+   * @param summaryTokens The number of tokens in the compacted summary
+   */
+  handleCompaction(summaryTokens: number): void {
+    const previousUsage = { ...this._totalUsage };
+
+    // Reset to just the summary tokens (all in prompt tokens since it's context)
+    this._totalUsage = {
+      promptTokens: summaryTokens,
+      completionTokens: 0,
+      totalTokens: summaryTokens,
+    };
+    this._lastCompactionAt = new Date();
+
+    logger.info('Token usage reset after compaction', {
+      previousUsage,
+      newUsage: this._totalUsage,
+      reduction: previousUsage.totalTokens - summaryTokens,
+      compactionAt: this._lastCompactionAt,
+    });
   }
 }
