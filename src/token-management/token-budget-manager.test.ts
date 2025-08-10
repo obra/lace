@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TokenBudgetManager } from '~/token-management/token-budget-manager';
 import { ProviderResponse } from '~/providers/base-provider';
+import type { CompactionData } from '~/threads/compaction/types';
 
 describe('TokenBudgetManager', () => {
   let budgetManager: TokenBudgetManager;
@@ -299,8 +300,27 @@ describe('TokenBudgetManager', () => {
       // Should have 5000 tokens used
       expect(manager.getTotalUsage()).toBe(5000);
 
-      // Handle compaction - pass the tokens in the summary
-      manager.handleCompaction(500); // Summary uses 500 tokens
+      // Handle compaction - pass the compaction data with summary
+      manager.handleCompaction({
+        strategyId: 'summarize',
+        originalEventCount: 10,
+        compactedEvents: [
+          {
+            id: 'summary',
+            threadId: 'test-thread',
+            type: 'AGENT_MESSAGE' as const,
+            timestamp: new Date(),
+            data: {
+              content: 'Compaction summary',
+              tokenUsage: {
+                promptTokens: 500,
+                completionTokens: 0,
+                totalTokens: 500,
+              },
+            },
+          },
+        ],
+      });
 
       // Should now only have 500 tokens used (just the summary)
       expect(manager.getTotalUsage()).toBe(500);
@@ -327,7 +347,26 @@ describe('TokenBudgetManager', () => {
       });
 
       // Compact
-      manager.handleCompaction(500);
+      manager.handleCompaction({
+        strategyId: 'summarize',
+        originalEventCount: 5,
+        compactedEvents: [
+          {
+            id: 'summary2',
+            threadId: 'test-thread',
+            type: 'AGENT_MESSAGE' as const,
+            timestamp: new Date(),
+            data: {
+              content: 'Post-compaction summary',
+              tokenUsage: {
+                promptTokens: 500,
+                completionTokens: 0,
+                totalTokens: 500,
+              },
+            },
+          },
+        ],
+      });
       expect(manager.getTotalUsage()).toBe(500);
 
       // Add post-compaction usage
@@ -387,7 +426,26 @@ describe('TokenBudgetManager', () => {
       });
 
       const beforeCompaction = new Date();
-      manager.handleCompaction(500);
+      manager.handleCompaction({
+        strategyId: 'summarize',
+        originalEventCount: 3,
+        compactedEvents: [
+          {
+            id: 'summary3',
+            threadId: 'test-thread',
+            type: 'AGENT_MESSAGE' as const,
+            timestamp: new Date(),
+            data: {
+              content: 'Usage info summary',
+              tokenUsage: {
+                promptTokens: 500,
+                completionTokens: 0,
+                totalTokens: 500,
+              },
+            },
+          },
+        ],
+      });
       const afterCompaction = new Date();
 
       const info = manager.getUsageInfo();
@@ -416,6 +474,111 @@ describe('TokenBudgetManager', () => {
         eventCount: 0,
         lastCompactionAt: undefined,
       });
+    });
+  });
+
+  describe('TokenBudgetManager compaction with CompactionData', () => {
+    let manager: TokenBudgetManager;
+
+    beforeEach(() => {
+      manager = new TokenBudgetManager({
+        maxTokens: 10000,
+        reserveTokens: 1000,
+        warningThreshold: 0.8,
+      });
+    });
+
+    it('should reset token counts after compaction', () => {
+      // Record some usage before compaction
+      manager.recordUsage({
+        content: 'Test response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 5000,
+          completionTokens: 2000,
+          totalTokens: 7000,
+        },
+      });
+
+      expect(manager.getTotalUsage()).toBe(7000);
+
+      // Handle compaction event with summary
+      const compactionData: CompactionData = {
+        strategyId: 'summarize',
+        originalEventCount: 50,
+        compactedEvents: [
+          {
+            id: 'summary',
+            threadId: 'thread_123',
+            type: 'AGENT_MESSAGE' as const,
+            timestamp: new Date(),
+            data: {
+              content: 'Summary of conversation',
+              tokenUsage: {
+                promptTokens: 300,
+                completionTokens: 200,
+                totalTokens: 500,
+              },
+            },
+          },
+        ],
+      };
+
+      manager.handleCompaction(compactionData);
+
+      // Should now only have the summary tokens
+      expect(manager.getTotalUsage()).toBe(500);
+      expect(manager.getPromptTokens()).toBe(300);
+      expect(manager.getCompletionTokens()).toBe(200);
+    });
+
+    it('should continue tracking after compaction', () => {
+      // Initial usage
+      manager.recordUsage({
+        content: 'Test response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 5000,
+          completionTokens: 2000,
+          totalTokens: 7000,
+        },
+      });
+
+      // Compact
+      manager.handleCompaction({
+        strategyId: 'summarize',
+        originalEventCount: 50,
+        compactedEvents: [
+          {
+            id: 'summary',
+            threadId: 'thread_123',
+            type: 'AGENT_MESSAGE' as const,
+            timestamp: new Date(),
+            data: {
+              content: 'Summary',
+              tokenUsage: {
+                promptTokens: 300,
+                completionTokens: 200,
+                totalTokens: 500,
+              },
+            },
+          },
+        ],
+      });
+
+      // Add more usage after compaction
+      manager.recordUsage({
+        content: 'New response',
+        toolCalls: [],
+        usage: {
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+        },
+      });
+
+      // Should be summary + new usage
+      expect(manager.getTotalUsage()).toBe(650); // 500 + 150
     });
   });
 });

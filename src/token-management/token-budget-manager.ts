@@ -11,6 +11,7 @@ import {
   ConversationMessage,
   TokenUsageInfo,
 } from '~/token-management/types';
+import type { CompactionData } from '~/threads/compaction/types';
 
 export class TokenBudgetManager {
   private readonly _config: TokenBudgetConfig;
@@ -253,26 +254,34 @@ export class TokenBudgetManager {
   }
 
   /**
-   * Handles compaction by resetting token counts to the summary's token count.
-   * This is called when conversation history is compacted into a summary.
-   * @param summaryTokens The number of tokens in the compacted summary
+   * Handles compaction by resetting token counts to post-compaction state
    */
-  handleCompaction(summaryTokens: number): void {
+  handleCompaction(compactionData: CompactionData): void {
     const previousUsage = { ...this._totalUsage };
 
-    // Reset to just the summary tokens (all in prompt tokens since it's context)
+    // Reset counts to zero
     this._totalUsage = {
-      promptTokens: summaryTokens,
+      promptTokens: 0,
       completionTokens: 0,
-      totalTokens: summaryTokens,
+      totalTokens: 0,
     };
+
+    // Add token usage from compacted events (the summary)
+    for (const event of compactionData.compactedEvents) {
+      if (event.type === 'AGENT_MESSAGE' && event.data.tokenUsage) {
+        this._totalUsage.promptTokens += event.data.tokenUsage.promptTokens;
+        this._totalUsage.completionTokens += event.data.tokenUsage.completionTokens;
+        this._totalUsage.totalTokens += event.data.tokenUsage.totalTokens;
+      }
+    }
+
     this._lastCompactionAt = new Date();
 
-    logger.info('Token usage reset after compaction', {
-      previousUsage,
+    logger.debug('Token budget reset after compaction', {
+      compactionStrategy: compactionData.strategyId,
+      originalEventCount: compactionData.originalEventCount,
       newUsage: this._totalUsage,
-      reduction: previousUsage.totalTokens - summaryTokens,
-      compactionAt: this._lastCompactionAt,
+      reduction: previousUsage.totalTokens - this._totalUsage.totalTokens,
     });
   }
 }
