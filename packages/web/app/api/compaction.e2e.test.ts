@@ -44,9 +44,9 @@ import {
 } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
-import { GET as getSession } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
+import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
 import type { ThreadId } from '@/types/core';
-import type { SessionResponse } from '@/types/api';
+import type { AgentResponse } from '@/types/api';
 
 describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   const _tempLaceDir = setupWebTest();
@@ -425,23 +425,21 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     }
 
     // Verify token usage is reported correctly in API
-    const request = new NextRequest(
-      `http://localhost:3000/api/projects/${projectId}/sessions/${sessionId}`
-    );
-    const response = await getSession(request, {
-      params: Promise.resolve({ projectId, sessionId }),
+    const request = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const response = await getAgent(request, {
+      params: Promise.resolve({ agentId: sessionId }),
     });
 
     expect(response.status).toBe(200);
-    const sessionData = (await parseResponse(response)) as SessionResponse;
+    const agentData = (await parseResponse(response)) as AgentResponse;
 
     // Token usage should be available
-    expect(sessionData.tokenUsage).toBeDefined();
-    expect(sessionData.tokenUsage!.totalTokens).toBeGreaterThan(0);
+    expect(agentData.agent.tokenUsage).toBeDefined();
+    expect(agentData.agent.tokenUsage!.totalTokens).toBeGreaterThan(0);
 
     // Should be below limit after compaction
-    expect(sessionData.tokenUsage!.percentUsed).toBeLessThan(80);
-    expect(sessionData.tokenUsage!.nearLimit).toBe(false);
+    expect(agentData.agent.tokenUsage!.percentUsed).toBeLessThan(80);
+    expect(agentData.agent.tokenUsage!.nearLimit).toBe(false);
   });
 
   it('should handle manual /compact command and emit events', async () => {
@@ -688,22 +686,22 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     await agent.sendMessage('Third message');
 
     // Check token usage via API
-    const request = new NextRequest(
-      `http://localhost:3000/api/projects/${projectId}/sessions/${sessionId}`
-    );
-    const response = await getSession(request, {
-      params: Promise.resolve({ projectId, sessionId }),
+    const request = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const response = await getAgent(request, {
+      params: Promise.resolve({ agentId: sessionId }),
     });
 
-    const sessionData = (await parseResponse(response)) as {
-      tokenUsage?: {
-        totalPromptTokens: number;
-        totalCompletionTokens: number;
-        totalTokens: number;
-        eventCount: number;
-        percentUsed?: number;
-        nearLimit?: boolean;
-        contextLimit?: number;
+    const agentData = (await parseResponse(response)) as {
+      agent: {
+        tokenUsage?: {
+          totalPromptTokens: number;
+          totalCompletionTokens: number;
+          totalTokens: number;
+          eventCount: number;
+          percentUsed?: number;
+          nearLimit?: boolean;
+          contextLimit?: number;
+        };
       };
     };
 
@@ -711,7 +709,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     const expectedTotalInput = tokenUsages.reduce((sum, u) => sum + u.input, 0);
     const expectedTotalOutput = tokenUsages.reduce((sum, u) => sum + u.output, 0);
 
-    expect(sessionData.tokenUsage).toMatchObject({
+    expect(agentData.agent.tokenUsage).toMatchObject({
       totalPromptTokens: expectedTotalInput,
       totalCompletionTokens: expectedTotalOutput,
       totalTokens: expectedTotalInput + expectedTotalOutput,

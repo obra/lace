@@ -59,6 +59,7 @@ export async function GET(
     }
 
     const metadata = agent.getThreadMetadata();
+    const tokenUsage = agent.getTokenUsage();
 
     const agentResponse = {
       threadId: agent.threadId,
@@ -68,6 +69,7 @@ export async function GET(
       providerInstanceId: (metadata?.providerInstanceId as string) || '',
       modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
+      tokenUsage,
       createdAt: new Date(), // TODO: Get actual creation time
     };
 
@@ -191,6 +193,7 @@ export async function PUT(
     }
 
     const metadata = agent.getThreadMetadata();
+    const tokenUsage = agent.getTokenUsage();
 
     const agentResponse = {
       threadId: agent.threadId,
@@ -200,6 +203,7 @@ export async function PUT(
       providerInstanceId: (metadata?.providerInstanceId as string) || '',
       modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
+      tokenUsage,
       createdAt: new Date(), // TODO: Get actual creation time
     };
 

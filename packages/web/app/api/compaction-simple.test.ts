@@ -19,7 +19,7 @@ import {
 } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
-import { GET as getSession } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
+import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
 import type { ThreadId } from '@/types/core';
 
 // Mock server-only module
@@ -170,26 +170,26 @@ describe('Compaction Integration Test', () => {
     });
 
     // Check token usage via API
-    const request = new NextRequest(
-      `http://localhost:3000/api/projects/${projectId}/sessions/${sessionId}`
-    );
-    const response = await getSession(request, {
-      params: Promise.resolve({ projectId, sessionId }),
+    const request = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const response = await getAgent(request, {
+      params: Promise.resolve({ agentId: sessionId }),
     });
 
     expect(response.status).toBe(200);
-    const sessionData = (await parseResponse(response)) as {
-      tokenUsage?: {
-        totalPromptTokens: number;
-        totalCompletionTokens: number;
-        totalTokens: number;
-        eventCount: number;
+    const agentData = (await parseResponse(response)) as {
+      agent: {
+        tokenUsage?: {
+          totalPromptTokens: number;
+          totalCompletionTokens: number;
+          totalTokens: number;
+          eventCount: number;
+        };
       };
     };
 
     // Verify token usage is calculated correctly
-    expect(sessionData.tokenUsage).toBeDefined();
-    expect(sessionData.tokenUsage).toMatchObject({
+    expect(agentData.agent.tokenUsage).toBeDefined();
+    expect(agentData.agent.tokenUsage).toMatchObject({
       totalPromptTokens: 300, // 100 + 200
       totalCompletionTokens: 125, // 50 + 75
       totalTokens: 425, // 150 + 275
