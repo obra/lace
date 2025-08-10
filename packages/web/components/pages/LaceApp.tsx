@@ -11,6 +11,8 @@ import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/component
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { TokenUsageDisplay } from '@/components/ui';
+import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
@@ -41,6 +43,24 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
+
+// Token usage section component
+const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId: ThreadId }) {
+  const { tokenUsage, loading } = useAgentTokenUsage(agentId);
+
+  if (loading || !tokenUsage) {
+    return null;
+  }
+
+  return (
+    <div className="flex justify-center p-4 border-t border-base-300">
+      <TokenUsageDisplay
+        tokenUsage={tokenUsage}
+        loading={loading}
+      />
+    </div>
+  );
+});
 
 export const LaceApp = memo(function LaceApp() {
   // Theme state
@@ -942,6 +962,11 @@ export const LaceApp = memo(function LaceApp() {
                   isStreaming={agentBusy}
                   placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
                 />
+
+                {/* Token Usage Display */}
+                {selectedAgent && (
+                  <TokenUsageSection agentId={selectedAgent} />
+                )}
               </div>
             ) : (
               /* Session Configuration Panel - Main UI for session/agent management */

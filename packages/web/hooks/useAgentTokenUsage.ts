@@ -7,16 +7,8 @@ import type { ThreadId } from '@/types/core';
 import type { AgentResponse } from '@/types/api';
 import type { SessionEvent } from '@/types/web-sse';
 
-export interface AgentTokenUsage {
-  totalPromptTokens: number;
-  totalCompletionTokens: number;
-  totalTokens: number;
-  contextLimit: number;
-  percentUsed: number;
-  nearLimit: boolean;
-  eventCount: number;
-  lastCompactionAt?: Date;
-}
+// Use the same type structure as the API
+export type AgentTokenUsage = NonNullable<AgentResponse['agent']['tokenUsage']>;
 
 export interface UseAgentTokenUsageResult {
   tokenUsage: AgentTokenUsage | null;
@@ -57,7 +49,20 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     (event: SessionEvent) => {
       // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
       if (event.threadId === agentId && event.type === 'AGENT_MESSAGE' && event.data?.tokenUsage) {
-        setTokenUsage(event.data.tokenUsage);
+        const tokenUsageData = event.data.tokenUsage;
+        // Transform core TokenUsage to AgentTokenUsage by providing defaults for any missing fields
+        const completeTokenUsage: AgentTokenUsage = {
+          totalPromptTokens: tokenUsageData.totalPromptTokens ?? tokenUsageData.promptTokens,
+          totalCompletionTokens:
+            tokenUsageData.totalCompletionTokens ?? tokenUsageData.completionTokens,
+          totalTokens: tokenUsageData.totalTokens ?? tokenUsageData.totalTokens,
+          contextLimit: tokenUsageData.contextLimit ?? 200000,
+          percentUsed: tokenUsageData.percentUsed ?? 0,
+          nearLimit: tokenUsageData.nearLimit ?? false,
+          eventCount: tokenUsageData.eventCount ?? 0,
+          lastCompactionAt: tokenUsageData.lastCompactionAt,
+        };
+        setTokenUsage(completeTokenUsage);
       }
     },
     [agentId]

@@ -11,6 +11,14 @@ export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  // New comprehensive fields (optional for compatibility)
+  totalPromptTokens?: number;
+  totalCompletionTokens?: number;
+  contextLimit?: number;
+  percentUsed?: number;
+  nearLimit?: boolean;
+  eventCount?: number;
+  lastCompactionAt?: Date;
 }
 
 export interface BudgetStatus {

@@ -86,6 +86,7 @@ export interface AgentTokenUsage {
   percentUsed: number;
   nearLimit: boolean;
   eventCount?: number;
+  lastCompactionAt?: Date;
 }
 
 // Event type definitions for TypeScript
@@ -676,15 +677,37 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Store raw content (with thinking blocks) for model context with token usage
+        const comprehensiveTokenUsage = this.getTokenUsage();
         this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', {
           content: response.content,
           tokenUsage: response.usage
             ? {
+                // Use API response for individual call tokens, comprehensive data for totals
                 promptTokens: response.usage.promptTokens,
                 completionTokens: response.usage.completionTokens,
                 totalTokens: response.usage.totalTokens,
+                // Add comprehensive data from TokenBudgetManager (ensure all fields are present)
+                totalPromptTokens: comprehensiveTokenUsage.totalPromptTokens,
+                totalCompletionTokens: comprehensiveTokenUsage.totalCompletionTokens,
+                contextLimit: comprehensiveTokenUsage.contextLimit,
+                percentUsed: comprehensiveTokenUsage.percentUsed,
+                nearLimit: comprehensiveTokenUsage.nearLimit,
+                eventCount: comprehensiveTokenUsage.eventCount ?? 0,
+                lastCompactionAt: comprehensiveTokenUsage.lastCompactionAt,
               }
-            : undefined,
+            : {
+                // Fallback: provide both individual and comprehensive data
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                totalPromptTokens: comprehensiveTokenUsage.totalPromptTokens,
+                totalCompletionTokens: comprehensiveTokenUsage.totalCompletionTokens,
+                contextLimit: comprehensiveTokenUsage.contextLimit,
+                percentUsed: comprehensiveTokenUsage.percentUsed,
+                nearLimit: comprehensiveTokenUsage.nearLimit,
+                eventCount: comprehensiveTokenUsage.eventCount ?? 0,
+                lastCompactionAt: comprehensiveTokenUsage.lastCompactionAt,
+              },
         });
 
         // Extract clean content for UI display and events
