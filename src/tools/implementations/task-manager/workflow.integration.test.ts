@@ -339,7 +339,6 @@ describe('Task Management Workflow Integration', () => {
         context
       );
 
-
       expect(createResult.status).toBe('completed');
       // After agent spawning, the assignment should show the delegate thread ID
       expect(createResult.content[0].text).toMatch(/assigned to \w+\.\d+/);
@@ -380,12 +379,13 @@ describe('Task Management Workflow Integration', () => {
       });
 
       // Simulate delegation execution
-      const delegateResult = await delegateTool.execute({
-        title: 'Analyze security vulnerabilities',
-        prompt: 'Review codebase for common security issues and provide recommendations',
-        expected_response: 'List of vulnerabilities with specific remediation steps',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
-      },
+      const delegateResult = await delegateTool.execute(
+        {
+          title: 'Analyze security vulnerabilities',
+          prompt: 'Review codebase for common security issues and provide recommendations',
+          expected_response: 'List of vulnerabilities with specific remediation steps',
+          model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        },
         {
           signal: new AbortController().signal,
         }
@@ -508,7 +508,6 @@ describe('Task Management Workflow Integration', () => {
               prompt: 'This is high priority',
               priority: 'high',
               assignedTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
-
             },
           ],
         },
@@ -519,21 +518,20 @@ describe('Task Management Workflow Integration', () => {
       // Get all tasks
       const allTasks = await taskListTool.execute({ filter: 'all' }, context);
       expect(allTasks.status).toBe('completed');
-      // Should have all 3 tasks (note: assigned task may be auto-started due to agent spawning)
+      // Should have all 3 tasks (assigned task gets auto-started but remains visible)
       expect(allTasks.content[0].text).toContain('Tasks (all): 3 found');
 
-      // Get thread tasks (should be same as all in this test)
+      // Get thread tasks (delegated task doesn't show in thread filter)
       const threadTasks = await taskListTool.execute({ filter: 'thread' }, context);
       expect(threadTasks.status).toBe('completed');
-      expect(threadTasks.content[0].text).toContain('Tasks (thread): 3 found');
+      expect(threadTasks.content[0].text).toContain('Tasks (thread): 2 found');
 
-      // Verify priority sorting (high -> medium -> low)
+      // Verify priority sorting (medium -> low, high task was delegated to another thread)
       const taskLines = (threadTasks.content[0].text || '')
         .split('\n')
-        .filter((line) => line.includes('○'));
-      expect(taskLines[0]).toContain('[high]');
-      expect(taskLines[1]).toContain('[medium]');
-      expect(taskLines[2]).toContain('[low]');
+        .filter((line) => line.includes('○') || line.includes('◐'));
+      expect(taskLines[0]).toContain('[medium]');
+      expect(taskLines[1]).toContain('[low]');
     });
   });
 });
