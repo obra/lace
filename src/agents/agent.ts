@@ -181,8 +181,6 @@ export class Agent extends EventEmitter {
   private _autoCompactConfig = {
     enabled: true,
     threshold: 0.8, // Compact at 80% of limit
-    cooldownMs: 60000, // Don't compact again for 1 minute
-    lastCompactionTime: 0,
   };
 
   constructor(config: AgentConfig) {
@@ -1661,12 +1659,6 @@ export class Agent extends EventEmitter {
   private async _checkAutoCompaction(): Promise<void> {
     if (!this._autoCompactConfig.enabled) return;
 
-    // Check cooldown
-    const now = Date.now();
-    if (now - this._autoCompactConfig.lastCompactionTime < this._autoCompactConfig.cooldownMs) {
-      return;
-    }
-
     // Check if we should compact based on token budget
     if (this._tokenBudgetManager) {
       const recommendations = this._tokenBudgetManager.getRecommendations();
@@ -1680,7 +1672,6 @@ export class Agent extends EventEmitter {
           this.emit('compaction_start', { auto: true });
 
           await this.compact(this._threadId);
-          this._autoCompactConfig.lastCompactionTime = now;
 
           // Reset token budget after compaction
           this._tokenBudgetManager.reset();
