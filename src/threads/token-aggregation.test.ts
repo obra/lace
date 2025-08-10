@@ -86,7 +86,7 @@ describe('Token aggregation', () => {
         timestamp: new Date(),
         data: {
           content: [{ type: 'text', text: 'Tool output' }],
-          isError: false,
+          status: 'completed',
           tokenUsage: { promptTokens: 50, completionTokens: 25, totalTokens: 75 },
         },
       },
@@ -143,7 +143,7 @@ describe('Token aggregation', () => {
         timestamp: new Date(),
         data: {
           content: [{ type: 'text', text: 'result' }],
-          isError: false,
+          status: 'completed',
         },
       },
     ];

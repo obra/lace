@@ -250,7 +250,6 @@ export class ThreadManager {
       logger.error('Failed to save delegate thread', { error });
     }
 
-
     return thread;
   }
 

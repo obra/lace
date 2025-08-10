@@ -2565,6 +2565,7 @@ export class Agent extends EventEmitter {
       nearLimit: false,
       eventCount: 0,
     };
+  }
 
   /*
    * Check if a file has been read in the current conversation (since last compaction).

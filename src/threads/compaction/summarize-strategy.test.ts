@@ -231,7 +231,7 @@ describe('SummarizeCompactionStrategy', () => {
         timestamp: new Date('2024-01-01T10:02:00Z'),
         data: {
           content: [{ type: 'text', text: 'File created successfully' }],
-          isError: false,
+          status: 'completed',
         },
       },
     ];

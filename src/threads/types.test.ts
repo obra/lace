@@ -47,7 +47,7 @@ describe('ThreadEvent token usage', () => {
       timestamp: new Date(),
       data: {
         content: [{ type: 'text', text: 'Tool output' }],
-        isError: false,
+        status: 'completed',
         tokenUsage: {
           promptTokens: 50,
           completionTokens: 25,
@@ -68,7 +68,7 @@ describe('ThreadEvent token usage', () => {
       timestamp: new Date(),
       data: {
         content: [{ type: 'text', text: 'Tool output' }],
-        isError: false,
+        status: 'completed',
       },
     };
 
