@@ -153,6 +153,7 @@ export class Agent extends EventEmitter {
   private _messageQueue: QueuedMessage[] = [];
   private _isProcessingQueue = false;
   private _configuration: AgentConfiguration = {};
+  private _abortedSinceLastTurn = false; // Track if agent was aborted to prevent late approvals
 
   // Simple tool batch tracking
   private _pendingToolCount = 0;
@@ -351,6 +352,7 @@ export class Agent extends EventEmitter {
     }
 
     if (aborted) {
+      this._abortedSinceLastTurn = true;
       this._setState('idle');
     }
 
@@ -878,6 +880,10 @@ export class Agent extends EventEmitter {
     });
 
     // Create abort controller for tool execution
+    // First abort any existing controller to prevent leaks
+    if (this._toolAbortController) {
+      this._toolAbortController.abort();
+    }
     this._toolAbortController = new AbortController();
 
     // Initialize tool batch tracking
@@ -1232,11 +1238,14 @@ export class Agent extends EventEmitter {
   }
 
   private _handleBatchComplete(): void {
+    // Evaluate continuation before clearing state
+    const shouldContinue = this._shouldContinueAfterToolBatch();
+
     // Clean up tool execution state
     this._toolAbortController = null;
     this._activeToolCalls.clear();
 
-    if (!this._shouldContinueAfterToolBatch()) {
+    if (!shouldContinue) {
       // Has rejections/aborts - wait for user input
       this._setState('idle');
       // Don't auto-continue conversation
@@ -1469,6 +1478,8 @@ export class Agent extends EventEmitter {
   // Turn tracking implementation
   private _startTurnTracking(userInput: string): void {
     const turnId = `turn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Reset abort flag at the start of each turn
+    this._abortedSinceLastTurn = false;
     this._currentTurnMetrics = {
       startTime: new Date(),
       elapsedMs: 0,
@@ -1555,9 +1566,9 @@ export class Agent extends EventEmitter {
     // Create a new controller
     const controller = new AbortController();
 
-    // If the agent was already aborted, immediately abort the new controller
-    // This happens when abort() was called and set _toolAbortController to null
-    if (this._abortController?.signal.aborted) {
+    // If the agent was aborted since the last turn, immediately abort the new controller
+    // This prevents late approvals from executing after abort
+    if (this._abortedSinceLastTurn) {
       controller.abort('Agent was aborted');
     }
 
