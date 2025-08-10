@@ -20,7 +20,7 @@ describe('fileWriteRenderer', () => {
         text: 'Successfully wrote 1.2 KB to /home/user/documents/project/src/components/Button.tsx',
       },
     ],
-    isError: false,
+    status: 'completed' as const,
   };
 
   const mockErrorResult: ToolResult = {
@@ -30,7 +30,7 @@ describe('fileWriteRenderer', () => {
         text: 'Permission denied writing to /protected/system.conf. Check file permissions or choose a different location. File system error: EACCES',
       },
     ],
-    isError: true,
+    status: 'failed' as const,
   };
 
   const mockLargeFileResult: ToolResult = {
@@ -40,7 +40,7 @@ describe('fileWriteRenderer', () => {
         text: 'Successfully wrote 2.5 MB to /home/user/data/large-dataset.json',
       },
     ],
-    isError: false,
+    status: 'completed' as const,
   };
 
   describe('getSummary', () => {
@@ -94,10 +94,26 @@ describe('fileWriteRenderer', () => {
       expect(fileWriteRenderer.isError?.(mockSuccessResult)).toBe(false);
     });
 
-    test('should detect error from content text patterns', () => {
+    test('should detect aborted status as error', () => {
+      const abortedResult: ToolResult = {
+        content: [{ type: 'text', text: 'File write was aborted' }],
+        status: 'aborted' as const,
+      };
+      expect(fileWriteRenderer.isError?.(abortedResult)).toBe(true);
+    });
+
+    test('should detect denied status as error', () => {
+      const deniedResult: ToolResult = {
+        content: [{ type: 'text', text: 'File write was denied by user' }],
+        status: 'denied' as const,
+      };
+      expect(fileWriteRenderer.isError?.(deniedResult)).toBe(true);
+    });
+
+    test('should prioritize completed status over content-based error detection', () => {
       const contentErrorResult: ToolResult = {
         content: [{ type: 'text', text: 'Failed to write file: ENOSPC' }],
-        isError: false, // Will be detected by content analysis
+        status: 'completed' as const, // Status precedence - content-based error detection ignored when status is 'completed'
       };
       expect(fileWriteRenderer.isError?.(contentErrorResult)).toBe(false);
     });
@@ -105,7 +121,7 @@ describe('fileWriteRenderer', () => {
     test('should handle missing content gracefully', () => {
       const emptyResult: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
       expect(fileWriteRenderer.isError?.(emptyResult)).toBe(false);
     });
@@ -130,7 +146,7 @@ describe('fileWriteRenderer', () => {
     test('should handle empty result content', () => {
       const emptyResult: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
       const result = fileWriteRenderer.renderResult?.(emptyResult);
       expect(result).toBeDefined();
@@ -179,7 +195,7 @@ describe('fileWriteRenderer', () => {
             text: 'Insufficient disk space to write file. Free up disk space and try again. File system error: ENOSPC',
           },
         ],
-        isError: true,
+        status: 'failed' as const,
       };
       const result = fileWriteRenderer.renderResult?.(diskSpaceError);
       expect(result).toBeDefined();

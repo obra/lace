@@ -1,7 +1,13 @@
 // ABOUTME: Simplified tool execution engine with configuration API and approval integration
 // ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
 
-import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
+import {
+  ToolResult,
+  ToolContext,
+  ToolCall,
+  createErrorResult,
+  createToolResult,
+} from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
@@ -120,7 +126,7 @@ export class ToolExecutor {
   async requestToolPermission(
     call: ToolCall,
     context?: ToolContext
-  ): Promise<'granted' | 'pending'> {
+  ): Promise<'granted' | 'pending' | ToolResult> {
     // 1. Check if tool exists
     const tool = this.tools.get(call.name);
     if (!tool) {
@@ -129,8 +135,15 @@ export class ToolExecutor {
 
     // 2. SECURITY: Fail-safe - require agent context for policy enforcement
     if (!context?.agent) {
-      throw new Error(
-        'Tool execution denied: agent context required for security policy enforcement'
+      return createToolResult(
+        'denied',
+        [
+          {
+            type: 'text',
+            text: 'Tool execution denied: agent context required for security policy enforcement',
+          },
+        ],
+        call.id
       );
     }
 
@@ -142,13 +155,21 @@ export class ToolExecutor {
     // 4. Check tool policy with agent context
     const session = await context.agent.getFullSession();
     if (!session) {
-      throw new Error('Session not found for policy enforcement');
+      return createToolResult(
+        'denied',
+        [{ type: 'text', text: 'Session not found for policy enforcement' }],
+        call.id
+      );
     }
 
     // Check if tool is allowed in configuration
     const config = session.getEffectiveConfiguration();
     if (config.tools && !config.tools.includes(call.name)) {
-      throw new Error(`Tool '${call.name}' not allowed in current configuration`);
+      return createToolResult(
+        'denied',
+        [{ type: 'text', text: `Tool '${call.name}' not allowed in current configuration` }],
+        call.id
+      );
     }
 
     // Check tool policy
@@ -156,7 +177,11 @@ export class ToolExecutor {
 
     switch (policy) {
       case 'deny':
-        throw new Error(`Tool '${call.name}' execution denied by policy`);
+        return createToolResult(
+          'denied',
+          [{ type: 'text', text: `Tool '${call.name}' execution denied by policy` }],
+          call.id
+        );
 
       case 'allow':
         return 'granted'; // Skip approval system
@@ -177,7 +202,11 @@ export class ToolExecutor {
       if (decision === ApprovalDecision.ALLOW_ONCE || decision === ApprovalDecision.ALLOW_SESSION) {
         return 'granted';
       } else if (decision === ApprovalDecision.DENY) {
-        throw new Error('Tool execution denied by approval policy');
+        return createToolResult(
+          'denied',
+          [{ type: 'text', text: 'Tool execution denied by approval policy' }],
+          call.id
+        );
       } else {
         throw new Error(`Unknown approval decision: ${String(decision)}`);
       }
@@ -192,7 +221,7 @@ export class ToolExecutor {
     }
   }
 
-  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  async executeTool(call: ToolCall, context: ToolContext): Promise<ToolResult> {
     // 1. Check if tool exists
     const tool = this.tools.get(call.name);
     if (!tool) {
@@ -204,13 +233,19 @@ export class ToolExecutor {
     // But old integration tests and direct calls should still work
     try {
       const permission = await this.requestToolPermission(call, context);
+
+      // If permission is a ToolResult, it means the tool was denied
+      if (typeof permission === 'object' && 'status' in permission) {
+        return permission;
+      }
+
       if (permission === 'pending') {
         // This should not happen in the new architecture, but handle gracefully
         return createErrorResult('Tool approval is pending', call.id);
       }
       // permission === 'granted', continue to execution
     } catch (error) {
-      // Permission denied or other permission error
+      // Handle any other errors
       return createErrorResult(error instanceof Error ? error.message : String(error), call.id);
     }
 
@@ -221,33 +256,29 @@ export class ToolExecutor {
   private async executeToolDirect(
     tool: Tool,
     call: ToolCall,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
-    // Set up environment for tool execution
-    const originalEnv = { ...process.env };
-
     try {
-      // Apply project environment variables if agent is available
+      // Create enhanced context with environment and temp directory
+      let toolContext: ToolContext = context || {};
+
+      // Merge project environment variables if agent is available
       if (context?.agent) {
         const session = await context.agent.getFullSession();
         const projectId = session?.getProjectId();
+
+        // Create merged environment for subprocess execution
         if (projectId) {
           const projectEnv = this.envManager.getMergedEnvironment(projectId);
-          Object.assign(process.env, projectEnv);
+          toolContext.processEnv = { ...process.env, ...projectEnv };
         }
-      }
 
-      // Create enhanced context with temp directory information
-      let toolContext: ToolContext = context || {};
-
-      // Create temp directories if agent is available
-      if (context?.agent) {
         // Use the LLM-provided tool call ID and create temp directory
         const toolTempDir = await this.createToolTempDirectory(call.id, context);
 
         // Enhanced context with temp directory information
         toolContext = {
-          ...context,
+          ...toolContext,
           toolTempDir,
         };
       }
@@ -264,14 +295,6 @@ export class ToolExecutor {
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
-    } finally {
-      // Restore original environment - properly restore all keys
-      for (const key in process.env) {
-        if (!(key in originalEnv)) {
-          delete process.env[key];
-        }
-      }
-      Object.assign(process.env, originalEnv);
     }
   }
 }

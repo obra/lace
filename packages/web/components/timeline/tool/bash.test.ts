@@ -24,7 +24,7 @@ describe('bashRenderer', () => {
         }),
       },
     ],
-    isError: false,
+    status: 'completed' as const,
   };
 
   const mockErrorResult: ToolResult = {
@@ -38,7 +38,7 @@ describe('bashRenderer', () => {
         }),
       },
     ],
-    isError: false, // Will be detected by exit code
+    status: 'completed' as const, // Will be detected by exit code
   };
 
   describe('getSummary', () => {
@@ -86,7 +86,7 @@ describe('bashRenderer', () => {
             }),
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const isError = bashRenderer.isError?.(nonZeroExitResult);
       expect(isError).toBe(true);
@@ -95,7 +95,7 @@ describe('bashRenderer', () => {
     test('should handle legacy plain text output', () => {
       const legacyResult = {
         content: [{ type: 'text', text: 'plain text output' }],
-        isError: false,
+        status: 'completed' as const,
       } as ToolResult;
       const isError = bashRenderer.isError?.(legacyResult);
       expect(isError).toBe(false);
@@ -113,7 +113,7 @@ describe('bashRenderer', () => {
             }),
           },
         ],
-        isError: true, // Explicitly flagged as error
+        status: 'failed' as const, // Explicitly flagged as error
       };
       const isError = bashRenderer.isError?.(flaggedErrorResult);
       expect(isError).toBe(true);
@@ -136,7 +136,7 @@ describe('bashRenderer', () => {
     test('should handle empty content', () => {
       const emptyResult: ToolResult = {
         content: [],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = bashRenderer.renderResult?.(emptyResult);
       expect(resultNode).toBeDefined();
@@ -150,7 +150,7 @@ describe('bashRenderer', () => {
             text: 'Plain text output from old format',
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = bashRenderer.renderResult?.(legacyResult);
       expect(resultNode).toBeDefined();
@@ -168,7 +168,7 @@ describe('bashRenderer', () => {
             }),
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = bashRenderer.renderResult?.(mixedResult);
       expect(resultNode).toBeDefined();
@@ -186,7 +186,7 @@ describe('bashRenderer', () => {
             }),
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = bashRenderer.renderResult?.(nonZeroExitResult);
       expect(resultNode).toBeDefined();
@@ -204,7 +204,7 @@ describe('bashRenderer', () => {
             }),
           },
         ],
-        isError: false,
+        status: 'completed' as const,
       };
       const resultNode = bashRenderer.renderResult?.(emptySuccessResult);
       expect(resultNode).toBeDefined();

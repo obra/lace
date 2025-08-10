@@ -267,7 +267,7 @@ export function AnimatedLaceApp({
         content: `${toolName} executed`,
         result: {
           content: [{ type: 'text' as const, text: `${toolName} completed successfully` }],
-          isError: false,
+          status: 'completed' as const,
         },
         timestamp: new Date(),
       };

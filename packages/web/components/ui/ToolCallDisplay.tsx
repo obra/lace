@@ -84,12 +84,12 @@ function createDefaultToolSummary(toolName: string, args: unknown): string {
 };
 
 function isDefaultError(result: ToolResult): boolean {
-  return Boolean(result?.isError);
+  return result?.status === 'failed' || result?.status === 'denied';
 }
 
 function createDefaultResultRenderer(result: ToolResult): React.ReactNode {
   const textContent = result.content.map(block => block.text ?? '').join('');
-  const isError = Boolean(result.isError);
+  const isError = result.status === 'failed' || result.status === 'denied';
   
   return (
     <ExpandableResult 
@@ -160,6 +160,7 @@ export function ToolCallDisplay({
   const toolIcon = renderer.getIcon?.() ?? getToolIcon(tool);
   const hasResult = result?.content?.some(block => block.text?.trim()) || !!result?.metadata;
   const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
+  const isAborted = hasResult && result?.status === 'aborted';
   const args = metadata?.arguments;
   const hasArgs: boolean = Boolean(args && typeof args === 'object' && args !== null && Object.keys(args).length > 0);
   const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
@@ -195,6 +196,8 @@ export function ToolCallDisplay({
         <div className={`w-8 h-8 rounded-md flex items-center justify-center text-sm ${
           isError 
             ? 'bg-error/10 text-error' 
+            : isAborted
+              ? 'bg-warning/10 text-warning'
             : hasResult 
               ? 'bg-success/10 text-success'
               : 'bg-warning/10 text-warning'

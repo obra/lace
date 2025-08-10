@@ -38,33 +38,39 @@ Follows redirects by default. Returns detailed error context for failures.`
 
   describe('Input validation', () => {
     it('should reject missing URL', async () => {
-      const result = await tool.execute({});
+      const result = await tool.execute({}, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Required');
     });
 
     it('should reject empty URL', async () => {
-      const result = await tool.execute({ url: '' });
+      const result = await tool.execute({ url: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
 
     it('should reject non-HTTP protocols', async () => {
-      const result = await tool.execute({ url: 'ftp://example.com' });
+      const result = await tool.execute(
+        { url: 'ftp://example.com' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Invalid URL format');
     });
 
     it('should reject malformed URLs', async () => {
-      const result = await tool.execute({ url: 'not-a-url' });
+      const result = await tool.execute(
+        { url: 'not-a-url' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -76,59 +82,71 @@ Follows redirects by default. Returns detailed error context for failures.`
       ];
 
       for (const url of validUrls) {
-        const result = await tool.execute({ url });
+        const result = await tool.execute({ url }, { signal: new AbortController().signal });
         // Should get network error, not validation error
-        if (result.isError) {
+        if (result.status === 'failed') {
           expect(result.content[0].text).not.toContain('Validation failed');
         }
       }
     });
 
     it('should validate timeout constraints', async () => {
-      const result = await tool.execute({
-        url: 'https://example.com',
-        timeout: 500, // Below minimum
-      });
+      const result = await tool.execute(
+        {
+          url: 'https://example.com',
+          timeout: 500, // Below minimum
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('timeout');
     });
 
     it('should validate maxSize constraints', async () => {
-      const result = await tool.execute({
-        url: 'https://example.com',
-        maxSize: 500, // Below minimum
-      });
+      const result = await tool.execute(
+        {
+          url: 'https://example.com',
+          maxSize: 500, // Below minimum
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('maxSize');
     });
 
     it('should validate method enum', async () => {
-      const result = await tool.execute({
-        url: 'https://example.com',
-        method: 'DELETE',
-      });
+      const result = await tool.execute(
+        {
+          url: 'https://example.com',
+          method: 'DELETE',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('method');
     });
 
     it('should accept valid parameters', async () => {
-      const result = await tool.execute({
-        url: 'https://httpbin.org/get',
-        method: 'GET',
-        timeout: 30000,
-        maxSize: 32768,
-        followRedirects: true,
-        returnContent: true,
-      });
+      const result = await tool.execute(
+        {
+          url: 'https://httpbin.org/get',
+          method: 'GET',
+          timeout: 30000,
+          maxSize: 32768,
+          followRedirects: true,
+          returnContent: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
       // May fail with network error, but should not fail validation
-      if (result.isError) {
+      if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
     });
@@ -220,16 +238,19 @@ Follows redirects by default. Returns detailed error context for failures.`
         true
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Content should be structured text, not JSON
       expect(result.content[0].text).toContain('Content from https://example.com');
       expect(result.content[0].text).toContain('test content');
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ url: 'invalid' });
+      const result = await tool.execute(
+        { url: 'invalid' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
@@ -242,7 +263,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         false
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Content not returned (returnContent=false)');
       expect(result.content[0].text).not.toContain('# Test');
     });
@@ -250,29 +271,38 @@ Follows redirects by default. Returns detailed error context for failures.`
 
   describe('Network error scenarios', () => {
     it('should handle timeout errors gracefully', async () => {
-      const result = await tool.execute({
-        url: 'https://httpbin.org/delay/5',
-        timeout: 1000, // 1 second timeout for 5 second delay
-      });
+      const result = await tool.execute(
+        {
+          url: 'https://httpbin.org/delay/5',
+          timeout: 1000, // 1 second timeout for 5 second delay
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       // Should get either timeout or network error depending on environment
       expect(result.content[0].text).toMatch(/(timeout|network|NETWORK ERROR|TIMEOUT ERROR)/i);
     }, 10000);
 
     it('should handle invalid domains', async () => {
-      const result = await tool.execute({
-        url: 'https://this-domain-definitely-does-not-exist-12345.invalid',
-      });
+      const result = await tool.execute(
+        {
+          url: 'https://this-domain-definitely-does-not-exist-12345.invalid',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toMatch(/(network|NETWORK ERROR)/i);
     }, 10000);
 
     it('should provide detailed error context', async () => {
-      const result = await tool.execute({ url: 'invalid-url' });
+      const result = await tool.execute(
+        { url: 'invalid-url' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       const errorText = result.content[0].text;
 
       // Schema validation errors come from base Tool class, not the rich error handler

@@ -25,8 +25,11 @@ Creates parent directories automatically if needed. Returns file size written.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileWriteSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { content, createDirs } = args;
       const resolvedPath = this.resolvePath(args.path, context);
@@ -39,16 +42,34 @@ Creates parent directories automatically if needed. Returns file size written.`;
 
       // Create parent directories if requested
       if (createDirs) {
+        // Check abort before mkdir
+        if (context.signal.aborted) {
+          return this.createCancellationResult();
+        }
+
         const dir = dirname(resolvedPath);
         await mkdir(dir, { recursive: true });
+
+        // Check abort after mkdir
+        if (context.signal.aborted) {
+          return this.createCancellationResult();
+        }
       }
 
       // Write the file
-      await writeFile(resolvedPath, content, 'utf-8');
+      await writeFile(resolvedPath, content, 'utf8');
 
-      return this.createResult(
-        `Successfully wrote ${this.formatFileSize(content.length)} to ${resolvedPath}`
+      // Check abort before returning success
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
+      const byteLength = Buffer.byteLength(content, 'utf8');
+      const result = this.createResult(
+        `Successfully wrote ${this.formatFileSize(byteLength)} to ${resolvedPath}`
       );
+      result.metadata = { path: resolvedPath, bytesWritten: byteLength };
+      return result;
     } catch (error: unknown) {
       return this.handleFileSystemError(error, args.path);
     }
@@ -59,36 +80,56 @@ Creates parent directories automatically if needed. Returns file size written.`;
       const nodeError = error as Error & { code?: string };
 
       switch (nodeError.code) {
-        case 'EACCES':
-          return this.createError(
+        case 'EACCES': {
+          const result = this.createError(
             `Permission denied writing to ${filePath}. Check file permissions or choose a different location. File system error: ${error.message}`
           );
+          result.metadata = { errorCode: 'EACCES' };
+          return result;
+        }
 
-        case 'ENOENT':
-          return this.createError(
+        case 'ENOENT': {
+          const result = this.createError(
             `Directory does not exist for path ${filePath}. Ensure parent directories exist or set createDirs to true. File system error: ${error.message}`
           );
+          result.metadata = { errorCode: 'ENOENT' };
+          return result;
+        }
 
-        case 'ENOSPC':
-          return this.createError(
+        case 'ENOSPC': {
+          const result = this.createError(
             `Insufficient disk space to write file. Free up disk space and try again. File system error: ${error.message}`
           );
+          result.metadata = { errorCode: 'ENOSPC' };
+          return result;
+        }
 
-        case 'EISDIR':
-          return this.createError(
+        case 'EISDIR': {
+          const result = this.createError(
             `Path ${filePath} is a directory, not a file. Specify a file path instead of a directory path.`
           );
+          result.metadata = { errorCode: 'EISDIR' };
+          return result;
+        }
 
         case 'EMFILE':
-        case 'ENFILE':
-          return this.createError(
+        case 'ENFILE': {
+          const result = this.createError(
             `Too many open files. Close some files and try again. File system error: ${error.message}`
           );
+          result.metadata = { errorCode: nodeError.code };
+          return result;
+        }
 
-        default:
-          return this.createError(
+        default: {
+          const result = this.createError(
             `Failed to write file: ${error.message}. Check the file path and permissions, then try again.`
           );
+          if (nodeError.code) {
+            result.metadata = { errorCode: nodeError.code };
+          }
+          return result;
+        }
       }
     }
 

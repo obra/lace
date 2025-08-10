@@ -41,8 +41,11 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileFindSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { pattern, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
 
@@ -66,15 +69,19 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
         throw error;
       }
 
-      const matches = await this.findFiles(resolvedPath, {
-        pattern,
-        type,
-        caseSensitive,
-        maxDepth,
-        includeHidden,
-        maxResults,
-        currentDepth: 0,
-      });
+      const matches = await this.findFiles(
+        resolvedPath,
+        {
+          pattern,
+          type,
+          caseSensitive,
+          maxDepth,
+          includeHidden,
+          maxResults,
+          currentDepth: 0,
+        },
+        context.signal
+      );
 
       const limitedMatches = matches.slice(0, maxResults);
       const resultLines: string[] = [];
@@ -94,6 +101,10 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
 
       return this.createResult(resultLines.join('\n'));
     } catch (error: unknown) {
+      // Handle cancellation
+      if (error instanceof Error && error.message === 'Aborted') {
+        return this.createCancellationResult();
+      }
       return this.handleFileSystemError(error, args.path);
     }
   }
@@ -108,8 +119,14 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
       includeHidden: boolean;
       maxResults: number;
       currentDepth: number;
-    }
+    },
+    signal?: AbortSignal
   ): Promise<Array<{ path: string; size?: number; isDirectory: boolean }>> {
+    // Check for abort signal
+    if (signal?.aborted) {
+      throw new Error('Aborted');
+    }
+
     const matches: Array<{ path: string; size?: number; isDirectory: boolean }> = [];
 
     if (options.currentDepth > options.maxDepth) {
@@ -120,6 +137,10 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
       const items = await readdir(dirPath);
 
       for (const item of items) {
+        // Check abort signal periodically during loop
+        if (signal?.aborted) {
+          throw new Error('Aborted');
+        }
         if (!options.includeHidden && item.startsWith('.')) {
           continue;
         }
@@ -152,10 +173,14 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
 
           // Recurse into directories
           if (isDirectory && options.currentDepth < options.maxDepth) {
-            const subMatches = await this.findFiles(fullPath, {
-              ...options,
-              currentDepth: options.currentDepth + 1,
-            });
+            const subMatches = await this.findFiles(
+              fullPath,
+              {
+                ...options,
+                currentDepth: options.currentDepth + 1,
+              },
+              signal
+            );
             matches.push(...subMatches);
 
             // Early termination: collect more than maxResults to detect truncation later

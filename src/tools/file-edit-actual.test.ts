@@ -32,18 +32,21 @@ describe('FileEditTool actual file modification', () => {
     expect(beforeEdit).toBe('Hello World');
 
     // Perform the edit
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'World',
-          new_text: 'Universe',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'World',
+            new_text: 'Universe',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     // Check the tool reports success
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Successfully applied 1 edit');
 
     // CRITICAL: Verify the file was actually modified
@@ -62,18 +65,21 @@ line 5`;
     await writeFile(testFile, originalContent, 'utf-8');
 
     // Try to replace text that appears twice - should fail
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'line 2',
-          new_text: 'modified line',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'line 2',
+            new_text: 'modified line',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
     // Should error because text appears multiple times
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('Expected 1 occurrence but found 2');
 
     // File should NOT be modified
@@ -90,18 +96,21 @@ line 5`;
 
     await writeFile(testFile, originalContent, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: `  console.log('Hello');
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: `  console.log('Hello');
   console.log('World');`,
-          new_text: `  console.log('Hello World');`,
-        },
-      ],
-    });
+            new_text: `  console.log('Hello World');`,
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
 
     // Verify the actual file content changed
     const afterEdit = await readFile(testFile, 'utf-8');
@@ -116,17 +125,20 @@ line 5`;
     const originalContent = 'First line\r\nSecond line\r\nThird line';
     await writeFile(testFile, originalContent, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'Second line',
-          new_text: 'Modified line',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'Second line',
+            new_text: 'Modified line',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
 
     const afterEdit = await readFile(testFile, 'utf-8');
     expect(afterEdit).toBe('First line\r\nModified line\r\nThird line');
@@ -136,17 +148,20 @@ line 5`;
     const originalContent = 'Hello World';
     await writeFile(testFile, originalContent, 'utf-8');
 
-    const result = await tool.execute({
-      path: testFile,
-      edits: [
-        {
-          old_text: 'Goodbye',
-          new_text: 'Hello',
-        },
-      ],
-    });
+    const result = await tool.execute(
+      {
+        path: testFile,
+        edits: [
+          {
+            old_text: 'Goodbye',
+            new_text: 'Hello',
+          },
+        ],
+      },
+      { signal: new AbortController().signal }
+    );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('Could not find exact text');
 
     // File should remain unchanged

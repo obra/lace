@@ -24,8 +24,11 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
 
   protected async executeValidated(
     args: z.infer<typeof fileInsertSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const { path, content, line } = args;
       const resolvedPath = this.resolvePath(path, context);
@@ -66,10 +69,15 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`;
         operation = `Inserted after line ${line}`;
       }
 
+      // Check for abort before writing
+      if (context.signal.aborted) {
+        return this.createCancellationResult();
+      }
+
       // Write back
       await writeFile(resolvedPath, newContent, 'utf-8');
 
-      const addedLines = content.split('\n').length;
+      const addedLines = content === '' ? 0 : content.split('\n').length;
 
       return this.createResult(
         `${operation} in ${resolvedPath} (+${addedLines} line${addedLines === 1 ? '' : 's'})`

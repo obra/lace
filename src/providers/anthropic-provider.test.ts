@@ -54,7 +54,7 @@ describe('AnthropicProvider', () => {
 
       protected async executeValidated(
         args: { action: string },
-        _context?: ToolContext
+        _context: ToolContext
       ): Promise<ToolResult> {
         return await Promise.resolve(this.createResult(`Executed action: ${args.action}`));
       }

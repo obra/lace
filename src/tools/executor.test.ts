@@ -60,7 +60,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       createMockToolContext()
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toBe('Line 1\nLine 2\nLine 3\n');
     expect(result.id).toBe('test-1');
 
@@ -82,7 +82,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       createMockToolContext()
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('Validation failed');
     expect(result.content[0].text).toContain('File path cannot be empty');
     expect(result.id).toBe('test-2');
@@ -111,7 +111,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       createMockToolContext()
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('endLine must be >= startLine');
     expect(result.id).toBe('test-3');
 
@@ -247,6 +247,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       if (!agent) throw new Error('Failed to get agent');
 
       const context: ToolContext = {
+        signal: new AbortController().signal,
         agent,
       };
 
@@ -266,6 +267,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       if (!agent) throw new Error('Failed to get agent');
 
       const context: ToolContext = {
+        signal: new AbortController().signal,
         agent,
       };
 
@@ -291,6 +293,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       if (!agent) throw new Error('Failed to get agent');
 
       const context: ToolContext = {
+        signal: new AbortController().signal,
         agent,
       };
 
@@ -305,6 +308,7 @@ describe('ToolExecutor with new schema-based tools', () => {
 
     it('should throw error when agent context missing', async () => {
       const context: ToolContext = {
+        signal: new AbortController().signal,
         // No agent - should fail temp directory creation
       };
 
@@ -313,14 +317,16 @@ describe('ToolExecutor with new schema-based tools', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain(
         'agent context required for security policy enforcement'
       );
     });
 
     it('should require agent context for security policy enforcement', async () => {
-      const context: ToolContext = {};
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+      };
       // No agent - should fail due to security policy
 
       const result = await toolExecutor.executeTool(
@@ -329,7 +335,7 @@ describe('ToolExecutor with new schema-based tools', () => {
       );
 
       // Should fail due to security requirement
-      expect(result.isError).toBe(true);
+      expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain(
         'agent context required for security policy enforcement'
       );

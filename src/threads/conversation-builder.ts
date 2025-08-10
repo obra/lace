@@ -3,6 +3,7 @@
 
 import type { ThreadEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
+import type { ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
 
 /**
@@ -28,14 +29,36 @@ function isCompactionData(data: unknown): data is CompactionData {
 }
 
 /**
+ * Status precedence for deduplication (higher number = higher priority)
+ * denied > failed > aborted > completed
+ */
+function getStatusPriority(status: string): number {
+  switch (status) {
+    case 'denied':
+      return 4;
+    case 'failed':
+      return 3;
+    case 'aborted':
+      return 2;
+    case 'completed':
+      return 1;
+    default:
+      return 0; // Unknown status has lowest priority
+  }
+}
+
+/**
  * Deduplicates TOOL_RESULT events to prevent duplicate tool results in conversations.
  *
  * This is part of the defense-in-depth strategy against tool approval race conditions.
  * Even if duplicate tool results make it into the event stream, we filter them out
  * at the conversation building level to ensure clean provider API calls.
+ *
+ * When duplicates are found, the status with higher precedence is kept:
+ * denied > failed > aborted > completed
  */
 function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
-  const seenToolResults = new Set<string>();
+  const toolResultsByCallId = new Map<string, { event: ThreadEvent; priority: number }>();
   const deduplicatedEvents: ThreadEvent[] = [];
 
   for (const event of events) {
@@ -59,19 +82,48 @@ function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
         continue; // Skip results without IDs
       }
 
-      if (seenToolResults.has(toolCallId)) {
-        logger.warn('CONVERSATION_BUILDER: Duplicate TOOL_RESULT filtered', {
+      const status = toolResult.status || 'completed';
+      const priority = getStatusPriority(status);
+      const existing = toolResultsByCallId.get(toolCallId);
+
+      if (!existing || priority > existing.priority) {
+        // First occurrence or higher priority status found
+        toolResultsByCallId.set(toolCallId, { event, priority });
+
+        if (existing) {
+          const existingResult = existing.event.data as ToolResult;
+          logger.warn('CONVERSATION_BUILDER: Duplicate TOOL_RESULT with precedence applied', {
+            toolCallId,
+            keptStatus: status,
+            replacedStatus: existingResult.status || 'completed',
+            eventId: event.id,
+            threadId: event.threadId,
+          });
+        }
+      } else if (existing) {
+        const existingResult = existing.event.data as ToolResult;
+        logger.warn('CONVERSATION_BUILDER: Duplicate TOOL_RESULT filtered (lower precedence)', {
           toolCallId,
+          skippedStatus: status,
+          keptStatus: existingResult.status || 'completed',
           eventId: event.id,
           threadId: event.threadId,
         });
-        continue; // Skip duplicate
       }
-
-      seenToolResults.add(toolCallId);
     }
+  }
 
-    deduplicatedEvents.push(event);
+  // Rebuild events list with deduplicated tool results
+  const keptToolResults = new Set(Array.from(toolResultsByCallId.values()).map((v) => v.event));
+
+  for (const event of events) {
+    if (event.type === 'TOOL_RESULT') {
+      if (keptToolResults.has(event)) {
+        deduplicatedEvents.push(event);
+      }
+    } else {
+      deduplicatedEvents.push(event);
+    }
   }
 
   return deduplicatedEvents;

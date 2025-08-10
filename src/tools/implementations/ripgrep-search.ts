@@ -23,6 +23,10 @@ const ripgrepSearchSchema = z.object({
   path: FilePath.default('.'),
   caseSensitive: z.boolean().default(false),
   wholeWord: z.boolean().default(false),
+  literal: z
+    .boolean()
+    .default(true)
+    .describe('Treat pattern as literal string (true) or as regex (false)'),
   includePattern: z.string().optional(),
   excludePattern: z.string().optional(),
   maxResults: z
@@ -52,14 +56,18 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
   protected async executeValidated(
     args: z.infer<typeof ripgrepSearchSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     try {
       const {
         pattern,
         path,
         caseSensitive,
         wholeWord,
+        literal,
         includePattern,
         excludePattern,
         maxResults,
@@ -74,6 +82,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         path: resolvedPath,
         caseSensitive,
         wholeWord,
+        literal,
         includePattern,
         excludePattern,
         maxResults,
@@ -85,6 +94,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
         const { stdout } = await execFileAsync('rg', ripgrepArgs, {
           cwd: process.cwd(),
           maxBuffer: 10485760, // 10MB buffer
+          signal: context.signal,
         });
 
         const matches = this.parseRipgrepOutput(stdout, maxResults);
@@ -125,6 +135,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     path: string;
     caseSensitive: boolean;
     wholeWord: boolean;
+    literal: boolean;
     includePattern?: string;
     excludePattern?: string;
     maxResults: number;
@@ -138,6 +149,10 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
     if (options.wholeWord) {
       args.push('--word-regexp');
+    }
+
+    if (options.literal) {
+      args.push('--fixed-strings');
     }
 
     if (options.includePattern) {

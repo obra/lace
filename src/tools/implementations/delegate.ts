@@ -59,8 +59,11 @@ Examples:
 
   protected async executeValidated(
     args: z.infer<typeof delegateSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       return this.createError('TaskManager is required for delegation');
@@ -137,7 +140,8 @@ Examples:
       const result = await this.waitForTaskCompletion(
         task.id,
         taskManager,
-        context?.agent?.threadId || 'unknown'
+        context?.agent?.threadId || 'unknown',
+        context?.signal
       );
 
       logger.debug('DelegateTool: Task completed', {
@@ -150,6 +154,10 @@ Examples:
         taskId: task.id,
       });
     } catch (error: unknown) {
+      // Handle cancellation
+      if (error instanceof Error && error.message === 'Aborted') {
+        return this.createCancellationResult();
+      }
       return this.createError(
         `Task-based delegation failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
       );
@@ -170,7 +178,8 @@ Please complete the task and provide your response in the expected format.`;
   private async waitForTaskCompletion(
     taskId: string,
     taskManager: TaskManager,
-    creatorThreadId: string
+    creatorThreadId: string,
+    signal?: AbortSignal
   ): Promise<string> {
     logger.debug('DelegateTool: Starting to wait for task completion', {
       taskId,
@@ -192,17 +201,32 @@ Please complete the task and provide your response in the expected format.`;
           if (event.task.status === 'completed') {
             logger.debug('DelegateTool: Task completed, resolving', { taskId });
             taskManager.off('task:updated', handleTaskUpdate);
+            signal?.removeEventListener('abort', abortHandler);
             const response = this.extractResponseFromTask(event.task);
             resolve(response);
           } else if (event.task.status === 'blocked') {
             logger.debug('DelegateTool: Task blocked, rejecting', { taskId });
             taskManager.off('task:updated', handleTaskUpdate);
+            signal?.removeEventListener('abort', abortHandler);
             reject(new Error(`Task ${taskId} is blocked`));
           }
         }
       };
 
+      const abortHandler = () => {
+        logger.debug('DelegateTool: Task aborted', { taskId });
+        taskManager.off('task:updated', handleTaskUpdate);
+        reject(new Error('Aborted'));
+      };
+
+      // Check if already aborted
+      if (signal?.aborted) {
+        reject(new Error('Aborted'));
+        return;
+      }
+
       taskManager.on('task:updated', handleTaskUpdate);
+      signal?.addEventListener('abort', abortHandler);
       logger.debug('DelegateTool: Registered task update handler', {
         taskId,
       });

@@ -45,77 +45,98 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
   describe('Input validation', () => {
     it('should reject missing path', async () => {
-      const result = await tool.execute({ content: 'test' });
+      const result = await tool.execute(
+        { content: 'test' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('path');
       expect(result.content[0].text).toContain('Required');
     });
 
     it('should reject empty path', async () => {
-      const result = await tool.execute({ path: '', content: 'test' });
+      const result = await tool.execute(
+        { path: '', content: 'test' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
 
     it('should reject missing content', async () => {
-      const result = await tool.execute({ path: '/tmp/test.txt' });
+      const result = await tool.execute(
+        { path: '/tmp/test.txt' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
       expect(result.content[0].text).toContain('Required');
     });
 
     it('should reject non-string content', async () => {
-      const result = await tool.execute({
-        path: '/tmp/test.txt',
-        content: 123,
-      });
+      const result = await tool.execute(
+        {
+          path: '/tmp/test.txt',
+          content: 123,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
     });
 
     it('should reject non-boolean createDirs', async () => {
-      const result = await tool.execute({
-        path: '/tmp/test.txt',
-        content: 'test',
-        createDirs: 'yes',
-      });
+      const result = await tool.execute(
+        {
+          path: '/tmp/test.txt',
+          content: 'test',
+          createDirs: 'yes',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('createDirs');
     });
 
     it('should accept valid parameters', async () => {
       const testFile = join(testDir, 'valid.txt');
-      const result = await tool.execute({
-        path: testFile,
-        content: 'test content',
-        createDirs: true,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'test content',
+          createDirs: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
       // Should not fail validation (may fail with file system error in test env)
-      if (result.isError) {
+      if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
     });
 
     it('should default createDirs to true', async () => {
       const testFile = join(testDir, 'nested', 'default.txt');
-      const result = await tool.execute({
-        path: testFile,
-        content: 'test content',
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'test content',
+        },
+        { signal: new AbortController().signal }
+      );
 
       // Should create directories by default
-      if (!result.isError) {
+      if (result.status === 'completed') {
         const written = await readFile(testFile, 'utf-8');
         expect(written).toBe('test content');
       }
@@ -127,9 +148,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'test.txt');
       const content = 'Hello, world!';
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
       expect(result.content[0].text).toContain(testFile);
 
@@ -143,12 +167,18 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const newContent = 'New content';
 
       // First write
-      await tool.execute({ path: testFile, content: originalContent });
+      await tool.execute(
+        { path: testFile, content: originalContent },
+        { signal: new AbortController().signal }
+      );
 
       // Overwrite
-      const result = await tool.execute({ path: testFile, content: newContent });
+      const result = await tool.execute(
+        { path: testFile, content: newContent },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(newContent);
@@ -158,9 +188,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'deep', 'nested', 'file.txt');
       const content = 'Deep file content';
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -174,13 +207,16 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'nonexistent', 'file.txt');
       const content = 'Content';
 
-      const result = await tool.execute({
-        path: testFile,
-        content,
-        createDirs: false,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content,
+          createDirs: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory does not exist');
     });
   });
@@ -190,31 +226,37 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'success.txt');
       const content = 'Success test';
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
       expect(result.content[0].text).toContain(`${content.length} bytes`);
       expect(result.content[0].text).toContain(testFile);
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ path: '' });
+      const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should provide enhanced error messages', async () => {
       const testFile = join(testDir, 'nonexistent', 'file.txt');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: 'test',
-        createDirs: false,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'test',
+          createDirs: false,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory does not exist');
       expect(result.content[0].text).toContain('createDirs to true');
     });
@@ -225,9 +267,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'empty.txt');
       const content = '';
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe('');
@@ -237,9 +282,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'large.txt');
       const content = 'A'.repeat(10000);
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -250,9 +298,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'unicode.txt');
       const content = 'Hello 世界! 🚀 Émojis and spéciål chars';
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const written = await readFile(testFile, 'utf-8');
       expect(written).toBe(content);
@@ -262,9 +313,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'sized.txt');
       const content = 'A'.repeat(1500); // > 1KB
 
-      const result = await tool.execute({ path: testFile, content });
+      const result = await tool.execute(
+        { path: testFile, content },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('1.5 KB');
     });
   });
@@ -277,10 +331,10 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       const result = await tool.execute(
         { path: relativeTestFile, content },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
 
       // Verify the file was created in the working directory
@@ -295,10 +349,10 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       const result = await tool.execute(
         { path: absoluteTestFile, content },
-        { workingDirectory: '/some/other/dir' }
+        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
 
       // Verify the file was created at the absolute path
@@ -312,9 +366,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const content = 'CWD test content';
 
       try {
-        const result = await tool.execute({ path: relativeFile, content });
+        const result = await tool.execute(
+          { path: relativeFile, content },
+          { signal: new AbortController().signal }
+        );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('Successfully wrote');
 
         // Verify the file was created in the current working directory
@@ -333,10 +390,10 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       const result = await tool.execute(
         { path: relativeNestedFile, content },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
 
       // Verify the file was created in the nested structure within working directory

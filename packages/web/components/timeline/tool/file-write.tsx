@@ -27,8 +27,8 @@ export const fileWriteRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
-    // Trust the tool's own error flag - it knows if it failed
-    return result.isError;
+    // Check for error statuses (failed, denied, aborted) vs non-error (completed)
+    return result.status === 'failed' || result.status === 'denied' || result.status === 'aborted';
   },
 
   renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {

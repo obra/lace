@@ -61,6 +61,7 @@ describe('ToolExecutor policy enforcement', () => {
     } as unknown as Agent;
 
     context = {
+      signal: new AbortController().signal,
       workingDirectory: '/project/path',
       agent: mockAgent,
     };
@@ -106,7 +107,7 @@ describe('ToolExecutor policy enforcement', () => {
     const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
     const result = await executor.executeTool(toolCall, context);
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('execution denied by policy');
   });
 
@@ -118,7 +119,7 @@ describe('ToolExecutor policy enforcement', () => {
     const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
     const result = await executor.executeTool(toolCall, context);
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('not allowed in current configuration');
   });
 
@@ -129,13 +130,14 @@ describe('ToolExecutor policy enforcement', () => {
     } as unknown as Agent;
 
     const contextWithoutSession = {
+      signal: new AbortController().signal,
       agent: mockAgentWithoutSession,
     };
 
     const toolCall = { id: 'test-id', name: 'file-read', arguments: { file_path: '/test.txt' } };
     const result = await executor.executeTool(toolCall, contextWithoutSession);
 
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('Session not found for policy enforcement');
   });
 
@@ -156,7 +158,7 @@ describe('ToolExecutor policy enforcement', () => {
     const result = await executor.executeTool(toolCall, context);
 
     expect(mockApprovalCallback.requestApproval).toHaveBeenCalled();
-    expect(result.isError).toBe(true);
+    expect(result.status).toBe('denied');
     expect(result.content[0].text).toContain('Tool execution denied by approval policy');
   });
 });

@@ -55,6 +55,7 @@ describe('Task-Based DelegateTool Integration', () => {
     const agent = testSetup.session.getAgent(testSetup.session.getId())!;
 
     context = {
+      signal: new AbortController().signal,
       agent, // Access to threadId and session via agent
     };
   });
@@ -91,7 +92,7 @@ describe('Task-Based DelegateTool Integration', () => {
       );
 
       expect(result).toBeDefined();
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Integration test completed successfully');
     }, 15000); // Increase timeout to 15 seconds
 
@@ -140,9 +141,9 @@ describe('Task-Based DelegateTool Integration', () => {
       ]);
 
       // Assert all succeeded independently
-      expect(result1.isError).toBe(false);
-      expect(result2.isError).toBe(false);
-      expect(result3.isError).toBe(false);
+      expect(result1.status).toBe('completed');
+      expect(result2.status).toBe('completed');
+      expect(result3.status).toBe('completed');
 
       // Verify each got a different response (showing proper cycling)
       const responses = [result1.content[0].text, result2.content[0].text, result3.content[0].text];
@@ -171,8 +172,30 @@ describe('Task-Based DelegateTool Integration', () => {
         context
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('blocked');
+    });
+
+    it('should handle aborted signal during execution', async () => {
+      const abortController = new AbortController();
+      abortController.abort(); // Signal is already aborted
+
+      const abortedContext: ToolContext = {
+        signal: abortController.signal,
+        agent: context.agent,
+      };
+
+      const result = await delegateTool.execute(
+        {
+          title: 'Aborted Task',
+          prompt: 'This task should be aborted',
+          expected_response: 'Should not complete',
+          model: 'anthropic:claude-3-5-haiku-20241022',
+        },
+        abortedContext
+      );
+
+      expect(result.status).toBe('aborted');
     });
   });
 });

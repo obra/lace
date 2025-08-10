@@ -110,7 +110,7 @@ describe('Task Tool Renderer Integration', () => {
           }),
         },
       ],
-      isError: true,
+      status: 'failed' as const,
     };
 
     taskTools.forEach((toolName) => {

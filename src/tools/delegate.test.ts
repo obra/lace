@@ -48,6 +48,7 @@ describe('DelegateTool', () => {
     tool = toolExecutor.getTool('delegate') as DelegateTool;
 
     context = {
+      signal: new AbortController().signal,
       agent: agent!, // Access to threadId and session via agent
     };
   });
@@ -80,7 +81,7 @@ describe('DelegateTool', () => {
     );
 
     // Test the actual behavior - delegation should work and return results
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0]?.text).toContain('Analysis complete: 3 test failures identified');
     expect(result.metadata?.taskTitle).toBe('Analyze test failures');
   });
@@ -99,7 +100,7 @@ describe('DelegateTool', () => {
     );
 
     // Test that delegation works with custom model specification
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0]?.text).toContain('Custom model response');
   });
 
@@ -117,7 +118,7 @@ describe('DelegateTool', () => {
     );
 
     // Verify delegation succeeded
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0]?.text).toContain('Directory listed successfully');
     expect(result.metadata?.taskTitle).toBe('List files');
   });
@@ -136,7 +137,7 @@ describe('DelegateTool', () => {
     );
 
     // Since we're using the proper integration pattern, the delegation should work
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0]?.text).toContain('Task completed');
   });
 
@@ -151,7 +152,7 @@ describe('DelegateTool', () => {
       context
     );
 
-    expect(result.isError).toBe(true);
+    expect(result.status).not.toBe('completed');
     expect(result.content[0].text).toContain('Invalid model format');
   });
 
@@ -168,7 +169,7 @@ describe('DelegateTool', () => {
       context
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0]?.text).toContain('Task completed with combined responses');
   });
 
@@ -185,7 +186,7 @@ describe('DelegateTool', () => {
       context
     );
 
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.metadata).toBeDefined();
     expect(result.metadata?.taskTitle).toBeDefined();
   });
@@ -207,7 +208,7 @@ describe('DelegateTool', () => {
       );
 
       // Should not fail on model validation
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     }
   });
 });

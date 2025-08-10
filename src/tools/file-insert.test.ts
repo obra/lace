@@ -46,74 +46,95 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
   describe('Input validation', () => {
     it('should reject missing path', async () => {
-      const result = await tool.execute({ content: 'test' });
+      const result = await tool.execute(
+        { content: 'test' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('path');
       expect(result.content[0].text).toContain('Required');
     });
 
     it('should reject empty path', async () => {
-      const result = await tool.execute({ path: '', content: 'test' });
+      const result = await tool.execute(
+        { path: '', content: 'test' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
 
     it('should reject missing content', async () => {
-      const result = await tool.execute({ path: '/tmp/test.txt' });
+      const result = await tool.execute(
+        { path: '/tmp/test.txt' },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
       expect(result.content[0].text).toContain('Required');
     });
 
     it('should reject non-string content', async () => {
-      const result = await tool.execute({
-        path: '/tmp/test.txt',
-        content: 123,
-      });
+      const result = await tool.execute(
+        {
+          path: '/tmp/test.txt',
+          content: 123,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('content');
     });
 
     it('should reject non-integer line numbers', async () => {
-      const result = await tool.execute({
-        path: '/tmp/test.txt',
-        content: 'test',
-        line: 1.5,
-      });
+      const result = await tool.execute(
+        {
+          path: '/tmp/test.txt',
+          content: 'test',
+          line: 1.5,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be an integer');
     });
 
     it('should reject negative line numbers', async () => {
-      const result = await tool.execute({
-        path: '/tmp/test.txt',
-        content: 'test',
-        line: -1,
-      });
+      const result = await tool.execute(
+        {
+          path: '/tmp/test.txt',
+          content: 'test',
+          line: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be positive');
     });
 
     it('should reject zero line numbers', async () => {
-      const result = await tool.execute({
-        path: '/tmp/test.txt',
-        content: 'test',
-        line: 0,
-      });
+      const result = await tool.execute(
+        {
+          path: '/tmp/test.txt',
+          content: 'test',
+          line: 0,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be positive');
     });
@@ -122,14 +143,17 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
       const testFile = join(testDir, 'valid.txt');
       await writeFile(testFile, 'line 1\nline 2\n', 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: 'inserted content',
-        line: 1,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'inserted content',
+          line: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
       // Should not fail validation (may fail if line number is out of range)
-      if (result.isError) {
+      if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
     });
@@ -143,12 +167,15 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: insertContent,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: insertContent,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Appended to end of file');
       expect(result.content[0].text).toContain(testFile);
 
@@ -163,12 +190,15 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: insertContent,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: insertContent,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toBe(originalContent + '\n' + insertContent);
@@ -181,13 +211,16 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: insertContent,
-        line: 2,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: insertContent,
+          line: 2,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Inserted after line 2');
 
       const newContent = await readFile(testFile, 'utf-8');
@@ -205,13 +238,16 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: insertContent,
-        line: 1,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: insertContent,
+          line: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('+2 lines');
 
       const newContent = await readFile(testFile, 'utf-8');
@@ -227,13 +263,16 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: insertContent,
-        line: 1,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: insertContent,
+          line: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('+1 line');
       expect(result.content[0].text).not.toContain('+1 lines');
     });
@@ -244,13 +283,16 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: 'test',
-        line: 5, // Line 5 doesn't exist
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'test',
+          line: 5, // Line 5 doesn't exist
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Line number');
       expect(result.content[0].text).toContain('out of range');
     });
@@ -262,31 +304,37 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
       const content = 'original content';
       await writeFile(testFile, content, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: 'inserted',
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'inserted',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Appended to end of file');
       expect(result.content[0].text).toContain(testFile);
       expect(result.content[0].text).toContain('+1 line');
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ path: '' });
+      const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should provide enhanced error messages for file not found', async () => {
-      const result = await tool.execute({
-        path: '/nonexistent/file.txt',
-        content: 'test',
-      });
+      const result = await tool.execute(
+        {
+          path: '/nonexistent/file.txt',
+          content: 'test',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
   });
@@ -298,12 +346,15 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: '',
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: '',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toBe(originalContent);
@@ -313,12 +364,15 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
       const testFile = join(testDir, 'empty-file.txt');
       await writeFile(testFile, '', 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: 'first content',
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: 'first content',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toBe('first content');
@@ -331,13 +385,16 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
 
       await writeFile(testFile, originalContent, 'utf-8');
 
-      const result = await tool.execute({
-        path: testFile,
-        content: insertContent,
-        line: 1,
-      });
+      const result = await tool.execute(
+        {
+          path: testFile,
+          content: insertContent,
+          line: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
 
       const newContent = await readFile(testFile, 'utf-8');
       expect(newContent).toContain('世界! 🚀 Émojis');
@@ -371,10 +428,10 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
           content: 'Inserted content',
           line: 1,
         },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Inserted after line 1');
 
       const newContent = await readFile(absoluteTestFile, 'utf-8');
@@ -390,10 +447,10 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
           path: testFile, // absolute path
           content: 'Inserted content',
         },
-        { workingDirectory: '/some/other/dir' }
+        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Appended to end of file');
 
       const newContent = await readFile(testFile, 'utf-8');
@@ -407,12 +464,15 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
       await writeFile(absoluteFile, 'CWD test content\n', 'utf-8');
 
       try {
-        const result = await tool.execute({
-          path: relativeFile,
-          content: 'Appended content',
-        });
+        const result = await tool.execute(
+          {
+            path: relativeFile,
+            content: 'Appended content',
+          },
+          { signal: new AbortController().signal }
+        );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('Appended to end of file');
 
         const newContent = await readFile(absoluteFile, 'utf-8');
@@ -428,10 +488,10 @@ Line numbers are 1-based, inserts AFTER specified line. Omit line to append.`);
           path: 'nonexistent-relative-file.txt',
           content: 'test content',
         },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('File not found');
     });
   });

@@ -129,6 +129,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     // This tests are really testing task management within a single session
     // with different actors (threadIds) working on shared tasks
     mainAgentContext = {
+      signal: new AbortController().signal,
       agent,
     };
 
@@ -136,9 +137,11 @@ describe('Multi-Agent Task Manager Integration', () => {
     // The task manager uses threadId from the task context to track
     // who created/updated tasks, not from the agent
     agent2Context = {
+      signal: new AbortController().signal,
       agent,
     };
     agent3Context = {
+      signal: new AbortController().signal,
       agent,
     };
   });
@@ -173,7 +176,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         mainAgentContext
       );
 
-      expect(createResult.isError).toBe(false);
+      expect(createResult.status).toBe('completed');
       const taskId = createResult.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
       expect(taskId).toBeTruthy();
 
@@ -185,7 +188,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         mainAgentContext
       );
 
-      expect(listResult1.isError).toBe(false);
+      expect(listResult1.status).toBe('completed');
       expect(listResult1.content?.[0]?.text).toContain('Implement user authentication');
 
       // Step 3: Main agent assigns task to agent2
@@ -197,7 +200,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         mainAgentContext
       );
 
-      expect(assignResult.isError).toBe(false);
+      expect(assignResult.status).toBe('completed');
 
       // Step 4: Agent2 sees the task in their list (using agent2's tools)
       const agent2ListTool = agent2Context.agent!.toolExecutor.getTool('task_list') as TaskListTool;
@@ -208,7 +211,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         agent2Context
       );
 
-      expect(listResult2.isError).toBe(false);
+      expect(listResult2.status).toBe('completed');
       expect(listResult2.content?.[0]?.text).toContain('Implement user authentication');
 
       // Step 5: Agent2 updates status to in_progress
@@ -220,7 +223,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         agent2Context
       );
 
-      expect(statusResult.isError).toBe(false);
+      expect(statusResult.status).toBe('completed');
 
       // Step 6: Agent2 adds a progress note
       const noteResult1 = await noteTool.execute(
@@ -231,7 +234,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         agent2Context
       );
 
-      expect(noteResult1.isError).toBe(false);
+      expect(noteResult1.status).toBe('completed');
 
       // Step 7: Main agent adds a note with additional requirements
       const noteResult2 = await noteTool.execute(
@@ -242,7 +245,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         mainAgentContext
       );
 
-      expect(noteResult2.isError).toBe(false);
+      expect(noteResult2.status).toBe('completed');
 
       // Step 8: Agent3 can see all tasks in the thread
       const listResult3 = await listTool.execute(
@@ -252,12 +255,12 @@ describe('Multi-Agent Task Manager Integration', () => {
         agent3Context
       );
 
-      expect(listResult3.isError).toBe(false);
+      expect(listResult3.status).toBe('completed');
       expect(listResult3.content?.[0]?.text).toContain('Implement user authentication');
 
       // Step 9: Verify task has all notes using TaskViewTool
       const finalViewResult = await viewTool.execute({ taskId }, mainAgentContext);
-      expect(finalViewResult.isError).toBe(false);
+      expect(finalViewResult.status).toBe('completed');
 
       const taskDetails = finalViewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('JWT token generation');
@@ -288,12 +291,12 @@ describe('Multi-Agent Task Manager Integration', () => {
         mainAgentContext
       );
 
-      expect(createResult.isError).toBe(false);
+      expect(createResult.status).toBe('completed');
       const taskId = createResult.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
 
       // Verify task shows new agent assignment using TaskViewTool
       const viewResult = await viewTool.execute({ taskId }, mainAgentContext);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
       // After agent spawning, the task should be assigned to the spawned agent thread ID
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toMatch(/Assigned to: \w+\.\d+/); // Should show delegate thread ID
@@ -308,11 +311,11 @@ describe('Multi-Agent Task Manager Integration', () => {
         mainAgentContext
       );
 
-      expect(actualAgentResult.isError).toBe(false);
+      expect(actualAgentResult.status).toBe('completed');
 
       // Verify reassignment using TaskViewTool
       const viewResult2 = await viewTool.execute({ taskId }, mainAgentContext);
-      expect(viewResult2.isError).toBe(false);
+      expect(viewResult2.status).toBe('completed');
       expect(viewResult2.content?.[0]?.text).toContain(agent3Context.agent!.threadId);
     });
   });
@@ -321,6 +324,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     it('should share tasks between threads in the same session', async () => {
       // Create a different parent thread context
       const otherAgentContext: ToolContext = {
+        signal: new AbortController().signal,
         agent: session.getAgent(session.getId())!,
       };
 
@@ -400,6 +404,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       const listTool2 = toolExecutor2.getTool('task_list') as TaskListTool;
 
       const session2Context = {
+        signal: new AbortController().signal,
         agent: session2.getAgent(session2.getId())!,
       };
 
@@ -480,12 +485,12 @@ describe('Multi-Agent Task Manager Integration', () => {
 
       // All should succeed
       results.forEach((result) => {
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
       });
 
       // Verify all notes were added using TaskViewTool
       const viewResult = await viewTool.execute({ taskId }, mainAgentContext);
-      expect(viewResult.isError).toBe(false);
+      expect(viewResult.status).toBe('completed');
 
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('Note from agent 1');

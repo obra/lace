@@ -161,7 +161,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
         return {
           id: 'tool-counter',
           content: [{ type: 'text', text: `Executed ${executionCount} times` }],
-          isError: false,
+          status: 'completed' as const,
         };
       });
 
@@ -287,13 +287,13 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       threadManager.addEvent(agent.threadId, 'TOOL_RESULT', {
         id: toolCallId,
         content: [{ type: 'text', text: 'Result 1' }],
-        isError: false,
+        status: 'completed' as const,
       });
 
       threadManager.addEvent(agent.threadId, 'TOOL_RESULT', {
         id: toolCallId,
         content: [{ type: 'text', text: 'Result 2' }],
-        isError: false,
+        status: 'completed' as const,
       });
 
       // Build conversation messages (what gets sent to AI provider)

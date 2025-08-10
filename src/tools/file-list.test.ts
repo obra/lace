@@ -66,60 +66,75 @@ describe('FileListTool with schema validation', () => {
 
   describe('Input validation', () => {
     it('should reject empty path', async () => {
-      const result = await tool.execute({ path: '' });
+      const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Path cannot be empty');
     });
 
     it('should reject negative maxDepth', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        maxDepth: -1,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          maxDepth: -1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should reject non-integer maxDepth', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        maxDepth: 1.5,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          maxDepth: 1.5,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Must be an integer');
     });
 
     it('should reject excessive maxResults', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        maxResults: 10000,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          maxResults: 10000,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should accept valid parameters with defaults', async () => {
-      const result = await tool.execute({
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
     });
   });
 
   describe('Basic directory listing', () => {
     it('should list files and directories in current directory', async () => {
-      const result = await tool.execute({
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('package.json');
       expect(result.content[0].text).toContain('src/');
@@ -127,65 +142,83 @@ describe('FileListTool with schema validation', () => {
     });
 
     it('should show file sizes', async () => {
-      const result = await tool.execute({
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toMatch(/README\.md.*\(\d+ bytes\)/);
       expect(result.content[0].text).toMatch(/package\.json.*\(\d+ bytes\)/);
     });
 
     it('should exclude hidden files by default', async () => {
-      const result = await tool.execute({
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).not.toContain('.hidden');
     });
 
     it('should include hidden files when requested', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        includeHidden: true,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          includeHidden: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('.hidden/');
     });
   });
 
   describe('Pattern filtering', () => {
     it('should filter files by pattern', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        pattern: '*.md',
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          pattern: '*.md',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).not.toContain('package.json');
     });
 
     it('should filter files by wildcard pattern', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        pattern: 'package*',
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          pattern: 'package*',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('package.json');
       expect(result.content[0].text).not.toContain('README.md');
     });
 
     it('should handle patterns with question marks', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        pattern: '???.md',
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          pattern: '???.md',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should not match README.md (6 chars) but would match shorter .md files
       expect(result.content[0].text).not.toContain('README.md');
     });
@@ -193,37 +226,46 @@ describe('FileListTool with schema validation', () => {
 
   describe('Recursive listing', () => {
     it('should list recursively when enabled', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('Button.tsx');
       expect(result.content[0].text).toContain('app.test.ts');
     });
 
     it('should respect maxDepth in recursive listing', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-        maxDepth: 1,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+          maxDepth: 1,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).not.toContain('Button.tsx'); // Should not go deep enough for components/
     });
 
     it('should format tree structure correctly', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-        maxDepth: 2,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+          maxDepth: 2,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
       // Check for tree structure characters
       expect(output).toMatch(/[├└]/); // Tree characters
@@ -234,24 +276,30 @@ describe('FileListTool with schema validation', () => {
 
   describe('Summarization features', () => {
     it('should summarize large directories', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-        summaryThreshold: 1, // Force summarization
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+          summaryThreshold: 1, // Force summarization
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should see summary format for directories with many files
       expect(result.content[0].text).toMatch(/\(\d+ files; \d+ dirs\)/);
     });
 
     it('should auto-summarize node_modules', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // node_modules should be summarized regardless of threshold
       expect(result.content[0].text).toMatch(/node_modules.*\(\d+ files; \d+ dirs\)/);
     });
@@ -259,51 +307,63 @@ describe('FileListTool with schema validation', () => {
 
   describe('Result limits', () => {
     it('should respect maxResults limit', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-        maxResults: 3,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+          maxResults: 3,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       // Should have truncation message
       expect(result.content[0].text).toContain('Results limited to 3');
     });
 
     it('should not show truncation message when under limit', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        maxResults: 100,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          maxResults: 100,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).not.toContain('Results limited to');
     });
   });
 
   describe('Structured output with helpers', () => {
     it('should use createResult for successful listings', async () => {
-      const result = await tool.execute({
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ path: '' });
+      const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Validation failed');
     });
 
     it('should handle directory not found error', async () => {
-      const result = await tool.execute({
-        path: '/nonexistent/directory',
-      });
+      const result = await tool.execute(
+        {
+          path: '/nonexistent/directory',
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory not found');
     });
 
@@ -311,24 +371,30 @@ describe('FileListTool with schema validation', () => {
       const emptyDir = join(testDir, 'empty');
       await mkdir(emptyDir);
 
-      const result = await tool.execute({
-        path: emptyDir,
-      });
+      const result = await tool.execute(
+        {
+          path: emptyDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     });
   });
 
   describe('Tree formatting', () => {
     it('should format directory tree with proper indentation', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-        maxDepth: 2,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+          maxDepth: 2,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       const output = result.content[0].text;
 
       // Should have tree structure
@@ -338,12 +404,15 @@ describe('FileListTool with schema validation', () => {
     });
 
     it('should show file extensions and sizes', async () => {
-      const result = await tool.execute({
-        path: testDir,
-        recursive: true,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+          recursive: true,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('app.ts');
       expect(result.content[0].text).toContain('app.js');
       expect(result.content[0].text).toContain('Button.tsx');
@@ -356,29 +425,38 @@ describe('FileListTool with schema validation', () => {
       const emptyDir = join(testDir, 'empty');
       await mkdir(emptyDir);
 
-      const result = await tool.execute({
-        path: emptyDir,
-      });
+      const result = await tool.execute(
+        {
+          path: emptyDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('No files found');
     });
 
     it('should handle non-directory path', async () => {
-      const result = await tool.execute({
-        path: join(testDir, 'README.md'),
-      });
+      const result = await tool.execute(
+        {
+          path: join(testDir, 'README.md'),
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('not a directory');
     });
 
     it('should sort directories before files', async () => {
-      const result = await tool.execute({
-        path: testDir,
-      });
+      const result = await tool.execute(
+        {
+          path: testDir,
+        },
+        { signal: new AbortController().signal }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0]).toBeDefined();
       expect(result.content[0].text).toBeDefined();
       const output = result.content[0].text!;
@@ -415,19 +493,22 @@ describe('FileListTool with schema validation', () => {
       await mkdir(absoluteTestDir, { recursive: true });
       await writeFile(join(absoluteTestDir, 'relative-file.txt'), 'Relative file content');
 
-      const result = await tool.execute({ path: relativeTestDir }, { workingDirectory: testDir });
+      const result = await tool.execute(
+        { path: relativeTestDir },
+        { signal: new AbortController().signal, workingDirectory: testDir }
+      );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('relative-file.txt');
     });
 
     it('should use absolute paths directly even when working directory is provided', async () => {
       const result = await tool.execute(
         { path: testDir }, // absolute path
-        { workingDirectory: '/some/other/dir' }
+        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
     });
 
@@ -439,9 +520,12 @@ describe('FileListTool with schema validation', () => {
       await writeFile(join(tempDirPath, 'cwd-test.txt'), 'CWD test content');
 
       try {
-        const result = await tool.execute({ path: tempDirName });
+        const result = await tool.execute(
+          { path: tempDirName },
+          { signal: new AbortController().signal }
+        );
 
-        expect(result.isError).toBe(false);
+        expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('cwd-test.txt');
       } finally {
         await mkdir(tempDirPath, { recursive: true }).catch(() => {});
@@ -459,10 +543,10 @@ describe('FileListTool with schema validation', () => {
     it('should handle non-existent relative paths with working directory context', async () => {
       const result = await tool.execute(
         { path: 'non-existent-relative-dir' },
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(true);
+      expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('Directory not found');
       expect(result.content[0].text).toContain('non-existent-relative-dir');
     });
@@ -470,10 +554,10 @@ describe('FileListTool with schema validation', () => {
     it('should handle default path correctly with working directory context', async () => {
       const result = await tool.execute(
         {}, // No path provided, should use default '.'
-        { workingDirectory: testDir }
+        { signal: new AbortController().signal, workingDirectory: testDir }
       );
 
-      expect(result.isError).toBe(false);
+      expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('src/');
     });

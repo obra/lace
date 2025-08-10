@@ -19,7 +19,7 @@ class MockTool extends Tool {
 
   protected executeValidated(
     args: { action: string; value?: string },
-    _context?: ToolContext
+    _context: ToolContext
   ): Promise<ToolResult> {
     return Promise.resolve(this.createResult(`Mock executed: ${JSON.stringify(args)}`));
   }

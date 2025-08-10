@@ -267,15 +267,16 @@ describe('Delegation Integration Tests', () => {
     };
 
     const result = await delegateToolInstance.execute(delegateInput, {
+      signal: new AbortController().signal,
       agent, // Access to threadId via agent.threadId and session via agent.getFullSession()
     });
 
-    if (result.isError) {
+    if (result.status !== 'completed') {
       logger.error('Delegation failed', { content: result.content });
     }
 
     // The delegation should succeed with our mock provider handling task completion
-    expect(result.isError).toBe(false);
+    expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Successfully analyzed the project structure');
     expect(result.metadata?.taskTitle).toBe('Code Analysis');
   });

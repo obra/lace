@@ -4,7 +4,13 @@
 import { ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { resolve, isAbsolute } from 'path';
-import type { ToolResult, ToolContext, ToolInputSchema, ToolAnnotations } from '~/tools/types';
+import type {
+  ToolResult,
+  ToolContext,
+  ToolInputSchema,
+  ToolAnnotations,
+  ToolResultStatus,
+} from '~/tools/types';
 
 export abstract class Tool {
   abstract name: string;
@@ -41,7 +47,7 @@ export abstract class Tool {
   }
 
   // Public execute method that handles validation
-  async execute(args: unknown, context?: ToolContext): Promise<ToolResult> {
+  async execute(args: unknown, context: ToolContext): Promise<ToolResult> {
     try {
       const validated = this.schema.parse(args) as ReturnType<this['schema']['parse']>;
       return await this.executeValidated(validated, context);
@@ -56,7 +62,7 @@ export abstract class Tool {
   // Implement this in subclasses with validated args
   protected abstract executeValidated(
     args: ReturnType<this['schema']['parse']>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult>;
 
   // Output helpers for consistent result construction
@@ -66,14 +72,29 @@ export abstract class Tool {
     content: string | Record<string, unknown>,
     metadata?: Record<string, unknown>
   ): ToolResult {
-    return this._makeResult({ content, metadata, isError: false });
+    return this._makeResult({ content, metadata, status: 'completed' });
   }
 
   protected createError(
     content: string | Record<string, unknown>,
     metadata?: Record<string, unknown>
   ): ToolResult {
-    return this._makeResult({ content, metadata, isError: true });
+    return this._makeResult({ content, metadata, status: 'failed' });
+  }
+
+  protected createCancellationResult(
+    partialOutput?: string,
+    metadata?: Record<string, unknown>
+  ): ToolResult {
+    const message = partialOutput
+      ? `Tool execution cancelled by user.\n\nPartial output:\n${partialOutput}`
+      : 'Tool execution cancelled by user.';
+
+    return this._makeResult({
+      content: message,
+      metadata,
+      status: 'aborted',
+    });
   }
 
   // Path resolution helper for file operations
@@ -142,7 +163,7 @@ export abstract class Tool {
   private _makeResult(options: {
     content: string | Record<string, unknown>;
     metadata?: Record<string, unknown>;
-    isError: boolean;
+    status: ToolResultStatus;
   }): ToolResult {
     const text =
       typeof options.content === 'string'
@@ -151,7 +172,7 @@ export abstract class Tool {
 
     return {
       content: [{ type: 'text', text }],
-      isError: options.isError,
+      status: options.status,
       ...(options.metadata && { metadata: options.metadata }),
     };
   }
@@ -171,7 +192,7 @@ export abstract class Tool {
           text: `Validation failed: ${issues}. Check parameter types and values.`,
         },
       ],
-      isError: true,
+      status: 'failed',
     };
   }
 }

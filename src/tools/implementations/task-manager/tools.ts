@@ -88,8 +88,11 @@ Bulk planning: task_add({ tasks: [
 
   protected async executeValidated(
     args: z.infer<typeof createTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
@@ -205,8 +208,11 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
 
   protected async executeValidated(
     args: z.infer<typeof listTasksSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
@@ -310,8 +316,11 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
 
   protected async executeValidated(
     args: z.infer<typeof completeTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
@@ -402,8 +411,11 @@ Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked o
 
   protected async executeValidated(
     args: z.infer<typeof updateTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
@@ -504,8 +516,11 @@ Notes become part of permanent task history - write for future readers.`;
 
   protected async executeValidated(
     args: z.infer<typeof addNoteSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }
@@ -572,8 +587,11 @@ Example: task_view({ taskId: "task_123" })`;
 
   protected async executeValidated(
     args: z.infer<typeof viewTaskSchema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
+    if (context.signal.aborted) {
+      return this.createCancellationResult();
+    }
     if (!context?.agent?.threadId) {
       return this.createError('No thread context available');
     }

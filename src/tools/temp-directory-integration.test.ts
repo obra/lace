@@ -35,7 +35,7 @@ class IntegrationTestTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof this.schema>,
-    context?: ToolContext
+    context: ToolContext
   ): Promise<ToolResult> {
     this.capturedContext = context;
     return Promise.resolve(this.createResult(`Integration test: ${args.content}`));
@@ -69,8 +69,8 @@ describe('Temp Directory Integration', () => {
     // Create real project and session
     project = Project.create(
       'Integration Test Project',
-      'Project for integration testing',
       tempLaceDirContext.tempDir,
+      'Project for integration testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -100,6 +100,7 @@ describe('Temp Directory Integration', () => {
     const agent = session.getAgent(session.getId())!;
 
     const context: ToolContext = {
+      signal: new AbortController().signal,
       agent,
     };
 
@@ -137,6 +138,7 @@ describe('Temp Directory Integration', () => {
     const agent = session.getAgent(session.getId())!;
 
     const context: ToolContext = {
+      signal: new AbortController().signal,
       agent,
     };
 
@@ -171,6 +173,7 @@ describe('Temp Directory Integration', () => {
     const agent = session.getAgent(session.getId())!;
 
     const context: ToolContext = {
+      signal: new AbortController().signal,
       agent,
     };
 

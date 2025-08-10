@@ -54,7 +54,7 @@ describe('Event-Based Approval Callback', () => {
     });
     threadId = asThreadId(session.getId());
 
-    threadManager.createThread(threadId);
+    threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
       provider,
