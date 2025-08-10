@@ -200,16 +200,8 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     // Start the agent now that handlers are set up
     await agent.start();
 
-    // The agent auto-initialized its token budget from the model
-    // We need to update it to trigger compaction more easily for testing
-    const tokenBudgetManager = agent.tokenBudgetManager;
-    if (tokenBudgetManager) {
-      tokenBudgetManager.updateConfig({
-        maxTokens: 12000, // Lower limit for testing
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      });
-    }
+    // Token budget management has been simplified to use direct percentage thresholds
+    // Auto-compaction will trigger at 80% usage based on provider-reported context limits
 
     // Add listeners to debug what's happening
     agent.on('compaction_start', ({ auto: _auto }: { auto: boolean }) => {
@@ -355,9 +347,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     ];
 
     for (let i = 0; i < messages.length; i++) {
-      // Check token budget BEFORE sending
-      const _tbmBefore = agent.tokenBudgetManager;
-
+      // Check token usage before sending
       await agent.sendMessage(messages[i]!);
 
       // Small delay to ensure events are processed
@@ -368,8 +358,8 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
       const _lastAgentMessage = agentMessages[agentMessages.length - 1];
 
-      // Check TokenBudgetManager state
-      const _recommendations = agent.getTokenBudgetRecommendations();
+      // Check token usage state
+      const _currentUsage = agent.getTokenUsage();
 
       // Give auto-compaction time to trigger after message 4
       if (i === 3) {

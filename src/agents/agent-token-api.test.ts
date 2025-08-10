@@ -67,11 +67,6 @@ describe('Agent getTokenUsage API', () => {
       toolExecutor: new ToolExecutor(),
       threadId: 'test-thread',
       tools: [],
-      tokenBudget: {
-        maxTokens: 10000,
-        reserveTokens: 1000,
-        warningThreshold: 0.8,
-      },
       metadata: {
         name: 'Test Agent',
         modelId: 'claude-3-5-haiku-20241022',
@@ -82,53 +77,50 @@ describe('Agent getTokenUsage API', () => {
     await agent.start();
   });
 
-  it('should return token usage information', () => {
+  it('should return token usage information', async () => {
     // Initially should be zero
     let usage = agent.getTokenUsage();
     expect(usage.totalTokens).toBe(0);
     expect(usage.totalPromptTokens).toBe(0);
     expect(usage.totalCompletionTokens).toBe(0);
-    expect(usage.contextLimit).toBe(10000);
+    expect(usage.contextLimit).toBeGreaterThan(0); // Context limit from provider model info
     expect(usage.percentUsed).toBe(0);
     expect(usage.nearLimit).toBe(false);
 
-    // Simulate token usage by directly calling the token budget manager
-    expect(agent.tokenBudgetManager).not.toBeNull();
-    agent.tokenBudgetManager!.recordUsage({
-      content: 'Test response',
-      toolCalls: [],
-      usage: {
-        promptTokens: 100,
-        completionTokens: 50,
-        totalTokens: 150,
-      },
-    });
+    // Simulate a conversation to generate actual token usage
+    await agent.sendMessage('Test message to generate token usage');
 
-    // Should now have token usage
+    // Should now have token usage calculated from thread events
     usage = agent.getTokenUsage();
-    expect(usage.totalTokens).toBe(150);
+    expect(usage.totalTokens).toBeGreaterThan(0);
     expect(usage.totalPromptTokens).toBe(100);
     expect(usage.totalCompletionTokens).toBe(50);
-    expect(usage.percentUsed).toBe(1.5); // 150/10000 * 100
+    // Context limit comes from provider model info, percentUsed calculated from that
+    expect(usage.contextLimit).toBeGreaterThan(0);
+    expect(usage.percentUsed).toBeGreaterThan(0);
     expect(usage.nearLimit).toBe(false);
   });
 
-  it('should handle missing token budget manager', () => {
-    // Create agent without token budget
-    const agentNoBudget = new Agent({
+  it('should calculate token usage directly from thread events', () => {
+    // Create agent that uses direct token tracking
+    const directAgent = new Agent({
       provider: new MockProvider({ responses: [] }),
       threadManager,
       toolExecutor: new ToolExecutor(),
-      threadId: 'test-thread-no-budget',
+      threadId: 'test-thread-direct',
       tools: [],
-      // No tokenBudget specified
+      metadata: {
+        name: 'Direct Agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId: 'test-provider-instance',
+      },
     });
 
-    const usage = agentNoBudget.getTokenUsage();
+    const usage = directAgent.getTokenUsage();
 
-    // Should return sensible defaults
+    // Should return calculated values from thread events
     expect(usage.totalTokens).toBe(0);
-    expect(usage.contextLimit).toBe(200000); // Default
+    expect(usage.contextLimit).toBeGreaterThan(0); // From provider model info
     expect(usage.percentUsed).toBe(0);
     expect(usage.nearLimit).toBe(false);
   });

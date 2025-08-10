@@ -20,9 +20,7 @@ import {
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
-import { TokenBudgetManager } from '~/token-management/token-budget-manager';
 import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
-import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
@@ -30,6 +28,7 @@ import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import type { CompactionData } from '~/threads/compaction/types';
+import { aggregateTokenUsage } from '~/threads/token-aggregation';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -37,7 +36,6 @@ export interface AgentConfig {
   threadManager: ThreadManager;
   threadId: string;
   tools: Tool[];
-  tokenBudget?: TokenBudgetConfig;
   metadata?: {
     name: string;
     modelId: string;
@@ -95,9 +93,7 @@ export interface AgentEvents {
   token_usage_update: [
     { usage: { promptTokens: number; completionTokens: number; totalTokens: number } },
   ];
-  token_budget_warning: [
-    { message: string; usage: BudgetStatus; recommendations: BudgetRecommendations },
-  ];
+  token_budget_warning: [{ message: string; usage: ThreadTokenUsage }];
   // Turn tracking events
   turn_start: [{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }];
   turn_progress: [{ metrics: CurrentTurnMetrics }];
@@ -146,11 +142,6 @@ export class Agent extends EventEmitter {
     return asThreadId(this._threadId);
   }
 
-  // Public access to token budget manager for testing
-  get tokenBudgetManager(): TokenBudgetManager | null {
-    return this._tokenBudgetManager;
-  }
-
   // Public access to thread manager for approval system
   get threadManager(): ThreadManager {
     return this._threadManager;
@@ -160,7 +151,6 @@ export class Agent extends EventEmitter {
     return this._isRunning;
   }
   private readonly _stopReasonHandler: StopReasonHandler;
-  private _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
   private _isRunning = false;
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
@@ -192,14 +182,7 @@ export class Agent extends EventEmitter {
     this._tools = config.tools;
     this._stopReasonHandler = new StopReasonHandler();
 
-    // Initialize token budget manager based on config or auto-detect from model
-    if (config.tokenBudget) {
-      // Use provided token budget config
-      this._tokenBudgetManager = new TokenBudgetManager(config.tokenBudget);
-    } else {
-      // Will be initialized lazily when we know the model
-      this._tokenBudgetManager = null;
-    }
+    // Token budget management has been removed - using direct ThreadTokenUsage calculation
 
     // Set metadata if provided
     if (config.metadata) {
@@ -327,8 +310,7 @@ export class Agent extends EventEmitter {
 
     this._isRunning = true;
 
-    // Initialize token budget if not already done
-    this._initializeTokenBudget();
+    // Token budget initialization removed - using direct token tracking
 
     logger.info('AGENT: Started', {
       threadId: this._threadId,
@@ -448,45 +430,6 @@ export class Agent extends EventEmitter {
     return (metadata?.modelId as string) || 'unknown-model';
   }
 
-  /**
-   * Initialize token budget manager based on the model's context window
-   */
-  private _initializeTokenBudget(): void {
-    // Skip if already initialized or explicitly disabled
-    if (this._tokenBudgetManager) return;
-
-    const modelId = this.model;
-    if (!modelId || modelId === 'unknown-model') {
-      logger.debug('Cannot initialize token budget: model not specified');
-      return;
-    }
-
-    // Get model info from provider
-    const models = this._provider.getAvailableModels();
-    const modelInfo = models.find((m) => m.id === modelId);
-
-    if (!modelInfo) {
-      logger.debug('Cannot initialize token budget: model info not found', { modelId });
-      return;
-    }
-
-    // Create token budget config based on model's context window
-    const tokenBudget = {
-      maxTokens: modelInfo.contextWindow,
-      reserveTokens: Math.min(2000, Math.floor(modelInfo.contextWindow * 0.05)), // Reserve 5% or 2000 tokens
-      warningThreshold: 0.8, // Warn at 80% usage
-    };
-
-    logger.info('Initializing token budget from model info', {
-      modelId,
-      contextWindow: modelInfo.contextWindow,
-      maxTokens: tokenBudget.maxTokens,
-      reserveTokens: tokenBudget.reserveTokens,
-    });
-
-    this._tokenBudgetManager = new TokenBudgetManager(tokenBudget);
-  }
-
   get status(): AgentState {
     return this._state;
   }
@@ -500,19 +443,6 @@ export class Agent extends EventEmitter {
       modelId: (metadata?.modelId as string) || 'unknown',
       status: this.status,
     };
-  }
-
-  // Token budget management
-  getTokenBudgetStatus() {
-    return this._tokenBudgetManager?.getBudgetStatus() || null;
-  }
-
-  getTokenBudgetRecommendations() {
-    return this._tokenBudgetManager?.getRecommendations() || null;
-  }
-
-  resetTokenBudget(): void {
-    this._tokenBudgetManager?.reset();
   }
 
   // Thread message processing for agent-facing conversation
@@ -541,30 +471,23 @@ export class Agent extends EventEmitter {
         availableToolNames: this._tools.map((t) => t.name),
       });
 
-      // Check token budget before making request
-      if (this._tokenBudgetManager) {
-        const conversationTokens = this._tokenBudgetManager.estimateConversationTokens(
-          conversation.map((msg) => ({ role: msg.role, content: msg.content }))
-        );
+      // Check if we're approaching token limit (simple threshold check)
+      const tokenUsage = this.getTokenUsage();
+      if (tokenUsage.percentUsed >= 0.95) {
+        this.emit('token_budget_warning', {
+          message: 'Cannot make request: approaching token limit',
+          usage: tokenUsage,
+        });
 
-        if (!this._tokenBudgetManager.canMakeRequest(conversationTokens + 200)) {
-          const recommendations = this._tokenBudgetManager.getRecommendations();
-          this.emit('token_budget_warning', {
-            message: 'Cannot make request: would exceed token budget',
-            usage: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
+        logger.warn('Request blocked by token limit', {
+          threadId: this._threadId,
+          percentUsed: tokenUsage.percentUsed,
+          totalTokens: tokenUsage.totalTokens,
+          contextLimit: tokenUsage.contextLimit,
+        });
 
-          logger.warn('Request blocked by token budget', {
-            threadId: this._threadId,
-            estimatedTokens: conversationTokens + 200,
-            budgetStatus: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
-
-          this._setState('idle');
-          return;
-        }
+        this._setState('idle');
+        return;
       }
 
       // Debug logging for provider configuration
@@ -867,19 +790,13 @@ export class Agent extends EventEmitter {
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
 
-      // Record token usage if budget tracking is enabled
-      if (this._tokenBudgetManager) {
-        this._tokenBudgetManager.recordUsage(processedResponse);
-
-        // Emit warning if approaching budget limits
-        const recommendations = this._tokenBudgetManager.getRecommendations();
-        if (recommendations.warningMessage) {
-          this.emit('token_budget_warning', {
-            message: recommendations.warningMessage,
-            usage: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
-        }
+      // Check for token warnings based on current usage
+      const tokenUsage = this.getTokenUsage();
+      if (tokenUsage.nearLimit) {
+        this.emit('token_budget_warning', {
+          message: `Token usage at ${(tokenUsage.percentUsed * 100).toFixed(1)}% of limit`,
+          usage: tokenUsage,
+        });
       }
 
       // Add provider response tokens to current turn metrics
@@ -962,19 +879,13 @@ export class Agent extends EventEmitter {
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
 
-      // Record token usage if budget tracking is enabled
-      if (this._tokenBudgetManager) {
-        this._tokenBudgetManager.recordUsage(processedResponse);
-
-        // Emit warning if approaching budget limits
-        const recommendations = this._tokenBudgetManager.getRecommendations();
-        if (recommendations.warningMessage) {
-          this.emit('token_budget_warning', {
-            message: recommendations.warningMessage,
-            usage: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
-        }
+      // Check for token warnings based on current usage
+      const tokenUsage = this.getTokenUsage();
+      if (tokenUsage.nearLimit) {
+        this.emit('token_budget_warning', {
+          message: `Token usage at ${(tokenUsage.percentUsed * 100).toFixed(1)}% of limit`,
+          usage: tokenUsage,
+        });
       }
 
       // Add provider response tokens to current turn metrics
@@ -1659,34 +1570,31 @@ export class Agent extends EventEmitter {
   private async _checkAutoCompaction(): Promise<void> {
     if (!this._autoCompactConfig.enabled) return;
 
-    // Check if we should compact based on token budget
-    if (this._tokenBudgetManager) {
-      const recommendations = this._tokenBudgetManager.getRecommendations();
-      if (recommendations.shouldPrune) {
-        logger.info('Auto-compacting due to token limit approaching', {
+    // Check if we should compact based on token usage percentage
+    const tokenUsage = this.getTokenUsage();
+    if (tokenUsage.percentUsed >= this._autoCompactConfig.threshold) {
+      logger.info('Auto-compacting due to token limit approaching', {
+        threadId: this._threadId,
+        percentUsed: tokenUsage.percentUsed,
+        threshold: this._autoCompactConfig.threshold,
+      });
+
+      try {
+        // Emit compaction event
+        this.emit('compaction_start', { auto: true });
+
+        await this.compact(this._threadId);
+
+        // Emit compaction complete event
+        this.emit('compaction_complete', { success: true });
+      } catch (error) {
+        logger.error('Auto-compaction failed', {
           threadId: this._threadId,
+          error: error instanceof Error ? error.message : String(error),
         });
-
-        try {
-          // Emit compaction event
-          this.emit('compaction_start', { auto: true });
-
-          await this.compact(this._threadId);
-
-          // Reset token budget after compaction
-          this._tokenBudgetManager.reset();
-
-          // Emit compaction complete event
-          this.emit('compaction_complete', { success: true });
-        } catch (error) {
-          logger.error('Auto-compaction failed', {
-            threadId: this._threadId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // Emit thinking complete even on failure
-          this.emit('agent_thinking_complete');
-          // Don't throw - continue conversation even if compaction fails
-        }
+        // Emit thinking complete even on failure
+        this.emit('agent_thinking_complete');
+        // Don't throw - continue conversation even if compaction fails
       }
     }
   }
@@ -1947,14 +1855,8 @@ export class Agent extends EventEmitter {
       agent: this,
     });
 
-    // Get the latest compaction event to find token count
-    const events = this._threadManager.getEvents(threadId);
-    const compactionEvent = events.findLast((e) => e.type === 'COMPACTION');
-
-    if (compactionEvent && this._tokenBudgetManager) {
-      // Notify TokenBudgetManager about the compaction
-      this._tokenBudgetManager.handleCompaction(compactionEvent.data);
-    }
+    // Compaction handling is now automatic through event sourcing
+    // TokenBudgetManager no longer needed for compaction tracking
   }
 
   /**
@@ -2547,26 +2449,31 @@ export class Agent extends EventEmitter {
    * Gets current token usage information for this agent
    */
   getTokenUsage(): ThreadTokenUsage {
-    if (this._tokenBudgetManager) {
-      const budget = this._tokenBudgetManager.getBudgetStatus();
-      return {
-        totalPromptTokens: budget.promptTokens,
-        totalCompletionTokens: budget.completionTokens,
-        totalTokens: budget.totalUsed,
-        contextLimit: budget.maxTokens,
-        percentUsed: budget.usagePercentage * 100,
-        nearLimit: budget.warningTriggered,
-      };
+    const events = this._threadManager.getEvents(this._threadId);
+    const tokenSummary = aggregateTokenUsage(events);
+
+    // Get context limit from provider system
+    const modelId = this.model;
+    let contextLimit = 200000; // Default fallback
+
+    if (modelId && modelId !== 'unknown-model') {
+      const models = this._provider.getAvailableModels();
+      const modelInfo = models.find((m) => m.id === modelId);
+      if (modelInfo) {
+        contextLimit = modelInfo.contextWindow;
+      }
     }
 
-    // Return defaults if no token budget manager
+    const percentUsed = contextLimit > 0 ? tokenSummary.totalTokens / contextLimit : 0;
+    const nearLimit = percentUsed >= 0.8;
+
     return {
-      totalPromptTokens: 0,
-      totalCompletionTokens: 0,
-      totalTokens: 0,
-      contextLimit: 200000, // Default context limit
-      percentUsed: 0,
-      nearLimit: false,
+      totalPromptTokens: tokenSummary.totalPromptTokens,
+      totalCompletionTokens: tokenSummary.totalCompletionTokens,
+      totalTokens: tokenSummary.totalTokens,
+      contextLimit,
+      percentUsed,
+      nearLimit,
     };
   }
 

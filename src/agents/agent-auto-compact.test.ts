@@ -108,11 +108,6 @@ describe('Agent auto-compaction', () => {
       toolExecutor,
       threadId,
       tools: [],
-      tokenBudget: {
-        maxTokens: 12000, // Will trigger at 80% = 9600 tokens
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
     });
 
     // Set model metadata
@@ -151,11 +146,6 @@ describe('Agent auto-compaction', () => {
       toolExecutor,
       threadId,
       tools: [],
-      tokenBudget: {
-        maxTokens: 12000,
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
     });
 
     // Set model metadata
@@ -195,11 +185,6 @@ describe('Agent auto-compaction', () => {
       toolExecutor,
       threadId,
       tools: [],
-      tokenBudget: {
-        maxTokens: 12000,
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
     });
 
     // Set model metadata
@@ -236,11 +221,6 @@ describe('Agent auto-compaction', () => {
       toolExecutor,
       threadId,
       tools: [],
-      tokenBudget: {
-        maxTokens: 12000,
-        reserveTokens: 1000,
-        warningThreshold: 0.7,
-      },
     });
 
     // Set model metadata
