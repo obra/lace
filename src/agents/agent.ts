@@ -77,6 +77,16 @@ export interface CurrentTurnMetrics {
   };
 }
 
+export interface AgentTokenUsage {
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokens: number;
+  contextLimit: number;
+  percentUsed: number;
+  nearLimit: boolean;
+  eventCount?: number;
+}
+
 // Event type definitions for TypeScript
 export interface AgentEvents {
   agent_thinking_start: [];
@@ -2426,5 +2436,32 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  /**
+   * Gets current token usage information for this agent
+   */
+  getTokenUsage(): AgentTokenUsage {
+    if (this._tokenBudgetManager) {
+      const budget = this._tokenBudgetManager.getBudgetStatus();
+      return {
+        totalPromptTokens: budget.promptTokens,
+        totalCompletionTokens: budget.completionTokens,
+        totalTokens: budget.totalUsed,
+        contextLimit: budget.maxTokens,
+        percentUsed: budget.usagePercentage * 100,
+        nearLimit: budget.warningTriggered,
+      };
+    }
+
+    // Return defaults if no token budget manager
+    return {
+      totalPromptTokens: 0,
+      totalCompletionTokens: 0,
+      totalTokens: 0,
+      contextLimit: 200000, // Default context limit
+      percentUsed: 0,
+      nearLimit: false,
+    };
   }
 }
