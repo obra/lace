@@ -117,16 +117,15 @@ export class SessionService {
         logger.debug(
           `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
         );
-        const event: SessionEvent = {
-          type: 'AGENT_MESSAGE',
-          threadId,
-          timestamp: new Date(),
-          data: { content, tokenUsage },
-        };
         sseManager.broadcast({
           eventType: 'session',
           scope: { sessionId },
-          data: event,
+          data: {
+            type: 'AGENT_MESSAGE',
+            threadId,
+            timestamp: new Date(),
+            data: { content, tokenUsage },
+          },
         });
       }
     );

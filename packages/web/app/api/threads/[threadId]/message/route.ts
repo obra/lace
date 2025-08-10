@@ -5,9 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionService } from '@/lib/server/session-service';
 import { MessageResponse } from '@/types/api';
-import type { SessionEvent } from '@/types/web-sse';
 import { asThreadId, type ThreadId } from '@/types/core';
-import { EventStreamManager } from '@/lib/event-stream-manager';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
 import { createSuperjsonResponse } from '@/lib/serialization';
@@ -92,20 +90,8 @@ export async function POST(
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Broadcast user message event via SSE
-    const sseManager = EventStreamManager.getInstance();
-
-    const userMessageEvent: SessionEvent = {
-      type: 'USER_MESSAGE' as const,
-      threadId,
-      timestamp: new Date(),
-      data: { content: body.message },
-    };
-    sseManager.broadcast({
-      eventType: 'session',
-      scope: { sessionId },
-      data: userMessageEvent,
-    });
+    // Note: USER_MESSAGE event will be added to thread and broadcast by agent.sendMessage()
+    // No need to duplicate the event here
 
     // Generate message ID
     const messageId = randomUUID();
@@ -118,19 +104,8 @@ export async function POST(
         // Message processing started
       })
       .catch((error: unknown) => {
-        // Emit error event
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorEvent: SessionEvent = {
-          type: 'LOCAL_SYSTEM_MESSAGE' as const,
-          threadId,
-          timestamp: new Date(),
-          data: { content: `Error: ${errorMessage}` },
-        };
-        sseManager.broadcast({
-          eventType: 'session',
-          scope: { sessionId },
-          data: errorEvent,
-        });
+        // Error will be emitted by agent via its error event handlers
+        console.error('Message processing error:', error);
       });
 
     // Return immediate acknowledgment
