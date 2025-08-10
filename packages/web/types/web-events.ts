@@ -1,7 +1,7 @@
 // ABOUTME: Shared event data structures used by both API and SSE streaming
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
-import type { ThreadEventType, ToolResult } from '@/types/core';
+import type { ThreadEventType, ToolResult, AgentMessageData } from '@/types/core';
 import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
 // Event data structures shared between API and SSE streaming

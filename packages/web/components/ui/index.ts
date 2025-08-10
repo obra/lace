@@ -14,6 +14,7 @@ export { default as SectionHeader } from './SectionHeader';
 export { default as MessageText } from './MessageText';
 export { default as AgentBadge } from './AgentBadge';
 export { default as TimestampDisplay } from './TimestampDisplay';
+export { default as TokenUsageDisplay } from './TokenUsageDisplay';
 export { default as NavigationButton } from './NavigationButton';
 export { default as FileDiffViewer } from '@/components/files/FileDiffViewer';
 export { default as CodeBlock } from './CodeBlock';
