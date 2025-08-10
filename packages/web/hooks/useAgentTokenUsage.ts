@@ -6,6 +6,7 @@ import { useEventStream } from './useEventStream';
 import type { ThreadId } from '@/types/core';
 import type { AgentResponse } from '@/types/api';
 import type { SessionEvent } from '@/types/web-sse';
+import { parse } from '@/lib/serialization';
 
 // Use the same type structure as the API
 export type AgentTokenUsage = NonNullable<AgentResponse['agent']['tokenUsage']>;
@@ -28,16 +29,28 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
       setLoading(true);
       setError(null);
 
+      console.log('[useAgentTokenUsage] Fetching token usage for agent:', agentId);
       const response = await fetch(`/api/agents/${agentId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch agent data: ${response.status}`);
       }
 
-      const data = (await response.json()) as AgentResponse;
+      const responseText = await response.text();
+      const data = parse(responseText) as AgentResponse;
+      console.log('[useAgentTokenUsage] API response:', {
+        hasAgent: !!data.agent,
+        hasTokenUsage: !!data.agent?.tokenUsage,
+        tokenUsage: data.agent?.tokenUsage,
+      });
+
       if (data.agent?.tokenUsage) {
+        console.log('[useAgentTokenUsage] Setting initial token usage:', data.agent.tokenUsage);
         setTokenUsage(data.agent.tokenUsage);
+      } else {
+        console.log('[useAgentTokenUsage] No token usage data in API response');
       }
     } catch (err) {
+      console.error('[useAgentTokenUsage] Error fetching token usage:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch token usage');
     } finally {
       setLoading(false);
@@ -47,9 +60,19 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   // Listen for AGENT_MESSAGE events that include token usage updates
   const handleAgentMessage = useCallback(
     (event: SessionEvent) => {
+      console.log('[useAgentTokenUsage] Received event:', {
+        eventType: event.type,
+        eventThreadId: event.threadId,
+        targetAgentId: agentId,
+        eventData: event.data,
+        hasTokenUsage: !!(event.data && 'tokenUsage' in event.data && event.data.tokenUsage),
+      });
+
       // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
       if (event.threadId === agentId && event.type === 'AGENT_MESSAGE' && event.data?.tokenUsage) {
         const tokenUsageData = event.data.tokenUsage;
+        console.log('[useAgentTokenUsage] Processing token usage data:', tokenUsageData);
+
         // Transform core TokenUsage to AgentTokenUsage by providing defaults for any missing fields
         const completeTokenUsage: AgentTokenUsage = {
           totalPromptTokens: tokenUsageData.totalPromptTokens ?? tokenUsageData.promptTokens,
@@ -62,6 +85,8 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
           eventCount: tokenUsageData.eventCount ?? 0,
           lastCompactionAt: tokenUsageData.lastCompactionAt,
         };
+
+        console.log('[useAgentTokenUsage] Setting token usage:', completeTokenUsage);
         setTokenUsage(completeTokenUsage);
       }
     },

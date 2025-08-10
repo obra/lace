@@ -46,10 +46,31 @@ import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 // Token usage section component
 const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId: ThreadId }) {
-  const { tokenUsage, loading } = useAgentTokenUsage(agentId);
+  const { tokenUsage, loading, error } = useAgentTokenUsage(agentId);
 
-  if (loading || !tokenUsage) {
-    return null;
+
+  if (loading) {
+    return (
+      <div className="flex justify-center p-4 border-t border-base-300">
+        <div className="text-xs text-base-content/60">Loading token usage...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center p-4 border-t border-base-300">
+        <div className="text-xs text-error">Error loading token usage: {error}</div>
+      </div>
+    );
+  }
+
+  if (!tokenUsage) {
+    return (
+      <div className="flex justify-center p-4 border-t border-base-300">
+        <div className="text-xs text-base-content/60">No token usage data available</div>
+      </div>
+    );
   }
 
   return (
@@ -946,13 +967,22 @@ export const LaceApp = memo(function LaceApp() {
             selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
-                <div style={{ height: 'calc(100% - 80px)' }}>
+                <div className="flex-1 min-h-0">
                   <TimelineView
                     entries={timelineEntries}
                     isTyping={agentBusy}
                     currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
                   />
                 </div>
+
+                {/* Token Usage Display */}
+                {selectedAgent ? (
+                  <TokenUsageSection agentId={selectedAgent} />
+                ) : (
+                  <div className="p-2 text-xs text-base-content/60 text-center">
+                    No agent selected (selectedAgent: {selectedAgent || 'null'})
+                  </div>
+                )}
 
                 {/* Chat Input */}
                 <MemoizedChatInput
@@ -962,11 +992,6 @@ export const LaceApp = memo(function LaceApp() {
                   isStreaming={agentBusy}
                   placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
                 />
-
-                {/* Token Usage Display */}
-                {selectedAgent && (
-                  <TokenUsageSection agentId={selectedAgent} />
-                )}
               </div>
             ) : (
               /* Session Configuration Panel - Main UI for session/agent management */

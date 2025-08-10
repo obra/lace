@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolCall, ToolResult } from '@/types/core';
+import type { ThreadEvent, ToolCall, ToolResult, TokenUsage } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { SessionEvent } from '@/types/web-sse';
@@ -111,22 +111,25 @@ export class SessionService {
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
 
-    agent.on('agent_response_complete', ({ content }: { content: string }) => {
-      logger.debug(
-        `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
-      );
-      const event: SessionEvent = {
-        type: 'AGENT_MESSAGE',
-        threadId,
-        timestamp: new Date(),
-        data: { content },
-      };
-      sseManager.broadcast({
-        eventType: 'session',
-        scope: { sessionId },
-        data: event,
-      });
-    });
+    agent.on(
+      'agent_response_complete',
+      ({ content, tokenUsage }: { content: string; tokenUsage?: TokenUsage }) => {
+        logger.debug(
+          `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
+        );
+        const event: SessionEvent = {
+          type: 'AGENT_MESSAGE',
+          threadId,
+          timestamp: new Date(),
+          data: { content, tokenUsage },
+        };
+        sseManager.broadcast({
+          eventType: 'session',
+          scope: { sessionId },
+          data: event,
+        });
+      }
+    );
 
     // Handle streaming tokens
     agent.on('agent_token', ({ token }: { token: string }) => {

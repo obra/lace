@@ -10,7 +10,7 @@
     "dev": "tsx server.ts",
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
-    "lint": "next lint",
+    "lint": "next lint; npx tsc --noEmit",
     "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server.ts",
     "dev:debug-file": "LACE_LOG_LEVEL=debug LACE_LOG_FILE=/tmp/lace-web.log tsx server.ts",
     "lint:fix": "next lint --fix",

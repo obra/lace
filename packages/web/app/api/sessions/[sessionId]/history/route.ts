@@ -74,12 +74,10 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'AGENT_MESSAGE': {
-      const content =
-        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'AGENT_MESSAGE',
-        data: { content },
+        data: threadEvent.data,
       };
     }
 

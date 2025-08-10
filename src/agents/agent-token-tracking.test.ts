@@ -395,11 +395,21 @@ describe('Agent token tracking', () => {
 
     expect(agentMessage).toBeDefined();
     expect(agentMessage?.data).toHaveProperty('tokenUsage');
-    expect(agentMessage?.data.tokenUsage).toEqual({
-      promptTokens: 100,
-      completionTokens: 50,
-      totalTokens: 150,
-    });
+    expect(agentMessage?.data.tokenUsage).toEqual(
+      expect.objectContaining({
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+      })
+    );
+
+    // Verify comprehensive fields exist with correct types
+    expect(typeof agentMessage?.data.tokenUsage?.totalPromptTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.totalCompletionTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.contextLimit).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.percentUsed).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.nearLimit).toBe('boolean');
+    expect(typeof agentMessage?.data.tokenUsage?.eventCount).toBe('number');
   });
 
   describe('token estimation fallback', () => {
@@ -478,6 +488,20 @@ describe('Agent token tracking', () => {
     const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
 
     expect(agentMessage).toBeDefined();
-    expect(agentMessage?.data.tokenUsage).toBeUndefined();
+    expect(agentMessage?.data.tokenUsage).toEqual(
+      expect.objectContaining({
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      })
+    );
+
+    // Verify comprehensive fields exist with correct types even without provider usage
+    expect(typeof agentMessage?.data.tokenUsage?.totalPromptTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.totalCompletionTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.contextLimit).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.percentUsed).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.nearLimit).toBe('boolean');
+    expect(typeof agentMessage?.data.tokenUsage?.eventCount).toBe('number');
   });
 });
