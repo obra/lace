@@ -219,11 +219,7 @@ export class ThreadManager {
     };
 
     // Save thread to database immediately
-    try {
-      this._persistence.saveThread(thread);
-    } catch (error) {
-      logger.error('Failed to save thread with metadata', { threadId, error });
-    }
+    this.saveThread(thread);
 
     return thread;
   }
@@ -248,11 +244,7 @@ export class ThreadManager {
     };
 
     // Save thread to database without changing current thread
-    try {
-      this._persistence.saveThread(thread);
-    } catch (error) {
-      logger.error('Failed to save delegate thread', { error });
-    }
+    this.saveThread(thread);
 
     return thread;
   }
