@@ -140,7 +140,7 @@ export type SessionEvent =
       timestamp: Date;
       data: {
         strategy: string;
-        message?: string;
+        auto: boolean;
       };
     }
   | {

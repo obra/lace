@@ -1563,9 +1563,10 @@ export class Agent extends EventEmitter {
         event.type === 'SYSTEM_PROMPT' ||
         event.type === 'USER_SYSTEM_PROMPT' ||
         event.type === 'TOOL_APPROVAL_REQUEST' ||
-        event.type === 'TOOL_APPROVAL_RESPONSE'
+        event.type === 'TOOL_APPROVAL_RESPONSE' ||
+        event.type === 'COMPACTION'
       ) {
-        // Skip UI-only events - they're not sent to model
+        // Skip UI-only events and compaction events - they're not sent to model
         continue;
       } else {
         throw new Error(`Unknown event type: ${(event as { type: string }).type}`);

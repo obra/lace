@@ -73,7 +73,7 @@ describe('Token Usage Integration Tests', () => {
     // Intercept SSE broadcasts to capture events
     const eventManager = EventStreamManager.getInstance();
     originalBroadcast = eventManager.broadcast;
-    const mockBroadcast = vi.fn((event: unknown) => {
+    const mockBroadcast = vi.fn((event: Parameters<typeof eventManager.broadcast>[0]) => {
       streamedEvents.push(event);
       if (originalBroadcast) {
         return originalBroadcast.call(eventManager, event);

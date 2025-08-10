@@ -9,10 +9,13 @@ import type { ToolResult } from '@/types/core';
 // ThreadId schema (assumes string validation exists elsewhere)
 const ThreadIdSchema = z.string() as unknown as z.ZodType<ThreadId>;
 
-// Timestamp schema - converts ISO strings to Date objects for internal consistency  
+// Timestamp schema - converts ISO strings to Date objects for internal consistency
 const DateTimeSchema = z.union([
   z.date(), // Keep Date as-is
-  z.string().datetime().transform((str) => new Date(str)), // Convert ISO string to Date
+  z
+    .string()
+    .datetime()
+    .transform((str) => new Date(str)), // Convert ISO string to Date
 ]);
 
 // Event data schemas
@@ -169,6 +172,23 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
     data: CompactionEventDataSchema,
+  }),
+  z.object({
+    type: z.literal('COMPACTION_START'),
+    threadId: ThreadIdSchema,
+    timestamp: DateTimeSchema,
+    data: z.object({
+      strategy: z.string(),
+      auto: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal('COMPACTION_COMPLETE'),
+    threadId: ThreadIdSchema,
+    timestamp: DateTimeSchema,
+    data: z.object({
+      success: z.boolean(),
+    }),
   }),
   z.object({
     type: z.literal('AGENT_STATE_CHANGE'),
