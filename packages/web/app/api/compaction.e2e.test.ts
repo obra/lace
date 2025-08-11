@@ -386,10 +386,10 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     // Check that SSE events were emitted for auto-compaction
     const compactionStartEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+      (e) => (e as { type?: string }).type === 'COMPACTION_START'
     );
     const compactionCompleteEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_COMPLETE'
+      (e) => (e as { type?: string }).type === 'COMPACTION_COMPLETE'
     );
 
     expect(compactionStartEvents.length).toBeGreaterThan(0);
@@ -398,18 +398,15 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     // Verify the SSE event has correct structure
     if (compactionStartEvents.length > 0) {
       const startEvent = compactionStartEvents[0] as {
+        type: string;
         data: {
-          data: {
-            strategy: string;
-            message: string;
-            auto: boolean;
-          };
+          auto: boolean;
         };
       };
-      expect(startEvent.data).toMatchObject({
+      expect(startEvent).toMatchObject({
         type: 'COMPACTION_START',
         data: {
-          strategy: 'summarize',
+          auto: true,
         },
       });
     }
@@ -554,22 +551,21 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
     // Verify compaction events were emitted
     const compactionStartEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+      (e) => (e as { type?: string }).type === 'COMPACTION_START'
     );
     const compactionCompleteEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_COMPLETE'
+      (e) => (e as { type?: string }).type === 'COMPACTION_COMPLETE'
     );
 
     expect(compactionStartEvents.length).toBe(1);
     expect(compactionCompleteEvents.length).toBe(1);
 
-    // Verify LOCAL_SYSTEM_MESSAGE was added
+    // Verify COMPACTION_COMPLETE event was added instead of LOCAL_SYSTEM_MESSAGE
     const events = agent!.threadManager.getEvents(agentId);
-    const systemMessage = events.find(
-      (e) =>
-        e.type === 'LOCAL_SYSTEM_MESSAGE' && e.data === '✅ Conversation compacted successfully'
+    const compactionComplete = events.find(
+      (e) => e.type === 'COMPACTION_COMPLETE' && e.data?.success === true
     );
-    expect(systemMessage).toBeDefined();
+    expect(compactionComplete).toBeDefined();
   });
 
   it('should track token usage correctly across multiple messages', async () => {

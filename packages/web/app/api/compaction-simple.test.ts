@@ -137,19 +137,24 @@ describe('Compaction Integration Test', () => {
     // Wait for compaction to complete
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Verify compaction start event was emitted (with fixed event handler)
-    const _compactionStartEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+    // Verify compaction events were emitted
+    const compactionStartEvents = streamedEvents.filter(
+      (e) => (e as { type?: string }).type === 'COMPACTION_START'
+    );
+    const compactionCompleteEvents = streamedEvents.filter(
+      (e) => (e as { type?: string }).type === 'COMPACTION_COMPLETE'
     );
 
-    // We expect 0 events since the handler won't match due to missing message
-    // But the LOCAL_SYSTEM_MESSAGE should be added
+    // We expect both start and complete events to be broadcast
+    expect(compactionStartEvents.length).toBeGreaterThan(0);
+    expect(compactionCompleteEvents.length).toBeGreaterThan(0);
+
+    // Also verify the events are in the thread
     const events = agent.threadManager.getEvents(sessionId);
-    const systemMessage = events.find(
-      (e) =>
-        e.type === 'LOCAL_SYSTEM_MESSAGE' && e.data === '✅ Conversation compacted successfully'
+    const compactionComplete = events.find(
+      (e) => e.type === 'COMPACTION_COMPLETE' && e.data?.success === true
     );
-    expect(systemMessage).toBeDefined();
+    expect(compactionComplete).toBeDefined();
   });
 
   it('should include token usage field in agent API responses', async () => {
@@ -218,24 +223,15 @@ describe('Compaction Integration Test', () => {
 
     // Check that compaction start event was emitted
     const compactionStartEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_START'
+      (e) => (e as { type?: string }).type === 'COMPACTION_START'
     );
 
     expect(compactionStartEvents.length).toBe(1);
     expect(compactionStartEvents[0]).toMatchObject({
-      eventType: 'session',
-      scope: {
-        projectId,
-        sessionId,
-        threadId: sessionId,
-      },
+      type: 'COMPACTION_START',
+      threadId: sessionId,
       data: {
-        type: 'COMPACTION_START',
-        threadId: sessionId,
-        data: {
-          strategy: 'summarize',
-          auto: false,
-        },
+        auto: false,
       },
     });
 
@@ -244,18 +240,15 @@ describe('Compaction Integration Test', () => {
 
     // Check that compaction complete event was emitted
     const compactionCompleteEvents = streamedEvents.filter(
-      (e) => (e as { data?: { type?: string } }).data?.type === 'COMPACTION_COMPLETE'
+      (e) => (e as { type?: string }).type === 'COMPACTION_COMPLETE'
     );
 
     expect(compactionCompleteEvents.length).toBe(1);
     expect(compactionCompleteEvents[0]).toMatchObject({
-      eventType: 'session',
+      type: 'COMPACTION_COMPLETE',
+      threadId: sessionId,
       data: {
-        type: 'COMPACTION_COMPLETE',
-        threadId: sessionId,
-        data: {
-          success: true,
-        },
+        success: true,
       },
     });
   });

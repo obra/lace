@@ -2,18 +2,19 @@
 // ABOUTME: Validates text search, filtering, and output formatting with Zod validation
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFile, mkdir, rm } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
+import { createTestTempDir } from '~/test-utils/temp-directory';
 
 describe('RipgrepSearchTool with schema validation', () => {
   let tool: RipgrepSearchTool;
-  const testDir = join(process.cwd(), 'test-temp-ripgrep-schema');
+  const tempDir = createTestTempDir('ripgrep-test-');
+  let testDir: string;
 
   beforeEach(async () => {
     tool = new RipgrepSearchTool();
-    await rm(testDir, { recursive: true, force: true });
-    await mkdir(testDir, { recursive: true });
+    testDir = await tempDir.getPath();
 
     // Create test files
     await writeFile(
@@ -38,7 +39,7 @@ describe('RipgrepSearchTool with schema validation', () => {
   });
 
   afterEach(async () => {
-    await rm(testDir, { recursive: true, force: true });
+    await tempDir.cleanup();
   });
 
   describe('Tool metadata', () => {

@@ -417,7 +417,10 @@ export function useEventStream({
           case 'AGENT_STATE_CHANGE':
             if (event.type === 'AGENT_STATE_CHANGE') {
               const { agentId, from, to } = event.data;
-              callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+              // Only call the callback if all required fields are present
+              if (agentId && from !== undefined && to !== undefined) {
+                callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+              }
             }
             break;
         }
