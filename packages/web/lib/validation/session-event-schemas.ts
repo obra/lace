@@ -18,10 +18,7 @@ const DateTimeSchema = z.union([
     .transform((str) => new Date(str)), // Convert ISO string to Date
 ]);
 
-// Event data schemas
-const UserMessageEventDataSchema = z.object({
-  content: z.string(),
-});
+// Event data schemas - USER_MESSAGE is just a string per ThreadEvent type
 
 const AgentMessageDataSchema = z.object({
   content: z.string(),
@@ -118,7 +115,7 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('USER_MESSAGE'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: UserMessageEventDataSchema,
+    data: z.string(), // USER_MESSAGE data is just a string
   }),
   z.object({
     type: z.literal('AGENT_MESSAGE'),

@@ -12,10 +12,7 @@ import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
 // Event data structures shared between API and SSE streaming
 // These are the payloads contained within events, not the events themselves
-
-export interface UserMessageEventData {
-  content: string;
-}
+// Note: USER_MESSAGE uses string directly, not an object wrapper
 
 // NOTE: AgentMessageData is imported from core, replaces AgentMessageEventData
 
