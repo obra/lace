@@ -300,7 +300,11 @@ describe('Enhanced Agent', () => {
       expect(agent.isRunning).toBe(false);
 
       // Add a user message first so there's conversation to continue
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Previous message');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Previous message',
+      });
 
       await agent.continueConversation();
 
@@ -772,9 +776,13 @@ describe('Enhanced Agent', () => {
 
       // Simulate approval response
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_1',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
 
@@ -819,9 +827,13 @@ describe('Enhanced Agent', () => {
 
       // Deny the tool
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: ApprovalDecision.DENY,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_1',
+            decision: ApprovalDecision.DENY,
+          },
         })
       );
 
@@ -925,9 +937,13 @@ describe('Enhanced Agent', () => {
 
       // Approve the tool
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_1',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -1153,9 +1169,13 @@ describe('Enhanced Agent', () => {
 
       // Now approve the tool
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_approval',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_approval',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -1255,9 +1275,21 @@ describe('Enhanced Agent', () => {
     });
 
     it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(agent.getThreadId(), 'LOCAL_SYSTEM_MESSAGE', 'System info message');
-      threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', { content: 'Response' });
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Test',
+      });
+      threadManager.addEvent({
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'System info message',
+      });
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: { content: 'Response' },
+      });
 
       const history = agent.buildThreadMessages();
 

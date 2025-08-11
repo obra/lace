@@ -60,7 +60,11 @@ describe('CompactionHandler', () => {
 
   it('should detect compaction start when /compact command is sent', () => {
     // Add /compact message to thread
-    threadManager.addEvent(agent['_threadId'], 'USER_MESSAGE', '/compact');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agent['_threadId'],
+      data: '/compact',
+    });
 
     // Emit thinking start
     agent.emit('agent_thinking_start');
@@ -70,7 +74,11 @@ describe('CompactionHandler', () => {
 
   it('should not detect compaction for regular messages', () => {
     // Add regular message to thread
-    threadManager.addEvent(agent['_threadId'], 'USER_MESSAGE', 'Hello world');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agent['_threadId'],
+      data: 'Hello world',
+    });
 
     // Emit thinking start
     agent.emit('agent_thinking_start');
@@ -80,7 +88,11 @@ describe('CompactionHandler', () => {
 
   it('should handle compaction complete', () => {
     // Setup compaction scenario
-    threadManager.addEvent(agent['_threadId'], 'USER_MESSAGE', '/compact');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agent['_threadId'],
+      data: '/compact',
+    });
 
     // Start compaction first
     agent.emit('agent_thinking_start');
@@ -98,7 +110,11 @@ describe('CompactionHandler', () => {
         compactedEvents: [],
       },
     };
-    threadManager.addEvent(agent['_threadId'], 'COMPACTION', compactionEvent.data);
+    threadManager.addEvent({
+      type: 'COMPACTION',
+      threadId: agent['_threadId'],
+      data: compactionEvent.data,
+    });
 
     // Complete compaction
     agent.emit('agent_thinking_complete');
@@ -108,7 +124,11 @@ describe('CompactionHandler', () => {
 
   it('should handle compaction errors', () => {
     // Setup compaction scenario
-    threadManager.addEvent(agent['_threadId'], 'USER_MESSAGE', '/compact');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agent['_threadId'],
+      data: '/compact',
+    });
 
     // Start compaction
     agent.emit('agent_thinking_start');

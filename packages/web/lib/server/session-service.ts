@@ -5,7 +5,6 @@ import { Agent, Session } from '@/lib/server/lace-imports';
 import type { ThreadEvent, ToolCall, ToolResult, CombinedTokenUsage } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
-import type { SessionEvent } from '@/types/web-sse';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { logger } from '~/utils/logger';
 
@@ -136,16 +135,15 @@ export class SessionService {
       process.stdout.write(token);
 
       // Broadcast token to UI for real-time display
-      const event: SessionEvent = {
-        type: 'AGENT_TOKEN',
-        threadId,
-        timestamp: new Date(),
-        data: { token },
-      };
       sseManager.broadcast({
         eventType: 'session',
         scope: { sessionId },
-        data: event,
+        data: {
+          type: 'AGENT_TOKEN',
+          threadId,
+          timestamp: new Date(),
+          data: { token },
+        },
       });
     });
 
@@ -166,7 +164,6 @@ export class SessionService {
           threadId,
           timestamp: new Date(),
           data: {
-            strategy: 'summarize',
             auto,
           },
         },
@@ -209,16 +206,15 @@ export class SessionService {
         input: Record<string, unknown>;
         callId: string;
       }) => {
-        const event: SessionEvent = {
-          type: 'TOOL_CALL',
-          threadId,
-          timestamp: new Date(),
-          data: { id: callId, name: toolName, arguments: input },
-        };
         sseManager.broadcast({
           eventType: 'session',
           scope: { sessionId },
-          data: event,
+          data: {
+            type: 'TOOL_CALL',
+            threadId,
+            timestamp: new Date(),
+            data: { id: callId, name: toolName, arguments: input },
+          },
         });
       }
     );
@@ -226,16 +222,15 @@ export class SessionService {
     agent.on(
       'tool_call_complete',
       ({ result }: { toolName: string; result: unknown; callId: string }) => {
-        const event: SessionEvent = {
-          type: 'TOOL_RESULT',
-          threadId,
-          timestamp: new Date(),
-          data: result as ToolResult, // Cast to ToolResult for type safety
-        };
         sseManager.broadcast({
           eventType: 'session',
           scope: { sessionId },
-          data: event,
+          data: {
+            type: 'TOOL_RESULT',
+            threadId,
+            timestamp: new Date(),
+            data: result as ToolResult, // Cast to ToolResult for type safety
+          },
         });
       }
     );
@@ -243,20 +238,18 @@ export class SessionService {
     // Listen for state changes and broadcast to UI
     agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
       // Broadcast agent state change to UI via SSE
-      const event: SessionEvent = {
-        type: 'AGENT_STATE_CHANGE',
-        threadId,
-        timestamp: new Date(),
-        data: {
-          agentId: threadId,
-          from,
-          to,
-        },
-      };
       sseManager.broadcast({
         eventType: 'session',
         scope: { sessionId },
-        data: event,
+        data: {
+          type: 'AGENT_STATE_CHANGE',
+          threadId,
+          timestamp: new Date(),
+          data: {
+            oldState: from,
+            newState: to,
+          },
+        },
       });
     });
 
@@ -272,16 +265,15 @@ export class SessionService {
         error.message === 'Aborted';
 
       if (!isAbortError) {
-        const event: SessionEvent = {
-          type: 'LOCAL_SYSTEM_MESSAGE',
-          threadId,
-          timestamp: new Date(),
-          data: { content: `Agent error: ${error.message}` },
-        };
         sseManager.broadcast({
           eventType: 'session',
           scope: { sessionId },
-          data: event,
+          data: {
+            type: 'LOCAL_SYSTEM_MESSAGE',
+            threadId,
+            timestamp: new Date(),
+            data: `Agent error: ${error.message}`,
+          },
         });
       }
     });
@@ -297,7 +289,7 @@ export class SessionService {
     agent.on(
       'thread_event_added',
       ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
-        // Convert thread events to session events and broadcast them
+        // Pass ThreadEvents directly without conversion for approval events
         if (event.type === 'TOOL_APPROVAL_REQUEST') {
           const toolCallData = event.data as { toolCallId: string };
 
@@ -323,49 +315,45 @@ export class SessionService {
               tool = null;
             }
 
-            const sessionEvent: SessionEvent = {
-              type: 'TOOL_APPROVAL_REQUEST',
-              threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp),
-              data: {
-                requestId: toolCallData.toolCallId,
-                toolName: toolCall.name,
-                input: toolCall.arguments,
-                isReadOnly: tool?.annotations?.readOnlyHint ?? false,
-                toolDescription: tool?.description,
-                toolAnnotations: tool?.annotations,
-                riskLevel: tool?.annotations?.readOnlyHint
-                  ? 'safe'
-                  : tool?.annotations?.destructiveHint
-                    ? 'destructive'
-                    : 'moderate',
-              },
-            };
-
             sseManager.broadcast({
               eventType: 'session',
               scope: { sessionId },
-              data: sessionEvent,
+              data: {
+                type: 'TOOL_APPROVAL_REQUEST',
+                threadId: asThreadId(eventThreadId),
+                timestamp: new Date(event.timestamp),
+                data: {
+                  requestId: toolCallData.toolCallId,
+                  toolName: toolCall.name,
+                  input: toolCall.arguments,
+                  isReadOnly: tool?.annotations?.readOnlyHint ?? false,
+                  toolDescription: tool?.description,
+                  toolAnnotations: tool?.annotations,
+                  riskLevel: tool?.annotations?.readOnlyHint
+                    ? 'safe'
+                    : tool?.annotations?.destructiveHint
+                      ? 'destructive'
+                      : 'moderate',
+                },
+              },
             });
           }
         } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
           // Forward approval response events to UI so modal can refresh
           const responseData = event.data as { toolCallId: string; decision: string };
 
-          const sessionEvent: SessionEvent = {
-            type: 'TOOL_APPROVAL_RESPONSE',
-            threadId: asThreadId(eventThreadId),
-            timestamp: new Date(event.timestamp),
-            data: {
-              toolCallId: responseData.toolCallId,
-              decision: responseData.decision,
-            },
-          };
-
           sseManager.broadcast({
             eventType: 'session',
             scope: { sessionId },
-            data: sessionEvent,
+            data: {
+              type: 'TOOL_APPROVAL_RESPONSE',
+              threadId: asThreadId(eventThreadId),
+              timestamp: new Date(event.timestamp),
+              data: {
+                toolCallId: responseData.toolCallId,
+                decision: responseData.decision,
+              },
+            },
           });
         }
       }

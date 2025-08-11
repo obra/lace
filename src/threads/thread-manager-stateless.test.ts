@@ -24,8 +24,20 @@ describe('ThreadManager - Core Behavior', () => {
     });
 
     it('adds events to specific thread', () => {
-      expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
-      expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there'));
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Hello',
+        })
+      );
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'AGENT_MESSAGE',
+          threadId,
+          data: 'Hi there',
+        })
+      );
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(2);
@@ -37,8 +49,20 @@ describe('ThreadManager - Core Behavior', () => {
       const thread1 = threadManager.createThread();
       const thread2 = threadManager.createThread();
 
-      expectEventAdded(threadManager.addEvent(thread1, 'USER_MESSAGE', 'Thread 1 message'));
-      expectEventAdded(threadManager.addEvent(thread2, 'USER_MESSAGE', 'Thread 2 message'));
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: thread1,
+          data: 'Thread 1 message',
+        })
+      );
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: thread2,
+          data: 'Thread 2 message',
+        })
+      );
 
       const events1 = threadManager.getEvents(thread1);
       const events2 = threadManager.getEvents(thread2);
@@ -57,7 +81,13 @@ describe('ThreadManager - Core Behavior', () => {
 
   describe('Thread persistence', () => {
     it('persists thread data across ThreadManager instances', () => {
-      expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Persistent message'));
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Persistent message',
+        })
+      );
 
       // Create new ThreadManager instance
       const newManager = new ThreadManager();
@@ -82,8 +112,20 @@ describe('ThreadManager - Core Behavior', () => {
       const delegateId = threadManager.generateDelegateThreadId(threadId);
       threadManager.createThread(delegateId);
 
-      expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Parent message'));
-      expectEventAdded(threadManager.addEvent(delegateId, 'USER_MESSAGE', 'Delegate message'));
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Parent message',
+        })
+      );
+      expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: delegateId,
+          data: 'Delegate message',
+        })
+      );
 
       const parentEvents = threadManager.getEvents(threadId);
       const delegateEvents = threadManager.getEvents(delegateId);

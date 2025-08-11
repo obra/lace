@@ -57,6 +57,23 @@ function createThreadEventFromDb(
     case 'TOOL_APPROVAL_RESPONSE':
       return { ...baseEvent, type, data: data as ToolApprovalResponseData };
 
+    // Transient event types - these should never be persisted to database
+    // but we need cases for TypeScript exhaustive checking
+    case 'AGENT_TOKEN':
+      throw new Error('AGENT_TOKEN events are transient and should not be persisted');
+
+    case 'AGENT_STREAMING':
+      throw new Error('AGENT_STREAMING events are transient and should not be persisted');
+
+    case 'AGENT_STATE_CHANGE':
+      throw new Error('AGENT_STATE_CHANGE events are transient and should not be persisted');
+
+    case 'COMPACTION_START':
+      throw new Error('COMPACTION_START events are transient and should not be persisted');
+
+    case 'COMPACTION_COMPLETE':
+      throw new Error('COMPACTION_COMPLETE events are transient and should not be persisted');
+
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown event type: ${String(_exhaustive)}`);

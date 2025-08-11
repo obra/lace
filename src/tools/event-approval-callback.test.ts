@@ -205,9 +205,13 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Simulate user approval
     const responseEvent = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_test',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_test',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
 
@@ -251,9 +255,13 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Simulate user denial
     const responseEvent = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_deny',
-        decision: ApprovalDecision.DENY,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_deny',
+          decision: ApprovalDecision.DENY,
+        },
       })
     );
 
@@ -308,9 +316,13 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Approve first tool call to allow second one to be processed
     const response1Event = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_multi_1',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_multi_1',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
 
@@ -328,9 +340,13 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Approve second tool call
     const response2Event = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_multi_2',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_multi_2',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
 
@@ -350,19 +366,31 @@ describe('EventApprovalCallback Integration Tests', () => {
 
   it('should recover from existing approvals in the thread', async () => {
     // Pre-populate thread with existing approval (simulating recovery scenario)
-    threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-      id: 'call_recovery',
-      name: 'bash',
-      arguments: { command: 'echo "recovery test"' },
+    threadManager.addEvent({
+      type: 'TOOL_CALL',
+      threadId: agent.threadId,
+      data: {
+        id: 'call_recovery',
+        name: 'bash',
+        arguments: { command: 'echo "recovery test"' },
+      },
     });
 
-    threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: 'call_recovery',
+    threadManager.addEvent({
+      type: 'TOOL_APPROVAL_REQUEST',
+      threadId: agent.threadId,
+      data: {
+        toolCallId: 'call_recovery',
+      },
     });
 
-    threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_recovery',
-      decision: ApprovalDecision.ALLOW_SESSION,
+    threadManager.addEvent({
+      type: 'TOOL_APPROVAL_RESPONSE',
+      threadId: agent.threadId,
+      data: {
+        toolCallId: 'call_recovery',
+        decision: ApprovalDecision.ALLOW_SESSION,
+      },
     });
 
     // Configure provider to return the same tool call
@@ -429,9 +457,13 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Complete the test
     const responseEvent = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_emit_test',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_emit_test',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
 
@@ -454,10 +486,14 @@ describe('EventApprovalCallback Integration Tests', () => {
   describe('direct requestApproval method behavior', () => {
     it('should throw ApprovalPendingError when approval is needed', async () => {
       // Setup tool call event
-      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-        id: 'call_test',
-        name: 'bash',
-        arguments: { command: 'ls' },
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: {
+          id: 'call_test',
+          name: 'bash',
+          arguments: { command: 'ls' },
+        },
       });
 
       const approvalCallback = new EventApprovalCallback(agent);
@@ -480,15 +516,23 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     it('should return existing approval decision if already present', async () => {
       // Setup tool call and approval response events
-      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-        id: 'call_existing',
-        name: 'bash',
-        arguments: { command: 'pwd' },
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: {
+          id: 'call_existing',
+          name: 'bash',
+          arguments: { command: 'pwd' },
+        },
       });
 
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_existing',
-        decision: ApprovalDecision.ALLOW_SESSION,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_existing',
+          decision: ApprovalDecision.ALLOW_SESSION,
+        },
       });
 
       const approvalCallback = new EventApprovalCallback(agent);
@@ -504,15 +548,23 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     it('should not create duplicate approval requests', async () => {
       // Setup tool call event
-      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-        id: 'call_duplicate',
-        name: 'bash',
-        arguments: { command: 'echo test' },
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: {
+          id: 'call_duplicate',
+          name: 'bash',
+          arguments: { command: 'echo test' },
+        },
       });
 
       // Add existing approval request
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_REQUEST', {
-        toolCallId: 'call_duplicate',
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_REQUEST',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_duplicate',
+        },
       });
 
       const approvalCallback = new EventApprovalCallback(agent);

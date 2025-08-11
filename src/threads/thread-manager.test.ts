@@ -27,7 +27,11 @@ describe('ThreadManager', () => {
 
       // Act
       const event = expectEventAdded(
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message')
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Test message',
+        })
       );
 
       // Assert
@@ -46,7 +50,13 @@ describe('ThreadManager', () => {
       threadManager.createThread(threadId);
 
       // Act - ThreadManager now operates as pure data layer
-      const event1 = expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+      const event1 = expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Hello',
+        })
+      );
       const event2 = expectEventAdded(
         threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there')
       );

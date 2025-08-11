@@ -292,25 +292,58 @@ export class ThreadManager {
    * prevents duplicate approvals for the same toolCallId, causing
    * this method to throw if a duplicate is attempted.
    */
+  addEvent(event: ThreadEvent): ThreadEvent | null;
+  // Legacy overload for backwards compatibility during transition
+  addEvent(threadId: string, type: ThreadEventType, data: ThreadEventData): ThreadEvent | null;
   addEvent(
-    threadId: string,
-    type: ThreadEventType,
-    eventData: ThreadEventData
+    eventOrThreadId: ThreadEvent | string,
+    type?: ThreadEventType,
+    data?: ThreadEventData
   ): ThreadEvent | null {
-    const thread = this.getThread(threadId);
-    if (!thread) {
-      throw new Error(`Thread ${threadId} not found`);
+    // Handle legacy 3-parameter call
+    if (typeof eventOrThreadId === 'string' && type && data !== undefined) {
+      const event: ThreadEvent = {
+        type,
+        threadId: eventOrThreadId,
+        data,
+      } as ThreadEvent;
+      return this.addEvent(event);
     }
 
-    const event = {
-      id: generateEventId(),
-      threadId,
-      type,
-      timestamp: new Date(),
-      data: eventData,
-    } as ThreadEvent;
+    // Handle new single-parameter call
+    const event = eventOrThreadId as ThreadEvent;
+    // Fill in defaults
+    if (!event.id) {
+      event.id = generateEventId();
+    }
+    if (!event.timestamp) {
+      event.timestamp = new Date();
+    }
 
-    // Use database transaction for atomicity
+    // Non-thread events pass through without persistence
+    if (!event.threadId) {
+      // Just return the event - caller will broadcast it
+      return event;
+    }
+
+    // Thread events require the thread to exist
+    const thread = this.getThread(event.threadId);
+    if (!thread) {
+      throw new Error(`Thread ${event.threadId} not found`);
+    }
+
+    // Determine if this event should be persisted
+    const isTransient = event.transient || this.isTransientEventType(event.type);
+
+    if (isTransient) {
+      // Don't persist transient events to database
+      thread.events.push(event);
+      thread.updatedAt = new Date();
+      processLocalThreadCache.set(event.threadId, thread);
+      return event;
+    }
+
+    // Use database transaction for atomicity (only for non-transient events)
     return this._persistence.transaction(() => {
       // Save to database first and check if it was actually saved
       const wasSaved = this._persistence.saveEvent(event);
@@ -321,7 +354,7 @@ export class ThreadManager {
         thread.updatedAt = new Date();
 
         // Update process-local cache
-        processLocalThreadCache.set(threadId, thread);
+        processLocalThreadCache.set(event.threadId, thread);
 
         return event;
       } else {
@@ -329,6 +362,17 @@ export class ThreadManager {
         return null;
       }
     });
+  }
+
+  private isTransientEventType(type: ThreadEventType): boolean {
+    // These event types are always transient, even if they have a threadId
+    return [
+      'AGENT_TOKEN',
+      'AGENT_STREAMING',
+      'AGENT_STATE_CHANGE',
+      'COMPACTION_START',
+      'COMPACTION_COMPLETE',
+    ].includes(type);
   }
 
   /**
@@ -527,7 +571,11 @@ export class ThreadManager {
     // 4. Subsequent operations will retry persistence, maintaining eventual consistency
     // 5. The thread cache remains consistent with successful database state
     const compactionData = compactionEvent.data as CompactionData;
-    this.addEvent(threadId, 'COMPACTION', compactionData);
+    this.addEvent({
+      type: 'COMPACTION',
+      threadId,
+      data: compactionData,
+    } as ThreadEvent);
   }
 
   clearEvents(threadId: string): void {

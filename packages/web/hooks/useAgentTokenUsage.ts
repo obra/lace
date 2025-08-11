@@ -65,21 +65,13 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         eventThreadId: event.threadId,
         targetAgentId: agentId,
         eventData: event.data,
-        hasTokenUsage: !!(
-          event.data?.data &&
-          'tokenUsage' in event.data.data &&
-          event.data.data.tokenUsage
-        ),
+        hasTokenUsage: !!(event.data && 'tokenUsage' in event.data && event.data.tokenUsage),
       });
 
       // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
-      // Note: Due to StreamEvent structure, tokenUsage is nested at event.data.data.tokenUsage
-      if (
-        event.threadId === agentId &&
-        event.type === 'AGENT_MESSAGE' &&
-        event.data?.data?.tokenUsage
-      ) {
-        const tokenUsageData = event.data.data.tokenUsage;
+      // Note: TokenUsage is now directly at event.data.tokenUsage (no more double nesting)
+      if (event.threadId === agentId && event.type === 'AGENT_MESSAGE' && event.data?.tokenUsage) {
+        const tokenUsageData = event.data.tokenUsage;
         console.log('[useAgentTokenUsage] Processing token usage data:', tokenUsageData);
 
         // Transform CombinedTokenUsage to AgentTokenUsage by extracting thread-level data

@@ -19,7 +19,13 @@ describe('Compaction Integration', () => {
 
   it('creates working conversation without compaction', () => {
     // Add some events
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Hello',
+      })
+    );
     expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there'));
 
     const workingEvents = threadManager.getEvents(threadId);
@@ -91,7 +97,13 @@ describe('Compaction Integration', () => {
 
   it('continues conversation after compaction', async () => {
     // Set up conversation and compact it
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Hello',
+      })
+    );
     expectEventAdded(
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call-hello',
@@ -142,7 +154,13 @@ describe('Compaction Integration', () => {
 
   it('handles multiple compactions', async () => {
     // Create initial conversation
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Hello',
+      })
+    );
     expectEventAdded(
       threadManager.addEvent(threadId, 'TOOL_RESULT', {
         id: 'call-first',
@@ -248,7 +266,13 @@ describe('Compaction Integration', () => {
   });
 
   it('throws error for unknown strategy', async () => {
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Hello',
+      })
+    );
 
     await expect(threadManager.compact(threadId, 'unknown-strategy')).rejects.toThrow(
       'Unknown compaction strategy: unknown-strategy'

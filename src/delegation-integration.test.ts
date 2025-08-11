@@ -163,7 +163,11 @@ describe('Delegation Integration Tests', () => {
 
     // Create the delegate thread so it appears in queries
     threadManager.createThread(delegate1);
-    threadManager.addEvent(delegate1, 'AGENT_MESSAGE', 'test');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate1,
+      data: 'test',
+    });
 
     // Generate second delegate
     const delegate2 = threadManager.generateDelegateThreadId(mainThreadId);
@@ -171,7 +175,11 @@ describe('Delegation Integration Tests', () => {
 
     // Create and add event to delegate1 so it can have sub-delegates
     threadManager.createThread(delegate2);
-    threadManager.addEvent(delegate2, 'AGENT_MESSAGE', 'test');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate2,
+      data: 'test',
+    });
 
     // Generate sub-delegate from first delegate
     const subDelegate1 = threadManager.generateDelegateThreadId(delegate1);
@@ -190,9 +198,21 @@ describe('Delegation Integration Tests', () => {
     threadManager.createThread(delegate2);
 
     // Add events to each thread
-    threadManager.addEvent(mainThreadId, 'USER_MESSAGE', 'Main thread message');
-    threadManager.addEvent(delegate1, 'AGENT_MESSAGE', 'Delegate 1 message');
-    threadManager.addEvent(delegate2, 'AGENT_MESSAGE', 'Delegate 2 message');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: mainThreadId,
+      data: 'Main thread message',
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate1,
+      data: 'Delegate 1 message',
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate2,
+      data: 'Delegate 2 message',
+    });
 
     // Test multi-thread querying
     const allEvents = threadManager.getMainAndDelegateEvents(mainThreadId);
@@ -228,12 +248,20 @@ describe('Delegation Integration Tests', () => {
     // Create first delegate
     const delegate1 = threadManager.generateDelegateThreadId(mainThread);
     threadManager.createThread(delegate1);
-    threadManager.addEvent(delegate1, 'AGENT_MESSAGE', 'test1');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate1,
+      data: 'test1',
+    });
 
     // Create second delegate
     const delegate2 = threadManager.generateDelegateThreadId(mainThread);
     threadManager.createThread(delegate2);
-    threadManager.addEvent(delegate2, 'AGENT_MESSAGE', 'test2');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate2,
+      data: 'test2',
+    });
 
     // Create third delegate
     const delegate3 = threadManager.generateDelegateThreadId(mainThread);

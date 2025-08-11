@@ -8,6 +8,7 @@ import type { CombinedTokenUsage } from '~/token-management/types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [
+  // Persisted events
   'USER_MESSAGE',
   'AGENT_MESSAGE',
   'TOOL_CALL',
@@ -18,6 +19,12 @@ export const EVENT_TYPES = [
   'SYSTEM_PROMPT',
   'USER_SYSTEM_PROMPT',
   'COMPACTION',
+  // Transient events (not persisted to database)
+  'AGENT_TOKEN',
+  'AGENT_STREAMING',
+  'AGENT_STATE_CHANGE',
+  'COMPACTION_START',
+  'COMPACTION_COMPLETE',
 ] as const;
 
 // Derive ThreadEventType union from the array
@@ -38,12 +45,44 @@ interface BaseThreadEvent {
   id: string;
   threadId: string;
   timestamp: Date;
+  // New fields for unified event system
+  transient?: boolean; // If true, don't persist to database
+  context?: {
+    sessionId?: string;
+    projectId?: string;
+    taskId?: string;
+    agentId?: string;
+  };
 }
 
 // Agent message data with optional token usage
 export interface AgentMessageData {
   content: string;
   tokenUsage?: CombinedTokenUsage;
+}
+
+// Data types for transient events
+export interface AgentTokenData {
+  token: string;
+}
+
+export interface AgentStreamingData {
+  content: string;
+}
+
+export interface AgentStateChangeData {
+  oldState: string;
+  newState: string;
+  reason?: string;
+}
+
+export interface CompactionStartData {
+  auto: boolean;
+}
+
+export interface CompactionCompleteData {
+  success: boolean;
+  error?: string;
 }
 
 // Discriminated union for type-safe event handling
@@ -87,6 +126,26 @@ export type ThreadEvent =
   | (BaseThreadEvent & {
       type: 'COMPACTION';
       data: CompactionData;
+    })
+  | (BaseThreadEvent & {
+      type: 'AGENT_TOKEN';
+      data: AgentTokenData;
+    })
+  | (BaseThreadEvent & {
+      type: 'AGENT_STREAMING';
+      data: AgentStreamingData;
+    })
+  | (BaseThreadEvent & {
+      type: 'AGENT_STATE_CHANGE';
+      data: AgentStateChangeData;
+    })
+  | (BaseThreadEvent & {
+      type: 'COMPACTION_START';
+      data: CompactionStartData;
+    })
+  | (BaseThreadEvent & {
+      type: 'COMPACTION_COMPLETE';
+      data: CompactionCompleteData;
     });
 
 // Helper type to extract valid data types for addEvent method

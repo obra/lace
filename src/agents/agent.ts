@@ -17,6 +17,11 @@ import {
   ThreadId,
   asThreadId,
   AgentMessageData,
+  AgentTokenData,
+  AgentStreamingData,
+  AgentStateChangeData,
+  CompactionStartData,
+  CompactionCompleteData,
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
@@ -702,6 +707,7 @@ export class Agent extends EventEmitter {
     const tokenListener = ({ token }: { token: string }) => {
       // Simple pass-through - emit all tokens as received
       this.emit('agent_token', { token });
+      this._addEventAndEmit(this._threadId, 'AGENT_TOKEN', { token }, { transient: true });
     };
 
     const tokenUsageListener = ({
@@ -1309,6 +1315,15 @@ export class Agent extends EventEmitter {
     if (oldState !== newState) {
       this._state = newState;
       this.emit('state_change', { from: oldState, to: newState });
+      this._addEventAndEmit(
+        this._threadId,
+        'AGENT_STATE_CHANGE',
+        {
+          oldState,
+          newState,
+        },
+        { transient: true }
+      );
 
       logger.debug('AGENT: State change', {
         threadId: this._threadId,
@@ -1582,11 +1597,23 @@ export class Agent extends EventEmitter {
       try {
         // Emit compaction event
         this.emit('compaction_start', { auto: true });
+        this._addEventAndEmit(
+          this._threadId,
+          'COMPACTION_START',
+          { auto: true },
+          { transient: true }
+        );
 
         await this.compact(this._threadId);
 
         // Emit compaction complete event
         this.emit('compaction_complete', { success: true });
+        this._addEventAndEmit(
+          this._threadId,
+          'COMPACTION_COMPLETE',
+          { success: true },
+          { transient: true }
+        );
       } catch (error) {
         logger.error('Auto-compaction failed', {
           threadId: this._threadId,
@@ -1827,21 +1854,34 @@ export class Agent extends EventEmitter {
 
   private async _handleCompactCommand(): Promise<void> {
     this.emit('compaction_start', { auto: false });
+    this._addEventAndEmit(this._threadId, 'COMPACTION_START', { auto: false }, { transient: true });
 
     try {
       // Use the AI-powered summarization strategy
       await this.compact(this._threadId);
 
       // Add a system message about compaction
-      this._threadManager.addEvent(
+      this._addEventAndEmit(
         this._threadId,
         'LOCAL_SYSTEM_MESSAGE',
         '✅ Conversation compacted successfully'
       );
 
       this.emit('compaction_complete', { success: true });
+      this._addEventAndEmit(
+        this._threadId,
+        'COMPACTION_COMPLETE',
+        { success: true },
+        { transient: true }
+      );
     } catch (error) {
       this.emit('compaction_complete', { success: false });
+      this._addEventAndEmit(
+        this._threadId,
+        'COMPACTION_COMPLETE',
+        { success: false },
+        { transient: true }
+      );
       this.emit('error', {
         error: error instanceof Error ? error : new Error('Compaction failed'),
         context: { operation: 'compact', threadId: this._threadId },
@@ -1896,12 +1936,24 @@ export class Agent extends EventEmitter {
   }
 
   /**
+   * Get context information for thread events
+   */
+  private _getEventContext(): { sessionId?: string; projectId?: string; agentId?: string } {
+    const thread = this._threadManager.getThread(this._threadId);
+    return {
+      sessionId: thread?.sessionId,
+      projectId: thread?.projectId,
+      agentId: this._threadId, // Use threadId as agentId since each agent has one thread
+    };
+  }
+
+  /**
    * Helper method to add event to ThreadManager and emit Agent event
    * This ensures Agent is the single event source for UI updates
    */
   private _addEventAndEmit(
     threadId: string,
-    type: string,
+    type: ThreadEventType,
     data:
       | string
       | AgentMessageData
@@ -1910,6 +1962,20 @@ export class Agent extends EventEmitter {
       | CompactionData
       | ToolApprovalRequestData
       | ToolApprovalResponseData
+      | AgentTokenData
+      | AgentStreamingData
+      | AgentStateChangeData
+      | CompactionStartData
+      | CompactionCompleteData,
+    options?: {
+      transient?: boolean;
+      context?: {
+        sessionId?: string;
+        projectId?: string;
+        taskId?: string;
+        agentId?: string;
+      };
+    }
   ): ThreadEvent | null {
     // Safety check: only add events if thread exists
     if (!this._threadManager.getThread(threadId)) {
@@ -1920,7 +1986,14 @@ export class Agent extends EventEmitter {
       return null;
     }
 
-    const event = this._threadManager.addEvent(threadId, type as ThreadEventType, data);
+    const event = this._threadManager.addEvent({
+      type,
+      threadId,
+      data,
+      transient: options?.transient,
+      context: options?.context || this._getEventContext(),
+    } as ThreadEvent);
+
     if (event) {
       this.emit('thread_event_added', { event, threadId });
     }

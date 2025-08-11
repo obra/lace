@@ -61,9 +61,17 @@ describe('Agent command handling', () => {
 
   it('should handle /compact command', async () => {
     // Add some events first to make compaction meaningful
-    threadManager.addEvent(agent.threadId, 'USER_MESSAGE', 'Hello');
-    threadManager.addEvent(agent.threadId, 'AGENT_MESSAGE', {
-      content: 'Hi there! How can I help you today?',
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agent.threadId,
+      data: 'Hello',
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: agent.threadId,
+      data: {
+        content: 'Hi there! How can I help you today?',
+      },
     });
 
     // Spy on the compact method (we'll implement this)

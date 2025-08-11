@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__secret-journal__process_thoughts",
+      "Bash(rg:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(npm run test:run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}

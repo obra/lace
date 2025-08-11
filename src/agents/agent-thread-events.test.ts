@@ -124,9 +124,21 @@ describe('Agent Thread Events', () => {
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
 
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message');
-      threadManager.addEvent(threadId, 'AGENT_MESSAGE', { content: 'First response' });
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'First message',
+      });
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId,
+        data: { content: 'First response' },
+      });
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Second message',
+      });
 
       const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
@@ -165,13 +177,25 @@ describe('Agent Thread Events', () => {
       threadManager.clearEvents(threadId);
 
       const event1 = expectEventAdded(
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 1')
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Message 1',
+        })
       );
       const event2 = expectEventAdded(
-        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Response 1')
+        threadManager.addEvent({
+          type: 'AGENT_MESSAGE',
+          threadId,
+          data: 'Response 1',
+        })
       );
       const event3 = expectEventAdded(
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Message 2')
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Message 2',
+        })
       );
 
       const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
@@ -224,7 +248,11 @@ describe('Agent Thread Events', () => {
       // Arrange
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Test message',
+      });
 
       // Act
       const events = agent.getThreadEvents();
@@ -239,7 +267,11 @@ describe('Agent Thread Events', () => {
       // Arrange
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
-      threadManager.addEvent(threadId, 'USER_MESSAGE', 'Specific thread message');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Specific thread message',
+      });
 
       // Act
       const events = agent.getThreadEvents(threadId);
@@ -275,7 +307,11 @@ describe('Agent Thread Events', () => {
       // Arrange
       const existingThreadId = agent.getThreadId();
       threadManager.clearEvents(existingThreadId);
-      threadManager.addEvent(existingThreadId, 'USER_MESSAGE', 'Existing message');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: existingThreadId,
+        data: 'Existing message',
+      });
 
       const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);

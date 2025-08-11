@@ -81,8 +81,16 @@ describe('Agent Single Event Source Integration', () => {
   it('should handle Agent API operations correctly', () => {
     // Create thread and add some events
     threadManager.createThread('api-test-thread');
-    threadManager.addEvent('api-test-thread', 'USER_MESSAGE', 'test message 1');
-    threadManager.addEvent('api-test-thread', 'AGENT_MESSAGE', 'test response 1');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: 'api-test-thread',
+      data: 'test message 1',
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: 'api-test-thread',
+      data: 'test response 1',
+    });
 
     // Test getThreadEvents
     const events = agent.getThreadEvents('api-test-thread');
