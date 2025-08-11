@@ -7,7 +7,7 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, ThreadEventType, isTransientEventType } from '~/threads/types';
+import { Thread, ThreadEvent, isTransientEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
@@ -314,7 +314,7 @@ export class ThreadManager {
     }
 
     // Determine if this event should be persisted
-    const isTransient = event.transient || this.isTransientEventType(event.type);
+    const isTransient = event.transient || isTransientEventType(event.type);
 
     if (isTransient) {
       // Don't persist transient events to database
@@ -343,10 +343,6 @@ export class ThreadManager {
         return null;
       }
     });
-  }
-
-  private isTransientEventType(type: ThreadEventType): boolean {
-    return isTransientEventType(type);
   }
 
   /**

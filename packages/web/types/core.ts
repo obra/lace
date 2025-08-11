@@ -11,8 +11,6 @@ export type {
   AgentMessageData,
 } from '~/threads/types';
 
-// Re-export helper functions
-export { isThreadId, asThreadId, isTransientEventType } from '~/threads/types';
 export type {
   MessageTokenUsage,
   ThreadTokenUsage,
@@ -54,4 +52,5 @@ export {
   asAssigneeId,
   isAssigneeId,
   EVENT_TYPES,
+  isTransientEventType,
 } from '~/threads/types';
