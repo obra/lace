@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
+import { safeStringify } from '~/utils/safeStringify';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];
@@ -88,7 +89,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
 
   const formatInput = (input: unknown): string => {
     if (typeof input === 'string') return input;
-    return JSON.stringify(input, null, 2);
+    return safeStringify(input);
   };
 
   return (
