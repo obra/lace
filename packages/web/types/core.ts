@@ -54,4 +54,6 @@ export {
   isAssigneeId,
   EVENT_TYPES,
   isTransientEventType,
+  isInternalWorkflowEvent,
+  isConversationEvent,
 } from '~/threads/types';

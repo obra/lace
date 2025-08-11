@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import type { ThreadEvent } from '@/types/core';
-import { asThreadId, isTransientEventType } from '@/types/core';
+import { asThreadId, isConversationEvent } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
@@ -41,13 +41,8 @@ export async function GET(
     // Load all events from the session and its delegates through the Agent layer
     const threadEvents = coordinatorAgent.getMainAndDelegateEvents(sessionId);
 
-    // Filter out transient and approval events - they're not part of the conversation history
-    const events: ThreadEvent[] = threadEvents.filter(
-      (event) =>
-        !isTransientEventType(event.type) &&
-        event.type !== 'TOOL_APPROVAL_REQUEST' &&
-        event.type !== 'TOOL_APPROVAL_RESPONSE'
-    );
+    // Filter to only conversation events (persisted and shown in timeline)
+    const events: ThreadEvent[] = threadEvents.filter((event) => isConversationEvent(event.type));
 
     return createSuperjsonResponse({ events }, { status: 200 });
   } catch (error: unknown) {

@@ -9,6 +9,7 @@ import type {
   PendingApprovalsResponse,
 } from '@/types/api';
 import type { ThreadId } from '@/types/core';
+import { isInternalWorkflowEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
 interface UseSessionEventsReturn {
@@ -135,10 +136,9 @@ export function useSessionEvents(
       .then((data) => {
         if (data.events) {
           // Events are already properly typed ThreadEvents from superjson
-          // Filter out approval events (they're handled separately)
+          // Filter out internal workflow events (they're handled separately)
           const timelineEvents = data.events.filter(
-            (event) =>
-              event.type !== 'TOOL_APPROVAL_REQUEST' && event.type !== 'TOOL_APPROVAL_RESPONSE'
+            (event) => !isInternalWorkflowEvent(event.type)
           );
 
           setEvents(timelineEvents);

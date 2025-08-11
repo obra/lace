@@ -134,8 +134,8 @@ describe('Type Integrity - Current State', () => {
   });
 
   describe('Event type imports', () => {
-    it('should import EVENT_TYPES from events constants', async () => {
-      const { EVENT_TYPES } = await import('@/types/events-constants');
+    it('should import EVENT_TYPES from core', async () => {
+      const { EVENT_TYPES } = await import('@/types/core');
 
       expect(EVENT_TYPES).toContain('USER_MESSAGE');
       expect(EVENT_TYPES).toContain('AGENT_MESSAGE');
@@ -143,11 +143,11 @@ describe('Type Integrity - Current State', () => {
       expect(EVENT_TYPES).toContain('TOOL_RESULT');
     });
 
-    it('should import ThreadEventType from events constants', async () => {
-      const eventsModule = await import('@/types/events-constants');
+    it('should import ThreadEventType from core', async () => {
+      const coreModule = await import('@/types/core');
       // ThreadEventType is a type, not a value, so we just check the module exists
-      expect(eventsModule).toBeDefined();
-      expect(eventsModule.EVENT_TYPES).toBeDefined(); // This is a value export
+      expect(coreModule).toBeDefined();
+      expect(coreModule.EVENT_TYPES).toBeDefined(); // This is a value export
     });
   });
 
@@ -158,15 +158,13 @@ describe('Type Integrity - Current State', () => {
         () => import('@/types/api'),
         () => import('@/types/core'),
         () => import('@/lib/server/lace-imports'),
-        () => import('@/types/core'),
         () => import('@/lib/validation/schemas'),
         () => import('@/lib/validation/thread-id-validation'),
-        () => import('@/types/events-constants'),
       ];
 
       // All imports should resolve successfully
       const resolvedImports = await Promise.all(imports.map((importFn) => importFn()));
-      expect(resolvedImports).toHaveLength(7);
+      expect(resolvedImports).toHaveLength(5);
       resolvedImports.forEach((module) => {
         expect(module).toBeDefined();
       });

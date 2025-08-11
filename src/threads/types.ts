@@ -68,6 +68,43 @@ export function isTransientEventType(type: ThreadEventType): boolean {
   ].includes(type);
 }
 
+/**
+ * Event Category Helpers
+ *
+ * Lace events fall into three semantic categories:
+ *
+ * 1. CONVERSATION EVENTS: Persisted and shown in timeline
+ *    - USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, etc.
+ *    - These form the core conversation history
+ *
+ * 2. TRANSIENT EVENTS: Not persisted, used for real-time updates
+ *    - AGENT_TOKEN, AGENT_STREAMING, AGENT_STATE_CHANGE, etc.
+ *    - These provide live feedback but aren't part of history
+ *
+ * 3. INTERNAL WORKFLOW EVENTS: Persisted but not shown in timeline
+ *    - TOOL_APPROVAL_REQUEST, TOOL_APPROVAL_RESPONSE
+ *    - These support features like resumable approvals after restart
+ */
+
+/**
+ * Check if an event is part of internal workflow (persisted but not shown)
+ * These events are persisted for system functionality but hidden from users
+ */
+export function isInternalWorkflowEvent(type: ThreadEventType): boolean {
+  return ['TOOL_APPROVAL_REQUEST', 'TOOL_APPROVAL_RESPONSE'].includes(type);
+}
+
+/**
+ * Check if an event should be shown in the conversation timeline
+ * These are the events that form the visible conversation history
+ */
+export function isConversationEvent(type: ThreadEventType): boolean {
+  // Conversation events are those that are:
+  // 1. Not transient (persisted to database)
+  // 2. Not internal workflow events (hidden from timeline)
+  return !isTransientEventType(type) && !isInternalWorkflowEvent(type);
+}
+
 // Tool approval event data types
 export interface ToolApprovalRequestData {
   toolCallId: string;
