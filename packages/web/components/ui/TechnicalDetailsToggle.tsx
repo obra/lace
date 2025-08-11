@@ -60,7 +60,7 @@ export function TechnicalDetailsToggle({
   };
   
   return (
-    <div className={className}>
+    <div className={`relative ${className || ''}`}>
       {children}
       
       <button

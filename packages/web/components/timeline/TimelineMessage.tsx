@@ -248,23 +248,25 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
       );
 
     // System notification
-    case 'SYSTEM_NOTIFICATION':
-      const severityColors = {
-        info: 'info',
-        warning: 'warning',
-        error: 'error',
+    case 'SYSTEM_NOTIFICATION': {
+      const severityClassMap = {
+        info: 'bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info',
+        warning: 'bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning',
+        error: 'bg-error/10 border border-error/20 rounded-lg px-4 py-2 text-sm text-error',
       };
-      const color = severityColors[event.data.severity] || 'info';
+      const className = severityClassMap[event.data?.severity] || severityClassMap.info;
+      
       return (
         <div className="flex justify-center">
-          <div className={`bg-${color}/10 border border-${color}/20 rounded-lg px-4 py-2 text-sm text-${color}`}>
+          <div className={className}>
             <div className="flex items-center gap-2">
               <span>ℹ️</span>
-              <span>{event.data.message}</span>
+              <span>{event.data?.message}</span>
             </div>
           </div>
         </div>
       );
+    }
 
     // These are handled elsewhere or not displayed
     case 'AGENT_TOKEN':

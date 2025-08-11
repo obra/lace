@@ -18,7 +18,6 @@ export function TimelineMessageWithDetails({ event, agents }: TimelineMessageWit
     <TechnicalDetailsToggle 
       details={event}
       label="Event Details"
-      className="relative"
       buttonClassName="absolute top-2 right-2 text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200"
     >
       <TimelineMessage event={event} agents={agents} />

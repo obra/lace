@@ -230,8 +230,8 @@ export const Default: Story = {
     events: sampleEvents,
     agents: mockAgents,
     isTyping: false,
-    currentAgent: 'lace_20240115_abc123.1',
-    selectedAgent: 'lace_20240115_abc123.1',
+    currentAgent: asThreadId('lace_20240115_abc123.1'),
+    selectedAgent: asThreadId('lace_20240115_abc123.1'),
   },
 };
 
@@ -241,8 +241,8 @@ export const EmptyState: Story = {
     events: emptyEvents,
     agents: mockAgents,
     isTyping: false,
-    currentAgent: 'lace_20240115_abc123.1',
-    selectedAgent: 'lace_20240115_abc123.1',
+    currentAgent: asThreadId('lace_20240115_abc123.1'),
+    selectedAgent: asThreadId('lace_20240115_abc123.1'),
   },
 };
 
@@ -252,8 +252,8 @@ export const AgentTyping: Story = {
     events: sampleEvents,
     agents: mockAgents,
     isTyping: true,
-    currentAgent: 'lace_20240115_abc123.1',
-    selectedAgent: 'lace_20240115_abc123.1',
+    currentAgent: asThreadId('lace_20240115_abc123.1'),
+    selectedAgent: asThreadId('lace_20240115_abc123.1'),
   },
 };
 
@@ -263,8 +263,8 @@ export const StreamingResponse: Story = {
     events: sampleEvents,
     agents: mockAgents,
     isTyping: false,
-    currentAgent: 'lace_20240115_abc123.1',
-    selectedAgent: 'lace_20240115_abc123.1',
+    currentAgent: asThreadId('lace_20240115_abc123.1'),
+    selectedAgent: asThreadId('lace_20240115_abc123.1'),
     streamingContent: 'Let me create a more advanced example that shows how to use multiple hooks together...',
   },
 };
@@ -319,8 +319,8 @@ export const MultiAgent: Story = {
     ],
     agents: mockAgents,
     isTyping: false,
-    currentAgent: 'lace_20240115_abc123.2',
-    selectedAgent: 'lace_20240115_abc123.2',
+    currentAgent: asThreadId('lace_20240115_abc123.2'),
+    selectedAgent: asThreadId('lace_20240115_abc123.2'),
   },
 };
 
@@ -342,8 +342,8 @@ export const LongConversation: Story = {
     ],
     agents: mockAgents,
     isTyping: false,
-    currentAgent: 'lace_20240115_abc123.1',
-    selectedAgent: 'lace_20240115_abc123.1',
+    currentAgent: asThreadId('lace_20240115_abc123.1'),
+    selectedAgent: asThreadId('lace_20240115_abc123.1'),
   },
 };
 
@@ -412,7 +412,7 @@ export const WithTaskEvents: Story = {
     ],
     agents: mockAgents,
     isTyping: false,
-    currentAgent: 'lace_20240115_abc123.1',
-    selectedAgent: 'lace_20240115_abc123.1',
+    currentAgent: asThreadId('lace_20240115_abc123.1'),
+    selectedAgent: asThreadId('lace_20240115_abc123.1'),
   },
 };
