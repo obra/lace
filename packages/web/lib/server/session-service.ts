@@ -248,8 +248,9 @@ export class SessionService {
         threadId,
         timestamp: new Date(),
         data: {
-          oldState: from,
-          newState: to,
+          agentId: threadId,
+          from,
+          to,
         },
         context: {
           sessionId,

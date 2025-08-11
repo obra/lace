@@ -221,8 +221,8 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-// StreamEvent timestamp schema (for the outer StreamEvent wrapper)
-export const StreamEventTimestampSchema = DateTimeSchema;
+// ThreadEvent timestamp schema
+export const ThreadEventTimestampSchema = DateTimeSchema;
 
 // Helper function to safely parse SessionEvent from JSON
 export function parseSessionEvent(data: unknown): SessionEvent {

@@ -15,7 +15,7 @@ import type { PendingApproval } from '@/types/api';
 import type { Task } from '@/types/core';
 import {
   parseSessionEvent,
-  StreamEventTimestampSchema,
+  ThreadEventTimestampSchema,
 } from '@/lib/validation/session-event-schemas';
 
 // Task event types
@@ -372,7 +372,7 @@ export function useEventStream({
       if (isSessionEvent(event)) {
         // ThreadEvent IS the session event - no unwrapping needed
         const sessionEvent = event as SessionEvent;
-        const streamTimestamp = event.timestamp || new Date();
+        const threadTimestamp = ThreadEventTimestampSchema.parse(event.timestamp || new Date());
 
         // Handle tool approval requests
         if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
@@ -385,7 +385,7 @@ export function useEventStream({
               name: approvalData.toolName,
               arguments: approvalData.input,
             },
-            requestedAt: streamTimestamp, // Date object, SuperJSON handles serialization
+            requestedAt: threadTimestamp, // Date object, SuperJSON handles serialization
             requestData: approvalData,
           };
           callbackRefs.current.onApprovalRequest?.(pendingApproval);

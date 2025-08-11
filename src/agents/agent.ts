@@ -1354,8 +1354,9 @@ export class Agent extends EventEmitter {
         type: 'AGENT_STATE_CHANGE',
         threadId: this._threadId,
         data: {
-          oldState,
-          newState,
+          agentId: this._threadId as ThreadId,
+          from: oldState,
+          to: newState,
         },
         transient: true,
       });

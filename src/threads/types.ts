@@ -84,9 +84,9 @@ export interface AgentStreamingData {
 }
 
 export interface AgentStateChangeData {
-  oldState: string;
-  newState: string;
-  reason?: string;
+  agentId: ThreadId;
+  from: string;
+  to: string;
 }
 
 export interface CompactionStartData {
