@@ -1,347 +1,285 @@
+// ABOUTME: Timeline message component that renders ThreadEvent directly
+// ABOUTME: Replaces TimelineMessage to work with unified event system
+
 'use client';
 
-import { TimelineEntry } from '@/types/web-events';
-import { MessageHeader, MessageText, AgentBadge, TimestampDisplay } from '@/components/ui';
+import type { ThreadEvent, AgentInfo } from '@/types/core';
+import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
+import { MessageHeader, MessageText } from '@/components/ui';
 import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
-import { IntegrationEntry } from '@/components/timeline/IntegrationEntry';
-import { UnknownEventEntry } from '@/components/timeline/UnknownEventEntry';
 import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
-import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faImages, faExternalLinkAlt, faUser, faRobot } from '@/lib/fontawesome';
-import { formatTime } from '@/lib/format';
 
 interface TimelineMessageProps {
-  /** The timeline entry data to display with type discrimination for different message types */
-  entry: TimelineEntry;
+  event: ProcessedEvent;
+  agents?: AgentInfo[];
 }
 
-/**
- * TimelineMessage is a complex organism that renders different types of timeline entries
- * in a conversation interface. It handles multiple message types (human, AI, tool, 
- * integration, carousel, Google Doc) with appropriate styling and interactions.
- * 
- * @component
- * @example
- * ```tsx
- * <TimelineMessage entry={humanMessageEntry} />
- * <TimelineMessage entry={aiMessageEntry} />
- * <TimelineMessage entry={toolMessageEntry} />
- * ```
- */
-export function TimelineMessage({ entry }: TimelineMessageProps) {
-  // Admin Messages
-  if (entry.type === 'admin') {
-    return (
-      <div className="flex justify-center">
-        <div className="bg-base-200 border border-base-300 rounded-full px-4 py-2 text-sm text-base-content/70">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-info rounded-full"></div>
-            <span>{entry.content}</span>
+function getAgentName(threadId: string, agents?: AgentInfo[]): string {
+  const agent = agents?.find(a => a.threadId === threadId);
+  return agent?.name || 'Assistant';
+}
+
+export function TimelineMessage({ event, agents }: TimelineMessageProps) {
+  const timestamp = event.timestamp || new Date();
+  const agentName = getAgentName(event.threadId, agents);
+
+  switch (event.type) {
+    case 'USER_MESSAGE':
+      return (
+        <div className="flex gap-3">
+          <div className="flex-1 min-w-0">
+            <MessageHeader
+              name="You"
+              timestamp={timestamp}
+              role="user"
+            />
+            <MessageText content={event.data} />
           </div>
         </div>
-      </div>
-    );
-  }
+      );
 
-  // Tool Messages - use enhanced display for aggregated tools, fallback for legacy
-  if (entry.type === 'tool') {
-    // Check if this is an aggregated tool call with metadata, or a regular tool call with arguments
-    if ((entry.metadata && entry.metadata.toolId) || (entry.metadata && entry.metadata.arguments)) {
+    case 'AGENT_MESSAGE':
+    case 'AGENT_STREAMING':
+      return (
+        <div className="flex gap-3">
+          <div className="flex-1 min-w-0">
+            <MessageHeader
+              name={agentName}
+              timestamp={timestamp}
+              role="assistant"
+              badge={{ text: agentName, variant: 'primary' }}
+            />
+            <MessageText content={event.data.content} />
+          </div>
+        </div>
+      );
+
+    case 'TOOL_AGGREGATED':
+      // Use enhanced display for aggregated tools
       return (
         <ToolCallDisplay
-          tool={entry.tool || 'Unknown Tool'}
-          content={entry.content || ''}
-          result={entry.result}
-          timestamp={entry.timestamp}
-          metadata={entry.metadata}
+          tool={event.data.toolName}
+          content={`Tool: ${event.data.toolName}`}
+          result={event.data.result}
+          timestamp={timestamp}
+          metadata={{
+            toolId: event.data.toolId,
+            arguments: event.data.arguments,
+          }}
         />
       );
-    }
-    
-    // Legacy tool display for backwards compatibility
-    return (
-      <div className="flex gap-3">
-        <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
-            <div className="w-3 h-3 bg-teal-600 rounded"></div>
+
+    case 'TOOL_CALL':
+      // Standalone tool call (not aggregated)
+      return (
+        <div className="flex gap-3">
+          <div className="flex-shrink-0">
+            <div className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
+              <div className="w-3 h-3 bg-teal-600 rounded"></div>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <MessageHeader
+              name="Tool"
+              timestamp={timestamp}
+              badge={{ text: event.data.name, variant: 'info' }}
+            />
+            <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
+              <div className="text-base-content/80 mb-2 font-mono">$ {event.data.name}</div>
+              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
+                {JSON.stringify(event.data.arguments, null, 2)}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <MessageHeader
-            name="Tool"
-            timestamp={entry.timestamp}
-            badge={entry.tool ? { text: entry.tool, variant: 'info' } : undefined}
-          />
-          <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
-            <div className="text-base-content/80 mb-2 font-mono">$ {entry.content}</div>
-            {entry.result && (
+      );
+
+    case 'TOOL_RESULT':
+      // Standalone tool result (not aggregated)
+      return (
+        <div className="flex gap-3">
+          <div className="flex-shrink-0">
+            <div className="w-8 h-8 rounded-md bg-green-100 text-green-700 flex items-center justify-center text-sm">
+              ✓
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <MessageHeader
+              name="Tool Result"
+              timestamp={timestamp}
+            />
+            <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
               <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
-                {typeof entry.result === 'string' 
-                  ? entry.result 
-                  : entry.result?.content?.map(block => block.text).join('') || 'No result'
+                {typeof event.data === 'string' 
+                  ? event.data 
+                  : event.data?.content?.map(block => block.text).join('') || 'No result'
                 }
               </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
 
-  // Human Messages
-  if (entry.type === 'human') {
-    return (
-      <div className="flex gap-3">
-        <div className="flex-1 min-w-0">
-          <MessageHeader
-            name="You"
-            timestamp={entry.timestamp}
-            role="user"
-          />
-          <MessageText content={entry.content || ''} />
-        </div>
-      </div>
-    );
-  }
-
-  // AI Messages
-  if (entry.type === 'ai') {
-    return (
-      <div className="flex gap-3">
-        <div className="flex-1 min-w-0">
-          <MessageHeader
-            name={entry.agent || 'Assistant'}
-            timestamp={entry.timestamp}
-            role="assistant"
-            badge={entry.agent ? { text: entry.agent, variant: 'primary' } : undefined}
-          />
-          <MessageText content={entry.content || ''} />
-        </div>
-      </div>
-    );
-  }
-
-  // System Prompt
-  if (entry.type === 'system-prompt') {
-    return (
-      <SystemPromptEntry
-        content={entry.content || ''}
-        timestamp={entry.timestamp}
-        isRecentMessage={false} // System prompts are typically not recent
-      />
-    );
-  }
-
-  // User System Prompt
-  if (entry.type === 'user-system-prompt') {
-    return (
-      <UserSystemPromptEntry
-        content={entry.content || ''}
-        timestamp={entry.timestamp}
-        isRecentMessage={false} // User system prompts are typically not recent
-      />
-    );
-  }
-
-  // Unknown events with expandable content and metadata
-  if (entry.type === 'unknown') {
-    return (
-      <UnknownEventEntry
-        id={entry.id.toString()}
-        eventType={entry.eventType || 'UNKNOWN'}
-        content={entry.content || ''}
-        timestamp={entry.timestamp}
-        metadata={entry.metadata}
-      />
-    );
-  }
-
-  // Integration
-  if (entry.type === 'integration') {
-    const baseEntry = {
-      id: entry.id.toString(),
-      action: entry.action as 'created' | 'updated' | 'shared' | 'completed',
-      title: entry.title || '',
-      description: entry.description || '',
-      url: entry.link,
-      timestamp: entry.timestamp,
-    };
-
-    let integrationEntry;
-    switch (entry.tool) {
-      case 'Google Drive':
-        integrationEntry = {
-          ...baseEntry,
-          type: 'google-drive' as const,
-          fileType: 'document' as const,
-          sharedWith: ['user@example.com'],
-        };
-        break;
-      case 'Google Sheets':
-        integrationEntry = {
-          ...baseEntry,
-          type: 'google-sheets' as const,
-          sheetName: 'Sheet1',
-          rowsAdded: 100,
-          collaborators: ['user@example.com'],
-        };
-        break;
-      case 'Slack':
-        integrationEntry = {
-          ...baseEntry,
-          type: 'slack' as const,
-          channel: '#development',
-          messagePreview: entry.description,
-        };
-        break;
-      case 'GitHub':
-        integrationEntry = {
-          ...baseEntry,
-          type: 'github' as const,
-          repository: 'lace',
-          pullRequest: 123,
-        };
-        break;
-      default:
-        integrationEntry = {
-          ...baseEntry,
-          type: 'google-drive' as const,
-          fileType: 'document' as const,
-          sharedWith: ['user@example.com'],
-        };
-    }
-
-    return <IntegrationEntry entry={integrationEntry} />;
-  }
-
-  // Carousel
-  if (entry.type === 'carousel' && entry.items) {
-    return (
-      <div className="flex gap-3">
-        <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 flex items-center justify-center text-sm">
-            <FontAwesomeIcon icon={faImages} className="text-xs" />
+    case 'LOCAL_SYSTEM_MESSAGE':
+      return (
+        <div className="flex justify-center">
+          <div className="bg-base-200 border border-base-300 rounded-full px-4 py-2 text-sm text-base-content/70">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-info rounded-full"></div>
+              <span>{event.data}</span>
+            </div>
           </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-semibold text-base-content">{entry.title}</h3>
-            <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
+      );
+
+    case 'SYSTEM_PROMPT':
+      return (
+        <SystemPromptEntry
+          content={event.data}
+          timestamp={timestamp}
+          isRecentMessage={false}
+        />
+      );
+
+    case 'USER_SYSTEM_PROMPT':
+      return (
+        <UserSystemPromptEntry
+          content={event.data}
+          timestamp={timestamp}
+          isRecentMessage={false}
+        />
+      );
+
+    case 'COMPACTION':
+      return (
+        <div className="flex justify-center">
+          <div className="bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning">
+            <div className="flex items-center gap-2">
+              <span>📦</span>
+              <span>Conversation compacted ({event.data.originalEventCount} → {event.data.compactedEvents.length} events)</span>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {entry.items.map((item, index) => (
-              <div key={index} className="card bg-base-100 shadow-sm border border-base-300">
-                <div className="card-body p-3">
-                  <div className="flex items-start justify-between">
-                    <h4 className="card-title text-sm">{item.title}</h4>
-                    <div
-                      className={`badge badge-sm ${
-                        item.type === 'feature'
-                          ? 'badge-success'
-                          : item.type === 'bugfix'
-                            ? 'badge-error'
-                            : item.type === 'refactor'
-                              ? 'badge-warning'
-                              : 'badge-ghost'
-                      }`}
-                    >
-                      {item.type}
-                    </div>
-                  </div>
-                  <p className="text-xs text-base-content/70 mt-2">{item.description}</p>
+        </div>
+      );
 
-                  <div className="flex items-center justify-between mt-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-base-content/50">Impact:</span>
-                      <div className="flex gap-1">
-                        {[1, 2, 3].map((i) => (
-                          <div
-                            key={i}
-                            className={`w-2 h-2 rounded-full ${
-                              item.impact === 'high' && i <= 3
-                                ? 'bg-error'
-                                : item.impact === 'medium' && i <= 2
-                                  ? 'bg-warning'
-                                  : item.impact === 'low' && i <= 1
-                                    ? 'bg-success'
-                                    : 'bg-base-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono text-base-content/50">{item.commit}</span>
-                  </div>
+    case 'COMPACTION_START':
+      return (
+        <div className="flex justify-center">
+          <div className="bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info">
+            <div className="flex items-center gap-2">
+              <span className="loading loading-spinner loading-xs"></span>
+              <span>Compacting conversation{event.data.auto ? ' (auto)' : ''}...</span>
+            </div>
+          </div>
+        </div>
+      );
 
-                  <div className="mt-3">
-                    <span className="text-xs text-base-content/50 block mb-1">Files:</span>
-                    {item.files.slice(0, 2).map((file, i) => (
-                      <div key={i} className="text-xs bg-base-200 px-2 py-1 rounded mb-1 font-mono">
-                        {file}
-                      </div>
-                    ))}
-                    {item.files.length > 2 && (
-                      <div className="text-xs text-base-content/50">
-                        +{item.files.length - 2} more files
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="card-actions justify-end mt-3">
-                    <button className="btn btn-xs btn-outline">
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-1" />
-                      View
-                    </button>
-                  </div>
-                </div>
+    case 'COMPACTION_COMPLETE':
+      if (!event.data.success) {
+        return (
+          <div className="flex justify-center">
+            <div className="bg-error/10 border border-error/20 rounded-lg px-4 py-2 text-sm text-error">
+              <div className="flex items-center gap-2">
+                <span>❌</span>
+                <span>Compaction failed</span>
               </div>
-            ))}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="flex justify-center">
+          <div className="bg-success/10 border border-success/20 rounded-lg px-4 py-2 text-sm text-success">
+            <div className="flex items-center gap-2">
+              <span>✅</span>
+              <span>Compaction complete</span>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+
+    // Task events
+    case 'TASK_CREATED':
+      return (
+        <div className="flex justify-center">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary">
+            <div className="flex items-center gap-2">
+              <span>📝</span>
+              <span>Task created: {event.data.task?.name || event.data.taskId}</span>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'TASK_UPDATED':
+      return (
+        <div className="flex justify-center">
+          <div className="bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info">
+            <div className="flex items-center gap-2">
+              <span>✏️</span>
+              <span>Task updated: {event.data.task?.name || event.data.taskId}</span>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'TASK_DELETED':
+      return (
+        <div className="flex justify-center">
+          <div className="bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning">
+            <div className="flex items-center gap-2">
+              <span>🗑️</span>
+              <span>Task deleted: {event.data.task?.name || event.data.taskId}</span>
+            </div>
+          </div>
+        </div>
+      );
+
+    // System notification
+    case 'SYSTEM_NOTIFICATION':
+      const severityColors = {
+        info: 'info',
+        warning: 'warning',
+        error: 'error',
+      };
+      const color = severityColors[event.data.severity] || 'info';
+      return (
+        <div className="flex justify-center">
+          <div className={`bg-${color}/10 border border-${color}/20 rounded-lg px-4 py-2 text-sm text-${color}`}>
+            <div className="flex items-center gap-2">
+              <span>ℹ️</span>
+              <span>{event.data.message}</span>
+            </div>
+          </div>
+        </div>
+      );
+
+    // These are handled elsewhere or not displayed
+    case 'AGENT_TOKEN':
+    case 'AGENT_STATE_CHANGE':
+    case 'TOOL_APPROVAL_REQUEST':
+    case 'TOOL_APPROVAL_RESPONSE':
+    case 'AGENT_SPAWNED':
+    case 'PROJECT_CREATED':
+    case 'PROJECT_UPDATED':
+    case 'PROJECT_DELETED':
+    case 'TASK_NOTE_ADDED':
+      return null;
+
+    default:
+      // Unknown event type - show debug info in development
+      if (process.env.NODE_ENV === 'development') {
+        return (
+          <div className="flex justify-center">
+            <div className="bg-base-200 border border-base-300 rounded-lg px-4 py-2 text-sm text-base-content/50">
+              <div className="font-mono text-xs">
+                Unknown event: {(event as any).type}
+              </div>
+            </div>
+          </div>
+        );
+      }
+      return null;
   }
-
-  // Google Doc Messages
-  if (entry.type === 'google-doc') {
-    const message = {
-      id: entry.id.toString(),
-      role: entry.agent ? ('assistant' as const) : ('user' as const),
-      content: entry.content || '',
-      timestamp: entry.timestamp,
-      document: entry.document,
-    };
-
-    return (
-      <div className="flex gap-3">
-        <div className="flex-shrink-0">
-          <div
-            className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
-              entry.agent ? 'bg-orange-500 text-white' : 'bg-teal-600 text-white'
-            }`}
-          >
-            <FontAwesomeIcon icon={entry.agent ? faRobot : faUser} className="text-xs" />
-          </div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-medium text-sm text-base-content">{entry.agent || 'You'}</span>
-            <span className="text-xs text-base-content/50">{formatTime(entry.timestamp)}</span>
-            {entry.agent && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                {entry.agent}
-              </span>
-            )}
-          </div>
-          <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-            <GoogleDocChatMessage message={message} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
 }

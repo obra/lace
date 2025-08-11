@@ -34,9 +34,8 @@ import { isApiError } from '@/types/api';
 import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
-import type { SessionEvent } from '@/types/web-sse';
-import type { ToolApprovalRequestData, TimelineEntry } from '@/types/web-events';
-import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
+import type { ThreadEvent } from '~/threads/types';
+import type { ToolApprovalRequestData } from '@/types/web-events';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
@@ -195,13 +194,8 @@ export const LaceApp = memo(function LaceApp() {
   
   const connected = connection.connected;
 
-  // Convert SessionEvents to TimelineEntries for the design system
-  const timelineEntries = useMemo((): TimelineEntry[] => {
-    return convertSessionEventsToTimeline(events, {
-      agents: selectedSessionDetails?.agents || [],
-      selectedAgent: selectedAgent || undefined,
-    });
-  }, [events, selectedSessionDetails?.agents, selectedAgent]);
+  // Events are now ThreadEvent[] directly
+  // No conversion needed - components handle ThreadEvent natively
 
   // Project loading function
   const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
@@ -969,9 +963,11 @@ export const LaceApp = memo(function LaceApp() {
                 {/* Conversation Display */}
                 <div className="flex-1 min-h-0">
                   <TimelineView
-                    entries={timelineEntries}
+                    events={events}
+                    agents={selectedSessionDetails?.agents}
                     isTyping={agentBusy}
                     currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                    selectedAgent={selectedAgent}
                   />
                 </div>
 
