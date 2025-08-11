@@ -10,6 +10,7 @@ import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { EVENT_TYPES } from '~/threads/types';
 
 // Helper function to wait for agent to return to idle state
 async function waitForAgentIdle(agent: Agent, timeout = 5000): Promise<void> {
@@ -281,17 +282,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     expect(events.length).toBeGreaterThan(0);
 
     // All events should be valid types
-    const validEventTypes = [
-      'USER_MESSAGE',
-      'AGENT_MESSAGE',
-      'TOOL_CALL',
-      'TOOL_RESULT',
-      'LOCAL_SYSTEM_MESSAGE',
-      'THINKING',
-      'SYSTEM_PROMPT',
-      'USER_SYSTEM_PROMPT',
-    ];
-    const allEventsValid = events.every((e) => validEventTypes.includes(e.type));
+    const allEventsValid = events.every((e) => (EVENT_TYPES as readonly string[]).includes(e.type));
     expect(allEventsValid).toBe(true);
 
     // Conversation building should work normally

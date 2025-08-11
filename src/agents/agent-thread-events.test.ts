@@ -80,24 +80,27 @@ describe('Agent Thread Events', () => {
       // Act
       await agent.sendMessage('Test message');
 
-      // Assert - Should emit for both USER_MESSAGE and AGENT_MESSAGE
-      expect(eventSpy).toHaveBeenCalledTimes(2);
-      expect(eventSpy).toHaveBeenNthCalledWith(1, {
-        event: expect.objectContaining({
-          type: 'USER_MESSAGE',
-          data: 'Test message',
-        }) as ThreadEvent,
-        threadId: expect.any(String) as string,
-      });
-      expect(eventSpy).toHaveBeenNthCalledWith(2, {
-        event: expect.objectContaining({
-          type: 'AGENT_MESSAGE',
-          data: expect.objectContaining({
-            content: expect.any(String) as string,
-          }) as { content: string; tokenUsage?: any },
-        }) as ThreadEvent,
-        threadId: expect.any(String) as string,
-      });
+      // Assert - Should emit for USER_MESSAGE and AGENT_MESSAGE (and possibly system prompts)
+      // Filter to only check the events we care about
+      const userMessageCalls = eventSpy.mock.calls.filter(
+        (call) => call[0].event.type === 'USER_MESSAGE'
+      );
+      const agentMessageCalls = eventSpy.mock.calls.filter(
+        (call) => call[0].event.type === 'AGENT_MESSAGE'
+      );
+
+      expect(userMessageCalls).toHaveLength(1);
+      expect(agentMessageCalls).toHaveLength(1);
+
+      // Check USER_MESSAGE event
+      expect(userMessageCalls[0][0].event.type).toBe('USER_MESSAGE');
+      expect(userMessageCalls[0][0].event.data).toBe('Test message');
+      expect(typeof userMessageCalls[0][0].threadId).toBe('string');
+
+      // Check AGENT_MESSAGE event
+      expect(agentMessageCalls[0][0].event.type).toBe('AGENT_MESSAGE');
+      expect((agentMessageCalls[0][0].event.data as { content: string }).content).toBeDefined();
+      expect(typeof agentMessageCalls[0][0].threadId).toBe('string');
     });
 
     it('should emit thread_event_added with consistent threadId', async () => {
@@ -108,10 +111,15 @@ describe('Agent Thread Events', () => {
       // Act
       await agent.sendMessage('Test message');
 
-      // Assert - Both events should have same threadId
-      expect(eventSpy).toHaveBeenCalledTimes(2);
-      const firstCall: { event: ThreadEvent; threadId: string } = eventSpy.mock.calls[0][0];
-      const secondCall: { event: ThreadEvent; threadId: string } = eventSpy.mock.calls[1][0];
+      // Assert - All events should have same threadId
+      // Filter to only check USER_MESSAGE and AGENT_MESSAGE
+      const relevantCalls = eventSpy.mock.calls.filter(
+        (call) => call[0].event.type === 'USER_MESSAGE' || call[0].event.type === 'AGENT_MESSAGE'
+      );
+
+      expect(relevantCalls).toHaveLength(2);
+      const firstCall: { event: ThreadEvent; threadId: string } = relevantCalls[0][0];
+      const secondCall: { event: ThreadEvent; threadId: string } = relevantCalls[1][0];
 
       expect(firstCall.threadId).toBe(secondCall.threadId);
       expect(firstCall.event.threadId).toBe(secondCall.event.threadId);

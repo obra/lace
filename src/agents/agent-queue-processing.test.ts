@@ -9,7 +9,6 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Type helper for accessing private methods in tests
 type _AgentWithPrivateMethods = Agent & {
@@ -50,7 +49,8 @@ describe('Agent Queue Processing', () => {
   let agent: Agent;
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
-  let mockThreadManager: ThreadManager;
+  let threadManager: ThreadManager;
+  let testThreadId: string;
 
   beforeEach(() => {
     // setupTestPersistence replaced by setupCoreTest
@@ -62,14 +62,14 @@ describe('Agent Queue Processing', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ToolExecutor;
 
-    mockThreadManager = createMockThreadManager();
-
-    const testThreadId = 'lace_20250723_abc123';
+    // Use real ThreadManager
+    threadManager = new ThreadManager();
+    testThreadId = threadManager.createThread();
 
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
-      threadManager: mockThreadManager,
+      threadManager: threadManager,
       threadId: testThreadId,
       tools: [],
     });
@@ -83,6 +83,7 @@ describe('Agent Queue Processing', () => {
 
   afterEach(() => {
     // Test cleanup handled by setupCoreTest
+    threadManager.close();
   });
 
   describe('processQueuedMessages', () => {
@@ -104,10 +105,10 @@ describe('Agent Queue Processing', () => {
       expect(finalStats.queueLength).toBe(0);
 
       // Verify the message was processed by checking thread events
-      const events = mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>;
-      expect(
-        events.mock.calls.some((call) => call[1] === 'USER_MESSAGE' && call[2] === 'test message')
-      ).toBe(true);
+      const events = threadManager.getEvents(testThreadId);
+      const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
+      expect(userMessages.length).toBeGreaterThan(0);
+      expect(userMessages.some((e) => e.data === 'test message')).toBe(true);
     });
 
     it('should process messages in correct order (high priority first)', async () => {
@@ -128,14 +129,13 @@ describe('Agent Queue Processing', () => {
       const finalStats = agent.getQueueStats();
       expect(finalStats.queueLength).toBe(0);
 
-      // Verify messages were processed by checking thread manager calls
-      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
-        .calls;
-      const userMessages = addEventCalls.filter((call) => call[1] === 'USER_MESSAGE');
+      // Verify messages were processed by checking thread events
+      const events = threadManager.getEvents(testThreadId);
+      const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
       expect(userMessages.length).toBe(3);
 
       // High priority should be processed first in the order they were added to thread
-      const messageOrder = userMessages.map((call: unknown[]) => call[2] as string);
+      const messageOrder = userMessages.map((e) => e.data);
       expect(messageOrder).toEqual(['high priority', 'normal 1', 'normal 2']);
     });
 
@@ -156,10 +156,9 @@ describe('Agent Queue Processing', () => {
       expect(statsAfterSecond.queueLength).toBe(0);
 
       // Should only have processed message once
-      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
-        .calls;
-      const userMessages = addEventCalls.filter(
-        (call) => call[1] === 'USER_MESSAGE' && call[2] === 'test message'
+      const events = threadManager.getEvents(testThreadId);
+      const userMessages = events.filter(
+        (e) => e.type === 'USER_MESSAGE' && e.data === 'test message'
       );
       expect(userMessages.length).toBe(1);
     });
