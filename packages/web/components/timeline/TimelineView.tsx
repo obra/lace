@@ -6,9 +6,10 @@
 import { useEffect, useRef } from 'react';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
-import { TimelineMessage } from './TimelineMessage';
+import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
 import { TypingIndicator } from './TypingIndicator';
 import { useProcessedEvents } from '@/hooks/useProcessedEvents';
+import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
 interface TimelineViewProps {
   events: LaceEvent[];
@@ -48,15 +49,19 @@ export function TimelineView({
         )}
         
         {processedEvents.map((event, index) => (
-          <TimelineMessage 
-            key={event.id || `${event.threadId}-${event.timestamp}-${index}`} 
-            event={event} 
-            agents={agents}
-          />
+          <TimelineEntryErrorBoundary
+            key={event.id || `${event.threadId}-${event.timestamp}-${index}`}
+            event={event}
+          >
+            <TimelineMessageWithDetails 
+              event={event} 
+              agents={agents}
+            />
+          </TimelineEntryErrorBoundary>
         ))}
 
         {streamingContent && (
-          <TimelineMessage
+          <TimelineEntryErrorBoundary
             event={{
               id: 'streaming',
               type: 'AGENT_STREAMING',
@@ -65,8 +70,19 @@ export function TimelineView({
               data: { content: streamingContent },
               transient: true,
             }}
-            agents={agents}
-          />
+          >
+            <TimelineMessageWithDetails
+              event={{
+                id: 'streaming',
+                type: 'AGENT_STREAMING',
+                threadId: currentAgent ? asThreadId(currentAgent) : asThreadId(''),
+                timestamp: new Date(),
+                data: { content: streamingContent },
+                transient: true,
+              }}
+              agents={agents}
+            />
+          </TimelineEntryErrorBoundary>
         )}
 
         {isTyping && !streamingContent && <TypingIndicator agent={currentAgent} />}

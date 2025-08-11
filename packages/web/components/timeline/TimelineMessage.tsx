@@ -40,6 +40,20 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
       );
 
     case 'AGENT_MESSAGE':
+      return (
+        <div className="flex gap-3">
+          <div className="flex-1 min-w-0">
+            <MessageHeader
+              name={agentName}
+              timestamp={timestamp}
+              role="assistant"
+              badge={{ text: agentName, variant: 'primary' }}
+            />
+            <MessageText content={event.data} />
+          </div>
+        </div>
+      );
+    
     case 'AGENT_STREAMING':
       return (
         <div className="flex gap-3">
@@ -113,7 +127,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
               <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
                 {typeof event.data === 'string' 
                   ? event.data 
-                  : event.data?.content?.map(block => block.text).join('') || 'No result'
+                  : event.data.content?.map(block => block.text).join('') || 'No result'
                 }
               </div>
             </div>
@@ -206,7 +220,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary">
             <div className="flex items-center gap-2">
               <span>📝</span>
-              <span>Task created: {(event.data as { task?: { name?: string }; taskId?: string }).task?.name || (event.data as { task?: { name?: string }; taskId?: string }).taskId}</span>
+              <span>Task created: {event.data.task?.title || event.data.taskId}</span>
             </div>
           </div>
         </div>
@@ -218,7 +232,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info">
             <div className="flex items-center gap-2">
               <span>✏️</span>
-              <span>Task updated: {(event.data as { task?: { name?: string }; taskId?: string }).task?.name || (event.data as { task?: { name?: string }; taskId?: string }).taskId}</span>
+              <span>Task updated: {event.data.task?.title || event.data.taskId}</span>
             </div>
           </div>
         </div>
@@ -230,7 +244,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning">
             <div className="flex items-center gap-2">
               <span>🗑️</span>
-              <span>Task deleted: {(event.data as { task?: { name?: string }; taskId?: string }).task?.name || (event.data as { task?: { name?: string }; taskId?: string }).taskId}</span>
+              <span>Task deleted: {event.data.task?.title || event.data.taskId}</span>
             </div>
           </div>
         </div>

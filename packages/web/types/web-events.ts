@@ -26,16 +26,6 @@ export interface ToolAggregatedEventData {
   arguments?: unknown;
 }
 
-// Note: LOCAL_SYSTEM_MESSAGE, SYSTEM_PROMPT, and USER_SYSTEM_PROMPT
-// use string data directly, not wrapped in objects
-
-export interface CompactionEventData {
-  strategyId: string;
-  originalEventCount: number;
-  compactedEvents: unknown[]; // Array of events, kept as unknown for simplicity
-  metadata?: Record<string, unknown>;
-}
-
 // Tool approval data structure - shared between API and SSE
 // This is the extended UI version with all metadata needed for approval decisions
 export interface ToolApprovalRequestData {
@@ -47,21 +37,6 @@ export interface ToolApprovalRequestData {
   toolDescription?: string;
   toolAnnotations?: ToolAnnotations;
   riskLevel: 'safe' | 'moderate' | 'destructive';
-}
-
-// Simple data for approval response events
-export interface ToolApprovalResponseData {
-  toolCallId: string;
-  decision: string;
-}
-
-// Streaming-specific event data
-export interface AgentTokenData {
-  token: string;
-}
-
-export interface AgentStreamingData {
-  content: string;
 }
 
 // Timeline UI data structures
