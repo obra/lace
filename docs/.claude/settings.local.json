@@ -14,8 +14,12 @@
       "Bash(awk:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(/tmp/rename_threadevent.sh:*)"
+      "Bash(/tmp/rename_threadevent.sh:*)",
+      "Bash(npm --prefix packages/web run test:run)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "/Users/jesse/Documents/GitHub/lace/.worktrees/proper-compaction"
+    ]
   }
 }

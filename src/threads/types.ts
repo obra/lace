@@ -5,6 +5,7 @@ import { ToolCall, ToolResult } from '~/tools/types';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ApprovalDecision } from '~/tools/approval-types';
 import type { CombinedTokenUsage } from '~/token-management/types';
+import type { Task, TaskContext } from '~/tasks/types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [
@@ -166,32 +167,32 @@ export interface CompactionCompleteData {
 // Task event data types
 export interface TaskCreatedData {
   taskId: string;
-  task: any; // TODO: Import Task type when circular dependency is resolved
-  context: any; // TODO: Import TaskContext type
+  task: Task;
+  context: TaskContext;
   timestamp: Date;
   type: 'task:created'; // For compatibility with existing handlers
 }
 
 export interface TaskUpdatedData {
   taskId: string;
-  task: any; // TODO: Import Task type
-  context: any; // TODO: Import TaskContext type
+  task: Task;
+  context: TaskContext;
   timestamp: Date;
   type: 'task:updated'; // For compatibility
 }
 
 export interface TaskDeletedData {
   taskId: string;
-  task?: any; // TODO: Import Task type
-  context: any; // TODO: Import TaskContext type
+  task?: Task;
+  context: TaskContext;
   timestamp: Date;
   type: 'task:deleted'; // For compatibility
 }
 
 export interface TaskNoteAddedData {
   taskId: string;
-  task: any; // TODO: Import Task type
-  context: any; // TODO: Import TaskContext type
+  task: Task;
+  context: TaskContext;
   timestamp: Date;
   type: 'task:note_added'; // For compatibility
 }
