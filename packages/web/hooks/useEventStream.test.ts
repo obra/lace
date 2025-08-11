@@ -4,8 +4,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
-import type { ThreadEvent, AgentStateChangeData } from '@/types/core';
-// StreamEvent removed - using ThreadEvent directly
+import type { LaceEvent, AgentStateChangeData } from '@/types/core';
+// StreamEvent removed - using LaceEvent directly
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';
 
@@ -115,7 +115,7 @@ describe('useEventStream agent state change handling', () => {
     expect(result.current.connection.connected).toBe(true);
 
     // Act: Simulate receiving an AGENT_STATE_CHANGE event
-    const mockThreadEvent: ThreadEvent = {
+    const mockLaceEvent: LaceEvent = {
       id: 'event-123',
       type: 'AGENT_STATE_CHANGE',
       threadId: asThreadId('lace_20250101_agent1'),
@@ -129,7 +129,7 @@ describe('useEventStream agent state change handling', () => {
     };
 
     await act(async () => {
-      mockEventSource.simulateMessage(mockThreadEvent);
+      mockEventSource.simulateMessage(mockLaceEvent);
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
@@ -167,7 +167,7 @@ describe('useEventStream agent state change handling', () => {
     ];
 
     for (const transition of transitions) {
-      const mockThreadEvent: ThreadEvent = {
+      const mockLaceEvent: LaceEvent = {
         id: `event-${Date.now()}`,
         type: 'AGENT_STATE_CHANGE',
         threadId: transition.agentId,
@@ -177,7 +177,7 @@ describe('useEventStream agent state change handling', () => {
       };
 
       await act(async () => {
-        mockEventSource.simulateMessage(mockThreadEvent);
+        mockEventSource.simulateMessage(mockLaceEvent);
         await new Promise((resolve) => setTimeout(resolve, 10));
       });
     }
@@ -227,7 +227,7 @@ describe('useEventStream agent state change handling', () => {
     });
 
     // Act: Simulate state changes for different agents
-    const agent1Event: ThreadEvent = {
+    const agent1Event: LaceEvent = {
       id: 'event-1',
       type: 'AGENT_STATE_CHANGE',
       threadId: asThreadId('lace_20250101_agent2'),
@@ -240,7 +240,7 @@ describe('useEventStream agent state change handling', () => {
       context: { sessionId: 'test-session' },
     };
 
-    const agent2Event: ThreadEvent = {
+    const agent2Event: LaceEvent = {
       id: 'event-2',
       type: 'AGENT_STATE_CHANGE',
       threadId: asThreadId('lace_20250101_agent3'),
@@ -296,7 +296,7 @@ describe('useEventStream agent state change handling', () => {
     });
 
     // Act: Simulate receiving other types of session events
-    const otherEvents: ThreadEvent[] = [
+    const otherEvents: LaceEvent[] = [
       {
         id: `event-${Date.now()}`,
         type: 'USER_MESSAGE',
@@ -323,9 +323,9 @@ describe('useEventStream agent state change handling', () => {
       },
     ];
 
-    for (const mockThreadEvent of otherEvents) {
+    for (const mockLaceEvent of otherEvents) {
       await act(async () => {
-        mockEventSource.simulateMessage(mockThreadEvent);
+        mockEventSource.simulateMessage(mockLaceEvent);
         await new Promise((resolve) => setTimeout(resolve, 10));
       });
     }
@@ -364,7 +364,7 @@ describe('useEventStream agent state change handling', () => {
         // from and to are missing
       } as any,
       context: { sessionId: 'test-session' },
-    } as ThreadEvent;
+    } as LaceEvent;
 
     await act(async () => {
       mockEventSource.simulateMessage(malformedEvent);
@@ -392,7 +392,7 @@ describe('useEventStream agent state change handling', () => {
     });
 
     // Act: Simulate receiving an AGENT_STATE_CHANGE event
-    const mockThreadEvent: ThreadEvent = {
+    const mockLaceEvent: LaceEvent = {
       id: 'event-123',
       type: 'AGENT_STATE_CHANGE',
       threadId: asThreadId('lace_20250101_agent1'),
@@ -406,7 +406,7 @@ describe('useEventStream agent state change handling', () => {
     };
 
     await act(async () => {
-      mockEventSource.simulateMessage(mockThreadEvent);
+      mockEventSource.simulateMessage(mockLaceEvent);
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
 

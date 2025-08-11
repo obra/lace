@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionService, getSessionService } from './session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
@@ -102,7 +102,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         }
       );
 
-      // Verify the broadcast was called with correct ThreadEvent structure
+      // Verify the broadcast was called with correct LaceEvent structure
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'TASK_CREATED',
@@ -157,7 +157,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         }
       );
 
-      const broadcastCall = broadcastSpy.mock.calls[0][0] as ThreadEvent;
+      const broadcastCall = broadcastSpy.mock.calls[0][0] as LaceEvent;
 
       // Verify complete context hierarchy
       expect(broadcastCall.context).toEqual(
@@ -314,7 +314,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
       // Find the task:note_added event (not the task:updated event)
       const noteAddedCalls = broadcastSpy.mock.calls.filter(
-        (call) => (call[0] as ThreadEvent).type === 'TASK_NOTE_ADDED'
+        (call) => (call[0] as LaceEvent).type === 'TASK_NOTE_ADDED'
       );
       expect(noteAddedCalls).toHaveLength(1);
 
@@ -376,8 +376,10 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(allCalls.length).toBeGreaterThan(0);
 
       for (const call of allCalls) {
-        const event = call[0] as ThreadEvent;
-        expect(['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED']).toContain(event.type);
+        const event = call[0] as LaceEvent;
+        expect(['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED']).toContain(
+          event.type
+        );
         expect(event.context?.taskId).toBeDefined(); // Task events must have task context
       }
     });
@@ -387,7 +389,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // If someone accidentally broadcasts task events as 'session' type,
       // the frontend should not process them
 
-      const _taskThreadEvent: ThreadEvent = {
+      const _taskLaceEvent: LaceEvent = {
         id: 'test-event',
         timestamp: new Date(),
         type: 'TASK_CREATED',
@@ -444,8 +446,10 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(allCalls.length).toBeGreaterThan(0);
 
       for (const call of allCalls) {
-        const event = call[0] as ThreadEvent;
-        expect(['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED']).toContain(event.type);
+        const event = call[0] as LaceEvent;
+        expect(['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED']).toContain(
+          event.type
+        );
         // Architecture enforcement: Task events must have task context
         expect(event.context?.taskId).toBeDefined();
       }

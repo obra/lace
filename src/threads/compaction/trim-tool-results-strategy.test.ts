@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TrimToolResultsStrategy } from '~/threads/compaction/trim-tool-results-strategy';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
 import type { ToolResult } from '~/tools/types';
 
@@ -17,7 +17,7 @@ describe('TrimToolResultsStrategy', () => {
 
   describe('compact', () => {
     it('preserves non-tool-result events unchanged', async () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -45,7 +45,7 @@ describe('TrimToolResultsStrategy', () => {
 
     it('truncates string tool results longer than 3 lines', async () => {
       const longResult = 'line1\nline2\nline3\nline4\nline5';
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -72,7 +72,7 @@ describe('TrimToolResultsStrategy', () => {
 
     it('preserves short tool results unchanged', async () => {
       const shortResult = 'line1\nline2';
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -107,7 +107,7 @@ describe('TrimToolResultsStrategy', () => {
         id: 'tool-123',
       };
 
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -129,7 +129,7 @@ describe('TrimToolResultsStrategy', () => {
     });
 
     it('includes correct metadata', async () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -175,7 +175,7 @@ describe('TrimToolResultsStrategy', () => {
         status: 'completed',
       };
 
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -205,7 +205,7 @@ describe('TrimToolResultsStrategy', () => {
         metadata: { errorMessage: 'Tool failed' },
       };
 
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',
@@ -222,7 +222,7 @@ describe('TrimToolResultsStrategy', () => {
     });
 
     it('generates unique event IDs', async () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'e1',
           threadId: 'test-thread',

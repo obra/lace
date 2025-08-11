@@ -2,7 +2,7 @@
 // ABOUTME: Tests that real-time and persistence TOOL_RESULT events have identical structure
 
 import { describe, it, expect } from 'vitest';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import type { ToolResult, ThreadId } from '@/types/core';
 
 describe('Task Metadata Event Format', () => {
@@ -29,7 +29,7 @@ describe('Task Metadata Event Format', () => {
     const testThreadId = 'lace_20240115_abc123' as ThreadId;
 
     // Real-time event format (correct)
-    const toolResultEvent: ThreadEvent = {
+    const toolResultEvent: LaceEvent = {
       type: 'TOOL_RESULT',
       threadId: testThreadId,
       timestamp: new Date(),

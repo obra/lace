@@ -1,7 +1,7 @@
 // ABOUTME: Core interfaces for the compaction event system
 // ABOUTME: Defines strategy pattern and event types for conversation compaction
 
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { AIProvider } from '~/providers/base-provider';
 import type { ToolExecutor } from '~/tools/executor';
 import type { Agent } from '~/agents/agent';
@@ -17,7 +17,7 @@ export interface CompactionData {
   /** Number of original events that were replaced by this compaction */
   originalEventCount: number;
   /** The replacement events that represent the compacted conversation */
-  compactedEvents: ThreadEvent[];
+  compactedEvents: LaceEvent[];
   /** Optional strategy-specific metadata about the compaction process */
   metadata?: Record<string, unknown>;
 }
@@ -37,9 +37,9 @@ export interface CompactionStrategy {
    *
    * @param events - The events to compact (all events before the compaction point)
    * @param context - Additional context for the compaction process
-   * @returns A ThreadEvent with type 'COMPACTION' containing CompactionData
+   * @returns A LaceEvent with type 'COMPACTION' containing CompactionData
    */
-  compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent>;
+  compact(events: LaceEvent[], context: CompactionContext): Promise<LaceEvent>;
 }
 
 /**

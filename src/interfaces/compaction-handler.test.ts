@@ -8,7 +8,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionDisplay } from '~/interfaces/compaction-handler';
 
 class MockCompactionDisplay implements CompactionDisplay {
@@ -99,7 +99,7 @@ describe('CompactionHandler', () => {
     expect(mockDisplay.onCompactionStart).toHaveBeenCalled();
 
     // Create a compaction event
-    const compactionEvent: ThreadEvent = {
+    const compactionEvent: LaceEvent = {
       id: 'evt_123',
       threadId: agent['_threadId'],
       type: 'COMPACTION',
@@ -170,7 +170,7 @@ describe('ConsoleCompactionDisplay', () => {
   });
 
   it('should display detailed compaction complete message with stats', () => {
-    const compactionEvent: ThreadEvent = {
+    const compactionEvent: LaceEvent = {
       id: 'evt_123',
       threadId: 'thread_123',
       type: 'COMPACTION',
@@ -178,7 +178,7 @@ describe('ConsoleCompactionDisplay', () => {
       data: {
         strategyId: 'summarize',
         originalEventCount: 100,
-        compactedEvents: new Array(25) as ThreadEvent[],
+        compactedEvents: new Array(25) as LaceEvent[],
       },
     };
 

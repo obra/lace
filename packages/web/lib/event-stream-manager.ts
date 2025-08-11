@@ -1,8 +1,8 @@
 // ABOUTME: Event stream manager for real-time client notifications
 // ABOUTME: Manages global event distribution with client-side filtering
 
-// StreamEvent removed - using ThreadEvent directly
-import type { Task, TaskContext, ThreadId, ThreadEvent } from '@/types/core';
+// StreamEvent removed - using LaceEvent directly
+import type { Task, TaskContext, ThreadId, LaceEvent } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
@@ -74,7 +74,7 @@ interface ClientConnection {
     sessions?: string[];
     threads?: string[];
     global?: boolean;
-    // eventTypes removed - ThreadEvent handles all types
+    // eventTypes removed - LaceEvent handles all types
   };
   lastEventId?: string;
   connectedAt: Date;
@@ -111,7 +111,7 @@ export class EventStreamManager {
 
     EventStreamManager.registeredTaskManagers.add(taskManager);
 
-    // Convert TaskManager events to ThreadEvent format
+    // Convert TaskManager events to LaceEvent format
     taskManager.on('task:created', (event: unknown) => {
       const e = event as TaskCreatedEvent;
       this.broadcast({
@@ -221,7 +221,7 @@ export class EventStreamManager {
       this.startKeepAlive();
     }
 
-    // Send connection confirmation as ThreadEvent
+    // Send connection confirmation as LaceEvent
     this.sendToConnection(connection, {
       id: this.generateEventId(),
       timestamp: new Date(),
@@ -254,9 +254,9 @@ export class EventStreamManager {
   }
 
   // Broadcast event to all matching connections
-  broadcast(event: ThreadEvent): void {
+  broadcast(event: LaceEvent): void {
     // Ensure event has required fields
-    const fullEvent: ThreadEvent = {
+    const fullEvent: LaceEvent = {
       ...event,
       id: event.id || this.generateEventId(),
       timestamp: event.timestamp || new Date(),
@@ -282,7 +282,7 @@ export class EventStreamManager {
   }
 
   // Check if event should be sent to connection based on subscription
-  private shouldSendToConnection(connection: ClientConnection, event: ThreadEvent): boolean {
+  private shouldSendToConnection(connection: ClientConnection, event: LaceEvent): boolean {
     const { subscription } = connection;
 
     // Thread filtering
@@ -306,7 +306,7 @@ export class EventStreamManager {
       }
     }
 
-    // Event type filtering removed - ThreadEvent handles all types
+    // Event type filtering removed - LaceEvent handles all types
 
     // Global filtering - include all if subscription.global is true
     if (subscription.global === true) {
@@ -317,7 +317,7 @@ export class EventStreamManager {
   }
 
   // Send event to specific connection
-  private sendToConnection(connection: ClientConnection, event: ThreadEvent): void {
+  private sendToConnection(connection: ClientConnection, event: LaceEvent): void {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
 

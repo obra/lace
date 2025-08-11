@@ -89,13 +89,13 @@ describe('Agent sendMessage Queue Option', () => {
 
   describe('when agent is idle', () => {
     it('should process message immediately without queue option', async () => {
-      const initialThreadEvents = threadManager.getEvents(testThreadId).length;
+      const initialLaceEvents = threadManager.getEvents(testThreadId).length;
 
       await agent.sendMessage('test message');
 
       // Verify message was processed immediately (added to thread)
-      const finalThreadEvents = threadManager.getEvents(testThreadId).length;
-      expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
+      const finalLaceEvents = threadManager.getEvents(testThreadId).length;
+      expect(finalLaceEvents).toBeGreaterThan(initialLaceEvents);
 
       // Verify the message appears in thread events
       const events = threadManager.getEvents(testThreadId);
@@ -107,13 +107,13 @@ describe('Agent sendMessage Queue Option', () => {
     });
 
     it('should process message immediately even with queue option', async () => {
-      const initialThreadEvents = threadManager.getEvents(testThreadId).length;
+      const initialLaceEvents = threadManager.getEvents(testThreadId).length;
 
       await agent.sendMessage('test message', { queue: true });
 
       // Verify message was processed immediately (added to thread) even with queue option
-      const finalThreadEvents = threadManager.getEvents(testThreadId).length;
-      expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
+      const finalLaceEvents = threadManager.getEvents(testThreadId).length;
+      expect(finalLaceEvents).toBeGreaterThan(initialLaceEvents);
 
       // Verify the message appears in thread events
       const events = threadManager.getEvents(testThreadId);

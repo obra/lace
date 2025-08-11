@@ -3,12 +3,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { aggregateTokenUsage, estimateConversationTokens } from '~/threads/token-aggregation';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CombinedTokenUsage } from '~/token-management/types';
 
 describe('Token aggregation', () => {
   it('should aggregate token usage from events', () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test',
@@ -59,7 +59,7 @@ describe('Token aggregation', () => {
   });
 
   it('should handle mixed events with and without token usage', () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test',
@@ -101,7 +101,7 @@ describe('Token aggregation', () => {
   });
 
   it('should aggregate token usage from TOOL_RESULT events', () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test',
@@ -127,7 +127,7 @@ describe('Token aggregation', () => {
   });
 
   it('should estimate tokens when usage data not available', () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test',
@@ -145,7 +145,7 @@ describe('Token aggregation', () => {
   });
 
   it('should estimate tokens for mixed event types', () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test',
@@ -196,7 +196,7 @@ describe('Token aggregation', () => {
 
   describe('Token aggregation with compaction', () => {
     it('should only count events after compaction plus summary', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         // Original events (before compaction) - these should be ignored
         {
           id: '1',
@@ -295,7 +295,7 @@ describe('Token aggregation', () => {
     });
 
     it('should handle multiple compactions correctly', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         // First batch of events
         {
           id: '1',
@@ -408,7 +408,7 @@ describe('Token aggregation', () => {
     });
 
     it('should handle compaction with no post-compaction events', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: '1',
           threadId: 'test',
@@ -462,7 +462,7 @@ describe('Token aggregation', () => {
     });
 
     it('should handle empty compacted events', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: '1',
           threadId: 'test',

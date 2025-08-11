@@ -106,7 +106,7 @@ describe('SessionService compaction event streaming', () => {
       }
     );
 
-    // Verify broadcast was called with COMPACTION_START ThreadEvent
+    // Verify broadcast was called with COMPACTION_START LaceEvent
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
       type: 'COMPACTION_START',
       threadId: 'thread_123',
@@ -151,7 +151,7 @@ describe('SessionService compaction event streaming', () => {
       }
     );
 
-    // Verify broadcast was called with COMPACTION_COMPLETE ThreadEvent
+    // Verify broadcast was called with COMPACTION_COMPLETE LaceEvent
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
       type: 'COMPACTION_COMPLETE',
       threadId: 'thread_123',

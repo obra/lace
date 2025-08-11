@@ -34,7 +34,7 @@ import { isApiError } from '@/types/api';
 import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
@@ -194,8 +194,8 @@ export const LaceApp = memo(function LaceApp() {
   
   const connected = connection.connected;
 
-  // Events are now ThreadEvent[] directly
-  // No conversion needed - components handle ThreadEvent natively
+  // Events are now LaceEvent[] directly
+  // No conversion needed - components handle LaceEvent natively
 
   // Project loading function
   const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {

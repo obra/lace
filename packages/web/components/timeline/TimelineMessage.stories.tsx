@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TimelineMessage } from './TimelineMessage';
-import type { ThreadEvent, AgentInfo } from '@/types/core';
+import type { LaceEvent, AgentInfo } from '@/types/core';
 import { asThreadId } from '@/types/core';
 
 const meta: Meta<typeof TimelineMessage> = {
@@ -32,7 +32,7 @@ A complex, self-contained component that renders different types of thread event
 - **SystemNotificationDisplay** for system messages
 
 ### Component Contract
-- **Props**: ThreadEvent object containing type, data, timestamp, and metadata
+- **Props**: LaceEvent object containing type, data, timestamp, and metadata
 - **State**: Internally manages display variations based on event type
 - **Events**: None (display-only component)
 
@@ -44,7 +44,7 @@ Uses semantic tokens for different message types:
 - System messages: muted colors
 
 ### Best Practices
-✅ **Do**: Pass complete ThreadEvent objects
+✅ **Do**: Pass complete LaceEvent objects
 ✅ **Do**: Include agent info for proper attribution
 ✅ **Do**: Use semantic colors for message types
 ✗ **Don't**: Modify event data before passing
@@ -88,7 +88,7 @@ const mockAgents: AgentInfo[] = [
 ];
 
 // User message event
-const userMessageEvent: ThreadEvent = {
+const userMessageEvent: LaceEvent = {
   id: 'evt-1',
   type: 'USER_MESSAGE',
   threadId: asThreadId('lace_20240115_abc123'),
@@ -97,7 +97,7 @@ const userMessageEvent: ThreadEvent = {
 };
 
 // Agent message event
-const agentMessageEvent: ThreadEvent = {
+const agentMessageEvent: LaceEvent = {
   id: 'evt-2',
   type: 'AGENT_MESSAGE',
   threadId: asThreadId('lace_20240115_abc123.1'),
@@ -123,7 +123,7 @@ const agentMessageEvent: ThreadEvent = {
 };
 
 // Tool call event
-const toolCallEvent: ThreadEvent = {
+const toolCallEvent: LaceEvent = {
   id: 'evt-3',
   type: 'TOOL_CALL',
   threadId: asThreadId('lace_20240115_abc123.1'),
@@ -138,7 +138,7 @@ const toolCallEvent: ThreadEvent = {
 };
 
 // Tool result event
-const toolResultEvent: ThreadEvent = {
+const toolResultEvent: LaceEvent = {
   id: 'evt-4',
   type: 'TOOL_RESULT',
   threadId: asThreadId('lace_20240115_abc123.1'),
@@ -156,7 +156,7 @@ const toolResultEvent: ThreadEvent = {
 };
 
 // System message event
-const systemMessageEvent: ThreadEvent = {
+const systemMessageEvent: LaceEvent = {
   id: 'evt-5',
   type: 'LOCAL_SYSTEM_MESSAGE',
   threadId: asThreadId('lace_20240115_abc123'),
@@ -165,7 +165,7 @@ const systemMessageEvent: ThreadEvent = {
 };
 
 // Task created event
-const taskCreatedEvent: ThreadEvent = {
+const taskCreatedEvent: LaceEvent = {
   id: 'evt-6',
   type: 'TASK_CREATED',
   threadId: asThreadId('lace_20240115_abc123'),
@@ -187,7 +187,7 @@ const taskCreatedEvent: ThreadEvent = {
 };
 
 // Agent streaming event
-const agentStreamingEvent: ThreadEvent = {
+const agentStreamingEvent: LaceEvent = {
   id: 'evt-7',
   type: 'AGENT_STREAMING',
   threadId: asThreadId('lace_20240115_abc123.1'),

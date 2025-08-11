@@ -6,7 +6,7 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
-import { ThreadEvent } from '~/threads/types';
+import { LaceEvent } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { createTestTempDir } from '~/test-utils/temp-directory';
@@ -53,7 +53,7 @@ describe('Agent Thread Events', () => {
   describe('sendMessage', () => {
     it('should emit thread_event_added after ThreadManager.addEvent', async () => {
       // Arrange
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -65,14 +65,14 @@ describe('Agent Thread Events', () => {
           type: 'USER_MESSAGE',
           data: 'Test message',
           threadId: expect.any(String) as string,
-        }) as ThreadEvent,
+        }) as LaceEvent,
         threadId: expect.any(String) as string,
       });
     });
 
     it('should emit thread_event_added for agent response', async () => {
       // Arrange
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -103,7 +103,7 @@ describe('Agent Thread Events', () => {
 
     it('should emit thread_event_added with consistent threadId', async () => {
       // Arrange
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -116,8 +116,8 @@ describe('Agent Thread Events', () => {
       );
 
       expect(relevantCalls).toHaveLength(2);
-      const firstCall: { event: ThreadEvent; threadId: string } = relevantCalls[0][0];
-      const secondCall: { event: ThreadEvent; threadId: string } = relevantCalls[1][0];
+      const firstCall: { event: LaceEvent; threadId: string } = relevantCalls[0][0];
+      const secondCall: { event: LaceEvent; threadId: string } = relevantCalls[1][0];
 
       expect(firstCall.threadId).toBe(secondCall.threadId);
       expect(firstCall.event.threadId).toBe(secondCall.event.threadId);
@@ -146,7 +146,7 @@ describe('Agent Thread Events', () => {
         data: 'Second message',
       });
 
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -158,21 +158,21 @@ describe('Agent Thread Events', () => {
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
           data: 'First message',
-        }) as ThreadEvent,
+        }) as LaceEvent,
         threadId,
       });
       expect(eventSpy).toHaveBeenNthCalledWith(2, {
         event: expect.objectContaining({
           type: 'AGENT_MESSAGE',
           data: { content: 'First response' },
-        }) as ThreadEvent,
+        }) as LaceEvent,
         threadId,
       });
       expect(eventSpy).toHaveBeenNthCalledWith(3, {
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
           data: 'Second message',
-        }) as ThreadEvent,
+        }) as LaceEvent,
         threadId,
       });
     });
@@ -204,7 +204,7 @@ describe('Agent Thread Events', () => {
         })
       );
 
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -212,8 +212,8 @@ describe('Agent Thread Events', () => {
 
       // Assert - Events should be emitted in chronological order
       expect(eventSpy).toHaveBeenCalledTimes(3);
-      const calls: ThreadEvent[] = eventSpy.mock.calls.map(
-        (call: [{ event: ThreadEvent; threadId: string }]) => call[0].event
+      const calls: LaceEvent[] = eventSpy.mock.calls.map(
+        (call: [{ event: LaceEvent; threadId: string }]) => call[0].event
       );
 
       expect(calls[0].timestamp!.getTime()).toBeLessThanOrEqual(calls[1].timestamp!.getTime());
@@ -229,7 +229,7 @@ describe('Agent Thread Events', () => {
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
 
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -250,7 +250,7 @@ describe('Agent Thread Events', () => {
       expect(typeof threadId).toBe('string');
     });
 
-    it('should provide getThreadEvents method', () => {
+    it('should provide getLaceEvents method', () => {
       // Arrange
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
@@ -261,7 +261,7 @@ describe('Agent Thread Events', () => {
       });
 
       // Act
-      const events = agent.getThreadEvents();
+      const events = agent.getLaceEvents();
 
       // Assert
       expect(events).toHaveLength(1);
@@ -269,7 +269,7 @@ describe('Agent Thread Events', () => {
       expect(events[0].data).toBe('Test message');
     });
 
-    it('should provide getThreadEvents with specific threadId', () => {
+    it('should provide getLaceEvents with specific threadId', () => {
       // Arrange
       const threadId = agent.getThreadId();
       threadManager.clearEvents(threadId);
@@ -280,7 +280,7 @@ describe('Agent Thread Events', () => {
       });
 
       // Act
-      const events = agent.getThreadEvents(threadId);
+      const events = agent.getLaceEvents(threadId);
 
       // Assert
       expect(events).toHaveLength(1);
@@ -319,7 +319,7 @@ describe('Agent Thread Events', () => {
         data: 'Existing message',
       });
 
-      const eventSpy = vi.fn<(arg: { event: ThreadEvent; threadId: string }) => void>();
+      const eventSpy = vi.fn<(arg: { event: LaceEvent; threadId: string }) => void>();
       agent.on('thread_event_added', eventSpy);
 
       // Act
@@ -332,7 +332,7 @@ describe('Agent Thread Events', () => {
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
           data: 'Existing message',
-        }) as ThreadEvent,
+        }) as LaceEvent,
         threadId: existingThreadId,
       });
     });

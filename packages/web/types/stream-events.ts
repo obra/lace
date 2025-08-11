@@ -1,7 +1,7 @@
 // ABOUTME: Event stream types for real-time notifications
-// ABOUTME: Now uses ThreadEvent directly - no StreamEvent wrapper
+// ABOUTME: Now uses LaceEvent directly - no StreamEvent wrapper
 
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 
 // Web-specific connection state (not part of core events)
 export interface StreamConnection {
@@ -11,12 +11,12 @@ export interface StreamConnection {
   maxReconnectAttempts: number;
 }
 
-// Client-side event filtering for ThreadEvents
+// Client-side event filtering for LaceEvents
 export interface EventFilter {
-  shouldIncludeEvent: (event: ThreadEvent) => boolean;
+  shouldIncludeEvent: (event: LaceEvent) => boolean;
 }
 
-// Subscription options for ThreadEvents
+// Subscription options for LaceEvents
 export interface StreamSubscription {
   threads?: string[]; // Filter to specific thread IDs
   sessionIds?: string[]; // Filter by session context
@@ -25,7 +25,7 @@ export interface StreamSubscription {
 
 export function createEventFilter(subscription: StreamSubscription): EventFilter {
   return {
-    shouldIncludeEvent: (event: ThreadEvent) => {
+    shouldIncludeEvent: (event: LaceEvent) => {
       // Filter by thread ID
       if (subscription.threads && subscription.threads.length > 0) {
         if (!event.threadId || !subscription.threads.includes(event.threadId)) {

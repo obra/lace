@@ -56,7 +56,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       expect(typeof agent.resumeOrCreateThread).toBe('function');
 
       // Event operations
-      expect(typeof agent.getThreadEvents).toBe('function');
+      expect(typeof agent.getLaceEvents).toBe('function');
       expect(typeof agent.replaySessionEvents).toBe('function');
 
       // Agent should provide complete functionality without ThreadManager exposure
@@ -72,7 +72,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       const currentThreadId = agent.getThreadId();
       expect(typeof currentThreadId).toBe('string');
 
-      const events = agent.getThreadEvents();
+      const events = agent.getLaceEvents();
       expect(Array.isArray(events)).toBe(true);
     });
 
@@ -84,7 +84,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       expect(threadId).toBeDefined();
 
       // Event access
-      const events = agent.getThreadEvents();
+      const events = agent.getLaceEvents();
       expect(Array.isArray(events)).toBe(true);
 
       // Thread creation
@@ -110,7 +110,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       expect(typeof agent.getThreadId).toBe('function');
 
       // Event access
-      expect(typeof agent.getThreadEvents).toBe('function');
+      expect(typeof agent.getLaceEvents).toBe('function');
       expect(typeof agent.replaySessionEvents).toBe('function');
 
       // Note: Some ThreadManager methods like compact(), getMainAndDelegateEvents()

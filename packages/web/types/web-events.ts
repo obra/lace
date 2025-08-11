@@ -2,7 +2,7 @@
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
 import type {
-  ThreadEventType,
+  LaceEventType,
   ToolResult,
   AgentMessageData,
   ToolAnnotations,

@@ -5,8 +5,8 @@ import Database from 'better-sqlite3';
 import { getLaceDbPath } from '~/config/lace-dir';
 import {
   Thread,
-  ThreadEvent,
-  ThreadEventType,
+  LaceEvent,
+  LaceEventType,
   ThreadId,
   AssigneeId,
   AgentMessageData,
@@ -22,14 +22,14 @@ import { logger } from '~/utils/logger';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
 
-// Helper function to create properly typed ThreadEvent from database row
-function createThreadEventFromDb(
+// Helper function to create properly typed LaceEvent from database row
+function createLaceEventFromDb(
   id: string,
   threadId: string,
-  type: ThreadEventType,
+  type: LaceEventType,
   timestamp: Date,
   data: unknown
-): ThreadEvent {
+): LaceEvent {
   const baseEvent = { id, threadId, timestamp };
 
   switch (type) {
@@ -384,7 +384,7 @@ export class DatabasePersistence {
     };
   }
 
-  saveEvent(event: ThreadEvent): boolean {
+  saveEvent(event: LaceEvent): boolean {
     if (this._closed || this._disabled || !this.db) return false;
 
     try {
@@ -432,7 +432,7 @@ export class DatabasePersistence {
     );
   }
 
-  loadEvents(threadId: string): ThreadEvent[] {
+  loadEvents(threadId: string): LaceEvent[] {
     if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
@@ -453,10 +453,10 @@ export class DatabasePersistence {
 
     return rows.map((row) => {
       try {
-        return createThreadEventFromDb(
+        return createLaceEventFromDb(
           row.id,
           row.thread_id,
-          row.type as ThreadEventType,
+          row.type as LaceEventType,
           new Date(row.timestamp),
           JSON.parse(row.data) as unknown
         );

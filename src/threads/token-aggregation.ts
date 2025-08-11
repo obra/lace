@@ -1,7 +1,7 @@
 // ABOUTME: Utilities for aggregating token usage across thread events
 // ABOUTME: Calculates cumulative token counts from conversation history
 
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 
 export interface TokenSummary {
   totalPromptTokens: number;
@@ -9,7 +9,7 @@ export interface TokenSummary {
   totalTokens: number;
 }
 
-export function aggregateTokenUsage(events: ThreadEvent[]): TokenSummary {
+export function aggregateTokenUsage(events: LaceEvent[]): TokenSummary {
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
 
@@ -117,7 +117,7 @@ export function aggregateTokenUsage(events: ThreadEvent[]): TokenSummary {
   };
 }
 
-export function estimateConversationTokens(events: ThreadEvent[]): number {
+export function estimateConversationTokens(events: LaceEvent[]): number {
   // Conservative estimation when actual counts aren't available
   let estimatedTokens = 0;
 

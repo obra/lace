@@ -2,11 +2,11 @@
 // ABOUTME: Validates that events can store token usage data correctly
 
 import { describe, it, expect } from 'vitest';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 
-describe('ThreadEvent token usage', () => {
+describe('LaceEvent token usage', () => {
   it('should allow AGENT_MESSAGE with token usage', () => {
-    const event: ThreadEvent = {
+    const event: LaceEvent = {
       id: 'evt_123',
       threadId: 'thread_123',
       type: 'AGENT_MESSAGE',
@@ -32,7 +32,7 @@ describe('ThreadEvent token usage', () => {
   });
 
   it('should allow AGENT_MESSAGE without token usage', () => {
-    const event: ThreadEvent = {
+    const event: LaceEvent = {
       id: 'evt_123',
       threadId: 'thread_123',
       type: 'AGENT_MESSAGE',
@@ -46,7 +46,7 @@ describe('ThreadEvent token usage', () => {
   });
 
   it('should allow TOOL_RESULT with token usage', () => {
-    const event: ThreadEvent = {
+    const event: LaceEvent = {
       id: 'evt_456',
       threadId: 'thread_123',
       type: 'TOOL_RESULT',
@@ -73,7 +73,7 @@ describe('ThreadEvent token usage', () => {
   });
 
   it('should allow TOOL_RESULT without token usage', () => {
-    const event: ThreadEvent = {
+    const event: LaceEvent = {
       id: 'evt_456',
       threadId: 'thread_123',
       type: 'TOOL_RESULT',

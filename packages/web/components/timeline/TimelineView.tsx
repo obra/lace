@@ -1,17 +1,17 @@
-// ABOUTME: Timeline view component that renders ThreadEvents directly
+// ABOUTME: Timeline view component that renders LaceEvents directly
 // ABOUTME: Replaces TimelineView to work with unified event system
 
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { ThreadEvent, AgentInfo, ThreadId } from '@/types/core';
+import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { TimelineMessage } from './TimelineMessage';
 import { TypingIndicator } from './TypingIndicator';
 import { useProcessedEvents } from '@/hooks/useProcessedEvents';
 
 interface TimelineViewProps {
-  events: ThreadEvent[];
+  events: LaceEvent[];
   agents?: AgentInfo[];
   isTyping: boolean;
   currentAgent: string;

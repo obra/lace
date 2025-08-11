@@ -7,7 +7,7 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, isTransientEventType } from '~/threads/types';
+import { Thread, LaceEvent, isTransientEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
@@ -292,7 +292,7 @@ export class ThreadManager {
    * prevents duplicate approvals for the same toolCallId, causing
    * this method to throw if a duplicate is attempted.
    */
-  addEvent(event: ThreadEvent): ThreadEvent | null {
+  addEvent(event: LaceEvent): LaceEvent | null {
     // Fill in defaults
     if (!event.id) {
       event.id = generateEventId();
@@ -359,7 +359,7 @@ export class ThreadManager {
    * @param threadId - The ID of the thread to get events for
    * @returns Array of thread events representing the working conversation
    */
-  getEvents(threadId: string): ThreadEvent[] {
+  getEvents(threadId: string): LaceEvent[] {
     const thread = this.getThread(threadId);
     if (!thread) return [];
 
@@ -380,15 +380,15 @@ export class ThreadManager {
    * @param threadId - The ID of the thread to get complete history for
    * @returns Array of all thread events in chronological order
    */
-  getAllEvents(threadId: string): ThreadEvent[] {
+  getAllEvents(threadId: string): LaceEvent[] {
     const thread = this.getThread(threadId);
     if (!thread) return [];
 
     return buildCompleteHistory(thread.events);
   }
 
-  getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
-    const allEvents: ThreadEvent[] = [];
+  getMainAndDelegateEvents(mainThreadId: string): LaceEvent[] {
+    const allEvents: LaceEvent[] = [];
 
     // Get main thread events
     allEvents.push(...this.getEvents(mainThreadId));
@@ -545,7 +545,7 @@ export class ThreadManager {
       type: 'COMPACTION',
       threadId,
       data: compactionData,
-    } as ThreadEvent);
+    } as LaceEvent);
   }
 
   clearEvents(threadId: string): void {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TimelineView } from './TimelineView';
-import type { ThreadEvent, AgentInfo } from '@/types/core';
+import type { LaceEvent, AgentInfo } from '@/types/core';
 import { asThreadId } from '@/types/core';
 
 const meta: Meta<typeof TimelineView> = {
@@ -64,7 +64,7 @@ The main conversation display component that shows all thread events (messages, 
 - **Layout**: Flexbox-based responsive design
 
 ### Best Practices
-✅ **Do**: Use proper ThreadEvent types for all events
+✅ **Do**: Use proper LaceEvent types for all events
 ✅ **Do**: Include agent info for multi-agent conversations  
 ✅ **Do**: Handle empty states gracefully
 ✗ **Don't**: Mutate event data directly
@@ -104,7 +104,7 @@ const mockAgents: AgentInfo[] = [
 ];
 
 // Sample thread events for stories
-const sampleEvents: ThreadEvent[] = [
+const sampleEvents: LaceEvent[] = [
   {
     id: 'evt-1',
     type: 'USER_MESSAGE',
@@ -207,10 +207,10 @@ const sampleEvents: ThreadEvent[] = [
 ];
 
 // Empty state
-const emptyEvents: ThreadEvent[] = [];
+const emptyEvents: LaceEvent[] = [];
 
 // Streaming state events
-const streamingEvents: ThreadEvent[] = [
+const streamingEvents: LaceEvent[] = [
   ...sampleEvents.slice(0, 3),
   {
     id: 'evt-streaming',

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import { asThreadId, isConversationEvent } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
@@ -42,7 +42,7 @@ export async function GET(
     const threadEvents = coordinatorAgent.getMainAndDelegateEvents(sessionId);
 
     // Filter to only conversation events (persisted and shown in timeline)
-    const events: ThreadEvent[] = threadEvents.filter((event) => isConversationEvent(event.type));
+    const events: LaceEvent[] = threadEvents.filter((event) => isConversationEvent(event.type));
 
     return createSuperjsonResponse({ events }, { status: 200 });
   } catch (error: unknown) {

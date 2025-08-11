@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/sessions/[sessionId]/history/route';
 import { getSessionService } from '@/lib/server/session-service';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import type { ApiErrorResponse } from '@/types/api';
 import { asThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
@@ -22,7 +22,7 @@ import { Project, Session } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
 interface HistoryResponse {
-  events: ThreadEvent[];
+  events: LaceEvent[];
 }
 
 describe('Session History API', () => {

@@ -143,9 +143,9 @@ describe('Type Integrity - Current State', () => {
       expect(EVENT_TYPES).toContain('TOOL_RESULT');
     });
 
-    it('should import ThreadEventType from core', async () => {
+    it('should import LaceEventType from core', async () => {
       const coreModule = await import('@/types/core');
-      // ThreadEventType is a type, not a value, so we just check the module exists
+      // LaceEventType is a type, not a value, so we just check the module exists
       expect(coreModule).toBeDefined();
       expect(coreModule.EVENT_TYPES).toBeDefined(); // This is a value export
     });

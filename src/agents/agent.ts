@@ -10,7 +10,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
-  ThreadEvent,
+  LaceEvent,
   ToolApprovalResponseData,
   ThreadId,
   asThreadId,
@@ -109,7 +109,7 @@ export interface AgentEvents {
     },
   ];
   // Thread events proxied from ThreadManager
-  thread_event_added: [{ event: ThreadEvent; threadId: string }];
+  thread_event_added: [{ event: LaceEvent; threadId: string }];
   thread_state_changed: [{ threadId: string; eventType: string }];
   // Queue events
   queue_processing_start: [];
@@ -989,7 +989,7 @@ export class Agent extends EventEmitter {
   /**
    * Handle TOOL_APPROVAL_RESPONSE events by executing the approved tool
    */
-  private _handleToolApprovalResponse(event: ThreadEvent): void {
+  private _handleToolApprovalResponse(event: LaceEvent): void {
     if (event.type !== 'TOOL_APPROVAL_RESPONSE') return;
 
     const responseData = event.data;
@@ -1386,7 +1386,7 @@ export class Agent extends EventEmitter {
   }
 
   // Agent-specific conversation building (preserves thinking blocks for model context)
-  private _buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
+  private _buildConversationFromEvents(events: LaceEvent[]): ProviderMessage[] {
     const messages: ProviderMessage[] = [];
 
     // Track which events have been processed to avoid duplicates
@@ -1842,7 +1842,7 @@ export class Agent extends EventEmitter {
 
   // Thread management API - proxies to ThreadManager
 
-  getThreadEvents(threadId?: string): ThreadEvent[] {
+  getLaceEvents(threadId?: string): LaceEvent[] {
     const targetThreadId = threadId || this._threadId;
     return this._threadManager.getEvents(targetThreadId);
   }
@@ -1892,7 +1892,7 @@ export class Agent extends EventEmitter {
     return this._threadManager.getLatestThreadId();
   }
 
-  getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
+  getMainAndDelegateEvents(mainThreadId: string): LaceEvent[] {
     return this._threadManager.getMainAndDelegateEvents(mainThreadId);
   }
 
@@ -1946,7 +1946,7 @@ export class Agent extends EventEmitter {
    * Generate a summary using the current conversation context
    * Used by compaction strategies to leverage the agent's full context
    */
-  async generateSummary(promptContent: string, events: ThreadEvent[]): Promise<string> {
+  async generateSummary(promptContent: string, events: LaceEvent[]): Promise<string> {
     // Build conversation messages from the provided events
     const messages = this._buildConversationFromEvents(events);
 
@@ -1970,7 +1970,7 @@ export class Agent extends EventEmitter {
    * Add a system message to the current thread
    * Used for error messages, notifications, etc.
    */
-  addSystemMessage(message: string, threadId?: string): ThreadEvent | null {
+  addSystemMessage(message: string, threadId?: string): LaceEvent | null {
     const targetThreadId = threadId || this._threadId;
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
@@ -1998,7 +1998,7 @@ export class Agent extends EventEmitter {
    * Helper method to add event to ThreadManager and emit Agent event
    * This ensures Agent is the single event source for UI updates
    */
-  private _addEventAndEmit(event: ThreadEvent): ThreadEvent | null {
+  private _addEventAndEmit(event: LaceEvent): LaceEvent | null {
     // Safety check: only add events if thread exists
     if (event.threadId && !this._threadManager.getThread(event.threadId)) {
       logger.warn('AGENT: Skipping event addition - thread not found', {
@@ -2148,7 +2148,7 @@ export class Agent extends EventEmitter {
    * This provides controlled access to thread events for the web layer
    * without exposing ThreadManager directly.
    */
-  getToolCallEventById(toolCallId: string): ThreadEvent | undefined {
+  getToolCallEventById(toolCallId: string): LaceEvent | undefined {
     const events = this._threadManager.getEvents(this._threadId);
     return events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
   }
@@ -2159,7 +2159,7 @@ export class Agent extends EventEmitter {
    * Used by web layer components that need to look up tool calls
    * without direct ThreadManager access.
    */
-  getToolCallEventByIdForThread(toolCallId: string, threadId: string): ThreadEvent | undefined {
+  getToolCallEventByIdForThread(toolCallId: string, threadId: string): LaceEvent | undefined {
     const events = this._threadManager.getEvents(threadId);
     return events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
   }
@@ -2189,7 +2189,7 @@ export class Agent extends EventEmitter {
    * Add an approval request event for the given tool call ID.
    * Used by EventApprovalCallback to create approval requests.
    */
-  addApprovalRequestEvent(toolCallId: string): ThreadEvent {
+  addApprovalRequestEvent(toolCallId: string): LaceEvent {
     const event = this._addEventAndEmit({
       type: 'TOOL_APPROVAL_REQUEST',
       threadId: this._threadId,

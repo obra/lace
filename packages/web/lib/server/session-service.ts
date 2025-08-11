@@ -2,7 +2,7 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolResult, CombinedTokenUsage } from '@/types/core';
+import type { LaceEvent, ToolResult, CombinedTokenUsage } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
@@ -302,8 +302,8 @@ export class SessionService {
     // Handle thread events (including approval events)
     agent.on(
       'thread_event_added',
-      ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
-        // Pass ThreadEvents directly without conversion for approval events
+      ({ event, threadId: eventThreadId }: { event: LaceEvent; threadId: string }) => {
+        // Pass LaceEvents directly without conversion for approval events
         if (event.type === 'TOOL_APPROVAL_REQUEST') {
           const toolCallData = event.data as { toolCallId: string };
 

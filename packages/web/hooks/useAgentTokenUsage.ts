@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEventStream } from './useEventStream';
 import type { ThreadId, CombinedTokenUsage } from '@/types/core';
 import type { AgentResponse } from '@/types/api';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
 // Use the same type structure as the API
@@ -59,7 +59,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
 
   // Listen for AGENT_MESSAGE events that include token usage updates
   const handleAgentMessage = useCallback(
-    (event: ThreadEvent) => {
+    (event: LaceEvent) => {
       console.log('[useAgentTokenUsage] Received event:', {
         eventType: event.type,
         eventThreadId: event.threadId,

@@ -8,11 +8,11 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
 
 // Helper to cast result data to CompactionData
-function getCompactionData(result: ThreadEvent): CompactionData {
+function getCompactionData(result: LaceEvent): CompactionData {
   return result.data as CompactionData;
 }
 
@@ -83,7 +83,7 @@ describe('SummarizeCompactionStrategy', () => {
   });
 
   it('should create summary from conversation events', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: context.threadId,
@@ -146,7 +146,7 @@ describe('SummarizeCompactionStrategy', () => {
   });
 
   it('should preserve recent events', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       // Old events
       {
         id: '1',
@@ -215,7 +215,7 @@ describe('SummarizeCompactionStrategy', () => {
   });
 
   it('should handle tool calls and results appropriately', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test-thread-123',
@@ -263,7 +263,7 @@ describe('SummarizeCompactionStrategy', () => {
   });
 
   it('should throw error when no agent or provider available', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test-thread-123',
@@ -295,7 +295,7 @@ describe('SummarizeCompactionStrategy', () => {
     // Test that it still works with just a provider (backward compatibility)
     const providerContext = { threadId: 'test-thread-123', provider: mockProvider };
 
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test-thread-123',
@@ -322,7 +322,7 @@ describe('SummarizeCompactionStrategy', () => {
   });
 
   it('should skip COMPACTION events', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: 'test-thread-123',

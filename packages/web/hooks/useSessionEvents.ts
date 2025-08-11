@@ -2,7 +2,7 @@
 // ABOUTME: Real-time updates using unified event stream
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import type {
   PendingApproval,
   SessionHistoryResponse,
@@ -13,14 +13,14 @@ import { isInternalWorkflowEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
 interface UseSessionEventsReturn {
-  allEvents: ThreadEvent[];
-  filteredEvents: ThreadEvent[];
+  allEvents: LaceEvent[];
+  filteredEvents: LaceEvent[];
   pendingApprovals: PendingApproval[];
   loadingHistory: boolean;
   connected: boolean;
   clearApprovalRequest: () => void;
   // Event handlers for the parent to wire to useEventStream
-  addSessionEvent: (event: ThreadEvent) => void;
+  addSessionEvent: (event: LaceEvent) => void;
   handleApprovalRequest: (approval: PendingApproval) => void;
   handleApprovalResponse: (toolCallId: string) => void;
 }
@@ -30,7 +30,7 @@ export function useSessionEvents(
   selectedAgent: ThreadId | null,
   connected = false // Connection state passed from parent
 ): UseSessionEventsReturn {
-  const [events, setEvents] = useState<ThreadEvent[]>([]);
+  const [events, setEvents] = useState<LaceEvent[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
@@ -38,13 +38,13 @@ export function useSessionEvents(
   const seenEvents = useRef(new Set<string>());
 
   // Generate a composite key for event deduplication
-  const getEventKey = useCallback((event: ThreadEvent): string => {
+  const getEventKey = useCallback((event: LaceEvent): string => {
     return `${event.type}:${event.timestamp}:${event.threadId}:${JSON.stringify(event.data)}`;
   }, []);
 
   // Add thread event to timeline
   const addSessionEvent = useCallback(
-    (threadEvent: ThreadEvent) => {
+    (threadEvent: LaceEvent) => {
       const eventKey = getEventKey(threadEvent);
 
       // O(1) duplicate check
@@ -135,7 +135,7 @@ export function useSessionEvents(
       })
       .then((data) => {
         if (data.events) {
-          // Events are already properly typed ThreadEvents from superjson
+          // Events are already properly typed LaceEvents from superjson
           // Filter out internal workflow events (they're handled separately)
           const timelineEvents = data.events.filter(
             (event) => !isInternalWorkflowEvent(event.type)

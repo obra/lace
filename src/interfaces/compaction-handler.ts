@@ -2,11 +2,11 @@
 // ABOUTME: Provides visual feedback when conversation compaction occurs
 
 import type { Agent } from '~/agents/agent';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 
 export interface CompactionDisplay {
   onCompactionStart(): void;
-  onCompactionComplete(event?: ThreadEvent): void;
+  onCompactionComplete(event?: LaceEvent): void;
   onCompactionError(error: Error): void;
 }
 
@@ -84,7 +84,7 @@ export class ConsoleCompactionDisplay implements CompactionDisplay {
     console.log('\n🔄 Compacting conversation to reduce size...');
   }
 
-  onCompactionComplete(event?: ThreadEvent): void {
+  onCompactionComplete(event?: LaceEvent): void {
     if (event && event.type === 'COMPACTION') {
       const data = event.data;
       const originalCount = data.originalEventCount;

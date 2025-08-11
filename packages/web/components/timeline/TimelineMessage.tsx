@@ -1,9 +1,9 @@
-// ABOUTME: Timeline message component that renders ThreadEvent directly
+// ABOUTME: Timeline message component that renders LaceEvent directly
 // ABOUTME: Replaces TimelineMessage to work with unified event system
 
 'use client';
 
-import type { ThreadEvent, AgentInfo } from '@/types/core';
+import type { LaceEvent, AgentInfo } from '@/types/core';
 import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
 import { MessageHeader, MessageText } from '@/components/ui';
 import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';

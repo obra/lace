@@ -8,7 +8,7 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
 
 // Mock provider for testing summarization
@@ -45,7 +45,7 @@ class MockSummarizationProvider extends BaseMockProvider {
 }
 
 // Helper to cast result data to CompactionData
-function getCompactionData(result: ThreadEvent): CompactionData {
+function getCompactionData(result: LaceEvent): CompactionData {
   return result.data as CompactionData;
 }
 
@@ -82,7 +82,7 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
   });
 
   it('should preserve ALL user messages', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       // Many user messages
       {
         id: '1',
@@ -156,7 +156,7 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
   });
 
   it('should summarize old agent messages but keep recent ones', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: context.threadId,
@@ -249,7 +249,7 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
       agent,
     };
 
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: context.threadId,
@@ -274,7 +274,7 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
   });
 
   it('should not duplicate events when preserving user messages', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: context.threadId,
@@ -324,7 +324,7 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
   });
 
   it('should include all enhanced metadata fields', async () => {
-    const events: ThreadEvent[] = [
+    const events: LaceEvent[] = [
       {
         id: '1',
         threadId: context.threadId,

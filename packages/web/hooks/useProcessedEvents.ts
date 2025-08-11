@@ -1,10 +1,10 @@
-// ABOUTME: Hook for processing ThreadEvents for timeline display
+// ABOUTME: Hook for processing LaceEvents for timeline display
 // ABOUTME: Handles filtering, token aggregation, and tool call/result pairing
 
 import { useMemo } from 'react';
-import type { ThreadEvent, ThreadId, ToolCall, ToolResult } from '@/types/core';
+import type { LaceEvent, ThreadId, ToolCall, ToolResult } from '@/types/core';
 
-interface ProcessedToolEvent extends Omit<ThreadEvent, 'type' | 'data'> {
+interface ProcessedToolEvent extends Omit<LaceEvent, 'type' | 'data'> {
   type: 'TOOL_AGGREGATED';
   data: {
     call: ToolCall;
@@ -15,12 +15,12 @@ interface ProcessedToolEvent extends Omit<ThreadEvent, 'type' | 'data'> {
   };
 }
 
-export type ProcessedEvent = ThreadEvent | ProcessedToolEvent;
+export type ProcessedEvent = LaceEvent | ProcessedToolEvent;
 
 const MAX_STREAMING_MESSAGES = 100;
 
 export function useProcessedEvents(
-  events: ThreadEvent[],
+  events: LaceEvent[],
   selectedAgent?: ThreadId
 ): ProcessedEvent[] {
   return useMemo(() => {
@@ -37,7 +37,7 @@ export function useProcessedEvents(
   }, [events, selectedAgent]);
 }
 
-function filterEventsByAgent(events: ThreadEvent[], selectedAgent?: ThreadId): ThreadEvent[] {
+function filterEventsByAgent(events: LaceEvent[], selectedAgent?: ThreadId): LaceEvent[] {
   if (!selectedAgent) {
     return events;
   }
@@ -53,8 +53,8 @@ function filterEventsByAgent(events: ThreadEvent[], selectedAgent?: ThreadId): T
   });
 }
 
-function processStreamingTokens(events: ThreadEvent[]): ThreadEvent[] {
-  const processed: ThreadEvent[] = [];
+function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
+  const processed: LaceEvent[] = [];
   const streamingMessages = new Map<string, { content: string; timestamp: Date }>();
 
   for (const event of events) {
@@ -92,7 +92,7 @@ function processStreamingTokens(events: ThreadEvent[]): ThreadEvent[] {
 
   // Add remaining streaming messages as AGENT_STREAMING events
   for (const [threadId, { content, timestamp }] of streamingMessages.entries()) {
-    const streamingEvent: ThreadEvent = {
+    const streamingEvent: LaceEvent = {
       type: 'AGENT_STREAMING',
       threadId: threadId as ThreadId,
       timestamp: timestamp,
@@ -112,9 +112,9 @@ function processStreamingTokens(events: ThreadEvent[]): ThreadEvent[] {
   });
 }
 
-function processToolCallAggregation(events: ThreadEvent[]): ProcessedEvent[] {
+function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
   const processed: ProcessedEvent[] = [];
-  const pendingToolCalls = new Map<string, { call: ThreadEvent; result?: ThreadEvent }>();
+  const pendingToolCalls = new Map<string, { call: LaceEvent; result?: LaceEvent }>();
   let toolCallCounter = 0;
 
   for (const event of events) {

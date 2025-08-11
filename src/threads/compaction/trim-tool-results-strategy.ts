@@ -1,15 +1,15 @@
 // ABOUTME: Compaction strategy that truncates tool results to save token space
 // ABOUTME: Preserves conversation flow while reducing tool output size
 
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionStrategy, CompactionContext } from '~/threads/compaction/types';
 import type { ToolResult, ContentBlock } from '~/tools/types';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
   id = 'trim-tool-results';
 
-  compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent> {
-    const compactedEvents: ThreadEvent[] = [];
+  compact(events: LaceEvent[], context: CompactionContext): Promise<LaceEvent> {
+    const compactedEvents: LaceEvent[] = [];
     let modifiedCount = 0;
 
     for (const event of events) {
@@ -39,7 +39,7 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     }
 
     // Create the compaction event with data in the data field
-    const compactionEvent: ThreadEvent = {
+    const compactionEvent: LaceEvent = {
       id: this.generateEventId(),
       threadId: context.threadId,
       type: 'COMPACTION',
@@ -63,7 +63,7 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private trimToolResult(event: ThreadEvent): ThreadEvent {
+  private trimToolResult(event: LaceEvent): LaceEvent {
     // Handle ToolResult objects (they have a 'content' field)
     if (event.type === 'TOOL_RESULT') {
       const toolResult = event.data;

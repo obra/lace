@@ -2,7 +2,7 @@
 // ABOUTME: Ensures event types are correctly structured and utilities work
 
 import { describe, it, expect } from 'vitest';
-import type { ThreadEvent } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
 import { EVENT_TYPES, isTransientEventType, asThreadId } from '@/types/core';
 
 describe('Event Types', () => {
@@ -25,8 +25,8 @@ describe('Event Types', () => {
     expect(isTransientEventType('AGENT_STREAMING')).toBe(true); // Transient
   });
 
-  it('should create valid ThreadEvent', () => {
-    const event: ThreadEvent = {
+  it('should create valid LaceEvent', () => {
+    const event: LaceEvent = {
       type: 'USER_MESSAGE',
       threadId: asThreadId('lace_20250731_test01'),
       timestamp: new Date(),

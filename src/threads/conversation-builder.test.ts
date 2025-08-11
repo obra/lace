@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
 
 describe('conversation-builder', () => {
-  const mockEvents: ThreadEvent[] = [
+  const mockEvents: LaceEvent[] = [
     {
       id: 'e1',
       threadId: 'test-thread',
@@ -35,7 +35,7 @@ describe('conversation-builder', () => {
     });
 
     it('uses compacted events when compaction exists', () => {
-      const compactionEvent: ThreadEvent = {
+      const compactionEvent: LaceEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -55,7 +55,7 @@ describe('conversation-builder', () => {
         },
       };
 
-      const newEvent: ThreadEvent = {
+      const newEvent: LaceEvent = {
         id: 'e4',
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
@@ -74,7 +74,7 @@ describe('conversation-builder', () => {
     });
 
     it('uses latest compaction when multiple exist', () => {
-      const firstCompaction: ThreadEvent = {
+      const firstCompaction: LaceEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -94,7 +94,7 @@ describe('conversation-builder', () => {
         },
       };
 
-      const secondCompaction: ThreadEvent = {
+      const secondCompaction: LaceEvent = {
         id: 'comp2',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -126,7 +126,7 @@ describe('conversation-builder', () => {
 
   describe('buildCompleteHistory', () => {
     it('returns all events including compaction events', () => {
-      const compactionEvent: ThreadEvent = {
+      const compactionEvent: LaceEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -147,7 +147,7 @@ describe('conversation-builder', () => {
 
   describe('tool result deduplication', () => {
     it('should remove duplicate TOOL_RESULT events with same toolCallId', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -190,7 +190,7 @@ describe('conversation-builder', () => {
     });
 
     it('should keep TOOL_RESULT events with different toolCallIds', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -223,7 +223,7 @@ describe('conversation-builder', () => {
     });
 
     it('should skip TOOL_RESULT events missing toolCallId', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -253,7 +253,7 @@ describe('conversation-builder', () => {
     });
 
     it('should work correctly with compacted events containing duplicates', () => {
-      const compactionEvent: ThreadEvent = {
+      const compactionEvent: LaceEvent = {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -277,7 +277,7 @@ describe('conversation-builder', () => {
         },
       };
 
-      const duplicateAfterCompaction: ThreadEvent = {
+      const duplicateAfterCompaction: LaceEvent = {
         id: 'e4',
         threadId: 'test-thread',
         type: 'TOOL_RESULT',
@@ -301,7 +301,7 @@ describe('conversation-builder', () => {
     });
 
     it('should keep higher precedence status when multiple TOOL_RESULT events have same ID', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -349,7 +349,7 @@ describe('conversation-builder', () => {
     });
 
     it('should test deduplication with failed status first', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -386,7 +386,7 @@ describe('conversation-builder', () => {
     });
 
     it('should test deduplication with aborted status first', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -423,7 +423,7 @@ describe('conversation-builder', () => {
     });
 
     it('should prioritize denied status over all others', () => {
-      const events: ThreadEvent[] = [
+      const events: LaceEvent[] = [
         {
           id: 'evt1',
           threadId: 'thread-1',
@@ -484,7 +484,7 @@ describe('conversation-builder', () => {
 
   describe('malformed compaction data handling', () => {
     it('gracefully handles malformed compaction data by falling back to all events', () => {
-      const malformedCompactionEvent: ThreadEvent = {
+      const malformedCompactionEvent: LaceEvent = {
         id: 'compaction-bad',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -496,7 +496,7 @@ describe('conversation-builder', () => {
         } as unknown as CompactionData, // Type assertion to bypass TS checking
       };
 
-      const newEvent: ThreadEvent = {
+      const newEvent: LaceEvent = {
         id: 'e4',
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
@@ -512,7 +512,7 @@ describe('conversation-builder', () => {
     });
 
     it('handles invalid compaction data gracefully', () => {
-      const invalidCompactionEvent: ThreadEvent = {
+      const invalidCompactionEvent: LaceEvent = {
         id: 'compaction-invalid',
         threadId: 'test-thread',
         type: 'COMPACTION',
@@ -523,7 +523,7 @@ describe('conversation-builder', () => {
         } as unknown as CompactionData, // Type assertion to bypass TS checking
       };
 
-      const newEvent: ThreadEvent = {
+      const newEvent: LaceEvent = {
         id: 'e4',
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',

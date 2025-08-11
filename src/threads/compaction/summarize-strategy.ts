@@ -1,7 +1,7 @@
 // ABOUTME: AI-powered conversation summarization compaction strategy
 // ABOUTME: Uses AI to create concise summaries of older conversation parts while preserving recent context
 
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionStrategy, CompactionContext } from '~/threads/compaction/types';
 
 export class SummarizeCompactionStrategy implements CompactionStrategy {
@@ -10,7 +10,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
   // Keep the most recent N events to preserve immediate context
   private readonly RECENT_EVENT_COUNT = 2; // Last 2 events (usually 1 exchange)
 
-  async compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent> {
+  async compact(events: LaceEvent[], context: CompactionContext): Promise<LaceEvent> {
     if (!context.agent && !context.provider) {
       throw new Error('SummarizeCompactionStrategy requires an Agent instance or AI provider');
     }
@@ -33,7 +33,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     // Determine which non-user events to summarize vs preserve
     const { oldEvents, recentEvents } = this.categorizeEventsByCount(nonUserEvents);
 
-    const compactedEvents: ThreadEvent[] = [];
+    const compactedEvents: LaceEvent[] = [];
 
     // Generate summary for old non-user events if any exist
     let summary: string | undefined;
@@ -50,7 +50,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     return this.createCompactionEvent(compactedEvents, context, summary, events.length);
   }
 
-  private categorizeEventsByCount(events: ThreadEvent[]) {
+  private categorizeEventsByCount(events: LaceEvent[]) {
     // Only preserve recent events if we have enough events to make summarization worthwhile
     // If we have few events, summarize them all
     if (events.length <= this.RECENT_EVENT_COUNT + 1) {
@@ -66,8 +66,8 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
   }
 
   private async generateSummaryInConversation(
-    oldEvents: ThreadEvent[],
-    recentEvents: ThreadEvent[],
+    oldEvents: LaceEvent[],
+    recentEvents: LaceEvent[],
     context: CompactionContext
   ): Promise<string> {
     const summaryRequest = this.createSummaryRequest(oldEvents, recentEvents);
@@ -90,7 +90,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     throw new Error('No agent or provider available for summarization');
   }
 
-  private createSummaryRequest(oldEvents: ThreadEvent[], recentEvents: ThreadEvent[]): string {
+  private createSummaryRequest(oldEvents: LaceEvent[], recentEvents: LaceEvent[]): string {
     const oldConversation = this.eventsToText(oldEvents);
     const recentContext = recentEvents.length > 0 ? this.eventsToText(recentEvents) : '';
 
@@ -125,7 +125,7 @@ Be thorough but concise. Focus on actionable information that enables you to con
 Provide ONLY the summary, no preamble or explanation.`;
   }
 
-  private eventsToText(events: ThreadEvent[]): string {
+  private eventsToText(events: LaceEvent[]): string {
     return events
       .map((event) => {
         switch (event.type) {
@@ -157,11 +157,11 @@ Provide ONLY the summary, no preamble or explanation.`;
   // Removed createSummaryEvent - summary is now part of COMPACTION event data
 
   private createCompactionEvent(
-    compactedEvents: ThreadEvent[],
+    compactedEvents: LaceEvent[],
     context: CompactionContext,
     summary: string | undefined,
     originalEventCount: number
-  ): ThreadEvent {
+  ): LaceEvent {
     return {
       id: this.generateEventId(),
       threadId: context.threadId,
