@@ -49,7 +49,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
               role="assistant"
               badge={{ text: agentName, variant: 'primary' }}
             />
-            <MessageText content={event.data} />
+            <MessageText content={event.data.content} />
           </div>
         </div>
       );
