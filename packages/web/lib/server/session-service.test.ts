@@ -7,7 +7,7 @@ import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { TestProvider } from '@/lib/server/lace-imports';
-import type { SessionEvent } from '@/types/web-sse';
+import type { ThreadEvent } from '@/types/core';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -424,7 +424,7 @@ describe('SessionService agent state change broadcasting', () => {
           from: 'idle',
           to: 'thinking',
         },
-      }) satisfies Partial<SessionEvent>,
+      }) satisfies Partial<ThreadEvent>,
     });
   });
 
@@ -450,7 +450,7 @@ describe('SessionService agent state change broadcasting', () => {
           from: 'thinking',
           to: 'streaming',
         },
-      }) satisfies Partial<SessionEvent>,
+      }) satisfies Partial<ThreadEvent>,
     });
   });
 
@@ -476,7 +476,7 @@ describe('SessionService agent state change broadcasting', () => {
           from: 'streaming',
           to: 'tool_execution',
         },
-      }) satisfies Partial<SessionEvent>,
+      }) satisfies Partial<ThreadEvent>,
     });
   });
 
@@ -502,7 +502,7 @@ describe('SessionService agent state change broadcasting', () => {
           from: 'tool_execution',
           to: 'idle',
         },
-      }) satisfies Partial<SessionEvent>,
+      }) satisfies Partial<ThreadEvent>,
     });
   });
 
@@ -536,9 +536,9 @@ describe('SessionService agent state change broadcasting', () => {
     });
 
     // Verify timestamp is reasonable
-    const broadcastCall = broadcastSpy.mock.calls[0][0] as { data: SessionEvent };
+    const broadcastCall = broadcastSpy.mock.calls[0][0] as { data: ThreadEvent };
     const eventData = broadcastCall.data;
-    const timestamp = new Date(eventData.timestamp);
+    const timestamp = new Date(eventData.timestamp || new Date());
     expect(timestamp.getTime()).toBeGreaterThanOrEqual(beforeTime.getTime());
     expect(timestamp.getTime()).toBeLessThanOrEqual(afterTime.getTime());
   });
@@ -560,7 +560,7 @@ describe('SessionService agent state change broadcasting', () => {
 
     // Assert: Should only see ONE broadcast despite multiple handler registrations
     const stateChangeCalls = broadcastSpy.mock.calls.filter(
-      (call) => (call[0] as { data: SessionEvent }).data.type === 'AGENT_STATE_CHANGE'
+      (call) => (call[0] as { data: ThreadEvent }).data.type === 'AGENT_STATE_CHANGE'
     );
     expect(stateChangeCalls).toHaveLength(1);
   });

@@ -17,14 +17,14 @@ export const UI_EVENT_TYPES = [
 export type UIEventType = (typeof UI_EVENT_TYPES)[number];
 
 // Combined event types for SSE streaming
-export type SessionEventType = ThreadEventType | UIEventType;
+export type ExtendedEventType = ThreadEventType | UIEventType;
 
 // Get all event types for SSE listeners
-export function getAllEventTypes(): SessionEventType[] {
+export function getAllEventTypes(): ExtendedEventType[] {
   return [...EVENT_TYPES, ...UI_EVENT_TYPES];
 }
 
 // Helper to check if an event should be persisted
-export function isPersistedEvent(type: SessionEventType): type is ThreadEventType {
+export function isPersistedEvent(type: ExtendedEventType): type is ThreadEventType {
   return (EVENT_TYPES as readonly string[]).includes(type);
 }

@@ -2,21 +2,12 @@
 // ABOUTME: Single EventSource connection handling session, task, project, and approval events
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import type {
-  StreamSubscription,
-  StreamConnection,
-} from '@/types/stream-events';
+import type { StreamSubscription, StreamConnection } from '@/types/stream-events';
 import type { ThreadEvent } from '~/threads/types';
 import { parse } from '@/lib/serialization';
-import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadId } from '@/types/core';
-import type { ToolApprovalRequestData } from '@/types/web-events';
 import type { PendingApproval } from '@/types/api';
 import type { Task } from '@/types/core';
-import {
-  parseSessionEvent,
-  ThreadEventTimestampSchema,
-} from '@/lib/validation/session-event-schemas';
 
 // Task event types
 export interface TaskEvent {
@@ -75,13 +66,13 @@ export interface GlobalEvent {
 
 interface EventHandlers {
   // Session events
-  onSessionEvent?: (event: SessionEvent) => void;
-  onUserMessage?: (event: SessionEvent) => void;
-  onAgentMessage?: (event: SessionEvent) => void;
-  onAgentToken?: (event: SessionEvent) => void;
-  onToolCall?: (event: SessionEvent) => void;
-  onToolResult?: (event: SessionEvent) => void;
-  onSystemMessage?: (event: SessionEvent) => void;
+  onSessionEvent?: (event: ThreadEvent) => void;
+  onUserMessage?: (event: ThreadEvent) => void;
+  onAgentMessage?: (event: ThreadEvent) => void;
+  onAgentToken?: (event: ThreadEvent) => void;
+  onToolCall?: (event: ThreadEvent) => void;
+  onToolResult?: (event: ThreadEvent) => void;
+  onSystemMessage?: (event: ThreadEvent) => void;
   onAgentStateChange?: (agentId: string, from: string, to: string) => void;
 
   // Task events
@@ -137,7 +128,12 @@ interface UseEventStreamResult {
 function isTaskEvent(event: ThreadEvent): boolean {
   // Check if it's a task event by looking at the type
   // Task events come through as TASK_CREATED, TASK_UPDATED, etc. (will be added to enum)
-  return event.type && ['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED'].includes(event.type as string);
+  return (
+    event.type &&
+    ['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED'].includes(
+      event.type as string
+    )
+  );
 }
 
 function isAgentEvent(event: ThreadEvent): boolean {
@@ -147,29 +143,37 @@ function isAgentEvent(event: ThreadEvent): boolean {
 
 function isProjectEvent(event: ThreadEvent): boolean {
   // Project events will be added to ThreadEventType enum
-  return event.type && ['PROJECT_CREATED', 'PROJECT_UPDATED', 'PROJECT_DELETED'].includes(event.type as string);
+  return (
+    event.type &&
+    ['PROJECT_CREATED', 'PROJECT_UPDATED', 'PROJECT_DELETED'].includes(event.type as string)
+  );
 }
 
 function isGlobalEvent(event: ThreadEvent): boolean {
   // Global/system events
-  return event.type && ['SYSTEM_NOTIFICATION', 'LOCAL_SYSTEM_MESSAGE'].includes(event.type as string);
+  return (
+    event.type && ['SYSTEM_NOTIFICATION', 'LOCAL_SYSTEM_MESSAGE'].includes(event.type as string)
+  );
 }
 
 function isSessionEvent(event: ThreadEvent): boolean {
   // Session events are the core ThreadEvent types
-  return event.type && [
-    'USER_MESSAGE',
-    'AGENT_MESSAGE',
-    'AGENT_TOKEN',
-    'TOOL_CALL',
-    'TOOL_RESULT',
-    'TOOL_APPROVAL_REQUEST',
-    'TOOL_APPROVAL_RESPONSE',
-    'LOCAL_SYSTEM_MESSAGE',
-    'AGENT_STATE_CHANGE',
-    'COMPACTION_START',
-    'COMPACTION_COMPLETE'
-  ].includes(event.type);
+  return (
+    event.type &&
+    [
+      'USER_MESSAGE',
+      'AGENT_MESSAGE',
+      'AGENT_TOKEN',
+      'TOOL_CALL',
+      'TOOL_RESULT',
+      'TOOL_APPROVAL_REQUEST',
+      'TOOL_APPROVAL_RESPONSE',
+      'LOCAL_SYSTEM_MESSAGE',
+      'AGENT_STATE_CHANGE',
+      'COMPACTION_START',
+      'COMPACTION_COMPLETE',
+    ].includes(event.type)
+  );
 }
 
 export function useEventStream({
@@ -370,53 +374,49 @@ export function useEventStream({
   const handleStreamEvent = useCallback((event: ThreadEvent) => {
     try {
       if (isSessionEvent(event)) {
-        // ThreadEvent IS the session event - no unwrapping needed
-        const sessionEvent = event as SessionEvent;
-        const threadTimestamp = ThreadEventTimestampSchema.parse(event.timestamp || new Date());
-
         // Handle tool approval requests
-        if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
-          const approvalData = sessionEvent.data as { toolCallId: string };
-          
+        if (event.type === 'TOOL_APPROVAL_REQUEST') {
+          const approvalData = event.data as { toolCallId: string };
+
           // Pass minimal data - consumer will fetch full details or look up TOOL_CALL event
           callbackRefs.current.onApprovalRequest?.({
             toolCallId: approvalData.toolCallId,
-            requestedAt: threadTimestamp,
+            requestedAt: event.timestamp || new Date(),
           } as PendingApproval);
           return; // Don't process as regular session event
         }
 
         // Handle tool approval responses
-        if (sessionEvent.type === 'TOOL_APPROVAL_RESPONSE') {
-          const responseData = sessionEvent.data as { toolCallId: string };
+        if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+          const responseData = event.data as { toolCallId: string };
           callbackRefs.current.onApprovalResponse?.(responseData.toolCallId);
           return; // Don't process as regular session event
         }
 
         // Route to specific session event handlers
-        callbackRefs.current.onSessionEvent?.(sessionEvent);
-        switch (sessionEvent.type) {
+        callbackRefs.current.onSessionEvent?.(event);
+        switch (event.type) {
           case 'USER_MESSAGE':
-            callbackRefs.current.onUserMessage?.(sessionEvent);
+            callbackRefs.current.onUserMessage?.(event);
             break;
           case 'AGENT_MESSAGE':
-            callbackRefs.current.onAgentMessage?.(sessionEvent);
+            callbackRefs.current.onAgentMessage?.(event);
             break;
           case 'AGENT_TOKEN':
-            callbackRefs.current.onAgentToken?.(sessionEvent);
+            callbackRefs.current.onAgentToken?.(event);
             break;
           case 'TOOL_CALL':
-            callbackRefs.current.onToolCall?.(sessionEvent);
+            callbackRefs.current.onToolCall?.(event);
             break;
           case 'TOOL_RESULT':
-            callbackRefs.current.onToolResult?.(sessionEvent);
+            callbackRefs.current.onToolResult?.(event);
             break;
           case 'LOCAL_SYSTEM_MESSAGE':
-            callbackRefs.current.onSystemMessage?.(sessionEvent);
+            callbackRefs.current.onSystemMessage?.(event);
             break;
           case 'AGENT_STATE_CHANGE':
-            if (sessionEvent.type === 'AGENT_STATE_CHANGE') {
-              const { agentId, from, to } = sessionEvent.data;
+            if (event.type === 'AGENT_STATE_CHANGE') {
+              const { agentId, from, to } = event.data;
               callbackRefs.current.onAgentStateChange?.(agentId, from, to);
             }
             break;
@@ -440,7 +440,7 @@ export function useEventStream({
             break;
         }
       } else if (isAgentEvent(event)) {
-        // Extract agent event data from ThreadEvent  
+        // Extract agent event data from ThreadEvent
         const agentEvent = event.data as unknown as AgentEvent;
         callbackRefs.current.onAgentEvent?.(agentEvent);
         switch (agentEvent.type) {

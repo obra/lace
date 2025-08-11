@@ -9,6 +9,7 @@ export type {
   ThreadEvent,
   Thread,
   AgentMessageData,
+  AgentStateChangeData,
 } from '~/threads/types';
 
 export type {

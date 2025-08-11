@@ -1,27 +1,25 @@
-// ABOUTME: Event stream hook for session events and tool approvals
+// ABOUTME: Event stream hook for thread events and tool approvals
 // ABOUTME: Real-time updates using unified event stream
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { SessionEvent } from '@/types/web-sse';
+import type { ThreadEvent } from '@/types/core';
 import type {
   PendingApproval,
   SessionHistoryResponse,
   PendingApprovalsResponse,
 } from '@/types/api';
-import type { ToolApprovalRequestData } from '@/types/web-events';
 import type { ThreadId } from '@/types/core';
-import { parseSessionEvents } from '@/lib/validation/session-event-schemas';
 import { parse } from '@/lib/serialization';
 
 interface UseSessionEventsReturn {
-  allEvents: SessionEvent[];
-  filteredEvents: SessionEvent[];
+  allEvents: ThreadEvent[];
+  filteredEvents: ThreadEvent[];
   pendingApprovals: PendingApproval[];
   loadingHistory: boolean;
   connected: boolean;
   clearApprovalRequest: () => void;
   // Event handlers for the parent to wire to useEventStream
-  addSessionEvent: (event: SessionEvent) => void;
+  addSessionEvent: (event: ThreadEvent) => void;
   handleApprovalRequest: (approval: PendingApproval) => void;
   handleApprovalResponse: (toolCallId: string) => void;
 }
@@ -31,7 +29,7 @@ export function useSessionEvents(
   selectedAgent: ThreadId | null,
   connected = false // Connection state passed from parent
 ): UseSessionEventsReturn {
-  const [events, setEvents] = useState<SessionEvent[]>([]);
+  const [events, setEvents] = useState<ThreadEvent[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
@@ -39,14 +37,14 @@ export function useSessionEvents(
   const seenEvents = useRef(new Set<string>());
 
   // Generate a composite key for event deduplication
-  const getEventKey = useCallback((event: SessionEvent): string => {
+  const getEventKey = useCallback((event: ThreadEvent): string => {
     return `${event.type}:${event.timestamp}:${event.threadId}:${JSON.stringify(event.data)}`;
   }, []);
 
-  // Add session event to timeline
+  // Add thread event to timeline
   const addSessionEvent = useCallback(
-    (sessionEvent: SessionEvent) => {
-      const eventKey = getEventKey(sessionEvent);
+    (threadEvent: ThreadEvent) => {
+      const eventKey = getEventKey(threadEvent);
 
       // O(1) duplicate check
       if (seenEvents.current.has(eventKey)) {
@@ -57,7 +55,7 @@ export function useSessionEvents(
 
       setEvents((prev) => {
         // Insert in sorted position to avoid full sort
-        const timestamp = new Date(sessionEvent.timestamp || new Date()).getTime();
+        const timestamp = new Date(threadEvent.timestamp || new Date()).getTime();
         let insertIndex = prev.length;
 
         // Find insertion point (reverse search since newer events are more common)
@@ -72,7 +70,7 @@ export function useSessionEvents(
         }
 
         const newEvents = [...prev];
-        newEvents.splice(insertIndex, 0, sessionEvent);
+        newEvents.splice(insertIndex, 0, threadEvent);
         return newEvents;
       });
     },
@@ -80,32 +78,35 @@ export function useSessionEvents(
   );
 
   // Handle approval requests
-  const handleApprovalRequest = useCallback((approval: PendingApproval) => {
-    // When we get a TOOL_APPROVAL_REQUEST, we need to trigger a refresh
-    // The pending approvals will be fetched from the API endpoint
-    // which has access to the tool metadata to properly enrich the data
-    setPendingApprovals((prev) => {
-      // Just mark that we need to refresh - the useEffect below will fetch the data
-      return prev;
-    });
-    
-    // Trigger a fetch of pending approvals if we have a selected agent
-    if (selectedAgent) {
-      fetch(`/api/threads/${selectedAgent}/approvals/pending`)
-        .then(async (res) => {
-          const text = await res.text();
-          return parse(text) as PendingApprovalsResponse;
-        })
-        .then((data) => {
-          if (data.pendingApprovals?.length > 0) {
-            setPendingApprovals(data.pendingApprovals);
-          }
-        })
-        .catch((error) => {
-          console.error('[SESSION_EVENTS] Failed to fetch pending approvals:', error);
-        });
-    }
-  }, [selectedAgent]);
+  const handleApprovalRequest = useCallback(
+    (approval: PendingApproval) => {
+      // When we get a TOOL_APPROVAL_REQUEST, we need to trigger a refresh
+      // The pending approvals will be fetched from the API endpoint
+      // which has access to the tool metadata to properly enrich the data
+      setPendingApprovals((prev) => {
+        // Just mark that we need to refresh - the useEffect below will fetch the data
+        return prev;
+      });
+
+      // Trigger a fetch of pending approvals if we have a selected agent
+      if (selectedAgent) {
+        fetch(`/api/threads/${selectedAgent}/approvals/pending`)
+          .then(async (res) => {
+            const text = await res.text();
+            return parse(text) as PendingApprovalsResponse;
+          })
+          .then((data) => {
+            if (data.pendingApprovals?.length > 0) {
+              setPendingApprovals(data.pendingApprovals);
+            }
+          })
+          .catch((error) => {
+            console.error('[SESSION_EVENTS] Failed to fetch pending approvals:', error);
+          });
+      }
+    },
+    [selectedAgent]
+  );
 
   // Handle approval responses
   const handleApprovalResponse = useCallback((toolCallId: string) => {
@@ -133,21 +134,14 @@ export function useSessionEvents(
       })
       .then((data) => {
         if (data.events) {
-          try {
-            // Parse and validate all events with proper date hydration
-            const allEvents = parseSessionEvents(data.events);
+          // Events are already properly typed ThreadEvents from superjson
+          // Filter out approval events (they're handled separately)
+          const timelineEvents = data.events.filter(
+            (event) =>
+              event.type !== 'TOOL_APPROVAL_REQUEST' && event.type !== 'TOOL_APPROVAL_RESPONSE'
+          );
 
-            // Filter out approval events (they're handled separately)
-            const timelineEvents = allEvents.filter(
-              (event) =>
-                event.type !== 'TOOL_APPROVAL_REQUEST' && event.type !== 'TOOL_APPROVAL_RESPONSE'
-            );
-
-            setEvents(timelineEvents);
-          } catch (error) {
-            console.error('[SESSION_EVENTS] Failed to parse history events:', error);
-            setEvents([]); // Fallback to empty array
-          }
+          setEvents(timelineEvents);
         }
         setLoadingHistory(false);
       })

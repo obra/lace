@@ -4,8 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
-import type { SessionEvent } from '@/types/web-sse';
-import type { ThreadEvent, AgentStateChangeData } from '~/threads/types';
+import type { ThreadEvent, AgentStateChangeData } from '@/types/core';
 // StreamEvent removed - using ThreadEvent directly
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';
@@ -325,7 +324,6 @@ describe('useEventStream agent state change handling', () => {
     ];
 
     for (const mockThreadEvent of otherEvents) {
-
       await act(async () => {
         mockEventSource.simulateMessage(mockThreadEvent);
         await new Promise((resolve) => setTimeout(resolve, 10));

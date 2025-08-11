@@ -2,13 +2,9 @@
 // ABOUTME: Ensures event types are correctly structured and utilities work
 
 import { describe, it, expect } from 'vitest';
-import {
-  EVENT_TYPES,
-  UI_EVENT_TYPES,
-  getAllEventTypes,
-  isPersistedEvent,
-  type SessionEvent,
-} from './web-sse';
+import type { ThreadEvent } from '@/types/core';
+import { EVENT_TYPES } from '@/types/core';
+import { UI_EVENT_TYPES, getAllEventTypes, isPersistedEvent } from './events-constants';
 import { asThreadId } from '@/types/core';
 
 describe('Event Types', () => {
@@ -35,15 +31,15 @@ describe('Event Types', () => {
     expect(isPersistedEvent('AGENT_TOKEN')).toBe(false);
   });
 
-  it('should create valid SessionEvent', () => {
-    const event: SessionEvent = {
+  it('should create valid ThreadEvent', () => {
+    const event: ThreadEvent = {
       type: 'USER_MESSAGE',
       threadId: asThreadId('lace_20250731_test01'),
       timestamp: new Date(),
-      data: { content: 'Hello' },
+      data: 'Hello', // USER_MESSAGE data is a string
     };
 
     expect(event.type).toBe('USER_MESSAGE');
-    expect(event.data.content).toBe('Hello');
+    expect(event.data).toBe('Hello');
   });
 });

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEventStream } from './useEventStream';
 import type { ThreadId, CombinedTokenUsage } from '@/types/core';
 import type { AgentResponse } from '@/types/api';
-import type { SessionEvent } from '@/types/web-sse';
+import type { ThreadEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
 // Use the same type structure as the API
@@ -59,18 +59,29 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
 
   // Listen for AGENT_MESSAGE events that include token usage updates
   const handleAgentMessage = useCallback(
-    (event: SessionEvent) => {
+    (event: ThreadEvent) => {
       console.log('[useAgentTokenUsage] Received event:', {
         eventType: event.type,
         eventThreadId: event.threadId,
         targetAgentId: agentId,
         eventData: event.data,
-        hasTokenUsage: !!(event.data && typeof event.data === 'object' && 'tokenUsage' in event.data && (event.data as { tokenUsage?: unknown }).tokenUsage),
+        hasTokenUsage: !!(
+          event.data &&
+          typeof event.data === 'object' &&
+          'tokenUsage' in event.data &&
+          (event.data as { tokenUsage?: unknown }).tokenUsage
+        ),
       });
 
       // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
       // Note: TokenUsage is now directly at event.data.tokenUsage (no more double nesting)
-      if (event.threadId === agentId && event.type === 'AGENT_MESSAGE' && event.data && typeof event.data === 'object' && 'tokenUsage' in event.data) {
+      if (
+        event.threadId === agentId &&
+        event.type === 'AGENT_MESSAGE' &&
+        event.data &&
+        typeof event.data === 'object' &&
+        'tokenUsage' in event.data
+      ) {
         const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
         console.log('[useAgentTokenUsage] Processing token usage data:', tokenUsageData);
 
