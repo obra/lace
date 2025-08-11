@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadId } from '@/types/core';
 import type { ToolResult } from '@/types/core';
+import { ApprovalDecision } from '@/types/core';
 
 // ThreadId schema (assumes string validation exists elsewhere)
 const ThreadIdSchema = z.string() as unknown as z.ZodType<ThreadId>;
@@ -51,14 +52,6 @@ const ToolCallSchema = z.object({
 
 const ToolResultSchema = z.unknown() as unknown as z.ZodType<ToolResult>;
 
-const ToolAggregatedEventDataSchema = z.object({
-  call: ToolCallSchema,
-  result: ToolResultSchema.optional(),
-  toolName: z.string(),
-  toolId: z.string().optional(),
-  arguments: z.unknown().optional(),
-});
-
 // LOCAL_SYSTEM_MESSAGE data is just a string per ThreadEvent type
 
 const AgentTokenEventDataSchema = z.object({
@@ -69,35 +62,20 @@ const AgentStreamingEventDataSchema = z.object({
   content: z.string(),
 });
 
-const ToolApprovalRequestDataSchema = z.object({
-  requestId: z.string(),
-  toolName: z.string(),
-  input: z.unknown(),
-  isReadOnly: z.boolean(),
-  toolDescription: z.string().optional(),
-  toolAnnotations: z
-    .object({
-      title: z.string().optional(),
-      readOnlyHint: z.boolean().optional(),
-      destructiveHint: z.boolean().optional(),
-      idempotentHint: z.boolean().optional(),
-      safeInternal: z.boolean().optional(),
-    })
-    .optional(),
-  riskLevel: z.enum(['safe', 'moderate', 'destructive']),
-});
 
 const ToolApprovalResponseDataSchema = z.object({
   toolCallId: z.string(),
-  decision: z.string(),
+  decision: z.nativeEnum(ApprovalDecision),
 });
 
 // SYSTEM_PROMPT and USER_SYSTEM_PROMPT data are just strings per ThreadEvent type
 
+// We need to use z.lazy to avoid circular dependency since ThreadEvent contains CompactionData
+// which contains ThreadEvent[]
 const CompactionEventDataSchema = z.object({
   strategyId: z.string(),
   originalEventCount: z.number(),
-  compactedEvents: z.array(z.unknown()),
+  compactedEvents: z.array(z.lazy(() => SessionEventSchema)),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -128,12 +106,6 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     data: ToolResultSchema,
   }),
   z.object({
-    type: z.literal('TOOL_AGGREGATED'),
-    threadId: ThreadIdSchema,
-    timestamp: DateTimeSchema,
-    data: ToolAggregatedEventDataSchema,
-  }),
-  z.object({
     type: z.literal('LOCAL_SYSTEM_MESSAGE'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
@@ -155,7 +127,9 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('TOOL_APPROVAL_REQUEST'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: ToolApprovalRequestDataSchema,
+    data: z.object({
+      toolCallId: z.string(),
+    }),
   }),
   z.object({
     type: z.literal('TOOL_APPROVAL_RESPONSE'),

@@ -319,8 +319,8 @@ export class SessionService {
           );
 
           if (toolCallEvent) {
-            // Tool approval request only needs the toolCallId for ThreadEvent
-
+            // Broadcast tool approval request with just the toolCallId
+            // The UI will use this to look up the corresponding TOOL_CALL event
             sseManager.broadcast({
               type: 'TOOL_APPROVAL_REQUEST',
               threadId: asThreadId(eventThreadId),

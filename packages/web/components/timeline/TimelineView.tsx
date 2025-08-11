@@ -4,7 +4,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { ThreadEvent, AgentInfo } from '@/types/core';
+import type { ThreadEvent, AgentInfo, ThreadId } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import { TimelineMessage } from './TimelineMessage';
 import { TypingIndicator } from './TypingIndicator';
 import { useProcessedEvents } from '@/hooks/useProcessedEvents';
@@ -29,7 +30,7 @@ export function TimelineView({
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Process events (filtering, aggregation, etc.)
-  const processedEvents = useProcessedEvents(events, selectedAgent as any);
+  const processedEvents = useProcessedEvents(events, selectedAgent ? asThreadId(selectedAgent) : undefined);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -59,7 +60,7 @@ export function TimelineView({
             event={{
               id: 'streaming',
               type: 'AGENT_STREAMING',
-              threadId: currentAgent as any,
+              threadId: currentAgent ? asThreadId(currentAgent) : asThreadId(''),
               timestamp: new Date(),
               data: { content: streamingContent },
               transient: true,

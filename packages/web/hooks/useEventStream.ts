@@ -376,19 +376,13 @@ export function useEventStream({
 
         // Handle tool approval requests
         if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
-          const approvalData = sessionEvent.data as ToolApprovalRequestData & {
-            toolCallId?: string;
-          };
-          const pendingApproval: PendingApproval = {
-            toolCallId: approvalData.toolCallId || approvalData.requestId,
-            toolCall: {
-              name: approvalData.toolName,
-              arguments: approvalData.input,
-            },
-            requestedAt: threadTimestamp, // Date object, SuperJSON handles serialization
-            requestData: approvalData,
-          };
-          callbackRefs.current.onApprovalRequest?.(pendingApproval);
+          const approvalData = sessionEvent.data as { toolCallId: string };
+          
+          // Pass minimal data - consumer will fetch full details or look up TOOL_CALL event
+          callbackRefs.current.onApprovalRequest?.({
+            toolCallId: approvalData.toolCallId,
+            requestedAt: threadTimestamp,
+          } as PendingApproval);
           return; // Don't process as regular session event
         }
 

@@ -206,7 +206,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary">
             <div className="flex items-center gap-2">
               <span>📝</span>
-              <span>Task created: {event.data.task?.name || event.data.taskId}</span>
+              <span>Task created: {(event.data as { task?: { name?: string }; taskId?: string }).task?.name || (event.data as { task?: { name?: string }; taskId?: string }).taskId}</span>
             </div>
           </div>
         </div>
@@ -218,7 +218,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info">
             <div className="flex items-center gap-2">
               <span>✏️</span>
-              <span>Task updated: {event.data.task?.name || event.data.taskId}</span>
+              <span>Task updated: {(event.data as { task?: { name?: string }; taskId?: string }).task?.name || (event.data as { task?: { name?: string }; taskId?: string }).taskId}</span>
             </div>
           </div>
         </div>
@@ -230,7 +230,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning">
             <div className="flex items-center gap-2">
               <span>🗑️</span>
-              <span>Task deleted: {event.data.task?.name || event.data.taskId}</span>
+              <span>Task deleted: {(event.data as { task?: { name?: string }; taskId?: string }).task?.name || (event.data as { task?: { name?: string }; taskId?: string }).taskId}</span>
             </div>
           </div>
         </div>
@@ -274,7 +274,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           <div className="flex justify-center">
             <div className="bg-base-200 border border-base-300 rounded-lg px-4 py-2 text-sm text-base-content/50">
               <div className="font-mono text-xs">
-                Unknown event: {(event as any).type}
+                Unknown event: {(event as { type: string }).type}
               </div>
             </div>
           </div>

@@ -57,12 +57,12 @@ export function useSessionEvents(
 
       setEvents((prev) => {
         // Insert in sorted position to avoid full sort
-        const timestamp = new Date(sessionEvent.timestamp).getTime();
+        const timestamp = new Date(sessionEvent.timestamp || new Date()).getTime();
         let insertIndex = prev.length;
 
         // Find insertion point (reverse search since newer events are more common)
         for (let i = prev.length - 1; i >= 0; i--) {
-          if (new Date(prev[i]!.timestamp).getTime() <= timestamp) {
+          if (new Date(prev[i]!.timestamp || new Date()).getTime() <= timestamp) {
             insertIndex = i + 1;
             break;
           }
@@ -81,12 +81,31 @@ export function useSessionEvents(
 
   // Handle approval requests
   const handleApprovalRequest = useCallback((approval: PendingApproval) => {
+    // When we get a TOOL_APPROVAL_REQUEST, we need to trigger a refresh
+    // The pending approvals will be fetched from the API endpoint
+    // which has access to the tool metadata to properly enrich the data
     setPendingApprovals((prev) => {
-      const exists = prev.some((p) => p.toolCallId === approval.toolCallId);
-      if (exists) return prev;
-      return [...prev, approval];
+      // Just mark that we need to refresh - the useEffect below will fetch the data
+      return prev;
     });
-  }, []);
+    
+    // Trigger a fetch of pending approvals if we have a selected agent
+    if (selectedAgent) {
+      fetch(`/api/threads/${selectedAgent}/approvals/pending`)
+        .then(async (res) => {
+          const text = await res.text();
+          return parse(text) as PendingApprovalsResponse;
+        })
+        .then((data) => {
+          if (data.pendingApprovals?.length > 0) {
+            setPendingApprovals(data.pendingApprovals);
+          }
+        })
+        .catch((error) => {
+          console.error('[SESSION_EVENTS] Failed to fetch pending approvals:', error);
+        });
+    }
+  }, [selectedAgent]);
 
   // Handle approval responses
   const handleApprovalResponse = useCallback((toolCallId: string) => {
