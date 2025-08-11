@@ -26,17 +26,8 @@ export interface ToolAggregatedEventData {
   arguments?: unknown;
 }
 
-export interface LocalSystemMessageEventData {
-  content: string;
-}
-
-export interface SystemPromptEventData {
-  content: string;
-}
-
-export interface UserSystemPromptEventData {
-  content: string;
-}
+// Note: LOCAL_SYSTEM_MESSAGE, SYSTEM_PROMPT, and USER_SYSTEM_PROMPT
+// use string data directly, not wrapped in objects
 
 export interface CompactionEventData {
   strategyId: string;

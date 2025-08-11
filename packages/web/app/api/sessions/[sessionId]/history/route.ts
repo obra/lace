@@ -64,12 +64,13 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
 
   switch (threadEvent.type) {
     case 'USER_MESSAGE': {
+      // USER_MESSAGE data is a string directly, not wrapped in an object
       const content =
         typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'USER_MESSAGE',
-        data: { content },
+        data: content,
       };
     }
 
@@ -122,12 +123,13 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'LOCAL_SYSTEM_MESSAGE': {
+      // LOCAL_SYSTEM_MESSAGE data is a string directly
       const content =
         typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content },
+        data: content,
       };
     }
 
@@ -146,22 +148,24 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     }
 
     case 'SYSTEM_PROMPT': {
+      // SYSTEM_PROMPT data is a string directly
       const content =
         typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'SYSTEM_PROMPT',
-        data: { content },
+        data: content,
       };
     }
 
     case 'USER_SYSTEM_PROMPT': {
+      // USER_SYSTEM_PROMPT data is a string directly
       const content =
         typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
       return {
         ...baseEvent,
         type: 'USER_SYSTEM_PROMPT',
-        data: { content },
+        data: content,
       };
     }
 
@@ -182,7 +186,7 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       return {
         ...baseEvent,
         type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event type: ${unknownEvent.type}` },
+        data: `Unknown event type: ${unknownEvent.type}`,
       } as SessionEvent;
     }
   }

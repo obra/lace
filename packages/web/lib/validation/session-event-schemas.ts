@@ -59,9 +59,7 @@ const ToolAggregatedEventDataSchema = z.object({
   arguments: z.unknown().optional(),
 });
 
-const LocalSystemMessageEventDataSchema = z.object({
-  content: z.string(),
-});
+// LOCAL_SYSTEM_MESSAGE data is just a string per ThreadEvent type
 
 const AgentTokenEventDataSchema = z.object({
   token: z.string(),
@@ -94,13 +92,7 @@ const ToolApprovalResponseDataSchema = z.object({
   decision: z.string(),
 });
 
-const SystemPromptEventDataSchema = z.object({
-  content: z.string(),
-});
-
-const UserSystemPromptEventDataSchema = z.object({
-  content: z.string(),
-});
+// SYSTEM_PROMPT and USER_SYSTEM_PROMPT data are just strings per ThreadEvent type
 
 const CompactionEventDataSchema = z.object({
   strategyId: z.string(),
@@ -145,7 +137,7 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('LOCAL_SYSTEM_MESSAGE'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: LocalSystemMessageEventDataSchema,
+    data: z.string(), // LOCAL_SYSTEM_MESSAGE data is just a string,
   }),
   z.object({
     type: z.literal('AGENT_TOKEN'),
@@ -175,13 +167,13 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('SYSTEM_PROMPT'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: SystemPromptEventDataSchema,
+    data: z.string(), // SYSTEM_PROMPT data is just a string,
   }),
   z.object({
     type: z.literal('USER_SYSTEM_PROMPT'),
     threadId: ThreadIdSchema,
     timestamp: DateTimeSchema,
-    data: UserSystemPromptEventDataSchema,
+    data: z.string(), // USER_SYSTEM_PROMPT data is just a string,
   }),
   z.object({
     type: z.literal('COMPACTION'),
