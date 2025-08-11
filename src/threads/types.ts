@@ -158,6 +158,9 @@ export interface CompactionStartData {
 export interface CompactionCompleteData {
   success: boolean;
   error?: string;
+  summary?: string;
+  originalEventCount?: number;
+  compactedEventCount?: number;
 }
 
 // Task event data types

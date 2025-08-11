@@ -106,23 +106,21 @@ describe('SessionService compaction event streaming', () => {
       }
     );
 
-    // Verify broadcast was called with COMPACTION_START event
+    // Verify broadcast was called with COMPACTION_START ThreadEvent
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: {
+      type: 'COMPACTION_START',
+      threadId: 'thread_123',
+      timestamp: expect.any(Date),
+      data: {
+        auto: true,
+      },
+      context: {
         projectId: 'project_123',
         sessionId: 'session_123',
-        threadId: 'thread_123',
+        agentId: undefined,
+        taskId: undefined,
       },
-      data: {
-        type: 'COMPACTION_START',
-        threadId: 'thread_123',
-        timestamp: expect.any(Date),
-        data: {
-          strategy: 'summarize',
-          auto: true,
-        },
-      },
+      transient: true,
     });
   });
 
@@ -153,22 +151,21 @@ describe('SessionService compaction event streaming', () => {
       }
     );
 
-    // Verify broadcast was called with COMPACTION_COMPLETE event
+    // Verify broadcast was called with COMPACTION_COMPLETE ThreadEvent
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: {
+      type: 'COMPACTION_COMPLETE',
+      threadId: 'thread_123',
+      timestamp: expect.any(Date),
+      data: {
+        success: true,
+      },
+      context: {
         projectId: 'project_123',
         sessionId: 'session_123',
-        threadId: 'thread_123',
+        agentId: undefined,
+        taskId: undefined,
       },
-      data: {
-        type: 'COMPACTION_COMPLETE',
-        threadId: 'thread_123',
-        timestamp: expect.any(Date),
-        data: {
-          success: true,
-        },
-      },
+      transient: true,
     });
   });
 
@@ -190,21 +187,19 @@ describe('SessionService compaction event streaming', () => {
 
     // Verify broadcast was called
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: {
+      type: 'COMPACTION_START',
+      threadId: 'thread_123',
+      timestamp: expect.any(Date),
+      data: {
+        auto: true, // Auto-compaction flag
+      },
+      context: {
         projectId: 'project_123',
         sessionId: 'session_123',
-        threadId: 'thread_123',
+        agentId: undefined,
+        taskId: undefined,
       },
-      data: {
-        type: 'COMPACTION_START',
-        threadId: 'thread_123',
-        timestamp: expect.any(Date),
-        data: {
-          strategy: 'summarize',
-          auto: true, // Auto-compaction flag
-        },
-      },
+      transient: true,
     });
   });
 

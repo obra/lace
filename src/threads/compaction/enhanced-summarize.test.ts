@@ -269,9 +269,8 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     const result = await strategy.compact(events, context);
     const compactionData = getCompactionData(result);
 
-    // Check that summary length is tracked
-    expect(compactionData.metadata?.summaryLength).toBe(mockSummary.length);
-    expect(compactionData.metadata?.summaryGenerated).toBe(true);
+    // Check that summary is in metadata
+    expect(compactionData.metadata?.summary).toBe(mockSummary);
   });
 
   it('should not duplicate events when preserving user messages', async () => {
@@ -347,10 +346,9 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
 
     // Should have all metadata fields
     expect(compactionData.metadata).toBeDefined();
-    expect(compactionData.metadata?.summaryGenerated).toBeDefined();
-    expect(compactionData.metadata?.recentEventCount).toBeDefined();
+    expect(compactionData.metadata?.summary).toBeDefined();
+    expect(compactionData.metadata?.recentEventCount).toBe(2);
     expect(compactionData.metadata?.strategy).toBe('ai-powered-summarization');
-    expect(compactionData.metadata?.summaryLength).toBeDefined();
-    expect(compactionData.metadata?.preservedUserMessages).toBeDefined();
+    expect(compactionData.metadata?.preservedUserMessages).toBe(1);
   });
 });

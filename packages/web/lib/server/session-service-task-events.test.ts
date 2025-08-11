@@ -105,7 +105,9 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify the broadcast was called with correct ThreadEvent structure
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'LOCAL_SYSTEM_MESSAGE', // Task events are system messages
+          type: 'TASK_CREATED',
+          threadId: 'task-manager',
+          transient: true,
           context: expect.objectContaining({
             projectId: testProject.getId(),
             sessionId: sessionInfo.id,
@@ -207,7 +209,9 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify task:updated event was broadcast correctly
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: 'TASK_UPDATED',
+          threadId: 'task-manager',
+          transient: true,
           context: expect.objectContaining({
             projectId: testProject.getId(),
             sessionId: sessionInfo.id,
@@ -258,7 +262,9 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify task:deleted event was broadcast correctly
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: 'TASK_DELETED',
+          threadId: 'task-manager',
+          transient: true,
           context: {
             projectId: testProject.getId(),
             sessionId: session.getId(),
@@ -314,7 +320,9 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
       const noteAddedEvent = noteAddedCalls[0][0];
       expect(noteAddedEvent).toMatchObject({
-        type: 'LOCAL_SYSTEM_MESSAGE',
+        type: 'TASK_NOTE_ADDED',
+        threadId: 'task-manager',
+        transient: true,
         context: {
           projectId: testProject.getId(),
           sessionId: session.getId(),
@@ -369,7 +377,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
       for (const call of allCalls) {
         const event = call[0] as ThreadEvent;
-        expect(event.type).toBe('LOCAL_SYSTEM_MESSAGE');
+        expect(['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED']).toContain(event.type);
         expect(event.context?.taskId).toBeDefined(); // Task events must have task context
       }
     });
@@ -437,7 +445,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
       for (const call of allCalls) {
         const event = call[0] as ThreadEvent;
-        expect(event.type).toBe('LOCAL_SYSTEM_MESSAGE');
+        expect(['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED']).toContain(event.type);
         // Architecture enforcement: Task events must have task context
         expect(event.context?.taskId).toBeDefined();
       }
@@ -477,7 +485,9 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify event forwarding still works after reconstruction
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'LOCAL_SYSTEM_MESSAGE',
+          type: 'TASK_CREATED',
+          threadId: 'task-manager',
+          transient: true,
           context: expect.objectContaining({
             projectId: testProject.getId(),
             sessionId: sessionInfo.id,

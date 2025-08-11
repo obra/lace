@@ -16,14 +16,14 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     }
 
     if (events.length === 0) {
-      return this.createCompactionEvent([], context, false, 0);
+      return this.createCompactionEvent([], context, undefined, 0);
     }
 
     // Filter out COMPACTION events (they're metadata, not conversation content)
     const conversationEvents = events.filter((event) => event.type !== 'COMPACTION');
 
     if (conversationEvents.length === 0) {
-      return this.createCompactionEvent([], context, false, 0);
+      return this.createCompactionEvent([], context, undefined, 0);
     }
 
     // Separate events into categories
@@ -36,12 +36,9 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     const compactedEvents: ThreadEvent[] = [];
 
     // Generate summary for old non-user events if any exist
-    let summaryLength = 0;
+    let summary: string | undefined;
     if (oldEvents.length > 0) {
-      const summary = await this.generateSummaryInConversation(oldEvents, recentEvents, context);
-      summaryLength = summary.length;
-      const summaryEvent = this.createSummaryEvent(summary, context.threadId);
-      compactedEvents.push(summaryEvent);
+      summary = await this.generateSummaryInConversation(oldEvents, recentEvents, context);
     }
 
     // Preserve ALL user messages (they provide essential context)
@@ -50,13 +47,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     // Add recent non-user events unchanged
     compactedEvents.push(...recentEvents);
 
-    return this.createCompactionEvent(
-      compactedEvents,
-      context,
-      oldEvents.length > 0,
-      events.length,
-      summaryLength
-    );
+    return this.createCompactionEvent(compactedEvents, context, summary, events.length);
   }
 
   private categorizeEventsByCount(events: ThreadEvent[]) {
@@ -163,22 +154,13 @@ Provide ONLY the summary, no preamble or explanation.`;
       .join('\n');
   }
 
-  private createSummaryEvent(summary: string, threadId: string): ThreadEvent {
-    return {
-      id: this.generateEventId(),
-      threadId,
-      type: 'LOCAL_SYSTEM_MESSAGE',
-      timestamp: new Date(),
-      data: `📝 Summary of previous conversation: ${summary}`,
-    };
-  }
+  // Removed createSummaryEvent - summary is now part of COMPACTION event data
 
   private createCompactionEvent(
     compactedEvents: ThreadEvent[],
     context: CompactionContext,
-    summaryGenerated: boolean,
-    originalEventCount: number,
-    summaryLength = 0
+    summary: string | undefined,
+    originalEventCount: number
   ): ThreadEvent {
     return {
       id: this.generateEventId(),
@@ -190,10 +172,9 @@ Provide ONLY the summary, no preamble or explanation.`;
         originalEventCount,
         compactedEvents,
         metadata: {
-          summaryGenerated,
+          summary,
           recentEventCount: this.RECENT_EVENT_COUNT,
           strategy: 'ai-powered-summarization',
-          summaryLength,
           preservedUserMessages: compactedEvents.filter((e) => e.type === 'USER_MESSAGE').length,
         },
       },

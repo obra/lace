@@ -406,7 +406,7 @@ describe('Compaction Integration', () => {
     expect(workingEvents[0].type).toBe('USER_MESSAGE');
     expect(workingEvents[0].data).toBe('First message');
     expect(workingEvents[1].type).toBe('AGENT_MESSAGE');
-    expect(workingEvents[1].data).toBe('First response');
+    expect(workingEvents[1].data).toEqual({ content: 'First response' });
     expect(workingEvents[2].type).toBe('TOOL_RESULT');
     expect((workingEvents[2].data as { content: Array<{ text: string }> }).content[0].text).toBe(
       'long\ntool\nresult\n[results truncated to save space.]'

@@ -72,7 +72,7 @@ describe('ThreadManager', () => {
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(2);
       expect(events[0].data).toBe('Hello');
-      expect(events[1].data).toBe('Hi there');
+      expect(events[1].data).toEqual({ content: 'Hi there' });
     });
 
     it('should handle duplicate tool approval responses correctly', () => {

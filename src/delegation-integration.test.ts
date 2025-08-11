@@ -220,8 +220,8 @@ describe('Delegation Integration Tests', () => {
 
     // Events should be sorted chronologically
     expect(allEvents[0].data).toBe('Main thread message');
-    expect(allEvents[1].data).toBe('Delegate 1 message');
-    expect(allEvents[2].data).toBe('Delegate 2 message');
+    expect(allEvents[1].data).toEqual({ content: 'Delegate 1 message' });
+    expect(allEvents[2].data).toEqual({ content: 'Delegate 2 message' });
   });
 
   it('should handle nested delegations', () => {

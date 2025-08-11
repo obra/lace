@@ -1909,13 +1909,7 @@ export class Agent extends EventEmitter {
       // Use the AI-powered summarization strategy
       await this.compact(this._threadId);
 
-      // Add a system message about compaction
-      this._addEventAndEmit({
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: this._threadId,
-        data: '✅ Conversation compacted successfully',
-      });
-
+      // Emit compaction complete event for UI updates
       this.emit('compaction_complete', { success: true });
       this._addEventAndEmit({
         type: 'COMPACTION_COMPLETE',

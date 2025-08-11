@@ -61,17 +61,15 @@ describe('Compaction SSE Events', () => {
     // Verify COMPACTION_START was broadcast
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'session',
-        scope: expect.objectContaining({
+        type: 'COMPACTION_START',
+        threadId: undefined,
+        transient: true,
+        data: expect.objectContaining({
+          auto: true,
+        }),
+        context: expect.objectContaining({
           projectId,
           sessionId,
-        }),
-        data: expect.objectContaining({
-          type: 'COMPACTION_START',
-          data: expect.objectContaining({
-            strategy: 'summarize',
-            auto: true,
-          }),
         }),
       })
     );
@@ -93,16 +91,15 @@ describe('Compaction SSE Events', () => {
     // Verify COMPACTION_COMPLETE was broadcast
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'session',
-        scope: expect.objectContaining({
+        type: 'COMPACTION_COMPLETE',
+        threadId: undefined,
+        transient: true,
+        data: expect.objectContaining({
+          success: true,
+        }),
+        context: expect.objectContaining({
           projectId,
           sessionId,
-        }),
-        data: expect.objectContaining({
-          type: 'COMPACTION_COMPLETE',
-          data: expect.objectContaining({
-            success: true,
-          }),
         }),
       })
     );
@@ -123,11 +120,15 @@ describe('Compaction SSE Events', () => {
     // Verify COMPACTION_START was broadcast
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        type: 'COMPACTION_START',
+        threadId: undefined,
+        transient: true,
         data: expect.objectContaining({
-          type: 'COMPACTION_START',
-          data: expect.objectContaining({
-            auto: false,
-          }),
+          auto: false,
+        }),
+        context: expect.objectContaining({
+          projectId,
+          sessionId,
         }),
       })
     );
@@ -141,11 +142,15 @@ describe('Compaction SSE Events', () => {
     // Verify COMPACTION_COMPLETE was broadcast
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        type: 'COMPACTION_COMPLETE',
+        threadId: undefined,
+        transient: true,
         data: expect.objectContaining({
-          type: 'COMPACTION_COMPLETE',
-          data: expect.objectContaining({
-            success: true,
-          }),
+          success: true,
+        }),
+        context: expect.objectContaining({
+          projectId,
+          sessionId,
         }),
       })
     );
@@ -166,11 +171,15 @@ describe('Compaction SSE Events', () => {
     // Verify auto flag is true
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        type: 'COMPACTION_START',
+        threadId: undefined,
+        transient: true,
         data: expect.objectContaining({
-          type: 'COMPACTION_START',
-          data: expect.objectContaining({
-            auto: true,
-          }),
+          auto: true,
+        }),
+        context: expect.objectContaining({
+          projectId,
+          sessionId,
         }),
       })
     );
@@ -185,11 +194,15 @@ describe('Compaction SSE Events', () => {
     // Verify auto flag is false
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        type: 'COMPACTION_START',
+        threadId: undefined,
+        transient: true,
         data: expect.objectContaining({
-          type: 'COMPACTION_START',
-          data: expect.objectContaining({
-            auto: false,
-          }),
+          auto: false,
+        }),
+        context: expect.objectContaining({
+          projectId,
+          sessionId,
         }),
       })
     );
