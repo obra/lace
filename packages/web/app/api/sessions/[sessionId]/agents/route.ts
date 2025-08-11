@@ -119,13 +119,15 @@ export async function POST(
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentResponse.threadId as ThreadId,
       timestamp: new Date(),
-      data: { content: `Agent "${agentResponse.name}" spawned successfully` },
+      data: `Agent "${agentResponse.name}" spawned successfully`,
+      context: {
+        sessionId,
+        projectId: undefined,
+        taskId: undefined,
+        agentId: undefined,
+      },
     };
-    sseManager.broadcast({
-      eventType: 'session',
-      scope: { sessionId },
-      data: testEvent,
-    });
+    sseManager.broadcast(testEvent);
 
     return createSuperjsonResponse({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {

@@ -353,6 +353,19 @@ export class ThreadManager {
       'AGENT_STATE_CHANGE',
       'COMPACTION_START',
       'COMPACTION_COMPLETE',
+      // Task events
+      'TASK_CREATED',
+      'TASK_UPDATED',
+      'TASK_DELETED',
+      'TASK_NOTE_ADDED',
+      // Agent lifecycle events
+      'AGENT_SPAWNED',
+      // Project events
+      'PROJECT_CREATED',
+      'PROJECT_UPDATED',
+      'PROJECT_DELETED',
+      // System events
+      'SYSTEM_NOTIFICATION',
     ].includes(type);
   }
 

@@ -10,7 +10,10 @@
       "Bash(grep:*)",
       "Bash(npm run test:run:*)",
       "Bash(npx tsc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(awk:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": []
   }

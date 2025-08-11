@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
 import type { SessionEvent } from '@/types/web-sse';
-import type { StreamEvent } from '@/types/stream-events';
+// StreamEvent removed - using ThreadEvent directly
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';
 

@@ -74,6 +74,27 @@ function createThreadEventFromDb(
     case 'COMPACTION_COMPLETE':
       throw new Error('COMPACTION_COMPLETE events are transient and should not be persisted');
 
+    // Task events are transient
+    case 'TASK_CREATED':
+    case 'TASK_UPDATED':
+    case 'TASK_DELETED':
+    case 'TASK_NOTE_ADDED':
+      throw new Error(`${type} events are transient and should not be persisted`);
+
+    // Agent lifecycle events are transient
+    case 'AGENT_SPAWNED':
+      throw new Error('AGENT_SPAWNED events are transient and should not be persisted');
+
+    // Project events are transient
+    case 'PROJECT_CREATED':
+    case 'PROJECT_UPDATED':
+    case 'PROJECT_DELETED':
+      throw new Error(`${type} events are transient and should not be persisted`);
+
+    // System events are transient
+    case 'SYSTEM_NOTIFICATION':
+      throw new Error('SYSTEM_NOTIFICATION events are transient and should not be persisted');
+
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown event type: ${String(_exhaustive)}`);

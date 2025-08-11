@@ -1,7 +1,7 @@
 // ABOUTME: Event stream manager for real-time client notifications
 // ABOUTME: Manages global event distribution with client-side filtering
 
-import type { StreamEvent, StreamEventCategory } from '@/types/stream-events';
+// StreamEvent removed - using ThreadEvent directly
 import type { Task, TaskContext, ThreadId, ThreadEvent } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
@@ -74,7 +74,7 @@ interface ClientConnection {
     sessions?: string[];
     threads?: string[];
     global?: boolean;
-    eventTypes?: StreamEventCategory[];
+    // eventTypes removed - ThreadEvent handles all types
   };
   lastEventId?: string;
   connectedAt: Date;
@@ -115,7 +115,7 @@ export class EventStreamManager {
     taskManager.on('task:created', (event: unknown) => {
       const e = event as TaskCreatedEvent;
       this.broadcast({
-        type: 'TASK_CREATED' as any, // We'll add these types to ThreadEventType later
+        type: 'TASK_CREATED',
         threadId: 'task-manager',
         data: { taskId: e.task.id, ...e },
         context: { projectId, sessionId, taskId: e.task.id },
@@ -126,7 +126,7 @@ export class EventStreamManager {
     taskManager.on('task:updated', (event: unknown) => {
       const e = event as TaskUpdatedEvent;
       this.broadcast({
-        type: 'TASK_UPDATED' as any,
+        type: 'TASK_UPDATED',
         threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
         context: { projectId, sessionId, taskId: e.task?.id },
@@ -137,7 +137,7 @@ export class EventStreamManager {
     taskManager.on('task:deleted', (event: unknown) => {
       const e = event as TaskDeletedEvent;
       this.broadcast({
-        type: 'TASK_DELETED' as any,
+        type: 'TASK_DELETED',
         threadId: 'task-manager',
         data: { ...e },
         context: { projectId, sessionId, taskId: e.taskId },
@@ -148,7 +148,7 @@ export class EventStreamManager {
     taskManager.on('task:note_added', (event: unknown) => {
       const e = event as TaskNoteAddedEvent;
       this.broadcast({
-        type: 'TASK_NOTE_ADDED' as any,
+        type: 'TASK_NOTE_ADDED',
         threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
         context: { projectId, sessionId, taskId: e.task?.id },
@@ -159,7 +159,7 @@ export class EventStreamManager {
     taskManager.on('agent:spawned', (event: unknown) => {
       const e = event as AgentSpawnedEvent;
       this.broadcast({
-        type: 'AGENT_SPAWNED' as any,
+        type: 'AGENT_SPAWNED',
         threadId: e.agentThreadId,
         data: {
           type: e.type,
@@ -306,12 +306,7 @@ export class EventStreamManager {
       }
     }
 
-    // Event type filtering
-    if (subscription.eventTypes && subscription.eventTypes.length > 0) {
-      if (!subscription.eventTypes.includes(event.type as any)) {
-        return false;
-      }
-    }
+    // Event type filtering removed - ThreadEvent handles all types
 
     // Global filtering - include all if subscription.global is true
     if (subscription.global === true) {

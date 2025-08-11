@@ -3,11 +3,10 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type {
-  StreamEvent,
   StreamSubscription,
   StreamConnection,
-  StreamEventCategory,
 } from '@/types/stream-events';
+import type { ThreadEvent } from '~/threads/types';
 import { parse } from '@/lib/serialization';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadId } from '@/types/core';
@@ -129,45 +128,48 @@ interface UseEventStreamOptions extends EventHandlers {
 
 interface UseEventStreamResult {
   connection: StreamConnection;
-  lastEvent?: StreamEvent;
+  lastEvent?: ThreadEvent;
   sendCount: number;
   close: () => void;
   reconnect: () => void;
 }
 
-function isTaskEvent(streamEvent: StreamEvent): boolean {
-  return (
-    streamEvent.eventType === 'task' &&
-    ['task:created', 'task:updated', 'task:deleted', 'task:note_added'].includes(
-      (streamEvent.data as TaskEvent).type
-    )
-  );
+function isTaskEvent(event: ThreadEvent): boolean {
+  // Check if it's a task event by looking at the type
+  // Task events come through as TASK_CREATED, TASK_UPDATED, etc. (will be added to enum)
+  return event.type && ['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED'].includes(event.type as string);
 }
 
-function isAgentEvent(streamEvent: StreamEvent): boolean {
-  if (streamEvent.eventType !== 'task') {
-    return false;
-  }
-
-  const data = streamEvent.data as unknown;
-  if (!data || typeof data !== 'object' || !('type' in data)) {
-    return false;
-  }
-
-  const eventData = data as { type: string };
-  return ['agent:spawned', 'agent:started', 'agent:stopped'].includes(eventData.type);
+function isAgentEvent(event: ThreadEvent): boolean {
+  // Agent events include AGENT_SPAWNED and AGENT_STATE_CHANGE
+  return event.type && ['AGENT_SPAWNED', 'AGENT_STATE_CHANGE'].includes(event.type as string);
 }
 
-function isProjectEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.eventType === 'project';
+function isProjectEvent(event: ThreadEvent): boolean {
+  // Project events will be added to ThreadEventType enum
+  return event.type && ['PROJECT_CREATED', 'PROJECT_UPDATED', 'PROJECT_DELETED'].includes(event.type as string);
 }
 
-function isGlobalEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.eventType === 'global';
+function isGlobalEvent(event: ThreadEvent): boolean {
+  // Global/system events
+  return event.type && ['SYSTEM_NOTIFICATION', 'LOCAL_SYSTEM_MESSAGE'].includes(event.type as string);
 }
 
-function isSessionEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.eventType === 'session';
+function isSessionEvent(event: ThreadEvent): boolean {
+  // Session events are the core ThreadEvent types
+  return event.type && [
+    'USER_MESSAGE',
+    'AGENT_MESSAGE',
+    'AGENT_TOKEN',
+    'TOOL_CALL',
+    'TOOL_RESULT',
+    'TOOL_APPROVAL_REQUEST',
+    'TOOL_APPROVAL_RESPONSE',
+    'LOCAL_SYSTEM_MESSAGE',
+    'AGENT_STATE_CHANGE',
+    'COMPACTION_START',
+    'COMPACTION_COMPLETE'
+  ].includes(event.type);
 }
 
 export function useEventStream({
@@ -218,12 +220,12 @@ export function useEventStream({
     maxReconnectAttempts: 5,
   });
 
-  const [lastEvent, setLastEvent] = useState<StreamEvent>();
+  const [lastEvent, setLastEvent] = useState<ThreadEvent>();
   const [sendCount, setSendCount] = useState(0);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleStreamEventRef = useRef<(event: StreamEvent) => void>(() => {});
+  const handleStreamEventRef = useRef<(event: ThreadEvent) => void>(() => {});
   const autoReconnectRef = useRef(autoReconnect);
   const reconnectIntervalRef = useRef(reconnectInterval);
 
@@ -335,10 +337,9 @@ export function useEventStream({
       // Sort arrays to ensure consistent key even if order changes
       const sortedThreadIds = threadIds ? [...threadIds].sort() : [];
       return JSON.stringify({
-        projects: projectId ? [projectId] : [],
-        sessions: sessionId ? [sessionId] : [],
+        projectIds: projectId ? [projectId] : [],
+        sessionIds: sessionId ? [sessionId] : [],
         threads: sortedThreadIds,
-        global: includeGlobal,
       });
     },
     [projectId, sessionId, threadIds?.join(','), includeGlobal] // Use join for array stability
@@ -346,11 +347,9 @@ export function useEventStream({
 
   const subscription = useMemo(
     () => ({
-      projects: projectId ? [projectId] : [],
-      sessions: sessionId ? [sessionId] : [],
+      projectIds: projectId ? [projectId] : [],
+      sessionIds: sessionId ? [sessionId] : [],
       threads: threadIds || [],
-      global: includeGlobal,
-      eventTypes: ['session', 'task', 'project', 'global'] as StreamEventCategory[],
     }),
     [subscriptionKey] // Only recreate when actual content changes
   );
@@ -359,22 +358,21 @@ export function useEventStream({
   const buildQueryString = (sub: StreamSubscription): string => {
     const params = new URLSearchParams();
 
-    if (sub.projects?.length) params.set('projects', sub.projects.join(','));
-    if (sub.sessions?.length) params.set('sessions', sub.sessions.join(','));
+    if (sub.projectIds?.length) params.set('projects', sub.projectIds.join(','));
+    if (sub.sessionIds?.length) params.set('sessions', sub.sessionIds.join(','));
     if (sub.threads?.length) params.set('threads', sub.threads.join(','));
-    if (sub.global) params.set('global', 'true');
-    if (sub.eventTypes?.length) params.set('eventTypes', sub.eventTypes.join(','));
+    // global and eventTypes removed - ThreadEvent handles all types
 
     return params.toString();
   };
 
   // Unified event handler that routes to specific callbacks
-  const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
+  const handleStreamEvent = useCallback((event: ThreadEvent) => {
     try {
-      if (isSessionEvent(streamEvent)) {
-        // Parse and validate SessionEvent
-        const sessionEvent = parseSessionEvent(streamEvent.data);
-        const streamTimestamp = StreamEventTimestampSchema.parse(streamEvent.timestamp);
+      if (isSessionEvent(event)) {
+        // ThreadEvent IS the session event - no unwrapping needed
+        const sessionEvent = event as SessionEvent;
+        const streamTimestamp = event.timestamp || new Date();
 
         // Handle tool approval requests
         if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
@@ -429,8 +427,9 @@ export function useEventStream({
             }
             break;
         }
-      } else if (isTaskEvent(streamEvent)) {
-        const taskEvent = streamEvent.data as TaskEvent;
+      } else if (isTaskEvent(event)) {
+        // Extract task event data from ThreadEvent
+        const taskEvent = event.data as TaskEvent;
         callbackRefs.current.onTaskEvent?.(taskEvent);
         switch (taskEvent.type) {
           case 'task:created':
@@ -446,8 +445,9 @@ export function useEventStream({
             callbackRefs.current.onTaskNoteAdded?.(taskEvent);
             break;
         }
-      } else if (isAgentEvent(streamEvent)) {
-        const agentEvent = streamEvent.data as unknown as AgentEvent;
+      } else if (isAgentEvent(event)) {
+        // Extract agent event data from ThreadEvent  
+        const agentEvent = event.data as unknown as AgentEvent;
         callbackRefs.current.onAgentEvent?.(agentEvent);
         switch (agentEvent.type) {
           case 'agent:spawned':
@@ -460,8 +460,9 @@ export function useEventStream({
             callbackRefs.current.onAgentStopped?.(agentEvent);
             break;
         }
-      } else if (isProjectEvent(streamEvent)) {
-        const projectEvent = streamEvent.data as ProjectEvent;
+      } else if (isProjectEvent(event)) {
+        // Extract project event data from ThreadEvent
+        const projectEvent = event.data as ProjectEvent;
         callbackRefs.current.onProjectEvent?.(projectEvent);
         switch (projectEvent.type) {
           case 'project:created':
@@ -474,15 +475,16 @@ export function useEventStream({
             callbackRefs.current.onProjectDeleted?.(projectEvent);
             break;
         }
-      } else if (isGlobalEvent(streamEvent)) {
-        const globalEvent = streamEvent.data as GlobalEvent;
+      } else if (isGlobalEvent(event)) {
+        // Extract global event data from ThreadEvent
+        const globalEvent = event.data as GlobalEvent;
         callbackRefs.current.onGlobalEvent?.(globalEvent);
         if (globalEvent.type === 'system:notification') {
           callbackRefs.current.onSystemNotification?.(globalEvent);
         }
       }
     } catch (error) {
-      console.error('[EVENT_STREAM] Failed to parse stream event:', error, streamEvent);
+      console.error('[EVENT_STREAM] Failed to parse stream event:', error, event);
       callbackRefs.current.onError?.(error as Error);
     }
   }, []);
@@ -529,16 +531,16 @@ export function useEventStream({
 
     eventSource.onmessage = (event) => {
       try {
-        const streamEvent = parse(event.data) as StreamEvent;
+        const threadEvent = parse(event.data) as ThreadEvent;
 
-        setLastEvent(streamEvent);
+        setLastEvent(threadEvent);
         setSendCount((prev) => prev + 1);
         setConnection((prev) => ({
           ...prev,
-          lastEventId: streamEvent.id,
+          lastEventId: threadEvent.id,
         }));
 
-        handleStreamEventRef.current?.(streamEvent);
+        handleStreamEventRef.current?.(threadEvent);
       } catch (error) {
         console.error('[EVENT_STREAM] Failed to parse event:', error);
         callbackRefs.current.onError?.(error as Error);

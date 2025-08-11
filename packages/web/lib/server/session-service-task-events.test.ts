@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionService, getSessionService } from './session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import type { StreamEvent } from '@/types/stream-events';
+import type { ThreadEvent } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
@@ -102,11 +102,11 @@ describe('SessionService TaskManager Event Forwarding', () => {
         }
       );
 
-      // Verify the broadcast was called with correct eventType: 'task'
+      // Verify the broadcast was called with correct ThreadEvent structure
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          eventType: 'task', // Critical: Must be 'task', not 'session'
-          scope: expect.objectContaining({
+          type: 'LOCAL_SYSTEM_MESSAGE', // Task events are system messages
+          context: expect.objectContaining({
             projectId: testProject.getId(),
             sessionId: sessionInfo.id,
             taskId: task.id,
@@ -155,10 +155,10 @@ describe('SessionService TaskManager Event Forwarding', () => {
         }
       );
 
-      const broadcastCall = broadcastSpy.mock.calls[0][0] as StreamEvent;
+      const broadcastCall = broadcastSpy.mock.calls[0][0] as ThreadEvent;
 
-      // Verify complete scope hierarchy
-      expect(broadcastCall.scope).toEqual(
+      // Verify complete context hierarchy
+      expect(broadcastCall.context).toEqual(
         expect.objectContaining({
           projectId: testProject.getId(),
           sessionId: sessionInfo.id,
@@ -166,10 +166,10 @@ describe('SessionService TaskManager Event Forwarding', () => {
         })
       );
 
-      // Verify no missing scope properties
-      expect(broadcastCall.scope.projectId).toBeDefined();
-      expect(broadcastCall.scope.sessionId).toBeDefined();
-      expect(broadcastCall.scope.taskId).toBeDefined();
+      // Verify no missing context properties
+      expect(broadcastCall.context?.projectId).toBeDefined();
+      expect(broadcastCall.context?.sessionId).toBeDefined();
+      expect(broadcastCall.context?.taskId).toBeDefined();
     });
   });
 
@@ -207,8 +207,8 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify task:updated event was broadcast correctly
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          eventType: 'task', // Must be 'task'
-          scope: expect.objectContaining({
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          context: expect.objectContaining({
             projectId: testProject.getId(),
             sessionId: sessionInfo.id,
             taskId: task.id,
@@ -258,11 +258,11 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify task:deleted event was broadcast correctly
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          eventType: 'task',
-          scope: {
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          context: {
             projectId: testProject.getId(),
             sessionId: session.getId(),
-            taskId: task.id, // taskId should be in scope for deletion events
+            taskId: task.id, // taskId should be in context for deletion events
           },
           data: expect.objectContaining({
             type: 'task:deleted',
@@ -308,14 +308,14 @@ describe('SessionService TaskManager Event Forwarding', () => {
 
       // Find the task:note_added event (not the task:updated event)
       const noteAddedCalls = broadcastSpy.mock.calls.filter(
-        (call) => (call[0] as StreamEvent).data.type === 'task:note_added'
+        (call) => (call[0] as ThreadEvent).type === 'TASK_NOTE_ADDED'
       );
       expect(noteAddedCalls).toHaveLength(1);
 
       const noteAddedEvent = noteAddedCalls[0][0];
       expect(noteAddedEvent).toMatchObject({
-        eventType: 'task',
-        scope: {
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        context: {
           projectId: testProject.getId(),
           sessionId: session.getId(),
           taskId: task.id,
@@ -368,9 +368,9 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(allCalls.length).toBeGreaterThan(0);
 
       for (const call of allCalls) {
-        const event = call[0] as StreamEvent;
-        expect(event.eventType).toBe('task');
-        expect(event.eventType).not.toBe('session'); // Explicit anti-pattern check
+        const event = call[0] as ThreadEvent;
+        expect(event.type).toBe('LOCAL_SYSTEM_MESSAGE');
+        expect(event.context?.taskId).toBeDefined(); // Task events must have task context
       }
     });
 
@@ -379,11 +379,12 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // If someone accidentally broadcasts task events as 'session' type,
       // the frontend should not process them
 
-      const _taskStreamEvent: StreamEvent = {
+      const _taskThreadEvent: ThreadEvent = {
         id: 'test-event',
         timestamp: new Date(),
-        eventType: 'session', // Wrong! Should be 'task'
-        scope: { sessionId: 'test-session', taskId: 'test-task' },
+        type: 'TASK_CREATED',
+        threadId: 'task-manager',
+        context: { sessionId: 'test-session', taskId: 'test-task' },
         data: {
           type: 'task:created',
           taskId: 'test-task',
@@ -435,10 +436,10 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(allCalls.length).toBeGreaterThan(0);
 
       for (const call of allCalls) {
-        const event = call[0] as StreamEvent;
-        expect(event.eventType).toBe('task');
-        // Architecture enforcement: NEVER 'session' for task events
-        expect(event.eventType).not.toBe('session');
+        const event = call[0] as ThreadEvent;
+        expect(event.type).toBe('LOCAL_SYSTEM_MESSAGE');
+        // Architecture enforcement: Task events must have task context
+        expect(event.context?.taskId).toBeDefined();
       }
     });
   });
@@ -476,8 +477,8 @@ describe('SessionService TaskManager Event Forwarding', () => {
       // Verify event forwarding still works after reconstruction
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          eventType: 'task',
-          scope: expect.objectContaining({
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          context: expect.objectContaining({
             projectId: testProject.getId(),
             sessionId: sessionInfo.id,
           }),

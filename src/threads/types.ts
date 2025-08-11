@@ -25,6 +25,19 @@ export const EVENT_TYPES = [
   'AGENT_STATE_CHANGE',
   'COMPACTION_START',
   'COMPACTION_COMPLETE',
+  // Task events (transient)
+  'TASK_CREATED',
+  'TASK_UPDATED',
+  'TASK_DELETED',
+  'TASK_NOTE_ADDED',
+  // Agent lifecycle events (transient)
+  'AGENT_SPAWNED',
+  // Project events (transient)
+  'PROJECT_CREATED',
+  'PROJECT_UPDATED',
+  'PROJECT_DELETED',
+  // System events (transient)
+  'SYSTEM_NOTIFICATION',
 ] as const;
 
 // Derive ThreadEventType union from the array
@@ -83,6 +96,114 @@ export interface CompactionStartData {
 export interface CompactionCompleteData {
   success: boolean;
   error?: string;
+}
+
+// Task event data types
+export interface TaskCreatedData {
+  taskId: string;
+  task: any; // TODO: Import Task type when circular dependency is resolved
+  context: any; // TODO: Import TaskContext type
+  timestamp: Date;
+  type: 'task:created'; // For compatibility with existing handlers
+}
+
+export interface TaskUpdatedData {
+  taskId: string;
+  task: any; // TODO: Import Task type
+  context: any; // TODO: Import TaskContext type
+  timestamp: Date;
+  type: 'task:updated'; // For compatibility
+}
+
+export interface TaskDeletedData {
+  taskId: string;
+  task?: any; // TODO: Import Task type
+  context: any; // TODO: Import TaskContext type
+  timestamp: Date;
+  type: 'task:deleted'; // For compatibility
+}
+
+export interface TaskNoteAddedData {
+  taskId: string;
+  task: any; // TODO: Import Task type
+  context: any; // TODO: Import TaskContext type
+  timestamp: Date;
+  type: 'task:note_added'; // For compatibility
+}
+
+// Agent lifecycle event data
+export interface AgentSpawnedData {
+  type: 'agent:spawned'; // For compatibility with existing handlers
+  taskId?: string;
+  agentThreadId: ThreadId;
+  provider: string;
+  model: string;
+  context: {
+    actor: string;
+    isHuman: boolean;
+  };
+  timestamp: Date;
+}
+
+// Project event data types
+export interface ProjectCreatedData {
+  projectId: string;
+  project: {
+    id: string;
+    name: string;
+    description?: string;
+    path: string;
+  };
+  context: {
+    actor: string;
+    isHuman: boolean;
+  };
+  timestamp: Date;
+  type: 'project:created'; // For compatibility
+}
+
+export interface ProjectUpdatedData {
+  projectId: string;
+  project: {
+    id: string;
+    name: string;
+    description?: string;
+    path: string;
+  };
+  context: {
+    actor: string;
+    isHuman: boolean;
+  };
+  timestamp: Date;
+  type: 'project:updated'; // For compatibility
+}
+
+export interface ProjectDeletedData {
+  projectId: string;
+  project: {
+    id: string;
+    name: string;
+    description?: string;
+    path: string;
+  };
+  context: {
+    actor: string;
+    isHuman: boolean;
+  };
+  timestamp: Date;
+  type: 'project:deleted'; // For compatibility
+}
+
+// System event data
+export interface SystemNotificationData {
+  message: string;
+  severity: 'info' | 'warning' | 'error';
+  context: {
+    actor: string;
+    isHuman: boolean;
+  };
+  timestamp: Date;
+  type: 'system:notification'; // For compatibility
 }
 
 // Discriminated union for type-safe event handling
@@ -146,6 +267,42 @@ export type ThreadEvent =
   | (BaseThreadEvent & {
       type: 'COMPACTION_COMPLETE';
       data: CompactionCompleteData;
+    })
+  | (BaseThreadEvent & {
+      type: 'TASK_CREATED';
+      data: TaskCreatedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'TASK_UPDATED';
+      data: TaskUpdatedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'TASK_DELETED';
+      data: TaskDeletedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'TASK_NOTE_ADDED';
+      data: TaskNoteAddedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'AGENT_SPAWNED';
+      data: AgentSpawnedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'PROJECT_CREATED';
+      data: ProjectCreatedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'PROJECT_UPDATED';
+      data: ProjectUpdatedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'PROJECT_DELETED';
+      data: ProjectDeletedData;
+    })
+  | (BaseThreadEvent & {
+      type: 'SYSTEM_NOTIFICATION';
+      data: SystemNotificationData;
     });
 
 // Helper type to extract valid data types for addEvent method
