@@ -11,6 +11,9 @@ import { TypingIndicator } from './TypingIndicator';
 import { useProcessedEvents } from '@/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
+// Placeholder for when currentAgent is not available
+const STREAMING_THREAD_ID = asThreadId('streaming-placeholder');
+
 interface TimelineViewProps {
   events: LaceEvent[];
   agents?: AgentInfo[];
@@ -60,30 +63,25 @@ export function TimelineView({
           </TimelineEntryErrorBoundary>
         ))}
 
-        {streamingContent && (
-          <TimelineEntryErrorBoundary
-            event={{
-              id: 'streaming',
-              type: 'AGENT_STREAMING',
-              threadId: currentAgent ? asThreadId(currentAgent) : asThreadId(''),
-              timestamp: new Date(),
-              data: { content: streamingContent },
-              transient: true,
-            }}
-          >
-            <TimelineMessageWithDetails
-              event={{
-                id: 'streaming',
-                type: 'AGENT_STREAMING',
-                threadId: currentAgent ? asThreadId(currentAgent) : asThreadId(''),
-                timestamp: new Date(),
-                data: { content: streamingContent },
-                transient: true,
-              }}
-              agents={agents}
-            />
-          </TimelineEntryErrorBoundary>
-        )}
+        {streamingContent && (() => {
+          const streamingEvent = {
+            id: 'streaming',
+            type: 'AGENT_STREAMING' as const,
+            threadId: currentAgent ? asThreadId(currentAgent) : STREAMING_THREAD_ID,
+            timestamp: new Date(),
+            data: { content: streamingContent },
+            transient: true,
+          };
+          
+          return (
+            <TimelineEntryErrorBoundary event={streamingEvent}>
+              <TimelineMessageWithDetails
+                event={streamingEvent}
+                agents={agents}
+              />
+            </TimelineEntryErrorBoundary>
+          );
+        })()}
 
         {isTyping && !streamingContent && <TypingIndicator agent={currentAgent} />}
       </div>

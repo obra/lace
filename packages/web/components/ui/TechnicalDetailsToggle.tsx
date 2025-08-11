@@ -15,6 +15,24 @@ interface TechnicalDetailsToggleProps {
   children?: ReactNode;
 }
 
+// Safe JSON stringify that handles circular references
+function safeStringify(obj: unknown): string {
+  try {
+    const seen = new WeakSet();
+    return JSON.stringify(obj, (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[Circular]';
+        }
+        seen.add(value);
+      }
+      return value;
+    }, 2);
+  } catch (error) {
+    return `[Error serializing object: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+  }
+}
+
 export function TechnicalDetailsToggle({ 
   details, 
   label = 'Event Details',
@@ -24,12 +42,21 @@ export function TechnicalDetailsToggle({
 }: TechnicalDetailsToggleProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   
-  const handleCopy = () => {
-    const detailsJson = JSON.stringify(details, null, 2);
-    navigator.clipboard.writeText(detailsJson);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      setCopyError(null);
+      const detailsJson = safeStringify(details);
+      await navigator.clipboard.writeText(detailsJson);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to copy';
+      setCopyError(errorMessage);
+      // Clear error after 3 seconds
+      setTimeout(() => setCopyError(null), 3000);
+    }
   };
   
   return (
@@ -49,14 +76,17 @@ export function TechnicalDetailsToggle({
             <div className="text-xs text-base-content/70 font-medium">{label}:</div>
             <button
               onClick={handleCopy}
-              className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex items-center gap-1"
+              className={`text-xs px-2 py-1 rounded hover:bg-base-200 flex items-center gap-1 ${
+                copyError ? 'text-error hover:text-error' : 'text-base-content/50 hover:text-base-content'
+              }`}
+              title={copyError || undefined}
             >
               <FontAwesomeIcon icon={copied ? faCheck : faCopy} className="text-xs" />
-              {copied ? 'Copied!' : 'Copy'}
+              {copyError ? 'Error' : copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
           <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
-            {JSON.stringify(details, null, 2)}
+            {safeStringify(details)}
           </div>
         </div>
       )}
