@@ -56,8 +56,10 @@ export default function TokenUsageDisplay({
     return `${remaining.toFixed(0)}% until auto-compaction`;
   };
 
-  const usageStatus = getUsageStatus(tokenUsage.percentUsed);
-  const compactionDistance = getCompactionDistance(tokenUsage.percentUsed);
+
+  const percentAsPercentage = tokenUsage.percentUsed * 100;
+  const usageStatus = getUsageStatus(percentAsPercentage);
+  const compactionDistance = getCompactionDistance(percentAsPercentage);
 
   return (
     <div className={`flex items-center justify-between text-xs text-base-content/70 py-2 px-1 ${className}`}>
@@ -73,7 +75,7 @@ export default function TokenUsageDisplay({
             {formatTokenCount(tokenUsage.totalTokens)} tokens
           </span>
           <Badge variant={usageStatus.status} size="xs">
-            {tokenUsage.percentUsed.toFixed(0)}%
+            {(tokenUsage.percentUsed * 100).toFixed(0)}%
           </Badge>
         </div>
         
