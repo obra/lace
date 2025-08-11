@@ -2,7 +2,7 @@
 // ABOUTME: Manages global event distribution with client-side filtering
 
 import type { StreamEvent, StreamEventCategory } from '@/types/stream-events';
-import type { Task, TaskContext, ThreadId } from '@/types/core';
+import type { Task, TaskContext, ThreadId, ThreadEvent } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
@@ -111,57 +111,67 @@ export class EventStreamManager {
 
     EventStreamManager.registeredTaskManagers.add(taskManager);
 
-    // Forward all TaskManager events - these are known types from our own TaskManager
+    // Convert TaskManager events to ThreadEvent format
     taskManager.on('task:created', (event: unknown) => {
       const e = event as TaskCreatedEvent;
       this.broadcast({
-        eventType: 'task',
-        scope: { projectId, sessionId, taskId: e.task.id },
+        type: 'TASK_CREATED' as any, // We'll add these types to ThreadEventType later
+        threadId: 'task-manager',
         data: { taskId: e.task.id, ...e },
+        context: { projectId, sessionId, taskId: e.task.id },
+        transient: true,
       });
     });
 
     taskManager.on('task:updated', (event: unknown) => {
       const e = event as TaskUpdatedEvent;
       this.broadcast({
-        eventType: 'task',
-        scope: { projectId, sessionId, taskId: e.task?.id },
+        type: 'TASK_UPDATED' as any,
+        threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
+        context: { projectId, sessionId, taskId: e.task?.id },
+        transient: true,
       });
     });
 
     taskManager.on('task:deleted', (event: unknown) => {
       const e = event as TaskDeletedEvent;
       this.broadcast({
-        eventType: 'task',
-        scope: { projectId, sessionId, taskId: e.taskId },
+        type: 'TASK_DELETED' as any,
+        threadId: 'task-manager',
         data: { ...e },
+        context: { projectId, sessionId, taskId: e.taskId },
+        transient: true,
       });
     });
 
     taskManager.on('task:note_added', (event: unknown) => {
       const e = event as TaskNoteAddedEvent;
       this.broadcast({
-        eventType: 'task',
-        scope: { projectId, sessionId, taskId: e.task?.id },
+        type: 'TASK_NOTE_ADDED' as any,
+        threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
+        context: { projectId, sessionId, taskId: e.task?.id },
+        transient: true,
       });
     });
 
     taskManager.on('agent:spawned', (event: unknown) => {
       const e = event as AgentSpawnedEvent;
       this.broadcast({
-        eventType: 'task',
-        scope: { projectId, sessionId, taskId: e.taskId },
+        type: 'AGENT_SPAWNED' as any,
+        threadId: e.agentThreadId,
         data: {
           type: e.type,
           taskId: e.taskId,
           agentThreadId: e.agentThreadId,
-          provider: e.providerInstanceId, // Map providerInstanceId to provider
-          model: e.modelId, // Map modelId to model
+          provider: e.providerInstanceId,
+          model: e.modelId,
           context: e.context,
           timestamp: e.timestamp,
         },
+        context: { projectId, sessionId, taskId: e.taskId },
+        transient: true,
       });
     });
   }
@@ -211,19 +221,14 @@ export class EventStreamManager {
       this.startKeepAlive();
     }
 
-    // Send connection confirmation
+    // Send connection confirmation as ThreadEvent
     this.sendToConnection(connection, {
       id: this.generateEventId(),
       timestamp: new Date(),
-      eventType: 'global',
-      scope: { global: true },
-      data: {
-        type: 'system:notification',
-        message: 'Connected to unified event stream',
-        severity: 'info',
-        context: { actor: 'system', isHuman: false },
-        timestamp: new Date(),
-      },
+      threadId: 'system',
+      type: 'LOCAL_SYSTEM_MESSAGE',
+      data: 'Connected to unified event stream',
+      transient: true,
     });
 
     return connectionId;
@@ -249,11 +254,12 @@ export class EventStreamManager {
   }
 
   // Broadcast event to all matching connections
-  broadcast(event: Omit<StreamEvent, 'id' | 'timestamp'>): void {
-    const fullEvent: StreamEvent = {
+  broadcast(event: ThreadEvent): void {
+    // Ensure event has required fields
+    const fullEvent: ThreadEvent = {
       ...event,
-      id: this.generateEventId(),
-      timestamp: new Date(),
+      id: event.id || this.generateEventId(),
+      timestamp: event.timestamp || new Date(),
     };
 
     const deadConnections: string[] = [];
@@ -276,47 +282,47 @@ export class EventStreamManager {
   }
 
   // Check if event should be sent to connection based on subscription
-  private shouldSendToConnection(connection: ClientConnection, event: StreamEvent): boolean {
+  private shouldSendToConnection(connection: ClientConnection, event: ThreadEvent): boolean {
     const { subscription } = connection;
 
-    // Global events
-    if (event.eventType === 'global') {
-      return subscription.global === true;
-    }
-
-    // Project filtering
-    if (subscription.projects && event.scope.projectId) {
-      if (!subscription.projects.includes(event.scope.projectId)) {
-        return false;
-      }
-    }
-
-    // Session filtering
-    if (subscription.sessions && event.scope.sessionId) {
-      if (!subscription.sessions.includes(event.scope.sessionId)) {
-        return false;
-      }
-    }
-
     // Thread filtering
-    if (subscription.threads && event.scope.threadId) {
-      if (!subscription.threads.includes(event.scope.threadId)) {
+    if (subscription.threads && subscription.threads.length > 0) {
+      if (!subscription.threads.includes(event.threadId)) {
         return false;
       }
     }
 
-    // Event type filtering (filters by top-level eventType, not event.data.type)
-    if (subscription.eventTypes && subscription.eventTypes.length > 0) {
-      if (!subscription.eventTypes.includes(event.eventType)) {
+    // Project filtering via context
+    if (subscription.projects && subscription.projects.length > 0) {
+      if (!event.context?.projectId || !subscription.projects.includes(event.context.projectId)) {
         return false;
       }
+    }
+
+    // Session filtering via context
+    if (subscription.sessions && subscription.sessions.length > 0) {
+      if (!event.context?.sessionId || !subscription.sessions.includes(event.context.sessionId)) {
+        return false;
+      }
+    }
+
+    // Event type filtering
+    if (subscription.eventTypes && subscription.eventTypes.length > 0) {
+      if (!subscription.eventTypes.includes(event.type as any)) {
+        return false;
+      }
+    }
+
+    // Global filtering - include all if subscription.global is true
+    if (subscription.global === true) {
+      return true;
     }
 
     return true;
   }
 
   // Send event to specific connection
-  private sendToConnection(connection: ClientConnection, event: StreamEvent): void {
+  private sendToConnection(connection: ClientConnection, event: ThreadEvent): void {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
 

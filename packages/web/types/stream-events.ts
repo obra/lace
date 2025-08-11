@@ -1,31 +1,7 @@
 // ABOUTME: Event stream types for real-time notifications
-// ABOUTME: Clean re-export of core event types - no duplicate definitions
+// ABOUTME: Now uses ThreadEvent directly - no StreamEvent wrapper
 
-import type { StreamEvent, StreamSubscription } from '~/stream-events/types';
-
-// Re-export all core event types (single source of truth)
-export type {
-  StreamEventCategory,
-  EventScope,
-  EventContext,
-  StreamEvent,
-  StreamSubscription,
-  TaskEventData,
-  AgentEventData,
-  ProjectEventData,
-  GlobalEventData,
-  SessionEventData,
-  createTaskEvent,
-  createAgentEvent,
-  createProjectEvent,
-  createGlobalEvent,
-  createSessionEvent,
-  isTaskEvent,
-  isAgentEvent,
-  isProjectEvent,
-  isGlobalEvent,
-  isSessionEvent,
-} from '~/stream-events/types';
+import type { ThreadEvent } from '~/threads/types';
 
 // Web-specific connection state (not part of core events)
 export interface StreamConnection {
@@ -35,45 +11,46 @@ export interface StreamConnection {
   maxReconnectAttempts: number;
 }
 
-// Client-side event filtering
+// Client-side event filtering for ThreadEvents
 export interface EventFilter {
-  shouldIncludeEvent: (event: StreamEvent) => boolean;
+  shouldIncludeEvent: (event: ThreadEvent) => boolean;
+}
+
+// Subscription options for ThreadEvents
+export interface StreamSubscription {
+  threads?: string[]; // Filter to specific thread IDs
+  sessionIds?: string[]; // Filter by session context
+  projectIds?: string[]; // Filter by project context
 }
 
 export function createEventFilter(subscription: StreamSubscription): EventFilter {
   return {
-    shouldIncludeEvent: (event: StreamEvent) => {
-      // Filter by event types
-      if (subscription.eventTypes && subscription.eventTypes.length > 0) {
-        if (!subscription.eventTypes.includes(event.eventType)) {
-          return false;
-        }
-      }
-
-      // Filter by project scope
-      if (subscription.projects && subscription.projects.length > 0) {
-        if (!event.scope.projectId || !subscription.projects.includes(event.scope.projectId)) {
-          return false;
-        }
-      }
-
-      // Filter by session scope
-      if (subscription.sessions && subscription.sessions.length > 0) {
-        if (!event.scope.sessionId || !subscription.sessions.includes(event.scope.sessionId)) {
-          return false;
-        }
-      }
-
-      // Filter by thread scope
+    shouldIncludeEvent: (event: ThreadEvent) => {
+      // Filter by thread ID
       if (subscription.threads && subscription.threads.length > 0) {
-        if (!event.scope.threadId || !subscription.threads.includes(event.scope.threadId)) {
+        if (!event.threadId || !subscription.threads.includes(event.threadId)) {
           return false;
         }
       }
 
-      // Include global events if requested
-      if (subscription.global && event.scope.global) {
-        return true;
+      // Filter by session context
+      if (subscription.sessionIds && subscription.sessionIds.length > 0) {
+        if (
+          !event.context?.sessionId ||
+          !subscription.sessionIds.includes(event.context.sessionId)
+        ) {
+          return false;
+        }
+      }
+
+      // Filter by project context
+      if (subscription.projectIds && subscription.projectIds.length > 0) {
+        if (
+          !event.context?.projectId ||
+          !subscription.projectIds.includes(event.context.projectId)
+        ) {
+          return false;
+        }
       }
 
       return true;
