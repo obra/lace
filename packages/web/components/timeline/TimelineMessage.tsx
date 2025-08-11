@@ -9,6 +9,7 @@ import { MessageHeader, MessageText } from '@/components/ui';
 import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
 import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
+import { CompactionEntry } from '@/components/timeline/CompactionEntry';
 
 interface TimelineMessageProps {
   event: ProcessedEvent;
@@ -167,14 +168,10 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
 
     case 'COMPACTION':
       return (
-        <div className="flex justify-center">
-          <div className="bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning">
-            <div className="flex items-center gap-2">
-              <span>📦</span>
-              <span>Conversation compacted ({event.data.originalEventCount} → {event.data.compactedEvents.length} events)</span>
-            </div>
-          </div>
-        </div>
+        <CompactionEntry
+          data={event.data}
+          timestamp={timestamp}
+        />
       );
 
     case 'COMPACTION_START':
