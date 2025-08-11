@@ -162,32 +162,40 @@ describe('Token Usage Integration Tests', () => {
 
     // Simulate agent message with token usage by directly adding events
     // This simulates what would happen during actual conversation
-    agent.threadManager.addEvent(sessionId, 'AGENT_MESSAGE', {
-      content: 'First test response',
-      tokenUsage: {
-        message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
-        thread: {
-          totalPromptTokens: 100,
-          totalCompletionTokens: 50,
-          totalTokens: 150,
-          contextLimit: 200000,
-          percentUsed: 0.1,
-          nearLimit: false,
+    agent.threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: sessionId,
+      data: {
+        content: 'First test response',
+        tokenUsage: {
+          message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+          thread: {
+            totalPromptTokens: 100,
+            totalCompletionTokens: 50,
+            totalTokens: 150,
+            contextLimit: 200000,
+            percentUsed: 0.1,
+            nearLimit: false,
+          },
         },
       },
     });
 
-    agent.threadManager.addEvent(sessionId, 'AGENT_MESSAGE', {
-      content: 'Second test response',
-      tokenUsage: {
-        message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
-        thread: {
-          totalPromptTokens: 300,
-          totalCompletionTokens: 125,
-          totalTokens: 425,
-          contextLimit: 200000,
-          percentUsed: 0.2,
-          nearLimit: false,
+    agent.threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: sessionId,
+      data: {
+        content: 'Second test response',
+        tokenUsage: {
+          message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
+          thread: {
+            totalPromptTokens: 300,
+            totalCompletionTokens: 125,
+            totalTokens: 425,
+            contextLimit: 200000,
+            percentUsed: 0.2,
+            nearLimit: false,
+          },
         },
       },
     });
@@ -245,17 +253,21 @@ describe('Token Usage Integration Tests', () => {
     await agent.start();
 
     // Add some initial token usage
-    agent.threadManager.addEvent(sessionId, 'AGENT_MESSAGE', {
-      content: 'Pre-compaction response',
-      tokenUsage: {
-        message: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
-        thread: {
-          totalPromptTokens: 1000,
-          totalCompletionTokens: 500,
-          totalTokens: 1500,
-          contextLimit: 200000,
-          percentUsed: 0.75,
-          nearLimit: false,
+    agent.threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: sessionId,
+      data: {
+        content: 'Pre-compaction response',
+        tokenUsage: {
+          message: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
+          thread: {
+            totalPromptTokens: 1000,
+            totalCompletionTokens: 500,
+            totalTokens: 1500,
+            contextLimit: 200000,
+            percentUsed: 0.75,
+            nearLimit: false,
+          },
         },
       },
     });

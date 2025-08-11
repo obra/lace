@@ -9,20 +9,7 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import {
-  ThreadEvent,
-  ThreadEventType,
-  ToolApprovalResponseData,
-  ToolApprovalRequestData,
-  ThreadId,
-  asThreadId,
-  AgentMessageData,
-  AgentTokenData,
-  AgentStreamingData,
-  AgentStateChangeData,
-  CompactionStartData,
-  CompactionCompleteData,
-} from '~/threads/types';
+import { ThreadEvent, ToolApprovalResponseData, ThreadId, asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
@@ -32,7 +19,6 @@ import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import type { CompactionData } from '~/threads/compaction/types';
 import { aggregateTokenUsage } from '~/threads/token-aggregation';
 
 export interface AgentConfig {
@@ -253,7 +239,11 @@ export class Agent extends EventEmitter {
 
     if (content.trim()) {
       // Add user message to active thread
-      this._addEventAndEmit(this._threadId, 'USER_MESSAGE', content);
+      this._addEventAndEmit({
+        type: 'USER_MESSAGE',
+        threadId: this._threadId,
+        data: content,
+      });
     }
 
     try {
@@ -309,8 +299,16 @@ export class Agent extends EventEmitter {
     );
 
     if (!hasConversationStarted && !hasSystemPrompts) {
-      this._addEventAndEmit(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
-      this._addEventAndEmit(this._threadId, 'USER_SYSTEM_PROMPT', promptConfig.userInstructions);
+      this._addEventAndEmit({
+        type: 'SYSTEM_PROMPT',
+        threadId: this._threadId,
+        data: promptConfig.systemPrompt,
+      });
+      this._addEventAndEmit({
+        type: 'USER_SYSTEM_PROMPT',
+        threadId: this._threadId,
+        data: promptConfig.userInstructions,
+      });
     }
 
     this._isRunning = true;
@@ -619,9 +617,13 @@ export class Agent extends EventEmitter {
           finalTokenUsage: agentMessageTokenUsage,
         });
 
-        this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', {
-          content: response.content,
-          tokenUsage: agentMessageTokenUsage,
+        this._addEventAndEmit({
+          type: 'AGENT_MESSAGE',
+          threadId: this._threadId,
+          data: {
+            content: response.content,
+            tokenUsage: agentMessageTokenUsage,
+          },
         });
 
         // Extract clean content for UI display and events
@@ -707,7 +709,12 @@ export class Agent extends EventEmitter {
     const tokenListener = ({ token }: { token: string }) => {
       // Simple pass-through - emit all tokens as received
       this.emit('agent_token', { token });
-      this._addEventAndEmit(this._threadId, 'AGENT_TOKEN', { token }, { transient: true });
+      this._addEventAndEmit({
+        type: 'AGENT_TOKEN',
+        threadId: this._threadId,
+        data: { token },
+        transient: true,
+      });
     };
 
     const tokenUsageListener = ({
@@ -951,7 +958,11 @@ export class Agent extends EventEmitter {
       this._activeToolCalls.set(toolCall.id, toolCall);
 
       // Add tool call to thread
-      this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
+      this._addEventAndEmit({
+        type: 'TOOL_CALL',
+        threadId: this._threadId,
+        data: toolCall,
+      });
 
       // Emit tool call start event for UI
       this.emit('tool_call_start', {
@@ -1013,7 +1024,11 @@ export class Agent extends EventEmitter {
       };
       // Remove from active tools tracking (it was denied)
       this._activeToolCalls.delete(toolCallId);
-      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+      this._addEventAndEmit({
+        type: 'TOOL_RESULT',
+        threadId: this._threadId,
+        data: errorResult,
+      });
     } else if (decision === ApprovalDecision.ALLOW_SESSION) {
       // Update session tool policy for session-wide approval
       void this._updateSessionToolPolicy(toolCall.name, 'allow');
@@ -1068,7 +1083,11 @@ export class Agent extends EventEmitter {
           this._activeToolCalls.delete(toolCall.id);
 
           // Add result and update tracking
-          this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+          this._addEventAndEmit({
+            type: 'TOOL_RESULT',
+            threadId: this._threadId,
+            data: result,
+          });
           this.emit('tool_call_complete', {
             toolName: toolCall.name,
             result,
@@ -1098,7 +1117,11 @@ export class Agent extends EventEmitter {
           this._activeToolCalls.delete(toolCall.id);
 
           // Add result and update tracking
-          this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+          this._addEventAndEmit({
+            type: 'TOOL_RESULT',
+            threadId: this._threadId,
+            data: result,
+          });
           this.emit('tool_call_complete', {
             toolName: toolCall.name,
             result,
@@ -1132,7 +1155,11 @@ export class Agent extends EventEmitter {
           status: 'failed',
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+        this._addEventAndEmit({
+          type: 'TOOL_RESULT',
+          threadId: this._threadId,
+          data: errorResult,
+        });
 
         // Emit tool call complete event for failed execution
         this.emit('tool_call_complete', {
@@ -1190,7 +1217,11 @@ export class Agent extends EventEmitter {
         this._activeToolCalls.delete(toolCall.id);
 
         // Add result and update tracking
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+        this._addEventAndEmit({
+          type: 'TOOL_RESULT',
+          threadId: this._threadId,
+          data: result,
+        });
         this.emit('tool_call_complete', {
           toolName: toolCall.name,
           result,
@@ -1225,7 +1256,11 @@ export class Agent extends EventEmitter {
           status: 'failed',
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+        this._addEventAndEmit({
+          type: 'TOOL_RESULT',
+          threadId: this._threadId,
+          data: errorResult,
+        });
 
         // Emit tool call complete event for failed execution
         this.emit('tool_call_complete', {
@@ -1315,15 +1350,15 @@ export class Agent extends EventEmitter {
     if (oldState !== newState) {
       this._state = newState;
       this.emit('state_change', { from: oldState, to: newState });
-      this._addEventAndEmit(
-        this._threadId,
-        'AGENT_STATE_CHANGE',
-        {
+      this._addEventAndEmit({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: this._threadId,
+        data: {
           oldState,
           newState,
         },
-        { transient: true }
-      );
+        transient: true,
+      });
 
       logger.debug('AGENT: State change', {
         threadId: this._threadId,
@@ -1597,23 +1632,23 @@ export class Agent extends EventEmitter {
       try {
         // Emit compaction event
         this.emit('compaction_start', { auto: true });
-        this._addEventAndEmit(
-          this._threadId,
-          'COMPACTION_START',
-          { auto: true },
-          { transient: true }
-        );
+        this._addEventAndEmit({
+          type: 'COMPACTION_START',
+          threadId: this._threadId,
+          data: { auto: true },
+          transient: true,
+        });
 
         await this.compact(this._threadId);
 
         // Emit compaction complete event
         this.emit('compaction_complete', { success: true });
-        this._addEventAndEmit(
-          this._threadId,
-          'COMPACTION_COMPLETE',
-          { success: true },
-          { transient: true }
-        );
+        this._addEventAndEmit({
+          type: 'COMPACTION_COMPLETE',
+          threadId: this._threadId,
+          data: { success: true },
+          transient: true,
+        });
       } catch (error) {
         logger.error('Auto-compaction failed', {
           threadId: this._threadId,
@@ -1854,34 +1889,39 @@ export class Agent extends EventEmitter {
 
   private async _handleCompactCommand(): Promise<void> {
     this.emit('compaction_start', { auto: false });
-    this._addEventAndEmit(this._threadId, 'COMPACTION_START', { auto: false }, { transient: true });
+    this._addEventAndEmit({
+      type: 'COMPACTION_START',
+      threadId: this._threadId,
+      data: { auto: false },
+      transient: true,
+    });
 
     try {
       // Use the AI-powered summarization strategy
       await this.compact(this._threadId);
 
       // Add a system message about compaction
-      this._addEventAndEmit(
-        this._threadId,
-        'LOCAL_SYSTEM_MESSAGE',
-        '✅ Conversation compacted successfully'
-      );
+      this._addEventAndEmit({
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        threadId: this._threadId,
+        data: '✅ Conversation compacted successfully',
+      });
 
       this.emit('compaction_complete', { success: true });
-      this._addEventAndEmit(
-        this._threadId,
-        'COMPACTION_COMPLETE',
-        { success: true },
-        { transient: true }
-      );
+      this._addEventAndEmit({
+        type: 'COMPACTION_COMPLETE',
+        threadId: this._threadId,
+        data: { success: true },
+        transient: true,
+      });
     } catch (error) {
       this.emit('compaction_complete', { success: false });
-      this._addEventAndEmit(
-        this._threadId,
-        'COMPACTION_COMPLETE',
-        { success: false },
-        { transient: true }
-      );
+      this._addEventAndEmit({
+        type: 'COMPACTION_COMPLETE',
+        threadId: this._threadId,
+        data: { success: false },
+        transient: true,
+      });
       this.emit('error', {
         error: error instanceof Error ? error : new Error('Compaction failed'),
         context: { operation: 'compact', threadId: this._threadId },
@@ -1932,7 +1972,11 @@ export class Agent extends EventEmitter {
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
     }
-    return this._addEventAndEmit(targetThreadId, 'LOCAL_SYSTEM_MESSAGE', message);
+    return this._addEventAndEmit({
+      type: 'LOCAL_SYSTEM_MESSAGE',
+      threadId: targetThreadId,
+      data: message,
+    });
   }
 
   /**
@@ -1951,53 +1995,27 @@ export class Agent extends EventEmitter {
    * Helper method to add event to ThreadManager and emit Agent event
    * This ensures Agent is the single event source for UI updates
    */
-  private _addEventAndEmit(
-    threadId: string,
-    type: ThreadEventType,
-    data:
-      | string
-      | AgentMessageData
-      | ToolCall
-      | ToolResult
-      | CompactionData
-      | ToolApprovalRequestData
-      | ToolApprovalResponseData
-      | AgentTokenData
-      | AgentStreamingData
-      | AgentStateChangeData
-      | CompactionStartData
-      | CompactionCompleteData,
-    options?: {
-      transient?: boolean;
-      context?: {
-        sessionId?: string;
-        projectId?: string;
-        taskId?: string;
-        agentId?: string;
-      };
-    }
-  ): ThreadEvent | null {
+  private _addEventAndEmit(event: ThreadEvent): ThreadEvent | null {
     // Safety check: only add events if thread exists
-    if (!this._threadManager.getThread(threadId)) {
+    if (event.threadId && !this._threadManager.getThread(event.threadId)) {
       logger.warn('AGENT: Skipping event addition - thread not found', {
-        threadId,
-        type,
+        threadId: event.threadId,
+        type: event.type,
       });
       return null;
     }
 
-    const event = this._threadManager.addEvent({
-      type,
-      threadId,
-      data,
-      transient: options?.transient,
-      context: options?.context || this._getEventContext(),
-    } as ThreadEvent);
-
-    if (event) {
-      this.emit('thread_event_added', { event, threadId });
+    // Add context if not already provided
+    if (!event.context) {
+      event.context = this._getEventContext();
     }
-    return event;
+
+    const addedEvent = this._threadManager.addEvent(event);
+
+    if (addedEvent) {
+      this.emit('thread_event_added', { event: addedEvent, threadId: event.threadId });
+    }
+    return addedEvent;
   }
 
   // Message queue methods
@@ -2097,9 +2115,13 @@ export class Agent extends EventEmitter {
   handleApprovalResponse(toolCallId: string, decision: ApprovalDecision): void {
     // Create approval response event with atomic database transaction
     // The persistence layer handles duplicate detection idempotently
-    this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId,
-      decision,
+    this._addEventAndEmit({
+      type: 'TOOL_APPROVAL_RESPONSE',
+      threadId: this._threadId,
+      data: {
+        toolCallId,
+        decision,
+      },
     });
   }
 
@@ -2165,8 +2187,12 @@ export class Agent extends EventEmitter {
    * Used by EventApprovalCallback to create approval requests.
    */
   addApprovalRequestEvent(toolCallId: string): ThreadEvent {
-    const event = this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: toolCallId,
+    const event = this._addEventAndEmit({
+      type: 'TOOL_APPROVAL_REQUEST',
+      threadId: this._threadId,
+      data: {
+        toolCallId: toolCallId,
+      },
     });
 
     if (!event) {

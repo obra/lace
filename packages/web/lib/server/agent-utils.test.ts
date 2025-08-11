@@ -134,9 +134,13 @@ describe('Event-Based Approval Callback', () => {
     }
 
     // Now simulate an approval response
-    threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'call_789',
-      decision: ApprovalDecision.ALLOW_ONCE,
+    threadManager.addEvent({
+      type: 'TOOL_APPROVAL_RESPONSE',
+      threadId,
+      data: {
+        toolCallId: 'call_789',
+        decision: ApprovalDecision.ALLOW_ONCE,
+      },
     });
 
     // Second request should return the existing approval

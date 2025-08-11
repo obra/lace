@@ -7,7 +7,7 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, ThreadEventType, ThreadEventData } from '~/threads/types';
+import { Thread, ThreadEvent, ThreadEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
@@ -292,26 +292,7 @@ export class ThreadManager {
    * prevents duplicate approvals for the same toolCallId, causing
    * this method to throw if a duplicate is attempted.
    */
-  addEvent(event: ThreadEvent): ThreadEvent | null;
-  // Legacy overload for backwards compatibility during transition
-  addEvent(threadId: string, type: ThreadEventType, data: ThreadEventData): ThreadEvent | null;
-  addEvent(
-    eventOrThreadId: ThreadEvent | string,
-    type?: ThreadEventType,
-    data?: ThreadEventData
-  ): ThreadEvent | null {
-    // Handle legacy 3-parameter call
-    if (typeof eventOrThreadId === 'string' && type && data !== undefined) {
-      const event: ThreadEvent = {
-        type,
-        threadId: eventOrThreadId,
-        data,
-      } as ThreadEvent;
-      return this.addEvent(event);
-    }
-
-    // Handle new single-parameter call
-    const event = eventOrThreadId as ThreadEvent;
+  addEvent(event: ThreadEvent): ThreadEvent | null {
     // Fill in defaults
     if (!event.id) {
       event.id = generateEventId();
@@ -431,7 +412,7 @@ export class ThreadManager {
     }
 
     // Sort chronologically across all threads
-    return allEvents.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return allEvents.sort((a, b) => a.timestamp!.getTime() - b.timestamp!.getTime());
   }
 
   /**

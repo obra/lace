@@ -166,7 +166,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: delegate1,
-      data: 'test',
+      data: { content: 'test' },
     });
 
     // Generate second delegate
@@ -178,7 +178,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: delegate2,
-      data: 'test',
+      data: { content: 'test' },
     });
 
     // Generate sub-delegate from first delegate
@@ -206,12 +206,12 @@ describe('Delegation Integration Tests', () => {
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: delegate1,
-      data: 'Delegate 1 message',
+      data: { content: 'Delegate 1 message' },
     });
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: delegate2,
-      data: 'Delegate 2 message',
+      data: { content: 'Delegate 2 message' },
     });
 
     // Test multi-thread querying
@@ -251,7 +251,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: delegate1,
-      data: 'test1',
+      data: { content: 'test1' },
     });
 
     // Create second delegate
@@ -260,7 +260,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: delegate2,
-      data: 'test2',
+      data: { content: 'test2' },
     });
 
     // Create third delegate

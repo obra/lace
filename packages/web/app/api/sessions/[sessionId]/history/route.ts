@@ -59,7 +59,7 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
     timestamp:
       threadEvent.timestamp instanceof Date
         ? threadEvent.timestamp
-        : new Date(threadEvent.timestamp),
+        : new Date(threadEvent.timestamp || new Date()),
   };
 
   switch (threadEvent.type) {

@@ -26,7 +26,13 @@ describe('Compaction Integration', () => {
         data: 'Hello',
       })
     );
-    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there'));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId,
+        data: { content: 'Hi there' },
+      })
+    );
 
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
@@ -38,23 +44,43 @@ describe('Compaction Integration', () => {
 
   it('compacts conversation using trim-tool-results strategy', async () => {
     // Add events including a long tool result
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files'));
     expectEventAdded(
-      threadManager.addEvent(threadId, 'TOOL_CALL', {
-        id: 'call1',
-        name: 'list_files',
-        arguments: {},
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'List files',
       })
     );
     expectEventAdded(
-      threadManager.addEvent(threadId, 'TOOL_RESULT', {
-        id: 'call1',
-        content: [{ type: 'text', text: 'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt' }],
-        status: 'completed',
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId,
+        data: {
+          id: 'call1',
+          name: 'list_files',
+          arguments: {},
+        },
       })
     );
     expectEventAdded(
-      threadManager.addEvent(threadId, 'AGENT_MESSAGE', { content: 'Found 5 files' })
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId,
+        data: {
+          id: 'call1',
+          content: [
+            { type: 'text', text: 'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt' },
+          ],
+          status: 'completed',
+        },
+      })
+    );
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId,
+        data: { content: 'Found 5 files' },
+      })
     );
 
     expect(threadManager.getAllEvents(threadId)).toHaveLength(4);
@@ -105,18 +131,34 @@ describe('Compaction Integration', () => {
       })
     );
     expectEventAdded(
-      threadManager.addEvent(threadId, 'TOOL_RESULT', {
-        id: 'call-hello',
-        content: [{ type: 'text', text: 'line1\nline2\nline3\nline4\nline5' }],
-        status: 'completed',
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId,
+        data: {
+          id: 'call-hello',
+          content: [{ type: 'text', text: 'line1\nline2\nline3\nline4\nline5' }],
+          status: 'completed',
+        },
       })
     );
 
     await threadManager.compact(threadId, 'trim-tool-results');
 
     // Add more events after compaction
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'What next?'));
-    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', { content: 'Let me help' }));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'What next?',
+      })
+    );
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId,
+        data: { content: 'Let me help' },
+      })
+    );
 
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
@@ -162,10 +204,14 @@ describe('Compaction Integration', () => {
       })
     );
     expectEventAdded(
-      threadManager.addEvent(threadId, 'TOOL_RESULT', {
-        id: 'call-first',
-        content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
-        status: 'completed',
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId,
+        data: {
+          id: 'call-first',
+          content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
+          status: 'completed',
+        },
       })
     );
 
@@ -173,12 +219,22 @@ describe('Compaction Integration', () => {
     await threadManager.compact(threadId, 'trim-tool-results');
 
     // Add more events
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Continue'));
     expectEventAdded(
-      threadManager.addEvent(threadId, 'TOOL_RESULT', {
-        id: 'call-second',
-        content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
-        status: 'completed',
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Continue',
+      })
+    );
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId,
+        data: {
+          id: 'call-second',
+          content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
+          status: 'completed',
+        },
       })
     );
 
@@ -291,10 +347,14 @@ describe('Compaction Integration', () => {
 
     // Should be able to use the trim-tool-results strategy without manual registration
     expectEventAdded(
-      newThreadManager.addEvent(newThreadId, 'TOOL_RESULT', {
-        id: 'call-auto',
-        content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
-        status: 'completed',
+      newThreadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId: newThreadId,
+        data: {
+          id: 'call-auto',
+          content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
+          status: 'completed',
+        },
       })
     );
 
@@ -305,16 +365,38 @@ describe('Compaction Integration', () => {
 
   it('preserves event order in compacted conversation', async () => {
     // Add events in specific order
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'First message'));
-    expectEventAdded(threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'First response'));
     expectEventAdded(
-      threadManager.addEvent(threadId, 'TOOL_RESULT', {
-        id: 'call-order',
-        content: [{ type: 'text', text: 'long\ntool\nresult\nwith\nmany\nlines' }],
-        status: 'completed',
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'First message',
       })
     );
-    expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Second message'));
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId,
+        data: { content: 'First response' },
+      })
+    );
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId,
+        data: {
+          id: 'call-order',
+          content: [{ type: 'text', text: 'long\ntool\nresult\nwith\nmany\nlines' }],
+          status: 'completed',
+        },
+      })
+    );
+    expectEventAdded(
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Second message',
+      })
+    );
 
     await threadManager.compact(threadId, 'trim-tool-results');
 

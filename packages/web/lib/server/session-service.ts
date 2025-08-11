@@ -321,7 +321,7 @@ export class SessionService {
               data: {
                 type: 'TOOL_APPROVAL_REQUEST',
                 threadId: asThreadId(eventThreadId),
-                timestamp: new Date(event.timestamp),
+                timestamp: new Date(event.timestamp || new Date()),
                 data: {
                   requestId: toolCallData.toolCallId,
                   toolName: toolCall.name,
@@ -348,7 +348,7 @@ export class SessionService {
             data: {
               type: 'TOOL_APPROVAL_RESPONSE',
               threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp),
+              timestamp: new Date(event.timestamp || new Date()),
               data: {
                 toolCallId: responseData.toolCallId,
                 decision: responseData.decision,

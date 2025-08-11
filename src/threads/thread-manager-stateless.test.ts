@@ -35,7 +35,7 @@ describe('ThreadManager - Core Behavior', () => {
         threadManager.addEvent({
           type: 'AGENT_MESSAGE',
           threadId,
-          data: 'Hi there',
+          data: { content: 'Hi there' },
         })
       );
 

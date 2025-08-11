@@ -178,7 +178,11 @@ describe('Session.spawnAgent Method', () => {
     const threadManager = new ThreadManager();
 
     // This should NOT throw an error
-    const event = threadManager.addEvent(agentThreadId, 'USER_MESSAGE', 'Hello agent');
+    const event = threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agentThreadId,
+      data: 'Hello agent',
+    });
     expect(event).not.toBeNull();
     expect(event?.threadId).toBe(agentThreadId);
     expect(event?.type).toBe('USER_MESSAGE');
@@ -221,11 +225,11 @@ describe('Session.spawnAgent Method', () => {
     expect(threadFromNew?.id).toBe(agentThreadId);
 
     // Try to add an event using the new ThreadManager instance
-    const event = newThreadManager.addEvent(
-      agentThreadId,
-      'USER_MESSAGE',
-      'Hello from new manager'
-    );
+    const event = newThreadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: agentThreadId,
+      data: 'Hello from new manager',
+    });
     expect(event).not.toBeNull();
     expect(event?.threadId).toBe(agentThreadId);
 
@@ -257,7 +261,7 @@ describe('Session.spawnAgent Method', () => {
         _threadManager: {
           createThread: () => unknown;
           getThread: (id: ThreadId) => unknown;
-          addEvent: (id: ThreadId, type: string, data: string) => unknown;
+          addEvent: (event: { type: string; threadId: ThreadId; data: unknown }) => unknown;
         };
       }
     )._threadManager;
@@ -272,11 +276,11 @@ describe('Session.spawnAgent Method', () => {
     expect((delegateThread as { id: ThreadId } | undefined)?.id).toBe(agentThreadId);
 
     // Try to add event to the delegate thread
-    const event = sessionThreadManager.addEvent(
-      asThreadId(agentThreadId),
-      'USER_MESSAGE',
-      'Hello after switch'
-    );
+    const event = sessionThreadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: asThreadId(agentThreadId),
+      data: 'Hello after switch',
+    });
     expect((event as { threadId: ThreadId }).threadId).toBe(agentThreadId);
   });
 

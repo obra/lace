@@ -376,7 +376,7 @@ export class DatabasePersistence {
         event.id,
         event.threadId,
         event.type,
-        event.timestamp.toISOString(),
+        event.timestamp!.toISOString(),
         JSON.stringify(event.data)
       );
 

@@ -58,7 +58,11 @@ describe('ThreadManager', () => {
         })
       );
       const event2 = expectEventAdded(
-        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there')
+        threadManager.addEvent({
+          type: 'AGENT_MESSAGE',
+          threadId,
+          data: { content: 'Hi there' },
+        })
       );
 
       // Assert - Data operations work correctly
@@ -78,17 +82,25 @@ describe('ThreadManager', () => {
 
       // Act - First approval should succeed
       expectEventAdded(
-        threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'tool-123',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId,
+          data: {
+            toolCallId: 'tool-123',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
 
       // Second approval should be ignored due to database constraint
-      const secondEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'tool-123',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      const secondEvent = threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId,
+        data: {
+          toolCallId: 'tool-123',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       });
       expect(secondEvent).toBeNull(); // Returns null for duplicates
 
@@ -99,7 +111,11 @@ describe('ThreadManager', () => {
     it('should handle thread not found gracefully', () => {
       // Act & Assert - Should throw for non-existent thread
       expect(() => {
-        threadManager.addEvent('non-existent-thread', 'USER_MESSAGE', 'test');
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: 'non-existent-thread',
+          data: 'test',
+        });
       }).toThrow('Thread non-existent-thread not found');
     });
   });

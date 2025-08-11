@@ -89,7 +89,7 @@ describe('Agent Single Event Source Integration', () => {
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
       threadId: 'api-test-thread',
-      data: 'test response 1',
+      data: { content: 'test response 1' },
     });
 
     // Test getThreadEvents

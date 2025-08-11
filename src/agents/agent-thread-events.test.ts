@@ -187,7 +187,7 @@ describe('Agent Thread Events', () => {
         threadManager.addEvent({
           type: 'AGENT_MESSAGE',
           threadId,
-          data: 'Response 1',
+          data: { content: 'Response 1' },
         })
       );
       const event3 = expectEventAdded(
@@ -210,8 +210,8 @@ describe('Agent Thread Events', () => {
         (call: [{ event: ThreadEvent; threadId: string }]) => call[0].event
       );
 
-      expect(calls[0].timestamp.getTime()).toBeLessThanOrEqual(calls[1].timestamp.getTime());
-      expect(calls[1].timestamp.getTime()).toBeLessThanOrEqual(calls[2].timestamp.getTime());
+      expect(calls[0].timestamp!.getTime()).toBeLessThanOrEqual(calls[1].timestamp!.getTime());
+      expect(calls[1].timestamp!.getTime()).toBeLessThanOrEqual(calls[2].timestamp!.getTime());
 
       expect(calls[0].id).toBe(event1.id);
       expect(calls[1].id).toBe(event2.id);
