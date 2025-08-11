@@ -43,6 +43,31 @@ export const EVENT_TYPES = [
 // Derive ThreadEventType union from the array
 export type ThreadEventType = (typeof EVENT_TYPES)[number];
 
+// Helper to check if an event type is transient (not persisted to database)
+export function isTransientEventType(type: ThreadEventType): boolean {
+  // These event types are always transient, even if they have a threadId
+  return [
+    'AGENT_TOKEN',
+    'AGENT_STREAMING',
+    'AGENT_STATE_CHANGE',
+    'COMPACTION_START',
+    'COMPACTION_COMPLETE',
+    // Task events
+    'TASK_CREATED',
+    'TASK_UPDATED',
+    'TASK_DELETED',
+    'TASK_NOTE_ADDED',
+    // Agent lifecycle events
+    'AGENT_SPAWNED',
+    // Project events
+    'PROJECT_CREATED',
+    'PROJECT_UPDATED',
+    'PROJECT_DELETED',
+    // System events
+    'SYSTEM_NOTIFICATION',
+  ].includes(type);
+}
+
 // Tool approval event data types
 export interface ToolApprovalRequestData {
   toolCallId: string;

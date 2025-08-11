@@ -10,10 +10,13 @@ export type {
   Thread,
   AgentMessageData,
 } from '~/threads/types';
-export type { 
-  MessageTokenUsage, 
-  ThreadTokenUsage, 
-  CombinedTokenUsage
+
+// Re-export helper functions
+export { isThreadId, asThreadId, isTransientEventType } from '~/threads/types';
+export type {
+  MessageTokenUsage,
+  ThreadTokenUsage,
+  CombinedTokenUsage,
 } from '~/token-management/types';
 
 export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';

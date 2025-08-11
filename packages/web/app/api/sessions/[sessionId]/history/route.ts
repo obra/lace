@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadEvent, ToolResult } from '@/types/core';
-import { asThreadId } from '@/types/core';
+import { asThreadId, isTransientEventType } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
@@ -51,6 +51,11 @@ function safeGetToolCallData(
 
 // Convert ThreadEvent to SessionEvent with proper type handling
 function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEvent | null {
+  // Skip transient events - they're not included in history
+  if (isTransientEventType(threadEvent.type)) {
+    return null;
+  }
+
   // Convert string threadId to ThreadId type
   const threadId = asThreadId(threadEvent.threadId);
 
@@ -169,15 +174,10 @@ function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEven
       };
     }
 
-    case 'TOOL_APPROVAL_REQUEST': {
-      // Don't include approval request events in timeline - they're for internal approval flow only
+    case 'TOOL_APPROVAL_REQUEST':
+    case 'TOOL_APPROVAL_RESPONSE':
+      // Don't include approval events in timeline - they're for internal approval flow only
       return null;
-    }
-
-    case 'TOOL_APPROVAL_RESPONSE': {
-      // Don't include approval response events in timeline - they're for internal approval flow only
-      return null;
-    }
 
     default: {
       // TypeScript exhaustiveness check - cast to access type property

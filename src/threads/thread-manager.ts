@@ -7,7 +7,7 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, ThreadEventType } from '~/threads/types';
+import { Thread, ThreadEvent, ThreadEventType, isTransientEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
@@ -346,27 +346,7 @@ export class ThreadManager {
   }
 
   private isTransientEventType(type: ThreadEventType): boolean {
-    // These event types are always transient, even if they have a threadId
-    return [
-      'AGENT_TOKEN',
-      'AGENT_STREAMING',
-      'AGENT_STATE_CHANGE',
-      'COMPACTION_START',
-      'COMPACTION_COMPLETE',
-      // Task events
-      'TASK_CREATED',
-      'TASK_UPDATED',
-      'TASK_DELETED',
-      'TASK_NOTE_ADDED',
-      // Agent lifecycle events
-      'AGENT_SPAWNED',
-      // Project events
-      'PROJECT_CREATED',
-      'PROJECT_UPDATED',
-      'PROJECT_DELETED',
-      // System events
-      'SYSTEM_NOTIFICATION',
-    ].includes(type);
+    return isTransientEventType(type);
   }
 
   /**

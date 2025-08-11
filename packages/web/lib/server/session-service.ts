@@ -143,6 +143,7 @@ export class SessionService {
         threadId,
         timestamp: new Date(),
         data: { token },
+        transient: true,
         context: {
           sessionId,
           projectId: undefined,
@@ -164,6 +165,7 @@ export class SessionService {
         data: {
           auto,
         },
+        transient: true,
         context: {
           sessionId,
           projectId: this.projectId,
@@ -187,6 +189,7 @@ export class SessionService {
         data: {
           success,
         },
+        transient: true,
         context: {
           sessionId,
           projectId: this.projectId,
@@ -252,6 +255,7 @@ export class SessionService {
           from,
           to,
         },
+        transient: true,
         context: {
           sessionId,
           projectId: undefined,

@@ -9,7 +9,13 @@ import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
-import { ThreadEvent, ToolApprovalResponseData, ThreadId, asThreadId } from '~/threads/types';
+import {
+  ThreadEvent,
+  ToolApprovalResponseData,
+  ThreadId,
+  asThreadId,
+  isTransientEventType,
+} from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
@@ -1538,9 +1544,11 @@ export class Agent extends EventEmitter {
         event.type === 'USER_SYSTEM_PROMPT' ||
         event.type === 'TOOL_APPROVAL_REQUEST' ||
         event.type === 'TOOL_APPROVAL_RESPONSE' ||
-        event.type === 'COMPACTION'
+        event.type === 'COMPACTION' ||
+        // Check if it's a transient event type
+        isTransientEventType(event.type)
       ) {
-        // Skip UI-only events and compaction events - they're not sent to model
+        // Skip UI-only events, compaction events, and transient events - they're not sent to model
         continue;
       } else {
         throw new Error(`Unknown event type: ${(event as { type: string }).type}`);
