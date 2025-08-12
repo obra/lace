@@ -1,7 +1,36 @@
 // ABOUTME: Consolidated SQLite persistence layer for threads, events, and tasks
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
-import Database from 'better-sqlite3';
+// Common SQLite interface that both better-sqlite3 and bun:sqlite implement
+interface SQLiteDatabase {
+  prepare(sql: string): {
+    run(...params: unknown[]): { lastInsertRowid: number | bigint; changes: number };
+    get(...params: unknown[]): unknown;
+    all(...params: unknown[]): unknown[];
+  };
+  exec(sql: string): void;
+  pragma(sql: string): unknown;
+  transaction<T>(fn: () => T): () => T;
+  close(): void;
+}
+
+// Type for the Database constructor
+type DatabaseConstructor = new (path: string) => SQLiteDatabase;
+
+// Dynamic import to handle both Node.js and Bun runtimes
+let Database: DatabaseConstructor;
+if (process?.versions?.bun) {
+  // Running in Bun - use built-in SQLite
+  // Use string concatenation to prevent webpack from analyzing this import
+  // @ts-expect-error - bun:sqlite is only available in Bun runtime
+  const bunSqlite = (await import('bun' + ':sqlite')) as { Database: DatabaseConstructor };
+  Database = bunSqlite.Database;
+} else {
+  // Running in Node.js - use better-sqlite3
+  const betterSqlite3 = await import('better-sqlite3');
+  Database = betterSqlite3.default as DatabaseConstructor;
+}
+
 import { getLaceDbPath } from '~/config/lace-dir';
 import { Thread, ThreadEvent, ThreadEventType, ThreadId, AssigneeId } from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
@@ -78,15 +107,15 @@ export interface SessionData {
 }
 
 export class DatabasePersistence {
-  private db: Database.Database | null = null;
+  private db: SQLiteDatabase | null = null;
   private _closed: boolean = false;
   private _disabled: boolean = false;
 
-  get database(): Database.Database | null {
+  get database(): SQLiteDatabase | null {
     return this.db;
   }
 
-  constructor(dbPath: string | Database.Database) {
+  constructor(dbPath: string | SQLiteDatabase) {
     try {
       if (typeof dbPath === 'string') {
         this.db = new Database(dbPath);
