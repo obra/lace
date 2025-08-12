@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import '@/app/globals.css';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { ConsoleForwardScript } from '@/lib/console-forward/script';
 
 export const metadata: Metadata = {
   title: 'Lace Web Terminal',
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="antialiased">
+        <ConsoleForwardScript />
         <ErrorBoundary>
           <ThemeProvider>
             {children}
