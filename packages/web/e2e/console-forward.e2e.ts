@@ -3,6 +3,15 @@
 
 import { test, expect } from '@playwright/test';
 
+interface ApiRequest {
+  status: number;
+  url: string;
+}
+
+interface ApiRequestWithTimestamp extends ApiRequest {
+  timestamp: number;
+}
+
 test.describe('Console Forwarding E2E', () => {
   test('should forward simple console messages', async ({ page }) => {
     // Navigate to the app
@@ -13,7 +22,7 @@ test.describe('Console Forwarding E2E', () => {
 
     // Capture console events and network requests
     const logs: string[] = [];
-    const apiRequests: any[] = [];
+    const apiRequests: ApiRequest[] = [];
 
     page.on('console', (msg) => {
       logs.push(`BROWSER: ${msg.type()}: ${msg.text()}`);
@@ -46,7 +55,7 @@ test.describe('Console Forwarding E2E', () => {
   });
 
   test('should handle complex objects with circular references', async ({ page }) => {
-    const apiRequests: any[] = [];
+    const apiRequests: number[] = [];
 
     page.on('response', (response) => {
       if (response.url().includes('/api/debug/console')) {
@@ -59,12 +68,12 @@ test.describe('Console Forwarding E2E', () => {
 
     // Create complex object with circular reference
     await page.evaluate(() => {
-      const complexObj = {
+      const complexObj: Record<string, unknown> = {
         name: 'test-object',
         date: new Date('2025-01-01T00:00:00.000Z'),
         nested: { value: 42, array: [1, 2, 3] },
       };
-      (complexObj as any).circular = complexObj;
+      complexObj.circular = complexObj;
       console.log('Complex object test:', complexObj);
     });
 
@@ -118,12 +127,13 @@ test.describe('Console Forwarding E2E', () => {
   });
 
   test('should batch multiple console calls', async ({ page }) => {
-    const apiRequests: any[] = [];
+    const apiRequests: ApiRequestWithTimestamp[] = [];
 
     page.on('response', (response) => {
       if (response.url().includes('/api/debug/console')) {
         apiRequests.push({
           status: response.status(),
+          url: response.url(),
           timestamp: Date.now(),
         });
       }
@@ -152,7 +162,7 @@ test.describe('Console Forwarding E2E', () => {
   });
 
   test('should only run in development mode', async ({ page }) => {
-    const apiRequests: any[] = [];
+    const apiRequests: number[] = [];
 
     page.on('response', (response) => {
       if (response.url().includes('/api/debug/console')) {
