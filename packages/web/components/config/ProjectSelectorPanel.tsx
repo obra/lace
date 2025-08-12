@@ -533,6 +533,7 @@ export function ProjectSelectorPanel({
         <button
           onClick={() => setShowCreateProject(true)}
           className="btn btn-primary"
+          data-testid="new-project-button"
           disabled={loading}
         >
           <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
@@ -989,6 +990,7 @@ export function ProjectSelectorPanel({
                         value={createWorkingDirectory}
                         onChange={(e) => handleCreateDirectoryChange(e.target.value)}
                         className="input input-bordered w-full input-lg"
+                        data-testid="project-path-input"
                         placeholder="/path/to/your/project"
                         required
                         autoFocus
@@ -1033,6 +1035,7 @@ export function ProjectSelectorPanel({
                       value={createName}
                       onChange={(e) => setCreateName(e.target.value)}
                       className="input input-bordered w-full"
+                      data-testid="project-name-input"
                       placeholder="Enter project name"
                       required
                       autoFocus
@@ -1219,6 +1222,7 @@ export function ProjectSelectorPanel({
                 <button
                   type="submit"
                   className="btn btn-primary"
+                  data-testid="create-project-submit"
                   disabled={!createName.trim() || !createWorkingDirectory.trim() || loading}
                 >
                   {loading ? (
