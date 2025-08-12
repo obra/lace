@@ -134,7 +134,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          file: ./coverage/lcov.info
+          files: ./coverage/lcov.info,./packages/web/coverage/lcov.info
           fail_ci_if_error: false
 
 
