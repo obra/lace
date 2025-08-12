@@ -75,53 +75,6 @@ describe('useSessionAPI', () => {
     });
   });
 
-  describe('listSessions', () => {
-    it('should return session list and manage loading states', async () => {
-      const mockSessions = [
-        {
-          id: 'lace_20250113_test123' as ThreadId,
-          name: 'Session 1',
-          createdAt: new Date().toISOString(),
-          agents: [],
-        },
-        {
-          id: 'lace_20250113_test456' as ThreadId,
-          name: 'Session 2',
-          createdAt: new Date().toISOString(),
-          agents: [],
-        },
-      ];
-
-      mockFetch.mockResolvedValueOnce(createMockResponse({ sessions: mockSessions }));
-
-      const { result } = renderHook(() => useSessionAPI());
-
-      let sessions;
-      await act(async () => {
-        sessions = await result.current.listSessions();
-      });
-
-      // Verify successful operation result and final state
-      expect(sessions).toEqual(mockSessions);
-      expect(result.current.error).toBe(null);
-    });
-
-    it('should return empty array and set error state on failure', async () => {
-      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to list sessions'));
-
-      const { result } = renderHook(() => useSessionAPI());
-
-      let sessions;
-      await act(async () => {
-        sessions = await result.current.listSessions();
-      });
-
-      // Verify error handling behavior
-      expect(sessions).toEqual([]);
-      expect(result.current.error).toBe('Failed to list sessions');
-    });
-  });
-
   describe('getSession', () => {
     it('should return session details when found', async () => {
       const sessionId = 'lace_20250113_test123' as ThreadId;
@@ -370,10 +323,16 @@ describe('useSessionAPI', () => {
       expect(result.current.error).toBe('First error');
 
       // Second operation succeeds - error should be cleared
-      mockFetch.mockResolvedValueOnce(createMockResponse({ sessions: [] }));
+      const mockSession = {
+        id: 'lace_20250113_test123',
+        name: 'Test',
+        createdAt: new Date().toISOString(),
+        agents: [],
+      };
+      mockFetch.mockResolvedValueOnce(createMockResponse({ session: mockSession }));
 
       await act(async () => {
-        await result.current.listSessions();
+        await result.current.getSession('lace_20250113_test123' as ThreadId);
       });
 
       expect(result.current.error).toBe(null);

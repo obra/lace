@@ -51,34 +51,6 @@ export class SessionService {
     return this.sessionToMetadata(session);
   }
 
-  async listSessions(): Promise<SessionInfo[]> {
-    const sessionInfos = Session.getAll();
-    const sessions: SessionInfo[] = [];
-
-    for (const sessionInfo of sessionInfos) {
-      // Try to get from registry first, then reconstruct if needed
-      let session = await Session.getById(sessionInfo.id);
-
-      if (session) {
-        // Set up event handlers for all agents in the session
-        const agents = session.getAgents();
-        for (const agentInfo of agents) {
-          const agent = session.getAgent(agentInfo.threadId);
-          if (agent) {
-            this.setupAgentEventHandlers(agent, sessionInfo.id);
-          }
-        }
-
-        // Register Session with EventStreamManager (WeakSet prevents duplicates)
-        EventStreamManager.getInstance().registerSession(session);
-
-        sessions.push(this.sessionToMetadata(session));
-      }
-    }
-
-    return sessions;
-  }
-
   async getSession(sessionId: ThreadId): Promise<Session | null> {
     // Use Session's internal registry - this will reconstruct from database if needed
     const session = await Session.getById(sessionId);
@@ -366,34 +338,7 @@ export class SessionService {
     Session.updateSession(sessionId, updates);
   }
 
-  // Test helper method to stop all agents and clear sessions
-  async stopAllAgents(): Promise<void> {
-    const sessionInfos = Session.getAll();
-    for (const sessionInfo of sessionInfos) {
-      const session = await Session.getById(sessionInfo.id);
-      if (session) {
-        // Stop the coordinator agent
-        const coordinatorAgent = session.getAgent(session.getId());
-        if (coordinatorAgent) {
-          coordinatorAgent.stop();
-        }
-
-        // Stop all delegate agents
-        const agentMetadata = session.getAgents();
-        for (const agentMeta of agentMetadata) {
-          if (agentMeta.threadId !== session.getId()) {
-            // Skip coordinator (already stopped)
-            const agent = session.getAgent(agentMeta.threadId);
-            if (agent) {
-              agent.stop();
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Test helper method to clear session registry
+  // Test helper method to clear session registry (replaced stopAllAgents)
   clearActiveSessions(): void {
     Session.clearRegistry();
   }

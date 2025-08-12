@@ -26,11 +26,9 @@ interface MockSession {
 
 interface MockSessionService {
   createSession: ReturnType<typeof vi.fn>;
-  listSessions: ReturnType<typeof vi.fn>;
   getSession: ReturnType<typeof vi.fn>;
   setupAgentEventHandlers: ReturnType<typeof vi.fn>;
   updateSession: ReturnType<typeof vi.fn>;
-  stopAllAgents: ReturnType<typeof vi.fn>;
   clearActiveSessions: ReturnType<typeof vi.fn>;
 }
 
@@ -59,11 +57,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     // Create mock SessionService
     mockSessionService = {
       createSession: vi.fn(),
-      listSessions: vi.fn(),
       getSession: vi.fn().mockReturnValue(mockSession),
       setupAgentEventHandlers: vi.fn(),
       updateSession: vi.fn(),
-      stopAllAgents: vi.fn(),
       clearActiveSessions: vi.fn(),
     };
 

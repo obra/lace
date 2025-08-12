@@ -71,7 +71,6 @@ describe('Thread Messaging API', () => {
   afterEach(async () => {
     console.error = originalConsoleError;
     // Stop all agents first to prevent async operations after database closure
-    await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
     // Clean up provider instances
     await cleanupTestProviderInstances([providerInstanceId]);

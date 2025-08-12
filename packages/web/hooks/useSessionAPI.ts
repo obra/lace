@@ -59,31 +59,6 @@ export function useSessionAPI() {
     []
   );
 
-  const listSessions = useCallback(async (): Promise<SessionInfo[]> => {
-    setError(null);
-
-    try {
-      const response = await fetch('/api/sessions');
-
-      if (!response.ok) {
-        const error: unknown = parse(await response.text());
-        if (isApiError(error)) {
-          throw new Error(error.error || 'Failed to list sessions');
-        }
-        throw new Error('Failed to list sessions');
-      }
-
-      const data: unknown = parse(await response.text());
-      if (isApiSuccess<SessionsResponse>(data) && 'sessions' in data) {
-        return data['sessions'] as SessionInfo[];
-      }
-      throw new Error('Invalid response format');
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unknown error');
-      return [];
-    }
-  }, []);
-
   const getSession = useCallback(async (sessionId: ThreadId): Promise<SessionInfo | null> => {
     setError(null);
 
@@ -226,7 +201,6 @@ export function useSessionAPI() {
   return {
     error: state.error,
     createSession,
-    listSessions,
     getSession,
     spawnAgent,
     listAgents,

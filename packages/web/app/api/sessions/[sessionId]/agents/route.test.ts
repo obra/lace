@@ -95,7 +95,6 @@ describe('Agent Spawning API E2E Tests', () => {
   afterEach(async () => {
     // Clean up agents before tearing down persistence
     if (sessionService) {
-      await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
 

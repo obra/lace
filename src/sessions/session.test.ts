@@ -592,67 +592,9 @@ describe('Session', () => {
       expect(sessionData!.projectId).toBe(testProjectId);
       expect(sessionData!.name).toBe('Test Session');
     });
-
-    it('should get sessions from table not metadata in getAll', () => {
-      // Create a couple of real sessions
-      const session1 = Session.create({
-        name: 'Session 1',
-        projectId: testProjectId,
-      });
-      const session2 = Session.create({
-        name: 'Session 2',
-        projectId: testProjectId,
-      });
-
-      // Get all sessions
-      const result = Session.getAll();
-
-      // Should find our sessions
-      expect(result.length).toBeGreaterThanOrEqual(2);
-
-      const session1Data = result.find((s) => s.id === session1.getId());
-      const session2Data = result.find((s) => s.id === session2.getId());
-
-      expect(session1Data).toBeDefined();
-      expect(session1Data!.name).toBe('Session 1');
-
-      expect(session2Data).toBeDefined();
-      expect(session2Data!.name).toBe('Session 2');
-    });
   });
 
   describe('static methods', () => {
-    describe('getAll', () => {
-      it('should return sessions from database', () => {
-        // Create test project first
-        const testProject = Project.create(
-          'Test Project',
-          '/test/path',
-          'Test project for getAll test',
-          {
-            providerInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          }
-        );
-        const projectId = testProject.getId();
-
-        // Create sessions with project ID (only these are stored in sessions table)
-        Session.create({
-          name: 'Session 1',
-          projectId: projectId,
-        });
-        Session.create({
-          name: 'Session 2',
-          projectId: projectId,
-        });
-
-        const sessions = Session.getAll();
-        expect(sessions.length).toBeGreaterThanOrEqual(2);
-        expect(sessions.some((s) => s.name === 'Session 1')).toBe(true);
-        expect(sessions.some((s) => s.name === 'Session 2')).toBe(true);
-      });
-    });
-
     describe('getById', () => {
       it('should return null for non-existent session', async () => {
         const session = await Session.getById(asThreadId('lace_20250101_nofind'));

@@ -85,8 +85,7 @@ describe('SSE Stream E2E Tests', () => {
 
   afterEach(async () => {
     if (sessionService) {
-      // Stop all agents first to prevent async operations after database closure
-      await sessionService.stopAllAgents();
+      // Clear session registry to prevent async operations after database closure
       sessionService.clearActiveSessions();
     }
     cleanupTestProviderDefaults();
