@@ -20,7 +20,7 @@
     "jsx": "react",
     "jsxFactory": "React.createElement"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "knip.config.ts"],
   "exclude": ["node_modules", "dist", "packages"],
   "tsc-alias": {
     "resolveFullPaths": true,
