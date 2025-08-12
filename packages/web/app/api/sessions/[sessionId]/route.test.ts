@@ -114,7 +114,11 @@ describe('Session Detail API Route', () => {
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession('Test Session', projectId);
+      const sessionInstance = Session.create({
+        name: 'Test Session',
+        projectId: projectId,
+      });
+      const session = sessionInstance.getInfo()!;
       const sessionId = session.id;
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
@@ -185,7 +189,11 @@ describe('Session Detail API Route', () => {
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession('Original Session', projectId);
+      const sessionInstance = Session.create({
+        name: 'Original Session',
+        projectId: projectId,
+      });
+      const session = sessionInstance.getInfo()!;
       const sessionId = session.id;
 
       const updates = {
@@ -255,7 +263,11 @@ describe('Session Detail API Route', () => {
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession('Test Session', projectId);
+      const sessionInstance = Session.create({
+        name: 'Test Session',
+        projectId: projectId,
+      });
+      const session = sessionInstance.getInfo()!;
       const sessionId = session.id;
 
       const invalidUpdates = {
@@ -293,7 +305,11 @@ describe('Session Detail API Route', () => {
       const projectId = testProject.getId();
 
       // Create a real session using the session service
-      const session = await sessionService.createSession('Original Session', projectId);
+      const sessionInstance = Session.create({
+        name: 'Original Session',
+        projectId: projectId,
+      });
+      const session = sessionInstance.getInfo()!;
       const sessionId = session.id;
 
       // Only update name, leaving description and status unchanged
@@ -369,7 +385,11 @@ describe('Session Detail API Route', () => {
         providerInstanceId: anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
-      const session = await sessionService.createSession('Test Session', testProject.getId());
+      const sessionInstance = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+      });
+      const session = sessionInstance.getInfo()!;
 
       const request = new NextRequest(`http://localhost:3005/api/sessions/${session.id}`, {
         method: 'PATCH',

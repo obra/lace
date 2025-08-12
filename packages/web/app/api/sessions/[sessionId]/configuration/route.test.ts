@@ -65,7 +65,11 @@ describe('Session Configuration API', () => {
       maxTokens: 4000,
     });
 
-    const session = await sessionService.createSession('Test Session', testProject.getId());
+    const sessionInstance = Session.create({
+      name: 'Test Session',
+      projectId: testProject.getId(),
+    });
+    const session = sessionInstance.getInfo()!;
     sessionId = session.id;
   });
 
@@ -259,7 +263,11 @@ describe('TDD: Direct Session Usage', () => {
       providerInstanceId: tddProviderInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
-    const session = await sessionService.createSession('TDD Test Session', testProject.getId());
+    const sessionInstance = Session.create({
+      name: 'TDD Test Session',
+      projectId: testProject.getId(),
+    });
+    const session = sessionInstance.getInfo()!;
     testSessionId = session.id;
   });
 
@@ -309,10 +317,11 @@ describe('TDD: Direct Session Configuration Update', () => {
       providerInstanceId: updateProviderInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
-    const session = await sessionService.createSession(
-      'TDD Update Test Session',
-      testProject.getId()
-    );
+    const sessionInstance = Session.create({
+      name: 'TDD Update Test Session',
+      projectId: testProject.getId(),
+    });
+    const session = sessionInstance.getInfo()!;
     testSessionId = session.id;
   });
 
