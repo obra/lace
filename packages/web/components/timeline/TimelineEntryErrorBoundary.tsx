@@ -6,7 +6,6 @@
 import React, { Component, ReactNode } from 'react';
 import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
 import CodeBlock from '@/components/ui/CodeBlock';
-import { logger } from '~/utils/logger';
 import { safeStringify } from '~/utils/safeStringify';
 
 interface Props {
@@ -30,7 +29,7 @@ export default class TimelineEntryErrorBoundary extends Component<Props, State> 
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    logger.error('Timeline entry rendering error', {
+    console.error('Timeline entry rendering error', {
       error: safeStringify(error),
       errorInfo: safeStringify(errorInfo),
       event: safeStringify(this.props.event)
