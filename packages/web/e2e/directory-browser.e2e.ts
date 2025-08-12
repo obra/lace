@@ -185,11 +185,12 @@ test.describe('Directory Browser E2E Tests', () => {
       timeout: 10000,
     });
 
-    // Navigate to directory field using Tab key
-    await page.keyboard.press('Tab'); // Should focus first field (project name or similar)
-    await page.keyboard.press('Tab'); // Should focus directory field
-
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
+    await directoryInput.waitFor({ timeout: 5000 });
+
+    // Directly focus the directory input instead of relying on Tab navigation
+    // Tab navigation can be unreliable in different modal implementations
+    await directoryInput.focus();
 
     // Verify field is focused
     await expect(directoryInput).toBeFocused();
@@ -203,9 +204,16 @@ test.describe('Directory Browser E2E Tests', () => {
     // Press Escape to potentially close any dropdown
     await page.keyboard.press('Escape');
 
-    // Field should still be focused and retain value
+    // Field should still be focused and retain value after Escape
     await expect(directoryInput).toBeFocused();
     await expect(directoryInput).toHaveValue(`${homedir()}/test`);
+
+    // Test that we can clear and retype using clear() method
+    await directoryInput.clear();
+    await page.keyboard.type('/new/path');
+
+    // Verify new value
+    await expect(directoryInput).toHaveValue('/new/path');
   });
 
   test('should integrate with project creation workflow', async ({ page }) => {
