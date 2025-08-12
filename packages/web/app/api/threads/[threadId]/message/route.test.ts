@@ -161,7 +161,7 @@ describe('Thread Messaging API', () => {
     const threadManager = agent!.threadManager;
 
     // Get initial event count
-    const initialEvents = threadManager.getEvents(realThreadId);
+    const initialEvents = threadManager.getEvents(asThreadId(realThreadId));
     const initialUserMessageCount = initialEvents.filter((e) => e.type === 'USER_MESSAGE').length;
 
     const request = new NextRequest('http://localhost/api/threads/test/message', {
@@ -176,11 +176,21 @@ describe('Thread Messaging API', () => {
 
     expect(response.status).toBe(202);
 
-    // Wait for message processing to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for message processing to complete by polling events
+    let finalEvents;
+    let attempts = 0;
+    const maxAttempts = 20; // Max 1 second wait
+
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      finalEvents = threadManager.getEvents(asThreadId(realThreadId));
+      attempts++;
+    } while (
+      finalEvents.filter((e) => e.type === 'USER_MESSAGE').length <= initialUserMessageCount &&
+      attempts < maxAttempts
+    );
 
     // Verify exactly one USER_MESSAGE was added
-    const finalEvents = threadManager.getEvents(realThreadId);
     const finalUserMessageCount = finalEvents.filter((e) => e.type === 'USER_MESSAGE').length;
 
     expect(finalUserMessageCount).toBe(initialUserMessageCount + 1);

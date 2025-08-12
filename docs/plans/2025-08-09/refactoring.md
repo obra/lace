@@ -4,7 +4,7 @@
 
 **This is a breaking change refactor. We are NOT maintaining backward compatibility.**
 - All agent creation code MUST be updated to use the new API
-- The old `createDelegateAgent` method will be completely removed
+- The old `createDelegateAgent` method has been completely removed
 - All callers of `spawnAgent` MUST provide the required `threadId` parameter
 - There is no deprecation period - make the changes directly
 
@@ -29,7 +29,7 @@ Currently, spawned agents in our system have a race condition where they can sta
 3. Set `sessionId` on all threads (including delegates)
 4. Track all agents in `Session._agents` for proper cleanup
 5. Remove unused `isAgent` metadata field
-6. Remove `parentSessionId` metadata field (no longer needed)
+6. Remove `parentSessionId` metadata field (completed - no longer needed)
 
 ## Implementation Tasks
 

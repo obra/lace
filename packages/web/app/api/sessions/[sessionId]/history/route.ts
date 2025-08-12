@@ -39,7 +39,7 @@ export async function GET(
     }
 
     // Load all events from the session and its delegates through the Agent layer
-    const threadEvents = coordinatorAgent.getMainAndDelegateEvents(sessionId);
+    const threadEvents = coordinatorAgent.getMainAndDelegateEvents(asThreadId(sessionId));
 
     // Filter to only conversation events (persisted and shown in timeline)
     const events: LaceEvent[] = threadEvents.filter((event) => isConversationEvent(event.type));

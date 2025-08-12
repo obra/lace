@@ -73,6 +73,8 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
         return 'text-warning border-warning';
       case 'destructive':
         return 'text-error border-error';
+      default:
+        return 'text-warning border-warning';
     }
   };
 
@@ -84,6 +86,8 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
         return '🟡';
       case 'destructive':
         return '🔴';
+      default:
+        return '🟡';
     }
   };
 

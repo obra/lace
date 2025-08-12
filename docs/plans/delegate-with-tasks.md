@@ -273,9 +273,11 @@ private spawnAgentWithFilteredTools(name: string, provider?: string, model?: str
   }
 
   // Create delegate agent with filtered tools
+  // NOTE: This code is outdated - createDelegateAgent has been replaced with session.spawnAgent()
   const agent = this._sessionAgent.createDelegateAgent(filteredToolExecutor, providerInstance);
 
   // Store the agent metadata
+  // NOTE: parentSessionId field has been removed - delegates now have sessionId set directly
   agent.updateThreadMetadata({
     name: agentName,
     isAgent: true,
