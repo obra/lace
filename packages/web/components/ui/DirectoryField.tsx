@@ -15,9 +15,14 @@ const getHomedir = (): string => {
     // In browser/Storybook environment, use a mock path
     return '/home/user';
   }
-  // In Node.js environment
-  const { homedir } = require('os');
-  return homedir();
+  // In Node.js environment - dynamic import to avoid browser issues
+  try {
+    const { homedir } = require('os') as typeof import('os');
+    return homedir();
+  } catch {
+    // Fallback if os module is not available
+    return '/home/user';
+  }
 };
 
 interface DirectoryFieldProps {

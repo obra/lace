@@ -5,9 +5,9 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { DirectoryField } from './DirectoryField';
 import { useState } from 'react';
 
-const meta = {
+// Create a meta object that doesn't enforce the DirectoryField component's required props
+const meta: Meta = {
   title: 'UI/DirectoryField',
-  component: DirectoryField,
   parameters: {
     layout: 'padded',
     docs: {
@@ -16,17 +16,14 @@ const meta = {
       },
     },
   },
-  argTypes: {
-    onChange: { action: 'changed' },
-  },
   tags: ['autodocs'],
-} satisfies Meta<typeof DirectoryField>;
+};
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj;
 
 // Wrapper component to manage state
-function DirectoryFieldWrapper(props: Partial<React.ComponentProps<typeof DirectoryField>>) {
+function DirectoryFieldWrapper(props: Omit<React.ComponentProps<typeof DirectoryField>, 'value' | 'onChange'> & { value?: string }) {
   const [value, setValue] = useState(props.value || '');
   
   return (
@@ -39,64 +36,57 @@ function DirectoryFieldWrapper(props: Partial<React.ComponentProps<typeof Direct
 }
 
 export const Default: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    label: 'Project Directory',
-    placeholder: 'Select a directory',
-  },
+  render: () => <DirectoryFieldWrapper 
+    label="Project Directory"
+    placeholder="Select a directory"
+  />,
 };
 
 export const Required: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    label: 'Required Directory',
-    required: true,
-    helpText: 'This field is required',
-  },
+  render: () => <DirectoryFieldWrapper 
+    label="Required Directory"
+    required={true}
+    helpText="This field is required"
+  />,
 };
 
 export const WithError: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    label: 'Directory with Error',
-    error: true,
-    value: '/invalid/path',
-    helpText: 'Please select a valid directory',
-  },
+  render: () => <DirectoryFieldWrapper 
+    label="Directory with Error"
+    error={true}
+    value="/invalid/path"
+    helpText="Please select a valid directory"
+  />,
 };
 
 export const Disabled: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    label: 'Disabled Directory',
-    value: '/some/path',
-    disabled: true,
-  },
+  render: () => <DirectoryFieldWrapper 
+    label="Disabled Directory"
+    value="/some/path"
+    disabled={true}
+  />,
 };
 
 export const WithValue: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    label: 'Pre-filled Directory',
-    value: process.env.HOME || '/home/user',
-    helpText: 'Directory field with existing value',
-  },
+  render: () => <DirectoryFieldWrapper 
+    label="Pre-filled Directory"
+    value={'/home/user'}
+    helpText="Directory field with existing value"
+  />,
 };
 
 export const LargeSize: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    label: 'Large Directory Field',
-    placeholder: 'Choose your project directory',
-    className: 'input-lg',
-    helpText: 'Large input for prominent form sections',
-  },
+  render: () => <DirectoryFieldWrapper 
+    label="Large Directory Field"
+    placeholder="Choose your project directory"
+    className="input-lg"
+    helpText="Large input for prominent form sections"
+  />,
 };
 
 export const WithoutLabel: Story = {
-  render: (args) => <DirectoryFieldWrapper {...args} />,
-  args: {
-    placeholder: 'Select directory path',
-    helpText: 'Directory field without label',
-  },
+  render: () => <DirectoryFieldWrapper 
+    placeholder="Select directory path"
+    helpText="Directory field without label"
+  />,
 };

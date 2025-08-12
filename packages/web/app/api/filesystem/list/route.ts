@@ -91,16 +91,19 @@ export async function GET(request: NextRequest) {
 
     return createSuperjsonResponse(response);
   } catch (error) {
-    if (error instanceof Error && (error as any).code === 'ENOENT') {
-      return createErrorResponse('Directory not found', 404, {
-        code: 'DIRECTORY_NOT_FOUND',
-      });
-    }
+    if (error instanceof Error) {
+      const fsError = error as NodeJS.ErrnoException;
+      if (fsError.code === 'ENOENT') {
+        return createErrorResponse('Directory not found', 404, {
+          code: 'DIRECTORY_NOT_FOUND',
+        });
+      }
 
-    if (error instanceof Error && (error as any).code === 'EACCES') {
-      return createErrorResponse('Permission denied', 403, {
-        code: 'PERMISSION_DENIED',
-      });
+      if (fsError.code === 'EACCES') {
+        return createErrorResponse('Permission denied', 403, {
+          code: 'PERMISSION_DENIED',
+        });
+      }
     }
 
     return createErrorResponse(

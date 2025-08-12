@@ -181,8 +181,8 @@ describe('Filesystem Type Validation', () => {
 
       // These should not cause TypeScript errors
       expect(typeof entry.name).toBe('string');
-      expect(typeof entry.canRead).toBe('undefined'); // Not a direct property
       expect(typeof entry.permissions.canRead).toBe('boolean');
+      expect(typeof entry.permissions.canWrite).toBe('boolean');
     });
   });
 });
