@@ -6,6 +6,7 @@
 import { useState, ReactNode } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faCheck } from '@/lib/fontawesome';
+import { safeStringify } from '~/utils/safeStringify';
 
 interface TechnicalDetailsToggleProps {
   details: unknown;
@@ -15,23 +16,6 @@ interface TechnicalDetailsToggleProps {
   children?: ReactNode;
 }
 
-// Safe JSON stringify that handles circular references
-function safeStringify(obj: unknown): string {
-  try {
-    const seen = new WeakSet();
-    return JSON.stringify(obj, (key, value) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
-          return '[Circular]';
-        }
-        seen.add(value);
-      }
-      return value;
-    }, 2);
-  } catch (error) {
-    return `[Error serializing object: ${error instanceof Error ? error.message : 'Unknown error'}]`;
-  }
-}
 
 export function TechnicalDetailsToggle({ 
   details, 
