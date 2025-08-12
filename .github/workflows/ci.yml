@@ -49,144 +49,10 @@ jobs:
         run: npm ci
 
       - name: Build project
-        run: npm run build
+        run: cd packages/web && npm run build
 
   test:
     name: Test Suite
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        test-group: [unit, integration]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install system dependencies
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y \
-              python3 \
-              make \
-              g++ \
-              libtool \
-              pkg-config \
-              libncurses5-dev \
-              ripgrep
-          else
-            brew install ripgrep
-          fi
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-      - name: Run unit tests
-        if: matrix.test-group == 'unit'
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "npm run test:unit" /dev/null
-          else
-            script -q /dev/null sh -c "npm run test:unit"
-          fi
-
-      - name: Run integration tests
-        if: matrix.test-group == 'integration'
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "npm run test:integration" /dev/null
-          else
-            script -q /dev/null sh -c "npm run test:integration"
-          fi
-
-  test-coverage:
-    name: Test Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install system dependencies
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y \
-              python3 \
-              make \
-              g++ \
-              libtool \
-              pkg-config \
-              libncurses5-dev \
-              ripgrep
-          else
-            brew install ripgrep
-          fi
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run coverage
-        run: |
-          COVER_CMD="npm run test:coverage -- --exclude '**/*lmstudio-integration*' \
-            --exclude '**/*ollama-integration*' --exclude '**/e2e-cli*'"
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "$COVER_CMD" /dev/null
-          else
-            script -q /dev/null sh -c "$COVER_CMD"
-          fi
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage/lcov.info
-          fail_ci_if_error: false
-
-
-  build-and-package:
-    name: Build and Package
-    runs-on: ubuntu-latest
-    needs: [lint-and-format, build, test]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            dist/
-            !dist/**/*.map
-          retention-days: 7
-
-  matrix-test:
-    name: Cross-Platform Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -220,18 +86,85 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Core tests
+      - name: Build project
+        run: npm run build
+
+      - name: Run all tests
         run: |
-          CORE_CMD="npm run test:run -- \
-            --exclude '**/*lmstudio-integration*' \
-            --exclude '**/*ollama-integration*' \
-            --exclude '**/e2e-cli*' \
-            --exclude '**/*sigint-integration*'"
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "$CORE_CMD" /dev/null
+            script -q -c "npm test" /dev/null
           else
-            script -q /dev/null sh -c "$CORE_CMD"
+            script -q /dev/null sh -c "npm test"
           fi
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 \
+            make \
+            g++ \
+            libtool \
+            pkg-config \
+            libncurses5-dev \
+            ripgrep
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build project
         run: npm run build
+
+      - name: Run coverage
+        run: script -q -c "npm run test:coverage" /dev/null
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info,./packages/web/coverage/lcov.info
+          fail_ci_if_error: false
+
+
+  build-and-package:
+    name: Build and Package
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, build, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: cd packages/web &&  npm run build
+
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            !dist/**/*.map
+          retention-days: 7
+
