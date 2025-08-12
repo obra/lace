@@ -239,6 +239,9 @@ export class Project {
     persistence.deleteProject(this._id);
     // Don't close the global persistence - it's managed by the persistence system
 
+    // Clean up registry
+    Project._projectRegistry.delete(this._id);
+
     logger.info('Project deleted', { projectId: this._id });
   }
 

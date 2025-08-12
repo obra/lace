@@ -667,9 +667,10 @@ export class Session {
   refreshFromDatabase(): void {
     // Force database query, bypassing the registry cache
     const freshData = getPersistence().loadSession(this._sessionId);
-    if (freshData) {
-      this._sessionData = freshData;
+    if (!freshData) {
+      throw new Error(`Session not found: ${this._sessionId}`);
     }
+    this._sessionData = freshData;
   }
 
   // ===============================
@@ -715,15 +716,8 @@ export class Session {
     const currentConfig = this._sessionData.configuration || {};
     const newConfig = { ...currentConfig, ...validatedConfig };
 
-    // Update database
+    // Update database and cache
     Session.updateSession(this._sessionId, { configuration: newConfig });
-
-    // 👈 NEW: Update cached data
-    this._sessionData = {
-      ...this._sessionData,
-      configuration: newConfig,
-      updatedAt: new Date(),
-    };
   }
 
   getToolPolicy(toolName: string): 'allow' | 'require-approval' | 'deny' {
