@@ -304,12 +304,9 @@ export class Session {
    * @returns Session instance or null if not found
    */
   static async getById(sessionId: ThreadId): Promise<Session | null> {
-    logger.debug(`Session.getById called for sessionId: ${sessionId}`);
-
     // Check if session already exists in registry
     const existingSession = Session._sessionRegistry.get(sessionId);
     if (existingSession && !existingSession._destroyed) {
-      logger.debug(`Session.getById: Found existing session in registry for ${sessionId}`);
       return existingSession;
     }
 
@@ -620,6 +617,17 @@ export class Session {
 
   static updateSession(sessionId: string, updates: Partial<SessionData>): void {
     getPersistence().updateSession(sessionId, updates);
+
+    // Update cached Session instance if it exists in registry
+    const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
+    if (existingSession && !existingSession._destroyed) {
+      // Reload the fresh data from database into the cached instance
+      const freshData = getPersistence().loadSession(sessionId);
+      if (freshData) {
+        existingSession._sessionData = freshData;
+      }
+    }
+
     logger.info('Session updated', { sessionId, updates });
   }
 
@@ -699,7 +707,8 @@ export class Session {
    * update the cache.
    */
   refreshFromDatabase(): void {
-    const freshData = Session.getSession(this._sessionId);
+    // Force database query, bypassing the registry cache
+    const freshData = getPersistence().loadSession(this._sessionId);
     if (freshData) {
       this._sessionData = freshData;
     }

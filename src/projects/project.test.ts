@@ -174,11 +174,9 @@ describe('Project', () => {
         });
       });
 
-      it('should return null when project not found', () => {
-        const nonExistentProject = new Project('non-existent');
-
-        const info = nonExistentProject.getInfo();
-        expect(info).toBeNull();
+      it('should return null when project not found via getById', () => {
+        const nonExistentProject = Project.getById('non-existent');
+        expect(nonExistentProject).toBeNull();
       });
     });
 
