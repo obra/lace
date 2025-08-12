@@ -33,8 +33,14 @@ export class ProjectSelector {
   }
 
   async fillProjectForm(name: string, path: string): Promise<void> {
-    await this.projectNameInput.fill(name);
+    // Fill path input (always available)
     await this.projectPathInput.fill(path);
+    
+    // Fill name input only if it's visible (advanced mode)
+    const nameInputCount = await this.projectNameInput.count();
+    if (nameInputCount > 0) {
+      await this.projectNameInput.fill(name);
+    }
   }
 
   async submitProjectCreation(): Promise<void> {
