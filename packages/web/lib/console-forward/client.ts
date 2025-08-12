@@ -32,10 +32,13 @@ export class ConsoleForwarder {
   private patchConsole(): void {
     this.config.levels.forEach((level) => {
       // Store original method so we can restore it later
+      // eslint-disable-next-line no-console
       this.originalConsole[level] = console[level as keyof Console] as (...args: unknown[]) => void;
 
       // Replace console method with our interceptor
-      (console as any)[level] = (...args: unknown[]) => {
+      (console as unknown as Record<string, (...args: unknown[]) => void>)[level] = (
+        ...args: unknown[]
+      ) => {
         // IMPORTANT: Call original method first to maintain normal console behavior
         this.originalConsole[level](...args);
 
@@ -78,7 +81,7 @@ export class ConsoleForwarder {
       // Use SuperJSON to serialize the entire args array
       // This preserves dates, handles circular refs, and maintains type information
       return superjson.serialize(args);
-    } catch (error) {
+    } catch (_error) {
       // If SuperJSON fails, fall back to individual serialization with error handling
       return args.map((arg) => {
         try {
@@ -101,15 +104,15 @@ export class ConsoleForwarder {
    * Used as fallback when SuperJSON fails
    */
   private safeStringify(obj: unknown): string {
-    const seen = new WeakSet();
+    const seen = new WeakSet<object>();
     return JSON.stringify(
       obj,
-      (key, val) => {
+      (key, val: unknown) => {
         if (val != null && typeof val === 'object') {
           if (seen.has(val)) return '[Circular Reference]';
           seen.add(val);
         }
-        return val;
+        return val as unknown;
       },
       2
     );
@@ -150,8 +153,12 @@ export class ConsoleForwarder {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ logs }),
-    }).catch(() => {
-      // Silently fail to avoid infinite console loops
+    }).catch((error) => {
+      // Only log in development to help debug forwarding issues
+      if (process.env.NODE_ENV === 'development') {
+        // Use original console to avoid infinite loops
+        this.originalConsole.warn?.('Console forwarding failed:', error);
+      }
       // If server is down or network fails, we just lose these logs
     });
   }
@@ -163,7 +170,7 @@ export class ConsoleForwarder {
   public destroy(): void {
     // Restore original console methods to their unpatched state
     Object.entries(this.originalConsole).forEach(([level, originalMethod]) => {
-      (console as any)[level] = originalMethod;
+      (console as unknown as Record<string, (...args: unknown[]) => void>)[level] = originalMethod;
     });
 
     // Stop the flush timer to prevent further automatic flushes
