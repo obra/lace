@@ -2,16 +2,18 @@
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
 import { Agent, Session } from '@/lib/server/lace-imports';
-import type { ThreadEvent, ToolCall, ToolResult } from '@/types/core';
+import type { LaceEvent, ToolResult, CombinedTokenUsage } from '@/types/core';
+import { ApprovalDecision } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId, SessionInfo } from '@/types/core';
-import type { SessionEvent } from '@/types/web-sse';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { logger } from '~/utils/logger';
 
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates
   private registeredAgents = new WeakSet<Agent>();
+  // Project ID context for events
+  projectId?: string;
 
   constructor() {}
 
@@ -109,22 +111,26 @@ export class SessionService {
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
 
-    agent.on('agent_response_complete', ({ content }: { content: string }) => {
-      logger.debug(
-        `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
-      );
-      const event: SessionEvent = {
-        type: 'AGENT_MESSAGE',
-        threadId,
-        timestamp: new Date(),
-        data: { content },
-      };
-      sseManager.broadcast({
-        eventType: 'session',
-        scope: { sessionId },
-        data: event,
-      });
-    });
+    agent.on(
+      'agent_response_complete',
+      ({ content, tokenUsage }: { content: string; tokenUsage?: CombinedTokenUsage }) => {
+        logger.debug(
+          `[SESSION_SERVICE] Agent ${threadId} response complete, broadcasting AGENT_MESSAGE`
+        );
+        sseManager.broadcast({
+          type: 'AGENT_MESSAGE',
+          threadId,
+          timestamp: new Date(),
+          data: { content, tokenUsage },
+          context: {
+            sessionId,
+            projectId: undefined,
+            taskId: undefined,
+            agentId: undefined,
+          },
+        });
+      }
+    );
 
     // Handle streaming tokens
     agent.on('agent_token', ({ token }: { token: string }) => {
@@ -132,32 +138,89 @@ export class SessionService {
       process.stdout.write(token);
 
       // Broadcast token to UI for real-time display
-      const event: SessionEvent = {
+      sseManager.broadcast({
         type: 'AGENT_TOKEN',
         threadId,
         timestamp: new Date(),
         data: { token },
-      };
+        transient: true,
+        context: {
+          sessionId,
+          projectId: undefined,
+          taskId: undefined,
+          agentId: undefined,
+        },
+      });
+    });
+
+    // Handle compaction start events
+    agent.on('compaction_start', ({ auto }: { auto: boolean }) => {
+      logger.debug(`[SESSION_SERVICE] Agent ${threadId} starting compaction (auto: ${auto})`);
+
+      // Broadcast COMPACTION_START event
       sseManager.broadcast({
-        eventType: 'session',
-        scope: { sessionId },
-        data: event,
+        type: 'COMPACTION_START' as const,
+        threadId,
+        timestamp: new Date(),
+        data: {
+          auto,
+        },
+        transient: true,
+        context: {
+          sessionId,
+          projectId: this.projectId,
+          taskId: undefined,
+          agentId: undefined,
+        },
+      });
+    });
+
+    // Handle compaction complete events
+    agent.on('compaction_complete', ({ success }: { success: boolean }) => {
+      logger.debug(
+        `[SESSION_SERVICE] Agent ${threadId} completed compaction (success: ${success})`
+      );
+
+      // Broadcast COMPACTION_COMPLETE event
+      sseManager.broadcast({
+        type: 'COMPACTION_COMPLETE' as const,
+        threadId,
+        timestamp: new Date(),
+        data: {
+          success,
+        },
+        transient: true,
+        context: {
+          sessionId,
+          projectId: this.projectId,
+          taskId: undefined,
+          agentId: undefined,
+        },
       });
     });
 
     agent.on(
       'tool_call_start',
-      ({ toolName, input, callId }: { toolName: string; input: unknown; callId: string }) => {
-        const event: SessionEvent = {
+      ({
+        toolName,
+        input,
+        callId,
+      }: {
+        toolName: string;
+        input: Record<string, unknown>;
+        callId: string;
+      }) => {
+        sseManager.broadcast({
           type: 'TOOL_CALL',
           threadId,
           timestamp: new Date(),
           data: { id: callId, name: toolName, arguments: input },
-        };
-        sseManager.broadcast({
-          eventType: 'session',
-          scope: { sessionId },
-          data: event,
+          context: {
+            sessionId,
+            projectId: undefined,
+            taskId: undefined,
+            agentId: undefined,
+          },
         });
       }
     );
@@ -165,16 +228,17 @@ export class SessionService {
     agent.on(
       'tool_call_complete',
       ({ result }: { toolName: string; result: unknown; callId: string }) => {
-        const event: SessionEvent = {
+        sseManager.broadcast({
           type: 'TOOL_RESULT',
           threadId,
           timestamp: new Date(),
           data: result as ToolResult, // Cast to ToolResult for type safety
-        };
-        sseManager.broadcast({
-          eventType: 'session',
-          scope: { sessionId },
-          data: event,
+          context: {
+            sessionId,
+            projectId: undefined,
+            taskId: undefined,
+            agentId: undefined,
+          },
         });
       }
     );
@@ -182,7 +246,7 @@ export class SessionService {
     // Listen for state changes and broadcast to UI
     agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
       // Broadcast agent state change to UI via SSE
-      const event: SessionEvent = {
+      sseManager.broadcast({
         type: 'AGENT_STATE_CHANGE',
         threadId,
         timestamp: new Date(),
@@ -191,11 +255,13 @@ export class SessionService {
           from,
           to,
         },
-      };
-      sseManager.broadcast({
-        eventType: 'session',
-        scope: { sessionId },
-        data: event,
+        transient: true,
+        context: {
+          sessionId,
+          projectId: undefined,
+          taskId: undefined,
+          agentId: undefined,
+        },
       });
     });
 
@@ -211,16 +277,17 @@ export class SessionService {
         error.message === 'Aborted';
 
       if (!isAbortError) {
-        const event: SessionEvent = {
+        sseManager.broadcast({
           type: 'LOCAL_SYSTEM_MESSAGE',
           threadId,
           timestamp: new Date(),
-          data: { content: `Agent error: ${error.message}` },
-        };
-        sseManager.broadcast({
-          eventType: 'session',
-          scope: { sessionId },
-          data: event,
+          data: `Agent error: ${error.message}`,
+          context: {
+            sessionId,
+            projectId: undefined,
+            taskId: undefined,
+            agentId: undefined,
+          },
         });
       }
     });
@@ -235,8 +302,8 @@ export class SessionService {
     // Handle thread events (including approval events)
     agent.on(
       'thread_event_added',
-      ({ event, threadId: eventThreadId }: { event: ThreadEvent; threadId: string }) => {
-        // Convert thread events to session events and broadcast them
+      ({ event, threadId: eventThreadId }: { event: LaceEvent; threadId: string }) => {
+        // Pass LaceEvents directly without conversion for approval events
         if (event.type === 'TOOL_APPROVAL_REQUEST') {
           const toolCallData = event.data as { toolCallId: string };
 
@@ -252,59 +319,41 @@ export class SessionService {
           );
 
           if (toolCallEvent) {
-            const toolCall = toolCallEvent.data as ToolCall;
-
-            // Try to get tool metadata
-            let tool;
-            try {
-              tool = agent.toolExecutor?.getTool(toolCall.name);
-            } catch {
-              tool = null;
-            }
-
-            const sessionEvent: SessionEvent = {
+            // Broadcast tool approval request with just the toolCallId
+            // The UI will use this to look up the corresponding TOOL_CALL event
+            sseManager.broadcast({
               type: 'TOOL_APPROVAL_REQUEST',
               threadId: asThreadId(eventThreadId),
-              timestamp: new Date(event.timestamp),
+              timestamp: new Date(event.timestamp || new Date()),
               data: {
-                requestId: toolCallData.toolCallId,
-                toolName: toolCall.name,
-                input: toolCall.arguments,
-                isReadOnly: tool?.annotations?.readOnlyHint ?? false,
-                toolDescription: tool?.description,
-                toolAnnotations: tool?.annotations,
-                riskLevel: tool?.annotations?.readOnlyHint
-                  ? 'safe'
-                  : tool?.annotations?.destructiveHint
-                    ? 'destructive'
-                    : 'moderate',
+                toolCallId: toolCallData.toolCallId,
               },
-            };
-
-            sseManager.broadcast({
-              eventType: 'session',
-              scope: { sessionId },
-              data: sessionEvent,
+              context: {
+                sessionId,
+                projectId: undefined,
+                taskId: undefined,
+                agentId: undefined,
+              },
             });
           }
         } else if (event.type === 'TOOL_APPROVAL_RESPONSE') {
           // Forward approval response events to UI so modal can refresh
           const responseData = event.data as { toolCallId: string; decision: string };
 
-          const sessionEvent: SessionEvent = {
+          sseManager.broadcast({
             type: 'TOOL_APPROVAL_RESPONSE',
             threadId: asThreadId(eventThreadId),
-            timestamp: new Date(event.timestamp),
+            timestamp: new Date(event.timestamp || new Date()),
             data: {
               toolCallId: responseData.toolCallId,
-              decision: responseData.decision,
+              decision: responseData.decision as ApprovalDecision,
             },
-          };
-
-          sseManager.broadcast({
-            eventType: 'session',
-            scope: { sessionId },
-            data: sessionEvent,
+            context: {
+              sessionId,
+              projectId: undefined,
+              taskId: undefined,
+              agentId: undefined,
+            },
           });
         }
       }

@@ -11,6 +11,8 @@ import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/component
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { TokenUsageDisplay } from '@/components/ui';
+import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
@@ -32,15 +34,53 @@ import { isApiError } from '@/types/api';
 import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
-import type { SessionEvent } from '@/types/web-sse';
-import type { ToolApprovalRequestData, TimelineEntry } from '@/types/web-events';
-import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
+import type { LaceEvent } from '~/threads/types';
+import type { ToolApprovalRequestData } from '@/types/web-events';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
+
+// Token usage section component
+const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId: ThreadId }) {
+  const { tokenUsage, loading, error } = useAgentTokenUsage(agentId);
+
+
+  if (loading) {
+    return (
+      <div className="flex justify-center p-4 border-t border-base-300">
+        <div className="text-xs text-base-content/60">Loading token usage...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center p-4 border-t border-base-300">
+        <div className="text-xs text-error">Error loading token usage: {error}</div>
+      </div>
+    );
+  }
+
+  if (!tokenUsage) {
+    return (
+      <div className="flex justify-center p-4 border-t border-base-300">
+        <div className="text-xs text-base-content/60">No token usage data available</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-center p-4 border-t border-base-300">
+      <TokenUsageDisplay
+        tokenUsage={tokenUsage}
+        loading={loading}
+      />
+    </div>
+  );
+});
 
 export const LaceApp = memo(function LaceApp() {
   // Theme state
@@ -154,13 +194,8 @@ export const LaceApp = memo(function LaceApp() {
   
   const connected = connection.connected;
 
-  // Convert SessionEvents to TimelineEntries for the design system
-  const timelineEntries = useMemo((): TimelineEntry[] => {
-    return convertSessionEventsToTimeline(events, {
-      agents: selectedSessionDetails?.agents || [],
-      selectedAgent: selectedAgent || undefined,
-    });
-  }, [events, selectedSessionDetails?.agents, selectedAgent]);
+  // Events are now LaceEvent[] directly
+  // No conversion needed - components handle LaceEvent natively
 
   // Project loading function
   const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
@@ -926,13 +961,24 @@ export const LaceApp = memo(function LaceApp() {
             selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
-                <div style={{ height: 'calc(100% - 80px)' }}>
+                <div className="flex-1 min-h-0">
                   <TimelineView
-                    entries={timelineEntries}
+                    events={events}
+                    agents={selectedSessionDetails?.agents}
                     isTyping={agentBusy}
                     currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                    selectedAgent={selectedAgent}
                   />
                 </div>
+
+                {/* Token Usage Display */}
+                {selectedAgent ? (
+                  <TokenUsageSection agentId={selectedAgent} />
+                ) : (
+                  <div className="p-2 text-xs text-base-content/60 text-center">
+                    No agent selected (selectedAgent: {selectedAgent || 'null'})
+                  </div>
+                )}
 
                 {/* Chat Input */}
                 <MemoizedChatInput

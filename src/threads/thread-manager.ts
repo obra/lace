@@ -7,9 +7,8 @@ import {
   ProjectData,
   getPersistence,
 } from '~/persistence/database';
-import { Thread, ThreadEvent, ThreadEventType, ThreadEventData } from '~/threads/types';
+import { Thread, LaceEvent, isTransientEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
-import { estimateTokens } from '~/utils/token-estimation';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
 import { registerDefaultStrategies } from '~/threads/compaction/registry';
@@ -244,7 +243,12 @@ export class ThreadManager {
     };
 
     // Save thread to database without changing current thread
-    this.saveThread(thread);
+    // Use this.saveThread to ensure cache is updated
+    try {
+      this.saveThread(thread);
+    } catch (error) {
+      logger.error('Failed to save delegate thread', { error });
+    }
 
     return thread;
   }
@@ -288,25 +292,39 @@ export class ThreadManager {
    * prevents duplicate approvals for the same toolCallId, causing
    * this method to throw if a duplicate is attempted.
    */
-  addEvent(
-    threadId: string,
-    type: ThreadEventType,
-    eventData: ThreadEventData
-  ): ThreadEvent | null {
-    const thread = this.getThread(threadId);
-    if (!thread) {
-      throw new Error(`Thread ${threadId} not found`);
+  addEvent(event: LaceEvent): LaceEvent | null {
+    // Fill in defaults
+    if (!event.id) {
+      event.id = generateEventId();
+    }
+    if (!event.timestamp) {
+      event.timestamp = new Date();
     }
 
-    const event = {
-      id: generateEventId(),
-      threadId,
-      type,
-      timestamp: new Date(),
-      data: eventData,
-    } as ThreadEvent;
+    // Non-thread events pass through without persistence
+    if (!event.threadId) {
+      // Just return the event - caller will broadcast it
+      return event;
+    }
 
-    // Use database transaction for atomicity
+    // Thread events require the thread to exist
+    const thread = this.getThread(event.threadId);
+    if (!thread) {
+      throw new Error(`Thread ${event.threadId} not found`);
+    }
+
+    // Determine if this event should be persisted
+    const isTransient = event.transient || isTransientEventType(event.type);
+
+    if (isTransient) {
+      // Don't persist transient events to database
+      thread.events.push(event);
+      thread.updatedAt = new Date();
+      processLocalThreadCache.set(event.threadId, thread);
+      return event;
+    }
+
+    // Use database transaction for atomicity (only for non-transient events)
     return this._persistence.transaction(() => {
       // Save to database first and check if it was actually saved
       const wasSaved = this._persistence.saveEvent(event);
@@ -317,7 +335,7 @@ export class ThreadManager {
         thread.updatedAt = new Date();
 
         // Update process-local cache
-        processLocalThreadCache.set(threadId, thread);
+        processLocalThreadCache.set(event.threadId, thread);
 
         return event;
       } else {
@@ -341,7 +359,7 @@ export class ThreadManager {
    * @param threadId - The ID of the thread to get events for
    * @returns Array of thread events representing the working conversation
    */
-  getEvents(threadId: string): ThreadEvent[] {
+  getEvents(threadId: string): LaceEvent[] {
     const thread = this.getThread(threadId);
     if (!thread) return [];
 
@@ -362,15 +380,15 @@ export class ThreadManager {
    * @param threadId - The ID of the thread to get complete history for
    * @returns Array of all thread events in chronological order
    */
-  getAllEvents(threadId: string): ThreadEvent[] {
+  getAllEvents(threadId: string): LaceEvent[] {
     const thread = this.getThread(threadId);
     if (!thread) return [];
 
     return buildCompleteHistory(thread.events);
   }
 
-  getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
-    const allEvents: ThreadEvent[] = [];
+  getMainAndDelegateEvents(mainThreadId: string): LaceEvent[] {
+    const allEvents: LaceEvent[] = [];
 
     // Get main thread events
     allEvents.push(...this.getEvents(mainThreadId));
@@ -383,7 +401,7 @@ export class ThreadManager {
     }
 
     // Sort chronologically across all threads
-    return allEvents.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return allEvents.sort((a, b) => a.timestamp!.getTime() - b.timestamp!.getTime());
   }
 
   /**
@@ -504,10 +522,10 @@ export class ThreadManager {
       throw new Error(`Thread ${threadId} not found`);
     }
 
-    // Create compaction context
+    // Create compaction context with params merged in
     const context = {
       threadId,
-      params,
+      ...(params as object),
     };
 
     // Run compaction strategy
@@ -523,76 +541,11 @@ export class ThreadManager {
     // 4. Subsequent operations will retry persistence, maintaining eventual consistency
     // 5. The thread cache remains consistent with successful database state
     const compactionData = compactionEvent.data as CompactionData;
-    this.addEvent(threadId, 'COMPACTION', compactionData);
-  }
-
-  oldCompact(threadId: string): void {
-    const thread = this.getThread(threadId);
-    if (!thread) return;
-
-    let compactedCount = 0;
-    let totalTokensSaved = 0;
-
-    // Modify the actual events in memory - that's it
-    for (const event of thread.events) {
-      if (event.type === 'TOOL_RESULT') {
-        const toolResult = event.data;
-        const originalText = toolResult.content?.[0]?.text || '';
-        const originalTokens = this._estimateTokens(originalText);
-
-        const truncatedText = this._truncateToolResult(originalText);
-        if (toolResult.content && toolResult.content[0]) {
-          toolResult.content[0].text = truncatedText;
-        }
-        const newTokens = this._estimateTokens(truncatedText);
-
-        if (newTokens < originalTokens) {
-          compactedCount++;
-          totalTokensSaved += originalTokens - newTokens;
-        }
-      }
-    }
-
-    logger.info('Thread compacted', {
+    this.addEvent({
+      type: 'COMPACTION',
       threadId,
-      toolResultsCompacted: compactedCount,
-      approximateTokensSaved: totalTokensSaved,
-    });
-
-    // Add informational message to thread (shown to user but not sent to model)
-    const tokenMessage =
-      totalTokensSaved > 0 ? ` to save about ${totalTokensSaved} tokens` : ' to save tokens';
-
-    const event: ThreadEvent = {
-      id: generateEventId(),
-      threadId,
-      type: 'LOCAL_SYSTEM_MESSAGE',
-      timestamp: new Date(),
-      data: `🗜️ Compacted ${compactedCount} tool results${tokenMessage}.`,
-    };
-
-    thread.events.push(event);
-    thread.updatedAt = new Date();
-
-    // Save the compaction event to persistence
-    try {
-      this._persistence.saveEvent(event);
-    } catch (error) {
-      logger.error('Failed to save compaction event', { error });
-    }
-  }
-
-  private _truncateToolResult(output: string): string {
-    const words = output.split(/\s+/);
-    if (words.length <= 200) return output;
-
-    const truncated = words.slice(0, 200).join(' ');
-    const remaining = words.length - 200;
-    return `${truncated}... [truncated ${remaining} more words of tool output]`;
-  }
-
-  private _estimateTokens(text: string): number {
-    return estimateTokens(text);
+      data: compactionData,
+    } as LaceEvent);
   }
 
   clearEvents(threadId: string): void {
@@ -650,6 +603,9 @@ export class ThreadManager {
 
   // Cleanup
   close(): void {
+    // WARNING: This clears the GLOBAL cache and closes the GLOBAL persistence
+    // affecting ALL ThreadManager instances. This should only be called when
+    // the entire application is shutting down, not when individual agents stop.
     // Clear process-local cache
     processLocalThreadCache.clear();
     this._persistence.close();

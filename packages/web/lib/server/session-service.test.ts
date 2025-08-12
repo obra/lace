@@ -7,7 +7,7 @@ import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { TestProvider } from '@/lib/server/lace-imports';
-import type { SessionEvent } from '@/types/web-sse';
+import type { LaceEvent } from '@/types/core';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -304,18 +304,16 @@ describe('SessionService approval event forwarding', () => {
     expect((approvalRequestEvent?.data as { toolCallId: string }).toolCallId).toBe('test-call-123');
 
     // Verify that SessionService forwarded the event to real EventStreamManager
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: session.getId() },
-      data: expect.objectContaining({
+    // Note: TOOL_APPROVAL_REQUEST events are now broadcast as raw LaceEvents
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: 'TOOL_APPROVAL_REQUEST',
         threadId: session.getId(),
         data: expect.objectContaining({
-          requestId: 'test-call-123',
-          toolName: 'file_write',
+          toolCallId: 'test-call-123',
         }),
-      }),
-    });
+      })
+    );
   });
 
   it('should forward TOOL_APPROVAL_RESPONSE events to EventStreamManager when approval is given', async () => {
@@ -413,19 +411,18 @@ describe('SessionService agent state change broadcasting', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Assert: Verify SessionService broadcast the state change event
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: session.getId() },
-      data: expect.objectContaining({
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
+        transient: true,
         data: {
           agentId: agent.threadId,
           from: 'idle',
           to: 'thinking',
         },
-      }) satisfies Partial<SessionEvent>,
-    });
+      }) satisfies Partial<LaceEvent>
+    );
   });
 
   it('should broadcast AGENT_STATE_CHANGE events when agent transitions from thinking to streaming', async () => {
@@ -439,19 +436,18 @@ describe('SessionService agent state change broadcasting', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Assert: Verify the broadcast
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: session.getId() },
-      data: expect.objectContaining({
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
+        transient: true,
         data: {
           agentId: agent.threadId,
           from: 'thinking',
           to: 'streaming',
         },
-      }) satisfies Partial<SessionEvent>,
-    });
+      }) satisfies Partial<LaceEvent>
+    );
   });
 
   it('should broadcast AGENT_STATE_CHANGE events when agent transitions from streaming to tool_execution', async () => {
@@ -465,19 +461,18 @@ describe('SessionService agent state change broadcasting', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Assert: Verify the broadcast
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: session.getId() },
-      data: expect.objectContaining({
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
+        transient: true,
         data: {
           agentId: agent.threadId,
           from: 'streaming',
           to: 'tool_execution',
         },
-      }) satisfies Partial<SessionEvent>,
-    });
+      }) satisfies Partial<LaceEvent>
+    );
   });
 
   it('should broadcast AGENT_STATE_CHANGE events when agent transitions back to idle', async () => {
@@ -491,19 +486,18 @@ describe('SessionService agent state change broadcasting', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Assert: Verify the broadcast
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: session.getId() },
-      data: expect.objectContaining({
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
+        transient: true,
         data: {
           agentId: agent.threadId,
           from: 'tool_execution',
           to: 'idle',
         },
-      }) satisfies Partial<SessionEvent>,
-    });
+      }) satisfies Partial<LaceEvent>
+    );
   });
 
   it('should include proper timestamp and thread information in state change events', async () => {
@@ -520,25 +514,23 @@ describe('SessionService agent state change broadcasting', () => {
     const afterTime = new Date();
 
     // Assert: Verify the broadcast includes proper metadata
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: session.getId() },
-      data: expect.objectContaining({
+    expect(broadcastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
         threadId: agent.threadId,
         timestamp: expect.any(Date),
+        transient: true,
         data: expect.objectContaining({
           agentId: agent.threadId,
           from: 'idle',
           to: 'thinking',
         }),
-      }),
-    });
+      })
+    );
 
     // Verify timestamp is reasonable
-    const broadcastCall = broadcastSpy.mock.calls[0][0] as { data: SessionEvent };
-    const eventData = broadcastCall.data;
-    const timestamp = new Date(eventData.timestamp);
+    const broadcastCall = broadcastSpy.mock.calls[0][0] as LaceEvent;
+    const timestamp = new Date(broadcastCall.timestamp || new Date());
     expect(timestamp.getTime()).toBeGreaterThanOrEqual(beforeTime.getTime());
     expect(timestamp.getTime()).toBeLessThanOrEqual(afterTime.getTime());
   });
@@ -560,7 +552,7 @@ describe('SessionService agent state change broadcasting', () => {
 
     // Assert: Should only see ONE broadcast despite multiple handler registrations
     const stateChangeCalls = broadcastSpy.mock.calls.filter(
-      (call) => (call[0] as { data: SessionEvent }).data.type === 'AGENT_STATE_CHANGE'
+      (call) => (call[0] as LaceEvent).type === 'AGENT_STATE_CHANGE'
     );
     expect(stateChangeCalls).toHaveLength(1);
   });

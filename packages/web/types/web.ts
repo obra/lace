@@ -3,19 +3,15 @@
 
 import { z } from 'zod';
 import {
-  MessageRequestSchema,
   CreateTaskRequestSchema,
   UpdateTaskRequestSchema,
-  CreateSessionRequestSchema,
   SpawnAgentRequestSchema,
   ToolCallIdSchema,
 } from '@/lib/validation/schemas';
 
-// Request types (inferred from validation schemas) - ONLY PLACE THESE EXIST
-// These are derived from Zod schemas and don't exist anywhere else
+// Request types (inferred from validation schemas) - ONLY for types not in api.ts
+// Note: MessageRequest and CreateSessionRequest are defined in @/types/api
 export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
-export type MessageRequest = z.infer<typeof MessageRequestSchema>;
 export type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
 export type UpdateTaskRequest = z.infer<typeof UpdateTaskRequestSchema>;
-export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 export type SpawnAgentRequest = z.infer<typeof SpawnAgentRequestSchema>;

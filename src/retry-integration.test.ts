@@ -74,6 +74,16 @@ describe('Retry System Integration Tests', () => {
           })
         ),
 
+        // Mock getAvailableModels for token tracking
+        getAvailableModels: vi.fn().mockReturnValue([
+          {
+            id: 'mock-model',
+            displayName: 'Mock Model',
+            contextWindow: 100000,
+            maxOutputTokens: 4000,
+          },
+        ]),
+
         // Mock event emitter methods
         on: vi.fn(),
         off: vi.fn(),
@@ -169,6 +179,16 @@ describe('Retry System Integration Tests', () => {
           })
         ),
 
+        // Mock getAvailableModels for token tracking
+        getAvailableModels: vi.fn().mockReturnValue([
+          {
+            id: 'mock-model',
+            displayName: 'Mock Model',
+            contextWindow: 100000,
+            maxOutputTokens: 4000,
+          },
+        ]),
+
         // Track event listener setup
         on: vi.fn(),
         off: vi.fn(),
@@ -246,6 +266,16 @@ describe('Retry System Integration Tests', () => {
         // Mock provider that throws an error
         createResponse: vi.fn().mockRejectedValue(new Error('Mock provider error')),
         createStreamingResponse: vi.fn().mockRejectedValue(new Error('Mock provider error')),
+
+        // Mock getAvailableModels for token tracking
+        getAvailableModels: vi.fn().mockReturnValue([
+          {
+            id: 'mock-model',
+            displayName: 'Mock Model',
+            contextWindow: 100000,
+            maxOutputTokens: 4000,
+          },
+        ]),
 
         on: vi.fn(),
         off: vi.fn(),

@@ -2,6 +2,7 @@
 // ABOUTME: Handles --prompt flag execution without user interaction
 
 import type { Agent } from '~/agents/agent';
+import { CompactionHandler, ConsoleCompactionDisplay } from '~/interfaces/compaction-handler';
 
 // Simple interface for non-interactive execution
 interface UserInterface {
@@ -17,6 +18,7 @@ interface UserInterface {
  */
 export class NonInteractiveInterface implements UserInterface {
   agent: Agent;
+  private compactionHandler?: CompactionHandler;
 
   constructor(agent: Agent) {
     this.agent = agent;
@@ -40,6 +42,10 @@ export class NonInteractiveInterface implements UserInterface {
    * Execute a single prompt and exit
    */
   async executePrompt(prompt: string): Promise<void> {
+    // Set up compaction display handler
+    const compactionDisplay = new ConsoleCompactionDisplay();
+    this.compactionHandler = new CompactionHandler(this.agent, compactionDisplay);
+
     // Start agent and process the prompt
     await this.agent.start();
 
@@ -70,6 +76,11 @@ export class NonInteractiveInterface implements UserInterface {
       await this.agent.sendMessage(prompt);
       await conversationComplete;
     } finally {
+      // Clean up compaction handler
+      if (this.compactionHandler) {
+        this.compactionHandler.cleanup();
+      }
+
       // Always clean up agent resources, even on error
       try {
         this.agent.stop();

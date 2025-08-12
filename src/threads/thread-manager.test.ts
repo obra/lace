@@ -27,7 +27,11 @@ describe('ThreadManager', () => {
 
       // Act
       const event = expectEventAdded(
-        threadManager.addEvent(threadId, 'USER_MESSAGE', 'Test message')
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Test message',
+        })
       );
 
       // Assert
@@ -46,9 +50,19 @@ describe('ThreadManager', () => {
       threadManager.createThread(threadId);
 
       // Act - ThreadManager now operates as pure data layer
-      const event1 = expectEventAdded(threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello'));
+      const event1 = expectEventAdded(
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId,
+          data: 'Hello',
+        })
+      );
       const event2 = expectEventAdded(
-        threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there')
+        threadManager.addEvent({
+          type: 'AGENT_MESSAGE',
+          threadId,
+          data: { content: 'Hi there' },
+        })
       );
 
       // Assert - Data operations work correctly
@@ -58,7 +72,7 @@ describe('ThreadManager', () => {
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(2);
       expect(events[0].data).toBe('Hello');
-      expect(events[1].data).toBe('Hi there');
+      expect(events[1].data).toEqual({ content: 'Hi there' });
     });
 
     it('should handle duplicate tool approval responses correctly', () => {
@@ -68,17 +82,25 @@ describe('ThreadManager', () => {
 
       // Act - First approval should succeed
       expectEventAdded(
-        threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'tool-123',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId,
+          data: {
+            toolCallId: 'tool-123',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
       expect(threadManager.getEvents(threadId)).toHaveLength(1);
 
       // Second approval should be ignored due to database constraint
-      const secondEvent = threadManager.addEvent(threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'tool-123',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      const secondEvent = threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId,
+        data: {
+          toolCallId: 'tool-123',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       });
       expect(secondEvent).toBeNull(); // Returns null for duplicates
 
@@ -89,8 +111,30 @@ describe('ThreadManager', () => {
     it('should handle thread not found gracefully', () => {
       // Act & Assert - Should throw for non-existent thread
       expect(() => {
-        threadManager.addEvent('non-existent-thread', 'USER_MESSAGE', 'test');
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: 'non-existent-thread',
+          data: 'test',
+        });
       }).toThrow('Thread non-existent-thread not found');
+    });
+  });
+
+  describe('delegate thread creation', () => {
+    it('should set sessionId on delegate threads', () => {
+      const mainThreadId = 'lace_20250809_main';
+
+      // Create main thread with sessionId
+      threadManager.createThread(mainThreadId);
+      const mainThread = threadManager.getThread(mainThreadId);
+      mainThread!.sessionId = 'session_123';
+      threadManager.saveThread(mainThread!);
+
+      // Create delegate thread
+      const delegateThread = threadManager.createDelegateThreadFor(mainThreadId);
+
+      // Delegate should have same sessionId as parent
+      expect(delegateThread.sessionId).toBe('session_123');
     });
   });
 });

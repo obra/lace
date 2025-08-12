@@ -3,192 +3,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
-import type { SessionEvent } from '@/types/web-sse';
-import type { ThreadEvent, ToolResult } from '@/types/core';
-import { asThreadId } from '@/types/core';
+import type { LaceEvent } from '@/types/core';
+import { asThreadId, isConversationEvent } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-
-function isToolResult(data: unknown): data is ToolResult {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'content' in data &&
-    Array.isArray((data as { content: unknown }).content)
-  );
-}
-
-// Use core ThreadId validation instead of custom validation
-// isThreadId is imported from core-types and handles proper format validation
-
-// Safe property access functions that handle unknown types
-function safeGetToolCallData(
-  data: unknown
-): { name: string; arguments: Record<string, unknown> } | null {
-  if (typeof data !== 'object' || data === null) return null;
-  const obj = data as Record<string, unknown>;
-
-  // Handle both formats: { name, arguments } and { toolName, input }
-  if ('name' in obj && 'arguments' in obj && typeof obj.name === 'string') {
-    const args = obj.arguments;
-    return {
-      name: obj.name,
-      arguments: (typeof args === 'object' && args !== null ? args : {}) as Record<string, unknown>,
-    };
-  } else if ('toolName' in obj && typeof obj.toolName === 'string') {
-    const input = 'input' in obj ? obj.input : {};
-    return {
-      name: obj.toolName,
-      arguments: (typeof input === 'object' && input !== null ? input : {}) as Record<
-        string,
-        unknown
-      >,
-    };
-  }
-  return null;
-}
-
-// Convert ThreadEvent to SessionEvent with proper type handling
-function convertThreadEventToSessionEvent(threadEvent: ThreadEvent): SessionEvent | null {
-  // Convert string threadId to ThreadId type
-  const threadId = asThreadId(threadEvent.threadId);
-
-  const baseEvent = {
-    threadId,
-    timestamp:
-      threadEvent.timestamp instanceof Date
-        ? threadEvent.timestamp
-        : new Date(threadEvent.timestamp),
-  };
-
-  switch (threadEvent.type) {
-    case 'USER_MESSAGE': {
-      const content =
-        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
-      return {
-        ...baseEvent,
-        type: 'USER_MESSAGE',
-        data: { content },
-      };
-    }
-
-    case 'AGENT_MESSAGE': {
-      const content =
-        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
-      return {
-        ...baseEvent,
-        type: 'AGENT_MESSAGE',
-        data: { content },
-      };
-    }
-
-    case 'TOOL_CALL': {
-      // ThreadEvent.data is ToolCall for TOOL_CALL events
-      const toolCallData = safeGetToolCallData(threadEvent.data);
-      if (toolCallData) {
-        return {
-          ...baseEvent,
-          type: 'TOOL_CALL',
-          data: {
-            id: threadEvent.id || '',
-            name: toolCallData.name,
-            arguments: toolCallData.arguments,
-          },
-        };
-      } else {
-        // Fallback for invalid tool call data
-        return {
-          ...baseEvent,
-          type: 'TOOL_CALL',
-          data: {
-            id: threadEvent.id || '',
-            name: 'unknown',
-            arguments: {},
-          },
-        };
-      }
-    }
-
-    case 'TOOL_RESULT': {
-      // ThreadEvent.data should be ToolResult for TOOL_RESULT events
-      if (isToolResult(threadEvent.data)) {
-        return {
-          ...baseEvent,
-          type: 'TOOL_RESULT',
-          data: threadEvent.data,
-        };
-      }
-      // Skip malformed TOOL_RESULT events
-      return null;
-    }
-
-    case 'LOCAL_SYSTEM_MESSAGE': {
-      const content =
-        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
-      return {
-        ...baseEvent,
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content },
-      };
-    }
-
-    case 'COMPACTION': {
-      // With discriminated union, TypeScript knows threadEvent.data is CompactionData
-      return {
-        ...baseEvent,
-        type: 'COMPACTION',
-        data: {
-          strategyId: threadEvent.data.strategyId,
-          originalEventCount: threadEvent.data.originalEventCount,
-          compactedEvents: threadEvent.data.compactedEvents,
-          metadata: threadEvent.data.metadata,
-        },
-      };
-    }
-
-    case 'SYSTEM_PROMPT': {
-      const content =
-        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
-      return {
-        ...baseEvent,
-        type: 'SYSTEM_PROMPT',
-        data: { content },
-      };
-    }
-
-    case 'USER_SYSTEM_PROMPT': {
-      const content =
-        typeof threadEvent.data === 'string' ? threadEvent.data : String(threadEvent.data);
-      return {
-        ...baseEvent,
-        type: 'USER_SYSTEM_PROMPT',
-        data: { content },
-      };
-    }
-
-    case 'TOOL_APPROVAL_REQUEST': {
-      // Don't include approval request events in timeline - they're for internal approval flow only
-      return null;
-    }
-
-    case 'TOOL_APPROVAL_RESPONSE': {
-      // Don't include approval response events in timeline - they're for internal approval flow only
-      return null;
-    }
-
-    default: {
-      // TypeScript exhaustiveness check - cast to access type property
-      const unknownEvent = threadEvent as { type: string };
-      // Return a fallback for runtime safety
-      return {
-        ...baseEvent,
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        data: { content: `Unknown event type: ${unknownEvent.type}` },
-      } as SessionEvent;
-    }
-  }
-}
 
 export async function GET(
   _request: NextRequest,
@@ -222,10 +41,8 @@ export async function GET(
     // Load all events from the session and its delegates through the Agent layer
     const threadEvents = coordinatorAgent.getMainAndDelegateEvents(sessionId);
 
-    // Convert ThreadEvent to SessionEvent and filter out null values (approval events)
-    const events: SessionEvent[] = threadEvents
-      .map(convertThreadEventToSessionEvent)
-      .filter((event): event is SessionEvent => event !== null);
+    // Filter to only conversation events (persisted and shown in timeline)
+    const events: LaceEvent[] = threadEvents.filter((event) => isConversationEvent(event.type));
 
     return createSuperjsonResponse({ events }, { status: 200 });
   } catch (error: unknown) {

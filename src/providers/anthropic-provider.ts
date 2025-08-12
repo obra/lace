@@ -196,25 +196,28 @@ export class AnthropicProvider extends AIProvider {
             input: contentBlock.input as Record<string, unknown>,
           }));
 
+        const normalizedUsage = response.usage
+          ? {
+              promptTokens: response.usage.input_tokens,
+              completionTokens: response.usage.output_tokens,
+              totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+            }
+          : undefined;
+
         logger.debug('Received response from Anthropic', {
           provider: 'anthropic',
           contentLength: textContent.length,
           toolCallCount: toolCalls.length,
           toolCallNames: toolCalls.map((tc) => tc.name),
-          usage: response.usage,
+          rawUsage: response.usage,
+          normalizedUsage,
         });
 
         return {
           content: textContent,
           toolCalls,
           stopReason: this.normalizeStopReason(response.stop_reason),
-          usage: response.usage
-            ? {
-                promptTokens: response.usage.input_tokens,
-                completionTokens: response.usage.output_tokens,
-                totalTokens: response.usage.input_tokens + response.usage.output_tokens,
-              }
-            : undefined,
+          usage: normalizedUsage,
         };
       },
       { signal }

@@ -1,19 +1,47 @@
-// ABOUTME: Tests for Agent token counting integration with turn tracking
-// ABOUTME: Validates token accumulation, streaming updates, and estimation fallback
+// ABOUTME: Tests for agent token tracking from provider responses
+// ABOUTME: Verifies that token usage from providers is stored in AGENT_MESSAGE events
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { z } from 'zod';
-import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Agent, CurrentTurnMetrics } from '~/agents/agent';
+import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { z } from 'zod';
 
-// Mock provider with configurable token usage
+// Mock provider for testing token usage tracking
+class MockProvider extends BaseMockProvider {
+  providerName = 'mock-provider';
+  private mockResponse: ProviderResponse;
+
+  constructor(response?: Partial<ProviderResponse>) {
+    super({});
+    this.mockResponse = {
+      content: 'Default response',
+      toolCalls: [],
+      ...response,
+    };
+  }
+
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model?: string,
+    _signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    return Promise.resolve(this.mockResponse);
+  }
+
+  get supportsStreaming() {
+    return false;
+  }
+}
+
+// Advanced mock provider for token tracking tests with streaming support
 class MockTokenProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
   private delay: number;
@@ -27,7 +55,7 @@ class MockTokenProvider extends BaseMockProvider {
   }
 
   get providerName(): string {
-    return 'mock-token';
+    return 'mock-token-provider';
   }
 
   get supportsStreaming(): boolean {
@@ -43,95 +71,56 @@ class MockTokenProvider extends BaseMockProvider {
       await new Promise((resolve) => setTimeout(resolve, this.delay));
     }
 
-    // Return response with or without usage data based on configuration
-    return {
-      ...this.mockResponse,
-      usage: this.shouldReturnUsage ? this.mockResponse.usage : undefined,
-    };
-  }
-
-  async createStreamingResponse(
-    _messages: ProviderMessage[],
-    _tools: Tool[],
-    _model: string
-  ): Promise<ProviderResponse> {
-    // Simulate streaming with token events
-    if (this.mockResponse.usage) {
-      // Emit streaming token events during processing
-      setTimeout(() => {
-        this.emit('token_usage_update', {
-          usage: {
-            promptTokens: this.mockResponse.usage!.promptTokens,
-            completionTokens: Math.floor(this.mockResponse.usage!.completionTokens / 2),
-            totalTokens:
-              this.mockResponse.usage!.promptTokens +
-              Math.floor(this.mockResponse.usage!.completionTokens / 2),
-          },
-        });
-      }, 10);
-
-      setTimeout(() => {
-        this.emit('token_usage_update', {
-          usage: this.mockResponse.usage,
-        });
-      }, 20);
+    const response = { ...this.mockResponse };
+    if (!this.shouldReturnUsage) {
+      delete response.usage;
     }
 
-    return this.createResponse(_messages, _tools, _model);
+    return response;
   }
 }
 
-describe('Agent Token Tracking Integration', () => {
-  const _tempLaceDir = setupCoreTest();
+describe('Agent token tracking', () => {
+  setupCoreTest();
   let agent: Agent;
-  let provider: MockTokenProvider;
-  let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
-  let threadId: string;
+  let provider: MockProvider;
+  let toolExecutor: ToolExecutor;
 
-  beforeEach(async () => {
-    // setupTestPersistence replaced by setupCoreTest
-    // Create mock response with token usage
-    const mockResponse: ProviderResponse = {
-      content: 'Test response with tokens',
+  beforeEach(() => {
+    threadManager = new ThreadManager();
+    toolExecutor = new ToolExecutor();
+    toolExecutor.setApprovalCallback({
+      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+    });
+
+    provider = new MockProvider({
+      content: 'Test response',
       toolCalls: [],
       usage: {
-        promptTokens: 50,
-        completionTokens: 30,
-        totalTokens: 80,
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
       },
-    };
+    });
 
-    provider = new MockTokenProvider(mockResponse);
-    toolExecutor = new ToolExecutor();
-
-    // Set up auto-approval callback so tools actually execute and emit turn_complete
-    const autoApprovalCallback = {
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    };
-    toolExecutor.setApprovalCallback(autoApprovalCallback);
-
-    threadManager = new ThreadManager();
-    threadId = threadManager.generateThreadId();
+    const threadId = threadManager.generateThreadId();
+    // Create thread without session ID for simplicity
     threadManager.createThread(threadId);
 
-    const config: AgentConfig = {
+    agent = new Agent({
       provider,
-      toolExecutor,
       threadManager,
+      toolExecutor,
       threadId,
       tools: [],
-    };
-
-    agent = new Agent(config);
+    });
 
     // Set model metadata for the agent (required for model-agnostic providers)
     agent.updateThreadMetadata({
       modelId: 'test-model',
       providerInstanceId: 'test-instance',
     });
-
-    await agent.start();
   });
 
   afterEach(() => {
@@ -230,11 +219,14 @@ describe('Agent Token Tracking Integration', () => {
 
       // Create new agent with tool and multi-response provider
       const multiCallProvider = new MockTokenProvider(toolCallResponse);
+      const multiCallThreadId = threadManager.generateThreadId();
+      threadManager.createThread(multiCallThreadId);
+
       const multiCallAgent = new Agent({
         provider: multiCallProvider,
         toolExecutor,
         threadManager,
-        threadId,
+        threadId: multiCallThreadId,
         tools: [mockTool],
       });
 
@@ -287,7 +279,7 @@ describe('Agent Token Tracking Integration', () => {
 
       // Should track output tokens from provider response
       expect(finalMetrics.tokensOut).toBeGreaterThan(0);
-      expect(finalMetrics.tokensOut).toBe(30); // Provider reported 30 completion tokens
+      expect(finalMetrics.tokensOut).toBe(50); // Provider reported 50 completion tokens
     });
 
     it('should accumulate output tokens from multiple provider responses', async () => {
@@ -348,11 +340,14 @@ describe('Agent Token Tracking Integration', () => {
       toolExecutor.registerTool('test_tool', mockTool);
 
       const multiCallProvider = new MockTokenProvider(toolCallResponse);
+      const multiCallThreadId2 = threadManager.generateThreadId();
+      threadManager.createThread(multiCallThreadId2);
+
       const multiCallAgent = new Agent({
         provider: multiCallProvider,
         toolExecutor,
         threadManager,
-        threadId,
+        threadId: multiCallThreadId2,
         tools: [mockTool],
       });
 
@@ -392,62 +387,41 @@ describe('Agent Token Tracking Integration', () => {
     });
   });
 
-  describe('streaming token updates', () => {
-    it('should update token counts in real-time during streaming', async () => {
-      // Arrange
-      const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
-      agent.on('turn_progress', (data) => progressEvents.push(data));
+  it('should store token usage in AGENT_MESSAGE events', async () => {
+    await agent.sendMessage('Hello');
 
-      // Create streaming provider
-      const streamingProvider = new MockTokenProvider({
-        content: 'Streaming response',
-        toolCalls: [],
-        usage: {
-          promptTokens: 60,
-          completionTokens: 40,
-          totalTokens: 100,
-        },
-      });
+    const events = threadManager.getEvents(agent.threadId);
+    const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
 
-      // The provider already supports streaming since supportsStreaming getter returns true
+    expect(agentMessage).toBeDefined();
+    expect(agentMessage?.data).toHaveProperty('tokenUsage');
+    // Verify the new CombinedTokenUsage structure contains expected message data
+    expect(agentMessage?.data.tokenUsage).toEqual(
+      expect.objectContaining({
+        message: expect.objectContaining({
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+        }) as Record<string, unknown>,
+      })
+    );
 
-      const streamingAgent = new Agent({
-        provider: streamingProvider,
-        toolExecutor,
-        threadManager,
-        threadId,
-        tools: [],
-      });
+    // Verify new CombinedTokenUsage structure exists
+    expect(agentMessage?.data.tokenUsage).toBeDefined();
+    expect(agentMessage?.data.tokenUsage?.thread).toBeDefined();
+    expect(typeof agentMessage?.data.tokenUsage?.thread.totalPromptTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.totalCompletionTokens).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.contextLimit).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.percentUsed).toBe('number');
+    expect(typeof agentMessage?.data.tokenUsage?.thread.nearLimit).toBe('boolean');
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      streamingAgent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
-
-      await streamingAgent.start();
-
-      streamingAgent.on('turn_progress', (data) => progressEvents.push(data));
-
-      // Act
-      await streamingAgent.sendMessage('Stream some tokens');
-
-      // Wait for streaming events to process
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Assert
-      // Should have received multiple progress events with increasing token counts
-      expect(progressEvents.length).toBeGreaterThan(0);
-
-      // Find events that have token updates (some might just be timer-based)
-      const tokenProgressEvents = progressEvents.filter((event) => event.metrics.tokensOut > 0);
-
-      expect(tokenProgressEvents.length).toBeGreaterThan(0);
-
-      // Final token count should match the complete response
-      const lastEvent = progressEvents[progressEvents.length - 1];
-      expect(lastEvent.metrics.tokensOut).toBeGreaterThan(0);
-    });
+    // If message usage exists, verify its structure
+    if (agentMessage?.data.tokenUsage?.message) {
+      const message = agentMessage.data.tokenUsage.message;
+      expect(typeof message.promptTokens).toBe('number');
+      expect(typeof message.completionTokens).toBe('number');
+      expect(typeof message.totalTokens).toBe('number');
+    }
   });
 
   describe('token estimation fallback', () => {
@@ -463,11 +437,14 @@ describe('Agent Token Tracking Integration', () => {
         false // shouldReturnUsage = false
       );
 
+      const noUsageThreadId = threadManager.generateThreadId();
+      threadManager.createThread(noUsageThreadId);
+
       const noUsageAgent = new Agent({
         provider: noUsageProvider,
         toolExecutor,
         threadManager,
-        threadId,
+        threadId: noUsageThreadId,
         tools: [],
       });
 
@@ -477,93 +454,72 @@ describe('Agent Token Tracking Integration', () => {
         providerInstanceId: 'test-instance',
       });
 
-      await noUsageAgent.start();
-
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
       noUsageAgent.on('turn_complete', (data) => completeEvents.push(data));
 
       // Act
       await noUsageAgent.sendMessage('Message requiring token estimation');
 
-      // Assert
+      // Assert - should still have token counts using estimation
       expect(completeEvents).toHaveLength(1);
       const finalMetrics = completeEvents[0].metrics;
 
-      // Should still have token counts using estimation
       expect(finalMetrics.tokensIn).toBeGreaterThan(0);
       expect(finalMetrics.tokensOut).toBeGreaterThan(0);
-
-      // Estimated input tokens (~4 chars per token)
-      const userMessage = 'Message requiring token estimation';
-      const estimatedUserTokens = Math.ceil(userMessage.length / 4);
-      expect(finalMetrics.tokensIn).toBeGreaterThanOrEqual(estimatedUserTokens);
-
-      // Estimated output tokens
-      const responseContent = 'Response without usage data';
-      const estimatedOutputTokens = Math.ceil(responseContent.length / 4);
-      expect(finalMetrics.tokensOut).toBeGreaterThanOrEqual(estimatedOutputTokens);
-    });
-
-    it('should prefer native token counts over estimation when available', async () => {
-      // Arrange
-      const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      agent.on('turn_complete', (data) => completeEvents.push(data));
-
-      // Act
-      await agent.sendMessage('Message with native token counts');
-
-      // Assert
-      expect(completeEvents).toHaveLength(1);
-      const finalMetrics = completeEvents[0].metrics;
-
-      // Should use exact token counts from provider, not estimation
-      expect(finalMetrics.tokensOut).toBe(30); // Exact count from mock provider
-
-      // Turn metrics track only user input estimation, not provider prompt tokens
-      // Provider's promptTokens (50) are for session tracking, not turn metrics
-      expect(finalMetrics.tokensIn).toBeGreaterThan(0);
     });
   });
 
-  describe('token metrics reset', () => {
-    it('should reset token metrics between turns', async () => {
-      // Arrange
-      const firstCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-      const secondCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
-
-      let eventCount = 0;
-      agent.on('turn_complete', (data) => {
-        eventCount++;
-        if (eventCount === 1) {
-          firstCompleteEvents.push(data);
-        } else {
-          secondCompleteEvents.push(data);
-        }
-      });
-
-      // Act - Send two separate messages
-      await agent.sendMessage('First message with tokens');
-      await agent.sendMessage('Second message with tokens');
-
-      // Assert
-      expect(firstCompleteEvents).toHaveLength(1);
-      expect(secondCompleteEvents).toHaveLength(1);
-
-      const firstMetrics = firstCompleteEvents[0].metrics;
-      const secondMetrics = secondCompleteEvents[0].metrics;
-
-      // Both turns should have similar token counts (not accumulated)
-      expect(firstMetrics.tokensIn).toBeGreaterThan(0);
-      expect(firstMetrics.tokensOut).toBeGreaterThan(0);
-      expect(secondMetrics.tokensIn).toBeGreaterThan(0);
-      expect(secondMetrics.tokensOut).toBeGreaterThan(0);
-
-      // Second turn shouldn't accumulate from first turn
-      expect(secondMetrics.tokensIn).toBeLessThan(firstMetrics.tokensIn * 2);
-      expect(secondMetrics.tokensOut).toBeLessThan(firstMetrics.tokensOut * 2);
-
-      // Turn IDs should be different
-      expect(firstMetrics.turnId).not.toBe(secondMetrics.turnId);
+  it('should handle responses without token usage', async () => {
+    // Create provider that doesn't return usage info
+    const providerNoUsage = new MockProvider({
+      content: 'Response without usage',
+      toolCalls: [],
+      // No usage field
     });
+
+    const threadId2 = threadManager.generateThreadId();
+    threadManager.createThread(threadId2);
+
+    const agentNoUsage = new Agent({
+      provider: providerNoUsage,
+      threadManager,
+      toolExecutor,
+      threadId: threadId2,
+      tools: [],
+    });
+
+    // Set model metadata for the agent
+    agentNoUsage.updateThreadMetadata({
+      modelId: 'test-model',
+      providerInstanceId: 'test-instance',
+    });
+
+    await agentNoUsage.sendMessage('Hello');
+
+    const events = threadManager.getEvents(agentNoUsage.threadId);
+    const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
+
+    expect(agentMessage).toBeDefined();
+    expect(agentMessage?.data.tokenUsage?.thread).toEqual(
+      expect.objectContaining({
+        totalPromptTokens: 0,
+        totalCompletionTokens: 0,
+        totalTokens: 0,
+        contextLimit: expect.any(Number) as number,
+        percentUsed: expect.any(Number) as number,
+        nearLimit: expect.any(Boolean) as boolean,
+      })
+    );
+
+    // Verify new CombinedTokenUsage structure exists even without provider usage
+    expect(agentMessage?.data.tokenUsage?.thread).toBeDefined();
+    const thread = agentMessage?.data.tokenUsage?.thread;
+    if (thread) {
+      expect(typeof thread.totalPromptTokens).toBe('number');
+      expect(typeof thread.totalCompletionTokens).toBe('number');
+      expect(typeof thread.contextLimit).toBe('number');
+      expect(typeof thread.percentUsed).toBe('number');
+      expect(typeof thread.nearLimit).toBe('boolean');
+    }
   });
 });

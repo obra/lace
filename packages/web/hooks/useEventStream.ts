@@ -2,22 +2,12 @@
 // ABOUTME: Single EventSource connection handling session, task, project, and approval events
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import type {
-  StreamEvent,
-  StreamSubscription,
-  StreamConnection,
-  StreamEventCategory,
-} from '@/types/stream-events';
+import type { StreamSubscription, StreamConnection } from '@/types/stream-events';
+import type { LaceEvent } from '~/threads/types';
 import { parse } from '@/lib/serialization';
-import type { SessionEvent } from '@/types/web-sse';
 import type { ThreadId } from '@/types/core';
-import type { ToolApprovalRequestData } from '@/types/web-events';
 import type { PendingApproval } from '@/types/api';
 import type { Task } from '@/types/core';
-import {
-  parseSessionEvent,
-  StreamEventTimestampSchema,
-} from '@/lib/validation/session-event-schemas';
 
 // Task event types
 export interface TaskEvent {
@@ -76,13 +66,13 @@ export interface GlobalEvent {
 
 interface EventHandlers {
   // Session events
-  onSessionEvent?: (event: SessionEvent) => void;
-  onUserMessage?: (event: SessionEvent) => void;
-  onAgentMessage?: (event: SessionEvent) => void;
-  onAgentToken?: (event: SessionEvent) => void;
-  onToolCall?: (event: SessionEvent) => void;
-  onToolResult?: (event: SessionEvent) => void;
-  onSystemMessage?: (event: SessionEvent) => void;
+  onSessionEvent?: (event: LaceEvent) => void;
+  onUserMessage?: (event: LaceEvent) => void;
+  onAgentMessage?: (event: LaceEvent) => void;
+  onAgentToken?: (event: LaceEvent) => void;
+  onToolCall?: (event: LaceEvent) => void;
+  onToolResult?: (event: LaceEvent) => void;
+  onSystemMessage?: (event: LaceEvent) => void;
   onAgentStateChange?: (agentId: string, from: string, to: string) => void;
 
   // Task events
@@ -129,45 +119,61 @@ interface UseEventStreamOptions extends EventHandlers {
 
 interface UseEventStreamResult {
   connection: StreamConnection;
-  lastEvent?: StreamEvent;
+  lastEvent?: LaceEvent;
   sendCount: number;
   close: () => void;
   reconnect: () => void;
 }
 
-function isTaskEvent(streamEvent: StreamEvent): boolean {
+function isTaskEvent(event: LaceEvent): boolean {
+  // Check if it's a task event by looking at the type
+  // Task events come through as TASK_CREATED, TASK_UPDATED, etc. (will be added to enum)
   return (
-    streamEvent.eventType === 'task' &&
-    ['task:created', 'task:updated', 'task:deleted', 'task:note_added'].includes(
-      (streamEvent.data as TaskEvent).type
+    event.type &&
+    ['TASK_CREATED', 'TASK_UPDATED', 'TASK_DELETED', 'TASK_NOTE_ADDED'].includes(
+      event.type as string
     )
   );
 }
 
-function isAgentEvent(streamEvent: StreamEvent): boolean {
-  if (streamEvent.eventType !== 'task') {
-    return false;
-  }
-
-  const data = streamEvent.data as unknown;
-  if (!data || typeof data !== 'object' || !('type' in data)) {
-    return false;
-  }
-
-  const eventData = data as { type: string };
-  return ['agent:spawned', 'agent:started', 'agent:stopped'].includes(eventData.type);
+function isAgentEvent(event: LaceEvent): boolean {
+  // Agent events include AGENT_SPAWNED and AGENT_STATE_CHANGE
+  return event.type && ['AGENT_SPAWNED', 'AGENT_STATE_CHANGE'].includes(event.type as string);
 }
 
-function isProjectEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.eventType === 'project';
+function isProjectEvent(event: LaceEvent): boolean {
+  // Project events will be added to LaceEventType enum
+  return (
+    event.type &&
+    ['PROJECT_CREATED', 'PROJECT_UPDATED', 'PROJECT_DELETED'].includes(event.type as string)
+  );
 }
 
-function isGlobalEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.eventType === 'global';
+function isGlobalEvent(event: LaceEvent): boolean {
+  // Global/system events
+  return (
+    event.type && ['SYSTEM_NOTIFICATION', 'LOCAL_SYSTEM_MESSAGE'].includes(event.type as string)
+  );
 }
 
-function isSessionEvent(streamEvent: StreamEvent): boolean {
-  return streamEvent.eventType === 'session';
+function isSessionEvent(event: LaceEvent): boolean {
+  // Session events are the core LaceEvent types
+  return (
+    event.type &&
+    [
+      'USER_MESSAGE',
+      'AGENT_MESSAGE',
+      'AGENT_TOKEN',
+      'TOOL_CALL',
+      'TOOL_RESULT',
+      'TOOL_APPROVAL_REQUEST',
+      'TOOL_APPROVAL_RESPONSE',
+      'LOCAL_SYSTEM_MESSAGE',
+      'AGENT_STATE_CHANGE',
+      'COMPACTION_START',
+      'COMPACTION_COMPLETE',
+    ].includes(event.type)
+  );
 }
 
 export function useEventStream({
@@ -218,12 +224,12 @@ export function useEventStream({
     maxReconnectAttempts: 5,
   });
 
-  const [lastEvent, setLastEvent] = useState<StreamEvent>();
+  const [lastEvent, setLastEvent] = useState<LaceEvent>();
   const [sendCount, setSendCount] = useState(0);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleStreamEventRef = useRef<(event: StreamEvent) => void>(() => {});
+  const handleStreamEventRef = useRef<(event: LaceEvent) => void>(() => {});
   const autoReconnectRef = useRef(autoReconnect);
   const reconnectIntervalRef = useRef(reconnectInterval);
 
@@ -335,10 +341,9 @@ export function useEventStream({
       // Sort arrays to ensure consistent key even if order changes
       const sortedThreadIds = threadIds ? [...threadIds].sort() : [];
       return JSON.stringify({
-        projects: projectId ? [projectId] : [],
-        sessions: sessionId ? [sessionId] : [],
+        projectIds: projectId ? [projectId] : [],
+        sessionIds: sessionId ? [sessionId] : [],
         threads: sortedThreadIds,
-        global: includeGlobal,
       });
     },
     [projectId, sessionId, threadIds?.join(','), includeGlobal] // Use join for array stability
@@ -346,11 +351,9 @@ export function useEventStream({
 
   const subscription = useMemo(
     () => ({
-      projects: projectId ? [projectId] : [],
-      sessions: sessionId ? [sessionId] : [],
+      projectIds: projectId ? [projectId] : [],
+      sessionIds: sessionId ? [sessionId] : [],
       threads: threadIds || [],
-      global: includeGlobal,
-      eventTypes: ['session', 'task', 'project', 'global'] as StreamEventCategory[],
     }),
     [subscriptionKey] // Only recreate when actual content changes
   );
@@ -359,78 +362,71 @@ export function useEventStream({
   const buildQueryString = (sub: StreamSubscription): string => {
     const params = new URLSearchParams();
 
-    if (sub.projects?.length) params.set('projects', sub.projects.join(','));
-    if (sub.sessions?.length) params.set('sessions', sub.sessions.join(','));
+    if (sub.projectIds?.length) params.set('projects', sub.projectIds.join(','));
+    if (sub.sessionIds?.length) params.set('sessions', sub.sessionIds.join(','));
     if (sub.threads?.length) params.set('threads', sub.threads.join(','));
-    if (sub.global) params.set('global', 'true');
-    if (sub.eventTypes?.length) params.set('eventTypes', sub.eventTypes.join(','));
+    // global and eventTypes removed - LaceEvent handles all types
 
     return params.toString();
   };
 
   // Unified event handler that routes to specific callbacks
-  const handleStreamEvent = useCallback((streamEvent: StreamEvent) => {
+  const handleStreamEvent = useCallback((event: LaceEvent) => {
     try {
-      if (isSessionEvent(streamEvent)) {
-        // Parse and validate SessionEvent
-        const sessionEvent = parseSessionEvent(streamEvent.data);
-        const streamTimestamp = StreamEventTimestampSchema.parse(streamEvent.timestamp);
-
+      if (isSessionEvent(event)) {
         // Handle tool approval requests
-        if (sessionEvent.type === 'TOOL_APPROVAL_REQUEST') {
-          const approvalData = sessionEvent.data as ToolApprovalRequestData & {
-            toolCallId?: string;
-          };
-          const pendingApproval: PendingApproval = {
-            toolCallId: approvalData.toolCallId || approvalData.requestId,
-            toolCall: {
-              name: approvalData.toolName,
-              arguments: approvalData.input,
-            },
-            requestedAt: streamTimestamp, // Date object, SuperJSON handles serialization
-            requestData: approvalData,
-          };
-          callbackRefs.current.onApprovalRequest?.(pendingApproval);
+        if (event.type === 'TOOL_APPROVAL_REQUEST') {
+          const approvalData = event.data as { toolCallId: string };
+
+          // Pass minimal data - consumer will fetch full details or look up TOOL_CALL event
+          callbackRefs.current.onApprovalRequest?.({
+            toolCallId: approvalData.toolCallId,
+            requestedAt: event.timestamp || new Date(),
+          } as PendingApproval);
           return; // Don't process as regular session event
         }
 
         // Handle tool approval responses
-        if (sessionEvent.type === 'TOOL_APPROVAL_RESPONSE') {
-          const responseData = sessionEvent.data as { toolCallId: string };
+        if (event.type === 'TOOL_APPROVAL_RESPONSE') {
+          const responseData = event.data as { toolCallId: string };
           callbackRefs.current.onApprovalResponse?.(responseData.toolCallId);
           return; // Don't process as regular session event
         }
 
         // Route to specific session event handlers
-        callbackRefs.current.onSessionEvent?.(sessionEvent);
-        switch (sessionEvent.type) {
+        callbackRefs.current.onSessionEvent?.(event);
+        switch (event.type) {
           case 'USER_MESSAGE':
-            callbackRefs.current.onUserMessage?.(sessionEvent);
+            callbackRefs.current.onUserMessage?.(event);
             break;
           case 'AGENT_MESSAGE':
-            callbackRefs.current.onAgentMessage?.(sessionEvent);
+            callbackRefs.current.onAgentMessage?.(event);
             break;
           case 'AGENT_TOKEN':
-            callbackRefs.current.onAgentToken?.(sessionEvent);
+            callbackRefs.current.onAgentToken?.(event);
             break;
           case 'TOOL_CALL':
-            callbackRefs.current.onToolCall?.(sessionEvent);
+            callbackRefs.current.onToolCall?.(event);
             break;
           case 'TOOL_RESULT':
-            callbackRefs.current.onToolResult?.(sessionEvent);
+            callbackRefs.current.onToolResult?.(event);
             break;
           case 'LOCAL_SYSTEM_MESSAGE':
-            callbackRefs.current.onSystemMessage?.(sessionEvent);
+            callbackRefs.current.onSystemMessage?.(event);
             break;
           case 'AGENT_STATE_CHANGE':
-            if (sessionEvent.type === 'AGENT_STATE_CHANGE') {
-              const { agentId, from, to } = sessionEvent.data;
-              callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+            if (event.type === 'AGENT_STATE_CHANGE') {
+              const { agentId, from, to } = event.data;
+              // Only call the callback if all required fields are present
+              if (agentId && from !== undefined && to !== undefined) {
+                callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+              }
             }
             break;
         }
-      } else if (isTaskEvent(streamEvent)) {
-        const taskEvent = streamEvent.data as TaskEvent;
+      } else if (isTaskEvent(event)) {
+        // Extract task event data from LaceEvent
+        const taskEvent = event.data as TaskEvent;
         callbackRefs.current.onTaskEvent?.(taskEvent);
         switch (taskEvent.type) {
           case 'task:created':
@@ -446,8 +442,9 @@ export function useEventStream({
             callbackRefs.current.onTaskNoteAdded?.(taskEvent);
             break;
         }
-      } else if (isAgentEvent(streamEvent)) {
-        const agentEvent = streamEvent.data as unknown as AgentEvent;
+      } else if (isAgentEvent(event)) {
+        // Extract agent event data from LaceEvent
+        const agentEvent = event.data as unknown as AgentEvent;
         callbackRefs.current.onAgentEvent?.(agentEvent);
         switch (agentEvent.type) {
           case 'agent:spawned':
@@ -460,8 +457,9 @@ export function useEventStream({
             callbackRefs.current.onAgentStopped?.(agentEvent);
             break;
         }
-      } else if (isProjectEvent(streamEvent)) {
-        const projectEvent = streamEvent.data as ProjectEvent;
+      } else if (isProjectEvent(event)) {
+        // Extract project event data from LaceEvent
+        const projectEvent = event.data as ProjectEvent;
         callbackRefs.current.onProjectEvent?.(projectEvent);
         switch (projectEvent.type) {
           case 'project:created':
@@ -474,15 +472,16 @@ export function useEventStream({
             callbackRefs.current.onProjectDeleted?.(projectEvent);
             break;
         }
-      } else if (isGlobalEvent(streamEvent)) {
-        const globalEvent = streamEvent.data as GlobalEvent;
+      } else if (isGlobalEvent(event)) {
+        // Extract global event data from LaceEvent
+        const globalEvent = event.data as GlobalEvent;
         callbackRefs.current.onGlobalEvent?.(globalEvent);
         if (globalEvent.type === 'system:notification') {
           callbackRefs.current.onSystemNotification?.(globalEvent);
         }
       }
     } catch (error) {
-      console.error('[EVENT_STREAM] Failed to parse stream event:', error, streamEvent);
+      console.error('[EVENT_STREAM] Failed to parse stream event:', error, event);
       callbackRefs.current.onError?.(error as Error);
     }
   }, []);
@@ -529,16 +528,16 @@ export function useEventStream({
 
     eventSource.onmessage = (event) => {
       try {
-        const streamEvent = parse(event.data) as StreamEvent;
+        const threadEvent = parse(event.data) as LaceEvent;
 
-        setLastEvent(streamEvent);
+        setLastEvent(threadEvent);
         setSendCount((prev) => prev + 1);
         setConnection((prev) => ({
           ...prev,
-          lastEventId: streamEvent.id,
+          lastEventId: threadEvent.id,
         }));
 
-        handleStreamEventRef.current?.(streamEvent);
+        handleStreamEventRef.current?.(threadEvent);
       } catch (error) {
         console.error('[EVENT_STREAM] Failed to parse event:', error);
         callbackRefs.current.onError?.(error as Error);

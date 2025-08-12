@@ -108,13 +108,15 @@ describe('SessionService abort error filtering', () => {
 
     // Check that broadcast was called with the correct parameters
     expect(mockBroadcast).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId },
-      data: {
-        type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: 'lace_20250101_sess01.1',
-        timestamp: expect.any(Date),
-        data: { content: 'Agent error: Network connection failed' },
+      type: 'LOCAL_SYSTEM_MESSAGE',
+      threadId: 'lace_20250101_sess01.1',
+      timestamp: expect.any(Date),
+      data: 'Agent error: Network connection failed',
+      context: {
+        sessionId,
+        projectId: undefined,
+        agentId: undefined,
+        taskId: undefined,
       },
     });
   });

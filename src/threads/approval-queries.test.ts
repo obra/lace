@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { ThreadEvent } from '~/threads/types';
+import { LaceEvent } from '~/threads/types';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
@@ -32,7 +32,7 @@ describe('Approval Database Queries', () => {
   describe('pending approvals query', () => {
     it('should find pending approvals with no responses', () => {
       // Create TOOL_CALL event
-      const toolCallEvent: ThreadEvent = {
+      const toolCallEvent: LaceEvent = {
         id: 'event_1',
         threadId,
         type: 'TOOL_CALL',
@@ -42,7 +42,7 @@ describe('Approval Database Queries', () => {
       db.saveEvent(toolCallEvent);
 
       // Create TOOL_APPROVAL_REQUEST event
-      const requestEvent: ThreadEvent = {
+      const requestEvent: LaceEvent = {
         id: 'event_2',
         threadId,
         type: 'TOOL_APPROVAL_REQUEST',

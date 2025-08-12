@@ -63,7 +63,11 @@ describe('ThreadManager Caching Issues', () => {
     const delegateThreadId = delegateThread.id;
 
     // Try to add event immediately
-    const event = threadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello');
+    const event = threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: delegateThreadId,
+      data: 'Hello',
+    });
 
     // This should work
     expect(event).not.toBeNull();
@@ -81,11 +85,11 @@ describe('ThreadManager Caching Issues', () => {
     const newThreadManager = new ThreadManager();
 
     // Try to add event from the new instance
-    const event = newThreadManager.addEvent(
-      delegateThreadId,
-      'USER_MESSAGE',
-      'Hello from new manager'
-    );
+    const event = newThreadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: delegateThreadId,
+      data: 'Hello from new manager',
+    });
 
     // This should work
     expect(event).not.toBeNull();
@@ -109,8 +113,16 @@ describe('ThreadManager Caching Issues', () => {
     expect(retrieved2?.id).toBe(delegate2.id);
 
     // Should be able to add events to both
-    const event1 = threadManager.addEvent(delegate1.id, 'USER_MESSAGE', 'Hello 1');
-    const event2 = threadManager.addEvent(delegate2.id, 'USER_MESSAGE', 'Hello 2');
+    const event1 = threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: delegate1.id,
+      data: 'Hello 1',
+    });
+    const event2 = threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: delegate2.id,
+      data: 'Hello 2',
+    });
 
     expect(event1).not.toBeNull();
     expect(event2).not.toBeNull();
@@ -132,7 +144,11 @@ describe('ThreadManager Caching Issues', () => {
     expect(retrievedThread?.id).toBe(delegateThreadId);
 
     // Should be able to add event
-    const event = threadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello delegate');
+    const event = threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: delegateThreadId,
+      data: 'Hello delegate',
+    });
     expect(event).not.toBeNull();
     expect(event?.threadId).toBe(delegateThreadId);
   });

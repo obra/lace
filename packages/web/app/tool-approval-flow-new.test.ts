@@ -107,7 +107,11 @@ describe('Event-Based Tool Approval Integration', () => {
     };
 
     // Add TOOL_CALL event to thread
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
+    agent.threadManager.addEvent({
+      type: 'TOOL_CALL',
+      threadId: agent.threadId,
+      data: toolCall,
+    });
 
     // Get the approval callback that was set up
     const approvalCallback = agent.toolExecutor.getApprovalCallback();
@@ -150,10 +154,18 @@ describe('Event-Based Tool Approval Integration', () => {
     };
 
     // Add TOOL_CALL and existing TOOL_APPROVAL_RESPONSE events
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'existing-call-456',
-      decision: ApprovalDecision.ALLOW_SESSION,
+    agent.threadManager.addEvent({
+      type: 'TOOL_CALL',
+      threadId: agent.threadId,
+      data: toolCall,
+    });
+    agent.threadManager.addEvent({
+      type: 'TOOL_APPROVAL_RESPONSE',
+      threadId: agent.threadId,
+      data: {
+        toolCallId: 'existing-call-456',
+        decision: ApprovalDecision.ALLOW_SESSION,
+      },
     });
 
     // Get the approval callback
@@ -191,9 +203,17 @@ describe('Event-Based Tool Approval Integration', () => {
       arguments: { path: testFilePath },
     };
 
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: 'pending-call-789',
+    agent.threadManager.addEvent({
+      type: 'TOOL_CALL',
+      threadId: agent.threadId,
+      data: toolCall,
+    });
+    agent.threadManager.addEvent({
+      type: 'TOOL_APPROVAL_REQUEST',
+      threadId: agent.threadId,
+      data: {
+        toolCallId: 'pending-call-789',
+      },
     });
 
     // Query pending approvals using ThreadManager
@@ -204,9 +224,13 @@ describe('Event-Based Tool Approval Integration', () => {
     expect((pendingApprovals[0].toolCall as { name: string }).name).toBe('file-read');
 
     // Add approval response
-    agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId: 'pending-call-789',
-      decision: ApprovalDecision.DENY,
+    agent.threadManager.addEvent({
+      type: 'TOOL_APPROVAL_RESPONSE',
+      threadId: agent.threadId,
+      data: {
+        toolCallId: 'pending-call-789',
+        decision: ApprovalDecision.DENY,
+      },
     });
 
     // Now should have no pending approvals

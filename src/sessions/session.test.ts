@@ -479,6 +479,43 @@ describe('Session', () => {
         'Agent not found: lace_20250101_notfnd'
       );
     });
+
+    it('should create delegate thread automatically when threadId not provided', () => {
+      const session = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+      });
+
+      // Spawn without threadId - should create delegate thread
+      const agent = session.spawnAgent({
+        name: 'TestAgent',
+      });
+
+      // Should have created a delegate thread (sessionId.1, sessionId.2, etc)
+      expect(agent.threadId).toMatch(/\.\d+$/);
+      expect(agent.getThreadMetadata()?.name).toBe('TestAgent');
+
+      // Verify agent is tracked for cleanup
+      session.destroy();
+      // Agent should be stopped
+    });
+
+    it('should use provided threadId when specified', () => {
+      const session = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+      });
+
+      // Use session's threadId as the custom threadId (it already exists)
+      const customThreadId = session.getId();
+
+      const agent = session.spawnAgent({
+        threadId: customThreadId,
+        name: 'TestAgent',
+      });
+
+      expect(agent.threadId).toBe(customThreadId);
+    });
   });
 
   describe('destroy', () => {

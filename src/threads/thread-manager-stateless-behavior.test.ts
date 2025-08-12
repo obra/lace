@@ -9,7 +9,13 @@ describe('ThreadManager - Stateless Behavior', () => {
   it('should share data across instances via shared cache', () => {
     const manager1 = new ThreadManager();
     const threadId = manager1.createThread();
-    expectEventAdded(manager1.addEvent(threadId, 'USER_MESSAGE', 'Test message'));
+    expectEventAdded(
+      manager1.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'Test message',
+      })
+    );
 
     // Different instance should see same data
     const manager2 = new ThreadManager();
@@ -26,8 +32,20 @@ describe('ThreadManager - Stateless Behavior', () => {
     const threadId = manager1.createThread();
 
     // Both managers add events
-    expectEventAdded(manager1.addEvent(threadId, 'USER_MESSAGE', 'From manager 1'));
-    expectEventAdded(manager2.addEvent(threadId, 'USER_MESSAGE', 'From manager 2'));
+    expectEventAdded(
+      manager1.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'From manager 1',
+      })
+    );
+    expectEventAdded(
+      manager2.addEvent({
+        type: 'USER_MESSAGE',
+        threadId,
+        data: 'From manager 2',
+      })
+    );
 
     // Both should see all events
     const events1 = manager1.getEvents(threadId);
@@ -46,8 +64,20 @@ describe('ThreadManager - Stateless Behavior', () => {
     const thread2 = manager.createThread();
 
     // Add events to different threads
-    expectEventAdded(manager.addEvent(thread1, 'USER_MESSAGE', 'Message 1'));
-    expectEventAdded(manager.addEvent(thread2, 'USER_MESSAGE', 'Message 2'));
+    expectEventAdded(
+      manager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: thread1,
+        data: 'Message 1',
+      })
+    );
+    expectEventAdded(
+      manager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: thread2,
+        data: 'Message 2',
+      })
+    );
 
     // Each thread should have only its own events
     expect(manager.getEvents(thread1)).toHaveLength(1);

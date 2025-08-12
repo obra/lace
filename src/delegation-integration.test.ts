@@ -163,7 +163,11 @@ describe('Delegation Integration Tests', () => {
 
     // Create the delegate thread so it appears in queries
     threadManager.createThread(delegate1);
-    threadManager.addEvent(delegate1, 'AGENT_MESSAGE', 'test');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate1,
+      data: { content: 'test' },
+    });
 
     // Generate second delegate
     const delegate2 = threadManager.generateDelegateThreadId(mainThreadId);
@@ -171,7 +175,11 @@ describe('Delegation Integration Tests', () => {
 
     // Create and add event to delegate1 so it can have sub-delegates
     threadManager.createThread(delegate2);
-    threadManager.addEvent(delegate2, 'AGENT_MESSAGE', 'test');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate2,
+      data: { content: 'test' },
+    });
 
     // Generate sub-delegate from first delegate
     const subDelegate1 = threadManager.generateDelegateThreadId(delegate1);
@@ -190,9 +198,21 @@ describe('Delegation Integration Tests', () => {
     threadManager.createThread(delegate2);
 
     // Add events to each thread
-    threadManager.addEvent(mainThreadId, 'USER_MESSAGE', 'Main thread message');
-    threadManager.addEvent(delegate1, 'AGENT_MESSAGE', 'Delegate 1 message');
-    threadManager.addEvent(delegate2, 'AGENT_MESSAGE', 'Delegate 2 message');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: mainThreadId,
+      data: 'Main thread message',
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate1,
+      data: { content: 'Delegate 1 message' },
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate2,
+      data: { content: 'Delegate 2 message' },
+    });
 
     // Test multi-thread querying
     const allEvents = threadManager.getMainAndDelegateEvents(mainThreadId);
@@ -200,8 +220,8 @@ describe('Delegation Integration Tests', () => {
 
     // Events should be sorted chronologically
     expect(allEvents[0].data).toBe('Main thread message');
-    expect(allEvents[1].data).toBe('Delegate 1 message');
-    expect(allEvents[2].data).toBe('Delegate 2 message');
+    expect(allEvents[1].data).toEqual({ content: 'Delegate 1 message' });
+    expect(allEvents[2].data).toEqual({ content: 'Delegate 2 message' });
   });
 
   it('should handle nested delegations', () => {
@@ -228,12 +248,20 @@ describe('Delegation Integration Tests', () => {
     // Create first delegate
     const delegate1 = threadManager.generateDelegateThreadId(mainThread);
     threadManager.createThread(delegate1);
-    threadManager.addEvent(delegate1, 'AGENT_MESSAGE', 'test1');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate1,
+      data: { content: 'test1' },
+    });
 
     // Create second delegate
     const delegate2 = threadManager.generateDelegateThreadId(mainThread);
     threadManager.createThread(delegate2);
-    threadManager.addEvent(delegate2, 'AGENT_MESSAGE', 'test2');
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: delegate2,
+      data: { content: 'test2' },
+    });
 
     // Create third delegate
     const delegate3 = threadManager.generateDelegateThreadId(mainThread);
@@ -263,7 +291,7 @@ describe('Delegation Integration Tests', () => {
       title: 'Code Analysis',
       prompt: 'Analyze the project structure and identify key patterns',
       expected_response: 'Brief summary of project structure',
-      model: 'anthropic:claude-3-5-haiku-20241022',
+      model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
     };
 
     const result = await delegateToolInstance.execute(delegateInput, {

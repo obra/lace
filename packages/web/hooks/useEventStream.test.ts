@@ -4,8 +4,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
-import type { SessionEvent } from '@/types/web-sse';
-import type { StreamEvent } from '@/types/stream-events';
+import type { LaceEvent, AgentStateChangeData } from '@/types/core';
+// StreamEvent removed - using LaceEvent directly
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';
 
@@ -115,25 +115,21 @@ describe('useEventStream agent state change handling', () => {
     expect(result.current.connection.connected).toBe(true);
 
     // Act: Simulate receiving an AGENT_STATE_CHANGE event
-    const mockStreamEvent = {
+    const mockLaceEvent: LaceEvent = {
       id: 'event-123',
-      eventType: 'session',
+      type: 'AGENT_STATE_CHANGE',
+      threadId: asThreadId('lace_20250101_agent1'),
       timestamp: new Date(),
-      scope: { sessionId: 'test-session' },
       data: {
-        type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('lace_20250101_agent1'),
-        timestamp: new Date(),
-        data: {
-          agentId: asThreadId('lace_20250101_agent1'),
-          from: 'idle',
-          to: 'thinking',
-        },
-      } satisfies SessionEvent,
+        agentId: asThreadId('lace_20250101_agent1'),
+        from: 'idle',
+        to: 'thinking',
+      } as AgentStateChangeData,
+      context: { sessionId: 'test-session' },
     };
 
     await act(async () => {
-      mockEventSource.simulateMessage(mockStreamEvent);
+      mockEventSource.simulateMessage(mockLaceEvent);
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
@@ -171,21 +167,17 @@ describe('useEventStream agent state change handling', () => {
     ];
 
     for (const transition of transitions) {
-      const mockStreamEvent = {
+      const mockLaceEvent: LaceEvent = {
         id: `event-${Date.now()}`,
-        eventType: 'session',
+        type: 'AGENT_STATE_CHANGE',
+        threadId: transition.agentId,
         timestamp: new Date(),
-        scope: { sessionId: 'test-session' },
-        data: {
-          type: 'AGENT_STATE_CHANGE',
-          threadId: transition.agentId,
-          timestamp: new Date(),
-          data: transition,
-        } satisfies SessionEvent,
+        data: transition as AgentStateChangeData,
+        context: { sessionId: 'test-session' },
       };
 
       await act(async () => {
-        mockEventSource.simulateMessage(mockStreamEvent);
+        mockEventSource.simulateMessage(mockLaceEvent);
         await new Promise((resolve) => setTimeout(resolve, 10));
       });
     }
@@ -235,38 +227,30 @@ describe('useEventStream agent state change handling', () => {
     });
 
     // Act: Simulate state changes for different agents
-    const agent1Event = {
+    const agent1Event: LaceEvent = {
       id: 'event-1',
-      eventType: 'session',
+      type: 'AGENT_STATE_CHANGE',
+      threadId: asThreadId('lace_20250101_agent2'),
       timestamp: new Date(),
-      scope: { sessionId: 'test-session' },
       data: {
-        type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('lace_20250101_agent2'),
-        timestamp: new Date(),
-        data: {
-          agentId: asThreadId('lace_20250101_agent2'),
-          from: 'idle',
-          to: 'thinking',
-        },
-      } satisfies SessionEvent,
+        agentId: asThreadId('lace_20250101_agent2'),
+        from: 'idle',
+        to: 'thinking',
+      } as AgentStateChangeData,
+      context: { sessionId: 'test-session' },
     };
 
-    const agent2Event = {
+    const agent2Event: LaceEvent = {
       id: 'event-2',
-      eventType: 'session',
+      type: 'AGENT_STATE_CHANGE',
+      threadId: asThreadId('lace_20250101_agent3'),
       timestamp: new Date(),
-      scope: { sessionId: 'test-session' },
       data: {
-        type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('lace_20250101_agent3'),
-        timestamp: new Date(),
-        data: {
-          agentId: asThreadId('lace_20250101_agent3'),
-          from: 'idle',
-          to: 'streaming',
-        },
-      } satisfies SessionEvent,
+        agentId: asThreadId('lace_20250101_agent3'),
+        from: 'idle',
+        to: 'streaming',
+      } as AgentStateChangeData,
+      context: { sessionId: 'test-session' },
     };
 
     await act(async () => {
@@ -312,36 +296,36 @@ describe('useEventStream agent state change handling', () => {
     });
 
     // Act: Simulate receiving other types of session events
-    const otherEvents = [
+    const otherEvents: LaceEvent[] = [
       {
+        id: `event-${Date.now()}`,
         type: 'USER_MESSAGE',
-        data: { content: 'Hello' },
+        threadId: asThreadId('lace_20250101_agent1'),
+        timestamp: new Date(),
+        data: 'Hello',
+        context: { sessionId: 'test-session' },
       },
       {
+        id: `event-${Date.now() + 1}`,
         type: 'AGENT_MESSAGE',
+        threadId: asThreadId('lace_20250101_agent1'),
+        timestamp: new Date(),
         data: { content: 'Hi there' },
+        context: { sessionId: 'test-session' },
       },
       {
+        id: `event-${Date.now() + 2}`,
         type: 'TOOL_CALL',
+        threadId: asThreadId('lace_20250101_agent1'),
+        timestamp: new Date(),
         data: { id: 'call-123', name: 'test_tool', arguments: {} },
+        context: { sessionId: 'test-session' },
       },
     ];
 
-    for (const eventData of otherEvents) {
-      const mockStreamEvent = {
-        id: `event-${Date.now()}`,
-        eventType: 'session',
-        timestamp: new Date(),
-        scope: { sessionId: 'test-session' },
-        data: {
-          ...eventData,
-          threadId: asThreadId('lace_20250101_agent1'),
-          timestamp: new Date(),
-        } as SessionEvent,
-      };
-
+    for (const mockLaceEvent of otherEvents) {
       await act(async () => {
-        mockEventSource.simulateMessage(mockStreamEvent);
+        mockEventSource.simulateMessage(mockLaceEvent);
         await new Promise((resolve) => setTimeout(resolve, 10));
       });
     }
@@ -371,20 +355,16 @@ describe('useEventStream agent state change handling', () => {
     // Act: Simulate receiving a malformed AGENT_STATE_CHANGE event
     const malformedEvent = {
       id: 'event-123',
-      eventType: 'session',
+      type: 'AGENT_STATE_CHANGE',
+      threadId: asThreadId('lace_20250101_agent1'),
       timestamp: new Date(),
-      scope: { sessionId: 'test-session' },
       data: {
-        type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('lace_20250101_agent1'),
-        timestamp: new Date(),
-        data: {
-          // Missing required fields
-          agentId: asThreadId('lace_20250101_agent1'),
-          // from and to are missing
-        },
-      } as SessionEvent,
-    };
+        // Missing required fields
+        agentId: asThreadId('lace_20250101_agent1'),
+        // from and to are missing
+      } as any,
+      context: { sessionId: 'test-session' },
+    } as LaceEvent;
 
     await act(async () => {
       mockEventSource.simulateMessage(malformedEvent);
@@ -412,25 +392,21 @@ describe('useEventStream agent state change handling', () => {
     });
 
     // Act: Simulate receiving an AGENT_STATE_CHANGE event
-    const mockStreamEvent = {
+    const mockLaceEvent: LaceEvent = {
       id: 'event-123',
-      eventType: 'session',
+      type: 'AGENT_STATE_CHANGE',
+      threadId: asThreadId('lace_20250101_agent1'),
       timestamp: new Date(),
-      scope: { sessionId: 'test-session' },
       data: {
-        type: 'AGENT_STATE_CHANGE',
-        threadId: asThreadId('lace_20250101_agent1'),
-        timestamp: new Date(),
-        data: {
-          agentId: asThreadId('lace_20250101_agent1'),
-          from: 'idle',
-          to: 'thinking',
-        },
-      } satisfies SessionEvent,
+        agentId: asThreadId('lace_20250101_agent1'),
+        from: 'idle',
+        to: 'thinking',
+      } as AgentStateChangeData,
+      context: { sessionId: 'test-session' },
     };
 
     await act(async () => {
-      mockEventSource.simulateMessage(mockStreamEvent);
+      mockEventSource.simulateMessage(mockLaceEvent);
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
 

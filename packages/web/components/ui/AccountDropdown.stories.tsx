@@ -50,7 +50,7 @@ A comprehensive user account interface molecule that combines user avatar, profi
 - **Responsive Design**: Adapts to different screen sizes
 
 ### Integration Points
-- **useTokenUsage Hook**: Real-time usage and billing data
+- **useAgentTokenUsage Hook**: Real-time agent token usage without polling
 - **FontAwesome Icons**: Consistent iconography throughout
 - **DaisyUI Dropdown**: Accessible dropdown menu implementation
 - **Theme System**: Respects current theme settings

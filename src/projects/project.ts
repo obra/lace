@@ -10,7 +10,6 @@ import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
 import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
-import { TokenBudgetManager } from '~/token-management/token-budget-manager';
 import { getProcessTempDir } from '~/config/lace-dir';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
@@ -30,7 +29,6 @@ export class Project {
   private _id: string;
   private _promptTemplateManager: PromptTemplateManager;
   private _environmentManager: ProjectEnvironmentManager;
-  private _tokenBudgetManager: TokenBudgetManager | null = null;
 
   constructor(projectId: string) {
     this._id = projectId;
@@ -309,28 +307,6 @@ export class Project {
 
   getEnvironmentManager(): ProjectEnvironmentManager {
     return this._environmentManager;
-  }
-
-  getTokenBudgetManager(): TokenBudgetManager | null {
-    return this._tokenBudgetManager;
-  }
-
-  setTokenBudgetManager(manager: TokenBudgetManager | null): void {
-    this._tokenBudgetManager = manager;
-  }
-
-  createTokenBudgetManager(config: {
-    maxTokens: number;
-    warningThreshold?: number;
-    reserveTokens?: number;
-  }): TokenBudgetManager {
-    const manager = new TokenBudgetManager({
-      maxTokens: config.maxTokens,
-      warningThreshold: config.warningThreshold || 0.8,
-      reserveTokens: config.reserveTokens || 0,
-    });
-    this._tokenBudgetManager = manager;
-    return manager;
   }
 
   // Environment Variables Management

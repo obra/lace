@@ -10,24 +10,22 @@ import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
-  ThreadEvent,
-  ThreadEventType,
+  LaceEvent,
   ToolApprovalResponseData,
-  ToolApprovalRequestData,
   ThreadId,
   asThreadId,
+  isTransientEventType,
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
-import { TokenBudgetManager } from '~/token-management/token-budget-manager';
-import { TokenBudgetConfig, BudgetStatus, BudgetRecommendations } from '~/token-management/types';
+import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import type { CompactionData } from '~/threads/compaction/types';
+import { aggregateTokenUsage } from '~/threads/token-aggregation';
 
 export interface AgentConfig {
   provider: AIProvider;
@@ -35,12 +33,21 @@ export interface AgentConfig {
   threadManager: ThreadManager;
   threadId: string;
   tools: Tool[];
-  tokenBudget?: TokenBudgetConfig;
+  metadata?: {
+    name: string;
+    modelId: string;
+    providerInstanceId: string;
+  };
 }
 
 interface AgentMessageResult {
   content: string;
   toolCalls: ProviderToolCall[];
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export type AgentState = 'idle' | 'thinking' | 'tool_execution' | 'streaming';
@@ -72,7 +79,9 @@ export interface AgentEvents {
   agent_thinking_start: [];
   agent_token: [{ token: string }]; // Raw tokens including thinking block content during streaming
   agent_thinking_complete: [];
-  agent_response_complete: [{ content: string }]; // Clean content with thinking blocks removed
+  compaction_start: [{ auto: boolean }];
+  compaction_complete: [{ success: boolean }];
+  agent_response_complete: [{ content: string; tokenUsage?: CombinedTokenUsage }]; // Clean content with thinking blocks removed, plus token usage
   tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
   state_change: [{ from: AgentState; to: AgentState }];
@@ -81,9 +90,7 @@ export interface AgentEvents {
   token_usage_update: [
     { usage: { promptTokens: number; completionTokens: number; totalTokens: number } },
   ];
-  token_budget_warning: [
-    { message: string; usage: BudgetStatus; recommendations: BudgetRecommendations },
-  ];
+  token_budget_warning: [{ message: string; usage: ThreadTokenUsage }];
   // Turn tracking events
   turn_start: [{ turnId: string; userInput: string; metrics: CurrentTurnMetrics }];
   turn_progress: [{ metrics: CurrentTurnMetrics }];
@@ -102,7 +109,7 @@ export interface AgentEvents {
     },
   ];
   // Thread events proxied from ThreadManager
-  thread_event_added: [{ event: ThreadEvent; threadId: string }];
+  thread_event_added: [{ event: LaceEvent; threadId: string }];
   thread_state_changed: [{ threadId: string; eventType: string }];
   // Queue events
   queue_processing_start: [];
@@ -141,7 +148,6 @@ export class Agent extends EventEmitter {
     return this._isRunning;
   }
   private readonly _stopReasonHandler: StopReasonHandler;
-  private readonly _tokenBudgetManager: TokenBudgetManager | null;
   private _state: AgentState = 'idle';
   private _isRunning = false;
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
@@ -158,6 +164,12 @@ export class Agent extends EventEmitter {
   // Simple tool batch tracking
   private _pendingToolCount = 0;
 
+  // Auto-compaction configuration
+  private _autoCompactConfig = {
+    enabled: true,
+    threshold: 0.8, // Compact at 80% of limit
+  };
+
   constructor(config: AgentConfig) {
     super();
     this._provider = config.provider;
@@ -166,9 +178,13 @@ export class Agent extends EventEmitter {
     this._threadId = config.threadId;
     this._tools = config.tools;
     this._stopReasonHandler = new StopReasonHandler();
-    this._tokenBudgetManager = config.tokenBudget
-      ? new TokenBudgetManager(config.tokenBudget)
-      : null;
+
+    // Token budget management has been removed - using direct ThreadTokenUsage calculation
+
+    // Set metadata if provided
+    if (config.metadata) {
+      this.updateThreadMetadata(config.metadata);
+    }
 
     // Listen for tool approval responses
     this.on('thread_event_added', ({ event }) => {
@@ -215,6 +231,12 @@ export class Agent extends EventEmitter {
       currentState: this._state,
     });
 
+    // Check for slash commands
+    if (content.startsWith('/compact')) {
+      await this._handleCompactCommand();
+      return;
+    }
+
     // Start new turn tracking
     this._startTurnTracking(content);
 
@@ -223,7 +245,11 @@ export class Agent extends EventEmitter {
 
     if (content.trim()) {
       // Add user message to active thread
-      this._addEventAndEmit(this._threadId, 'USER_MESSAGE', content);
+      this._addEventAndEmit({
+        type: 'USER_MESSAGE',
+        threadId: this._threadId,
+        data: content,
+      });
     }
 
     try {
@@ -279,11 +305,22 @@ export class Agent extends EventEmitter {
     );
 
     if (!hasConversationStarted && !hasSystemPrompts) {
-      this._addEventAndEmit(this._threadId, 'SYSTEM_PROMPT', promptConfig.systemPrompt);
-      this._addEventAndEmit(this._threadId, 'USER_SYSTEM_PROMPT', promptConfig.userInstructions);
+      this._addEventAndEmit({
+        type: 'SYSTEM_PROMPT',
+        threadId: this._threadId,
+        data: promptConfig.systemPrompt,
+      });
+      this._addEventAndEmit({
+        type: 'USER_SYSTEM_PROMPT',
+        threadId: this._threadId,
+        data: promptConfig.userInstructions,
+      });
     }
 
     this._isRunning = true;
+
+    // Token budget initialization removed - using direct token tracking
+
     logger.info('AGENT: Started', {
       threadId: this._threadId,
       provider: this._provider.providerName,
@@ -293,6 +330,12 @@ export class Agent extends EventEmitter {
   stop(): void {
     this._isRunning = false;
     this._clearProgressTimer();
+
+    // Abort any in-progress processing
+    if (this._abortController) {
+      this.abort();
+    }
+
     this._setState('idle');
 
     // Clean up provider resources
@@ -304,7 +347,8 @@ export class Agent extends EventEmitter {
       });
     }
 
-    this._threadManager.close();
+    // DO NOT close ThreadManager - it's shared by all agents in the session!
+    // this._threadManager.close();  // This would affect ALL agents
     logger.info('AGENT: Stopped', { threadId: this._threadId });
   }
 
@@ -392,8 +436,7 @@ export class Agent extends EventEmitter {
 
   get model(): string {
     const metadata = this.getThreadMetadata();
-    // Check both 'model' and 'modelId' for backwards compatibility
-    return (metadata?.model as string) || (metadata?.modelId as string) || 'unknown-model';
+    return (metadata?.modelId as string) || 'unknown-model';
   }
 
   get status(): AgentState {
@@ -406,22 +449,9 @@ export class Agent extends EventEmitter {
       threadId: asThreadId(this._threadId),
       name: this.name,
       providerInstanceId: (metadata?.providerInstanceId as string) || 'unknown',
-      modelId: (metadata?.modelId as string) || (metadata?.model as string) || 'unknown',
+      modelId: (metadata?.modelId as string) || 'unknown',
       status: this.status,
     };
-  }
-
-  // Token budget management
-  getTokenBudgetStatus() {
-    return this._tokenBudgetManager?.getBudgetStatus() || null;
-  }
-
-  getTokenBudgetRecommendations() {
-    return this._tokenBudgetManager?.getRecommendations() || null;
-  }
-
-  resetTokenBudget(): void {
-    this._tokenBudgetManager?.reset();
   }
 
   // Thread message processing for agent-facing conversation
@@ -450,35 +480,28 @@ export class Agent extends EventEmitter {
         availableToolNames: this._tools.map((t) => t.name),
       });
 
-      // Check token budget before making request
-      if (this._tokenBudgetManager) {
-        const conversationTokens = this._tokenBudgetManager.estimateConversationTokens(
-          conversation.map((msg) => ({ role: msg.role, content: msg.content }))
-        );
+      // Check if we're approaching token limit (simple threshold check)
+      const tokenUsage = this.getTokenUsage();
+      if (tokenUsage.percentUsed >= 0.95) {
+        this.emit('token_budget_warning', {
+          message: 'Cannot make request: approaching token limit',
+          usage: tokenUsage,
+        });
 
-        if (!this._tokenBudgetManager.canMakeRequest(conversationTokens + 200)) {
-          const recommendations = this._tokenBudgetManager.getRecommendations();
-          this.emit('token_budget_warning', {
-            message: 'Cannot make request: would exceed token budget',
-            usage: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
+        logger.warn('Request blocked by token limit', {
+          threadId: this._threadId,
+          percentUsed: tokenUsage.percentUsed,
+          totalTokens: tokenUsage.totalTokens,
+          contextLimit: tokenUsage.contextLimit,
+        });
 
-          logger.warn('Request blocked by token budget', {
-            threadId: this._threadId,
-            estimatedTokens: conversationTokens + 200,
-            budgetStatus: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
-
-          this._setState('idle');
-          return;
-        }
+        this._setState('idle');
+        return;
       }
 
       // Debug logging for provider configuration
       const metadata = this.getThreadMetadata();
-      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      const modelId = metadata?.modelId as string;
 
       logger.info('🎯 AGENT PROVIDER CALL', {
         threadId: this._threadId,
@@ -486,7 +509,6 @@ export class Agent extends EventEmitter {
         providerName: this.providerInstance.providerName,
         modelId,
         metadataProvider: metadata?.provider as string,
-        metadataModel: metadata?.model as string,
         metadataModelId: metadata?.modelId as string,
         metadataProviderInstanceId: metadata?.providerInstanceId as string,
       });
@@ -574,16 +596,55 @@ export class Agent extends EventEmitter {
 
       // Process agent response
       if (response.content) {
-        // Store raw content (with thinking blocks) for model context
-        this._addEventAndEmit(this._threadId, 'AGENT_MESSAGE', response.content);
+        // Store raw content (with thinking blocks) for model context with token usage
+        const threadTokenUsage = this.getTokenUsage();
+
+        const agentMessageTokenUsage: CombinedTokenUsage = response.usage
+          ? {
+              // Current message token usage from provider
+              message: {
+                promptTokens: response.usage.promptTokens,
+                completionTokens: response.usage.completionTokens,
+                totalTokens: response.usage.totalTokens,
+              },
+              // Thread-level cumulative usage
+              thread: threadTokenUsage,
+            }
+          : {
+              // Fallback: no message usage data available
+              thread: threadTokenUsage,
+            };
+
+        logger.debug('Creating AGENT_MESSAGE event with token usage', {
+          threadId: this._threadId,
+          hasProviderUsage: !!response.usage,
+          providerUsage: response.usage,
+          threadTokenUsage,
+          finalTokenUsage: agentMessageTokenUsage,
+        });
+
+        this._addEventAndEmit({
+          type: 'AGENT_MESSAGE',
+          threadId: this._threadId,
+          data: {
+            content: response.content,
+            tokenUsage: agentMessageTokenUsage,
+          },
+        });
 
         // Extract clean content for UI display and events
         const cleanedContent = response.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
         // Emit thinking complete and response complete
         this.emit('agent_thinking_complete');
-        this.emit('agent_response_complete', { content: cleanedContent });
+        this.emit('agent_response_complete', {
+          content: cleanedContent,
+          tokenUsage: agentMessageTokenUsage,
+        });
       }
+
+      // Check if auto-compaction is needed after processing response
+      await this._checkAutoCompaction();
 
       // Handle tool calls
       if (response.toolCalls && response.toolCalls.length > 0) {
@@ -654,6 +715,12 @@ export class Agent extends EventEmitter {
     const tokenListener = ({ token }: { token: string }) => {
       // Simple pass-through - emit all tokens as received
       this.emit('agent_token', { token });
+      this._addEventAndEmit({
+        type: 'AGENT_TOKEN',
+        threadId: this._threadId,
+        data: { token },
+        transient: true,
+      });
     };
 
     const tokenUsageListener = ({
@@ -727,7 +794,7 @@ export class Agent extends EventEmitter {
     try {
       // Get model from thread metadata
       const metadata = this.getThreadMetadata();
-      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      const modelId = metadata?.modelId as string;
       if (!modelId) {
         throw new Error('No model configured for agent');
       }
@@ -742,19 +809,13 @@ export class Agent extends EventEmitter {
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
 
-      // Record token usage if budget tracking is enabled
-      if (this._tokenBudgetManager) {
-        this._tokenBudgetManager.recordUsage(processedResponse);
-
-        // Emit warning if approaching budget limits
-        const recommendations = this._tokenBudgetManager.getRecommendations();
-        if (recommendations.warningMessage) {
-          this.emit('token_budget_warning', {
-            message: recommendations.warningMessage,
-            usage: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
-        }
+      // Check for token warnings based on current usage
+      const tokenUsage = this.getTokenUsage();
+      if (tokenUsage.nearLimit) {
+        this.emit('token_budget_warning', {
+          message: `Token usage at ${(tokenUsage.percentUsed * 100).toFixed(1)}% of limit`,
+          usage: tokenUsage,
+        });
       }
 
       // Add provider response tokens to current turn metrics
@@ -768,6 +829,7 @@ export class Agent extends EventEmitter {
       return {
         content: processedResponse.content,
         toolCalls: processedResponse.toolCalls,
+        usage: processedResponse.usage,
       };
     } finally {
       // Clean up event listeners
@@ -826,7 +888,7 @@ export class Agent extends EventEmitter {
     try {
       // Get model from thread metadata
       const metadata = this.getThreadMetadata();
-      const modelId = (metadata?.modelId as string) || (metadata?.model as string);
+      const modelId = metadata?.modelId as string;
       if (!modelId) {
         throw new Error('No model configured for agent');
       }
@@ -836,19 +898,13 @@ export class Agent extends EventEmitter {
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
 
-      // Record token usage if budget tracking is enabled
-      if (this._tokenBudgetManager) {
-        this._tokenBudgetManager.recordUsage(processedResponse);
-
-        // Emit warning if approaching budget limits
-        const recommendations = this._tokenBudgetManager.getRecommendations();
-        if (recommendations.warningMessage) {
-          this.emit('token_budget_warning', {
-            message: recommendations.warningMessage,
-            usage: this._tokenBudgetManager.getBudgetStatus(),
-            recommendations,
-          });
-        }
+      // Check for token warnings based on current usage
+      const tokenUsage = this.getTokenUsage();
+      if (tokenUsage.nearLimit) {
+        this.emit('token_budget_warning', {
+          message: `Token usage at ${(tokenUsage.percentUsed * 100).toFixed(1)}% of limit`,
+          usage: tokenUsage,
+        });
       }
 
       // Add provider response tokens to current turn metrics
@@ -862,6 +918,7 @@ export class Agent extends EventEmitter {
       return {
         content: processedResponse.content,
         toolCalls: processedResponse.toolCalls,
+        usage: processedResponse.usage,
       };
     } finally {
       // Clean up retry event listeners
@@ -907,7 +964,11 @@ export class Agent extends EventEmitter {
       this._activeToolCalls.set(toolCall.id, toolCall);
 
       // Add tool call to thread
-      this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
+      this._addEventAndEmit({
+        type: 'TOOL_CALL',
+        threadId: this._threadId,
+        data: toolCall,
+      });
 
       // Emit tool call start event for UI
       this.emit('tool_call_start', {
@@ -928,7 +989,7 @@ export class Agent extends EventEmitter {
   /**
    * Handle TOOL_APPROVAL_RESPONSE events by executing the approved tool
    */
-  private _handleToolApprovalResponse(event: ThreadEvent): void {
+  private _handleToolApprovalResponse(event: LaceEvent): void {
     if (event.type !== 'TOOL_APPROVAL_RESPONSE') return;
 
     const responseData = event.data;
@@ -969,7 +1030,11 @@ export class Agent extends EventEmitter {
       };
       // Remove from active tools tracking (it was denied)
       this._activeToolCalls.delete(toolCallId);
-      this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+      this._addEventAndEmit({
+        type: 'TOOL_RESULT',
+        threadId: this._threadId,
+        data: errorResult,
+      });
     } else if (decision === ApprovalDecision.ALLOW_SESSION) {
       // Update session tool policy for session-wide approval
       void this._updateSessionToolPolicy(toolCall.name, 'allow');
@@ -1024,7 +1089,11 @@ export class Agent extends EventEmitter {
           this._activeToolCalls.delete(toolCall.id);
 
           // Add result and update tracking
-          this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+          this._addEventAndEmit({
+            type: 'TOOL_RESULT',
+            threadId: this._threadId,
+            data: result,
+          });
           this.emit('tool_call_complete', {
             toolName: toolCall.name,
             result,
@@ -1054,7 +1123,11 @@ export class Agent extends EventEmitter {
           this._activeToolCalls.delete(toolCall.id);
 
           // Add result and update tracking
-          this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+          this._addEventAndEmit({
+            type: 'TOOL_RESULT',
+            threadId: this._threadId,
+            data: result,
+          });
           this.emit('tool_call_complete', {
             toolName: toolCall.name,
             result,
@@ -1088,7 +1161,11 @@ export class Agent extends EventEmitter {
           status: 'failed',
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+        this._addEventAndEmit({
+          type: 'TOOL_RESULT',
+          threadId: this._threadId,
+          data: errorResult,
+        });
 
         // Emit tool call complete event for failed execution
         this.emit('tool_call_complete', {
@@ -1146,7 +1223,11 @@ export class Agent extends EventEmitter {
         this._activeToolCalls.delete(toolCall.id);
 
         // Add result and update tracking
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
+        this._addEventAndEmit({
+          type: 'TOOL_RESULT',
+          threadId: this._threadId,
+          data: result,
+        });
         this.emit('tool_call_complete', {
           toolName: toolCall.name,
           result,
@@ -1181,7 +1262,11 @@ export class Agent extends EventEmitter {
           status: 'failed',
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
         };
-        this._addEventAndEmit(this._threadId, 'TOOL_RESULT', errorResult);
+        this._addEventAndEmit({
+          type: 'TOOL_RESULT',
+          threadId: this._threadId,
+          data: errorResult,
+        });
 
         // Emit tool call complete event for failed execution
         this.emit('tool_call_complete', {
@@ -1271,6 +1356,16 @@ export class Agent extends EventEmitter {
     if (oldState !== newState) {
       this._state = newState;
       this.emit('state_change', { from: oldState, to: newState });
+      this._addEventAndEmit({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: this._threadId,
+        data: {
+          agentId: this._threadId as ThreadId,
+          from: oldState,
+          to: newState,
+        },
+        transient: true,
+      });
 
       logger.debug('AGENT: State change', {
         threadId: this._threadId,
@@ -1291,7 +1386,7 @@ export class Agent extends EventEmitter {
   }
 
   // Agent-specific conversation building (preserves thinking blocks for model context)
-  private _buildConversationFromEvents(events: ThreadEvent[]): ProviderMessage[] {
+  private _buildConversationFromEvents(events: LaceEvent[]): ProviderMessage[] {
     const messages: ProviderMessage[] = [];
 
     // Track which events have been processed to avoid duplicates
@@ -1340,7 +1435,7 @@ export class Agent extends EventEmitter {
         // IMPORTANT: Keep raw content (including thinking blocks) for model context
         const message: ProviderMessage = {
           role: 'assistant',
-          content: event.data,
+          content: event.data.content,
         };
 
         if (toolCallsForThisMessage.length > 0) {
@@ -1448,9 +1543,12 @@ export class Agent extends EventEmitter {
         event.type === 'SYSTEM_PROMPT' ||
         event.type === 'USER_SYSTEM_PROMPT' ||
         event.type === 'TOOL_APPROVAL_REQUEST' ||
-        event.type === 'TOOL_APPROVAL_RESPONSE'
+        event.type === 'TOOL_APPROVAL_RESPONSE' ||
+        event.type === 'COMPACTION' ||
+        // Check if it's a transient event type
+        isTransientEventType(event.type)
       ) {
-        // Skip UI-only events - they're not sent to model
+        // Skip UI-only events, compaction events, and transient events - they're not sent to model
         continue;
       } else {
         throw new Error(`Unknown event type: ${(event as { type: string }).type}`);
@@ -1525,6 +1623,50 @@ export class Agent extends EventEmitter {
     if (this._progressTimer) {
       clearInterval(this._progressTimer);
       this._progressTimer = null;
+    }
+  }
+
+  private async _checkAutoCompaction(): Promise<void> {
+    if (!this._autoCompactConfig.enabled) return;
+
+    // Check if we should compact based on token usage percentage
+    const tokenUsage = this.getTokenUsage();
+    if (tokenUsage.percentUsed >= this._autoCompactConfig.threshold) {
+      logger.info('Auto-compacting due to token limit approaching', {
+        threadId: this._threadId,
+        percentUsed: tokenUsage.percentUsed,
+        threshold: this._autoCompactConfig.threshold,
+      });
+
+      try {
+        // Emit compaction event
+        this.emit('compaction_start', { auto: true });
+        this._addEventAndEmit({
+          type: 'COMPACTION_START',
+          threadId: this._threadId,
+          data: { auto: true },
+          transient: true,
+        });
+
+        await this.compact(this._threadId);
+
+        // Emit compaction complete event
+        this.emit('compaction_complete', { success: true });
+        this._addEventAndEmit({
+          type: 'COMPACTION_COMPLETE',
+          threadId: this._threadId,
+          data: { success: true },
+          transient: true,
+        });
+      } catch (error) {
+        logger.error('Auto-compaction failed', {
+          threadId: this._threadId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Emit thinking complete even on failure
+        this.emit('agent_thinking_complete');
+        // Don't throw - continue conversation even if compaction fails
+      }
     }
   }
 
@@ -1700,7 +1842,7 @@ export class Agent extends EventEmitter {
 
   // Thread management API - proxies to ThreadManager
 
-  getThreadEvents(threadId?: string): ThreadEvent[] {
+  getLaceEvents(threadId?: string): LaceEvent[] {
     const targetThreadId = threadId || this._threadId;
     return this._threadManager.getEvents(targetThreadId);
   }
@@ -1716,7 +1858,8 @@ export class Agent extends EventEmitter {
   updateThreadMetadata(metadata: Record<string, unknown>): void {
     const thread = this._threadManager.getThread(this._threadId);
     if (thread) {
-      thread.metadata = { ...thread.metadata, ...metadata };
+      // Initialize metadata if it doesn't exist
+      thread.metadata = { ...(thread.metadata || {}), ...metadata };
       // Update timestamp
       thread.updatedAt = new Date();
       // Save through ThreadManager
@@ -1749,84 +1892,133 @@ export class Agent extends EventEmitter {
     return this._threadManager.getLatestThreadId();
   }
 
-  getMainAndDelegateEvents(mainThreadId: string): ThreadEvent[] {
+  getMainAndDelegateEvents(mainThreadId: string): LaceEvent[] {
     return this._threadManager.getMainAndDelegateEvents(mainThreadId);
   }
 
-  async compact(threadId: string): Promise<void> {
-    // TODO: Use a configurable strategy once registry is set up
-    await this._threadManager.compact(threadId, 'trim-tool-results');
-  }
-
-  createDelegateAgent(
-    toolExecutor: ToolExecutor,
-    provider?: AIProvider,
-    tokenBudget?: TokenBudgetConfig
-  ): Agent {
-    // Use this agent's thread ID as parent (not ThreadManager's current thread)
-    const parentThreadId = this._threadId;
-    if (!parentThreadId) {
-      throw new Error('No active thread for delegation');
-    }
-
-    // Create delegate thread
-    const delegateThread = this._threadManager.createDelegateThreadFor(parentThreadId);
-    const delegateThreadId = delegateThread.id;
-
-    // Create new Agent instance for the delegate thread
-    const delegateAgent = new Agent({
-      provider: provider || this._provider, // Use provided provider or fallback to parent's provider
-      toolExecutor,
-      threadManager: this._threadManager,
-      threadId: delegateThreadId,
-      tools: toolExecutor.getAllTools(),
-      tokenBudget,
+  private async _handleCompactCommand(): Promise<void> {
+    this.emit('compaction_start', { auto: false });
+    this._addEventAndEmit({
+      type: 'COMPACTION_START',
+      threadId: this._threadId,
+      data: { auto: false },
+      transient: true,
     });
 
-    return delegateAgent;
+    try {
+      // Use the AI-powered summarization strategy
+      await this.compact(this._threadId);
+
+      // Emit compaction complete event for UI updates
+      this.emit('compaction_complete', { success: true });
+      this._addEventAndEmit({
+        type: 'COMPACTION_COMPLETE',
+        threadId: this._threadId,
+        data: { success: true },
+        transient: true,
+      });
+    } catch (error) {
+      this.emit('compaction_complete', { success: false });
+      this._addEventAndEmit({
+        type: 'COMPACTION_COMPLETE',
+        threadId: this._threadId,
+        data: { success: false },
+        transient: true,
+      });
+      this.emit('error', {
+        error: error instanceof Error ? error : new Error('Compaction failed'),
+        context: { operation: 'compact', threadId: this._threadId },
+      });
+    }
+  }
+
+  async compact(threadId: string): Promise<void> {
+    // Use the AI-powered summarization strategy for better compaction
+    await this._threadManager.compact(threadId, 'summarize', {
+      agent: this,
+    });
+
+    // Compaction handling is now automatic through event sourcing
+    // TokenBudgetManager no longer needed for compaction tracking
+  }
+
+  /**
+   * Generate a summary using the current conversation context
+   * Used by compaction strategies to leverage the agent's full context
+   */
+  async generateSummary(promptContent: string, events: LaceEvent[]): Promise<string> {
+    // Build conversation messages from the provided events
+    const messages = this._buildConversationFromEvents(events);
+
+    // Add the summarization prompt
+    messages.push({
+      role: 'user',
+      content: promptContent,
+    });
+
+    // Get the summary using this agent's provider and model
+    const response = await this._provider.createResponse(
+      messages,
+      [], // No tools for summarization
+      this.model || 'default'
+    );
+
+    return response.content;
   }
 
   /**
    * Add a system message to the current thread
    * Used for error messages, notifications, etc.
    */
-  addSystemMessage(message: string, threadId?: string): ThreadEvent | null {
+  addSystemMessage(message: string, threadId?: string): LaceEvent | null {
     const targetThreadId = threadId || this._threadId;
     if (!targetThreadId) {
       throw new Error('No active thread available for system message');
     }
-    return this._addEventAndEmit(targetThreadId, 'LOCAL_SYSTEM_MESSAGE', message);
+    return this._addEventAndEmit({
+      type: 'LOCAL_SYSTEM_MESSAGE',
+      threadId: targetThreadId,
+      data: message,
+    });
+  }
+
+  /**
+   * Get context information for thread events
+   */
+  private _getEventContext(): { sessionId?: string; projectId?: string; agentId?: string } {
+    const thread = this._threadManager.getThread(this._threadId);
+    return {
+      sessionId: thread?.sessionId,
+      projectId: thread?.projectId,
+      agentId: this._threadId, // Use threadId as agentId since each agent has one thread
+    };
   }
 
   /**
    * Helper method to add event to ThreadManager and emit Agent event
    * This ensures Agent is the single event source for UI updates
    */
-  private _addEventAndEmit(
-    threadId: string,
-    type: string,
-    data:
-      | string
-      | ToolCall
-      | ToolResult
-      | CompactionData
-      | ToolApprovalRequestData
-      | ToolApprovalResponseData
-  ): ThreadEvent | null {
+  private _addEventAndEmit(event: LaceEvent): LaceEvent | null {
     // Safety check: only add events if thread exists
-    if (!this._threadManager.getThread(threadId)) {
+    if (event.threadId && !this._threadManager.getThread(event.threadId)) {
       logger.warn('AGENT: Skipping event addition - thread not found', {
-        threadId,
-        type,
+        threadId: event.threadId,
+        type: event.type,
       });
       return null;
     }
 
-    const event = this._threadManager.addEvent(threadId, type as ThreadEventType, data);
-    if (event) {
-      this.emit('thread_event_added', { event, threadId });
+    // Add context if not already provided
+    if (!event.context) {
+      event.context = this._getEventContext();
     }
-    return event;
+
+    const addedEvent = this._threadManager.addEvent(event);
+
+    if (addedEvent) {
+      this.emit('thread_event_added', { event: addedEvent, threadId: event.threadId });
+    }
+    return addedEvent;
   }
 
   // Message queue methods
@@ -1926,9 +2118,13 @@ export class Agent extends EventEmitter {
   handleApprovalResponse(toolCallId: string, decision: ApprovalDecision): void {
     // Create approval response event with atomic database transaction
     // The persistence layer handles duplicate detection idempotently
-    this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_RESPONSE', {
-      toolCallId,
-      decision,
+    this._addEventAndEmit({
+      type: 'TOOL_APPROVAL_RESPONSE',
+      threadId: this._threadId,
+      data: {
+        toolCallId,
+        decision,
+      },
     });
   }
 
@@ -1952,7 +2148,7 @@ export class Agent extends EventEmitter {
    * This provides controlled access to thread events for the web layer
    * without exposing ThreadManager directly.
    */
-  getToolCallEventById(toolCallId: string): ThreadEvent | undefined {
+  getToolCallEventById(toolCallId: string): LaceEvent | undefined {
     const events = this._threadManager.getEvents(this._threadId);
     return events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
   }
@@ -1963,7 +2159,7 @@ export class Agent extends EventEmitter {
    * Used by web layer components that need to look up tool calls
    * without direct ThreadManager access.
    */
-  getToolCallEventByIdForThread(toolCallId: string, threadId: string): ThreadEvent | undefined {
+  getToolCallEventByIdForThread(toolCallId: string, threadId: string): LaceEvent | undefined {
     const events = this._threadManager.getEvents(threadId);
     return events.find((e) => e.type === 'TOOL_CALL' && e.data.id === toolCallId);
   }
@@ -1993,9 +2189,13 @@ export class Agent extends EventEmitter {
    * Add an approval request event for the given tool call ID.
    * Used by EventApprovalCallback to create approval requests.
    */
-  addApprovalRequestEvent(toolCallId: string): ThreadEvent {
-    const event = this._addEventAndEmit(this._threadId, 'TOOL_APPROVAL_REQUEST', {
-      toolCallId: toolCallId,
+  addApprovalRequestEvent(toolCallId: string): LaceEvent {
+    const event = this._addEventAndEmit({
+      type: 'TOOL_APPROVAL_REQUEST',
+      threadId: this._threadId,
+      data: {
+        toolCallId: toolCallId,
+      },
     });
 
     if (!event) {
@@ -2221,15 +2421,8 @@ export class Agent extends EventEmitter {
       let sessionConfig: AgentConfiguration = {};
       let projectConfig: AgentConfiguration = {};
 
-      // Get session configuration if thread has a sessionId or parentSessionId
-      let sessionId = thread.sessionId;
-      if (!sessionId) {
-        // Check thread metadata for parentSessionId (for delegate agents)
-        const metadata = this._threadManager.getThread(this._threadId)?.metadata;
-        if (metadata && metadata.parentSessionId) {
-          sessionId = metadata.parentSessionId as string;
-        }
-      }
+      // Get session configuration if thread has a sessionId
+      const sessionId = thread.sessionId;
 
       if (sessionId) {
         const sessionData = Session.getSession(sessionId);
@@ -2355,6 +2548,38 @@ export class Agent extends EventEmitter {
   }
 
   /**
+   * Gets current token usage information for this agent
+   */
+  getTokenUsage(): ThreadTokenUsage {
+    const events = this._threadManager.getEvents(this._threadId);
+    const tokenSummary = aggregateTokenUsage(events);
+
+    // Get context limit from provider system
+    const modelId = this.model;
+    let contextLimit = 200000; // Default fallback
+
+    if (modelId && modelId !== 'unknown-model') {
+      const models = this._provider.getAvailableModels();
+      const modelInfo = models.find((m) => m.id === modelId);
+      if (modelInfo) {
+        contextLimit = modelInfo.contextWindow;
+      }
+    }
+
+    const percentUsed = contextLimit > 0 ? tokenSummary.totalTokens / contextLimit : 0;
+    const nearLimit = percentUsed >= 0.8;
+
+    return {
+      totalPromptTokens: tokenSummary.totalPromptTokens,
+      totalCompletionTokens: tokenSummary.totalCompletionTokens,
+      totalTokens: tokenSummary.totalTokens,
+      contextLimit,
+      percentUsed,
+      nearLimit,
+    };
+  }
+
+  /*
    * Check if a file has been read in the current conversation (since last compaction).
    * Used by file modification tools to prevent accidental overwrites.
    *

@@ -60,7 +60,7 @@ export default function SendButton({
 
   return (
     <button
-      type={isStreaming ? 'button' : 'submit'}
+      type="button"
       onClick={handleClick}
       disabled={isDisabled}
       className={`

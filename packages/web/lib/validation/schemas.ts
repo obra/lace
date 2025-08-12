@@ -27,12 +27,6 @@ export const MessageRequestSchema = z.object({
     .string()
     .min(1, 'Message cannot be empty')
     .max(10000, 'Message too long (max 10000 characters)'),
-  metadata: z
-    .object({
-      source: z.enum(['web', 'cli', 'api']).optional(),
-      timestamp: z.string().datetime().optional(),
-    })
-    .optional(),
 });
 
 // Task request schemas with proper validation
