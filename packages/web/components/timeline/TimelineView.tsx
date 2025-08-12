@@ -11,8 +11,8 @@ import { TypingIndicator } from './TypingIndicator';
 import { useProcessedEvents } from '@/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
-// Placeholder for when currentAgent is not available
-const STREAMING_THREAD_ID = asThreadId('streaming-placeholder');
+// Placeholder for when currentAgent is not available - use valid thread ID format
+const STREAMING_THREAD_ID = asThreadId('lace_19700101_stream');
 
 interface TimelineViewProps {
   events: LaceEvent[];
