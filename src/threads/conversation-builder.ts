@@ -5,6 +5,7 @@ import type { LaceEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
+import { hydrateEvents } from '~/threads/event-hydration';
 
 /**
  * Type guard to ensure data from COMPACTION events is valid CompactionData
@@ -147,7 +148,9 @@ export function buildWorkingConversation(events: LaceEvent[]): LaceEvent[] {
       workingEvents = events;
     } else {
       const compactionData = lastCompaction.data;
-      workingEvents = [...compactionData.compactedEvents, lastCompaction, ...eventsAfterCompaction];
+      // Ensure compacted events have proper Date timestamps (they may be strings from JSON serialization)
+      const hydratedCompactedEvents = hydrateEvents(compactionData.compactedEvents);
+      workingEvents = [...hydratedCompactedEvents, lastCompaction, ...eventsAfterCompaction];
     }
   }
 
