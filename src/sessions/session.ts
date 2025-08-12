@@ -504,6 +504,17 @@ export class Session {
       sessionId: sessionId,
     });
 
+    // 👈 NEW: Check registry first to avoid database query for active sessions
+    const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
+    if (existingSession && !existingSession._destroyed) {
+      logger.debug('Session.getSession() - found in registry, avoiding database query', {
+        sessionId: sessionId,
+      });
+      // Return cached SessionData from the existing session
+      return existingSession._sessionData;
+    }
+
+    // Fall back to database query for sessions not in memory
     const sessionData = getPersistence().loadSession(sessionId);
 
     logger.debug('Session.getSession() - database lookup result', {
