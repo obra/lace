@@ -63,6 +63,7 @@ export default function SendButton({
       type="button"
       onClick={handleClick}
       disabled={isDisabled}
+      data-testid={isStreaming ? 'stop-button' : 'send-button'}
       className={`
         ${getSizeClasses()} rounded-xl transition-colors
         ${
