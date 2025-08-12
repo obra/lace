@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { initConsoleForwarding } from './client';
+import { initConsoleForwarding, destroyConsoleForwarding } from './client';
 import { DEFAULT_CONFIG } from './index';
 
 /**
@@ -29,8 +29,8 @@ export function ConsoleForwardScript() {
     initConsoleForwarding(DEFAULT_CONFIG);
 
     return () => {
-      // Cleanup is automatically handled by the ConsoleForwarder class
-      // when the component unmounts or re-renders
+      // Explicit cleanup to restore original console methods
+      destroyConsoleForwarding();
     };
   }, []); // Empty dependency array - only run once on mount
 
