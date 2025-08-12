@@ -22,7 +22,6 @@ let Database: DatabaseConstructor;
 if (process?.versions?.bun) {
   // Running in Bun - use built-in SQLite
   // Use string concatenation to prevent webpack from analyzing this import
-  // @ts-expect-error - bun:sqlite is only available in Bun runtime
   const bunSqlite = (await import('bun' + ':sqlite')) as { Database: DatabaseConstructor };
   Database = bunSqlite.Database;
 } else {
