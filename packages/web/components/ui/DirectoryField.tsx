@@ -145,11 +145,11 @@ export function DirectoryField({
   
   // Load directories when dropdown opens
   useEffect(() => {
-    if (isDropdownOpen && !isLoading && directories.length === 0) {
+    if (isDropdownOpen && !isLoading && directories?.length === 0) {
       // Only fetch if we don't have any directories loaded
       void fetchDirectories('');
     }
-  }, [isDropdownOpen, isLoading, directories.length, fetchDirectories]);
+  }, [isDropdownOpen, isLoading, directories?.length, fetchDirectories]);
 
   // Add navigation handlers
   const handleNavigateToParent = useCallback(() => {
