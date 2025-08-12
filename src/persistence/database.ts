@@ -31,7 +31,14 @@ if (process?.versions?.bun) {
 }
 
 import { getLaceDbPath } from '~/config/lace-dir';
-import { Thread, ThreadEvent, ThreadEventType, ThreadId, AssigneeId } from '~/threads/types';
+import {
+  Thread,
+  LaceEvent,
+  LaceEventType,
+  ThreadId,
+  AssigneeId,
+  AgentMessageData,
+} from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
 import {
   Task,
@@ -43,23 +50,25 @@ import { logger } from '~/utils/logger';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
 
-// Helper function to create properly typed ThreadEvent from database row
-function createThreadEventFromDb(
+// Helper function to create properly typed LaceEvent from database row
+function createLaceEventFromDb(
   id: string,
   threadId: string,
-  type: ThreadEventType,
+  type: LaceEventType,
   timestamp: Date,
   data: unknown
-): ThreadEvent {
+): LaceEvent {
   const baseEvent = { id, threadId, timestamp };
 
   switch (type) {
     case 'USER_MESSAGE':
-    case 'AGENT_MESSAGE':
     case 'LOCAL_SYSTEM_MESSAGE':
     case 'SYSTEM_PROMPT':
     case 'USER_SYSTEM_PROMPT':
       return { ...baseEvent, type, data: data as string };
+
+    case 'AGENT_MESSAGE':
+      return { ...baseEvent, type, data: data as AgentMessageData };
 
     case 'TOOL_CALL':
       return { ...baseEvent, type, data: data as ToolCall };
@@ -75,6 +84,44 @@ function createThreadEventFromDb(
 
     case 'TOOL_APPROVAL_RESPONSE':
       return { ...baseEvent, type, data: data as ToolApprovalResponseData };
+
+    // Transient event types - these should never be persisted to database
+    // but we need cases for TypeScript exhaustive checking
+    case 'AGENT_TOKEN':
+      throw new Error('AGENT_TOKEN events are transient and should not be persisted');
+
+    case 'AGENT_STREAMING':
+      throw new Error('AGENT_STREAMING events are transient and should not be persisted');
+
+    case 'AGENT_STATE_CHANGE':
+      throw new Error('AGENT_STATE_CHANGE events are transient and should not be persisted');
+
+    case 'COMPACTION_START':
+      throw new Error('COMPACTION_START events are transient and should not be persisted');
+
+    case 'COMPACTION_COMPLETE':
+      throw new Error('COMPACTION_COMPLETE events are transient and should not be persisted');
+
+    // Task events are transient
+    case 'TASK_CREATED':
+    case 'TASK_UPDATED':
+    case 'TASK_DELETED':
+    case 'TASK_NOTE_ADDED':
+      throw new Error(`${type} events are transient and should not be persisted`);
+
+    // Agent lifecycle events are transient
+    case 'AGENT_SPAWNED':
+      throw new Error('AGENT_SPAWNED events are transient and should not be persisted');
+
+    // Project events are transient
+    case 'PROJECT_CREATED':
+    case 'PROJECT_UPDATED':
+    case 'PROJECT_DELETED':
+      throw new Error(`${type} events are transient and should not be persisted`);
+
+    // System events are transient
+    case 'SYSTEM_NOTIFICATION':
+      throw new Error('SYSTEM_NOTIFICATION events are transient and should not be persisted');
 
     default: {
       const _exhaustive: never = type;
@@ -365,7 +412,7 @@ export class DatabasePersistence {
     };
   }
 
-  saveEvent(event: ThreadEvent): boolean {
+  saveEvent(event: LaceEvent): boolean {
     if (this._closed || this._disabled || !this.db) return false;
 
     try {
@@ -378,7 +425,7 @@ export class DatabasePersistence {
         event.id,
         event.threadId,
         event.type,
-        event.timestamp.toISOString(),
+        event.timestamp!.toISOString(),
         JSON.stringify(event.data)
       );
 
@@ -413,7 +460,7 @@ export class DatabasePersistence {
     );
   }
 
-  loadEvents(threadId: string): ThreadEvent[] {
+  loadEvents(threadId: string): LaceEvent[] {
     if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
@@ -434,10 +481,10 @@ export class DatabasePersistence {
 
     return rows.map((row) => {
       try {
-        return createThreadEventFromDb(
+        return createLaceEventFromDb(
           row.id,
           row.thread_id,
-          row.type as ThreadEventType,
+          row.type as LaceEventType,
           new Date(row.timestamp),
           JSON.parse(row.data) as unknown
         );

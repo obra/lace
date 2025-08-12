@@ -54,14 +54,18 @@ export class Session {
   private _sessionId: ThreadId;
   private _agents: Map<ThreadId, Agent> = new Map();
   private _taskManager: TaskManager;
+  private _threadManager: ThreadManager;
   private _destroyed = false;
   private _projectId?: string;
   private _providerCache?: unknown; // Cached provider instance
 
-  constructor(sessionAgent: Agent, projectId?: string) {
+  constructor(sessionAgent: Agent, projectId?: string, threadManager?: ThreadManager) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
     this._projectId = projectId;
+
+    // Use provided ThreadManager or get it from the sessionAgent
+    this._threadManager = threadManager || sessionAgent.threadManager;
 
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
@@ -204,24 +208,28 @@ export class Session {
     });
     const providerInstance = Session.resolveProviderInstance(providerInstanceId);
 
-    // Create agent
+    // Agent will auto-initialize token budget based on model
+
+    // Create agent with token budget for auto-compaction
     const sessionAgent = new Agent({
       provider: providerInstance,
       toolExecutor,
       threadManager,
       threadId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: 'Lace', // Always name the coordinator agent "Lace"
+        providerInstanceId: providerInstanceId,
+        modelId: modelId,
+      },
     });
 
     // Mark the agent's thread as a session thread
     sessionAgent.updateThreadMetadata({
       isSession: true,
-      name: 'Lace', // Always name the coordinator agent "Lace"
-      providerInstanceId: providerInstanceId,
-      modelId: modelId,
     });
 
-    const session = new Session(sessionAgent, options.projectId);
+    const session = new Session(sessionAgent, options.projectId, threadManager);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -367,13 +375,18 @@ export class Session {
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor);
 
-    // Create agent with existing thread
+    // Create agent with existing thread - it will auto-initialize token budget based on model
     const sessionAgent = new Agent({
       provider: providerInstance,
       toolExecutor,
       threadManager,
       threadId: sessionId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: sessionData.name || 'Session Coordinator',
+        providerInstanceId: providerInstanceId,
+        modelId: modelId,
+      },
     });
 
     logger.debug(`Starting session agent for ${sessionId}`);
@@ -381,7 +394,7 @@ export class Session {
     await sessionAgent.start();
     logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
 
-    const session = new Session(sessionAgent, sessionData.projectId);
+    const session = new Session(sessionAgent, sessionData.projectId, threadManager);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -430,12 +443,18 @@ export class Session {
         );
 
         // Create agent for this delegate thread with its own provider
+        // Agent will auto-initialize token budget based on its model
         const delegateAgent = new Agent({
           provider: delegateProviderInstance,
           toolExecutor,
           threadManager,
           threadId: delegateThreadId,
           tools: toolExecutor.getAllTools(),
+          metadata: {
+            name: (delegateThread.metadata?.name as string) || 'Delegate Agent',
+            providerInstanceId: delegateProviderInstanceId,
+            modelId: delegateModelId,
+          },
         });
 
         // Start the delegate agent
@@ -698,7 +717,12 @@ export class Session {
     };
   }
 
-  spawnAgent(config: { name?: string; providerInstanceId?: string; modelId?: string }): Agent {
+  spawnAgent(config: {
+    threadId?: string;
+    name?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+  }): Agent {
     const agentName = config.name?.trim() || 'Lace';
 
     // If no provider instance specified, inherit from session
@@ -741,16 +765,23 @@ export class Session {
     const delegateTool = new DelegateTool();
     agentToolExecutor.registerTool('delegate', delegateTool);
 
-    // Create delegate agent with the appropriate provider instance and its own toolExecutor
-    const agent = this._sessionAgent.createDelegateAgent(agentToolExecutor, providerInstance);
+    // If no threadId provided, create a delegate thread
+    const targetThreadId =
+      config.threadId || this._threadManager.createDelegateThreadFor(this._sessionId).id;
 
-    // Store the agent metadata
-    agent.updateThreadMetadata({
-      name: agentName, // Use processed name
-      isAgent: true,
-      parentSessionId: this._sessionId,
-      providerInstanceId: targetProviderInstanceId,
-      modelId: targetModelId,
+    // Create agent with metadata
+    const agent = new Agent({
+      provider: providerInstance,
+      toolExecutor: agentToolExecutor,
+      threadManager: this._threadManager,
+      threadId: targetThreadId,
+      tools: agentToolExecutor.getAllTools(),
+      metadata: {
+        // Set metadata in constructor
+        name: agentName,
+        modelId: targetModelId,
+        providerInstanceId: targetProviderInstanceId,
+      },
     });
 
     // Set up approval callback for spawned agent (inherit from session agent)
@@ -863,18 +894,56 @@ export class Session {
       model: string,
       task
     ) => {
+      // The 'provider' parameter should now be a provider instance ID (e.g., 'pi_abc123')
+      // Validate that it's a real provider instance ID by trying to resolve it
+      let providerInstance: AIProvider;
+      try {
+        providerInstance = Session.resolveProviderInstance(provider);
+      } catch (error) {
+        throw new Error(
+          `Invalid provider instance ID: ${provider}. Task assignments must use provider instance IDs (e.g., 'new:pi_abc123/model-name'). Error: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
+      if (!providerInstance || !providerInstance.isConfigured()) {
+        throw new Error(
+          `Provider instance ${provider} is not properly configured. Task assignments must use valid provider instance IDs.`
+        );
+      }
+
       // Create a more descriptive agent name based on the task
       const agentName = `task-${task.id.split('_').pop()}`;
 
-      // Use the new spawnAgent method - convert old provider/model strings to provider instance
-      // TODO: Update TaskManager to use provider instances directly
+      // Spawn agent with the specified provider instance and model
       const agent = this.spawnAgent({
         name: agentName,
-        // For now, inherit from session since task system doesn't have provider instances yet
+        providerInstanceId: provider, // Use the provider instance ID directly
+        modelId: model, // Pass the model from the task assignment
+      });
+
+      // Start the agent to ensure token budget is initialized
+      await agent.start();
+
+      // Add error handler to prevent unhandled errors
+      agent.on('error', (error) => {
+        logger.error('Spawned agent error', {
+          threadId: agent.threadId,
+          task: task.id,
+          error: error.error || error,
+        });
       });
 
       // Send initial task notification to the new agent
-      await this.sendTaskNotification(agent, task);
+      try {
+        await this.sendTaskNotification(agent, task);
+      } catch (error) {
+        logger.error('Failed to send task notification to spawned agent', {
+          threadId: agent.threadId,
+          task: task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Don't fail task creation if agent fails - the task is still created
+      }
 
       return asThreadId(agent.threadId);
     };

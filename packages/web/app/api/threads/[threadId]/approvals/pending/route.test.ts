@@ -67,7 +67,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       clearActiveSessions: vi.fn(),
     };
 
-    mockGetSessionService.mockReturnValue(mockSessionService as unknown as ReturnType<typeof getSessionService>);
+    mockGetSessionService.mockReturnValue(
+      mockSessionService as unknown as ReturnType<typeof getSessionService>
+    );
   });
 
   afterEach(() => {

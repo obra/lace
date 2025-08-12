@@ -4,20 +4,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import type { StreamSubscription, StreamEventCategory } from '@/types/stream-events';
+import type { StreamSubscription } from '@/types/stream-events';
 
 // Parse subscription from query parameters
 function parseSubscription(request: NextRequest): StreamSubscription {
   const url = new URL(request.url);
 
-  const eventTypesParam = url.searchParams.get('eventTypes')?.split(',').filter(Boolean);
+  // Helper to parse comma-separated arrays, returning undefined for empty results
+  const parseArrayParam = (param: string | null): string[] | undefined => {
+    if (!param) return undefined;
+    const filtered = param.split(',').filter(Boolean);
+    return filtered.length > 0 ? filtered : undefined;
+  };
 
   return {
-    projects: url.searchParams.get('projects')?.split(',').filter(Boolean),
-    sessions: url.searchParams.get('sessions')?.split(',').filter(Boolean),
-    threads: url.searchParams.get('threads')?.split(',').filter(Boolean),
-    global: url.searchParams.get('global') === 'true',
-    eventTypes: eventTypesParam as StreamEventCategory[] | undefined,
+    projectIds: parseArrayParam(url.searchParams.get('projects')),
+    sessionIds: parseArrayParam(url.searchParams.get('sessions')),
+    threads: parseArrayParam(url.searchParams.get('threads')),
   };
 }
 

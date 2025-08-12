@@ -2,7 +2,21 @@
 // ABOUTME: Single source of truth for all core types, replaces multiple import files
 
 // Re-export all core types that web package needs
-export type { ThreadId, AssigneeId, ThreadEventType, ThreadEvent, Thread } from '~/threads/types';
+export type {
+  ThreadId,
+  AssigneeId,
+  LaceEventType,
+  LaceEvent,
+  Thread,
+  AgentMessageData,
+  AgentStateChangeData,
+} from '~/threads/types';
+
+export type {
+  MessageTokenUsage,
+  ThreadTokenUsage,
+  CombinedTokenUsage,
+} from '~/token-management/types';
 
 export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 
@@ -39,4 +53,7 @@ export {
   asAssigneeId,
   isAssigneeId,
   EVENT_TYPES,
+  isTransientEventType,
+  isInternalWorkflowEvent,
+  isConversationEvent,
 } from '~/threads/types';

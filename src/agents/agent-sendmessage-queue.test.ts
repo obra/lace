@@ -8,9 +8,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import type { ThreadEvent } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
 // Type helper for accessing private methods in tests
 type AgentWithPrivateMethods = {
@@ -50,7 +48,7 @@ describe('Agent sendMessage Queue Option', () => {
   let agent: Agent;
   let mockProvider: MockProvider;
   let mockToolExecutor: ToolExecutor;
-  let mockThreadManager: ThreadManager;
+  let threadManager: ThreadManager;
   let testThreadId: string;
 
   beforeEach(async () => {
@@ -63,44 +61,14 @@ describe('Agent sendMessage Queue Option', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ToolExecutor;
 
-    let eventCount = 0;
-
-    mockThreadManager = createMockThreadManager();
-    testThreadId = 'lace_20250723_abc123';
-
-    // Override addEvent to track event count for this specific test
-    mockThreadManager.addEvent = vi.fn((): ThreadEvent => {
-      eventCount++;
-      const event: ThreadEvent = {
-        id: `event_${eventCount}`,
-        threadId: testThreadId,
-        type: 'USER_MESSAGE' as const,
-        data: 'test',
-        timestamp: new Date(),
-      };
-      return event;
-    });
-
-    // Override getEvents to return events based on count for this specific test
-    mockThreadManager.getEvents = vi.fn((): ThreadEvent[] => {
-      const events: ThreadEvent[] = [];
-      for (let i = 0; i < eventCount; i++) {
-        const event: ThreadEvent = {
-          id: `event_${i + 1}`,
-          threadId: testThreadId,
-          type: 'USER_MESSAGE' as const,
-          data: 'test',
-          timestamp: new Date(),
-        };
-        events.push(event);
-      }
-      return events;
-    });
+    // Use real ThreadManager
+    threadManager = new ThreadManager();
+    testThreadId = threadManager.createThread();
 
     agent = new Agent({
       provider: mockProvider,
       toolExecutor: mockToolExecutor,
-      threadManager: mockThreadManager,
+      threadManager: threadManager,
       threadId: testThreadId,
       tools: [],
     });
@@ -116,44 +84,41 @@ describe('Agent sendMessage Queue Option', () => {
 
   afterEach(() => {
     // Test cleanup handled by setupCoreTest
+    threadManager.close();
   });
 
   describe('when agent is idle', () => {
     it('should process message immediately without queue option', async () => {
-      const initialThreadEvents = mockThreadManager.getEvents(testThreadId).length;
+      const initialLaceEvents = threadManager.getEvents(testThreadId).length;
 
       await agent.sendMessage('test message');
 
       // Verify message was processed immediately (added to thread)
-      const finalThreadEvents = mockThreadManager.getEvents(testThreadId).length;
-      expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
+      const finalLaceEvents = threadManager.getEvents(testThreadId).length;
+      expect(finalLaceEvents).toBeGreaterThan(initialLaceEvents);
 
-      // Verify the message appears in thread manager calls
-      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
-        .calls;
-      expect(
-        addEventCalls.some((call) => call[1] === 'USER_MESSAGE' && call[2] === 'test message')
-      ).toBe(true);
+      // Verify the message appears in thread events
+      const events = threadManager.getEvents(testThreadId);
+      const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
+      expect(userMessages.some((e) => e.data === 'test message')).toBe(true);
 
       const stats = agent.getQueueStats();
       expect(stats.queueLength).toBe(0);
     });
 
     it('should process message immediately even with queue option', async () => {
-      const initialThreadEvents = mockThreadManager.getEvents(testThreadId).length;
+      const initialLaceEvents = threadManager.getEvents(testThreadId).length;
 
       await agent.sendMessage('test message', { queue: true });
 
       // Verify message was processed immediately (added to thread) even with queue option
-      const finalThreadEvents = mockThreadManager.getEvents(testThreadId).length;
-      expect(finalThreadEvents).toBeGreaterThan(initialThreadEvents);
+      const finalLaceEvents = threadManager.getEvents(testThreadId).length;
+      expect(finalLaceEvents).toBeGreaterThan(initialLaceEvents);
 
-      // Verify the message appears in thread manager calls
-      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
-        .calls;
-      expect(
-        addEventCalls.some((call) => call[1] === 'USER_MESSAGE' && call[2] === 'test message')
-      ).toBe(true);
+      // Verify the message appears in thread events
+      const events = threadManager.getEvents(testThreadId);
+      const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
+      expect(userMessages.some((e) => e.data === 'test message')).toBe(true);
     });
   });
 
@@ -226,11 +191,10 @@ describe('Agent sendMessage Queue Option', () => {
       // Allow async processing
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Verify messages were processed by checking thread manager calls
-      const addEventCalls = (mockThreadManager.addEvent as unknown as ReturnType<typeof vi.fn>).mock
-        .calls;
-      const userMessageCalls = addEventCalls.filter((call) => call[1] === 'USER_MESSAGE');
-      const messageContents = userMessageCalls.map((call: unknown[]) => call[2] as string);
+      // Verify messages were processed by checking thread events
+      const events = threadManager.getEvents(testThreadId);
+      const userMessages = events.filter((e) => e.type === 'USER_MESSAGE');
+      const messageContents = userMessages.map((e) => e.data);
 
       expect(messageContents).toContain('message 1');
       expect(messageContents).toContain('message 2');

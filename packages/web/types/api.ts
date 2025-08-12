@@ -15,7 +15,7 @@ import { ApprovalDecision } from '@/types/core';
 
 // Import only the types we actually use
 import type { ToolApprovalRequestData } from './web-events';
-import type { SessionEvent } from './web-sse';
+import type { LaceEvent } from '@/types/core';
 
 // DESTROYED: API response types removed - using core types with superjson everywhere
 
@@ -97,7 +97,16 @@ export interface SessionResponse {
 }
 
 export interface AgentResponse {
-  agent: AgentInfo;
+  agent: AgentInfo & {
+    tokenUsage?: {
+      totalPromptTokens: number;
+      totalCompletionTokens: number;
+      totalTokens: number;
+      contextLimit: number;
+      percentUsed: number;
+      nearLimit: boolean;
+    };
+  };
 }
 
 export interface ProvidersResponse {
@@ -105,7 +114,7 @@ export interface ProvidersResponse {
 }
 
 export interface SessionHistoryResponse {
-  events: SessionEvent[];
+  events: LaceEvent[];
 }
 
 export interface PendingApprovalsResponse {

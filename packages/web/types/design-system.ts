@@ -10,38 +10,6 @@ export interface Message {
   timestamp: Date;
 }
 
-export interface StreamEvent {
-  type:
-    | 'connection'
-    | 'thinking_start'
-    | 'thinking_complete'
-    | 'token'
-    | 'tool_call_start'
-    | 'tool_call_complete'
-    | 'response_complete'
-    | 'ready_for_input'
-    | 'error';
-  content?: string;
-  error?: string;
-  timestamp?: string;
-  threadId?: string;
-  isNewThread?: boolean;
-  isNewAgent?: boolean;
-  provider?: string;
-  model?: string;
-  connectionKey?: string;
-  toolCall?: {
-    name: string;
-    id: string;
-    parameters?: unknown;
-  };
-  result?: {
-    success: boolean;
-    content: string;
-    isError: boolean;
-  };
-}
-
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;

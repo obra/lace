@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
+import { safeStringify } from '~/utils/safeStringify';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];
@@ -57,31 +58,42 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
   // Early return after hooks to satisfy React rules
   if (!currentApproval || !request) return null;
 
+  // Default values for missing fields (handle incomplete data)
+  const riskLevel = request.riskLevel || 'moderate';
+  const isReadOnly = request.isReadOnly ?? false;
+  const toolName = request.toolName || currentApproval.toolCall?.name || 'Unknown Tool';
+  const toolDescription = request.toolDescription;
+  const input = request.input || currentApproval.toolCall?.arguments;
+
   const getRiskClasses = () => {
-    switch (request.riskLevel) {
+    switch (riskLevel) {
       case 'safe':
         return 'text-success border-success';
       case 'moderate': 
         return 'text-warning border-warning';
       case 'destructive':
         return 'text-error border-error';
+      default:
+        return 'text-warning border-warning';
     }
   };
 
   const getRiskEmoji = () => {
-    switch (request.riskLevel) {
+    switch (riskLevel) {
       case 'safe':
         return '🟢';
       case 'moderate':
         return '🟡';
       case 'destructive':
         return '🔴';
+      default:
+        return '🟡';
     }
   };
 
   const formatInput = (input: unknown): string => {
     if (typeof input === 'string') return input;
-    return JSON.stringify(input, null, 2);
+    return safeStringify(input);
   };
 
   return (
@@ -93,11 +105,11 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
             <h2 className="text-xl font-bold text-base-content mb-1">Tool Approval Required</h2>
             <div className="flex items-center gap-2">
               <span className={`text-sm font-medium ${getRiskClasses().split(' ')[0]}`}>
-                {getRiskEmoji()} {request.riskLevel.toUpperCase()}
+                {getRiskEmoji()} {riskLevel.toUpperCase()}
               </span>
               <span className="text-base-content/40">•</span>
               <span className="text-sm text-base-content/60">
-                {request.isReadOnly ? 'Read-only' : 'May modify data'}
+                {isReadOnly ? 'Read-only' : 'May modify data'}
               </span>
             </div>
           </div>
@@ -113,12 +125,12 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
         <div className={`border-2 rounded-lg p-4 mb-4 ${getRiskClasses()}`}>
           <div className="flex items-start justify-between mb-2">
             <div>
-              <h3 className="text-lg font-mono font-semibold text-base-content">{request.toolName}</h3>
+              <h3 className="text-lg font-mono font-semibold text-base-content">{toolName}</h3>
               {request.toolAnnotations?.title && (
                 <div className="text-sm text-base-content/60 mt-1">{request.toolAnnotations.title}</div>
               )}
-              {request.toolDescription && (
-                <p className="text-sm text-base-content/80 mt-2">{request.toolDescription}</p>
+              {toolDescription && (
+                <p className="text-sm text-base-content/80 mt-2">{toolDescription}</p>
               )}
             </div>
           </div>
@@ -154,7 +166,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
         <div className="flex-1 overflow-auto mb-4 min-h-0">
           <h4 className="text-sm font-semibold text-base-content/70 mb-2">Parameters:</h4>
           <div className="mockup-code">
-            <pre className="text-sm"><code>{formatInput(request.input)}</code></pre>
+            <pre className="text-sm"><code>{formatInput(input)}</code></pre>
           </div>
         </div>
 
@@ -214,7 +226,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
             • <strong>Allow Once:</strong> Approve this specific call only
           </div>
           <div>
-            • <strong>Allow Session:</strong> Approve all calls to {request.toolName} this session
+            • <strong>Allow Session:</strong> Approve all calls to {toolName} this session
           </div>
           <div>
             • <strong>Deny:</strong> Reject this tool call

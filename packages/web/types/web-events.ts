@@ -1,51 +1,29 @@
 // ABOUTME: Shared event data structures used by both API and SSE streaming
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
-import type { ThreadEventType, ToolResult } from '@/types/core';
+import type {
+  LaceEventType,
+  ToolResult,
+  AgentMessageData,
+  ToolAnnotations,
+  ToolCall,
+} from '@/types/core';
 import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
 // Event data structures shared between API and SSE streaming
 // These are the payloads contained within events, not the events themselves
+// Note: USER_MESSAGE uses string directly, not an object wrapper
 
-export interface UserMessageEventData {
-  content: string;
-}
+// NOTE: AgentMessageData is imported from core, replaces AgentMessageEventData
 
-export interface AgentMessageEventData {
-  content: string;
-}
-
-export interface ToolCallEventData {
-  id: string;
-  name: string;
-  arguments?: unknown;
-}
+// NOTE: ToolCall is imported from core, replaces ToolCallEventData
 
 export interface ToolAggregatedEventData {
-  call: ToolCallEventData;
+  call: ToolCall;
   result?: ToolResult;
   toolName: string;
   toolId?: string;
   arguments?: unknown;
-}
-
-export interface LocalSystemMessageEventData {
-  content: string;
-}
-
-export interface SystemPromptEventData {
-  content: string;
-}
-
-export interface UserSystemPromptEventData {
-  content: string;
-}
-
-export interface CompactionEventData {
-  strategyId: string;
-  originalEventCount: number;
-  compactedEvents: unknown[]; // Array of events, kept as unknown for simplicity
-  metadata?: Record<string, unknown>;
 }
 
 // Tool approval data structure - shared between API and SSE
@@ -57,29 +35,8 @@ export interface ToolApprovalRequestData {
   isReadOnly: boolean;
   // Additional metadata for UI presentation
   toolDescription?: string;
-  toolAnnotations?: {
-    title?: string;
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    safeInternal?: boolean;
-  };
+  toolAnnotations?: ToolAnnotations;
   riskLevel: 'safe' | 'moderate' | 'destructive';
-}
-
-// Simple data for approval response events
-export interface ToolApprovalResponseData {
-  toolCallId: string;
-  decision: string;
-}
-
-// Streaming-specific event data
-export interface AgentTokenData {
-  token: string;
-}
-
-export interface AgentStreamingData {
-  content: string;
 }
 
 // Timeline UI data structures

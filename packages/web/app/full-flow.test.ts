@@ -95,7 +95,10 @@ describe('Full Conversation Flow', () => {
       'Test Project',
       '/test/path',
       'Test project for integration test',
-      {}
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     const projectId = project.getId();
 
@@ -191,7 +194,10 @@ describe('Full Conversation Flow', () => {
       'Multi-Agent Project',
       '/test/path',
       'Test project for multi-agent test',
-      {}
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     const projectId = project.getId();
     const createSessionRequest = new NextRequest(
@@ -271,13 +277,19 @@ describe('Full Conversation Flow', () => {
       'Session 1 Project',
       '/test/path1',
       'Test project for session 1',
-      {}
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     const project2 = Project.create(
       'Session 2 Project',
       '/test/path2',
       'Test project for session 2',
-      {}
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
     );
     const projectId1 = project1.getId();
     const projectId2 = project2.getId();

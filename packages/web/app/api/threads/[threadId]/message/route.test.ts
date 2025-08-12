@@ -23,9 +23,6 @@ import { parseResponse } from '@/lib/serialization';
 let consoleLogs: string[] = [];
 let originalConsoleError: typeof console.error;
 
-// Import real EventStreamManager for integration testing
-import { EventStreamManager } from '@/lib/event-stream-manager';
-
 describe('Thread Messaging API', () => {
   const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
@@ -157,9 +154,15 @@ describe('Thread Messaging API', () => {
     expect(response.status).toBe(400);
   });
 
-  it('should broadcast user message event via EventStreamManager', async () => {
-    // Set up spy on real EventStreamManager to verify broadcast is called
-    const broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
+  it('should not duplicate user messages in the database', async () => {
+    // Get the session to access thread manager for event verification
+    const session = await sessionService.getSession(asThreadId(realSessionId));
+    const agent = session!.getAgent(asThreadId(realThreadId));
+    const threadManager = agent!.threadManager;
+
+    // Get initial event count
+    const initialEvents = threadManager.getEvents(asThreadId(realThreadId));
+    const initialUserMessageCount = initialEvents.filter((e) => e.type === 'USER_MESSAGE').length;
 
     const request = new NextRequest('http://localhost/api/threads/test/message', {
       method: 'POST',
@@ -167,21 +170,36 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Test message' }),
     });
 
-    await POST(request, {
+    const response = await POST(request, {
       params: Promise.resolve({ threadId: realThreadId }),
     });
 
-    // Should broadcast the user message event
-    expect(broadcastSpy).toHaveBeenCalledWith({
-      eventType: 'session',
-      scope: { sessionId: realSessionId },
-      data: expect.objectContaining({
-        type: 'USER_MESSAGE',
-        data: { content: 'Test message' },
-      }),
-    });
+    expect(response.status).toBe(202);
 
-    broadcastSpy.mockRestore();
+    // Wait for message processing to complete by polling events
+    let finalEvents;
+    let attempts = 0;
+    const maxAttempts = 20; // Max 1 second wait
+
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      finalEvents = threadManager.getEvents(asThreadId(realThreadId));
+      attempts++;
+    } while (
+      finalEvents.filter((e) => e.type === 'USER_MESSAGE').length <= initialUserMessageCount &&
+      attempts < maxAttempts
+    );
+
+    // Verify exactly one USER_MESSAGE was added
+    const finalUserMessageCount = finalEvents.filter((e) => e.type === 'USER_MESSAGE').length;
+
+    expect(finalUserMessageCount).toBe(initialUserMessageCount + 1);
+
+    // Verify the message content is correct
+    const newUserMessages = finalEvents.filter(
+      (e) => e.type === 'USER_MESSAGE' && e.data === 'Test message'
+    );
+    expect(newUserMessages).toHaveLength(1);
   });
 
   it('should handle malformed JSON gracefully', async () => {

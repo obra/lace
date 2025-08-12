@@ -30,6 +30,16 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 
+// Type for AGENT_MESSAGE event data
+type AgentMessageData = {
+  content: string;
+  tokenUsage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+};
+
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
   private mockResponse: ProviderResponse;
@@ -226,6 +236,32 @@ describe('Enhanced Agent', () => {
       agent = createAgent();
       expect(agent.getCurrentState()).toBe('idle');
     });
+
+    it('should set thread metadata during construction', () => {
+      const testThreadId = threadManager.generateThreadId();
+      threadManager.createThread(testThreadId, session.getId());
+
+      const metadata = {
+        name: 'TestAgent',
+        modelId: 'test-model',
+        providerInstanceId: 'pi_test123',
+      };
+
+      agent = new Agent({
+        provider: mockProvider,
+        toolExecutor,
+        threadManager,
+        threadId: testThreadId,
+        tools: [],
+        metadata, // NEW parameter
+      });
+
+      // Verify metadata was set
+      const threadMetadata = agent.getThreadMetadata();
+      expect(threadMetadata?.name).toBe('TestAgent');
+      expect(threadMetadata?.modelId).toBe('test-model');
+      expect(threadMetadata?.providerInstanceId).toBe('pi_test123');
+    });
   });
 
   describe('start/stop lifecycle', () => {
@@ -264,7 +300,11 @@ describe('Enhanced Agent', () => {
       expect(agent.isRunning).toBe(false);
 
       // Add a user message first so there's conversation to continue
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Previous message');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Previous message',
+      });
 
       await agent.continueConversation();
 
@@ -315,7 +355,7 @@ describe('Enhanced Agent', () => {
       const events = threadManager.getEvents(agent.getThreadId());
       const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
       expect(agentMessages).toHaveLength(1);
-      expect(agentMessages[0].data).toBe('Test response');
+      expect((agentMessages[0].data as AgentMessageData).content).toBe('Test response');
     });
 
     it('should handle think blocks correctly', async () => {
@@ -335,14 +375,19 @@ describe('Enhanced Agent', () => {
       await agent.sendMessage('Test');
 
       expect(thinkingComplete).toHaveBeenCalled();
-      expect(responseComplete).toHaveBeenCalledWith({
-        content: 'This is my response',
-      });
+      expect(responseComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'This is my response',
+          tokenUsage: expect.any(Object) as Record<string, unknown>,
+        })
+      );
 
       // Verify that raw content (with thinking blocks) is stored in thread for model context
       const events = threadManager.getEvents(agent.getThreadId());
       const agentMessage = events.find((e) => e.type === 'AGENT_MESSAGE');
-      expect(agentMessage?.data).toBe('<think>I need to process this</think>This is my response');
+      expect((agentMessage?.data as AgentMessageData).content).toBe(
+        '<think>I need to process this</think>This is my response'
+      );
     });
 
     it('should handle empty message correctly', async () => {
@@ -731,9 +776,13 @@ describe('Enhanced Agent', () => {
 
       // Simulate approval response
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_1',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
 
@@ -778,9 +827,13 @@ describe('Enhanced Agent', () => {
 
       // Deny the tool
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: ApprovalDecision.DENY,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_1',
+            decision: ApprovalDecision.DENY,
+          },
         })
       );
 
@@ -884,9 +937,13 @@ describe('Enhanced Agent', () => {
 
       // Approve the tool
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_1',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_1',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -1112,9 +1169,13 @@ describe('Enhanced Agent', () => {
 
       // Now approve the tool
       const approvalEvent = expectEventAdded(
-        threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'call_approval',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'call_approval',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
       agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
@@ -1214,9 +1275,21 @@ describe('Enhanced Agent', () => {
     });
 
     it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(agent.getThreadId(), 'LOCAL_SYSTEM_MESSAGE', 'System info message');
-      threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', 'Response');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Test',
+      });
+      threadManager.addEvent({
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'System info message',
+      });
+      threadManager.addEvent({
+        type: 'AGENT_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: { content: 'Response' },
+      });
 
       const history = agent.buildThreadMessages();
 
@@ -1227,11 +1300,19 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle orphaned tool results gracefully', () => {
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(agent.getThreadId(), 'TOOL_RESULT', {
-        id: 'missing-call-id',
-        content: [{ type: 'text', text: 'Some output' }],
-        status: 'completed' as const,
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Test',
+      });
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId: agent.getThreadId(),
+        data: {
+          id: 'missing-call-id',
+          content: [{ type: 'text', text: 'Some output' }],
+          status: 'completed' as const,
+        },
       });
 
       // Should not throw error - orphaned tool results are now skipped
@@ -1242,11 +1323,19 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle orphaned tool calls gracefully', () => {
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Test');
-      threadManager.addEvent(agent.getThreadId(), 'TOOL_CALL', {
-        name: 'bash',
-        arguments: { command: 'ls' },
-        id: 'orphaned-call',
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Test',
+      });
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.getThreadId(),
+        data: {
+          name: 'bash',
+          arguments: { command: 'ls' },
+          id: 'orphaned-call',
+        },
       });
 
       // Should not throw error
@@ -1571,7 +1660,7 @@ describe('Enhanced Agent', () => {
         const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
-        expect(agentMessages[0].data).toBe(
+        expect((agentMessages[0].data as AgentMessageData).content).toBe(
           '<think>I need to think about this</think>Here is my response'
         );
 
@@ -1630,7 +1719,7 @@ describe('Enhanced Agent', () => {
         const events = threadManager.getEvents(agent.getThreadId());
         const agentMessages = events.filter((e) => e.type === 'AGENT_MESSAGE');
         expect(agentMessages).toHaveLength(1);
-        expect(agentMessages[0].data).toBe('Non-streaming response');
+        expect((agentMessages[0].data as AgentMessageData).content).toBe('Non-streaming response');
       });
     });
 
@@ -1690,15 +1779,23 @@ describe('Enhanced Agent', () => {
       agent = createAgent();
 
       // Manually add system prompt events to thread (simulating what Agent.start() does)
-      threadManager.addEvent(
-        agent.getThreadId(),
-        'SYSTEM_PROMPT',
-        'You are a helpful AI assistant.'
-      );
-      threadManager.addEvent(agent.getThreadId(), 'USER_SYSTEM_PROMPT', 'Always be concise.');
+      threadManager.addEvent({
+        type: 'SYSTEM_PROMPT',
+        threadId: agent.getThreadId(),
+        data: 'You are a helpful AI assistant.',
+      });
+      threadManager.addEvent({
+        type: 'USER_SYSTEM_PROMPT',
+        threadId: agent.getThreadId(),
+        data: 'Always be concise.',
+      });
 
       // Add a user message
-      threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello, how are you?');
+      threadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: agent.getThreadId(),
+        data: 'Hello, how are you?',
+      });
 
       // Mock the provider to capture what messages it receives
       const mockCreateResponse = vi.spyOn(mockProvider, 'createResponse');
@@ -1778,7 +1875,11 @@ describe('Enhanced Agent', () => {
         agent = createAgent();
 
         // Pre-populate thread with a user message (conversation started)
-        threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello there!');
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: agent.getThreadId(),
+          data: 'Hello there!',
+        });
 
         await agent.start();
 
@@ -1796,7 +1897,11 @@ describe('Enhanced Agent', () => {
         agent = createAgent();
 
         // Pre-populate thread with system prompts (e.g., from previous agent run)
-        threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'Existing system prompt');
+        threadManager.addEvent({
+          type: 'SYSTEM_PROMPT',
+          threadId: agent.getThreadId(),
+          data: 'Existing system prompt',
+        });
 
         await agent.start();
 
@@ -1832,11 +1937,11 @@ describe('Enhanced Agent', () => {
         agent = createAgent();
 
         // Pre-populate thread with some system messages but no conversation or prompts
-        threadManager.addEvent(
-          agent.getThreadId(),
-          'LOCAL_SYSTEM_MESSAGE',
-          'Connection established'
-        );
+        threadManager.addEvent({
+          type: 'LOCAL_SYSTEM_MESSAGE',
+          threadId: agent.getThreadId(),
+          data: 'Connection established',
+        });
 
         await agent.start();
 
@@ -1856,9 +1961,21 @@ describe('Enhanced Agent', () => {
         agent = createAgent();
 
         // Pre-populate with both conversation events and existing prompts
-        threadManager.addEvent(agent.getThreadId(), 'USER_MESSAGE', 'Hello');
-        threadManager.addEvent(agent.getThreadId(), 'AGENT_MESSAGE', 'Hi there!');
-        threadManager.addEvent(agent.getThreadId(), 'SYSTEM_PROMPT', 'You are helpful');
+        threadManager.addEvent({
+          type: 'USER_MESSAGE',
+          threadId: agent.getThreadId(),
+          data: 'Hello',
+        });
+        threadManager.addEvent({
+          type: 'AGENT_MESSAGE',
+          threadId: agent.getThreadId(),
+          data: { content: 'Hi there!' },
+        });
+        threadManager.addEvent({
+          type: 'SYSTEM_PROMPT',
+          threadId: agent.getThreadId(),
+          data: 'You are helpful',
+        });
 
         await agent.start();
 
@@ -1958,7 +2075,11 @@ describe('Enhanced Agent', () => {
         arguments: { command: 'echo "test"' },
       };
 
-      agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
+      agent.threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: toolCall,
+      });
 
       // Create existing tool result (simulates tool already executed)
       const existingResult: ToolResult = {
@@ -1967,16 +2088,24 @@ describe('Enhanced Agent', () => {
         status: 'completed' as const,
       };
 
-      agent.threadManager.addEvent(agent.threadId, 'TOOL_RESULT', existingResult);
+      agent.threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId: agent.threadId,
+        data: existingResult,
+      });
 
       // Mock tool executor to track calls
       const executeSpy = vi.spyOn(bashTool, 'execute');
 
       // Send approval response (this should be ignored due to duplicate guard)
       const approvalEvent = expectEventAdded(
-        agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'tool-123',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        agent.threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'tool-123',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
 
@@ -2014,7 +2143,11 @@ describe('Enhanced Agent', () => {
         arguments: { command: 'echo "success"' },
       };
 
-      agent.threadManager.addEvent(agent.threadId, 'TOOL_CALL', toolCall);
+      agent.threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: toolCall,
+      });
 
       // Mock tool executor to track calls
       const executeSpy = vi.spyOn(bashTool, 'execute');
@@ -2026,9 +2159,13 @@ describe('Enhanced Agent', () => {
 
       // Send approval response (this should execute normally)
       const approvalEvent = expectEventAdded(
-        agent.threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-          toolCallId: 'tool-456',
-          decision: ApprovalDecision.ALLOW_ONCE,
+        agent.threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'tool-456',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
         })
       );
 

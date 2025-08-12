@@ -48,7 +48,7 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   await page.waitForTimeout(2000);
 
   // Take screenshot before clicking for debugging
-  await page.screenshot({ path: 'debug-before-new-project.png' });
+  // await page.screenshot({ path: 'debug-before-new-project.png' });
 
   // Look for the New Project button with various selectors
   const newProjectButton = page
@@ -64,7 +64,7 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   await page.waitForTimeout(1000);
 
   // Take screenshot after clicking for debugging
-  await page.screenshot({ path: 'debug-after-new-project-click.png' });
+  // await page.screenshot({ path: 'debug-after-new-project-click.png' });
 
   // Wait for the project creation modal to appear
   await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
@@ -317,7 +317,7 @@ export async function createProjectWithProvider(
   await expect(createButton).toBeEnabled({ timeout: 10000 });
 
   // Take a screenshot before clicking to debug
-  await page.screenshot({ path: 'debug-before-create-project.png' });
+  // await page.screenshot({ path: 'debug-before-create-project.png' });
 
   await createButton.click();
 

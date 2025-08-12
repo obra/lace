@@ -135,7 +135,7 @@ Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, S
 - **Node.js** with ES modules
 - **SQLite** (better-sqlite3) for persistence
 - **React 19 + NextJS 15 ** for web interface
-- **Vitest ans Playwright** for testing
+- **Vitest and Playwright** for testing
 - **ESLint + Prettier** for code quality
 
 ## Tool Development
@@ -379,3 +379,4 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
 
  **Use type-aware tools**  
    Employ `ts-jest` or similar to verify snapshots and mocks against your TS types.
+- always use tempdir utilities when making temp dirs in tests

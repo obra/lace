@@ -2,6 +2,7 @@
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
 import type { Agent } from '~/agents/agent';
+import type { CombinedTokenUsage } from '~/token-management/types';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -66,6 +67,7 @@ export interface ToolResult {
   content: ContentBlock[];
   status: ToolResultStatus;
   metadata?: Record<string, unknown>; // For delegation threadId, etc.
+  tokenUsage?: CombinedTokenUsage;
 }
 
 // Helper to check if a result indicates an error

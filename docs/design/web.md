@@ -222,7 +222,7 @@ Central service managing sessions and agents:
 - Handles agent lifecycle and event routing
 - Manages tool approval flow
 - Maintains session/agent metadata (in-memory)
-- Creates delegates via `agent.createDelegateAgent()`
+- Creates delegates via `session.spawnAgent()`
 
 Key responsibilities:
 - Thread ID generation and management

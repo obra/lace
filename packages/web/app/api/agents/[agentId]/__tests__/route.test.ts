@@ -40,6 +40,7 @@ const mockAgent = {
     parentSessionId: validSessionId,
   }),
   updateThreadMetadata: vi.fn(),
+  getTokenUsage: vi.fn(),
 };
 
 // Mock session instance
@@ -93,6 +94,14 @@ describe('Agent API', () => {
       parentSessionId: 'lace_20241122_abc123',
     });
     mockAgent.getCurrentState.mockReturnValue('idle');
+    mockAgent.getTokenUsage.mockReturnValue({
+      totalPromptTokens: 0,
+      totalCompletionTokens: 0,
+      totalTokens: 0,
+      contextLimit: 200000,
+      percentUsed: 0,
+      nearLimit: false,
+    });
   });
 
   afterEach(async () => {
@@ -118,6 +127,14 @@ describe('Agent API', () => {
         providerInstanceId: '',
         modelId: 'claude-3-sonnet',
         status: 'idle',
+        tokenUsage: {
+          totalPromptTokens: 0,
+          totalCompletionTokens: 0,
+          totalTokens: 0,
+          contextLimit: 200000,
+          percentUsed: 0,
+          nearLimit: false,
+        },
         createdAt: expect.any(Date) as Date,
       });
       expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20241122_abc123');
@@ -178,6 +195,51 @@ describe('Agent API', () => {
       expect(data.error).toBe('Agent not found');
     });
 
+    it('should include token usage in agent response', async () => {
+      // Mock agent with token usage
+      const mockTokenUsage = {
+        totalPromptTokens: 1000,
+        totalCompletionTokens: 500,
+        totalTokens: 1500,
+        contextLimit: 200000,
+        percentUsed: 0.75,
+        nearLimit: false,
+      };
+
+      mockAgent.getTokenUsage = vi.fn().mockReturnValue(mockTokenUsage);
+
+      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
+      const response = await GET(request, {
+        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      });
+      const data = await parseResponse<AgentResponse>(response);
+
+      expect(response.status).toBe(200);
+      expect(data.agent.tokenUsage).toEqual(mockTokenUsage);
+      expect(mockAgent.getTokenUsage).toHaveBeenCalled();
+    });
+
+    it('should handle agents without token budget manager gracefully', async () => {
+      const defaultTokenUsage = {
+        totalPromptTokens: 0,
+        totalCompletionTokens: 0,
+        totalTokens: 0,
+        contextLimit: 200000,
+        percentUsed: 0,
+        nearLimit: false,
+      };
+
+      mockAgent.getTokenUsage = vi.fn().mockReturnValue(defaultTokenUsage);
+
+      const response = await GET(
+        new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1'),
+        { params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }) }
+      );
+      const data = await parseResponse<AgentResponse>(response);
+
+      expect(data.agent.tokenUsage).toEqual(defaultTokenUsage);
+    });
+
     it('should handle errors gracefully', async () => {
       mockSessionService.getSession.mockRejectedValue(new Error('Database error'));
 
@@ -229,6 +291,14 @@ describe('Agent API', () => {
         providerInstanceId: '',
         modelId: 'claude-3-sonnet',
         status: 'idle',
+        tokenUsage: {
+          totalPromptTokens: 0,
+          totalCompletionTokens: 0,
+          totalTokens: 0,
+          contextLimit: 200000,
+          percentUsed: 0,
+          nearLimit: false,
+        },
         createdAt: expect.any(Date) as Date,
       });
     });

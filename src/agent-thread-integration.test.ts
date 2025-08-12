@@ -34,9 +34,9 @@ describe('Agent Single Event Source Integration', () => {
 
   it('should emit Agent events for thread operations', async () => {
     // Set up listeners for Agent events only
-    const agentThreadEventAdded = vi.fn();
+    const agentLaceEventAdded = vi.fn();
 
-    agent.on('thread_event_added', agentThreadEventAdded);
+    agent.on('thread_event_added', agentLaceEventAdded);
 
     // Create thread
     threadManager.createThread('integration-test-thread');
@@ -54,7 +54,7 @@ describe('Agent Single Event Source Integration', () => {
     await agent.sendMessage('test message');
 
     // Verify Agent events are emitted
-    expect(agentThreadEventAdded).toHaveBeenCalledWith({
+    expect(agentLaceEventAdded).toHaveBeenCalledWith({
       event: expect.objectContaining({
         type: 'USER_MESSAGE',
         data: 'test message',
@@ -69,23 +69,31 @@ describe('Agent Single Event Source Integration', () => {
 
     // Test Agent API methods exist and work
     expect(agent.getThreadId()).toBe('integration-test-thread');
-    expect(typeof agent.getThreadEvents).toBe('function');
+    expect(typeof agent.getLaceEvents).toBe('function');
     expect(typeof agent.compact).toBe('function');
     expect(typeof agent.resumeOrCreateThread).toBe('function');
 
-    // Verify getThreadEvents returns events
-    const events = agent.getThreadEvents('integration-test-thread');
+    // Verify getLaceEvents returns events
+    const events = agent.getLaceEvents('integration-test-thread');
     expect(Array.isArray(events)).toBe(true);
   });
 
   it('should handle Agent API operations correctly', () => {
     // Create thread and add some events
     threadManager.createThread('api-test-thread');
-    threadManager.addEvent('api-test-thread', 'USER_MESSAGE', 'test message 1');
-    threadManager.addEvent('api-test-thread', 'AGENT_MESSAGE', 'test response 1');
+    threadManager.addEvent({
+      type: 'USER_MESSAGE',
+      threadId: 'api-test-thread',
+      data: 'test message 1',
+    });
+    threadManager.addEvent({
+      type: 'AGENT_MESSAGE',
+      threadId: 'api-test-thread',
+      data: { content: 'test response 1' },
+    });
 
-    // Test getThreadEvents
-    const events = agent.getThreadEvents('api-test-thread');
+    // Test getLaceEvents
+    const events = agent.getLaceEvents('api-test-thread');
     expect(events.length).toBe(2);
     expect(events[0].type).toBe('USER_MESSAGE');
     expect(events[1].type).toBe('AGENT_MESSAGE');

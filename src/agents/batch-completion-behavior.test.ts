@@ -195,9 +195,13 @@ describe('Tool Batch Completion Behavior', () => {
 
     // Approve the tool
     const responseEvent = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_fail',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_fail',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
 
@@ -243,9 +247,13 @@ describe('Tool Batch Completion Behavior', () => {
 
     // Deny the tool
     const responseEvent = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_deny',
-        decision: ApprovalDecision.DENY,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_deny',
+          decision: ApprovalDecision.DENY,
+        },
       })
     );
 
@@ -298,9 +306,13 @@ describe('Tool Batch Completion Behavior', () => {
     // Approve first tool (will succeed)
     configurableTool.setShouldFail(false);
     const response1Event = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_success',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_success',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
@@ -311,9 +323,13 @@ describe('Tool Batch Completion Behavior', () => {
     // Approve second tool (will fail)
     configurableTool.setShouldFail(true);
     const response2Event = expectEventAdded(
-      threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-        toolCallId: 'call_fail',
-        decision: ApprovalDecision.ALLOW_ONCE,
+      threadManager.addEvent({
+        type: 'TOOL_APPROVAL_RESPONSE',
+        threadId: agent.threadId,
+        data: {
+          toolCallId: 'call_fail',
+          decision: ApprovalDecision.ALLOW_ONCE,
+        },
       })
     );
     agent.emit('thread_event_added', { event: response2Event, threadId: agent.threadId });

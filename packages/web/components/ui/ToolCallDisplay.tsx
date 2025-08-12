@@ -18,7 +18,8 @@ import {
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
 import { getToolRenderer, type ToolResult } from '@/components/timeline/tool';
-import type { ToolAggregatedEventData, ToolCallEventData } from '@/types/web-events';
+import type { ToolAggregatedEventData } from '@/types/web-events';
+import type { ToolCall } from '@/types/core';
 
 interface ToolCallDisplayProps {
   tool: string;
@@ -173,7 +174,7 @@ export function ToolCallDisplay({
       id: metadata.toolId || '',
       name: tool,
       arguments: metadata.arguments
-    } as ToolCallEventData,
+    } as ToolCall,
     result,
     toolName: tool,
     toolId: metadata.toolId,

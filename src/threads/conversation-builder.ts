@@ -1,7 +1,7 @@
 // ABOUTME: Builds working conversations from thread events, handling compaction
 // ABOUTME: Core logic for reconstructing conversations post-compaction
 
-import type { ThreadEvent } from '~/threads/types';
+import type { LaceEvent } from '~/threads/types';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
@@ -57,9 +57,9 @@ function getStatusPriority(status: string): number {
  * When duplicates are found, the status with higher precedence is kept:
  * denied > failed > aborted > completed
  */
-function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
-  const toolResultsByCallId = new Map<string, { event: ThreadEvent; priority: number }>();
-  const deduplicatedEvents: ThreadEvent[] = [];
+function deduplicateToolResults(events: LaceEvent[]): LaceEvent[] {
+  const toolResultsByCallId = new Map<string, { event: LaceEvent; priority: number }>();
+  const deduplicatedEvents: LaceEvent[] = [];
 
   for (const event of events) {
     if (event.type === 'TOOL_RESULT') {
@@ -129,10 +129,10 @@ function deduplicateToolResults(events: ThreadEvent[]): ThreadEvent[] {
   return deduplicatedEvents;
 }
 
-export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
+export function buildWorkingConversation(events: LaceEvent[]): LaceEvent[] {
   const { lastCompaction, lastCompactionIndex } = findLastCompactionEventWithIndex(events);
 
-  let workingEvents: ThreadEvent[];
+  let workingEvents: LaceEvent[];
 
   if (!lastCompaction) {
     workingEvents = events; // No compaction yet, use all events
@@ -155,7 +155,7 @@ export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
   return deduplicateToolResults(workingEvents);
 }
 
-export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {
+export function buildCompleteHistory(events: LaceEvent[]): LaceEvent[] {
   // Return all events including compaction events (for debugging/inspection)
   return events;
 }
@@ -165,8 +165,8 @@ export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {
  * @param events Array of thread events
  * @returns Object with the last compaction event and its index, or null if no compaction found
  */
-function findLastCompactionEventWithIndex(events: ThreadEvent[]): {
-  lastCompaction: ThreadEvent | null;
+function findLastCompactionEventWithIndex(events: LaceEvent[]): {
+  lastCompaction: LaceEvent | null;
   lastCompactionIndex: number;
 } {
   // Single reverse pass to find the most recent COMPACTION event

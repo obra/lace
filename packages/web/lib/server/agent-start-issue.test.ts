@@ -125,7 +125,11 @@ describe('Agent Spawning and Thread Creation', () => {
 
     // Try to add event to persisted thread
     if (persistedThread) {
-      const _event = freshThreadManager.addEvent(delegateThreadId, 'USER_MESSAGE', 'Hello');
+      const _event = freshThreadManager.addEvent({
+        type: 'USER_MESSAGE',
+        threadId: delegateThreadId,
+        data: 'Hello',
+      });
       expect(_event).toBeDefined();
     }
   });
@@ -149,11 +153,11 @@ describe('Agent Spawning and Thread Creation', () => {
 
     // Now try to simulate what happens during agent operation
     // The agent tries to add an event to its thread
-    const _event = sessionThreadManager.addEvent(
-      delegateThreadId,
-      'SYSTEM_PROMPT',
-      'Starting agent...'
-    );
+    const _event = sessionThreadManager.addEvent({
+      type: 'SYSTEM_PROMPT',
+      threadId: delegateThreadId,
+      data: 'Starting agent...',
+    });
     expect(_event).toBeDefined();
   });
 

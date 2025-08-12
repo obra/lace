@@ -449,6 +449,7 @@ spawnAgent(name: string, provider?: string, model?: string): Agent {
   // ... rest of method unchanged, but use agentName instead of name
 
   // Update line 487-488:
+  // NOTE: This code is outdated - parentSessionId has been removed from metadata
   agent.updateThreadMetadata({
     name: agentName, // Use processed name
     isAgent: true,

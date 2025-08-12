@@ -242,10 +242,14 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // the database constraint still prevents duplicates
 
       // Create a tool call event
-      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-        id: 'constraint-test',
-        name: 'bash',
-        arguments: { command: 'echo "constraint"' },
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: {
+          id: 'constraint-test',
+          name: 'bash',
+          arguments: { command: 'echo "constraint"' },
+        },
       });
 
       // First approval should succeed
@@ -277,23 +281,35 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Manually create scenario with duplicate tool results (bypassing other defenses)
       const toolCallId = 'dedup-test';
 
-      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-        id: toolCallId,
-        name: 'bash',
-        arguments: { command: 'echo "dedup"' },
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: {
+          id: toolCallId,
+          name: 'bash',
+          arguments: { command: 'echo "dedup"' },
+        },
       });
 
       // Manually add duplicate TOOL_RESULT events (simulating race condition)
-      threadManager.addEvent(agent.threadId, 'TOOL_RESULT', {
-        id: toolCallId,
-        content: [{ type: 'text', text: 'Result 1' }],
-        status: 'completed' as const,
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId: agent.threadId,
+        data: {
+          id: toolCallId,
+          content: [{ type: 'text', text: 'Result 1' }],
+          status: 'completed' as const,
+        },
       });
 
-      threadManager.addEvent(agent.threadId, 'TOOL_RESULT', {
-        id: toolCallId,
-        content: [{ type: 'text', text: 'Result 2' }],
-        status: 'completed' as const,
+      threadManager.addEvent({
+        type: 'TOOL_RESULT',
+        threadId: agent.threadId,
+        data: {
+          id: toolCallId,
+          content: [{ type: 'text', text: 'Result 2' }],
+          status: 'completed' as const,
+        },
       });
 
       // Build conversation messages (what gets sent to AI provider)
@@ -312,10 +328,14 @@ describe('Tool Approval Race Condition Integration Tests', () => {
   describe('concurrent approval scenarios', () => {
     it('should handle rapid approval responses without data corruption', async () => {
       // Create tool call
-      threadManager.addEvent(agent.threadId, 'TOOL_CALL', {
-        id: 'rapid-test',
-        name: 'bash',
-        arguments: { command: 'echo "rapid"' },
+      threadManager.addEvent({
+        type: 'TOOL_CALL',
+        threadId: agent.threadId,
+        data: {
+          id: 'rapid-test',
+          name: 'bash',
+          arguments: { command: 'echo "rapid"' },
+        },
       });
 
       // Simulate extremely rapid concurrent approvals (like button mashing)

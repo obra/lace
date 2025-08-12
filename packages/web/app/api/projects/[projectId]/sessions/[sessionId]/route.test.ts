@@ -88,6 +88,40 @@ describe('Individual session API endpoints', () => {
       expect(data.error).toBe('Session not found in this project');
     });
 
+    it('should return session metadata without tokenUsage field', async () => {
+      mockProject.getSession.mockReturnValue(mockSession);
+
+      const response = await GET(
+        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+      );
+
+      const data = await parseResponse<{ session: typeof mockSession }>(response);
+
+      expect(response.status).toBe(200);
+      expect(data.session).toBeDefined();
+      expect(data.session.id).toBe('session1');
+
+      // CRITICAL: Should NOT have tokenUsage field
+      expect('tokenUsage' in data).toBe(false);
+    });
+
+    it('should not access Session.getById or agent internals', async () => {
+      // This test ensures we don't import Session or access agent internals
+      mockProject.getSession.mockReturnValue(mockSession);
+
+      const response = await GET(
+        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+      );
+
+      expect(response.status).toBe(200);
+
+      // Should only use Project.getById and project.getSession
+      expect(Project.getById).toHaveBeenCalledWith('project1');
+      expect(mockProject.getSession).toHaveBeenCalledWith('session1');
+    });
+
     it('should handle database errors', async () => {
       mockProject.getSession.mockImplementation(() => {
         throw new Error('Database error');

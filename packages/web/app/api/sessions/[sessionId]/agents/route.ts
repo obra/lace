@@ -9,6 +9,8 @@ import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { setupAgentApprovals } from '@/lib/server/agent-utils';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -95,7 +97,6 @@ export async function POST(
     });
 
     // Setup agent approvals using utility
-    const { setupAgentApprovals } = await import('@/lib/server/agent-utils');
     setupAgentApprovals(agent, sessionId);
 
     // CRITICAL: Setup event handlers for real-time updates
@@ -113,19 +114,20 @@ export async function POST(
     };
 
     // Test SSE broadcast
-    const { EventStreamManager } = await import('@/lib/event-stream-manager');
     const sseManager = EventStreamManager.getInstance();
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
       threadId: agentResponse.threadId as ThreadId,
       timestamp: new Date(),
-      data: { content: `Agent "${agentResponse.name}" spawned successfully` },
+      data: `Agent "${agentResponse.name}" spawned successfully`,
+      context: {
+        sessionId,
+        projectId: undefined,
+        taskId: undefined,
+        agentId: undefined,
+      },
     };
-    sseManager.broadcast({
-      eventType: 'session',
-      scope: { sessionId },
-      data: testEvent,
-    });
+    sseManager.broadcast(testEvent);
 
     return createSuperjsonResponse({ agent: agentResponse }, { status: 201 });
   } catch (error: unknown) {
