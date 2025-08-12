@@ -70,8 +70,9 @@ export const Disabled: Story = {
 export const WithValue: Story = {
   render: () => <DirectoryFieldWrapper 
     label="Pre-filled Directory"
-    value={'/home/user'}
+    value={'/mock/path'}
     helpText="Directory field with existing value"
+    prepopulatePath={false}
   />,
 };
 
@@ -88,5 +89,24 @@ export const WithoutLabel: Story = {
   render: () => <DirectoryFieldWrapper 
     placeholder="Select directory path"
     helpText="Directory field without label"
+    prepopulatePath={false}
+  />,
+};
+
+export const AutoPrepopulated: Story = {
+  render: () => <DirectoryFieldWrapper 
+    label="Auto-Prepopulated Directory"
+    placeholder="Loading home directory..."
+    helpText="Automatically loads and fills with home directory on mount"
+    prepopulatePath={true}
+  />,
+};
+
+export const FilteringDemo: Story = {
+  render: () => <DirectoryFieldWrapper 
+    label="Directory with Filtering"
+    value="git"
+    helpText="Try typing to filter directories (e.g., 'git', '.h', 'D')"
+    prepopulatePath={false}
   />,
 };

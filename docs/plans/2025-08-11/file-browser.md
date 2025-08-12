@@ -1664,6 +1664,67 @@ npx playwright test directory-browser.e2e.ts
 
 ---
 
+### Task 11: Fix UX issues and improve filtering
+
+**Files to modify:**
+- `packages/web/components/ui/DirectoryField.tsx`
+- `packages/web/components/ui/DirectoryField.stories.tsx`
+
+**Implementation updates:**
+1. **Prepopulate path**: Automatically fill input with home directory on mount
+2. **Improve title**: Show context like "inside /Users/jesse" in label
+3. **Filter dot files**: Hide dotfiles by default unless user types them
+4. **Constrain dropdown**: Ensure proper scrolling and container bounds
+5. **Better filtering**: Filter on what user types, not just autocomplete
+6. **Show more button**: Limited view with expansion option
+
+**Key Changes:**
+```typescript
+// Add prepopulatePath prop and initialization
+const [hasInitialized, setHasInitialized] = useState(false);
+
+// Enhanced filtering logic
+const getFilteredDirectories = useCallback((): DirectoryEntry[] => {
+  let filtered = directories;
+  
+  // Filter out dot files unless user is typing them
+  const searchTerm = value.split('/').pop()?.toLowerCase() || '';
+  if (!searchTerm.startsWith('.')) {
+    filtered = filtered.filter(dir => !dir.name.startsWith('.'));
+  }
+  
+  // Filter by what user typed
+  if (searchTerm.length > 0) {
+    filtered = filtered.filter(dir => 
+      dir.name.toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  return filtered;
+}, [value, directories]);
+
+// Show more functionality
+const [showMore, setShowMore] = useState(false);
+const getVisibleDirectories = () => {
+  const filtered = getFilteredDirectories();
+  return showMore ? filtered.slice(0, 100) : filtered.slice(0, 10);
+};
+```
+
+**Testing:**
+Updated all existing tests to work with new functionality.
+
+**How to test:**
+```bash
+cd packages/web
+npm run test:run components/ui/DirectoryField.test.tsx
+npm run lint
+```
+
+**Commit:** "feat: improve DirectoryField UX with better filtering and prepopulation" ✅ COMPLETED
+
+---
+
 ## Final Validation Checklist
 
 Before considering the implementation complete, verify:

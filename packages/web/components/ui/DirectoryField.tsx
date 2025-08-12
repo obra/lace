@@ -19,6 +19,7 @@ interface DirectoryFieldProps {
   error?: boolean;
   helpText?: string;
   className?: string;
+  prepopulatePath?: boolean;
 }
 
 export function DirectoryField({
@@ -30,7 +31,8 @@ export function DirectoryField({
   disabled = false,
   error = false,
   helpText,
-  className = ''
+  className = '',
+  prepopulatePath = true
 }: DirectoryFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -42,6 +44,8 @@ export function DirectoryField({
   const [breadcrumbPaths, setBreadcrumbPaths] = useState<string[]>([]);
   const [homeDirectory, setHomeDirectory] = useState<string>('');
   const [apiError, setApiError] = useState<string | null>(null);
+  const [showMore, setShowMore] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +67,7 @@ export function DirectoryField({
   const fetchDirectories = useCallback(async (path: string) => {
     setIsLoading(true);
     setApiError(null);
+    setShowMore(false);
     
     try {
       // If path is empty, don't include it in the query - let server use home directory
@@ -83,6 +88,7 @@ export function DirectoryField({
       // Use the breadcrumb information provided by the server
       setBreadcrumbs(data.breadcrumbNames);
       setBreadcrumbPaths(data.breadcrumbPaths);
+      
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Failed to load directories');
       setDirectories([]);
@@ -91,68 +97,103 @@ export function DirectoryField({
     }
   }, []);
 
-  // Add autocomplete logic
-  const getAutocompleteResults = useCallback((): DirectoryEntry[] => {
-    if (value.length < 3) return [];
+  // Get filtered directories based on current input
+  const getFilteredDirectories = useCallback((): DirectoryEntry[] => {
+    let filtered = directories;
     
-    // Extract parent path and search term
-    const lastSlash = value.lastIndexOf('/');
-    if (lastSlash === -1) return [];
+    // Extract the search term from the current input
+    // This should be the part after the last slash
+    const searchTerm = value.split('/').pop()?.toLowerCase() || '';
     
-    const parentPath = value.substring(0, lastSlash + 1);
-    const searchTerm = value.substring(lastSlash + 1).toLowerCase();
+    // Filter out dot files unless user is typing them
+    if (!searchTerm.startsWith('.')) {
+      filtered = filtered.filter(dir => !dir.name.startsWith('.'));
+    }
     
-    // Filter directories that start with search term
-    return directories.filter(dir => 
-      dir.name.toLowerCase().startsWith(searchTerm) &&
-      dir.path.startsWith(parentPath)
-    );
+    // If user has typed something and we're not just showing a complete path ending with /
+    if (searchTerm.length > 0 && !value.endsWith('/')) {
+      filtered = filtered.filter(dir => 
+        dir.name.toLowerCase().includes(searchTerm)
+      );
+    }
+    
+    return filtered;
   }, [value, directories]);
+  
+  // Get visible directories (limited by showMore state)
+  const getVisibleDirectories = useCallback((): DirectoryEntry[] => {
+    const filtered = getFilteredDirectories();
+    return showMore ? filtered.slice(0, 100) : filtered.slice(0, 10);
+  }, [getFilteredDirectories, showMore]);
 
-  // Add effect to load directories when dropdown opens
+  // Initialize with home directory on first load
+  useEffect(() => {
+    if (!hasInitialized) {
+      void fetchDirectories('');
+      setHasInitialized(true);
+    }
+  }, [hasInitialized, fetchDirectories]);
+  
+  // Separate effect for prepopulating path after initialization
+  useEffect(() => {
+    if (prepopulatePath && hasInitialized && !value && currentPath) {
+      // Add trailing slash for directory paths
+      const pathWithSlash = currentPath.endsWith('/') ? currentPath : currentPath + '/';
+      onChange(pathWithSlash);
+    }
+  }, [prepopulatePath, hasInitialized, value, currentPath, onChange]);
+  
+  // Load directories when dropdown opens
   useEffect(() => {
     if (isDropdownOpen && !isLoading && directories.length === 0) {
-      // Determine which directory to load
-      // If value has a path, try that directory, otherwise let server use home directory
-      const pathToLoad = value.length >= 3 && value.includes('/') ? 
-        value.substring(0, value.lastIndexOf('/') + 1) : 
-        ''; // Empty string lets server default to home directory
-      
-      void fetchDirectories(pathToLoad);
+      // Only fetch if we don't have any directories loaded
+      void fetchDirectories('');
     }
-  }, [isDropdownOpen, isLoading, directories.length, value, fetchDirectories]);
+  }, [isDropdownOpen, isLoading, directories.length, fetchDirectories]);
 
   // Add navigation handlers
-  const handleNavigateToParent = () => {
+  const handleNavigateToParent = useCallback(() => {
     if (parentPath) {
       void fetchDirectories(parentPath);
     }
-  };
+  }, [parentPath, fetchDirectories]);
 
-  const handleNavigateToHome = () => {
+  const handleNavigateToHome = useCallback(() => {
     void fetchDirectories(''); // Empty string = let server determine home directory
-  };
+  }, [fetchDirectories]);
 
-  const handleBreadcrumbClick = (index: number) => {
+  const handleBreadcrumbClick = useCallback((index: number) => {
     // Use the breadcrumb paths provided by the server for accurate navigation
     if (index < breadcrumbPaths.length) {
       void fetchDirectories(breadcrumbPaths[index]);
     }
-  };
+  }, [breadcrumbPaths, fetchDirectories]);
 
   // Add directory navigation (double-click to enter)
-  const handleDirectoryDoubleClick = (directory: DirectoryEntry) => {
-    void fetchDirectories(directory.path);
-  };
+  const handleDirectoryDoubleClick = useCallback((directory: DirectoryEntry) => {
+    const dirPath = directory.path.endsWith('/') ? directory.path : directory.path + '/';
+    void fetchDirectories(dirPath);
+    onChange(dirPath);
+  }, [fetchDirectories, onChange]);
 
   // Add directory selection handler
-  const handleDirectorySelect = (directory: DirectoryEntry) => {
-    onChange(directory.path);
-    setIsDropdownOpen(false);
-  };
+  const handleDirectorySelect = useCallback((directory: DirectoryEntry) => {
+    // Add trailing slash to make it clear it's a directory
+    const dirPath = directory.path.endsWith('/') ? directory.path : directory.path + '/';
+    onChange(dirPath);
+    // Navigate into this directory - load its contents immediately
+    void fetchDirectories(dirPath);
+    // Keep dropdown open to show the new directory contents
+  }, [onChange, fetchDirectories]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.value);
+    const newValue = e.target.value;
+    onChange(newValue);
+    
+    // If user has typed a complete directory path ending with '/', load that directory
+    if (newValue.endsWith('/') && newValue !== currentPath) {
+      void fetchDirectories(newValue);
+    }
   };
 
   const handleFocus = () => {
@@ -179,6 +220,11 @@ export function DirectoryField({
         <label className="label">
           <span className="label-text">
             {label}
+            {homeDirectory && (
+              <span className="text-sm text-base-content/60 ml-2">
+                inside {homeDirectory}
+              </span>
+            )}
             {required && <span className="text-error ml-1">*</span>}
           </span>
         </label>
@@ -206,13 +252,12 @@ export function DirectoryField({
             className="w-4 h-4 text-base-content/40" 
           />
         </div>
-      </div>
-      
-      {/* Dropdown */}
-      {isDropdownOpen && (
+        
+        {/* Dropdown */}
+        {isDropdownOpen && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+          className="absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden"
         >
           {isLoading ? (
             <div className="flex items-center justify-center p-4">
@@ -225,10 +270,10 @@ export function DirectoryField({
             </div>
           ) : (
             <>
-              {/* Navigation header */}
+              {/* Navigation header - removed breadcrumbs and home line */}
               {!isLoading && !apiError && (
                 <div className="sticky top-0 bg-base-200 border-b border-base-300 p-2">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2">
                     {parentPath && (
                       <button
                         onClick={handleNavigateToParent}
@@ -246,83 +291,64 @@ export function DirectoryField({
                       <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
                     </button>
                   </div>
-                  
-                  {/* Breadcrumbs */}
-                  <div className="flex items-center gap-1 text-xs">
-                    {breadcrumbs.map((crumb, index) => (
-                      <React.Fragment key={index}>
-                        {index > 0 && <span className="text-base-content/40">/</span>}
-                        <button
-                          onClick={() => handleBreadcrumbClick(index)}
-                          className="hover:text-primary hover:underline"
-                        >
-                          {crumb}
-                        </button>
-                      </React.Fragment>
+                </div>
+              )}
+              
+              {/* Show filtered directory contents */}
+              {getFilteredDirectories().length > 0 && (
+                <>
+                  <div className="max-h-96 overflow-y-auto">
+                    {getVisibleDirectories().map((dir) => (
+                      <button
+                        key={dir.path}
+                        onClick={() => handleDirectorySelect(dir)}
+                        onDoubleClick={() => handleDirectoryDoubleClick(dir)}
+                        className="w-full px-3 py-2 text-left hover:bg-base-200 flex items-center gap-2 group border-b border-base-200/50 last:border-b-0"
+                      >
+                        <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
+                        <span className="truncate flex-1">{dir.name}</span>
+                        <span className="text-xs text-base-content/40">
+                          {dir.permissions.canWrite ? 'R/W' : 'R/O'}
+                        </span>
+                      </button>
                     ))}
                   </div>
-                </div>
-              )}
-              
-              {/* Show autocomplete results if user has typed enough */}
-              {value.length >= 3 && getAutocompleteResults().length > 0 && (
-                <div className="border-b border-base-300">
-                  <div className="px-3 py-2 text-xs font-medium text-base-content/60 bg-base-200">
-                    Matching directories
-                  </div>
-                  {getAutocompleteResults().map((dir) => (
-                    <button
-                      key={dir.path}
-                      onClick={() => handleDirectorySelect(dir)}
-                      className="w-full px-3 py-2 text-left hover:bg-base-200 flex items-center gap-2"
-                    >
-                      <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                      <span className="truncate">{dir.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              
-              {/* Show current directory contents */}
-              {directories.length > 0 && (
-                <>
-                  <div className="px-3 py-2 text-xs font-medium text-base-content/60 bg-base-200">
-                    Browse: {currentPath}
-                  </div>
-                  {directories.slice(0, 10).map((dir) => (
-                    <button
-                      key={dir.path}
-                      onClick={() => handleDirectorySelect(dir)}
-                      onDoubleClick={() => handleDirectoryDoubleClick(dir)}
-                      className="w-full px-3 py-2 text-left hover:bg-base-200 flex items-center gap-2 group"
-                    >
-                      <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                      <span className="truncate flex-1">{dir.name}</span>
-                      <span className="text-xs text-base-content/40">
-                        {dir.permissions.canWrite ? 'Read/Write' : 'Read Only'}
-                      </span>
-                      <span className="text-xs text-base-content/20 group-hover:text-base-content/60">
-                        Double-click to browse
-                      </span>
-                    </button>
-                  ))}
-                  {directories.length > 10 && (
-                    <div className="px-3 py-2 text-xs text-base-content/60 text-center">
-                      ... and {directories.length - 10} more
+                  {getFilteredDirectories().length > 10 && !showMore && (
+                    <div className="border-t border-base-300 p-2">
+                      <button
+                        onClick={() => setShowMore(true)}
+                        className="w-full text-center text-sm text-primary hover:text-primary-focus py-1"
+                      >
+                        Show {Math.min(90, getFilteredDirectories().length - 10)} more directories
+                      </button>
+                    </div>
+                  )}
+                  {showMore && getFilteredDirectories().length > 10 && (
+                    <div className="border-t border-base-300 p-2">
+                      <button
+                        onClick={() => setShowMore(false)}
+                        className="w-full text-center text-sm text-base-content/60 hover:text-base-content py-1"
+                      >
+                        Show less
+                      </button>
                     </div>
                   )}
                 </>
               )}
               
-              {directories.length === 0 && !isLoading && !apiError && (
+              {getFilteredDirectories().length === 0 && !isLoading && !apiError && (
                 <div className="p-4 text-sm text-base-content/60 text-center">
-                  No directories found
+                  {value && value.split('/').pop() ? 
+                    `No directories found matching "${value.split('/').pop()}"` :
+                    'No directories found'
+                  }
                 </div>
               )}
             </>
           )}
         </div>
-      )}
+        )}
+      </div>
       
       {helpText && (
         <label className="label">

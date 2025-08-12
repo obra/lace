@@ -59,10 +59,21 @@ export async function GET(request: NextRequest) {
           canWrite = false;
         }
 
+        // Determine type: treat symlinks to directories as directories
+        let entryType: 'directory' | 'file';
+        if (dirent.isDirectory()) {
+          entryType = 'directory';
+        } else if (dirent.isSymbolicLink()) {
+          // For symlinks, check if they point to a directory
+          entryType = entryStats.isDirectory() ? 'directory' : 'file';
+        } else {
+          entryType = 'file';
+        }
+
         entries.push({
           name: dirent.name,
           path: entryPath,
-          type: dirent.isDirectory() ? 'directory' : 'file',
+          type: entryType,
           lastModified: entryStats.mtime,
           permissions: {
             canRead,
