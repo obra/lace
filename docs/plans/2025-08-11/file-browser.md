@@ -1660,7 +1660,7 @@ cd packages/web
 npx playwright test directory-browser.e2e.ts
 ```
 
-**Commit:** "test: add end-to-end tests for directory browser functionality"
+**Commit:** "test: add comprehensive E2E tests for directory browser functionality" ✅ COMPLETED
 
 ---
 
