@@ -32,7 +32,18 @@ const nextConfig: NextConfig = {
         fallback?: Record<string, string | boolean>;
         extensionAlias?: Record<string, string[]>;
       };
+      externals?: any;
     };
+
+    // Ignore all bun:* imports - they're only used in Bun runtime
+    if (isServer) {
+      webpackConfig.externals = [
+        ...(Array.isArray(webpackConfig.externals)
+          ? webpackConfig.externals
+          : [webpackConfig.externals].filter(Boolean)),
+        /^bun:/,
+      ];
+    }
 
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
