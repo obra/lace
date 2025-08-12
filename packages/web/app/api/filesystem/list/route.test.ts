@@ -1,0 +1,111 @@
+// ABOUTME: Tests for filesystem API endpoint with real filesystem operations
+// ABOUTME: Validates security restrictions, error handling, and directory listing functionality
+
+import { describe, it, expect } from 'vitest';
+import { GET } from './route';
+import { NextRequest } from 'next/server';
+import { homedir } from 'os';
+import { join } from 'path';
+import { parseResponse } from '@/lib/serialization';
+import type { ListDirectoryResponse } from '@/types/filesystem';
+
+describe('/api/filesystem/list', () => {
+  it('should list home directory contents', async () => {
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    const data = await parseResponse<ListDirectoryResponse>(response);
+    expect(data.currentPath).toBe(homedir());
+    expect(data.parentPath).toBeNull();
+    expect(Array.isArray(data.entries)).toBe(true);
+  });
+
+  it('should reject paths outside home directory', async () => {
+    const request = new NextRequest('http://localhost/api/filesystem/list?path=/etc');
+    const response = await GET(request);
+
+    expect(response.status).toBe(403);
+    const data = await parseResponse<{ error: string; code: string }>(response);
+    expect(data.code).toBe('PATH_ACCESS_DENIED');
+  });
+
+  it('should handle non-existent directories', async () => {
+    const invalidPath = join(homedir(), 'definitely-does-not-exist-12345');
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${invalidPath}`);
+    const response = await GET(request);
+
+    expect(response.status).toBe(404);
+    const data = await parseResponse<{ error: string; code: string }>(response);
+    expect(data.code).toBe('DIRECTORY_NOT_FOUND');
+  });
+
+  it('should only return directories', async () => {
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const response = await GET(request);
+
+    const data = await parseResponse<ListDirectoryResponse>(response);
+    for (const entry of data.entries) {
+      expect(entry.type).toBe('directory');
+    }
+  });
+
+  it('should default to home directory when no path provided', async () => {
+    const request = new NextRequest('http://localhost/api/filesystem/list');
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    const data = await parseResponse<ListDirectoryResponse>(response);
+    expect(data.currentPath).toBe(homedir());
+  });
+
+  it('should handle path traversal attempts', async () => {
+    const maliciousPath = join(homedir(), '../../../etc');
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${maliciousPath}`);
+    const response = await GET(request);
+
+    expect(response.status).toBe(403);
+    const data = await parseResponse<{ error: string; code: string }>(response);
+    expect(data.code).toBe('PATH_ACCESS_DENIED');
+  });
+
+  it('should include permission information in entries', async () => {
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const response = await GET(request);
+
+    const data = await parseResponse<ListDirectoryResponse>(response);
+    if (data.entries.length > 0) {
+      const entry = data.entries[0];
+      expect(typeof entry.permissions.canRead).toBe('boolean');
+      expect(typeof entry.permissions.canWrite).toBe('boolean');
+      expect(entry.permissions.canRead).toBe(true); // Should be readable since we can list it
+    }
+  });
+
+  it('should sort directories alphabetically', async () => {
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const response = await GET(request);
+
+    const data = await parseResponse<ListDirectoryResponse>(response);
+    if (data.entries.length > 1) {
+      for (let i = 1; i < data.entries.length; i++) {
+        expect(data.entries[i - 1].name.localeCompare(data.entries[i].name)).toBeLessThanOrEqual(0);
+      }
+    }
+  });
+
+  it('should handle file path as invalid directory', async () => {
+    // Try to use a file as if it were a directory
+    const filePath = join(homedir(), '.bashrc'); // Common file that might exist
+    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${filePath}`);
+    const response = await GET(request);
+
+    // Should either be 404 (file doesn't exist) or 400 (not a directory)
+    expect([400, 404]).toContain(response.status);
+
+    if (response.status === 400) {
+      const data = await parseResponse<{ error: string; code: string }>(response);
+      expect(data.code).toBe('NOT_A_DIRECTORY');
+    }
+  });
+});
