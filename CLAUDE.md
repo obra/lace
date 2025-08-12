@@ -269,7 +269,18 @@ ThreadProcessor caches processed events for performance.
 
 Because the UI is a full terminal application, it's hard for you to debug it interactively. Sometimes, it's better to refactor components into smaller, more easily testable pieces. Sometimes, it's better to ask your human partner to test something for you. 
 
-You MUST NEVER use console.log for debugging. Instead, you use the logger system and inspect the logs after runs.
+### Server-Side Debugging
+You MUST NEVER use console.log for server-side debugging. Instead, use the logger system and inspect the logs after runs.
+
+### Web Development Debugging  
+For the Next.js web interface (`packages/web`), browser console messages are automatically forwarded to your development server terminal. This means you CAN use `console.log`, `console.error`, etc. in React components and client-side code - they will appear in your server logs with colored `[BROWSER]` prefixes and proper object serialization (including circular references and dates).
+
+The console forwarding system:
+- Only runs in development mode  
+- Buffers and batches console calls to avoid network spam
+- Uses SuperJSON for robust object serialization
+- Provides colored, timestamped output in your terminal
+- Handles complex objects, circular references, and errors gracefully
 
 ### Event Inspection
 The conversation builder (`buildConversationFromEvents`) is critical for debugging. If conversations behave unexpectedly:
