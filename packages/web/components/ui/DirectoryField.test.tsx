@@ -7,6 +7,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { DirectoryField } from './DirectoryField';
+import { stringify } from '@/lib/serialization';
 
 // Use a mock homedir for consistent testing
 const mockHomedir = '/Users/testuser';
@@ -18,34 +19,37 @@ describe('DirectoryField', () => {
   const user = userEvent.setup();
 
   beforeEach(() => {
-    // Mock fetch to return a minimal valid response
+    // Create mock response data
+    const mockResponseData = {
+      currentPath: mockHomedir,
+      parentPath: null,
+      entries: [
+        {
+          name: 'Documents',
+          path: `${mockHomedir}/Documents`,
+          type: 'directory',
+          lastModified: new Date(),
+          permissions: { canRead: true, canWrite: true }
+        },
+        {
+          name: 'Downloads',
+          path: `${mockHomedir}/Downloads`,
+          type: 'directory',
+          lastModified: new Date(),
+          permissions: { canRead: true, canWrite: true }
+        }
+      ],
+      breadcrumbPaths: [mockHomedir],
+      breadcrumbNames: ['Home'],
+      homeDirectory: mockHomedir
+    };
+
+    // Mock fetch to return a superjson-serialized response
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      text: () => Promise.resolve('{}'),
-      json: () => Promise.resolve({
-        currentPath: mockHomedir,
-        parentPath: null,
-        entries: [
-          {
-            name: 'Documents',
-            path: `${mockHomedir}/Documents`,
-            type: 'directory',
-            lastModified: new Date(),
-            permissions: { canRead: true, canWrite: true }
-          },
-          {
-            name: 'Downloads',
-            path: `${mockHomedir}/Downloads`,
-            type: 'directory',
-            lastModified: new Date(),
-            permissions: { canRead: true, canWrite: true }
-          }
-        ],
-        breadcrumbPaths: [mockHomedir],
-        breadcrumbNames: ['Home'],
-        homeDirectory: mockHomedir
-      })
+      text: () => Promise.resolve(stringify(mockResponseData)),
+      json: () => Promise.resolve(mockResponseData)
     });
     vi.stubGlobal('fetch', mockFetch);
   });
@@ -291,15 +295,14 @@ describe('DirectoryField', () => {
     const input = screen.getByLabelText('Directory');
     await user.click(input);
     
-    // Should show loading initially or error
-    const loadingOrError = screen.queryByText('Loading directories...') || screen.queryByText(/Failed to/);
-    expect(loadingOrError).toBeInTheDocument();
+    // Wait for mock API response to load directories
+    await screen.findByText('Documents');
+    expect(screen.getByText('Documents')).toBeInTheDocument();
     
     await user.click(screen.getByTestId('outside'));
     
-    // Dropdown should close - check that the dropdown container is not present
-    expect(screen.queryByText('Loading directories...')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Failed to/)).not.toBeInTheDocument();
+    // Dropdown should close - check that the directory entries are not present
+    expect(screen.queryByText('Documents')).not.toBeInTheDocument();
   });
 
   it('should show loading state', () => {
@@ -335,12 +338,10 @@ describe('DirectoryField', () => {
     const input = screen.getByLabelText('Directory');
     await user.click(input);
 
-    // Wait for API call to start - should show loading or error
-    const loadingOrError = screen.queryByText('Loading directories...') || screen.queryByText(/Failed to/);
-    expect(loadingOrError).toBeInTheDocument();
-    
-    // Note: In integration tests, we would wait for directories to load
-    // For unit tests, we just verify the API call is triggered
+    // Wait for the mocked API response to load directories
+    await screen.findByText('Documents');
+    expect(screen.getByText('Documents')).toBeInTheDocument();
+    expect(screen.getByText('Downloads')).toBeInTheDocument();
   });
 
   it('should show autocomplete results when typing', async () => {
