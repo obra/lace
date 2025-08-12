@@ -7,6 +7,7 @@ interface ChatTextareaProps {
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   disabled?: boolean;
+  isMobile?: boolean;
   isDragOver?: boolean;
   onDragOver?: (e: DragEvent<HTMLDivElement>) => void;
   onDragLeave?: (e: DragEvent<HTMLDivElement>) => void;
