@@ -5,7 +5,7 @@ import { Agent, Session } from '@/lib/server/lace-imports';
 import type { LaceEvent, ToolResult, CombinedTokenUsage } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 import { asThreadId } from '@/types/core';
-import type { ThreadId, SessionInfo } from '@/types/core';
+import type { ThreadId } from '@/types/core';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { logger } from '~/utils/logger';
 
@@ -16,40 +16,6 @@ export class SessionService {
   projectId?: string;
 
   constructor() {}
-
-  async createSession(name: string, projectId: string): Promise<SessionInfo> {
-    // Create project-based session
-    const { Project } = await import('@/lib/server/lace-imports');
-    const project = Project.getById(projectId);
-    if (!project) {
-      throw new Error('Project not found');
-    }
-
-    // Create session using Session.create which handles both database and thread creation
-    const session = Session.create({
-      name,
-      projectId,
-    });
-
-    const sessionId = session.getId();
-
-    // Set up approval callback and event handlers for the coordinator agent
-    const coordinatorAgent = session.getAgent(sessionId);
-    if (coordinatorAgent) {
-      // Set up approval callback for the coordinator agent using utility
-      const { setupAgentApprovals } = await import('./agent-utils');
-      setupAgentApprovals(coordinatorAgent, sessionId);
-      // Set up web-specific event handlers
-      this.setupAgentEventHandlers(coordinatorAgent, sessionId);
-    }
-
-    // Register Session with EventStreamManager for TaskManager event forwarding
-    EventStreamManager.getInstance().registerSession(session);
-
-    // Session is automatically stored in Session._sessionRegistry via constructor
-    // Return metadata for API response
-    return this.sessionToMetadata(session);
-  }
 
   async getSession(sessionId: ThreadId): Promise<Session | null> {
     // Use Session's internal registry - this will reconstruct from database if needed
@@ -341,23 +307,6 @@ export class SessionService {
   // Test helper method to clear session registry (replaced stopAllAgents)
   clearActiveSessions(): void {
     Session.clearRegistry();
-  }
-
-  // Helper to convert Session instance to SessionInfo for API responses
-  private sessionToMetadata(session: Session): SessionInfo {
-    const sessionInfo = session.getInfo();
-    if (!sessionInfo) {
-      throw new Error('Failed to get session info');
-    }
-
-    const agents = session.getAgents();
-
-    return {
-      id: session.getId(),
-      name: sessionInfo.name,
-      createdAt: sessionInfo.createdAt,
-      agents: agents,
-    };
   }
 }
 
