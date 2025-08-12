@@ -9,22 +9,6 @@ import { faFolder, faSpinner, faChevronLeft, faHome } from '@/lib/fontawesome';
 import { parseResponse } from '@/lib/serialization';
 import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
 
-// Browser-compatible homedir function
-const getHomedir = (): string => {
-  if (typeof window !== 'undefined') {
-    // In browser/Storybook environment, use a mock path
-    return '/home/user';
-  }
-  // In Node.js environment - dynamic import to avoid browser issues
-  try {
-    const { homedir } = require('os') as typeof import('os');
-    return homedir();
-  } catch {
-    // Fallback if os module is not available
-    return '/home/user';
-  }
-};
-
 interface DirectoryFieldProps {
   label?: string;
   value: string;
@@ -52,9 +36,11 @@ export function DirectoryField({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
-  const [currentPath, setCurrentPath] = useState<string>(getHomedir());
+  const [currentPath, setCurrentPath] = useState<string>('');
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<string[]>([]);
+  const [breadcrumbPaths, setBreadcrumbPaths] = useState<string[]>([]);
+  const [homeDirectory, setHomeDirectory] = useState<string>('');
   const [apiError, setApiError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -79,7 +65,9 @@ export function DirectoryField({
     setApiError(null);
     
     try {
-      const response = await fetch(`/api/filesystem/list?path=${encodeURIComponent(path)}`);
+      // If path is empty, don't include it in the query - let server use home directory
+      const url = path ? `/api/filesystem/list?path=${encodeURIComponent(path)}` : '/api/filesystem/list';
+      const response = await fetch(url);
       
       if (!response.ok) {
         const errorData = await parseResponse<{ error: string; code: string }>(response);
@@ -90,16 +78,11 @@ export function DirectoryField({
       setDirectories(data.entries);
       setCurrentPath(data.currentPath);
       setParentPath(data.parentPath);
+      setHomeDirectory(data.homeDirectory);
       
-      // Build breadcrumbs
-      const home = getHomedir();
-      if (data.currentPath === home) {
-        setBreadcrumbs(['Home']);
-      } else {
-        const relativePath = data.currentPath.replace(home, '');
-        const pathParts = relativePath.split('/').filter(Boolean);
-        setBreadcrumbs(['Home', ...pathParts]);
-      }
+      // Use the breadcrumb information provided by the server
+      setBreadcrumbs(data.breadcrumbNames);
+      setBreadcrumbPaths(data.breadcrumbPaths);
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Failed to load directories');
       setDirectories([]);
@@ -130,9 +113,10 @@ export function DirectoryField({
   useEffect(() => {
     if (isDropdownOpen && !isLoading && directories.length === 0) {
       // Determine which directory to load
-      const pathToLoad = value.length >= 3 ? 
-        value.substring(0, value.lastIndexOf('/') + 1) || getHomedir() : 
-        getHomedir();
+      // If value has a path, try that directory, otherwise let server use home directory
+      const pathToLoad = value.length >= 3 && value.includes('/') ? 
+        value.substring(0, value.lastIndexOf('/') + 1) : 
+        ''; // Empty string lets server default to home directory
       
       void fetchDirectories(pathToLoad);
     }
@@ -146,19 +130,14 @@ export function DirectoryField({
   };
 
   const handleNavigateToHome = () => {
-    void fetchDirectories(getHomedir());
+    void fetchDirectories(''); // Empty string = let server determine home directory
   };
 
   const handleBreadcrumbClick = (index: number) => {
-    if (index === 0) {
-      handleNavigateToHome();
-      return;
+    // Use the breadcrumb paths provided by the server for accurate navigation
+    if (index < breadcrumbPaths.length) {
+      void fetchDirectories(breadcrumbPaths[index]);
     }
-    
-    const home = getHomedir();
-    const pathParts = breadcrumbs.slice(1, index + 1);
-    const targetPath = home + '/' + pathParts.join('/');
-    void fetchDirectories(targetPath);
   };
 
   // Add directory navigation (double-click to enter)

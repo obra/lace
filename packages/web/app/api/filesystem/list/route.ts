@@ -83,10 +83,36 @@ export async function GET(request: NextRequest) {
       return a.name.localeCompare(b.name);
     });
 
+    // Build breadcrumb information
+    const breadcrumbPaths: string[] = [];
+    const breadcrumbNames: string[] = [];
+
+    if (absolutePath === homeDir) {
+      breadcrumbPaths.push(homeDir);
+      breadcrumbNames.push('Home');
+    } else {
+      // Build path from home to current directory
+      const relativePath = relative(homeDir, absolutePath);
+      const pathParts = relativePath.split('/').filter(Boolean);
+
+      breadcrumbPaths.push(homeDir);
+      breadcrumbNames.push('Home');
+
+      let currentBreadcrumbPath = homeDir;
+      for (const part of pathParts) {
+        currentBreadcrumbPath = join(currentBreadcrumbPath, part);
+        breadcrumbPaths.push(currentBreadcrumbPath);
+        breadcrumbNames.push(part);
+      }
+    }
+
     const response: ListDirectoryResponse = {
       currentPath: absolutePath,
       parentPath: absolutePath === homeDir ? null : resolve(absolutePath, '..'),
       entries: entries.filter((entry) => entry.type === 'directory'), // Only directories
+      breadcrumbPaths,
+      breadcrumbNames,
+      homeDirectory: homeDir,
     };
 
     return createSuperjsonResponse(response);

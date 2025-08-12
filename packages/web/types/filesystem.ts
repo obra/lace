@@ -18,6 +18,12 @@ export interface ListDirectoryResponse {
   currentPath: string;
   parentPath: string | null;
   entries: DirectoryEntry[];
+  // Breadcrumb navigation - array of paths from home to current directory
+  breadcrumbPaths: string[];
+  // Human-readable breadcrumb names
+  breadcrumbNames: string[];
+  // Home directory path
+  homeDirectory: string;
 }
 
 // Zod validation schemas
@@ -40,6 +46,9 @@ export const ListDirectoryResponseSchema = z.object({
   currentPath: z.string(),
   parentPath: z.string().nullable(),
   entries: z.array(DirectoryEntrySchema),
+  breadcrumbPaths: z.array(z.string()),
+  breadcrumbNames: z.array(z.string()),
+  homeDirectory: z.string(),
 });
 
 // Type inference for request/response validation

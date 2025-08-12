@@ -199,7 +199,10 @@ test.describe('Directory Browser E2E Tests', () => {
       // Tab until we reach the directory input (should be 1-3 tabs typically)
       for (let i = 0; i < 5; i++) {
         await page.keyboard.press('Tab');
-        if (await directoryInput.isFocused()) {
+        if (
+          (await directoryInput.isVisible()) &&
+          (await directoryInput.evaluate((el) => el === document.activeElement))
+        ) {
           break;
         }
       }

@@ -106,6 +106,9 @@ describe('Filesystem Type Validation', () => {
       const validResponse: ListDirectoryResponse = {
         currentPath: '/home/user/Documents',
         parentPath: '/home/user',
+        breadcrumbPaths: ['/home/user', '/home/user/Documents'],
+        breadcrumbNames: ['Home', 'Documents'],
+        homeDirectory: '/home/user',
         entries: [
           {
             name: 'Projects',
@@ -143,6 +146,9 @@ describe('Filesystem Type Validation', () => {
       const rootResponse: ListDirectoryResponse = {
         currentPath: '/home/user',
         parentPath: null,
+        breadcrumbPaths: ['/home/user'],
+        breadcrumbNames: ['Home'],
+        homeDirectory: '/home/user',
         entries: [],
       };
 
@@ -157,6 +163,9 @@ describe('Filesystem Type Validation', () => {
       const emptyResponse: ListDirectoryResponse = {
         currentPath: '/home/user/empty',
         parentPath: '/home/user',
+        breadcrumbPaths: ['/home/user', '/home/user/empty'],
+        breadcrumbNames: ['Home', 'empty'],
+        homeDirectory: '/home/user',
         entries: [],
       };
 
