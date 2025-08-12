@@ -277,6 +277,10 @@ export const LaceApp = memo(function LaceApp() {
 
       if (isApiError(data)) {
         console.error('Failed to load session details:', data.error);
+        // If session not found, clear it from the hash to prevent repeated errors
+        if (data.error === 'Session not found') {
+          setSelectedSession(null);
+        }
         return;
       }
 
@@ -284,8 +288,10 @@ export const LaceApp = memo(function LaceApp() {
       setSelectedSessionDetails(sessionResponse.session);
     } catch (error) {
       console.error('Failed to load session details:', error);
+      // On network or other errors, also clear the invalid session
+      setSelectedSession(null);
     }
-  }, []);
+  }, [setSelectedSession]);
 
   // Load sessions and project configuration when project is selected
   useEffect(() => {
