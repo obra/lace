@@ -311,7 +311,6 @@ export class Session {
     }
 
     if (existingSession && existingSession._destroyed) {
-      logger.debug(`Session.getById: Removing destroyed session from registry for ${sessionId}`);
       Session._sessionRegistry.delete(sessionId);
     }
 
@@ -520,16 +519,9 @@ export class Session {
    * @returns SessionData or null if not found
    */
   static getSession(sessionId: string): SessionData | null {
-    logger.debug('Session.getSession() called', {
-      sessionId: sessionId,
-    });
-
     // 👈 NEW: Check registry first to avoid database query for active sessions
     const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
     if (existingSession && !existingSession._destroyed) {
-      logger.debug('Session.getSession() - found in registry, avoiding database query', {
-        sessionId: sessionId,
-      });
       // Return cached SessionData from the existing session
       return existingSession._sessionData;
     }
@@ -537,43 +529,9 @@ export class Session {
     // Fall back to database query for sessions not in memory
     const sessionData = getPersistence().loadSession(sessionId);
 
-    logger.debug('Session.getSession() - database lookup result', {
-      sessionId: sessionId,
-      hasSessionData: !!sessionData,
-      sessionData: sessionData,
-    });
-
-    // If session not found, let's see what sessions DO exist (only if database is still available)
+    // Log warning for missing sessions (avoid expensive debug queries)
     if (!sessionData) {
-      try {
-        const persistence = getPersistence();
-        // Only query if database is available and not closed
-        if (persistence.database && !persistence['_closed'] && !persistence['_disabled']) {
-          const allSessions = persistence.database
-            .prepare('SELECT id, name, project_id FROM sessions')
-            .all() as Array<{ id: string; name: string; project_id: string }>;
-          logger.debug('Session.getSession() - session not found, showing all sessions', {
-            requestedSessionId: sessionId,
-            allSessionIds: allSessions.map((s) => s.id),
-            allSessions: allSessions,
-          });
-        } else {
-          logger.debug(
-            'Session.getSession() - session not found, database unavailable for debugging',
-            {
-              requestedSessionId: sessionId,
-            }
-          );
-        }
-      } catch (error) {
-        logger.debug(
-          'Session.getSession() - session not found, error querying sessions for debug',
-          {
-            requestedSessionId: sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          }
-        );
-      }
+      logger.warn('Session not found in database', { sessionId });
     }
 
     return sessionData;

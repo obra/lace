@@ -26,6 +26,8 @@ export interface ProjectInfo {
 }
 
 export class Project {
+  private static _projectRegistry = new Map<string, Project>();
+
   private _id: string;
   private _projectData: ProjectData; // 👈 NEW: Cache the project data
   private _promptTemplateManager: PromptTemplateManager;
@@ -36,6 +38,9 @@ export class Project {
     this._projectData = projectData; // 👈 NEW: Store the data
     this._promptTemplateManager = new PromptTemplateManager();
     this._environmentManager = new ProjectEnvironmentManager();
+
+    // Register this project in the registry for cache consistency
+    Project._projectRegistry.set(this._id, this);
   }
 
   static create(
@@ -184,6 +189,16 @@ export class Project {
       ...this._projectData,
       ...updatesWithTimestamp,
     };
+
+    // Update all other Project instances for the same ID to maintain cache consistency
+    for (const [registryProjectId, registryProject] of Project._projectRegistry.entries()) {
+      if (registryProjectId === this._id && registryProject !== this) {
+        registryProject._projectData = {
+          ...registryProject._projectData,
+          ...updatesWithTimestamp,
+        };
+      }
+    }
 
     logger.info('Project updated', { projectId: this._id, updates });
   }
@@ -376,6 +391,20 @@ export class Project {
 
   deletePromptTemplate(templateId: string): boolean {
     return this._promptTemplateManager.deleteTemplate(this._id, templateId);
+  }
+
+  /**
+   * Clear the project registry - primarily for testing
+   */
+  static clearRegistry(): void {
+    Project._projectRegistry.clear();
+  }
+
+  /**
+   * Get registry size - primarily for testing
+   */
+  static getRegistrySize(): number {
+    return Project._projectRegistry.size;
   }
 
   /**
