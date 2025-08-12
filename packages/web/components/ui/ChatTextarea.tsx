@@ -7,7 +7,6 @@ interface ChatTextareaProps {
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   disabled?: boolean;
-  isMobile?: boolean;
   isDragOver?: boolean;
   onDragOver?: (e: DragEvent<HTMLDivElement>) => void;
   onDragLeave?: (e: DragEvent<HTMLDivElement>) => void;
@@ -68,7 +67,7 @@ const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(({
   }, [disabled, autoFocus]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isMobile && onSubmit) {
+    if (e.key === 'Enter' && e.shiftKey && onSubmit) {
       e.preventDefault();
       if (!value.trim() || disabled) return;
       onSubmit();
