@@ -290,6 +290,19 @@ export class Session {
     return sessionTempPath;
   }
 
+  /**
+   * Get a Session instance by ID, using registry cache when possible.
+   *
+   * This method implements a two-tier lookup strategy:
+   * 1. Check in-memory session registry first (fastest)
+   * 2. Fall back to database query if not in registry
+   *
+   * The returned Session object caches its SessionData internally,
+   * eliminating the need for repeated database queries.
+   *
+   * @param sessionId - The unique session identifier
+   * @returns Session instance or null if not found
+   */
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     logger.debug(`Session.getById called for sessionId: ${sessionId}`);
 
@@ -499,6 +512,16 @@ export class Session {
     logger.info('Session created', { sessionId: session.id, projectId: session.projectId });
   }
 
+  /**
+   * Get SessionData for a session, checking registry before database.
+   *
+   * This method is optimized to avoid database queries when the session
+   * is already loaded in memory. Use this instead of direct database
+   * queries for better performance.
+   *
+   * @param sessionId - The unique session identifier
+   * @returns SessionData or null if not found
+   */
   static getSession(sessionId: string): SessionData | null {
     logger.debug('Session.getSession() called', {
       sessionId: sessionId,
@@ -667,7 +690,14 @@ export class Session {
     return this._sessionData; // 👈 NEW: Return cached data instead of database query
   }
 
-  // Add method to force refresh from database when needed
+  /**
+   * Force refresh of cached SessionData from database.
+   *
+   * Use this method when you know the session data has been modified
+   * externally and you need to update the cache. Normal operations
+   * that modify data through this Session instance will automatically
+   * update the cache.
+   */
   refreshFromDatabase(): void {
     const freshData = Session.getSession(this._sessionId);
     if (freshData) {
