@@ -188,11 +188,27 @@ test.describe('Directory Browser E2E Tests', () => {
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
     await directoryInput.waitFor({ timeout: 5000 });
 
-    // Directly focus the directory input instead of relying on Tab navigation
-    // Tab navigation can be unreliable in different modal implementations
-    await directoryInput.focus();
+    // Test keyboard navigation by using Tab to navigate to the field
+    // Start by focusing on the modal close button or first element
+    const closeButton = page
+      .locator('button:has-text("×"), button[aria-label*="close"], .modal button')
+      .first();
+    if ((await closeButton.count()) > 0) {
+      await closeButton.focus();
 
-    // Verify field is focused
+      // Tab until we reach the directory input (should be 1-3 tabs typically)
+      for (let i = 0; i < 5; i++) {
+        await page.keyboard.press('Tab');
+        if (await directoryInput.isFocused()) {
+          break;
+        }
+      }
+    } else {
+      // Fallback: focus directly on the input
+      await directoryInput.focus();
+    }
+
+    // Verify field is focused (this tests that keyboard navigation worked)
     await expect(directoryInput).toBeFocused();
 
     // Type using keyboard
@@ -208,8 +224,13 @@ test.describe('Directory Browser E2E Tests', () => {
     await expect(directoryInput).toBeFocused();
     await expect(directoryInput).toHaveValue(`${homedir()}/test`);
 
-    // Test that we can clear and retype using clear() method
-    await directoryInput.clear();
+    // Test keyboard selection and replacement
+    // Select all text using Ctrl+A (or Cmd+A on Mac)
+    const isMac = process.platform === 'darwin';
+    const selectAllKey = isMac ? 'Meta+a' : 'Control+a';
+    await page.keyboard.press(selectAllKey);
+
+    // Type new text to replace selected text
     await page.keyboard.type('/new/path');
 
     // Verify new value
