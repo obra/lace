@@ -52,6 +52,7 @@ export class Session {
 
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
+  private _sessionData: SessionData; // 👈 NEW: Cache the session data
   private _agents: Map<ThreadId, Agent> = new Map();
   private _taskManager: TaskManager;
   private _threadManager: ThreadManager;
@@ -59,10 +60,11 @@ export class Session {
   private _projectId?: string;
   private _providerCache?: unknown; // Cached provider instance
 
-  constructor(sessionAgent: Agent, projectId?: string, threadManager?: ThreadManager) {
+  constructor(sessionAgent: Agent, sessionData: SessionData, threadManager?: ThreadManager) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
-    this._projectId = projectId;
+    this._sessionData = sessionData; // 👈 NEW: Store the data
+    this._projectId = sessionData.projectId;
 
     // Use provided ThreadManager or get it from the sessionAgent
     this._threadManager = threadManager || sessionAgent.threadManager;
@@ -229,7 +231,7 @@ export class Session {
       isSession: true,
     });
 
-    const session = new Session(sessionAgent, options.projectId, threadManager);
+    const session = new Session(sessionAgent, sessionData, threadManager);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -394,7 +396,7 @@ export class Session {
     await sessionAgent.start();
     logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
 
-    const session = new Session(sessionAgent, sessionData.projectId, threadManager);
+    const session = new Session(sessionAgent, sessionData, threadManager);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -649,8 +651,17 @@ export class Session {
   }
 
   // Made public for testing - should be private in production
-  public getSessionData() {
-    return Session.getSession(this._sessionId);
+  // Replace the existing getSessionData method with this:
+  private getSessionData(): SessionData {
+    return this._sessionData; // 👈 NEW: Return cached data instead of database query
+  }
+
+  // Add method to force refresh from database when needed
+  refreshFromDatabase(): void {
+    const freshData = Session.getSession(this._sessionId);
+    if (freshData) {
+      this._sessionData = freshData;
+    }
   }
 
   // ===============================
@@ -693,11 +704,18 @@ export class Session {
     // Validate configuration
     const validatedConfig = Session.validateConfiguration(updates);
 
-    const sessionData = this.getSessionData();
-    const currentConfig = sessionData?.configuration || {};
+    const currentConfig = this._sessionData.configuration || {};
     const newConfig = { ...currentConfig, ...validatedConfig };
 
+    // Update database
     Session.updateSession(this._sessionId, { configuration: newConfig });
+
+    // 👈 NEW: Update cached data
+    this._sessionData = {
+      ...this._sessionData,
+      configuration: newConfig,
+      updatedAt: new Date(),
+    };
   }
 
   getToolPolicy(toolName: string): 'allow' | 'require-approval' | 'deny' {

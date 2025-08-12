@@ -6,6 +6,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { asThreadId } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { getPersistence } from '~/persistence/database';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -657,6 +658,53 @@ describe('Session', () => {
         const session = await Session.getById(asThreadId('lace_20250101_nofind'));
         expect(session).toBeNull();
       });
+    });
+  });
+
+  describe('Session data caching', () => {
+    it('should cache SessionData after first load to avoid duplicate database queries', () => {
+      // Arrange: Create a session with known data
+      const session = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+        configuration: { testKey: 'testValue' },
+      });
+
+      // Spy on database calls to count them
+      const persistence = getPersistence();
+      const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
+
+      // Act: Call methods that need SessionData multiple times
+      const info1 = session.getInfo();
+      const info2 = session.getInfo();
+      const projectId1 = session.getProjectId();
+      const projectId2 = session.getProjectId();
+
+      // Assert: Database should only be called once (during creation)
+      // After creation, all data should come from cache
+      expect(loadSessionSpy).toHaveBeenCalledTimes(0); // No additional calls
+      expect(info1).toEqual(info2);
+      expect(projectId1).toEqual(projectId2);
+    });
+
+    it('should reload SessionData from database when explicitly requested', () => {
+      // This test ensures we can still force a database reload when needed
+      const session = Session.create({
+        name: 'Original Name',
+        projectId: testProject.getId(),
+        configuration: {},
+      });
+
+      // Simulate external update to session name in database
+      const persistence = getPersistence();
+      persistence.updateSession(session.getId(), { name: 'Updated Name' });
+
+      // The cached data should still show old name
+      expect(session.getInfo()?.name).toBe('Original Name');
+
+      // After refresh, should show new name
+      session.refreshFromDatabase();
+      expect(session.getInfo()?.name).toBe('Updated Name');
     });
   });
 
