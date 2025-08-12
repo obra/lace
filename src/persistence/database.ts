@@ -21,8 +21,8 @@ type DatabaseConstructor = new (path: string) => SQLiteDatabase;
 let Database: DatabaseConstructor;
 if (process?.versions?.bun) {
   // Running in Bun - use built-in SQLite
-  // Use string concatenation to prevent webpack from analyzing this import
-  const bunSqlite = (await import('bun' + ':sqlite')) as { Database: DatabaseConstructor };
+  // Use eval to completely prevent webpack analysis
+  const bunSqlite = (await eval('import("bun:sqlite")')) as { Database: DatabaseConstructor };
   Database = bunSqlite.Database;
 } else {
   // Running in Node.js - use better-sqlite3

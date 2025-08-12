@@ -68,7 +68,7 @@ const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(({
   }, [disabled, autoFocus]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isMobile && onSubmit) {
+    if (e.key === 'Enter' && e.shiftKey && onSubmit) {
       e.preventDefault();
       if (!value.trim() || disabled) return;
       onSubmit();

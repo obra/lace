@@ -547,7 +547,7 @@ export function useEventStream({
     eventSource.onerror = (error) => {
       // Check if this is a normal close or an actual error
       if (eventSource.readyState !== EventSource.CLOSED) {
-        console.error('[EVENT_STREAM] Connection error:', error);
+        console.warn('[EVENT_STREAM] Connection interrupted, attempting reconnect...');
       }
 
       setConnection((prev) => {
@@ -559,9 +559,12 @@ export function useEventStream({
 
         callbackRefs.current.onDisconnect?.();
 
-        // Only treat as error if not intentionally closed
-        if (eventSource.readyState !== EventSource.CLOSED) {
-          callbackRefs.current.onError?.(new Error('SSE connection failed'));
+        // Only treat as error if not intentionally closed and not auto-reconnecting
+        if (eventSource.readyState !== EventSource.CLOSED && !autoReconnectRef.current) {
+          // Schedule error callback to avoid state update issues
+          setTimeout(() => {
+            callbackRefs.current.onError?.(new Error('SSE connection failed'));
+          }, 0);
         }
 
         // Auto-reconnect logic using ref values to avoid stale closures
