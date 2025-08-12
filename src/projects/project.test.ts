@@ -1,10 +1,11 @@
 // ABOUTME: Tests for Project class functionality including CRUD operations and session management
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { getPersistence, ProjectData } from '~/persistence/database';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -173,11 +174,9 @@ describe('Project', () => {
         });
       });
 
-      it('should return null when project not found', () => {
-        const nonExistentProject = new Project('non-existent');
-
-        const info = nonExistentProject.getInfo();
-        expect(info).toBeNull();
+      it('should return null when project not found via getById', () => {
+        const nonExistentProject = Project.getById('non-existent');
+        expect(nonExistentProject).toBeNull();
       });
     });
 
@@ -576,6 +575,63 @@ describe('Project', () => {
       const processTempDir = getProcessTempDir();
 
       expect(tempDir).toContain(processTempDir);
+    });
+  });
+
+  describe('Project data caching', () => {
+    it('should cache ProjectData after first load to avoid duplicate database queries', () => {
+      // Arrange: Create project data in database
+      const projectData: ProjectData = {
+        id: 'test-project-cache',
+        name: 'Cached Project',
+        description: 'Test project for caching',
+        workingDirectory: '/tmp/test',
+        configuration: { testSetting: 'value' },
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+      };
+
+      const persistence = getPersistence();
+      persistence.saveProject(projectData);
+
+      // Spy on database calls
+      const loadProjectSpy = vi.spyOn(persistence, 'loadProject');
+
+      // Act: Load project and call methods that need ProjectData
+      const project = Project.getById('test-project-cache');
+      expect(project).toBeTruthy();
+
+      const info1 = project!.getInfo();
+      const info2 = project!.getInfo();
+      const name1 = project!.getName();
+      const name2 = project!.getName();
+
+      // Assert: Database should only be called once (in getById)
+      expect(loadProjectSpy).toHaveBeenCalledTimes(1);
+      expect(info1).toEqual(info2);
+      expect(name1).toEqual(name2);
+      expect(name1).toBe('Cached Project');
+    });
+
+    it('should refresh ProjectData from database when explicitly requested', () => {
+      // Create project
+      const project = Project.create('Original Name', '/tmp/original', 'Original description', {});
+
+      // Simulate external update in database
+      const persistence = getPersistence();
+      persistence.updateProject(project.getId(), {
+        name: 'Updated Name',
+        description: 'Updated description',
+      });
+
+      // Cached data should show old values
+      expect(project.getName()).toBe('Original Name');
+
+      // After refresh, should show new values
+      project.refreshFromDatabase();
+      expect(project.getName()).toBe('Updated Name');
+      expect(project.getInfo()?.description).toBe('Updated description');
     });
   });
 });

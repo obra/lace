@@ -26,14 +26,21 @@ export interface ProjectInfo {
 }
 
 export class Project {
+  private static _projectRegistry = new Map<string, Project>();
+
   private _id: string;
+  private _projectData: ProjectData; // 👈 NEW: Cache the project data
   private _promptTemplateManager: PromptTemplateManager;
   private _environmentManager: ProjectEnvironmentManager;
 
-  constructor(projectId: string) {
-    this._id = projectId;
+  constructor(projectData: ProjectData) {
+    this._id = projectData.id;
+    this._projectData = projectData; // 👈 NEW: Store the data
     this._promptTemplateManager = new PromptTemplateManager();
     this._environmentManager = new ProjectEnvironmentManager();
+
+    // Register this project in the registry for cache consistency
+    Project._projectRegistry.set(this._id, this);
   }
 
   static create(
@@ -64,7 +71,7 @@ export class Project {
     logger.info('Project created', { projectId: projectData.id, name, workingDirectory });
 
     // Create the project instance
-    const project = new Project(projectData.id);
+    const project = new Project(projectData);
 
     // Auto-create a default session (no provider info needed at session level)
     try {
@@ -91,7 +98,7 @@ export class Project {
 
     return projects.map((project) => {
       // Create a temporary Project instance to get session count
-      const projectInstance = new Project(project.id);
+      const projectInstance = new Project(project);
       return {
         id: project.id,
         name: project.name,
@@ -113,7 +120,8 @@ export class Project {
       return null;
     }
 
-    return new Project(projectId);
+    // 👈 NEW: Pass projectData to constructor instead of discarding it
+    return new Project(projectData);
   }
 
   getId(): string {
@@ -121,41 +129,42 @@ export class Project {
   }
 
   getInfo(): ProjectInfo | null {
-    const persistence = getPersistence();
-    const projectData = persistence.loadProject(this._id);
-
-    if (!projectData) {
-      return null;
-    }
-
+    // 👈 NEW: Use cached data instead of database query
     return {
-      id: projectData.id,
-      name: projectData.name,
-      description: projectData.description,
-      workingDirectory: projectData.workingDirectory,
-      isArchived: projectData.isArchived,
-      createdAt: projectData.createdAt,
-      lastUsedAt: projectData.lastUsedAt,
+      id: this._projectData.id,
+      name: this._projectData.name,
+      description: this._projectData.description,
+      workingDirectory: this._projectData.workingDirectory,
+      isArchived: this._projectData.isArchived,
+      createdAt: this._projectData.createdAt,
+      lastUsedAt: this._projectData.lastUsedAt,
       sessionCount: this.getSessionCount(),
     };
   }
 
   getName(): string {
-    const info = this.getInfo();
-    return info?.name || 'Unknown Project';
+    return this._projectData.name;
+  }
+
+  getDescription(): string {
+    return this._projectData.description;
   }
 
   getWorkingDirectory(): string {
-    const info = this.getInfo();
-    return info?.workingDirectory || process.cwd();
+    return this._projectData.workingDirectory;
+  }
+
+  // Add method to force refresh from database
+  refreshFromDatabase(): void {
+    const persistence = getPersistence();
+    const freshData = persistence.loadProject(this._id);
+    if (freshData) {
+      this._projectData = freshData;
+    }
   }
 
   getConfiguration(): Record<string, unknown> {
-    const persistence = getPersistence();
-    const projectData = persistence.loadProject(this._id);
-    // Don't close the global persistence - it's managed by the persistence system
-
-    return projectData?.configuration || {};
+    return this._projectData.configuration || {};
   }
 
   updateInfo(updates: {
@@ -174,7 +183,22 @@ export class Project {
     };
 
     persistence.updateProject(this._id, updatesWithTimestamp);
-    // Don't close the global persistence - it's managed by the persistence system
+
+    // 👈 NEW: Update cached data
+    this._projectData = {
+      ...this._projectData,
+      ...updatesWithTimestamp,
+    };
+
+    // Update all other Project instances for the same ID to maintain cache consistency
+    for (const [registryProjectId, registryProject] of Project._projectRegistry.entries()) {
+      if (registryProjectId === this._id && registryProject !== this) {
+        registryProject._projectData = {
+          ...registryProject._projectData,
+          ...updatesWithTimestamp,
+        };
+      }
+    }
 
     logger.info('Project updated', { projectId: this._id, updates });
   }
@@ -214,6 +238,9 @@ export class Project {
     // Then delete the project
     persistence.deleteProject(this._id);
     // Don't close the global persistence - it's managed by the persistence system
+
+    // Clean up registry
+    Project._projectRegistry.delete(this._id);
 
     logger.info('Project deleted', { projectId: this._id });
   }
@@ -367,6 +394,20 @@ export class Project {
 
   deletePromptTemplate(templateId: string): boolean {
     return this._promptTemplateManager.deleteTemplate(this._id, templateId);
+  }
+
+  /**
+   * Clear the project registry - primarily for testing
+   */
+  static clearRegistry(): void {
+    Project._projectRegistry.clear();
+  }
+
+  /**
+   * Get registry size - primarily for testing
+   */
+  static getRegistrySize(): number {
+    return Project._projectRegistry.size;
   }
 
   /**

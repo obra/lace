@@ -58,7 +58,9 @@ function createLaceEventFromDb(
   timestamp: Date,
   data: unknown
 ): LaceEvent {
-  const baseEvent = { id, threadId, timestamp };
+  // Ensure timestamp is always a Date object (defensive programming)
+  const safeTimestamp = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  const baseEvent = { id, threadId, timestamp: safeTimestamp };
 
   switch (type) {
     case 'USER_MESSAGE':

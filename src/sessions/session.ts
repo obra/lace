@@ -52,6 +52,7 @@ export class Session {
 
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
+  private _sessionData: SessionData; // 👈 NEW: Cache the session data
   private _agents: Map<ThreadId, Agent> = new Map();
   private _taskManager: TaskManager;
   private _threadManager: ThreadManager;
@@ -59,10 +60,11 @@ export class Session {
   private _projectId?: string;
   private _providerCache?: unknown; // Cached provider instance
 
-  constructor(sessionAgent: Agent, projectId?: string, threadManager?: ThreadManager) {
+  constructor(sessionAgent: Agent, sessionData: SessionData, threadManager?: ThreadManager) {
     this._sessionAgent = sessionAgent;
     this._sessionId = asThreadId(sessionAgent.threadId);
-    this._projectId = projectId;
+    this._sessionData = sessionData; // 👈 NEW: Store the data
+    this._projectId = sessionData.projectId;
 
     // Use provided ThreadManager or get it from the sessionAgent
     this._threadManager = threadManager || sessionAgent.threadManager;
@@ -229,7 +231,7 @@ export class Session {
       isSession: true,
     });
 
-    const session = new Session(sessionAgent, options.projectId, threadManager);
+    const session = new Session(sessionAgent, sessionData, threadManager);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -288,18 +290,27 @@ export class Session {
     return sessionTempPath;
   }
 
+  /**
+   * Get a Session instance by ID, using registry cache when possible.
+   *
+   * This method implements a two-tier lookup strategy:
+   * 1. Check in-memory session registry first (fastest)
+   * 2. Fall back to database query if not in registry
+   *
+   * The returned Session object caches its SessionData internally,
+   * eliminating the need for repeated database queries.
+   *
+   * @param sessionId - The unique session identifier
+   * @returns Session instance or null if not found
+   */
   static async getById(sessionId: ThreadId): Promise<Session | null> {
-    logger.debug(`Session.getById called for sessionId: ${sessionId}`);
-
     // Check if session already exists in registry
     const existingSession = Session._sessionRegistry.get(sessionId);
     if (existingSession && !existingSession._destroyed) {
-      logger.debug(`Session.getById: Found existing session in registry for ${sessionId}`);
       return existingSession;
     }
 
     if (existingSession && existingSession._destroyed) {
-      logger.debug(`Session.getById: Removing destroyed session from registry for ${sessionId}`);
       Session._sessionRegistry.delete(sessionId);
     }
 
@@ -394,7 +405,7 @@ export class Session {
     await sessionAgent.start();
     logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
 
-    const session = new Session(sessionAgent, sessionData.projectId, threadManager);
+    const session = new Session(sessionAgent, sessionData, threadManager);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -497,50 +508,30 @@ export class Session {
     logger.info('Session created', { sessionId: session.id, projectId: session.projectId });
   }
 
+  /**
+   * Get SessionData for a session, checking registry before database.
+   *
+   * This method is optimized to avoid database queries when the session
+   * is already loaded in memory. Use this instead of direct database
+   * queries for better performance.
+   *
+   * @param sessionId - The unique session identifier
+   * @returns SessionData or null if not found
+   */
   static getSession(sessionId: string): SessionData | null {
-    logger.debug('Session.getSession() called', {
-      sessionId: sessionId,
-    });
+    // 👈 NEW: Check registry first to avoid database query for active sessions
+    const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
+    if (existingSession && !existingSession._destroyed) {
+      // Return cached SessionData from the existing session
+      return existingSession._sessionData;
+    }
 
+    // Fall back to database query for sessions not in memory
     const sessionData = getPersistence().loadSession(sessionId);
 
-    logger.debug('Session.getSession() - database lookup result', {
-      sessionId: sessionId,
-      hasSessionData: !!sessionData,
-      sessionData: sessionData,
-    });
-
-    // If session not found, let's see what sessions DO exist (only if database is still available)
+    // Log warning for missing sessions (avoid expensive debug queries)
     if (!sessionData) {
-      try {
-        const persistence = getPersistence();
-        // Only query if database is available and not closed
-        if (persistence.database && !persistence['_closed'] && !persistence['_disabled']) {
-          const allSessions = persistence.database
-            .prepare('SELECT id, name, project_id FROM sessions')
-            .all() as Array<{ id: string; name: string; project_id: string }>;
-          logger.debug('Session.getSession() - session not found, showing all sessions', {
-            requestedSessionId: sessionId,
-            allSessionIds: allSessions.map((s) => s.id),
-            allSessions: allSessions,
-          });
-        } else {
-          logger.debug(
-            'Session.getSession() - session not found, database unavailable for debugging',
-            {
-              requestedSessionId: sessionId,
-            }
-          );
-        }
-      } catch (error) {
-        logger.debug(
-          'Session.getSession() - session not found, error querying sessions for debug',
-          {
-            requestedSessionId: sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          }
-        );
-      }
+      logger.warn('Session not found in database', { sessionId });
     }
 
     return sessionData;
@@ -584,6 +575,17 @@ export class Session {
 
   static updateSession(sessionId: string, updates: Partial<SessionData>): void {
     getPersistence().updateSession(sessionId, updates);
+
+    // Update cached Session instance if it exists in registry
+    const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
+    if (existingSession && !existingSession._destroyed) {
+      // Reload the fresh data from database into the cached instance
+      const freshData = getPersistence().loadSession(sessionId);
+      if (freshData) {
+        existingSession._sessionData = freshData;
+      }
+    }
+
     logger.info('Session updated', { sessionId, updates });
   }
 
@@ -649,8 +651,26 @@ export class Session {
   }
 
   // Made public for testing - should be private in production
-  public getSessionData() {
-    return Session.getSession(this._sessionId);
+  // Replace the existing getSessionData method with this:
+  private getSessionData(): SessionData {
+    return this._sessionData; // 👈 NEW: Return cached data instead of database query
+  }
+
+  /**
+   * Force refresh of cached SessionData from database.
+   *
+   * Use this method when you know the session data has been modified
+   * externally and you need to update the cache. Normal operations
+   * that modify data through this Session instance will automatically
+   * update the cache.
+   */
+  refreshFromDatabase(): void {
+    // Force database query, bypassing the registry cache
+    const freshData = getPersistence().loadSession(this._sessionId);
+    if (!freshData) {
+      throw new Error(`Session not found: ${this._sessionId}`);
+    }
+    this._sessionData = freshData;
   }
 
   // ===============================
@@ -693,10 +713,10 @@ export class Session {
     // Validate configuration
     const validatedConfig = Session.validateConfiguration(updates);
 
-    const sessionData = this.getSessionData();
-    const currentConfig = sessionData?.configuration || {};
+    const currentConfig = this._sessionData.configuration || {};
     const newConfig = { ...currentConfig, ...validatedConfig };
 
+    // Update database and cache
     Session.updateSession(this._sessionId, { configuration: newConfig });
   }
 

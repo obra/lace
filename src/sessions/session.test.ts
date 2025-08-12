@@ -6,6 +6,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { asThreadId } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { getPersistence, SessionData } from '~/persistence/database';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -657,6 +658,108 @@ describe('Session', () => {
         const session = await Session.getById(asThreadId('lace_20250101_nofind'));
         expect(session).toBeNull();
       });
+    });
+  });
+
+  describe('Session data caching', () => {
+    it('should cache SessionData after first load to avoid duplicate database queries', () => {
+      // Arrange: Create a session with known data
+      const session = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+        configuration: { testKey: 'testValue' },
+      });
+
+      // Spy on database calls to count them
+      const persistence = getPersistence();
+      const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
+
+      // Act: Call methods that need SessionData multiple times
+      const info1 = session.getInfo();
+      const info2 = session.getInfo();
+      const projectId1 = session.getProjectId();
+      const projectId2 = session.getProjectId();
+
+      // Assert: Database should only be called once (during creation)
+      // After creation, all data should come from cache
+      expect(loadSessionSpy).toHaveBeenCalledTimes(0); // No additional calls
+      expect(info1).toEqual(info2);
+      expect(projectId1).toEqual(projectId2);
+    });
+
+    it('should reload SessionData from database when explicitly requested', () => {
+      // This test ensures we can still force a database reload when needed
+      const session = Session.create({
+        name: 'Original Name',
+        projectId: testProject.getId(),
+        configuration: {},
+      });
+
+      // Simulate external update to session name in database
+      const persistence = getPersistence();
+      persistence.updateSession(session.getId(), { name: 'Updated Name' });
+
+      // The cached data should still show old name
+      expect(session.getInfo()?.name).toBe('Original Name');
+
+      // After refresh, should show new name
+      session.refreshFromDatabase();
+      expect(session.getInfo()?.name).toBe('Updated Name');
+    });
+  });
+
+  describe('Session.getSession registry optimization', () => {
+    it('should return cached SessionData from registry instead of database when session exists in memory', () => {
+      // Arrange: Create an active session
+      const session = Session.create({
+        name: 'Active Session',
+        projectId: testProject.getId(),
+        configuration: { cached: true },
+      });
+
+      const sessionId = session.getId();
+
+      // Spy on database to ensure it's not called
+      const persistence = getPersistence();
+      const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
+
+      // Act: Call static getSession method
+      const sessionData = Session.getSession(sessionId);
+
+      // Assert: Should get data without database call
+      expect(sessionData).toBeTruthy();
+      expect(sessionData?.name).toBe('Active Session');
+      expect(sessionData?.configuration?.cached).toBe(true);
+      expect(loadSessionSpy).not.toHaveBeenCalled();
+    });
+
+    it('should fall back to database when session not in registry', () => {
+      // Arrange: Create session data directly in database (not in registry)
+      const sessionId = 'test-session-not-in-registry';
+      const directSessionData: SessionData = {
+        id: sessionId,
+        projectId: testProject.getId(),
+        name: 'Database Only Session',
+        description: 'This session exists only in database',
+        configuration: {},
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const persistence = getPersistence();
+      persistence.saveSession(directSessionData);
+
+      // Spy on database to verify it gets called
+      const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
+
+      // Act: Call getSession for session not in registry
+      const sessionData = Session.getSession(sessionId);
+
+      // Assert: Should load from database
+      expect(sessionData).toBeTruthy();
+      expect(sessionData?.name).toBe('Database Only Session');
+      expect(loadSessionSpy).toHaveBeenCalledWith(sessionId);
     });
   });
 
