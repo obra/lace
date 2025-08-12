@@ -2,8 +2,8 @@
 // ABOUTME: Used in the design system documentation and testing
 
 import React, { useState } from 'react';
-import FileDiffViewer from './FileDiffViewer';
-import { createFileDiffFromText, createNewFileDiff, createDeletedFileDiff, createBinaryFileDiff } from './FileDiffViewer.utils';
+import FileDiffViewer from '@/components/files/FileDiffViewer';
+import { createFileDiffFromText, createNewFileDiff, createDeletedFileDiff, createBinaryFileDiff } from '@/components/files/FileDiffViewer.utils';
 
 const sampleOldCode = `import React from 'react';
 import { Button } from './Button';

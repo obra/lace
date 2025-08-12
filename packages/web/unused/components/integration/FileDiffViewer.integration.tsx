@@ -2,8 +2,8 @@
 // ABOUTME: Demonstrates creating diffs from file-edit tool arguments
 
 import React from 'react';
-import FileDiffViewer from './FileDiffViewer';
-import { createFileDiffFromText, detectLanguageFromPath } from './FileDiffViewer.utils';
+import FileDiffViewer from '@/components/files/FileDiffViewer';
+import { createFileDiffFromText, detectLanguageFromPath } from '@/components/files/FileDiffViewer.utils';
 
 interface FileEditToolArguments {
   file_path: string;

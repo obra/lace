@@ -16,11 +16,11 @@ export function useProviderStatus(instanceId: string) {
   const [status, setStatus] = useState<ProviderStatus>({ status: 'untested' });
 
   const testConnection = useCallback(async () => {
-    setStatus(prev => ({ ...prev, status: 'testing' }));
+    setStatus((prev) => ({ ...prev, status: 'testing' }));
 
     try {
       const response = await fetch(`/api/provider/instances/${instanceId}/test`, {
-        method: 'POST'
+        method: 'POST',
       });
 
       const responseData = await parseResponse<{
@@ -39,14 +39,14 @@ export function useProviderStatus(instanceId: string) {
         setStatus({
           status: 'error',
           lastTested: responseData.testedAt,
-          error: responseData.message || 'Connection failed'
+          error: responseData.message || 'Connection failed',
         });
       }
     } catch (error) {
       setStatus({
         status: 'error',
         lastTested: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'Connection failed'
+        error: error instanceof Error ? error.message : 'Connection failed',
       });
     }
   }, [instanceId]);

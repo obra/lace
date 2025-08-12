@@ -5,6 +5,9 @@ export default {
   ignore: [
     'debug-provider-defaults.js', // Debug script
     'packages/web/eslint.config.js', // ESLint config causes issues when run from root
+    // Ignore unused directories - intentionally moved files
+    'packages/web/unused/**/*',
+    'unused/**/*',
   ],
   workspaces: {
     'packages/web': {
@@ -16,9 +19,9 @@ export default {
         'app/api/**/route.ts',
         // Server entrypoint
         'server.ts',
-        // Storybook (auto-detected, but keep explicit)
-        '**/*.stories.{ts,tsx}',
       ],
+      // Enable Storybook plugin
+      storybook: true,
       // Disable ESLint plugin to avoid module resolution issues
       eslint: false,
     },

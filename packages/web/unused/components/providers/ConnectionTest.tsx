@@ -4,7 +4,7 @@
 'use client';
 
 import StatusDot from '@/components/ui/StatusDot';
-import { useProviderStatus } from '@/hooks/useProviderStatus';
+import { useProviderStatus } from '@/unused/hooks/useProviderStatus';
 
 interface ConnectionTestProps {
   instanceId: string;
