@@ -10,10 +10,17 @@ import type { StreamSubscription } from '@/types/stream-events';
 function parseSubscription(request: NextRequest): StreamSubscription {
   const url = new URL(request.url);
 
+  // Helper to parse comma-separated arrays, returning undefined for empty results
+  const parseArrayParam = (param: string | null): string[] | undefined => {
+    if (!param) return undefined;
+    const filtered = param.split(',').filter(Boolean);
+    return filtered.length > 0 ? filtered : undefined;
+  };
+
   return {
-    projectIds: url.searchParams.get('projects')?.split(',').filter(Boolean),
-    sessionIds: url.searchParams.get('sessions')?.split(',').filter(Boolean),
-    threads: url.searchParams.get('threads')?.split(',').filter(Boolean),
+    projectIds: parseArrayParam(url.searchParams.get('projects')),
+    sessionIds: parseArrayParam(url.searchParams.get('sessions')),
+    threads: parseArrayParam(url.searchParams.get('threads')),
   };
 }
 

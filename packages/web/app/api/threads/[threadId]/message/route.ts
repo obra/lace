@@ -10,6 +10,7 @@ import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { logger } from '~/utils/logger';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -98,15 +99,17 @@ export async function POST(
 
     // Process message asynchronously
 
-    agent
-      .sendMessage(body.message)
-      .then(() => {
-        // Message processing started
-      })
-      .catch((error: unknown) => {
-        // Error will be emitted by agent via its error event handlers
-        console.error('Message processing error:', error);
+    void agent.sendMessage(body.message).catch((error: unknown) => {
+      // Error will be emitted by agent via its error event handlers
+      logger.error('Message processing error', {
+        threadId,
+        sessionId,
+        messageId,
+        error: isError(error)
+          ? { name: error.name, message: error.message }
+          : { type: typeof error },
       });
+    });
 
     // Return immediate acknowledgment
     const response: MessageResponse = {
