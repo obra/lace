@@ -15,7 +15,7 @@ import type { ConsoleForwardConfig, ConsoleLogEntry } from './index';
 export class ConsoleForwarder {
   private config: ConsoleForwardConfig;
   private buffer: ConsoleLogEntry[] = [];
-  private flushTimer: NodeJS.Timeout | null = null;
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
   /** Store original console methods to restore later and call for local output */
   private originalConsole: Record<string, (...args: unknown[]) => void> = {};
 
@@ -145,22 +145,28 @@ export class ConsoleForwarder {
     const logs = [...this.buffer];
     this.buffer = [];
 
-    // Send to server with fire-and-forget approach
-    // We intentionally don't await or handle responses to avoid blocking console output
-    fetch(this.config.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ logs }),
-    }).catch((error) => {
-      // Only log in development to help debug forwarding issues
-      if (process.env.NODE_ENV === 'development') {
-        // Use original console to avoid infinite loops
-        this.originalConsole.warn?.('Console forwarding failed:', error);
+    // Send to server with fire-and-forget approach using void operator
+    const sendLogs = async (): Promise<void> => {
+      try {
+        await fetch(this.config.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ logs }),
+        });
+      } catch (error) {
+        // Only log in development to help debug forwarding issues
+        if (process.env.NODE_ENV === 'development') {
+          // Use original console to avoid infinite loops
+          this.originalConsole.warn?.('Console forwarding failed:', error);
+        }
+        // If server is down or network fails, we just lose these logs
       }
-      // If server is down or network fails, we just lose these logs
-    });
+    };
+
+    // Use void operator to satisfy @typescript-eslint/no-floating-promises
+    void sendLogs();
   }
 
   /**

@@ -31,7 +31,13 @@ export async function POST(request: NextRequest) {
     // Output each log to server console with formatting
     logs.forEach((entry) => {
       const timestamp = new Date(entry.timestamp).toISOString();
-      const url = new URL(entry.url).pathname;
+      let url: string;
+      try {
+        url = new URL(entry.url).pathname;
+      } catch {
+        // Fallback for invalid URLs
+        url = entry.url || '/';
+      }
 
       // Deserialize and format args for display
       let formattedArgs: string;
