@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { MessageResponse } from '@/types/api';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 import { getSessionService } from '@/lib/server/session-service';
 import { setupWebTest } from '@/test-utils/web-test-setup';
@@ -63,7 +63,11 @@ describe('Thread Messaging API', () => {
     testProjectId = project.getId();
 
     // Create a real session (will inherit provider config from project)
-    const session = await sessionService.createSession('Test Session', testProjectId);
+    const sessionInstance = Session.create({
+      name: 'Test Session',
+      projectId: testProjectId,
+    });
+    const session = sessionInstance.getInfo()!;
     realSessionId = session.id;
     realThreadId = session.id; // Session ID equals coordinator thread ID
   });
@@ -71,7 +75,6 @@ describe('Thread Messaging API', () => {
   afterEach(async () => {
     console.error = originalConsoleError;
     // Stop all agents first to prevent async operations after database closure
-    await sessionService.stopAllAgents();
     sessionService.clearActiveSessions();
     // Clean up provider instances
     await cleanupTestProviderInstances([providerInstanceId]);

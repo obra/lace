@@ -73,8 +73,7 @@ describe('Full Conversation Flow', () => {
   });
 
   afterEach(async () => {
-    // Stop all agents first to prevent async operations after database closure
-    await sessionService.stopAllAgents();
+    // Clear session registry to prevent async operations after database closure
     sessionService.clearActiveSessions();
     // Clean up spies
     addConnectionSpy?.mockRestore();

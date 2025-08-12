@@ -59,11 +59,15 @@ describe('SessionService with Provider Instances', () => {
       apiKey: 'test-key-123',
     });
 
-    // Now the test should pass - createSession should resolve the provider instance
-    const session = await sessionService.createSession('Test Session', testProject.getId());
+    // Use Session.create directly like the production code does
+    const session = Session.create({
+      name: 'Test Session',
+      projectId: testProject.getId(),
+    });
 
-    expect(session).toBeDefined();
-    expect(session.name).toBe('Test Session');
+    const sessionInfo = session.getInfo();
+    expect(sessionInfo).toBeDefined();
+    expect(sessionInfo!.name).toBe('Test Session');
   });
 });
 
@@ -137,11 +141,12 @@ describe('SessionService Missing Methods', () => {
       // Arrange: Create a session first
       const _sessionId = asThreadId('lace_20250101_sess02');
 
-      // Create a real session using SessionService
-      const initialSession = await sessionService.createSession(
-        'Original Session',
-        testProject.getId()
-      );
+      // Create a real session using Session.create directly
+      const sessionInstance = Session.create({
+        name: 'Original Session',
+        projectId: testProject.getId(),
+      });
+      const initialSession = sessionInstance.getInfo()!;
 
       const updates = { name: 'Updated Session', description: 'New description' };
 
@@ -158,10 +163,11 @@ describe('SessionService Missing Methods', () => {
 
     it('should handle partial updates correctly', async () => {
       // Arrange: Create a session with multiple properties
-      const initialSession = await sessionService.createSession(
-        'Original Session',
-        testProject.getId()
-      );
+      const sessionInstance = Session.create({
+        name: 'Original Session',
+        projectId: testProject.getId(),
+      });
+      const initialSession = sessionInstance.getInfo()!;
 
       // Act: Update only one property
       const partialUpdates = { description: 'Partially updated description' };
@@ -280,7 +286,11 @@ describe('SessionService approval event forwarding', () => {
     sessionService = getSessionService();
 
     // Create a real session with real agent using the real project
-    const sessionData = await sessionService.createSession('Test Session', testProject.getId());
+    const sessionInstance = Session.create({
+      name: 'Test Session',
+      projectId: testProject.getId(),
+    });
+    const sessionData = sessionInstance.getInfo()!;
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
@@ -374,7 +384,11 @@ describe('SessionService agent state change broadcasting', () => {
     sessionService = getSessionService();
 
     // Create a real session with real agent
-    const sessionData = await sessionService.createSession('Test Session', testProject.getId());
+    const sessionInstance = Session.create({
+      name: 'Test Session',
+      projectId: testProject.getId(),
+    });
+    const sessionData = sessionInstance.getInfo()!;
 
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;

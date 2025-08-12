@@ -66,7 +66,11 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     testProjectId = project.getId();
 
     // Create a real session
-    const newSession = await sessionService.createSession('Test Session', testProjectId);
+    const sessionInstance = Session.create({
+      name: 'Test Session',
+      projectId: testProjectId,
+    });
+    const newSession = sessionInstance.getInfo()!;
     testSessionId = newSession.id;
 
     // Get the active session instance to access task manager

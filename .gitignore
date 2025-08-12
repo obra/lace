@@ -52,7 +52,8 @@ debug.log*
 pids
 *.pid
 *.seed
-.claude/settings.local.json
+# Claude Code tool settings
+.claude/
 
 # Temp dir
 temp/

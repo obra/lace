@@ -27,7 +27,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 // Import the real API route handlers after mocks
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, Session } from '@/lib/server/lace-imports';
 import type { AgentInfo } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 
@@ -88,14 +88,17 @@ describe('Agent Spawning API E2E Tests', () => {
     );
 
     sessionService = getSessionService();
-    const session = await sessionService.createSession('Agent Test Session', testProject.getId());
+    const sessionInstance = Session.create({
+      name: 'Agent Test Session',
+      projectId: testProject.getId(),
+    });
+    const session = sessionInstance.getInfo()!;
     sessionId = session.id as string;
   });
 
   afterEach(async () => {
     // Clean up agents before tearing down persistence
     if (sessionService) {
-      await sessionService.stopAllAgents();
       sessionService.clearActiveSessions();
     }
 

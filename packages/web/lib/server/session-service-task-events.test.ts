@@ -61,9 +61,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
   afterEach(async () => {
     broadcastSpy.mockRestore();
     if (sessionService) {
-      await sessionService.stopAllAgents().catch(() => {
-        // Ignore cleanup errors - database may already be closed
-      });
       sessionService.clearActiveSessions();
     }
     cleanupTestProviderDefaults();
