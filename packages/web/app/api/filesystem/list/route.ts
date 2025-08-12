@@ -103,8 +103,8 @@ export async function GET(request: NextRequest) {
       breadcrumbNames.push('Home');
     } else {
       // Build path from home to current directory
-      const relativePath = relative(homeDir, absolutePath);
-      const pathParts = relativePath.split('/').filter(Boolean);
+      const relativePathForBreadcrumbs = relative(homeDir, absolutePath);
+      const pathParts = relativePathForBreadcrumbs.split('/').filter(Boolean);
 
       breadcrumbPaths.push(homeDir);
       breadcrumbNames.push('Home');

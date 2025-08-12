@@ -2,12 +2,12 @@
 // ABOUTME: Documents all component variants with interactive examples
 
 import type { Meta, StoryObj } from '@storybook/react';
-import { DirectoryField } from './DirectoryField';
-import { useState } from 'react';
+import { ComponentProps, useState } from 'react';
+import { DirectoryField } from '@/components/ui/DirectoryField';
 
-// Create a meta object that doesn't enforce the DirectoryField component's required props
-const meta: Meta = {
+const meta = {
   title: 'UI/DirectoryField',
+  component: DirectoryField,
   parameters: {
     layout: 'padded',
     docs: {
@@ -17,13 +17,13 @@ const meta: Meta = {
     },
   },
   tags: ['autodocs'],
-};
+} satisfies Meta<typeof DirectoryField>;
 
 export default meta;
 type Story = StoryObj;
 
 // Wrapper component to manage state
-function DirectoryFieldWrapper(props: Omit<React.ComponentProps<typeof DirectoryField>, 'value' | 'onChange'> & { value?: string }) {
+function DirectoryFieldWrapper(props: Omit<ComponentProps<typeof DirectoryField>, 'value' | 'onChange'> & { value?: string }) {
   const [value, setValue] = useState(props.value || '');
   
   return (

@@ -45,7 +45,7 @@ export function DirectoryField({
   const [homeDirectory, setHomeDirectory] = useState<string>('');
   const [apiError, setApiError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const hasInitializedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -128,20 +128,20 @@ export function DirectoryField({
 
   // Initialize with home directory on first load
   useEffect(() => {
-    if (!hasInitialized) {
+    if (!hasInitializedRef.current) {
       void fetchDirectories('');
-      setHasInitialized(true);
+      hasInitializedRef.current = true;
     }
-  }, [hasInitialized, fetchDirectories]);
+  }, [fetchDirectories]);
   
   // Separate effect for prepopulating path after initialization
   useEffect(() => {
-    if (prepopulatePath && hasInitialized && !value && currentPath) {
+    if (prepopulatePath && hasInitializedRef.current && !value && currentPath) {
       // Add trailing slash for directory paths
       const pathWithSlash = currentPath.endsWith('/') ? currentPath : currentPath + '/';
       onChange(pathWithSlash);
     }
-  }, [prepopulatePath, hasInitialized, value, currentPath, onChange]);
+  }, [prepopulatePath, value, currentPath, onChange]);
   
   // Load directories when dropdown opens
   useEffect(() => {
@@ -297,7 +297,7 @@ export function DirectoryField({
               {/* Show filtered directory contents */}
               {getFilteredDirectories().length > 0 && (
                 <>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div className="overflow-y-auto">
                     {getVisibleDirectories().map((dir) => (
                       <button
                         key={dir.path}

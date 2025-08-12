@@ -6,6 +6,7 @@ import { GET } from './route';
 import { NextRequest } from 'next/server';
 import { homedir } from 'os';
 import { join } from 'path';
+import { promises as fs } from 'fs';
 import { parseResponse } from '@/lib/serialization';
 import type { ListDirectoryResponse } from '@/types/filesystem';
 
@@ -95,17 +96,26 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should handle file path as invalid directory', async () => {
-    // Try to use a file as if it were a directory
-    const filePath = join(homedir(), '.bashrc'); // Common file that might exist
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${filePath}`);
-    const response = await GET(request);
+    // Create a temporary file inside home directory to ensure it exists and is accessible
+    const tempFilePath = join(homedir(), `test-file-${Date.now()}.txt`);
 
-    // Should either be 404 (file doesn't exist) or 400 (not a directory)
-    expect([400, 404]).toContain(response.status);
+    try {
+      await fs.writeFile(tempFilePath, 'test content');
 
-    if (response.status === 400) {
+      const request = new NextRequest(`http://localhost/api/filesystem/list?path=${tempFilePath}`);
+      const response = await GET(request);
+
+      // Should be 400 (not a directory) since we created a file
+      expect(response.status).toBe(400);
       const data = await parseResponse<{ error: string; code: string }>(response);
       expect(data.code).toBe('NOT_A_DIRECTORY');
+    } finally {
+      // Clean up the temporary file
+      try {
+        await fs.unlink(tempFilePath);
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   });
 });

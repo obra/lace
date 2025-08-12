@@ -2,7 +2,7 @@
 // ABOUTME: Validates input behavior, prop handling, and accessibility features
 
 import React from 'react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -11,11 +11,48 @@ import { DirectoryField } from './DirectoryField';
 // Use a mock homedir for consistent testing
 const mockHomedir = '/Users/testuser';
 
+// Mock fetch for consistent API responses
+const mockFetch = vi.fn();
+
 describe('DirectoryField', () => {
   const user = userEvent.setup();
 
+  beforeEach(() => {
+    // Mock fetch to return a minimal valid response
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{}'),
+      json: () => Promise.resolve({
+        currentPath: mockHomedir,
+        parentPath: null,
+        entries: [
+          {
+            name: 'Documents',
+            path: `${mockHomedir}/Documents`,
+            type: 'directory',
+            lastModified: new Date(),
+            permissions: { canRead: true, canWrite: true }
+          },
+          {
+            name: 'Downloads',
+            path: `${mockHomedir}/Downloads`,
+            type: 'directory',
+            lastModified: new Date(),
+            permissions: { canRead: true, canWrite: true }
+          }
+        ],
+        breadcrumbPaths: [mockHomedir],
+        breadcrumbNames: ['Home'],
+        homeDirectory: mockHomedir
+      })
+    });
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('should render with label and input', () => {
@@ -231,9 +268,10 @@ describe('DirectoryField', () => {
     const input = screen.getByLabelText('Directory');
     await user.click(input);
 
-    // Should show loading initially since API call will be triggered, or error if API fails
-    const loadingOrError = screen.queryByText('Loading directories...') || screen.queryByText(/Failed to/);
-    expect(loadingOrError).toBeInTheDocument();
+    // Wait for the mocked API response to load directories
+    await screen.findByText('Documents');
+    expect(screen.getByText('Documents')).toBeInTheDocument();
+    expect(screen.getByText('Downloads')).toBeInTheDocument();
   });
 
   it('should close dropdown when clicking outside', async () => {

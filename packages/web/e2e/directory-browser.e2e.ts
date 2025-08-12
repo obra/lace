@@ -7,7 +7,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
-} from './helpers/test-utils';
+} from '@/e2e/helpers/test-utils';
 
 test.describe('Directory Browser E2E Tests', () => {
   let testEnv: TestEnvironment;
@@ -87,8 +87,12 @@ test.describe('Directory Browser E2E Tests', () => {
     const hasValidationError =
       (await page.locator('.text-error, .text-red-500, [role="alert"]').count()) > 0;
 
-    // Either button should be disabled OR there should be a validation error visible
-    expect(isButtonEnabled === false || hasValidationError === true).toBeTruthy();
+    // Split OR condition into explicit assertions to show which condition failed
+    if (isButtonEnabled) {
+      expect(hasValidationError).toBeTruthy();
+    } else {
+      expect(isButtonEnabled).toBeFalsy();
+    }
   });
 
   test('should work with valid directory paths', async ({ page }) => {
@@ -159,10 +163,10 @@ test.describe('Directory Browser E2E Tests', () => {
     const hasBrowserElements = (await browserElements.count()) > 0;
     const hasDropdown = (await dropdownElement.count()) > 0;
 
-    // If DirectoryField dropdown is implemented, one of these should be true
-    if (hasBrowserElements || hasDropdown) {
-      console.log('Directory browser dropdown appears to be working');
-    }
+    // Verify DirectoryField dropdown functionality with proper assertion
+    await test.step('Verify directory browser dropdown appears', async () => {
+      expect(hasBrowserElements || hasDropdown).toBeTruthy();
+    });
 
     // This test mainly validates that the DirectoryField component is integrated
     // Even if dropdown doesn't appear, the field should still accept input
@@ -289,6 +293,13 @@ test.describe('Directory Browser E2E Tests', () => {
       timeout: 10000,
     });
 
-    console.log('Project creation with DirectoryField completed successfully');
+    await test.step('Project creation with DirectoryField completed', async () => {
+      // Verify we have successfully reached the chat interface
+      expect(
+        await page
+          .locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
+          .count()
+      ).toBeGreaterThan(0);
+    });
   });
 });
