@@ -78,3 +78,6 @@ storybook-static/
 
 # Playwright server files
 .playwright-server-url
+
+# Knip output
+knip-report.json
