@@ -101,7 +101,7 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = await parseResponse<Array<{ id: string; name: string }>>(response);
+      const data = await parseResponse<SessionInfo[]>(response);
 
       expect(response.status).toBe(200);
       expect(data.length).toBeGreaterThan(0); // At least the default session

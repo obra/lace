@@ -31,6 +31,11 @@ import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId, AgentInfo } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
+// Helper to escape special regex characters to prevent injection
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 interface ErrorResponse {
   error: string;
 }
@@ -127,7 +132,7 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       // ThreadId should follow sessionId.N pattern
-      expect(data.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
+      expect(data.threadId).toMatch(new RegExp(`^${escapeRegExp(sessionId)}\\.\\d+$`));
     });
 
     it('should support different provider instances and models', async () => {

@@ -60,7 +60,7 @@ describe('Provider Discovery API', () => {
           id: string;
           name: string;
           type: string;
-          models: Array<{ id: string; name: string }>;
+          models: Array<{ id: string; displayName: string }>;
           configured: boolean;
           instanceId?: string;
         }>
