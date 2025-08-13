@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "npm run typecheck ; eslint src ; ( cd packages/web && npm run lint)",
     "lint:fix": "npm run typecheck ; eslint src --fix ; (cd packages/web && npm run lint:fix)",
-    "format": "prettier --write \"src\"",
+    "format": "prettier --write \"src\"; ( cd packages/web && npm run format)",
     "knip": "npx knip --isolate-workspaces",
     "knip:ci": "npx knip --isolate-workspaces --reporter json > knip-report.json || true",
     "prepare": "husky",
