@@ -35,6 +35,7 @@ import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } 
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
+import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
@@ -45,10 +46,9 @@ import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 
 // Token usage section component
 const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId: ThreadId }) {
-  const { tokenUsage, loading, error } = useAgentTokenUsage(agentId);
+  const usageResult: UseAgentTokenUsageResult = useAgentTokenUsage(agentId);
 
-
-  if (loading) {
+  if (usageResult.loading) {
     return (
       <div className="flex justify-center p-4 border-t border-base-300">
         <div className="text-xs text-base-content/60">Loading token usage...</div>
@@ -56,15 +56,16 @@ const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId
     );
   }
 
-  if (error) {
+  if (usageResult.error) {
+    const errMsg = getErrorMessage(usageResult.error);
     return (
       <div className="flex justify-center p-4 border-t border-base-300">
-        <div className="text-xs text-error">Error loading token usage: {error}</div>
+        <div className="text-xs text-error">Error loading token usage: {errMsg}</div>
       </div>
     );
   }
 
-  if (!tokenUsage) {
+  if (!usageResult.tokenUsage) {
     return (
       <div className="flex justify-center p-4 border-t border-base-300">
         <div className="text-xs text-base-content/60">No token usage data available</div>
@@ -74,10 +75,7 @@ const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId
 
   return (
     <div className="flex justify-center p-4 border-t border-base-300">
-      <TokenUsageDisplay
-        tokenUsage={tokenUsage}
-        loading={loading}
-      />
+      <TokenUsageDisplay tokenUsage={usageResult.tokenUsage} loading={usageResult.loading} />
     </div>
   );
 });
