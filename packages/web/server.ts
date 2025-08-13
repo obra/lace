@@ -58,7 +58,7 @@ const shouldOpenBrowser = !!(process.stdin.isTTY && process.stdout.isTTY);
 
 // Validate port
 if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
-  console.error(`Error: Invalid port number: ${values.port}`);
+  console.error(`Error: Invalid port number: "${values.port}" (parsed as ${requestedPort})`);
   process.exit(1);
 }
 
@@ -80,7 +80,7 @@ async function tryStartServer(
         resolve(false);
       } else {
         // For other errors, we should fail
-        console.error(`Server error on port ${port}:`, err.message);
+        console.error(`Server error on port ${port} (${err.code || 'unknown'}):`, err.message);
         process.exit(1);
       }
     };
@@ -174,7 +174,8 @@ app
         await open(url);
       } catch (error) {
         // Silently ignore browser opening errors - not critical to server operation
-        console.log(`   ℹ️  Could not open browser automatically`);
+        const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
+        console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
       }
     }
   })
