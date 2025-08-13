@@ -31,5 +31,3 @@ export const InfoSection: React.FC<InfoSectionProps> = ({
     </div>
   );
 };
-
-export default InfoSection;

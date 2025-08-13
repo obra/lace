@@ -33,5 +33,3 @@ export const AccentInput = React.forwardRef<HTMLInputElement, AccentInputProps>(
   }
 );
 AccentInput.displayName = 'AccentInput';
-
-export default AccentInput;

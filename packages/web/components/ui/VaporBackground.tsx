@@ -49,5 +49,3 @@ export function VaporBackground({
     </div>
   );
 }
-
-export default VaporBackground;

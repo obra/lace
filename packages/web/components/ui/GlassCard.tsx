@@ -26,5 +26,3 @@ export function GlassCard({ as: Tag = 'div', className, children, ...rest }: Gla
     </Tag>
   );
 }
-
-export default GlassCard;

@@ -33,5 +33,3 @@ export const InfoIconButton: React.FC<InfoIconButtonProps> = ({
     </button>
   );
 };
-
-export default InfoIconButton;

@@ -35,5 +35,3 @@ export const OnboardingActions: React.FC<OnboardingActionsProps> = ({
     </div>
   );
 };
-
-export default OnboardingActions;

@@ -28,5 +28,3 @@ export const AdvancedSettingsCollapse: React.FC<AdvancedSettingsCollapseProps> =
     </div>
   );
 };
-
-export default AdvancedSettingsCollapse;

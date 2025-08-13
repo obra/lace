@@ -23,5 +23,3 @@ export function AccentButton({ className, iconLeft, children, ...rest }: AccentB
     </button>
   );
 }
-
-export default AccentButton;

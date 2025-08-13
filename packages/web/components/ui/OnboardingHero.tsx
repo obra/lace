@@ -59,5 +59,3 @@ export const OnboardingHero: React.FC<OnboardingHeroProps> = ({
     </div>
   );
 };
-
-export default OnboardingHero;

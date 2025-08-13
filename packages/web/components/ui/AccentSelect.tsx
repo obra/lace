@@ -41,5 +41,3 @@ export const AccentSelect = React.forwardRef<HTMLSelectElement, AccentSelectProp
   }
 );
 AccentSelect.displayName = 'AccentSelect';
-
-export default AccentSelect;
