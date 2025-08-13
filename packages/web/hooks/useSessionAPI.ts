@@ -93,7 +93,11 @@ export function useSessionAPI() {
           throw new Error('Failed to spawn agent');
         }
 
-        const data = parse(await response.text()) as AgentInfo;
+        const text = await response.text();
+        const data: unknown = parse(text);
+        if (!isAgentInfo(data)) {
+          throw new Error('Invalid agent payload');
+        }
         return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
