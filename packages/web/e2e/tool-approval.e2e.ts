@@ -165,12 +165,22 @@ test.describe('Tool Approval Workflow', () => {
         }
       }
       
+      // Check if test file still exists using async pattern
+      let testFileStillExists = false;
+      try {
+        await fs.promises.stat(testFilePath);
+        testFileStillExists = true;
+      } catch {
+        // File doesn't exist - ignore
+        testFileStillExists = false;
+      }
+      
       const toolTriggerAnalysis = {
         messagesAttempted: toolTriggerMessages.length,
         approvalRequests: toolActivity.approvalRequests,
         modalAppeared: toolActivity.modalAppeared,
         approvalButtons: toolActivity.approvalButtons,
-        testFileCreated: fs.existsSync(testFilePath)
+        testFileCreated: testFileStillExists
       };
       
       console.log('Tool Trigger Analysis:', JSON.stringify(toolTriggerAnalysis, null, 2));

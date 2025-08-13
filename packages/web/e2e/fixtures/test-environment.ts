@@ -14,7 +14,7 @@ export interface TestEnvironmentContext {
 
 // Extend Playwright's base test with our environment fixture
 export const test = baseTest.extend<{}, { testEnv: TestEnvironmentContext }>({
-  testEnv: [async (_args, use, testInfo) => {
+  testEnv: [async ({}, use, testInfo) => {
     // Create worker-specific temp directory (similar to temp-lace-dir.ts pattern)
     const workerIndex = testInfo.workerIndex;
     const tempDir = await fs.promises.mkdtemp(
@@ -46,7 +46,7 @@ export const test = baseTest.extend<{}, { testEnv: TestEnvironmentContext }>({
     }
 
     // Cleanup: remove temp directory
-    if (fs.existsSync(tempDir)) {
+    if (await fs.promises.stat(tempDir).then(() => true).catch(() => false)) {
       await fs.promises.rm(tempDir, { recursive: true, force: true });
     }
 

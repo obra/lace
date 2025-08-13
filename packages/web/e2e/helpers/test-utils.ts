@@ -34,7 +34,7 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
 
   delete process.env.ANTHROPIC_KEY;
 
-  if (env.tempDir && fs.existsSync(env.tempDir)) {
+  if (env.tempDir && await fs.promises.stat(env.tempDir).then(() => true).catch(() => false)) {
     await fs.promises.rm(env.tempDir, { recursive: true, force: true });
   }
 }
@@ -80,6 +80,11 @@ export async function createProject(page: Page, projectName: string, tempDir: st
 
   // Create the directory first so validation passes
   await fs.promises.mkdir(projectPath, { recursive: true });
+  
+  // Verify project directory was created successfully
+  if (!(await fs.promises.stat(projectPath).then(() => true).catch(() => false))) {
+    throw new Error(`Failed to create project directory: ${projectPath}`);
+  }
 
   // Fill the directory path
   await directoryInput.fill(projectPath);
@@ -274,6 +279,11 @@ export async function createProjectWithProvider(
   // Create the project directory
   const projectPath = path.join(tempDir, projectName.replace(/\s+/g, '-').toLowerCase());
   await fs.promises.mkdir(projectPath, { recursive: true });
+  
+  // Verify project directory was created successfully
+  if (!(await fs.promises.stat(projectPath).then(() => true).catch(() => false))) {
+    throw new Error(`Failed to create project directory: ${projectPath}`);
+  }
 
   // Fill in the directory path
   await directoryInput.fill(projectPath);

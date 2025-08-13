@@ -58,7 +58,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should persist project selection across page reloads', async ({ page }) => {
     // Navigate to the app
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
 
     // Wait for projects to load (h1 with "Select a Project" or existing project cards)
     await page.locator('h1:has-text("Select a Project"), h3').first().waitFor({ timeout: 5000 });
@@ -102,7 +102,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should persist session selection across page reloads', async ({ page }) => {
     // Start at the base URL
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
 
     // Navigate through project → session selection - wait for page to load
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
@@ -179,7 +179,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     page,
   }) => {
     // Navigate to the app
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
 
     // Navigate through the full hierarchy: project → session → agent
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
@@ -279,7 +279,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test.skip('should handle browser back/forward navigation correctly', async ({ page }) => {
     // Navigate to the app
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
 
     // Navigate through the hierarchy step by step to test back navigation
     await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
@@ -367,7 +367,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should handle invalid URLs gracefully', async ({ page }) => {
     // Test with invalid project ID
-    await page.goto('http://localhost:3005/#/project/invalid-project-id');
+    await page.goto('/#/project/invalid-project-id');
 
     // Should fallback to project selection view
     await expect(
@@ -375,7 +375,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     ).toBeVisible();
 
     // Test with malformed URL
-    await page.goto('http://localhost:3005/#/invalid/path/structure');
+    await page.goto('/#/invalid/path/structure');
 
     // Should fallback to project selection
     await expect(
@@ -383,7 +383,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     ).toBeVisible();
 
     // Test with partial hierarchy (agent without session)
-    await page.goto('http://localhost:3005/#/project/test/agent/invalid');
+    await page.goto('/#/project/test/agent/invalid');
 
     // Should fallback appropriately (likely to project view since session is missing)
     await expect(
@@ -393,7 +393,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should support deep linking to specific conversations', async ({ page }) => {
     // First, create the full hierarchy through normal navigation
-    await page.goto('http://localhost:3005');
+    await page.goto('/');
 
     // Navigate to create a testable URL
     await page.waitForSelector('h1:has-text("Select a Project"), [data-testid="project-card"]', {
@@ -417,7 +417,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
         // Verify we have a valid session URL
         if (deepLinkUrl.includes('/session/')) {
           // Open new page/tab simulation by navigating away and back
-          await page.goto('http://localhost:3005');
+          await page.goto('/');
 
           // Now use the deep link
           await page.goto(deepLinkUrl);

@@ -1,7 +1,7 @@
 // ABOUTME: E2E test for agent stop functionality using Playwright
 // ABOUTME: Tests stopping agent generation mid-stream using reusable test utilities
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './mocks/setup';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
