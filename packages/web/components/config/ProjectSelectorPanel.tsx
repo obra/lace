@@ -530,11 +530,11 @@ export function ProjectSelectorPanel({
             `[create-project] Could not obtain session for project ${projectId} after ${maxAttempts} attempts; falling back to project selection.`
           );
           // Fallback to regular project selection if session fetch failed
-          onProjectSelect(projectData.project);
+          onProjectSelect(projectData);
         }
       } else {
         // Fallback to regular project creation - just select the project
-        onProjectSelect(projectData.project);
+        onProjectSelect(projectData);
       }
 
       handleCancelCreateProject();

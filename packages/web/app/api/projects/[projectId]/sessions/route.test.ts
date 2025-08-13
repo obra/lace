@@ -134,9 +134,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{
-        session: { id: string; name: string; createdAt: Date };
-      }>(response);
+      const data = await parseResponse<{ id: string; name: string; createdAt: Date }>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();
