@@ -110,27 +110,23 @@ describe('LaceApp Task Sidebar Integration', () => {
     // Mock fetch using the new utility that handles superjson properly
     global.fetch = vi.fn().mockImplementation(
       createFetchMock({
-        '/api/projects': {
-          projects: [
-            {
-              id: 'test-project',
-              name: 'Test Project',
-              description: 'Test project description',
-              workingDirectory: '/test',
-              isArchived: false,
-              createdAt: new Date(),
-              lastUsedAt: new Date(),
-              sessionCount: 1,
-            },
-          ],
-        },
-        '/api/providers': { providers: [] },
-        '/api/sessions/lace_20250101_sess01': {
-          session: {
-            id: 'lace_20250101_sess01',
-            name: 'Test Session',
-            agents: [],
+        '/api/projects': [
+          {
+            id: 'test-project',
+            name: 'Test Project',
+            description: 'Test project description',
+            workingDirectory: '/test',
+            isArchived: false,
+            createdAt: new Date(),
+            lastUsedAt: new Date(),
+            sessionCount: 1,
           },
+        ],
+        '/api/providers': [],
+        '/api/sessions/lace_20250101_sess01': {
+          id: 'lace_20250101_sess01',
+          name: 'Test Session',
+          agents: [],
         },
       })
     );

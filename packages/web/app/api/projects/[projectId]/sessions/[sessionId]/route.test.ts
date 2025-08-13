@@ -99,7 +99,7 @@ describe('Individual session API endpoints', () => {
       const data = await parseResponse<typeof mockSession>(response);
 
       expect(response.status).toBe(200);
-      expect(data.session).toBeDefined();
+      expect(data).toBeDefined();
       expect(data.id).toBe('session1');
 
       // CRITICAL: Should NOT have tokenUsage field

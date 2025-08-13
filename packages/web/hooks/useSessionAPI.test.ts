@@ -27,7 +27,7 @@ describe('useSessionAPI', () => {
         agents: [],
       };
 
-      mockFetch.mockResolvedValueOnce(createMockResponse({ session: mockSession }));
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockSession));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -94,7 +94,7 @@ describe('useSessionAPI', () => {
         ],
       };
 
-      mockFetch.mockResolvedValueOnce(createMockResponse({ session: mockSession }));
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockSession));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -137,7 +137,7 @@ describe('useSessionAPI', () => {
         createdAt: new Date().toISOString(),
       };
 
-      mockFetch.mockResolvedValueOnce(createMockResponse({ agent: mockAgent }));
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockAgent));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -208,7 +208,7 @@ describe('useSessionAPI', () => {
         },
       ];
 
-      mockFetch.mockResolvedValueOnce(createMockResponse({ agents: mockAgents }));
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockAgents));
 
       const { result } = renderHook(() => useSessionAPI());
 
@@ -329,7 +329,7 @@ describe('useSessionAPI', () => {
         createdAt: new Date().toISOString(),
         agents: [],
       };
-      mockFetch.mockResolvedValueOnce(createMockResponse({ session: mockSession }));
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockSession));
 
       await act(async () => {
         await result.current.getSession('lace_20250113_test123' as ThreadId);

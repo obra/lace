@@ -135,10 +135,8 @@ describe('SSE Stream E2E Tests', () => {
     });
     expect(agentResponse.status).toBe(201);
 
-    const agentData = await parseResponse<{
-      agent: { threadId: string };
-    }>(agentResponse);
-    const agentThreadId = agentData.agent.threadId;
+    const agentData = await parseResponse<{ threadId: string }>(agentResponse);
+    const agentThreadId = agentData.threadId;
 
     // Establish SSE connection
     const sseRequest = new NextRequest(`http://localhost/api/events/stream?sessions=${sessionId}`);

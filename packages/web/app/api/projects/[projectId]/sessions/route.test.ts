@@ -75,9 +75,10 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = await parseResponse<{
-        sessions: Array<{ id: string; name: string; createdAt: Date; agentCount: number }>;
-      }>(response);
+      const data =
+        await parseResponse<
+          Array<{ id: string; name: string; createdAt: Date; agentCount: number }>
+        >(response);
 
       expect(response.status).toBe(200);
       expect(data.length).toBeGreaterThan(0);
@@ -201,9 +202,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{
-        session: { id: string; name: string; createdAt: Date };
-      }>(response);
+      const data = await parseResponse<{ id: string; name: string; createdAt: Date }>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();
@@ -223,9 +222,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{
-        session: { id: string; name: string; createdAt: Date };
-      }>(response);
+      const data = await parseResponse<{ id: string; name: string; createdAt: Date }>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();

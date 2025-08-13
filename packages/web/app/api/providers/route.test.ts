@@ -55,16 +55,16 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{
-        providers: Array<{
+      const data = await parseResponse<
+        Array<{
           id: string;
           name: string;
           type: string;
           models: Array<{ id: string; name: string }>;
           configured: boolean;
           instanceId?: string;
-        }>;
-      }>(response);
+        }>
+      >(response);
 
       // Should return providers with configured instances
       expect(data.length).toBeGreaterThan(0);
@@ -98,8 +98,8 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ providers: unknown[] }>(response);
-      expect(data.providers).toHaveLength(0);
+      const data = await parseResponse<unknown[]>(response);
+      expect(data).toHaveLength(0);
     });
 
     it('should include model information for each configured provider', async () => {
@@ -112,11 +112,11 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{
-        providers: Array<{
+      const data = await parseResponse<
+        Array<{
           models: Array<{ id: string; displayName: string }>;
-        }>;
-      }>(response);
+        }>
+      >(response);
 
       // Each provider should have its models listed
       data.forEach((provider) => {
