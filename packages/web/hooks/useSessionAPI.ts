@@ -38,11 +38,7 @@ export function useSessionAPI() {
           throw new Error('Failed to create session');
         }
 
-        const text = await response.text();
-        const data: unknown = parse(text);
-        if (!isSessionInfo(data)) {
-          throw new Error('Invalid session payload');
-        }
+        const data = parse(await response.text()) as SessionInfo;
         return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
@@ -66,11 +62,7 @@ export function useSessionAPI() {
         throw new Error('Failed to get session');
       }
 
-      const text = await response.text();
-      const data: unknown = parse(text);
-      if (!isSessionInfo(data)) {
-        throw new Error('Invalid session payload');
-      }
+      const data = parse(await response.text()) as SessionInfo;
       return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
@@ -97,11 +89,7 @@ export function useSessionAPI() {
           throw new Error('Failed to spawn agent');
         }
 
-        const text = await response.text();
-        const data: unknown = parse(text);
-        if (!isAgentInfo(data)) {
-          throw new Error('Invalid agent payload');
-        }
+        const data = parse(await response.text()) as AgentInfo;
         return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
@@ -125,11 +113,7 @@ export function useSessionAPI() {
         throw new Error('Failed to list agents');
       }
 
-      const text = await response.text();
-      const data: unknown = parse(text);
-      if (!Array.isArray(data) || !data.every(isAgentInfo)) {
-        throw new Error('Invalid agents payload');
-      }
+      const data = parse(await response.text()) as AgentInfo[];
       return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
