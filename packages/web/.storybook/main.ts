@@ -1,19 +1,16 @@
 import type { StorybookConfig } from '@storybook/nextjs-vite';
 import path from 'path';
+import tailwind from '@tailwindcss/postcss';
+import autoprefixer from 'autoprefixer';
 
 const config: StorybookConfig = {
   stories: ['../components/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
-  addons: [
-    '@storybook/addon-essentials',
-    '@storybook/addon-docs',
-    '@storybook/addon-a11y',
-  ],
+  addons: ['@storybook/addon-docs', '@storybook/addon-a11y'],
   framework: {
     name: '@storybook/nextjs-vite',
     options: {},
   },
   docs: {
-    autodocs: true,
     defaultName: 'Docs',
   },
   staticDirs: ['../public'],
@@ -47,11 +44,15 @@ const config: StorybookConfig = {
         'react',
         'react-dom',
         'react-dom/client',
-        'markdown-to-jsx',
       ],
       exclude: [
         // Exclude heavy dependencies that can be lazy-loaded
         'cli-highlight',
+        // Exclude CSS framework/plugins from pre-bundling to avoid Vite optimizer chunk issues
+        'daisyui',
+        'tailwindcss',
+        'postcss',
+        'autoprefixer',
       ],
     };
 
@@ -91,6 +92,16 @@ const config: StorybookConfig = {
         allow: ['..', '.'],
       },
     };
+
+    // Ensure PostCSS receives a `from` to avoid warnings in Storybook/Vite
+    config.css = {
+      ...config.css,
+      postcss: {
+        plugins: [tailwind(), autoprefixer()],
+        // Setting `from` helps PostCSS resolve paths and silences the warning
+        options: { from: 'storybook.css' },
+      },
+    } as any;
 
     return config;
   },

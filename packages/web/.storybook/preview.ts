@@ -1,6 +1,7 @@
 import type { Preview } from '@storybook/nextjs-vite';
 import React from 'react';
 import '../app/globals.css';
+import { dmSans, lato, jetBrainsMono } from '../app/fonts';
 import { withTennisCommentary } from './decorators/tennis-commentary';
 
 // Performance optimization: Lazy load heavy dependencies
@@ -31,7 +32,16 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ['Overview', 'Design System', 'Atoms', 'Molecules', 'Organisms', 'Templates', 'Pages', '*'],
+        order: [
+          'Overview',
+          'Design System',
+          'Atoms',
+          'Molecules',
+          'Organisms',
+          'Templates',
+          'Pages',
+          '*',
+        ],
       },
     },
     // Performance optimizations
@@ -52,10 +62,7 @@ const preview: Preview = {
       // Disable for heavy components during development
       disable: process.env.NODE_ENV === 'development',
       // Skip stories that are too complex for visual regression
-      skip: [
-        'Pages/LaceApp--interactive-demo',
-        'Pages/AnimatedLaceApp--interactive-demo',
-      ],
+      skip: ['Pages/LaceApp--interactive-demo', 'Pages/AnimatedLaceApp--interactive-demo'],
     },
     // Layout optimization
     layout: 'centered',
@@ -122,7 +129,7 @@ const preview: Preview = {
       const storyId = context.id;
       const isAnimatedStory = storyId.includes('animated') || storyId.includes('motion');
       const isCodeStory = storyId.includes('code') || storyId.includes('syntax');
-      
+
       // Preload dependencies based on story type
       if (isAnimatedStory) {
         lazyImports.framerMotion().catch(() => {});
@@ -130,7 +137,7 @@ const preview: Preview = {
       if (isCodeStory) {
         lazyImports.syntaxHighlighting().catch(() => {});
       }
-      
+
       return React.createElement(Story);
     },
     // Theme decorator
@@ -138,9 +145,9 @@ const preview: Preview = {
       const theme = context.globals.theme;
       return React.createElement(
         'div',
-        { 
+        {
           'data-theme': theme,
-          className: 'min-h-screen bg-base-100 text-base-content'
+          className: `${dmSans.className} ${dmSans.variable} ${lato.variable} ${jetBrainsMono.variable} min-h-screen bg-base-100 text-base-content`,
         },
         React.createElement(Story)
       );

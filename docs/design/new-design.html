@@ -1,0 +1,351 @@
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+  rel="stylesheet"
+/>
+
+<!-- Tailwind 4.1 (browser build) -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+<!-- daisyUI v5 (CDN) + all themes (so 'dim' & 'emerald' exist) -->
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" />
+
+<!-- Icons -->
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+
+<!-- Minimal custom CSS -->
+<style>
+  #app {
+    font-family:
+      'DM Sans',
+      system-ui,
+      -apple-system,
+      Segoe UI,
+      Roboto,
+      sans-serif;
+  }
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* Dim-friendly vapor backdrop (darker base, softer lines) */
+  .vapor-bg {
+    position: fixed;
+    inset: -12vmax;
+    z-index: -10;
+    pointer-events: none;
+    background-image:
+      radial-gradient(1200px 700px at 15% -10%, rgba(34, 197, 94, 0.14), transparent 60%),
+      radial-gradient(1000px 600px at 85% 0%, rgba(59, 130, 246, 0.1), transparent 60%),
+      linear-gradient(180deg, #0b0f0e, #121614);
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+  .vapor-bg .sunlines {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255, 105, 180, 0.1) 0 8px,
+      transparent 8px 22px
+    );
+    opacity: 0.15;
+  }
+  .vapor-bg .noise::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>\
+        <filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/>\
+        <feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .06 0'/></filter>\
+        <rect width='100%' height='100%' filter='url(%23n)'/>\
+      </svg>");
+    background-size: 220px 220px;
+    mix-blend-mode: overlay;
+    opacity: 0.35;
+  }
+
+  /* High-contrast glass for DIM: darker fill + lighter border + real blur */
+  .glass {
+    background-color: rgba(12, 16, 14, 0.55); /* deep neutral */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* crisp edge */
+    outline: 1px solid rgba(0, 0, 0, 0.45); /* depth */
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-radius: 1.25rem;
+    box-shadow:
+      0 14px 44px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .ring-hover {
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  .ring-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px rgba(16, 185, 129, 0.45),
+      0 22px 56px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Ensure readable copy on cards */
+  .card-copy {
+    color: hsl(0 0% 96% / 0.95);
+  } /* near-white */
+  .card-sub {
+    color: hsl(0 0% 92% / 0.8);
+  } /* softer but still high contrast */
+</style>
+
+<!-- APP (dim theme) -->
+<div id="app" data-theme="dim" class="min-h-screen text-base-content relative">
+  <!-- Background -->
+  <div class="vapor-bg">
+    <div class="sunlines"></div>
+    <div class="noise"></div>
+  </div>
+
+  <!-- NAV -->
+  <header class="sticky top-0 z-50 border-b border-white/10 bg-base-100/60 backdrop-blur-xl">
+    <div class="mx-auto max-w-6xl px-4">
+      <div class="navbar px-0">
+        <div class="flex-1 gap-3">
+          <a class="flex items-center gap-2 font-semibold tracking-tight">
+            <span
+              class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-300 text-xs"
+              >✦</span
+            >
+            <span class="text-lg">Lace</span>
+          </a>
+        </div>
+        <div class="flex-none">
+          <a class="btn btn-accent ring-hover">
+            <i class="fa-brands fa-vercel mr-2"></i>
+            Deploy
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="mx-auto max-w-6xl px-4 pt-16 pb-8">
+    <div class="grid gap-10 lg:grid-cols-2 items-center">
+      <div>
+        <h1 class="text-4xl md:text-6xl font-bold leading-[1.06] text-white">
+          Code with clarity.<br />
+          <span
+            class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent"
+          >
+            Not complexity.
+          </span>
+        </h1>
+        <p class="mt-4 max-w-prose text-lg text-white/85">
+          Local-first AI for developers—fast, private, and built to ship with confidence.
+        </p>
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <a href="#cta" class="btn btn-accent ring-hover">
+            <i class="fa-solid fa-bolt mr-2"></i>
+            Take control
+          </a>
+          <a
+            href="#features"
+            class="btn btn-outline border-white/20 text-white hover:border-white/40"
+          >
+            Learn more
+          </a>
+        </div>
+        <div
+          class="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white/80 backdrop-blur"
+        >
+          <i class="fa-solid fa-microchip"></i>
+          Powered by your hardware • OpenAI &amp; Anthropic compatible
+        </div>
+      </div>
+
+      <!-- Code panel -->
+      <div class="relative">
+        <div class="glass ring-hover p-5 lg:p-6">
+          <div class="rounded-2xl bg-gradient-to-b from-white/10 to-white/0 p-5">
+            <div
+              class="rounded-2xl p-5"
+              style="
+                background-image: repeating-linear-gradient(
+                  to bottom,
+                  rgba(255, 105, 180, 0.1) 0 8px,
+                  transparent 8px 22px
+                );
+              "
+            >
+              <pre
+                class="m-0 overflow-x-auto text-sm leading-relaxed font-mono text-white/95"
+              ><code>// lace.config.ts
+localFirst: true
+optimize:  "speed"
+insights:  "guided"
+visibility: "total"</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="pointer-events-none absolute -right-3 -top-3 select-none">
+          <div
+            class="rounded-full bg-gradient-to-br from-pink-300 to-cyan-300 px-3 py-1 text-xs font-semibold text-black"
+          >
+            NEW • v0.9
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUSTED -->
+  <section class="mx-auto max-w-6xl px-4 py-10">
+    <div class="text-center">
+      <div class="mb-4 text-xs tracking-widest text-white/60 uppercase">
+        Trusted by developers at leading companies
+      </div>
+      <div class="mx-auto inline-flex flex-wrap items-center justify-center gap-6 glass px-6 py-4">
+        <i class="fa-brands fa-stripe text-2xl text-white/70"></i>
+        <i class="fa-brands fa-vercel text-2xl text-white/70"></i>
+        <i class="fa-brands fa-figma text-2xl text-white/70"></i>
+        <i class="fa-brands fa-github text-2xl text-white/70"></i>
+        <i class="fa-brands fa-notion text-2xl text-white/70"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- GUIDE -->
+  <section class="bg-white/0">
+    <div class="mx-auto max-w-6xl px-4 py-16">
+      <div class="grid items-center gap-10 lg:grid-cols-2">
+        <div class="glass ring-hover p-6">
+          <h2 class="text-3xl md:text-4xl font-bold text-white">Your trail map for code.</h2>
+          <p class="mt-3 card-copy">
+            It’s easy to get lost in legacy projects or complex architecture. Lace provides
+            visibility into your work, illuminating the path forward so you can build, not decipher.
+          </p>
+          <p class="mt-2 card-sub">
+            Runs entirely on your local machine—fast, private, and free from network constraints.
+          </p>
+        </div>
+        <div class="relative">
+          <div class="glass ring-hover p-2">
+            <img
+              class="rounded-2xl border border-white/10"
+              src="https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&w=1400&q=80"
+              alt="Abstract representation of code structure"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="mx-auto max-w-6xl px-4 py-16">
+    <div class="text-center">
+      <h2 class="text-3xl md:text-4xl font-bold text-white">The right gear for any terrain.</h2>
+      <p class="mt-3 text-white/80">From quick scripts to enterprise apps—go fast, stay private.</p>
+    </div>
+
+    <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <article class="glass ring-hover p-6">
+        <div class="mb-3 text-2xl text-emerald-300"><i class="fa-solid fa-microchip"></i></div>
+        <h3 class="text-lg font-semibold text-white">Blazing-Fast Local AI</h3>
+        <p class="mt-2 card-copy">
+          Run models on your machine for instant suggestions—no cloud latency.
+        </p>
+        <div class="badge badge-accent mt-3">Local First</div>
+      </article>
+
+      <article class="glass ring-hover p-6">
+        <div class="mb-3 text-2xl text-cyan-300"><i class="fa-solid fa-layer-group"></i></div>
+        <h3 class="text-lg font-semibold text-white">Intuitive UX</h3>
+        <p class="mt-2 card-copy">
+          A clean, Vercel-adjacent UI that enhances your IDE flow, not fights it.
+        </p>
+        <div class="badge badge-info mt-3">Better Workflow</div>
+      </article>
+
+      <article class="glass ring-hover p-6">
+        <div class="mb-3 flex items-center gap-2 text-2xl text-rose-300">
+          <span>🐗</span><i class="fa-solid fa-chart-line"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-white">Guided Insights</h3>
+        <p class="mt-2 card-copy">
+          Tiny, delightful nudges—like a friendly hog pointing at hot paths.
+        </p>
+        <!-- sparkline -->
+        <svg
+          class="mt-4 h-10 w-full"
+          viewBox="0 0 100 24"
+          fill="none"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 20 L10 16 L18 18 L26 12 L34 14 L42 7 L50 10 L58 8 L66 5 L74 9 L82 6 L90 12 L98 4"
+            stroke="url(#g1)"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+          <defs>
+            <linearGradient id="g1" x1="0" x2="100" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF6AD5" />
+              <stop offset="1" stop-color="#22D3EE" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </article>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="cta" class="mx-auto max-w-6xl px-4 pb-20">
+    <div
+      class="relative overflow-hidden rounded-2xl p-8 sm:p-12"
+      style="
+        box-shadow: 0 18px 64px rgba(0, 0, 0, 0.45);
+        background: linear-gradient(135deg, #059669 0%, #06b6d4 30%, #6366f1 60%, #f472b6 100%);
+      "
+    >
+      <div class="relative z-10 text-center">
+        <h2 class="text-3xl md:text-4xl font-extrabold text-white">Ready to find a better path?</h2>
+        <p class="mx-auto mt-2 max-w-prose text-white/90">
+          Lace is in private beta. Join the waitlist and ship with confidence.
+        </p>
+        <div class="mt-6">
+          <a class="btn bg-white text-black hover:bg-white/90 border-0" href="#">
+            Join the Waitlist
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-white/10 bg-base-100/60 backdrop-blur">
+    <div class="mx-auto max-w-6xl px-4">
+      <div class="flex flex-col gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm text-white/70">© 2025 Lace, Inc.</p>
+        <nav class="flex flex-wrap items-center gap-4">
+          <a class="link link-hover text-sm text-white/80">Bluesky</a>
+          <a class="link link-hover text-sm text-white/80">GitHub</a>
+          <a class="link link-hover text-sm text-white/80">Changelog</a>
+          <a class="link link-hover text-sm text-white/80">Contact</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+</div>
