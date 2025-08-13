@@ -3,23 +3,15 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
+import { withTempLaceDir } from './utils/withTempLaceDir';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 test.describe('Browser Navigation Support', () => {
   test('handles browser back and forward navigation correctly', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-navigation-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Navigation Test Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-navigation-', async (tempDir) => {
+      const projectName = 'E2E Navigation Test Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Start at home page
       await page.goto('/');
       const homeUrl = page.url();
@@ -100,32 +92,13 @@ test.describe('Browser Navigation Support', () => {
         console.log('Browser navigation handled but behavior documented');
         expect(true).toBeTruthy(); // Still valid outcome
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
   test('preserves application state during URL hash changes', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-hash-navigation-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Hash Navigation Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-hash-navigation-', async (tempDir) => {
+      const projectName = 'E2E Hash Navigation Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
@@ -220,34 +193,16 @@ test.describe('Browser Navigation Support', () => {
           expect(true).toBeTruthy(); // Still valuable documentation
         }
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
   test('handles direct URL access and deep linking', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-deep-linking-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Deep Linking Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-deep-linking-', async (tempDir) => {
+      const projectName = 'E2E Deep Linking Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // First create a project to get a valid URL structure
       await page.goto('/');
+      const homeUrl = page.url(); // Capture home URL for reference
       
       const projectPath = path.join(tempDir, 'deep-linking-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
@@ -309,7 +264,7 @@ test.describe('Browser Navigation Support', () => {
               
               if (finalUrl === scenario.url) {
                 result = 'url-accepted';
-              } else if (finalUrl === 'http://localhost:3000/' || finalUrl.endsWith('/#/')) {
+              } else if (finalUrl === homeUrl || finalUrl.endsWith('/#/')) {
                 result = 'redirected-to-home';
               } else if (finalUrl.includes('/project/') && finalUrl !== scenario.url) {
                 result = 'redirected-to-valid-project';
@@ -371,32 +326,13 @@ test.describe('Browser Navigation Support', () => {
         console.log('Could not extract URL structure for deep linking tests');
         expect(true).toBeTruthy(); // Test still provides value by documenting URL structure
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
   test('validates browser refresh and reload behavior', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-refresh-behavior-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Refresh Behavior Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-refresh-behavior-', async (tempDir) => {
+      const projectName = 'E2E Refresh Behavior Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project and establish state
       await page.goto('/');
       
@@ -525,17 +461,6 @@ test.describe('Browser Navigation Support', () => {
         console.log('Refresh behavior documented - interface handling varies');
         expect(true).toBeTruthy(); // Still valuable documentation
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 });

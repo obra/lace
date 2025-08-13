@@ -3,23 +3,15 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
+import { withTempLaceDir } from './utils/withTempLaceDir';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 test.describe('Tool Approval Workflow', () => {
-  test('detects tool approval system endpoints and UI', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-tool-detection-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Tool Detection Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('detects tool approval system endpoints and UI', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-tool-detection-', async (tempDir) => {
+      const projectName = 'E2E Tool Detection Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Monitor for tool-related API calls
       const toolRequests: string[] = [];
       page.on('request', request => {
@@ -38,8 +30,8 @@ test.describe('Tool Approval Workflow', () => {
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
       
-      // Wait for initial API calls to complete
-      await page.waitForTimeout(3000);
+      // Wait for chat interface to be ready (indicates API calls completed)
+      await expect(chatInterface.messageInput).toBeVisible({ timeout: 5000 });
       
       // Check for tool approval related UI elements
       const toolApprovalElements = {
@@ -70,32 +62,13 @@ test.describe('Tool Approval Workflow', () => {
         console.log('No obvious tool approval UI found in default state');
         expect(true).toBeTruthy(); // Still a valid outcome to document
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('attempts to trigger tool approval with file operations request', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-tool-trigger-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Tool Trigger Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('attempts to trigger tool approval with file operations request', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-tool-trigger-', async (tempDir) => {
+      const projectName = 'E2E Tool Trigger Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       const toolActivity = {
         approvalRequests: [] as string[],
         modalAppeared: false,
@@ -134,8 +107,12 @@ test.describe('Tool Approval Workflow', () => {
         try {
           await chatInterface.sendMessage(message);
           
-          // Wait to see if tool approval modal appears
-          await page.waitForTimeout(2000);
+          // Wait to see if tool approval modal appears or message is processed
+          await Promise.race([
+            page.locator('[data-testid="tool-approval-modal"]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => null),
+            page.locator('[data-testid="approve-tool-button"]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => null),
+            chatInterface.messageInput.waitFor({ state: 'visible', timeout: 3000 }).catch(() => null)
+          ]);
           
           // Check for modal or approval UI
           const modalVisible = await page.locator('[data-testid="tool-approval-modal"]').isVisible().catch(() => false);
@@ -198,32 +175,13 @@ test.describe('Tool Approval Workflow', () => {
         // This is still valuable information about the current system
         expect(true).toBeTruthy();
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('documents tool approval API endpoints and request patterns', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-tool-api-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Tool API Documentation Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('documents tool approval API endpoints and request patterns', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-tool-api-', async (tempDir) => {
+      const projectName = 'E2E Tool API Documentation Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       const apiActivity = {
         allRequests: [] as string[],
         toolRelated: [] as string[],
@@ -297,17 +255,6 @@ test.describe('Tool Approval Workflow', () => {
         console.log('No tool-specific API endpoints detected');
         expect(true).toBeTruthy();
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 });
