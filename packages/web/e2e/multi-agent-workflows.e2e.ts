@@ -128,7 +128,7 @@ test.describe('Multi-Agent Workflows', () => {
             agentCreationAttempts.urlChanges.push(newUrl);
           }
         } catch (error) {
-          console.log('New agent button method failed:', error.message);
+          console.log('New agent button method failed:', error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -153,7 +153,7 @@ test.describe('Multi-Agent Workflows', () => {
             }
           }
         } catch (error) {
-          console.log('Agent selector method failed:', error.message);
+          console.log('Agent selector method failed:', error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -183,11 +183,11 @@ test.describe('Multi-Agent Workflows', () => {
               await expect(chatInterface.getMessage(agent2Message)).toBeVisible({ timeout: 10000 });
               console.log('Successfully interacted with new agent');
             } catch (error) {
-              console.log('Could not interact with new agent:', error.message);
+              console.log('Could not interact with new agent:', error instanceof Error ? error.message : String(error));
             }
           }
         } catch (error) {
-          console.log('URL manipulation method failed:', error.message);
+          console.log('URL manipulation method failed:', error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -207,7 +207,7 @@ test.describe('Multi-Agent Workflows', () => {
             agentCreationAttempts.agentSwitchAttempts.push('back-to-original-failed');
           }
         } catch (error) {
-          console.log('Switch back to original agent failed:', error.message);
+          console.log('Switch back to original agent failed:', error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -337,11 +337,11 @@ test.describe('Multi-Agent Workflows', () => {
               }
               
             } catch (error) {
-              console.log('Agent 2 interaction failed:', error.message);
+              console.log('Agent 2 interaction failed:', error instanceof Error ? error.message : String(error));
             }
           }
         } catch (error) {
-          console.log('Agent 2 creation failed:', error.message);
+          console.log('Agent 2 creation failed:', error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -482,7 +482,7 @@ test.describe('Multi-Agent Workflows', () => {
           
           await page.waitForTimeout(1000);
         } catch (error) {
-          console.log(`Coordination message error "${message}":`, error.message);
+          console.log(`Coordination message error "${message}":`, error instanceof Error ? error.message : String(error));
         }
       }
       

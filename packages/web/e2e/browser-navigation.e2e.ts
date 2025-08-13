@@ -192,8 +192,9 @@ test.describe('Browser Navigation Support', () => {
             console.log(`${navTest.name} - Message visible: ${messageVisible}, URL: ${currentUrl}`);
             
           } catch (error) {
-            console.log(`Hash navigation test "${navTest.name}" failed:`, error.message);
-            hashNavigationTest.navigationAttempts.push(`${navTest.name}: ERROR - ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.log(`Hash navigation test "${navTest.name}" failed:`, errorMessage);
+            hashNavigationTest.navigationAttempts.push(`${navTest.name}: ERROR - ${errorMessage}`);
           }
         }
         
@@ -336,7 +337,7 @@ test.describe('Browser Navigation Support', () => {
               deepLinkingTest.deepLinkTests.push({
                 description: scenario.description,
                 url: 'ERROR',
-                result: `error: ${error.message}`
+                result: `error: ${error instanceof Error ? error.message : String(error)}`
               });
             }
           }
@@ -485,12 +486,12 @@ test.describe('Browser Navigation Support', () => {
               await expect(chatInterface.getMessage(postRefreshMessage)).toBeVisible({ timeout: 5000 });
               console.log(`Successfully sent message after ${scenario.type}`);
             } catch (error) {
-              console.log(`Could not send message after ${scenario.type}:`, error.message);
+              console.log(`Could not send message after ${scenario.type}:`, error instanceof Error ? error.message : String(error));
             }
           }
           
         } catch (error) {
-          console.log(`Refresh scenario "${scenario.type}" failed:`, error.message);
+          console.log(`Refresh scenario "${scenario.type}" failed:`, error instanceof Error ? error.message : String(error));
           refreshTest.refreshBehaviors.push({
             type: scenario.type,
             url: 'ERROR',
