@@ -13,7 +13,7 @@
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint; npx tsc --noEmit",
     "lint:fix": "next lint --fix",
-    "format": "prettier --write",
+    "format": "prettier --write app components e2e hooks lib public scripts test-utils types",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
