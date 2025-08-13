@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for LaceApp.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { LaceApp } from './LaceApp';
 

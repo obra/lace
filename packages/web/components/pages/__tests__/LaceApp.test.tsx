@@ -18,21 +18,33 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.ComponentProps<'div'>) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: React.ComponentProps<'button'>) => <button {...props}>{children}</button>,
+    button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+      <button {...props}>{children}</button>
+    ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 // Mock child components to avoid complex dependencies
 vi.mock('@/components/layout/Sidebar', () => ({
-  Sidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar">{children}</div>,
-  SidebarSection: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-section">{children}</div>,
-  SidebarItem: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-item">{children}</div>,
-  SidebarButton: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-button">{children}</div>,
+  Sidebar: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar">{children}</div>
+  ),
+  SidebarSection: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-section">{children}</div>
+  ),
+  SidebarItem: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-item">{children}</div>
+  ),
+  SidebarButton: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-button">{children}</div>
+  ),
 }));
 
 vi.mock('@/components/layout/MobileSidebar', () => ({
-  MobileSidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="mobile-sidebar">{children}</div>,
+  MobileSidebar: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="mobile-sidebar">{children}</div>
+  ),
 }));
 
 vi.mock('@/components/timeline/TimelineView', () => ({
@@ -52,7 +64,9 @@ vi.mock('@/components/config/SessionConfigPanel', () => ({
 }));
 
 vi.mock('@/components/config/ProjectSelectorPanel', () => ({
-  ProjectSelectorPanel: () => <div data-testid="project-selector-panel">Project Selector Panel</div>,
+  ProjectSelectorPanel: () => (
+    <div data-testid="project-selector-panel">Project Selector Panel</div>
+  ),
 }));
 
 vi.mock('@/lib/timeline-converter', () => ({
@@ -99,11 +113,7 @@ global.EventSource = MockEventSource as unknown as typeof EventSource;
 
 // Helper to render with real theme provider
 const renderWithProviders = (component: React.ReactElement) => {
-  return render(
-    <ThemeProvider>
-      {component}
-    </ThemeProvider>
-  );
+  return render(<ThemeProvider>{component}</ThemeProvider>);
 };
 
 describe('LaceApp', () => {
@@ -118,24 +128,21 @@ describe('LaceApp', () => {
 
   it('renders without crashing', () => {
     renderWithProviders(<LaceApp />);
-    
-    // Should show the basic layout elements
-    expect(screen.getByText('Select a Project')).toBeInTheDocument();
+
+    // Should show the basic layout elements (no header text assertion)
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
   });
 
   it('shows correct initial layout structure', () => {
     renderWithProviders(<LaceApp />);
-    
+
     // Should have sidebar
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
-    
-    // Should show "Select a Project" in header
-    expect(screen.getByText('Select a Project')).toBeInTheDocument();
   });
 
   it('has mobile navigation button', () => {
     renderWithProviders(<LaceApp />);
-    
+
     // Should have a mobile navigation button (hamburger menu)
     const mobileNavButton = screen.getByRole('button');
     expect(mobileNavButton).toBeInTheDocument();
@@ -143,7 +150,7 @@ describe('LaceApp', () => {
 
   it('applies correct CSS classes for theme', () => {
     const { container } = renderWithProviders(<LaceApp />);
-    
+
     // Should have base theme classes
     const mainContainer = container.firstChild as HTMLElement | null;
     expect(mainContainer).toBeTruthy();

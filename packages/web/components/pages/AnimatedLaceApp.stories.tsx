@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AnimatedLaceApp.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnimatedLaceApp } from './AnimatedLaceApp';
 import { asThreadId } from '@/types/core';
@@ -6,7 +7,7 @@ import type { ProjectInfo as Project, Task } from '@/types/core';
 
 // Mock data for stories
 const mockProjects: Project[] = [
-  { 
+  {
     id: 'ai-research-project',
     name: 'AI Research',
     description: 'Advanced AI research and development project',
@@ -16,7 +17,7 @@ const mockProjects: Project[] = [
     lastUsedAt: new Date('2024-01-15T10:00:00Z'),
     sessionCount: 42,
   },
-  { 
+  {
     id: 'web-app-project',
     name: 'Web App',
     description: 'Full-stack web application development',
@@ -26,7 +27,7 @@ const mockProjects: Project[] = [
     lastUsedAt: new Date('2024-01-14T15:30:00Z'),
     sessionCount: 28,
   },
-  { 
+  {
     id: 'data-pipeline-project',
     name: 'Data Pipeline',
     description: 'ETL data processing pipeline',
@@ -61,7 +62,8 @@ const mockTasks: Task[] = [
     id: 'animated-task-001',
     title: 'AI Model Integration',
     description: 'Integrate latest language model',
-    prompt: 'Integrate the latest language model API with our existing codebase, ensuring proper error handling and performance optimization',
+    prompt:
+      'Integrate the latest language model API with our existing codebase, ensuring proper error handling and performance optimization',
     priority: 'high',
     assignedTo: asThreadId('lace_20240115_claude001'),
     status: 'in_progress',
@@ -75,7 +77,8 @@ const mockTasks: Task[] = [
     id: 'animated-task-002',
     title: 'Auth Bug Fix',
     description: 'Fix login timeout',
-    prompt: 'Investigate and fix the authentication timeout issue occurring in production environment',
+    prompt:
+      'Investigate and fix the authentication timeout issue occurring in production environment',
     priority: 'medium',
     assignedTo: undefined,
     status: 'pending',
@@ -89,7 +92,8 @@ const mockTasks: Task[] = [
     id: 'animated-task-003',
     title: 'Update Docs',
     description: 'API documentation',
-    prompt: 'Update the API documentation to reflect the recent changes in authentication endpoints and response formats',
+    prompt:
+      'Update the API documentation to reflect the recent changes in authentication endpoints and response formats',
     priority: 'low',
     assignedTo: asThreadId('lace_20240115_claude001'),
     status: 'blocked',
@@ -108,7 +112,8 @@ const meta: Meta<typeof AnimatedLaceApp> = {
     layout: 'fullscreen',
     docs: {
       description: {
-        component: 'Enhanced animated version of the main Lace application with Framer Motion animations, smooth transitions, and interactive elements. Features animated timeline view, voice recognition, task management, and comprehensive UI animations.',
+        component:
+          'Enhanced animated version of the main Lace application with Framer Motion animations, smooth transitions, and interactive elements. Features animated timeline view, voice recognition, task management, and comprehensive UI animations.',
       },
     },
   },
@@ -130,7 +135,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default animated Lace application with enhanced animations, transitions, and interactive features. Includes animated timeline, voice recognition, and task management.',
+        story:
+          'Default animated Lace application with enhanced animations, transitions, and interactive features. Includes animated timeline, voice recognition, and task management.',
       },
     },
   },
@@ -151,7 +157,8 @@ export const MobileView: Story = {
     },
     docs: {
       description: {
-        story: 'Animated Lace application optimized for mobile devices with mobile sidebar, touch interactions, and responsive animations.',
+        story:
+          'Animated Lace application optimized for mobile devices with mobile sidebar, touch interactions, and responsive animations.',
       },
     },
   },
@@ -172,7 +179,8 @@ export const TabletView: Story = {
     },
     docs: {
       description: {
-        story: 'Animated Lace application on tablet devices showing responsive layout transitions and touch-optimized interactions.',
+        story:
+          'Animated Lace application on tablet devices showing responsive layout transitions and touch-optimized interactions.',
       },
     },
   },
@@ -193,7 +201,8 @@ export const DarkTheme: Story = {
     },
     docs: {
       description: {
-        story: 'Animated Lace application with dark theme showing theme-aware animations and color transitions.',
+        story:
+          'Animated Lace application with dark theme showing theme-aware animations and color transitions.',
       },
     },
   },
@@ -221,7 +230,8 @@ export const LightTheme: Story = {
     },
     docs: {
       description: {
-        story: 'Animated Lace application with light theme showing bright, clean animations and transitions.',
+        story:
+          'Animated Lace application with light theme showing bright, clean animations and transitions.',
       },
     },
   },
@@ -249,7 +259,8 @@ export const CyberpunkTheme: Story = {
     },
     docs: {
       description: {
-        story: 'Animated Lace application with cyberpunk theme featuring neon colors and futuristic animations.',
+        story:
+          'Animated Lace application with cyberpunk theme featuring neon colors and futuristic animations.',
       },
     },
   },

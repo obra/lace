@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for ChatInterface.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import ChatInterface from './ChatInterface';
 
