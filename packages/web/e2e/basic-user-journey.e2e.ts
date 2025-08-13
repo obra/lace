@@ -3,24 +3,18 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
+import { withTempLaceDir } from './utils/withTempLaceDir';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 test.describe('Basic User Journey', () => {
   test('complete flow: onboarding → project creation → first message', async ({ 
     page,
-    worker
+    worker: _worker  // MSW fixture activation
   }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-basic-journey-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Test Project Basic Journey';
-    const { projectSelector, chatInterface } = createPageObjects(page);
+    await withTempLaceDir('lace-e2e-basic-journey-', async (tempDir) => {
+      const projectName = 'E2E Test Project Basic Journey';
+      const { projectSelector, chatInterface } = createPageObjects(page);
 
     // Step 1: User lands on the application
     await page.goto('/');
@@ -31,10 +25,9 @@ test.describe('Basic User Journey', () => {
     // Step 3: Create a new project
     const projectPath = path.join(tempDir, 'test-project');
     
-    // Create the directory so validation passes
-    await fs.promises.mkdir(projectPath, { recursive: true });
-    
-    try {
+      // Create the directory so validation passes
+      await fs.promises.mkdir(projectPath, { recursive: true });
+      
       // Use page object to create project
       await projectSelector.createProject(projectName, projectPath);
       
@@ -53,18 +46,6 @@ test.describe('Basic User Journey', () => {
       // The message was sent successfully (202 status) so the interface should be ready
       await chatInterface.waitForSendAvailable();
       await expect(chatInterface.sendButton).toBeVisible();
-    } finally {
-      // Cleanup: restore original LACE_DIR
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      // Cleanup: remove temp directory
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 });

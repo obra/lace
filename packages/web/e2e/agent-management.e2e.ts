@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 test.describe('Agent Management', () => {
-  test('automatically creates default agent when project is opened', async ({ page, worker }) => {
+  test('automatically creates default agent when project is opened', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-agent-auto-')
@@ -59,7 +59,7 @@ test.describe('Agent Management', () => {
     }
   });
 
-  test('agent state persists across page reloads', async ({ page, worker }) => {
+  test('agent state persists across page reloads', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-agent-persist-')
@@ -134,7 +134,7 @@ test.describe('Agent Management', () => {
     }
   });
 
-  test('maintains agent isolation between different workers', async ({ page, worker }) => {
+  test('maintains agent isolation between different workers', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-agent-isolation-')

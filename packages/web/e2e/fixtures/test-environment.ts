@@ -14,7 +14,7 @@ export interface TestEnvironmentContext {
 
 // Extend Playwright's base test with our environment fixture
 export const test = baseTest.extend<{}, { testEnv: TestEnvironmentContext }>({
-  testEnv: [async ({ }, use, testInfo) => {
+  testEnv: [async (_args, use, testInfo) => {
     // Create worker-specific temp directory (similar to temp-lace-dir.ts pattern)
     const workerIndex = testInfo.workerIndex;
     const tempDir = await fs.promises.mkdtemp(
