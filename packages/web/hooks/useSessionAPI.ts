@@ -66,7 +66,11 @@ export function useSessionAPI() {
         throw new Error('Failed to get session');
       }
 
-      const data = parse(await response.text()) as SessionInfo;
+      const text = await response.text();
+      const data: unknown = parse(text);
+      if (!isSessionInfo(data)) {
+        throw new Error('Invalid session payload');
+      }
       return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
