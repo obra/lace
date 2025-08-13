@@ -5,8 +5,6 @@ import { useState, useCallback } from 'react';
 import {
   CreateProjectRequest,
   UpdateProjectRequest,
-  ProjectsResponse,
-  ProjectResponse,
   DeleteProjectResponse,
   isApiError,
   isApiSuccess,
@@ -48,11 +46,8 @@ export function useProjectAPI() {
         throw new Error('Failed to list projects');
       }
 
-      const data: unknown = parse(await response.text());
-      if (isApiSuccess<ProjectsResponse>(data) && 'projects' in data) {
-        return data['projects'] as ProjectInfo[];
-      }
-      throw new Error('Invalid response format');
+      const data = parse(await response.text()) as ProjectInfo[];
+      return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return [];
@@ -76,11 +71,8 @@ export function useProjectAPI() {
         throw new Error('Failed to get project');
       }
 
-      const data: unknown = parse(await response.text());
-      if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
-        return data['project'] as ProjectInfo;
-      }
-      throw new Error('Invalid response format');
+      const data = parse(await response.text()) as ProjectInfo;
+      return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return null;
@@ -109,11 +101,8 @@ export function useProjectAPI() {
           throw new Error('Failed to create project');
         }
 
-        const data: unknown = parse(await response.text());
-        if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
-          return data['project'] as ProjectInfo;
-        }
-        throw new Error('Invalid response format');
+        const data = parse(await response.text()) as ProjectInfo;
+        return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
         return null;
@@ -144,11 +133,8 @@ export function useProjectAPI() {
           throw new Error('Failed to update project');
         }
 
-        const data: unknown = parse(await response.text());
-        if (isApiSuccess<ProjectResponse>(data) && 'project' in data) {
-          return data['project'] as ProjectInfo;
-        }
-        throw new Error('Invalid response format');
+        const data = parse(await response.text()) as ProjectInfo;
+        return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
         return null;

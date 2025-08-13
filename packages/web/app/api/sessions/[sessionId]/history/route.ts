@@ -42,9 +42,11 @@ export async function GET(
     const threadEvents = coordinatorAgent.getMainAndDelegateEvents(asThreadId(sessionId));
 
     // Filter to only conversation events (persisted and shown in timeline)
-    const events: LaceEvent[] = threadEvents.filter((event) => isConversationEvent(event.type));
+    const events: LaceEvent[] = threadEvents.filter((event): event is LaceEvent =>
+      isConversationEvent(event.type)
+    );
 
-    return createSuperjsonResponse({ events }, { status: 200 });
+    return createSuperjsonResponse(events, { status: 200 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR', error });

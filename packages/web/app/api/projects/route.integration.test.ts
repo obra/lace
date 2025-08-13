@@ -14,38 +14,12 @@ import {
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import { Session } from '@/lib/server/lace-imports';
+import type { ProjectInfo } from '@/types/core';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
 import { GET, POST } from '@/app/api/projects/route';
-
-// Type interfaces for API responses
-interface ProjectsResponse {
-  projects: Array<{
-    id: string;
-    name: string;
-    description: string;
-    workingDirectory: string;
-    isArchived: boolean;
-    createdAt: string;
-    lastUsedAt: string;
-    sessionCount: number;
-  }>;
-}
-
-interface ProjectResponse {
-  project: {
-    id: string;
-    name: string;
-    description: string;
-    workingDirectory: string;
-    isArchived: boolean;
-    createdAt: string;
-    lastUsedAt: string;
-    sessionCount: number;
-  };
-}
 
 interface ErrorResponse {
   error: string;
@@ -105,14 +79,14 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await GET();
-      const data = await parseResponse<ProjectsResponse>(response);
+      const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
-      expect(data.projects).toHaveLength(2); // 2 created projects
+      expect(data).toHaveLength(2); // 2 created projects
 
       // Find our created projects
-      const proj1 = data.projects.find((p) => p.name === 'Project 1');
-      const proj2 = data.projects.find((p) => p.name === 'Project 2');
+      const proj1 = data.find((p) => p.name === 'Project 1');
+      const proj2 = data.find((p) => p.name === 'Project 2');
 
       expect(proj1).toBeDefined();
       expect(proj1!.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
@@ -129,10 +103,10 @@ describe('Projects API Integration Tests', () => {
 
     it('should return empty projects array when no projects exist', async () => {
       const response = await GET();
-      const data = await parseResponse<ProjectsResponse>(response);
+      const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
-      expect(data.projects).toHaveLength(0); // No projects in clean database
+      expect(data).toHaveLength(0); // No projects in clean database
     });
   });
 
@@ -152,21 +126,21 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.project.name).toBe('New Project');
-      expect(data.project.description).toBe('A new project');
-      expect(data.project.workingDirectory).toBe('/new/path');
-      expect(data.project.isArchived).toBe(false);
-      expect(data.project.sessionCount).toBe(1); // Project.create() auto-creates a default session
-      expect(data.project.id).toBeDefined();
-      expect(data.project.createdAt).toBeDefined();
-      expect(data.project.lastUsedAt).toBeDefined();
+      expect(data.name).toBe('New Project');
+      expect(data.description).toBe('A new project');
+      expect(data.workingDirectory).toBe('/new/path');
+      expect(data.isArchived).toBe(false);
+      expect(data.sessionCount).toBe(1); // Project.create() auto-creates a default session
+      expect(data.id).toBeDefined();
+      expect(data.createdAt).toBeDefined();
+      expect(data.lastUsedAt).toBeDefined();
 
       // Verify the project was actually created in the database
       const { Project } = await import('~/projects/project');
-      const createdProject = Project.getById(data.project.id);
+      const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('New Project');
       expect(createdProject!.getWorkingDirectory()).toBe('/new/path');
@@ -186,17 +160,17 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.project.name).toBe('Minimal Project');
-      expect(data.project.description).toBe('');
-      expect(data.project.workingDirectory).toBe('/minimal/path');
-      expect(data.project.id).toBeDefined();
+      expect(data.name).toBe('Minimal Project');
+      expect(data.description).toBe('');
+      expect(data.workingDirectory).toBe('/minimal/path');
+      expect(data.id).toBeDefined();
 
       // Verify the project was actually created in the database
       const { Project } = await import('~/projects/project');
-      const createdProject = Project.getById(data.project.id);
+      const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('Minimal Project');
       expect(createdProject!.getConfiguration()).toEqual({});
@@ -234,11 +208,11 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await POST(request);
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.project.name).toBe('my-awesome-project');
-      expect(data.project.workingDirectory).toBe('/test/my-awesome-project');
+      expect(data.name).toBe('my-awesome-project');
+      expect(data.workingDirectory).toBe('/test/my-awesome-project');
     });
 
     it('should validate empty working directory', async () => {
@@ -303,8 +277,8 @@ describe('Projects API Integration Tests', () => {
 
       // Verify both projects exist
       const getResponse = await GET();
-      const data = await parseResponse<ProjectsResponse>(getResponse);
-      const duplicateProjects = data.projects.filter((p) => p.name === 'Duplicate Project');
+      const data = await parseResponse<ProjectInfo[]>(getResponse);
+      const duplicateProjects = data.filter((p) => p.name === 'Duplicate Project');
       expect(duplicateProjects).toHaveLength(2);
     });
   });

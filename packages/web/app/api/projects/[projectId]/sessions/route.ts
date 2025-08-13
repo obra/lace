@@ -37,7 +37,7 @@ export async function GET(
       // Full agent details will be populated when individual session is selected
     }));
 
-    return createSuperjsonResponse({ sessions });
+    return createSuperjsonResponse(sessions);
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch sessions',
@@ -84,7 +84,7 @@ export async function POST(
       createdAt: sessionInfo?.createdAt || new Date(),
     };
 
-    return createSuperjsonResponse({ session: sessionData }, { status: 201 });
+    return createSuperjsonResponse(sessionData, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       // Provide detailed field-level validation errors

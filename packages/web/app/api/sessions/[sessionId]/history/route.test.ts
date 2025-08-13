@@ -21,10 +21,6 @@ import {
 import { Project, Session } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
-interface HistoryResponse {
-  events: LaceEvent[];
-}
-
 describe('Session History API', () => {
   const _tempLaceDir = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
@@ -79,13 +75,13 @@ describe('Session History API', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = await parseResponse<HistoryResponse>(response);
+      const data = await parseResponse<LaceEvent[]>(response);
 
       // New sessions should have system events but no user messages yet
-      expect(Array.isArray(data.events)).toBe(true);
+      expect(Array.isArray(data)).toBe(true);
 
       // Check that we only have system-related events, no user messages
-      const userMessages = data.events.filter((e) => e.type === 'USER_MESSAGE');
+      const userMessages = data.filter((e) => e.type === 'USER_MESSAGE');
       expect(userMessages).toEqual([]);
     });
 
@@ -151,14 +147,14 @@ describe('Session History API', () => {
       });
 
       expect(response.status).toBe(200);
-      const data = await parseResponse<HistoryResponse>(response);
-      expect(data.events).toBeDefined();
-      expect(Array.isArray(data.events)).toBe(true);
+      const data = await parseResponse<LaceEvent[]>(response);
+      expect(data).toBeDefined();
+      expect(Array.isArray(data)).toBe(true);
 
       // Verify the route successfully called the agent's getMainAndDelegateEvents method
       // The exact content doesn't matter - what matters is that the route works
       // and converts events properly (we can see system events in earlier tests)
-      expect(data.events.length).toBeGreaterThanOrEqual(0);
+      expect(data.length).toBeGreaterThanOrEqual(0);
     });
   });
 });

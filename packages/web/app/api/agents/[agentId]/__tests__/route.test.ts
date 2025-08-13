@@ -14,8 +14,8 @@ import {
   cleanupTestProviderDefaults,
 } from '@/lib/server/lace-imports';
 
-// Import shared AgentResponse type
-import type { AgentResponse } from '@/types/api';
+// Import enhanced agent type
+import type { AgentWithTokenUsage } from '@/types/api';
 
 interface ErrorResponse {
   error: string;
@@ -116,10 +116,10 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = await parseResponse<AgentResponse>(response);
+      const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
-      expect(data.agent).toEqual({
+      expect(data).toEqual({
         threadId: 'lace_20241122_abc123.1',
         name: 'Test Agent',
         provider: 'anthropic',
@@ -135,7 +135,7 @@ describe('Agent API', () => {
           percentUsed: 0,
           nearLimit: false,
         },
-        createdAt: expect.any(Date) as Date,
+        createdAt: undefined,
       });
       expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20241122_abc123');
       expect(mockSession.getAgent).toHaveBeenCalledWith('lace_20241122_abc123.1');
@@ -152,12 +152,12 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = await parseResponse<AgentResponse>(response);
+      const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
-      expect(data.agent.name).toBe('Agent lace_20241122_abc123.1');
-      expect(data.agent.providerInstanceId).toBeDefined();
-      expect(data.agent.modelId).toBe('claude-3-sonnet');
+      expect(data.name).toBe('Agent lace_20241122_abc123.1');
+      expect(data.providerInstanceId).toBeDefined();
+      expect(data.modelId).toBe('claude-3-sonnet');
     });
 
     it('should return 400 for invalid agent ID', async () => {
@@ -212,10 +212,10 @@ describe('Agent API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = await parseResponse<AgentResponse>(response);
+      const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
-      expect(data.agent.tokenUsage).toEqual(mockTokenUsage);
+      expect(data.tokenUsage).toEqual(mockTokenUsage);
       expect(mockAgent.getTokenUsage).toHaveBeenCalled();
     });
 
@@ -235,9 +235,9 @@ describe('Agent API', () => {
         new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1'),
         { params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }) }
       );
-      const data = await parseResponse<AgentResponse>(response);
+      const data = await parseResponse<AgentWithTokenUsage>(response);
 
-      expect(data.agent.tokenUsage).toEqual(defaultTokenUsage);
+      expect(data.tokenUsage).toEqual(defaultTokenUsage);
     });
 
     it('should handle errors gracefully', async () => {
@@ -275,7 +275,7 @@ describe('Agent API', () => {
       const response = await PUT(request, {
         params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
       });
-      const data = await parseResponse<AgentResponse>(response);
+      const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
       expect(mockAgent.updateThreadMetadata).toHaveBeenCalledWith({
@@ -283,7 +283,7 @@ describe('Agent API', () => {
         providerInstanceId: testProviderInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
-      expect(data.agent).toEqual({
+      expect(data).toEqual({
         threadId: 'lace_20241122_abc123.1',
         name: 'Test Agent',
         provider: 'anthropic',
@@ -299,7 +299,7 @@ describe('Agent API', () => {
           percentUsed: 0,
           nearLimit: false,
         },
-        createdAt: expect.any(Date) as Date,
+        createdAt: undefined,
       });
     });
 

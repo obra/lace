@@ -70,10 +70,10 @@ export async function GET(
       modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
       tokenUsage,
-      createdAt: new Date(), // TODO: Get actual creation time
+      createdAt: (metadata?.createdAt as Date) || undefined,
     };
 
-    return createSuperjsonResponse({ agent: agentResponse });
+    return createSuperjsonResponse(agentResponse);
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch agent',
@@ -204,10 +204,10 @@ export async function PUT(
       modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
       status: agent.getCurrentState(),
       tokenUsage,
-      createdAt: new Date(), // TODO: Get actual creation time
+      createdAt: (metadata?.createdAt as Date) || undefined,
     };
 
-    return createSuperjsonResponse({ agent: agentResponse });
+    return createSuperjsonResponse(agentResponse);
   } catch (error: unknown) {
     // Zod errors are now handled above with better messages
 

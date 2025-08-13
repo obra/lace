@@ -133,8 +133,8 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     // Verify response
     expect(response.status).toBe(200);
-    const data = await parseResponse<{ pendingApprovals: unknown[] }>(response);
-    expect(data).toEqual({ pendingApprovals: expectedJsonResponse });
+    const data = await parseResponse<unknown[]>(response);
+    expect(data).toEqual(expectedJsonResponse);
   });
 
   it('should return empty array when no pending approvals', async () => {
@@ -152,8 +152,8 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
     expect(response.status).toBe(200);
 
-    const data = await parseResponse<{ pendingApprovals: unknown[] }>(response);
-    expect(data).toEqual({ pendingApprovals: [] });
+    const data = await parseResponse<unknown[]>(response);
+    expect(data).toEqual([]);
   });
 
   it('should return error if agent not found', async () => {
@@ -271,9 +271,9 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     const response = await GET(request, { params });
 
     expect(response.status).toBe(200);
-    const data = await parseResponse<{ pendingApprovals: unknown[] }>(response);
-    expect(data.pendingApprovals).toHaveLength(3);
-    expect(data.pendingApprovals).toEqual(expectedJsonResponse);
+    const data = await parseResponse<unknown[]>(response);
+    expect(data).toHaveLength(3);
+    expect(data).toEqual(expectedJsonResponse);
   });
 
   it('should handle Agent errors gracefully', async () => {

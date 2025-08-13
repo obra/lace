@@ -59,13 +59,15 @@ describe('LaceApp Onboarding Integration', () => {
         const method = options?.method || 'GET';
 
         if (url === '/api/projects' && method === 'GET') {
-          return Promise.resolve(createMockResponse({ projects: [] }));
+          return Promise.resolve(createMockResponse([]));
         }
 
         if (url === '/api/projects' && method === 'POST') {
           return Promise.resolve(
             createMockResponse({
-              project: { id: 'project-1', name: 'test-project', workingDirectory: '/test' },
+              id: 'project-1',
+              name: 'test-project',
+              workingDirectory: '/test',
             })
           );
         }
@@ -73,7 +75,8 @@ describe('LaceApp Onboarding Integration', () => {
         if (url.includes('/sessions') && method === 'POST') {
           return Promise.resolve(
             createMockResponse({
-              session: { id: 'session-1', name: 'Thursday, Jul 24' },
+              id: 'session-1',
+              name: 'Thursday, Jul 24',
             })
           );
         }
@@ -95,7 +98,7 @@ describe('LaceApp Onboarding Integration', () => {
         }
 
         if (url === '/api/providers') {
-          return Promise.resolve(createMockResponse({ providers: [] }));
+          return Promise.resolve(createMockResponse([]));
         }
 
         return Promise.reject(new Error(`Unhandled URL: ${url} with method: ${method}`));

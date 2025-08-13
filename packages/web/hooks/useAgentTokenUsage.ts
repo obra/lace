@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useEventStream } from './useEventStream';
-import type { ThreadId, CombinedTokenUsage } from '@/types/core';
-import type { AgentResponse } from '@/types/api';
+import type { ThreadId, CombinedTokenUsage, AgentInfo, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
+import type { AgentWithTokenUsage } from '@/types/api';
 import { parse } from '@/lib/serialization';
 
 // Use the same type structure as the API
-type AgentTokenUsage = NonNullable<AgentResponse['agent']['tokenUsage']>;
+type AgentTokenUsage = ThreadTokenUsage;
 
 export interface UseAgentTokenUsageResult {
   tokenUsage: AgentTokenUsage | null;
@@ -36,16 +36,15 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
       }
 
       const responseText = await response.text();
-      const data = parse(responseText) as AgentResponse;
+      const data = parse(responseText) as AgentWithTokenUsage;
       console.log('[useAgentTokenUsage] API response:', {
-        hasAgent: !!data.agent,
-        hasTokenUsage: !!data.agent?.tokenUsage,
-        tokenUsage: data.agent?.tokenUsage,
+        hasTokenUsage: !!data.tokenUsage,
+        tokenUsage: data.tokenUsage,
       });
 
-      if (data.agent?.tokenUsage) {
-        console.log('[useAgentTokenUsage] Setting initial token usage:', data.agent.tokenUsage);
-        setTokenUsage(data.agent.tokenUsage);
+      if (data.tokenUsage) {
+        console.log('[useAgentTokenUsage] Setting initial token usage:', data.tokenUsage);
+        setTokenUsage(data.tokenUsage);
       } else {
         console.log('[useAgentTokenUsage] No token usage data in API response');
       }

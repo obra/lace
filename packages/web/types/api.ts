@@ -10,6 +10,7 @@ import type {
   SessionInfo,
   AgentInfo,
   ProjectInfo,
+  ThreadTokenUsage,
 } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
 
@@ -87,39 +88,13 @@ export function isApiSuccess<T>(response: unknown): response is ApiSuccessRespon
   return typeof response === 'object' && response !== null && !('error' in response);
 }
 
-// Specific API response types - now using core types
-export interface SessionsResponse {
-  sessions: SessionInfo[];
-}
+// Specific API response types - now using core types directly (no wrappers)
 
-export interface SessionResponse {
-  session: SessionInfo;
-}
+// Agent response now returns enhanced AgentInfo directly (no wrapper)
 
-export interface AgentResponse {
-  agent: AgentInfo & {
-    tokenUsage?: {
-      totalPromptTokens: number;
-      totalCompletionTokens: number;
-      totalTokens: number;
-      contextLimit: number;
-      percentUsed: number;
-      nearLimit: boolean;
-    };
-  };
-}
+// Provider response now returns ProviderInfo[] directly (no wrapper)
 
-export interface ProvidersResponse {
-  providers: ProviderInfo[];
-}
-
-export interface SessionHistoryResponse {
-  events: LaceEvent[];
-}
-
-export interface PendingApprovalsResponse {
-  pendingApprovals: PendingApproval[];
-}
+// Session history and pending approvals now return arrays directly (no wrappers)
 
 // Extend backend types with web-specific additions
 export interface ProviderInfo extends BackendProviderInfo {
@@ -131,14 +106,7 @@ export interface ProviderInfo extends BackendProviderInfo {
 // Re-export backend ModelInfo directly - it matches what we need
 export type ModelInfo = BackendModelInfo;
 
-// Project management types - now using core types
-export interface ProjectsResponse {
-  projects: ProjectInfo[];
-}
-
-export interface ProjectResponse {
-  project: ProjectInfo;
-}
+// Project management types - now using core types directly (no wrappers)
 
 export interface CreateProjectRequest {
   name: string;
@@ -158,3 +126,8 @@ export interface UpdateProjectRequest {
 export interface DeleteProjectResponse {
   success: boolean;
 }
+
+// Agent type with token usage for API responses
+export type AgentWithTokenUsage = AgentInfo & {
+  tokenUsage?: ThreadTokenUsage;
+};

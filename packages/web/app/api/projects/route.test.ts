@@ -5,33 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/projects/route';
 import { parseResponse } from '@/lib/serialization';
-
-// Type interfaces for API responses
-interface ProjectsResponse {
-  projects: Array<{
-    id: string;
-    name: string;
-    description: string;
-    workingDirectory: string;
-    isArchived: boolean;
-    createdAt: string;
-    lastUsedAt: string;
-    sessionCount: number;
-  }>;
-}
-
-interface ProjectResponse {
-  project: {
-    id: string;
-    name: string;
-    description: string;
-    workingDirectory: string;
-    isArchived: boolean;
-    createdAt: string;
-    lastUsedAt: string;
-    sessionCount: number;
-  };
-}
+import type { ProjectInfo } from '@/types/core';
 
 interface ErrorResponse {
   error: string;
@@ -121,15 +95,15 @@ describe('Projects API', () => {
 
       // Act: Call the API endpoint
       const response = await GET();
-      const data = await parseResponse<ProjectsResponse>(response);
+      const data = await parseResponse<ProjectInfo[]>(response);
 
       // Assert: Verify the projects are returned
       expect(response.status).toBe(200);
-      expect(data.projects).toHaveLength(2);
+      expect(data).toHaveLength(2);
 
       // Find projects by name since IDs are generated
-      const returnedProject1 = data.projects.find((p) => p.name === 'Project 1');
-      const returnedProject2 = data.projects.find((p) => p.name === 'Project 2');
+      const returnedProject1 = data.find((p) => p.name === 'Project 1');
+      const returnedProject2 = data.find((p) => p.name === 'Project 2');
 
       expect(returnedProject1).toMatchObject({
         name: 'Project 1',
@@ -150,11 +124,11 @@ describe('Projects API', () => {
     it('should return empty array when no projects exist', async () => {
       // Act: Call API with no projects created
       const response = await GET();
-      const data = await parseResponse<ProjectsResponse>(response);
+      const data = await parseResponse<ProjectInfo[]>(response);
 
       // Assert: Empty array returned
       expect(response.status).toBe(200);
-      expect(data.projects).toHaveLength(0);
+      expect(data).toHaveLength(0);
     });
   });
 
@@ -176,22 +150,20 @@ describe('Projects API', () => {
 
       // Act: Create the project via API
       const response = await POST(request);
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       // Assert: Verify project was created with correct data
       expect(response.status).toBe(201);
-      expect(data.project).toMatchObject({
+      expect(data).toMatchObject({
         name: 'New Project',
         description: 'A new project',
         workingDirectory: '/new/path',
         isArchived: false,
         sessionCount: 0,
       });
-      expect(data.project.id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-      );
-      expect(data.project.createdAt).toBeTruthy();
-      expect(data.project.lastUsedAt).toBeTruthy();
+      expect(data.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(data.createdAt).toBeTruthy();
+      expect(data.lastUsedAt).toBeTruthy();
 
       // Verify the project can be retrieved via Project.getAll() (tests persistence)
       const { Project } = await import('@/lib/server/lace-imports');
@@ -216,11 +188,11 @@ describe('Projects API', () => {
 
       // Act: Create project with minimal data
       const response = await POST(request);
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       // Assert: Verify project created with defaults for optional fields
       expect(response.status).toBe(201);
-      expect(data.project).toMatchObject({
+      expect(data).toMatchObject({
         name: 'Minimal Project',
         description: '', // Default empty description
         workingDirectory: '/minimal/path',
@@ -261,11 +233,11 @@ describe('Projects API', () => {
       });
 
       const response = await POST(request);
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.project.name).toBeTruthy(); // Auto-generated name should exist
-      expect(data.project.name).not.toBe(''); // Should not be empty
+      expect(data.name).toBeTruthy(); // Auto-generated name should exist
+      expect(data.name).not.toBe(''); // Should not be empty
     });
 
     it('should handle creation errors gracefully', async () => {

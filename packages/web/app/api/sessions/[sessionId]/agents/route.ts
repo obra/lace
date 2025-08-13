@@ -104,13 +104,17 @@ export async function POST(
     sessionService.setupAgentEventHandlers(agent, sessionId);
 
     // Convert to API format - use agent's improved API
+    const metadata = agent.getThreadMetadata();
+    const tokenUsage = agent.getTokenUsage();
+
     const agentResponse = {
       threadId: agent.threadId,
       name: agent.name,
       providerInstanceId: body.providerInstanceId,
       modelId: body.modelId,
       status: agent.status,
-      createdAt: new Date(),
+      createdAt: (metadata?.createdAt as Date) || undefined,
+      tokenUsage,
     };
 
     // Test SSE broadcast
@@ -129,7 +133,12 @@ export async function POST(
     };
     sseManager.broadcast(testEvent);
 
-    return createSuperjsonResponse({ agent: agentResponse }, { status: 201 });
+    return createSuperjsonResponse(agentResponse, {
+      status: 201,
+      headers: {
+        Location: `/api/agents/${agent.threadId}`,
+      },
+    });
   } catch (error: unknown) {
     if (isError(error) && error.message === 'Session not found') {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -161,12 +170,7 @@ export async function GET(
 
     // Get agents from Session instance
     const agents = session.getAgents();
-    return createSuperjsonResponse({
-      agents: agents.map((agent) => ({
-        ...agent,
-        createdAt: new Date(),
-      })),
-    });
+    return createSuperjsonResponse(agents);
   } catch (_error: unknown) {
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }

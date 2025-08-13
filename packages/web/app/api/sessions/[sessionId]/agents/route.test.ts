@@ -28,14 +28,12 @@ vi.mock('@/lib/server/approval-manager', () => ({
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
-import type { AgentInfo } from '@/types/core';
-import type { ThreadId } from '@/types/core';
+import type { ThreadId, AgentInfo } from '@/types/core';
+import type { AgentWithTokenUsage } from '@/types/api';
 
-// Import shared AgentResponse type
-import type { AgentResponse } from '@/types/api';
-
-interface AgentsListResponse {
-  agents: AgentInfo[];
+// Helper to escape special regex characters to prevent injection
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 interface ErrorResponse {
@@ -123,10 +121,10 @@ describe('Agent Spawning API E2E Tests', () => {
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(201);
 
-      const data = await parseResponse<AgentResponse>(response);
+      const data = await parseResponse<AgentWithTokenUsage>(response);
 
       // Verify agent was created with correct properties
-      expect(data.agent).toMatchObject({
+      expect(data).toMatchObject({
         name: 'architect',
         providerInstanceId: anthropicInstanceId,
         modelId: 'claude-3-5-sonnet-20241022',
@@ -134,7 +132,7 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       // ThreadId should follow sessionId.N pattern
-      expect(data.agent.threadId).toMatch(new RegExp(`^${sessionId}\\.\\d+$`));
+      expect(data.threadId).toMatch(new RegExp(`^${escapeRegExp(sessionId)}\\.\\d+$`));
     });
 
     it('should support different provider instances and models', async () => {
@@ -151,10 +149,10 @@ describe('Agent Spawning API E2E Tests', () => {
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(201);
 
-      const data = await parseResponse<AgentResponse>(response);
-      expect(data.agent.providerInstanceId).toBe(openaiInstanceId);
-      expect(data.agent.modelId).toBe('gpt-4o');
-      expect(data.agent.name).toBe('openai-agent');
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      expect(data.providerInstanceId).toBe(openaiInstanceId);
+      expect(data.modelId).toBe('gpt-4o');
+      expect(data.name).toBe('openai-agent');
     });
 
     it('should auto-generate agent name when missing', async () => {
@@ -170,8 +168,8 @@ describe('Agent Spawning API E2E Tests', () => {
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(201);
 
-      const data = await parseResponse<AgentResponse>(response);
-      expect(data.agent.name).toBe('Lace'); // Default name
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      expect(data.name).toBe('Lace'); // Default name
     });
 
     it('should auto-generate agent name when empty', async () => {
@@ -188,8 +186,8 @@ describe('Agent Spawning API E2E Tests', () => {
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(201);
 
-      const data = await parseResponse<AgentResponse>(response);
-      expect(data.agent.name).toBe('Lace'); // Default name for empty string
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      expect(data.name).toBe('Lace'); // Default name for empty string
     });
 
     it('should increment agent threadIds sequentially', async () => {
@@ -205,10 +203,10 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       const response1 = await POST(request1, { params: Promise.resolve({ sessionId }) });
-      const data1 = await parseResponse<AgentResponse>(response1);
+      const data1 = await parseResponse<AgentWithTokenUsage>(response1);
 
       // Should be .1 since session already has a coordinator at .0
-      expect(data1.agent.threadId).toBe(`${sessionId}.1`);
+      expect(data1.threadId).toBe(`${sessionId}.1`);
 
       // Second agent
       const request2 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
@@ -222,8 +220,8 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       const response2 = await POST(request2, { params: Promise.resolve({ sessionId }) });
-      const data2 = await parseResponse<AgentResponse>(response2);
-      expect(data2.agent.threadId).toBe(`${sessionId}.2`);
+      const data2 = await parseResponse<AgentWithTokenUsage>(response2);
+      expect(data2.threadId).toBe(`${sessionId}.2`);
     });
 
     it('should return 400 for invalid sessionId format', async () => {
@@ -347,12 +345,12 @@ describe('Agent Spawning API E2E Tests', () => {
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<AgentsListResponse>(response);
+      const data = await parseResponse<AgentInfo[]>(response);
 
       // Should have coordinator (id .0) + spawned agent (id .1)
-      expect(data.agents).toHaveLength(2);
+      expect(data).toHaveLength(2);
 
-      const spawnedAgent = data.agents.find((a) => a.name === 'test-agent');
+      const spawnedAgent = data.find((a) => a.name === 'test-agent');
       expect(spawnedAgent).toBeDefined();
       expect(spawnedAgent?.threadId).toBe(`${sessionId}.1`);
     });
@@ -365,13 +363,13 @@ describe('Agent Spawning API E2E Tests', () => {
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<AgentsListResponse>(response);
+      const data = await parseResponse<AgentInfo[]>(response);
 
       // Should have at least the coordinator agent
-      expect(data.agents.length).toBeGreaterThanOrEqual(1);
+      expect(data.length).toBeGreaterThanOrEqual(1);
 
       // Each agent should have required fields
-      data.agents.forEach((agent) => {
+      data.forEach((agent) => {
         expect(agent.threadId).toBeDefined();
         expect(agent.name).toBeDefined();
         expect(agent.providerInstanceId).toBeDefined();
@@ -428,8 +426,8 @@ describe('Agent Spawning API E2E Tests', () => {
       const spawnResponse = await POST(spawnRequest, { params: Promise.resolve({ sessionId }) });
       expect(spawnResponse.status).toBe(201);
 
-      const spawnData = await parseResponse<AgentResponse>(spawnResponse);
-      const agentThreadId = spawnData.agent.threadId;
+      const spawnData = await parseResponse<AgentWithTokenUsage>(spawnResponse);
+      const agentThreadId = spawnData.threadId;
 
       // Verify agent exists in session service
       const session = await sessionService.getSession(sessionId as ThreadId);
@@ -446,9 +444,9 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       const listResponse = await GET(listRequest, { params: Promise.resolve({ sessionId }) });
-      const listData = await parseResponse<AgentsListResponse>(listResponse);
+      const listData = await parseResponse<AgentInfo[]>(listResponse);
 
-      const apiAgent = listData.agents.find((a) => a.threadId === agentThreadId);
+      const apiAgent = listData.find((a) => a.threadId === agentThreadId);
       expect(apiAgent).toBeDefined();
       expect(apiAgent!.name).toBe('integration-agent');
     });

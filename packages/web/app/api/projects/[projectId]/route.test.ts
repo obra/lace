@@ -5,20 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
 import { parseResponse } from '@/lib/serialization';
-
-// Type interfaces for API responses
-interface ProjectResponse {
-  project: {
-    id: string;
-    name: string;
-    description: string;
-    workingDirectory: string;
-    isArchived: boolean;
-    createdAt: string;
-    lastUsedAt: string;
-    sessionCount: number;
-  };
-}
+import type { ProjectInfo } from '@/types/core';
 
 interface ErrorResponse {
   error: string;
@@ -66,10 +53,10 @@ describe('Individual Project API', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project).toEqual({
+      expect(data).toEqual({
         id: 'test-project',
         name: 'Test Project',
         description: 'A test project',
@@ -132,10 +119,10 @@ describe('Individual Project API', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: 'test-project' }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project).toBeDefined();
+      expect(data).toBeDefined();
     });
 
     it('should return 404 when project not found', async () => {

@@ -55,37 +55,37 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{
-        providers: Array<{
+      const data = await parseResponse<
+        Array<{
           id: string;
           name: string;
           type: string;
-          models: Array<{ id: string; name: string }>;
+          models: Array<{ id: string; displayName: string }>;
           configured: boolean;
           instanceId?: string;
-        }>;
-      }>(response);
+        }>
+      >(response);
 
       // Should return providers with configured instances
-      expect(data.providers.length).toBeGreaterThan(0);
+      expect(data.length).toBeGreaterThan(0);
 
       // All returned providers should be configured
-      data.providers.forEach((provider) => {
+      data.forEach((provider) => {
         expect(provider.configured).toBe(true);
         expect(provider.instanceId).toBeDefined();
         expect(provider.instanceId).toEqual(expect.stringMatching(/^test-/));
       });
 
       // Should have unique provider types (no duplicates for same type)
-      const providerTypes = data.providers.map((p) => p.type);
+      const providerTypes = data.map((p) => p.type);
       const uniqueTypes = [...new Set(providerTypes)];
       expect(providerTypes).toHaveLength(uniqueTypes.length);
 
       // Should NOT include providers without configured instances (like lmstudio, ollama)
-      const lmstudioProvider = data.providers.find((p) => p.type === 'lmstudio');
+      const lmstudioProvider = data.find((p) => p.type === 'lmstudio');
       expect(lmstudioProvider).toBeUndefined();
 
-      const ollamaProvider = data.providers.find((p) => p.type === 'ollama');
+      const ollamaProvider = data.find((p) => p.type === 'ollama');
       expect(ollamaProvider).toBeUndefined();
     });
 
@@ -98,8 +98,8 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ providers: unknown[] }>(response);
-      expect(data.providers).toHaveLength(0);
+      const data = await parseResponse<unknown[]>(response);
+      expect(data).toHaveLength(0);
     });
 
     it('should include model information for each configured provider', async () => {
@@ -112,14 +112,14 @@ describe('Provider Discovery API', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{
-        providers: Array<{
+      const data = await parseResponse<
+        Array<{
           models: Array<{ id: string; displayName: string }>;
-        }>;
-      }>(response);
+        }>
+      >(response);
 
       // Each provider should have its models listed
-      data.providers.forEach((provider) => {
+      data.forEach((provider) => {
         expect(provider.models).toBeInstanceOf(Array);
         expect(provider.models.length).toBeGreaterThan(0);
 

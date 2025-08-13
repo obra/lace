@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
 import { parseResponse } from '@/lib/serialization';
+import type { SessionInfo } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
@@ -75,16 +76,17 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = await parseResponse<{
-        sessions: Array<{ id: string; name: string; createdAt: Date; agentCount: number }>;
-      }>(response);
+      const data =
+        await parseResponse<
+          Array<{ id: string; name: string; createdAt: Date; agentCount: number }>
+        >(response);
 
       expect(response.status).toBe(200);
-      expect(data.sessions.length).toBeGreaterThan(0);
+      expect(data.length).toBeGreaterThan(0);
 
       // Find our created sessions
-      const session1 = data.sessions.find((s) => s.name === 'Session 1');
-      const session2 = data.sessions.find((s) => s.name === 'Session 2');
+      const session1 = data.find((s) => s.name === 'Session 1');
+      const session2 = data.find((s) => s.name === 'Session 2');
 
       expect(session1).toBeDefined();
       expect(session2).toBeDefined();
@@ -99,10 +101,10 @@ describe('Session API endpoints under projects', () => {
         }
       );
 
-      const data = await parseResponse<{ sessions: Array<{ id: string; name: string }> }>(response);
+      const data = await parseResponse<SessionInfo[]>(response);
 
       expect(response.status).toBe(200);
-      expect(data.sessions.length).toBeGreaterThan(0); // At least the default session
+      expect(data.length).toBeGreaterThan(0); // At least the default session
     });
 
     it('should return 404 when project not found', async () => {
@@ -134,14 +136,12 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{
-        session: { id: string; name: string; createdAt: Date };
-      }>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.session.id).toBeDefined();
-      expect(data.session.name).toBe('New Session');
-      expect(data.session.createdAt).toBeDefined();
+      expect(data.id).toBeDefined();
+      expect(data.name).toBe('New Session');
+      expect(data.createdAt).toBeDefined();
     });
 
     it('should return 404 when project not found', async () => {
@@ -203,14 +203,12 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{
-        session: { id: string; name: string; createdAt: Date };
-      }>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.session.id).toBeDefined();
-      expect(data.session.name).toBe('Minimal Session');
-      expect(data.session.createdAt).toBeDefined();
+      expect(data.id).toBeDefined();
+      expect(data.name).toBe('Minimal Session');
+      expect(data.createdAt).toBeDefined();
     });
 
     it('should create session using providerInstanceId and modelId', async () => {
@@ -225,14 +223,12 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{
-        session: { id: string; name: string; createdAt: Date };
-      }>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
-      expect(data.session.id).toBeDefined();
-      expect(data.session.name).toBe('Provider Instance Session');
-      expect(data.session.createdAt).toBeDefined();
+      expect(data.id).toBeDefined();
+      expect(data.name).toBe('Provider Instance Session');
+      expect(data.createdAt).toBeDefined();
     });
   });
 });

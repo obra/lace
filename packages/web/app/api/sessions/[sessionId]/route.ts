@@ -50,7 +50,7 @@ export async function GET(
       agents: agents,
     };
 
-    return createSuperjsonResponse({ session: sessionData });
+    return createSuperjsonResponse(sessionData);
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
@@ -135,7 +135,7 @@ export async function PATCH(
       agents: agents,
     };
 
-    return createSuperjsonResponse({ session: sessionData });
+    return createSuperjsonResponse(sessionData);
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });

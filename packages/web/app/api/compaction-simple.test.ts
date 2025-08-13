@@ -20,6 +20,7 @@ import {
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
+import type { AgentWithTokenUsage } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 
 // Mock server-only module
@@ -175,35 +176,24 @@ describe('Compaction Integration Test', () => {
     });
 
     expect(response.status).toBe(200);
-    const agentData = (await parseResponse(response)) as {
-      agent: {
-        tokenUsage?: {
-          totalPromptTokens: number;
-          totalCompletionTokens: number;
-          totalTokens: number;
-          contextLimit: number;
-          percentUsed: number;
-          nearLimit: boolean;
-        };
-      };
-    };
+    const agentData = (await parseResponse(response)) as AgentWithTokenUsage;
 
     // Verify token usage field is present with expected structure
-    expect(agentData.agent.tokenUsage).toBeDefined();
-    expect(agentData.agent.tokenUsage).toHaveProperty('totalPromptTokens');
-    expect(agentData.agent.tokenUsage).toHaveProperty('totalCompletionTokens');
-    expect(agentData.agent.tokenUsage).toHaveProperty('totalTokens');
-    expect(agentData.agent.tokenUsage).toHaveProperty('contextLimit');
-    expect(agentData.agent.tokenUsage).toHaveProperty('percentUsed');
-    expect(agentData.agent.tokenUsage).toHaveProperty('nearLimit');
+    expect(agentData.tokenUsage).toBeDefined();
+    expect(agentData.tokenUsage).toHaveProperty('totalPromptTokens');
+    expect(agentData.tokenUsage).toHaveProperty('totalCompletionTokens');
+    expect(agentData.tokenUsage).toHaveProperty('totalTokens');
+    expect(agentData.tokenUsage).toHaveProperty('contextLimit');
+    expect(agentData.tokenUsage).toHaveProperty('percentUsed');
+    expect(agentData.tokenUsage).toHaveProperty('nearLimit');
 
     // Values should be numbers (even if 0 initially)
-    expect(typeof agentData.agent.tokenUsage!.totalPromptTokens).toBe('number');
-    expect(typeof agentData.agent.tokenUsage!.totalCompletionTokens).toBe('number');
-    expect(typeof agentData.agent.tokenUsage!.totalTokens).toBe('number');
-    expect(typeof agentData.agent.tokenUsage!.contextLimit).toBe('number');
-    expect(typeof agentData.agent.tokenUsage!.percentUsed).toBe('number');
-    expect(typeof agentData.agent.tokenUsage!.nearLimit).toBe('boolean');
+    expect(typeof agentData.tokenUsage!.totalPromptTokens).toBe('number');
+    expect(typeof agentData.tokenUsage!.totalCompletionTokens).toBe('number');
+    expect(typeof agentData.tokenUsage!.totalTokens).toBe('number');
+    expect(typeof agentData.tokenUsage!.contextLimit).toBe('number');
+    expect(typeof agentData.tokenUsage!.percentUsed).toBe('number');
+    expect(typeof agentData.tokenUsage!.nearLimit).toBe('boolean');
   });
 
   it('should emit compaction events when compaction starts', async () => {
