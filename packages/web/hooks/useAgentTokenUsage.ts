@@ -9,7 +9,7 @@ import type { LaceEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
 // Use the same type structure as the API
-export type AgentTokenUsage = NonNullable<AgentResponse['agent']['tokenUsage']>;
+type AgentTokenUsage = NonNullable<AgentResponse['agent']['tokenUsage']>;
 
 export interface UseAgentTokenUsageResult {
   tokenUsage: AgentTokenUsage | null;

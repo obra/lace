@@ -319,7 +319,7 @@ export function createBinaryFileDiff(
  * Parses a unified diff format string into a FileDiff object
  * This is a simplified parser - a production implementation would be more robust
  */
-export function parseUnifiedDiff(diffText: string): FileDiff[] {
+function parseUnifiedDiff(diffText: string): FileDiff[] {
   const diffs: FileDiff[] = [];
   const lines = diffText.split('\n');
 

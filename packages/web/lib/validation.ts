@@ -1,7 +1,7 @@
 // ABOUTME: Input validation and sanitization utilities for user settings
 // ABOUTME: Provides secure validation for email, text inputs with length limits and XSS protection
 
-export interface ValidationResult {
+interface ValidationResult {
   isValid: boolean;
   value: string;
   error?: string;

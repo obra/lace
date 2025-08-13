@@ -39,7 +39,7 @@ export interface FileDiff {
   isRenamed?: boolean;
 }
 
-export interface FileDiffViewerProps {
+interface FileDiffViewerProps {
   diff: FileDiff;
   viewMode?: 'side-by-side' | 'unified';
   showLineNumbers?: boolean;

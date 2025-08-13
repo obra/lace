@@ -22,7 +22,7 @@ export interface TaskEvent {
 }
 
 // Project event types
-export interface ProjectEvent {
+interface ProjectEvent {
   type: 'project:created' | 'project:updated' | 'project:deleted';
   projectId: string;
   project: {
@@ -39,7 +39,7 @@ export interface ProjectEvent {
 }
 
 // Agent event types
-export interface AgentEvent {
+interface AgentEvent {
   type: 'agent:spawned' | 'agent:started' | 'agent:stopped';
   taskId?: string;
   agentThreadId: ThreadId;
@@ -53,7 +53,7 @@ export interface AgentEvent {
 }
 
 // Global event types
-export interface GlobalEvent {
+interface GlobalEvent {
   type: 'system:maintenance' | 'system:update' | 'system:notification';
   message: string;
   severity: 'info' | 'warning' | 'error';

@@ -11,7 +11,7 @@ export const springConfig = {
 } as const;
 
 // Easing functions
-export const easings = {
+const _easings = {
   easeOut: [0.16, 1, 0.3, 1],
   easeIn: [0.55, 0, 1, 0.45],
   easeInOut: [0.4, 0, 0.2, 1],
@@ -37,7 +37,7 @@ export const fadeInUp: Variants = {
   },
 };
 
-export const fadeInDown: Variants = {
+const _fadeInDown: Variants = {
   initial: {
     opacity: 0,
     y: -20,
@@ -71,7 +71,7 @@ export const fadeInLeft: Variants = {
   },
 };
 
-export const fadeInRight: Variants = {
+const _fadeInRight: Variants = {
   initial: {
     opacity: 0,
     x: 20,
@@ -172,7 +172,7 @@ export const messageVariants: Variants = {
 };
 
 // Hover animations
-export const hoverScale = {
+const _hoverScale = {
   whileHover: {
     scale: 1.05,
     transition: springConfig.snappy,
@@ -292,7 +292,7 @@ export const loadingDot: Variants = {
 };
 
 // Typing indicator animation
-export const typingIndicator: Variants = {
+const _typingIndicator: Variants = {
   animate: {
     opacity: [0.5, 1, 0.5],
     transition: {
@@ -326,7 +326,7 @@ export const pageTransition: Variants = {
 };
 
 // Gesture-based animations for mobile
-export const swipeableItem = {
+const _swipeableItem = {
   drag: 'x' as const,
   dragConstraints: { left: -100, right: 100 },
   dragElastic: 0.2,
@@ -334,7 +334,7 @@ export const swipeableItem = {
 };
 
 // Path drawing animation for icons
-export const drawPath = {
+const _drawPath = {
   initial: { pathLength: 0, opacity: 0 },
   animate: {
     pathLength: 1,
@@ -359,7 +359,7 @@ export const shimmer: Variants = {
 };
 
 // Utility function to create custom spring transitions
-export const createSpring = (stiffness = 200, damping = 30, mass = 1): Transition => ({
+const _createSpring = (stiffness = 200, damping = 30, mass = 1): Transition => ({
   type: 'spring',
   stiffness,
   damping,
@@ -367,9 +367,7 @@ export const createSpring = (stiffness = 200, damping = 30, mass = 1): Transitio
 });
 
 // Utility function for sequential animations
-export const createSequence = (
-  delays: number[]
-): { animate: { transition: { delay: number } } }[] =>
+const _createSequence = (delays: number[]): { animate: { transition: { delay: number } } }[] =>
   delays.map((delay) => ({
     animate: {
       transition: { delay },
@@ -385,7 +383,7 @@ export const focusRing = {
 };
 
 // Carousel slide animation
-export const carouselSlide: Variants = {
+const _carouselSlide: Variants = {
   enter: (direction: number) => ({
     x: direction > 0 ? 1000 : -1000,
     opacity: 0,

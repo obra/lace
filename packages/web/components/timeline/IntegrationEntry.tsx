@@ -50,7 +50,7 @@ interface IntegrationEntryProps {
   compact?: boolean;
 }
 
-export function IntegrationTimelineEntry({ entry, compact = false }: IntegrationEntryProps) {
+function IntegrationTimelineEntry({ entry, compact = false }: IntegrationEntryProps) {
   const getIntegrationIcon = (type: IntegrationEntry['type']) => {
     switch (type) {
       case 'google-drive':

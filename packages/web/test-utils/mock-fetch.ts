@@ -3,7 +3,7 @@
 
 import { stringify } from 'superjson';
 
-export interface MockResponseOptions {
+interface MockResponseOptions {
   ok?: boolean;
   status?: number;
   statusText?: string;

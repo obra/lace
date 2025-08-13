@@ -52,6 +52,6 @@ export const ListDirectoryResponseSchema = z.object({
 });
 
 // Type inference for request/response validation
-export type ListDirectoryRequest = z.infer<typeof ListDirectoryRequestSchema>;
-export type ValidatedDirectoryEntry = z.infer<typeof DirectoryEntrySchema>;
-export type ValidatedListDirectoryResponse = z.infer<typeof ListDirectoryResponseSchema>;
+type ListDirectoryRequest = z.infer<typeof ListDirectoryRequestSchema>;
+type ValidatedDirectoryEntry = z.infer<typeof DirectoryEntrySchema>;
+type ValidatedListDirectoryResponse = z.infer<typeof ListDirectoryResponseSchema>;

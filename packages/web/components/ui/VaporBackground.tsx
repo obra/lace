@@ -1,7 +1,7 @@
 import React from 'react';
 import clsx from 'clsx';
 
-export interface VaporBackgroundProps extends React.HTMLAttributes<HTMLDivElement> {
+interface VaporBackgroundProps extends React.HTMLAttributes<HTMLDivElement> {
   intensity?: 'soft' | 'normal' | 'strong';
 }
 

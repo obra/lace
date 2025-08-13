@@ -10,7 +10,7 @@ export interface Message {
   timestamp: Date;
 }
 
-export interface ChatState {
+interface ChatState {
   messages: Message[];
   isLoading: boolean;
   error?: string;
@@ -49,7 +49,7 @@ export interface RecentFile {
   size?: number;
 }
 
-export interface Theme {
+interface Theme {
   name: string;
   colors: {
     primary: string;

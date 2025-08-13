@@ -12,7 +12,7 @@ import type { ConsoleForwardConfig, ConsoleLogEntry } from './index';
  * Console forwarding class that patches browser console methods
  * and forwards console calls to a server endpoint in batches
  */
-export class ConsoleForwarder {
+class ConsoleForwarder {
   private config: ConsoleForwardConfig;
   private buffer: ConsoleLogEntry[] = [];
   private flushTimer: ReturnType<typeof setInterval> | null = null;

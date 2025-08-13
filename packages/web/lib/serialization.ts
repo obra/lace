@@ -33,20 +33,20 @@ superjson.registerCustom<NewAgentSpec, string>(
 export const { serialize, deserialize, stringify, parse } = superjson;
 
 // Convenience functions for common use cases
-export function serializeForAPI<T>(data: T): string {
+function _serializeForAPI<T>(data: T): string {
   return stringify(data);
 }
 
-export function deserializeFromAPI<T>(data: string): T {
+function _deserializeFromAPI<T>(data: string): T {
   return parse(data);
 }
 
 // For SSE events specifically
-export function serializeEvent<T>(event: T): string {
+function _serializeEvent<T>(event: T): string {
   return stringify(event);
 }
 
-export function deserializeEvent<T>(data: string): T {
+function _deserializeEvent<T>(data: string): T {
   return parse(data);
 }
 

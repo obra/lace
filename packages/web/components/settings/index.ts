@@ -4,7 +4,3 @@
 export { SettingsTabs } from './SettingsTabs';
 export { SettingsPanel } from './SettingsPanel';
 export { SettingField } from './SettingField';
-export { UISettingsPanel } from './panels/UISettingsPanel';
-export { UserSettingsPanel } from './panels/UserSettingsPanel';
-export { ProvidersPanel } from './panels/ProvidersPanel';
-export { SettingsContainer } from './SettingsContainer';

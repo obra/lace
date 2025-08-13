@@ -12,7 +12,7 @@ export interface StreamConnection {
 }
 
 // Client-side event filtering for LaceEvents
-export interface EventFilter {
+interface EventFilter {
   shouldIncludeEvent: (event: LaceEvent) => boolean;
 }
 
@@ -23,7 +23,7 @@ export interface StreamSubscription {
   projectIds?: string[]; // Filter by project context
 }
 
-export function createEventFilter(subscription: StreamSubscription): EventFilter {
+function createEventFilter(subscription: StreamSubscription): EventFilter {
   return {
     shouldIncludeEvent: (event: LaceEvent) => {
       // Filter by thread ID

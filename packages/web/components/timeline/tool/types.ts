@@ -13,7 +13,7 @@ export interface ToolRenderer {
 }
 
 // Helper type to ensure tool renderer objects match the interface
-export type ToolRendererDefinition = Partial<ToolRenderer>;
+type ToolRendererDefinition = Partial<ToolRenderer>;
 
 // Re-export ToolResult for convenience
 export type { ToolResult };

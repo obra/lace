@@ -40,4 +40,4 @@ export function getToolRenderer(toolName: string): ToolRenderer {
   return toolRenderers[toolName.toLowerCase()] || {};
 }
 
-export type { ToolRenderer, ToolResult } from './types';
+export type { ToolResult } from './types';

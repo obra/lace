@@ -7,18 +7,13 @@ export type {
   AssigneeId,
   LaceEventType,
   LaceEvent,
-  Thread,
   AgentMessageData,
   AgentStateChangeData,
 } from '~/threads/types';
 
-export type {
-  MessageTokenUsage,
-  ThreadTokenUsage,
-  CombinedTokenUsage,
-} from '~/token-management/types';
+export type { CombinedTokenUsage } from '~/token-management/types';
 
-export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+export type { ToolCall, ToolResult, ToolAnnotations } from '~/tools/types';
 
 export type { FileEditDiffContext } from '~/tools/implementations/file-edit';
 
@@ -27,7 +22,6 @@ export type {
   TaskNote,
   TaskStatus,
   TaskPriority,
-  TaskActor,
   TaskContext,
   TaskFilters,
 } from '~/tasks/types';
@@ -49,9 +43,7 @@ export {
   asThreadId,
   isThreadId,
   asNewAgentSpec,
-  createNewAgentSpec,
   asAssigneeId,
-  isAssigneeId,
   EVENT_TYPES,
   isTransientEventType,
   isInternalWorkflowEvent,

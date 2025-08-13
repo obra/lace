@@ -4,28 +4,28 @@ import type { Decorator } from '@storybook/react';
 // Tennis commentary messages for different component interactions
 const TENNIS_COMMENTARY = {
   start: [
-    "🎾 And here we have a magnificent component warming up!",
-    "🎾 The component is taking its position on the court!",
+    '🎾 And here we have a magnificent component warming up!',
+    '🎾 The component is taking its position on the court!',
     "🎾 What a beautiful setup we're seeing here!",
-    "🎾 The component is ready to serve up some amazing functionality!",
+    '🎾 The component is ready to serve up some amazing functionality!',
   ],
   hover: [
     "🎾 Ooh, we're seeing some excellent hover behavior!",
-    "🎾 The component is responding beautifully to user interaction!",
-    "🎾 What precision! The hover state is executed flawlessly!",
-    "🎾 Outstanding form in that hover animation!",
+    '🎾 The component is responding beautifully to user interaction!',
+    '🎾 What precision! The hover state is executed flawlessly!',
+    '🎾 Outstanding form in that hover animation!',
   ],
   click: [
-    "🎾 BOOM! What a powerful click event!",
-    "🎾 Absolutely stunning execution on that click handler!",
-    "🎾 The component delivers exactly what was needed!",
-    "🎾 Perfect timing on that interaction!",
+    '🎾 BOOM! What a powerful click event!',
+    '🎾 Absolutely stunning execution on that click handler!',
+    '🎾 The component delivers exactly what was needed!',
+    '🎾 Perfect timing on that interaction!',
   ],
   render: [
-    "🎾 The component is rendering with championship-level performance!",
-    "🎾 Look at that beautiful rendering technique!",
-    "🎾 Flawless execution in the render cycle!",
-    "🎾 This component is playing at the top of its game!",
+    '🎾 The component is rendering with championship-level performance!',
+    '🎾 Look at that beautiful rendering technique!',
+    '🎾 Flawless execution in the render cycle!',
+    '🎾 This component is playing at the top of its game!',
   ],
 };
 
@@ -44,7 +44,7 @@ export const withTennisCommentary: Decorator = (Story, context) => {
     // Show initial commentary
     setCommentary(getRandomCommentary('start'));
     setIsVisible(true);
-    
+
     // Hide after 3 seconds
     const timer = setTimeout(() => {
       setIsVisible(false);
@@ -76,7 +76,7 @@ export const withTennisCommentary: Decorator = (Story, context) => {
           </div>
         </div>
       )}
-      
+
       {/* Component Wrapper with Event Handlers */}
       <div
         onMouseEnter={handleMouseEnter}
@@ -85,20 +85,24 @@ export const withTennisCommentary: Decorator = (Story, context) => {
       >
         <Story />
       </div>
-      
+
       {/* Commentary Instructions */}
       <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
         <p className="font-medium mb-1">🎾 Tennis Commentary Active!</p>
-        <p>• <strong>Hover</strong> over the component for live commentary</p>
-        <p>• <strong>Click</strong> the component for performance insights</p>
+        <p>
+          • <strong>Hover</strong> over the component for live commentary
+        </p>
+        <p>
+          • <strong>Click</strong> the component for performance insights
+        </p>
         <p>• Commentary auto-appears on story changes</p>
       </div>
     </div>
   );
 };
 
-// Export individual commentary functions for custom use
-export const TennisCommentary = {
+// Individual commentary functions for custom use
+const TennisCommentary = {
   getRandomCommentary,
   TENNIS_COMMENTARY,
 };

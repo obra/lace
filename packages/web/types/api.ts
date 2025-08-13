@@ -33,7 +33,7 @@ export interface PendingApproval {
 }
 
 // API request/response for approval decisions
-export interface ToolApprovalResponse {
+interface ToolApprovalResponse {
   requestId: string;
   decision: ApprovalDecision;
   reason?: string;
@@ -64,7 +64,7 @@ export interface MessageResponse {
 }
 
 // API response types for proper error handling
-export interface ApiSuccessResponse<T> {
+interface ApiSuccessResponse<T> {
   data?: T;
   [key: string]: unknown;
 }
@@ -76,7 +76,7 @@ export interface ApiErrorResponse {
   details?: unknown;
 }
 
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 // Helper type guards for API responses
 export function isApiError(response: unknown): response is ApiErrorResponse {

@@ -1,21 +1,21 @@
 // ABOUTME: Type definitions for contextual feedback system
 // ABOUTME: Defines commentary types, feedback events, and configuration options
 
-export type CommentaryType = 
-  | 'action'      // What's happening now
+type CommentaryType =
+  | 'action' // What's happening now
   | 'performance' // How well things are going
   | 'educational' // Why certain decisions were made
-  | 'predictive'  // What's likely to happen next
-  | 'error'       // What went wrong and how to fix it
+  | 'predictive' // What's likely to happen next
+  | 'error' // What went wrong and how to fix it
   | 'optimization' // Performance and efficiency suggestions
-  | 'insight'     // Deeper understanding of patterns
-  | 'celebration' // Acknowledging good outcomes;
+  | 'insight' // Deeper understanding of patterns
+  | 'celebration'; // Acknowledging good outcomes;
 
-export type FeedbackVerbosity = 'quiet' | 'normal' | 'verbose' | 'commentary';
+type FeedbackVerbosity = 'quiet' | 'normal' | 'verbose' | 'commentary';
 
-export type FeedbackTiming = 'immediate' | 'batched' | 'milestone';
+type FeedbackTiming = 'immediate' | 'batched' | 'milestone';
 
-export interface FeedbackConfig {
+interface FeedbackConfig {
   verbosity: FeedbackVerbosity;
   timing: FeedbackTiming;
   enabledTypes: CommentaryType[];
@@ -26,7 +26,7 @@ export interface FeedbackConfig {
   enableTennisBanter: boolean; // Fun, engaging commentary style
 }
 
-export interface FeedbackContext {
+interface FeedbackContext {
   threadId: string;
   agentState?: string;
   currentTool?: string;
@@ -109,7 +109,7 @@ export interface PredictiveInsight {
   preventionSuggestions?: string[];
 }
 
-export interface FeedbackEventHandlers {
+interface FeedbackEventHandlers {
   onFeedbackGenerated: (event: FeedbackEvent) => void;
   onInsightGenerated: (insight: FeedbackInsight) => void;
   onPerformanceAnalysis: (analysis: PerformanceAnalysis) => void;

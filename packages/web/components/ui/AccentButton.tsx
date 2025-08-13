@@ -1,7 +1,7 @@
 import React from 'react';
 import clsx from 'clsx';
 
-export interface AccentButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface AccentButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   iconLeft?: React.ReactNode;
 }
 

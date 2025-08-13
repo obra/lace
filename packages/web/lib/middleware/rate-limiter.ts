@@ -27,7 +27,7 @@ setInterval(() => {
   }
 }, 60000);
 
-export function createRateLimiter(config: RateLimitConfig) {
+function createRateLimiter(config: RateLimitConfig) {
   const { windowMs, maxRequests, keyGenerator } = config;
 
   return function rateLimiter(req: NextRequest): NextResponse | null {
@@ -72,7 +72,7 @@ export function createRateLimiter(config: RateLimitConfig) {
 }
 
 // Pre-configured rate limiters for different endpoints
-export const sessionCreationLimiter = createRateLimiter({
+const _sessionCreationLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
   maxRequests: 10, // 10 sessions per minute
 });
@@ -82,12 +82,12 @@ export const messageLimiter = createRateLimiter({
   maxRequests: 60, // 60 messages per minute
 });
 
-export const taskLimiter = createRateLimiter({
+const _taskLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
   maxRequests: 30, // 30 task operations per minute
 });
 
-export const sseLimiter = createRateLimiter({
+const _sseLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
   maxRequests: 5, // 5 SSE connections per minute
   keyGenerator: (req): string => {

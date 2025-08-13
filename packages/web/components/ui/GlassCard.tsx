@@ -5,7 +5,7 @@ import clsx from 'clsx';
  * GlassCard
  * Dim-theme friendly glass panel with blur, subtle borders and depth.
  */
-export interface GlassCardProps extends React.HTMLAttributes<HTMLElement> {
+interface GlassCardProps extends React.HTMLAttributes<HTMLElement> {
   as?: React.ElementType;
 }
 

@@ -1,7 +1,7 @@
 // ABOUTME: Client-safe URL utilities for Google Docs and other services
 // ABOUTME: Provides URL parsing and validation functions for external services
 
-export function extractGoogleDocId(url: string): string | null {
+function _extractGoogleDocId(url: string): string | null {
   try {
     const urlObj = new URL(url);
 

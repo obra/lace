@@ -67,7 +67,6 @@ export {
   faChevronRight,
   faCode,
   faQuestion,
-  faExternalLinkAlt as faExternalLink,
   faFlag,
   faClipboard,
   faClock,
