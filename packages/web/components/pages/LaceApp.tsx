@@ -639,7 +639,7 @@ export const LaceApp = memo(function LaceApp() {
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
     return (
-      <div className="flex h-screen bg-base-200 text-base-content font-sans items-center justify-center">
+      <div className="flex h-screen bg-base-200 text-base-content font-ui items-center justify-center">
         <div className="loading loading-spinner loading-lg"></div>
       </div>
     );
@@ -647,7 +647,7 @@ export const LaceApp = memo(function LaceApp() {
 
   return (
     <motion.div
-      className="flex h-screen bg-base-200 text-base-content font-sans overflow-hidden"
+      className="flex h-screen bg-base-200 text-base-content font-ui overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
@@ -678,8 +678,8 @@ export const LaceApp = memo(function LaceApp() {
                   <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
                     <div className="flex items-center gap-2 mb-1">
                       <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                      <span 
-                        data-testid="current-project-name"
+                      <span
+                        data-testid="current-project-name-desktop"
                         className="font-medium text-base-content truncate"
                       >
                         {currentProject.name}
@@ -933,6 +933,11 @@ export const LaceApp = memo(function LaceApp() {
 
       {/* Main Content - copy structure from AnimatedLaceApp */}
       <motion.div className="flex-1 flex flex-col min-w-0">
+        {/* Dim/Glass vapor background */}
+        <div className="vapor-bg" aria-hidden>
+          <div className="sunlines"></div>
+          <div className="noise"></div>
+        </div>
         {/* Top Bar */}
         <motion.div className="bg-transparent sticky top-0 z-30">
           <motion.div className="flex items-center justify-between p-4 lg:px-6">
