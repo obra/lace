@@ -243,6 +243,7 @@ export function DirectoryField({
           disabled={disabled}
           className={inputClasses}
           aria-label={label}
+          data-testid="project-path-input"
         />
         
         {/* Folder icon */}
