@@ -57,10 +57,9 @@ const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId
   }
 
   if (usageResult.error) {
-    const errMsg = getErrorMessage(usageResult.error);
     return (
       <div className="flex justify-center p-4 border-t border-base-300">
-        <div className="text-xs text-error">Error loading token usage: {errMsg}</div>
+        <div className="text-xs text-error">Error loading token usage: {usageResult.error}</div>
       </div>
     );
   }
@@ -227,6 +226,9 @@ export const LaceApp = memo(function LaceApp() {
       setProviders(providersData.providers || []);
     } catch (error) {
       console.error('Failed to load providers:', error);
+      setProviders([]);
+      setLoadingProviders(false);
+      return;
     }
     setLoadingProviders(false);
   }, []);
@@ -243,6 +245,11 @@ export const LaceApp = memo(function LaceApp() {
 
       if (isApiError(data)) {
         console.error('Failed to load sessions:', data.error);
+        if (data.error === 'Project not found') {
+          // Clear the stale selection to stop repeated errors and let FTUX flow proceed
+          setSelectedProject(null);
+          setSessions([]);
+        }
         return;
       }
 
@@ -251,7 +258,7 @@ export const LaceApp = memo(function LaceApp() {
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
-  }, [selectedProject]);
+  }, [selectedProject, setSelectedProject]);
 
   // Load projects and providers on mount
   useEffect(() => {
@@ -306,8 +313,8 @@ export const LaceApp = memo(function LaceApp() {
             setProjectConfig({});
           }
         })
-        .catch((err: unknown) => {
-          console.error('Failed to load project configuration:', err);
+        .catch((error) => {
+          console.error('Failed to load project configuration:', error);
           setProjectConfig(null);
         });
     } else {
@@ -401,11 +408,8 @@ export const LaceApp = memo(function LaceApp() {
         // Reload sessions to show the new one
         void loadSessions();
       } else {
-        const errorData = await parseResponse<{ error?: string; details?: unknown }>(res).catch(() => ({ error: 'Unknown error', details: undefined }));
-        console.error('Failed to create session:', errorData);
-        if (errorData.details) {
-          console.error('Validation details:', errorData.details);
-        }
+        const errorData = await parseResponse<{ error?: string }>(res);
+        console.error('Failed to create session:', errorData.error);
       }
     } catch (error) {
       console.error('Failed to create session:', error);
@@ -428,6 +432,7 @@ export const LaceApp = memo(function LaceApp() {
         void loadSessionDetails(sessionId as ThreadId);
       } else {
         console.error('Failed to create agent');
+        return;
       }
     } catch (error) {
       console.error('Failed to create agent:', error);
@@ -482,6 +487,7 @@ export const LaceApp = memo(function LaceApp() {
         void loadProjects();
       } else {
         console.error('Failed to update project');
+        return;
       }
     } catch (error) {
       console.error('Failed to update project:', error);
