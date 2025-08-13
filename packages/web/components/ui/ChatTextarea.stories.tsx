@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for ChatTextarea.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState, useRef } from 'react';
 import ChatTextarea, { ChatTextareaRef } from './ChatTextarea';

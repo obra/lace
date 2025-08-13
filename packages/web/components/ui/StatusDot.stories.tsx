@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for StatusDot.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import StatusDot from './StatusDot';
 

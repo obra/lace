@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for TimelineView.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { TimelineView } from './TimelineView';
 import type { LaceEvent, AgentInfo } from '@/types/core';

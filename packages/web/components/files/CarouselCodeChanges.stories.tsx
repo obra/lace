@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for CarouselCodeChanges.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { CarouselCodeChanges } from './CarouselCodeChanges';
 

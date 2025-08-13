@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for EnhancedChatInput.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { EnhancedChatInput } from './EnhancedChatInput';

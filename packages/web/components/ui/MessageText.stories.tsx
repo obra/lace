@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for MessageText.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import MessageText from './MessageText';
 

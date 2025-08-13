@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for FeedbackInsightCard.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackInsightCard } from './FeedbackInsightCard';
 import { FeedbackInsight } from '@/feedback/types';
@@ -9,7 +10,8 @@ const meta: Meta<typeof FeedbackInsightCard> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Insight card component for displaying contextual insights with confidence levels, recommendations, and actionable items. Shows machine learning-generated insights about development patterns and opportunities.',
+        component:
+          'Insight card component for displaying contextual insights with confidence levels, recommendations, and actionable items. Shows machine learning-generated insights about development patterns and opportunities.',
       },
     },
   },
@@ -46,7 +48,8 @@ export const PatternInsight: Story = {
       ...baseInsight,
       category: 'pattern',
       title: 'Development Pattern Detected',
-      description: 'You frequently refactor components after initial implementation. This suggests a pattern of iterative improvement, which is good practice for code quality.',
+      description:
+        'You frequently refactor components after initial implementation. This suggests a pattern of iterative improvement, which is good practice for code quality.',
       confidence: 0.87,
       impact: 'medium',
       actionable: true,
@@ -62,7 +65,8 @@ export const PatternInsight: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Pattern recognition insight showing development behavior patterns with actionable recommendations.',
+        story:
+          'Pattern recognition insight showing development behavior patterns with actionable recommendations.',
       },
     },
   },
@@ -74,7 +78,8 @@ export const PerformanceInsight: Story = {
       ...baseInsight,
       category: 'performance',
       title: 'Performance Optimization Opportunity',
-      description: 'Your recent code changes have improved render performance by 23%. The use of React.memo and useMemo is particularly effective.',
+      description:
+        'Your recent code changes have improved render performance by 23%. The use of React.memo and useMemo is particularly effective.',
       confidence: 0.94,
       impact: 'high',
       actionable: true,
@@ -90,7 +95,8 @@ export const PerformanceInsight: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Performance insight highlighting successful optimizations and suggesting further improvements.',
+        story:
+          'Performance insight highlighting successful optimizations and suggesting further improvements.',
       },
     },
   },
@@ -102,7 +108,8 @@ export const ErrorInsight: Story = {
       ...baseInsight,
       category: 'error',
       title: 'Error Pattern Analysis',
-      description: 'Async operations are causing 60% of runtime errors. Most errors occur during component unmounting when promises resolve.',
+      description:
+        'Async operations are causing 60% of runtime errors. Most errors occur during component unmounting when promises resolve.',
       confidence: 0.76,
       impact: 'high',
       actionable: true,
@@ -130,7 +137,8 @@ export const OptimizationInsight: Story = {
       ...baseInsight,
       category: 'optimization',
       title: 'Bundle Size Optimization',
-      description: 'Your application bundle has grown by 15% over the past week. Most growth comes from unused utility functions and duplicate dependencies.',
+      description:
+        'Your application bundle has grown by 15% over the past week. Most growth comes from unused utility functions and duplicate dependencies.',
       confidence: 0.82,
       impact: 'medium',
       actionable: true,
@@ -159,7 +167,8 @@ export const PredictionInsight: Story = {
       ...baseInsight,
       category: 'prediction',
       title: 'Technical Debt Prediction',
-      description: 'Based on current development velocity and complexity growth, technical debt will likely impact feature delivery within 2 weeks.',
+      description:
+        'Based on current development velocity and complexity growth, technical debt will likely impact feature delivery within 2 weeks.',
       confidence: 0.68,
       impact: 'high',
       actionable: true,
@@ -188,7 +197,8 @@ export const HighConfidence: Story = {
       ...baseInsight,
       category: 'performance',
       title: 'High Confidence Insight',
-      description: 'Component memoization has consistently improved performance across all measured scenarios.',
+      description:
+        'Component memoization has consistently improved performance across all measured scenarios.',
       confidence: 0.96,
       impact: 'high',
       actionable: true,
@@ -216,7 +226,8 @@ export const MediumConfidence: Story = {
       ...baseInsight,
       category: 'pattern',
       title: 'Medium Confidence Insight',
-      description: 'There appears to be a correlation between commit frequency and code quality metrics.',
+      description:
+        'There appears to be a correlation between commit frequency and code quality metrics.',
       confidence: 0.72,
       impact: 'medium',
       actionable: false,
@@ -244,7 +255,8 @@ export const LowConfidence: Story = {
       ...baseInsight,
       category: 'optimization',
       title: 'Low Confidence Insight',
-      description: 'Initial data suggests that afternoon coding sessions may be less productive, but more data is needed.',
+      description:
+        'Initial data suggests that afternoon coding sessions may be less productive, but more data is needed.',
       confidence: 0.45,
       impact: 'low',
       actionable: false,
@@ -272,7 +284,8 @@ export const WithRelatedEvents: Story = {
       ...baseInsight,
       category: 'pattern',
       title: 'Insight with Related Events',
-      description: 'This insight is derived from multiple related events in your development session.',
+      description:
+        'This insight is derived from multiple related events in your development session.',
       confidence: 0.84,
       impact: 'medium',
       actionable: true,
@@ -324,7 +337,7 @@ export const NonActionable: Story = {
       ...baseInsight,
       category: 'pattern',
       title: 'Non-Actionable Insight',
-      description: 'This is an informational insight that doesn\'t require immediate action.',
+      description: "This is an informational insight that doesn't require immediate action.",
       confidence: 0.81,
       impact: 'low',
       actionable: false,
@@ -348,13 +361,31 @@ export const NonActionable: Story = {
 export const AllCategories: Story = {
   render: () => (
     <div className="space-y-4">
-      {([
-        { category: 'pattern', title: 'Pattern Analysis', description: 'Development pattern detected' },
-        { category: 'performance', title: 'Performance Insight', description: 'Performance optimization opportunity' },
-        { category: 'error', title: 'Error Analysis', description: 'Error pattern identified' },
-        { category: 'optimization', title: 'Optimization Insight', description: 'Code optimization suggestion' },
-        { category: 'prediction', title: 'Predictive Insight', description: 'Future outcome prediction' },
-      ] as const).map((data, index) => (
+      {(
+        [
+          {
+            category: 'pattern',
+            title: 'Pattern Analysis',
+            description: 'Development pattern detected',
+          },
+          {
+            category: 'performance',
+            title: 'Performance Insight',
+            description: 'Performance optimization opportunity',
+          },
+          { category: 'error', title: 'Error Analysis', description: 'Error pattern identified' },
+          {
+            category: 'optimization',
+            title: 'Optimization Insight',
+            description: 'Code optimization suggestion',
+          },
+          {
+            category: 'prediction',
+            title: 'Predictive Insight',
+            description: 'Future outcome prediction',
+          },
+        ] as const
+      ).map((data, index) => (
         <FeedbackInsightCard
           key={index}
           insight={{
@@ -400,7 +431,7 @@ export const AllImpactLevels: Story = {
         }}
         showRecommendations={true}
       />
-      
+
       <h3 className="text-lg font-semibold">Medium Impact</h3>
       <FeedbackInsightCard
         insight={{
@@ -415,7 +446,7 @@ export const AllImpactLevels: Story = {
         }}
         showRecommendations={true}
       />
-      
+
       <h3 className="text-lg font-semibold">Low Impact</h3>
       <FeedbackInsightCard
         insight={{
@@ -488,7 +519,8 @@ export const InteractiveDemo: Story = {
       ...baseInsight,
       category: 'pattern',
       title: 'Interactive Demo Insight',
-      description: 'Use the controls below to toggle recommendations and related events visibility.',
+      description:
+        'Use the controls below to toggle recommendations and related events visibility.',
       confidence: 0.85,
       impact: 'medium',
       actionable: true,
@@ -504,7 +536,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showing all features including recommendations and related events.',
+        story:
+          'Interactive demo showing all features including recommendations and related events.',
       },
     },
   },

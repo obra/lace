@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for ChatInputComposer.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import ChatInputComposer from './ChatInputComposer';

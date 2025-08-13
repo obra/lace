@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for FileAttachment.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { FileAttachment, type AttachedFile } from './FileAttachment';

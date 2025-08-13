@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for TaskBoardModal.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { TaskBoardModal } from './TaskBoardModal';
 import { Task } from '@/types/core';

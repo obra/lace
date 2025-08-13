@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AnimatedTimelineView.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnimatedTimelineView } from './AnimatedTimelineView';
 import { TimelineEntry } from '@/types/web-events';
@@ -9,7 +10,8 @@ const meta: Meta<typeof AnimatedTimelineView> = {
     layout: 'fullscreen',
     docs: {
       description: {
-        component: 'Animated timeline view component with Framer Motion animations, auto-scrolling, typing indicators, and scroll-to-bottom functionality. Features staggered message entrance, smooth transitions, and performance-optimized animations.',
+        component:
+          'Animated timeline view component with Framer Motion animations, auto-scrolling, typing indicators, and scroll-to-bottom functionality. Features staggered message entrance, smooth transitions, and performance-optimized animations.',
       },
     },
   },
@@ -50,7 +52,8 @@ const sampleEntries: TimelineEntry[] = [
   {
     id: 3,
     type: 'ai',
-    content: "I'll help you optimize your React application. Let me analyze the performance bottlenecks.\n\n```typescript\nfunction OptimizedComponent() {\n  const memoizedValue = useMemo(() => {\n    return expensiveCalculation(data);\n  }, [data]);\n  \n  return <div>{memoizedValue}</div>;\n}\n```\n\nThis approach reduces unnecessary re-renders.",
+    content:
+      "I'll help you optimize your React application. Let me analyze the performance bottlenecks.\n\n```typescript\nfunction OptimizedComponent() {\n  const memoizedValue = useMemo(() => {\n    return expensiveCalculation(data);\n  }, [data]);\n  \n  return <div>{memoizedValue}</div>;\n}\n```\n\nThis approach reduces unnecessary re-renders.",
     agent: 'Claude',
     timestamp: new Date(Date.now() - 3400000),
   },
@@ -60,7 +63,10 @@ const sampleEntries: TimelineEntry[] = [
     tool: 'bash',
     content: 'npm run build -- --analyze',
     result: {
-      content: [{ type: 'text', text: `Bundle Analysis:
+      content: [
+        {
+          type: 'text',
+          text: `Bundle Analysis:
 ┌─────────────────────────────────────────────────────────────┐
 │                      Bundle Size Report                     │
 ├─────────────────────────────────────────────────────────────┤
@@ -72,7 +78,9 @@ const sampleEntries: TimelineEntry[] = [
 │ • react-dom: 120KB                                         │
 │ • framer-motion: 95KB                                      │
 │ • lodash: 70KB (consider tree-shaking)                     │
-└─────────────────────────────────────────────────────────────┘` }],
+└─────────────────────────────────────────────────────────────┘`,
+        },
+      ],
       status: 'completed' as const,
     },
     timestamp: new Date(Date.now() - 3300000),
@@ -100,7 +108,8 @@ const longConversation: TimelineEntry[] = [
   {
     id: 7,
     type: 'ai',
-    content: "The bundle analysis shows several optimization opportunities:\n\n**Key Findings:**\n1. **Lodash (70KB)** - Consider using individual imports\n2. **Large main chunk** - Implement code splitting\n3. **Vendor bundle** - Good separation of dependencies\n\n```javascript\n// Instead of:\nimport _ from 'lodash';\n\n// Use specific imports:\nimport { debounce, throttle } from 'lodash';\n```",
+    content:
+      "The bundle analysis shows several optimization opportunities:\n\n**Key Findings:**\n1. **Lodash (70KB)** - Consider using individual imports\n2. **Large main chunk** - Implement code splitting\n3. **Vendor bundle** - Good separation of dependencies\n\n```javascript\n// Instead of:\nimport _ from 'lodash';\n\n// Use specific imports:\nimport { debounce, throttle } from 'lodash';\n```",
     agent: 'Claude',
     timestamp: new Date(Date.now() - 3000000),
   },
@@ -142,11 +151,16 @@ const longConversation: TimelineEntry[] = [
     tool: 'file-write',
     content: 'next.config.js',
     result: {
-      content: [{ type: 'text', text: `Configuration updated with:
+      content: [
+        {
+          type: 'text',
+          text: `Configuration updated with:
 - Bundle analyzer plugin
 - Image optimization settings  
 - Tree shaking configuration
-- Compression middleware` }],
+- Compression middleware`,
+        },
+      ],
       status: 'completed' as const,
     },
     timestamp: new Date(Date.now() - 2800000),
@@ -154,7 +168,8 @@ const longConversation: TimelineEntry[] = [
   {
     id: 10,
     type: 'ai',
-    content: "Great! I've implemented the optimizations. Here's what we accomplished:\n\n✅ **Reduced bundle size by 40%**\n✅ **Improved First Contentful Paint by 1.2s**\n✅ **Better code splitting implementation**\n\nYour app should now load significantly faster!",
+    content:
+      "Great! I've implemented the optimizations. Here's what we accomplished:\n\n✅ **Reduced bundle size by 40%**\n✅ **Improved First Contentful Paint by 1.2s**\n✅ **Better code splitting implementation**\n\nYour app should now load significantly faster!",
     agent: 'Claude',
     timestamp: new Date(Date.now() - 2700000),
   },
@@ -164,27 +179,31 @@ const multiAgentEntries: TimelineEntry[] = [
   {
     id: 1,
     type: 'human',
-    content: 'I need help with a complex architecture decision. Can multiple agents provide different perspectives?',
+    content:
+      'I need help with a complex architecture decision. Can multiple agents provide different perspectives?',
     timestamp: new Date(Date.now() - 1800000),
   },
   {
     id: 2,
     type: 'ai',
-    content: "I'll provide a perspective focused on maintainability and developer experience:\n\n```typescript\ninterface ArchitectureDecision {\n  maintainability: 'high' | 'medium' | 'low';\n  scalability: number;\n  complexity: number;\n}\n```\n\nFocus on clean abstractions and clear separation of concerns.",
+    content:
+      "I'll provide a perspective focused on maintainability and developer experience:\n\n```typescript\ninterface ArchitectureDecision {\n  maintainability: 'high' | 'medium' | 'low';\n  scalability: number;\n  complexity: number;\n}\n```\n\nFocus on clean abstractions and clear separation of concerns.",
     agent: 'Claude',
     timestamp: new Date(Date.now() - 1700000),
   },
   {
     id: 3,
     type: 'ai',
-    content: "From a performance optimization standpoint:\n\n**Key Considerations:**\n- Memory usage patterns\n- CPU-intensive operations\n- Network request optimization\n- Caching strategies\n\n```python\n@lru_cache(maxsize=128)\ndef optimized_computation(input_data):\n    return complex_algorithm(input_data)\n```",
+    content:
+      'From a performance optimization standpoint:\n\n**Key Considerations:**\n- Memory usage patterns\n- CPU-intensive operations\n- Network request optimization\n- Caching strategies\n\n```python\n@lru_cache(maxsize=128)\ndef optimized_computation(input_data):\n    return complex_algorithm(input_data)\n```',
     agent: 'GPT-4',
     timestamp: new Date(Date.now() - 1600000),
   },
   {
     id: 4,
     type: 'ai',
-    content: "I'll focus on user experience and accessibility:\n\n**UX Priorities:**\n- Progressive loading strategies\n- Error state handling\n- Responsive design considerations\n- Accessibility compliance\n\n```css\n.accessible-architecture {\n  /* Focus management */\n  outline: 2px solid var(--focus-color);\n  outline-offset: 2px;\n  \n  /* Screen reader support */\n  @media (prefers-reduced-motion: reduce) {\n    transition: none;\n  }\n}\n```",
+    content:
+      "I'll focus on user experience and accessibility:\n\n**UX Priorities:**\n- Progressive loading strategies\n- Error state handling\n- Responsive design considerations\n- Accessibility compliance\n\n```css\n.accessible-architecture {\n  /* Focus management */\n  outline: 2px solid var(--focus-color);\n  outline-offset: 2px;\n  \n  /* Screen reader support */\n  @media (prefers-reduced-motion: reduce) {\n    transition: none;\n  }\n}\n```",
     agent: 'Gemini',
     timestamp: new Date(Date.now() - 1500000),
   },
@@ -199,7 +218,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default animated timeline view with various message types and smooth entrance animations.',
+        story:
+          'Default animated timeline view with various message types and smooth entrance animations.',
       },
     },
   },
@@ -274,7 +294,8 @@ export const MultiAgentConversation: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Multi-agent conversation showing different AI assistants with distinct styling and animations.',
+        story:
+          'Multi-agent conversation showing different AI assistants with distinct styling and animations.',
       },
     },
   },
@@ -319,7 +340,8 @@ export const ScrollBehaviorDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Demonstration of auto-scroll behavior, scroll-to-bottom button, and typing indicator.',
+        story:
+          'Demonstration of auto-scroll behavior, scroll-to-bottom button, and typing indicator.',
       },
     },
   },
@@ -398,7 +420,8 @@ export const PerformanceTest: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Performance test with 20 messages showing optimized animation delays and smooth scrolling.',
+        story:
+          'Performance test with 20 messages showing optimized animation delays and smooth scrolling.',
       },
     },
   },
@@ -413,7 +436,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demonstration showcasing all timeline features: auto-scroll, typing indicator, scroll-to-bottom button, and message animations.',
+        story:
+          'Interactive demonstration showcasing all timeline features: auto-scroll, typing indicator, scroll-to-bottom button, and message animations.',
       },
     },
   },

@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AnimatedButton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { AnimatedButton, AnimatedIconButton, AnimatedInput } from './AnimatedButton';

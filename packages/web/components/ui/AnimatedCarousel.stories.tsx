@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AnimatedCarousel.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnimatedCarousel } from './AnimatedCarousel';
 import Badge from './Badge';

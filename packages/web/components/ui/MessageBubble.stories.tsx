@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for MessageBubble.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import MessageBubble from './MessageBubble';
 import IconButton from './IconButton';

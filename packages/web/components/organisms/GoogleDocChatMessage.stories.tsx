@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for GoogleDocChatMessage.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import GoogleDocChatMessage from './GoogleDocChatMessage';

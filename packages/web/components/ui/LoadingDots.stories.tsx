@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for LoadingDots.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import LoadingDots from './LoadingDots';
 

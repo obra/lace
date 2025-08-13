@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for NavigationItem.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import NavigationItem from './NavigationItem';
 import IconButton from './IconButton';

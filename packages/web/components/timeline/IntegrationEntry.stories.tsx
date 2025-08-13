@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for IntegrationEntry.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { IntegrationEntry } from './IntegrationEntry';
 

@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AgentBadge.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import AgentBadge from './AgentBadge';
 

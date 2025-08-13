@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for PredictivePanel.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { PredictivePanel } from './PredictivePanel';
 import { PredictiveInsight } from '@/feedback/types';
@@ -9,7 +10,8 @@ const meta: Meta<typeof PredictivePanel> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Predictive insights panel for contextual feedback. Displays predictions, timeframes, and prevention suggestions based on development patterns and machine learning analysis.',
+        component:
+          'Predictive insights panel for contextual feedback. Displays predictions, timeframes, and prevention suggestions based on development patterns and machine learning analysis.',
       },
     },
   },
@@ -72,7 +74,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default predictive panel showing various insights with different timeframes and confidence levels.',
+        story:
+          'Default predictive panel showing various insights with different timeframes and confidence levels.',
       },
     },
   },
@@ -426,7 +429,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showing all predictive panel features including timeframes, confidence levels, and prevention suggestions.',
+        story:
+          'Interactive demo showing all predictive panel features including timeframes, confidence levels, and prevention suggestions.',
       },
     },
   },

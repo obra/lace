@@ -1,6 +1,12 @@
+// ABOUTME: Storybook story for FeedbackDisplay.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackDisplay } from './FeedbackDisplay';
-import { FeedbackEvent, FeedbackInsight, PerformanceAnalysis, PredictiveInsight } from '@/feedback/types';
+import {
+  FeedbackEvent,
+  FeedbackInsight,
+  PerformanceAnalysis,
+  PredictiveInsight,
+} from '@/feedback/types';
 
 const meta: Meta<typeof FeedbackDisplay> = {
   title: 'Organisms/FeedbackDisplay',
@@ -9,7 +15,8 @@ const meta: Meta<typeof FeedbackDisplay> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Main feedback display component for contextual feedback system. Renders feedback events, insights, and performance analysis in real-time with tabbed navigation, filtering, and comprehensive analytics.',
+        component:
+          'Main feedback display component for contextual feedback system. Renders feedback events, insights, and performance analysis in real-time with tabbed navigation, filtering, and comprehensive analytics.',
       },
     },
   },
@@ -334,7 +341,7 @@ export const EmptyState: Story = {
 
 export const HighSeverityEvents: Story = {
   args: {
-    events: sampleEvents.filter(event => event.priority === 'high'),
+    events: sampleEvents.filter((event) => event.priority === 'high'),
     insights: sampleInsights,
     performanceAnalysis: samplePerformanceAnalysis,
     predictiveInsights: samplePredictiveInsights,
@@ -354,11 +361,12 @@ export const HighSeverityEvents: Story = {
 
 export const PerformanceFocused: Story = {
   args: {
-    events: sampleEvents.filter(event => event.type === 'performance'),
-    insights: sampleInsights.filter(insight => insight.category === 'performance'),
+    events: sampleEvents.filter((event) => event.type === 'performance'),
+    insights: sampleInsights.filter((insight) => insight.category === 'performance'),
     performanceAnalysis: samplePerformanceAnalysis,
-    predictiveInsights: samplePredictiveInsights.filter(insight => 
-      insight.prediction.toLowerCase().includes('performance')),
+    predictiveInsights: samplePredictiveInsights.filter((insight) =>
+      insight.prediction.toLowerCase().includes('performance')
+    ),
     showPerformanceMetrics: true,
     showPredictions: true,
     showInsights: true,
@@ -367,7 +375,8 @@ export const PerformanceFocused: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Performance-focused feedback display with relevant events, insights, and predictions.',
+        story:
+          'Performance-focused feedback display with relevant events, insights, and predictions.',
       },
     },
   },
@@ -376,7 +385,7 @@ export const PerformanceFocused: Story = {
 export const SecurityFocused: Story = {
   args: {
     events: [
-      ...sampleEvents.filter(event => event.type === 'error' && event.tags.includes('security')),
+      ...sampleEvents.filter((event) => event.type === 'error' && event.tags.includes('security')),
       {
         id: '6',
         type: 'error',
@@ -533,7 +542,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showing all features: tab navigation, event filtering, and comprehensive feedback data.',
+        story:
+          'Interactive demo showing all features: tab navigation, event filtering, and comprehensive feedback data.',
       },
     },
   },

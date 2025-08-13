@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for TimestampDisplay.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import TimestampDisplay from './TimestampDisplay';
 

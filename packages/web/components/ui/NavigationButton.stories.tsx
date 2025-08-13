@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for NavigationButton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import NavigationButton from './NavigationButton';

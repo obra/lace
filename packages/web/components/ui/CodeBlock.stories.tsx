@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for CodeBlock.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import CodeBlock from './CodeBlock';
