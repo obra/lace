@@ -3,22 +3,14 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
+import { withTempLaceDir } from './utils/withTempLaceDir';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 test.describe('Error Handling and Recovery', () => {
-  test('handles invalid project paths gracefully', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-invalid-path-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('handles invalid project paths gracefully', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-invalid-path-', async (tempDir) => {
+      const { projectSelector, chatInterface } = createPageObjects(page);
       await page.goto('/');
       
       // Try to create project with invalid path
@@ -64,32 +56,13 @@ test.describe('Error Handling and Recovery', () => {
         console.log('Invalid path prevented by UI validation:', error instanceof Error ? error.message : String(error));
         expect(true).toBeTruthy(); // Test passes - UI validation is working
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('recovers from network failures gracefully', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-network-failure-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Network Failure Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('recovers from network failures gracefully', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-network-failure-', async (tempDir) => {
+      const projectName = 'E2E Network Failure Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project successfully first
       await page.goto('/');
       
@@ -162,33 +135,13 @@ test.describe('Error Handling and Recovery', () => {
       
       // Test passes if the interface remains responsive despite network issues
       expect(recoveryState.interfaceResponsive).toBeTruthy();
-      
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('provides user feedback during processing errors', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-processing-errors-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Processing Errors Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('provides user feedback during processing errors', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-processing-errors-', async (tempDir) => {
+      const projectName = 'E2E Processing Errors Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
@@ -261,31 +214,12 @@ test.describe('Error Handling and Recovery', () => {
         console.log('No obvious error feedback detected - documenting current behavior');
         expect(true).toBeTruthy(); // Still valid outcome
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('handles malformed URLs and navigation errors', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-url-errors-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('handles malformed URLs and navigation errors', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-url-errors-', async (tempDir) => {
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Test malformed URLs
       const malformedUrls = [
         '/#/project/invalid-project-id/session/invalid-session',
@@ -307,7 +241,10 @@ test.describe('Error Handling and Recovery', () => {
       
       for (const malformedUrl of malformedUrls) {
         try {
-          await page.goto(`http://localhost:3000${malformedUrl}`);
+          // Get the base URL from page and construct malformed URL
+          await page.goto('/');
+          const baseUrl = new URL(page.url()).origin;
+          await page.goto(`${baseUrl}${malformedUrl}`);
           await page.waitForTimeout(2000);
           
           const currentUrl = page.url();
@@ -316,7 +253,7 @@ test.describe('Error Handling and Recovery', () => {
           if (currentUrl.includes('/#/') && !currentUrl.includes(malformedUrl)) {
             // Redirected to a different valid URL
             urlErrorHandling.gracefulFallback++;
-          } else if (currentUrl === 'http://localhost:3000/' || currentUrl === 'http://localhost:3000') {
+          } else if (currentUrl === baseUrl || currentUrl === `${baseUrl}/`) {
             // Redirected to home
             urlErrorHandling.redirectsToHome++;
           } else {
@@ -339,33 +276,13 @@ test.describe('Error Handling and Recovery', () => {
                                urlErrorHandling.gracefulFallback;
       
       expect(totalHandledErrors).toBeGreaterThanOrEqual(malformedUrls.length - 1); // Allow for one failure
-      
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('maintains functionality after JavaScript errors', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-js-errors-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E JS Error Resilience Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('maintains functionality after JavaScript errors', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-js-errors-', async (tempDir) => {
+      const projectName = 'E2E JS Error Resilience Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
@@ -440,18 +357,6 @@ test.describe('Error Handling and Recovery', () => {
         console.log('Interface visible but interaction impacted - partial resilience');
         expect(postErrorState.canStillType || postErrorState.interfaceStillVisible).toBeTruthy();
       }
-      
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 });
