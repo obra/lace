@@ -3,16 +3,17 @@
 import React, { useState, useEffect } from 'react';
 // Using FontAwesome instead of Heroicons
 
+// Limit app-visible themes to core options for now. Others retained for quick restore.
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
-  { name: 'dark', colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
-  { name: 'cupcake', colors: { primary: '#65C3C8', secondary: '#EF9FBC', accent: '#EEAF3A' } },
-  { name: 'corporate', colors: { primary: '#4B6BFB', secondary: '#7C3AED', accent: '#37CDBE' } },
-  { name: 'synthwave', colors: { primary: '#E779C1', secondary: '#58C7F3', accent: '#F7CC50' } },
-  { name: 'cyberpunk', colors: { primary: '#FF7598', secondary: '#75D1F0', accent: '#C07F00' } },
-  { name: 'business', colors: { primary: '#1C4E80', secondary: '#7C909A', accent: '#EA6947' } },
-  { name: 'emerald', colors: { primary: '#66CC8A', secondary: '#377CFB', accent: '#F68067' } },
-  { name: 'lofi', colors: { primary: '#808080', secondary: '#4D4D4D', accent: '#1A1A1A' } },
+  { name: 'dark',  colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
+  // { name: 'cupcake', colors: { primary: '#65C3C8', secondary: '#EF9FBC', accent: '#EEAF3A' } },
+  // { name: 'corporate', colors: { primary: '#4B6BFB', secondary: '#7C3AED', accent: '#37CDBE' } },
+  // { name: 'synthwave', colors: { primary: '#E779C1', secondary: '#58C7F3', accent: '#F7CC50' } },
+  // { name: 'cyberpunk', colors: { primary: '#FF7598', secondary: '#75D1F0', accent: '#C07F00' } },
+  // { name: 'business', colors: { primary: '#1C4E80', secondary: '#7C909A', accent: '#EA6947' } },
+  // { name: 'emerald', colors: { primary: '#66CC8A', secondary: '#377CFB', accent: '#F68067' } },
+  // { name: 'lofi', colors: { primary: '#808080', secondary: '#4D4D4D', accent: '#1A1A1A' } },
 ];
 
 interface ThemeSelectorProps {
@@ -51,8 +52,8 @@ export function ThemeSelector({ currentTheme: propTheme, onThemeChange }: ThemeS
         <span className="text-xs text-base-content/60 capitalize">{currentTheme}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {availableThemes.slice(0, 9).map((theme) => (
+      <div className="grid grid-cols-2 gap-2">
+        {availableThemes.map((theme) => (
           <button
             key={theme.name}
             onClick={() => setTheme(theme.name)}
