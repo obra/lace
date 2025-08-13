@@ -45,7 +45,6 @@ import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
-
 // Token usage section component
 const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId: ThreadId }) {
   const usageResult: UseAgentTokenUsageResult = useAgentTokenUsage(agentId);
@@ -105,7 +104,6 @@ export const LaceApp = memo(function LaceApp() {
   const [showTaskDisplay, setShowTaskDisplay] = useState(false);
   const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
   const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
-  
 
   // Business Logic State (from current app/page.tsx)
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -132,34 +130,30 @@ export const LaceApp = memo(function LaceApp() {
 
   // Use session API hook for all API calls (HTTP requests only, not streaming state)
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
-  
+
   // Handle agent state changes from event stream
   const handleAgentStateChange = useCallback((agentId: string, from: string, to: string) => {
-    setSelectedSessionDetails(prevSession => {
+    setSelectedSessionDetails((prevSession) => {
       if (!prevSession?.agents) return prevSession;
-      
+
       return {
         ...prevSession,
-        agents: prevSession.agents.map(agent => 
-          agent.threadId === agentId 
-            ? { ...agent, status: to as AgentState }
-            : agent
-        )
+        agents: prevSession.agents.map((agent) =>
+          agent.threadId === agentId ? { ...agent, status: to as AgentState } : agent
+        ),
       };
     });
   }, []);
 
   // Get current agent's status from the updated session details
-  const currentAgent = selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent);
-  const agentBusy = currentAgent?.status === 'thinking' || 
-                   currentAgent?.status === 'streaming' || 
-                   currentAgent?.status === 'tool_execution';
+  const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent);
+  const agentBusy =
+    currentAgent?.status === 'thinking' ||
+    currentAgent?.status === 'streaming' ||
+    currentAgent?.status === 'tool_execution';
 
   // Task manager - only create when we have a project and session
-  const taskManager = useTaskManager(
-    selectedProject || '',
-    selectedSession || ''
-  );
+  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 
   // Single unified event stream connection with all event handlers
   const { connection } = useEventStream({
@@ -186,11 +180,11 @@ export const LaceApp = memo(function LaceApp() {
     onApprovalResponse: handleApprovalResponse,
     // Task event handlers - wire to useTaskManager (only if available)
     onTaskCreated: taskManager?.handleTaskCreated,
-    onTaskUpdated: taskManager?.handleTaskUpdated, 
+    onTaskUpdated: taskManager?.handleTaskUpdated,
     onTaskDeleted: taskManager?.handleTaskDeleted,
     onTaskNoteAdded: taskManager?.handleTaskNoteAdded,
   });
-  
+
   const connected = connection.connected;
 
   // Events are now LaceEvent[] directly
@@ -218,7 +212,7 @@ export const LaceApp = memo(function LaceApp() {
     try {
       const res = await fetch('/api/providers');
       const data: unknown = await parseResponse<unknown>(res);
-      
+
       if (isApiError(data)) {
         console.error('Failed to load providers:', data.error);
         return;
@@ -277,38 +271,41 @@ export const LaceApp = memo(function LaceApp() {
     }
   }, [projects.length, loadingProjects]);
 
-  const loadSessionDetails = useCallback(async (sessionId: ThreadId) => {
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}`);
-      const data: unknown = await parseResponse<unknown>(res);
+  const loadSessionDetails = useCallback(
+    async (sessionId: ThreadId) => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}`);
+        const data: unknown = await parseResponse<unknown>(res);
 
-      if (isApiError(data)) {
-        console.error('Failed to load session details:', data.error);
-        // If session not found, clear it from the hash to prevent repeated errors
-        if (data.error === 'Session not found') {
-          setSelectedSession(null);
+        if (isApiError(data)) {
+          console.error('Failed to load session details:', data.error);
+          // If session not found, clear it from the hash to prevent repeated errors
+          if (data.error === 'Session not found') {
+            setSelectedSession(null);
+          }
+          return;
         }
-        return;
-      }
 
-      const sessionResponse = data as SessionResponse;
-      setSelectedSessionDetails(sessionResponse.session);
-    } catch (error) {
-      console.error('Failed to load session details:', error);
-      // On network or other errors, also clear the invalid session
-      setSelectedSession(null);
-    }
-  }, [setSelectedSession]);
+        const sessionResponse = data as SessionResponse;
+        setSelectedSessionDetails(sessionResponse.session);
+      } catch (error) {
+        console.error('Failed to load session details:', error);
+        // On network or other errors, also clear the invalid session
+        setSelectedSession(null);
+      }
+    },
+    [setSelectedSession]
+  );
 
   // Load sessions and project configuration when project is selected
   useEffect(() => {
     void loadSessions();
-    
+
     // Load project configuration
     if (selectedProject) {
       fetch(`/api/projects/${selectedProject}/configuration`)
-        .then(res => parseResponse<{ configuration?: Record<string, unknown> }>(res))
-        .then(data => {
+        .then((res) => parseResponse<{ configuration?: Record<string, unknown> }>(res))
+        .then((data) => {
           if (data.configuration) {
             setProjectConfig(data.configuration);
           } else {
@@ -338,7 +335,13 @@ export const LaceApp = memo(function LaceApp() {
 
   // Auto-select agent if session has only one agent and auto-selection is enabled
   useEffect(() => {
-    if (shouldAutoSelectAgent && selectedSessionDetails && selectedSessionDetails.agents && selectedSessionDetails.agents.length === 1 && !selectedAgent) {
+    if (
+      shouldAutoSelectAgent &&
+      selectedSessionDetails &&
+      selectedSessionDetails.agents &&
+      selectedSessionDetails.agents.length === 1 &&
+      !selectedAgent
+    ) {
       setSelectedAgent(selectedSessionDetails.agents[0].threadId as ThreadId);
       setShouldAutoSelectAgent(false); // Reset flag after auto-selection
     }
@@ -357,13 +360,15 @@ export const LaceApp = memo(function LaceApp() {
     setShouldAutoSelectAgent(true);
   };
 
-
-  const sendMessage = useCallback(async (message: string) => {
-    if (!selectedAgent || !message.trim()) {
-      return false;
-    }
-    return await sendMessageAPI(selectedAgent, message);
-  }, [selectedAgent, sendMessageAPI]);
+  const sendMessage = useCallback(
+    async (message: string) => {
+      if (!selectedAgent || !message.trim()) {
+        return false;
+      }
+      return await sendMessageAPI(selectedAgent, message);
+    },
+    [selectedAgent, sendMessageAPI]
+  );
 
   const stopGeneration = useCallback(async () => {
     if (!selectedAgent) return false;
@@ -389,15 +394,14 @@ export const LaceApp = memo(function LaceApp() {
     }
   };
 
-
   // Session creation function with configuration
-  const handleSessionCreate = async (sessionData: { 
-    name: string; 
-    description?: string; 
-    configuration?: Record<string, unknown> 
+  const handleSessionCreate = async (sessionData: {
+    name: string;
+    description?: string;
+    configuration?: Record<string, unknown>;
   }) => {
     if (!selectedProject) return;
-    
+
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${selectedProject}/sessions`, {
@@ -405,7 +409,7 @@ export const LaceApp = memo(function LaceApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sessionData),
       });
-      
+
       if (res.ok) {
         // Reload sessions to show the new one
         void loadSessions();
@@ -428,7 +432,7 @@ export const LaceApp = memo(function LaceApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(agentData),
       });
-      
+
       if (res.ok) {
         // Reload session details to show the new agent
         void loadSessionDetails(sessionId as ThreadId);
@@ -445,7 +449,7 @@ export const LaceApp = memo(function LaceApp() {
   // Legacy session creation (for backward compatibility)
   const createSession = async () => {
     if (!selectedProject || !sessionName.trim()) return;
-    
+
     await handleSessionCreate({ name: sessionName.trim() });
     setSessionName('');
     setCreatingSession(false);
@@ -476,14 +480,23 @@ export const LaceApp = memo(function LaceApp() {
   };
 
   // Handle project updates (archive/unarchive/edit)
-  const handleProjectUpdate = async (projectId: string, updates: { isArchived?: boolean; name?: string; description?: string; workingDirectory?: string; configuration?: Record<string, unknown> }) => {
+  const handleProjectUpdate = async (
+    projectId: string,
+    updates: {
+      isArchived?: boolean;
+      name?: string;
+      description?: string;
+      workingDirectory?: string;
+      configuration?: Record<string, unknown>;
+    }
+  ) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      
+
       if (res.ok) {
         // Reload projects to reflect the changes
         void loadProjects();
@@ -497,20 +510,24 @@ export const LaceApp = memo(function LaceApp() {
   };
 
   // Handle onboarding completion - navigate directly to chat
-  const handleOnboardingComplete = async (projectId: string, sessionId: string, agentId: string) => {
+  const handleOnboardingComplete = async (
+    projectId: string,
+    sessionId: string,
+    agentId: string
+  ) => {
     // Reload projects first to ensure the newly created project is in the array
     await loadProjects();
-    
+
     // Set all three selections atomically to navigate directly to chat
     updateHashState({
       project: projectId,
       session: sessionId,
-      agent: agentId
+      agent: agentId,
     });
-    
+
     // Clear auto-open state
     setAutoOpenCreateProject(false);
-    
+
     // Enable auto-selection for future navigation within this project
     setShouldAutoSelectAgent(true);
   };
@@ -518,9 +535,9 @@ export const LaceApp = memo(function LaceApp() {
   // Handle task updates
   const handleTaskUpdate = async (task: Task) => {
     if (!taskManager) return;
-    
+
     try {
-      await taskManager.updateTask(task.id, { 
+      await taskManager.updateTask(task.id, {
         status: task.status,
         title: task.title,
         description: task.description,
@@ -534,7 +551,7 @@ export const LaceApp = memo(function LaceApp() {
 
   const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
     if (!taskManager) return;
-    
+
     try {
       await taskManager.createTask({
         title: taskData.title,
@@ -549,9 +566,11 @@ export const LaceApp = memo(function LaceApp() {
   };
 
   // Handle task creation from modal
-  const handleTaskCreateFromModal = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>) => {
+  const handleTaskCreateFromModal = async (
+    taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>
+  ) => {
     if (!taskManager) return;
-    
+
     try {
       await taskManager.createTask({
         title: taskData.title,
@@ -575,7 +594,7 @@ export const LaceApp = memo(function LaceApp() {
   // Handle updating task from display modal
   const handleTaskUpdateFromModal = async (taskId: string, updates: Partial<Task>) => {
     if (!taskManager) return;
-    
+
     try {
       await taskManager.updateTask(taskId, {
         title: updates.title,
@@ -592,7 +611,7 @@ export const LaceApp = memo(function LaceApp() {
   // Handle adding task note
   const handleTaskAddNote = async (taskId: string, content: string) => {
     if (!taskManager) return;
-    
+
     try {
       await taskManager.addNote(taskId, content);
     } catch (error) {
@@ -602,41 +621,48 @@ export const LaceApp = memo(function LaceApp() {
 
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
-  const foundProject = selectedProject ? projects.find(p => p.id === selectedProject) : null;
-  const currentProject = useMemo(() => foundProject || { 
-    id: '', 
-    name: 'No project selected', 
-    description: 'Select a project to get started',
-    workingDirectory: '/',
-    isArchived: false,
-    createdAt: new Date(),
-    lastUsedAt: new Date()
-  }, [foundProject]);
-  
-  
-  // Clear invalid project selection from URL  
+  const foundProject = selectedProject ? projects.find((p) => p.id === selectedProject) : null;
+  const currentProject = useMemo(
+    () =>
+      foundProject || {
+        id: '',
+        name: 'No project selected',
+        description: 'Select a project to get started',
+        workingDirectory: '/',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+      },
+    [foundProject]
+  );
+
+  // Clear invalid project selection from URL
   // useEffect(() => {
   //   // Clear any project ID that doesn't match loaded projects after loading is complete
   //   // This handles invalid URLs gracefully by falling back to project selection
-  //   if (selectedProject && 
-  //       !loadingProjects && 
-  //       projects.length > 0 && 
+  //   if (selectedProject &&
+  //       !loadingProjects &&
+  //       projects.length > 0 &&
   //       !foundProject) {
   //     console.log('Clearing invalid project ID from URL:', selectedProject);
   //     setSelectedProject(null, true); // Use replaceState to avoid polluting history
   //   }
   // }, [selectedProject, projects, foundProject, setSelectedProject, loadingProjects]);
 
-  const projectsForSidebar = useMemo(() => projects.map(p => ({
-    id: p.id,
-    name: p.name,
-    workingDirectory: p.workingDirectory,
-    description: p.description,
-    isArchived: p.isArchived || false,
-    createdAt: new Date(p.createdAt),
-    lastUsedAt: new Date(p.lastUsedAt),
-    sessionCount: p.sessionCount || 0,
-  })), [projects]);
+  const projectsForSidebar = useMemo(
+    () =>
+      projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        workingDirectory: p.workingDirectory,
+        description: p.description,
+        isArchived: p.isArchived || false,
+        createdAt: new Date(p.createdAt),
+        lastUsedAt: new Date(p.lastUsedAt),
+        sessionCount: p.sessionCount || 0,
+      })),
+    [projects]
+  );
 
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
@@ -823,8 +849,8 @@ export const LaceApp = memo(function LaceApp() {
             >
               {/* Current Project - Show only when project selected */}
               {selectedProject && (
-                <SidebarSection 
-                  title="Current Project" 
+                <SidebarSection
+                  title="Current Project"
                   icon={faFolder}
                   defaultCollapsed={false}
                   collapsible={false}
@@ -862,8 +888,8 @@ export const LaceApp = memo(function LaceApp() {
 
               {/* Session Management - Show session context and agent selection */}
               {selectedSessionDetails && (
-                <SidebarSection 
-                  title="Current Session" 
+                <SidebarSection
+                  title="Current Session"
                   icon={faComments}
                   defaultCollapsed={false}
                   collapsible={false}
@@ -898,19 +924,27 @@ export const LaceApp = memo(function LaceApp() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <FontAwesomeIcon 
-                            icon={faRobot} 
+                          <FontAwesomeIcon
+                            icon={faRobot}
                             className={`w-4 h-4 ${
-                              selectedAgent === agent.threadId ? 'text-primary' : 'text-base-content/60'
-                            }`} 
+                              selectedAgent === agent.threadId
+                                ? 'text-primary'
+                                : 'text-base-content/60'
+                            }`}
                           />
                           <span className="font-medium">{agent.name}</span>
                         </div>
-                        <span className={`text-xs badge badge-xs ${
-                          agent.status === 'idle' ? 'badge-success' :
-                          (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
-                          'badge-neutral'
-                        }`}>
+                        <span
+                          className={`text-xs badge badge-xs ${
+                            agent.status === 'idle'
+                              ? 'badge-success'
+                              : agent.status === 'thinking' ||
+                                  agent.status === 'tool_execution' ||
+                                  agent.status === 'streaming'
+                                ? 'badge-warning'
+                                : 'badge-neutral'
+                          }`}
+                        >
                           {agent.status}
                         </span>
                       </div>
@@ -921,7 +955,7 @@ export const LaceApp = memo(function LaceApp() {
 
               {/* Tasks Section - Show when session is selected */}
               {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
-                <SidebarSection 
+                <SidebarSection
                   title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
                   icon={faTasks}
                   defaultCollapsed={false}
@@ -998,7 +1032,10 @@ export const LaceApp = memo(function LaceApp() {
                     events={events}
                     agents={selectedSessionDetails?.agents}
                     isTyping={agentBusy}
-                    currentAgent={selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'Agent'}
+                    currentAgent={
+                      selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)
+                        ?.name || 'Agent'
+                    }
                     selectedAgent={selectedAgent}
                   />
                 </div>
@@ -1018,7 +1055,7 @@ export const LaceApp = memo(function LaceApp() {
                   onInterrupt={stopGeneration}
                   disabled={agentBusy}
                   isStreaming={agentBusy}
-                  placeholder={`Message ${selectedSessionDetails?.agents?.find(a => a.threadId === selectedAgent)?.name || 'agent'}...`}
+                  placeholder={`Message ${selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)?.name || 'agent'}...`}
                 />
               </div>
             ) : (
@@ -1098,10 +1135,7 @@ export const LaceApp = memo(function LaceApp() {
 
       {/* Tool Approval Modal */}
       {pendingApprovals && pendingApprovals.length > 0 && (
-        <ToolApprovalModal
-          approvals={pendingApprovals}
-          onDecision={handleApprovalDecision}
-        />
+        <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
       )}
 
       {/* Task Board Modal */}
@@ -1147,13 +1181,13 @@ export const LaceApp = memo(function LaceApp() {
 });
 
 // Memoized chat input component to prevent parent re-renders
-const MemoizedChatInput = memo(function MemoizedChatInput({ 
-  onSubmit, 
+const MemoizedChatInput = memo(function MemoizedChatInput({
+  onSubmit,
   onInterrupt,
   disabled,
   isStreaming,
-  placeholder 
-}: { 
+  placeholder,
+}: {
   onSubmit: (message: string) => Promise<boolean | void>;
   onInterrupt?: () => Promise<boolean | void>;
   disabled: boolean;

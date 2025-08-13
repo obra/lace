@@ -17,7 +17,7 @@ interface TimelineMessageProps {
 }
 
 function getAgentName(threadId: string, agents?: AgentInfo[]): string {
-  const agent = agents?.find(a => a.threadId === threadId);
+  const agent = agents?.find((a) => a.threadId === threadId);
   return agent?.name || 'Assistant';
 }
 
@@ -30,11 +30,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
       return (
         <div className="flex gap-3">
           <div className="flex-1 min-w-0">
-            <MessageHeader
-              name="You"
-              timestamp={timestamp}
-              role="user"
-            />
+            <MessageHeader name="You" timestamp={timestamp} role="user" />
             <MessageText content={event.data} />
           </div>
         </div>
@@ -54,7 +50,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
           </div>
         </div>
       );
-    
+
     case 'AGENT_STREAMING':
       return (
         <div className="flex gap-3">
@@ -120,16 +116,12 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <MessageHeader
-              name="Tool Result"
-              timestamp={timestamp}
-            />
+            <MessageHeader name="Tool Result" timestamp={timestamp} />
             <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
               <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
-                {typeof event.data === 'string' 
-                  ? event.data 
-                  : event.data.content?.map(block => block.text).join('') || 'No result'
-                }
+                {typeof event.data === 'string'
+                  ? event.data
+                  : event.data.content?.map((block) => block.text).join('') || 'No result'}
               </div>
             </div>
           </div>
@@ -150,29 +142,16 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
 
     case 'SYSTEM_PROMPT':
       return (
-        <SystemPromptEntry
-          content={event.data}
-          timestamp={timestamp}
-          isRecentMessage={false}
-        />
+        <SystemPromptEntry content={event.data} timestamp={timestamp} isRecentMessage={false} />
       );
 
     case 'USER_SYSTEM_PROMPT':
       return (
-        <UserSystemPromptEntry
-          content={event.data}
-          timestamp={timestamp}
-          isRecentMessage={false}
-        />
+        <UserSystemPromptEntry content={event.data} timestamp={timestamp} isRecentMessage={false} />
       );
 
     case 'COMPACTION':
-      return (
-        <CompactionEntry
-          data={event.data}
-          timestamp={timestamp}
-        />
-      );
+      return <CompactionEntry data={event.data} timestamp={timestamp} />;
 
     case 'COMPACTION_START':
       return (
@@ -255,7 +234,7 @@ export function TimelineMessage({ event, agents }: TimelineMessageProps) {
         error: 'bg-error/10 border border-error/20 rounded-lg px-4 py-2 text-sm text-error',
       };
       const className = severityClassMap[event.data?.severity] || severityClassMap.info;
-      
+
       return (
         <div className="flex justify-center">
           <div className={className}>

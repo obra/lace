@@ -14,10 +14,10 @@ interface UserSystemPromptEntryProps {
   isRecentMessage?: boolean;
 }
 
-export function UserSystemPromptEntry({ 
-  content, 
-  timestamp, 
-  isRecentMessage = false 
+export function UserSystemPromptEntry({
+  content,
+  timestamp,
+  isRecentMessage = false,
 }: UserSystemPromptEntryProps) {
   return (
     <div className="flex gap-3">
@@ -35,11 +35,7 @@ export function UserSystemPromptEntry({
             User
           </div>
         </div>
-        <MarkdownRenderer
-          content={content}
-          maxLines={10}
-          isRecentMessage={isRecentMessage}
-        />
+        <MarkdownRenderer content={content} maxLines={10} isRecentMessage={isRecentMessage} />
       </div>
     </div>
   );

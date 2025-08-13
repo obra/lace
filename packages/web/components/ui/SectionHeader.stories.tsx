@@ -242,7 +242,7 @@ export const Interactive: Story = {
   render: () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [count, setCount] = useState(5);
-    
+
     return (
       <div className="w-80">
         <SectionHeader
@@ -254,16 +254,13 @@ export const Interactive: Story = {
             variant: isExpanded ? 'success' : 'primary',
           }}
           rightContent={
-            <button
-              className="btn btn-xs btn-ghost"
-              onClick={() => setCount(count + 1)}
-            >
+            <button className="btn btn-xs btn-ghost" onClick={() => setCount(count + 1)}>
               +
             </button>
           }
           asButton={false}
         />
-        
+
         {isExpanded && (
           <div className="p-4 bg-base-100 border-l-2 border-primary">
             <p className="text-sm">This content is revealed when the header is expanded.</p>
@@ -290,14 +287,14 @@ export const NavigationExample: Story = {
       favorites: false,
       settings: false,
     });
-    
+
     const toggleSection = (section: keyof typeof sections) => {
-      setSections(prev => ({
+      setSections((prev) => ({
         ...prev,
         [section]: !prev[section],
       }));
     };
-    
+
     return (
       <div className="w-80 border border-base-300 rounded-lg overflow-hidden">
         <SectionHeader
@@ -305,33 +302,29 @@ export const NavigationExample: Story = {
           isExpanded={sections.files}
           onToggle={() => toggleSection('files')}
           badge={{ text: '24', variant: 'primary' }}
-          rightContent={
-            <button className="btn btn-xs btn-ghost">+</button>
-          }
+          rightContent={<button className="btn btn-xs btn-ghost">+</button>}
           asButton={false}
         />
-        
+
         <SectionHeader
           title="Recent"
           isExpanded={sections.recent}
           onToggle={() => toggleSection('recent')}
           badge={{ text: '8', variant: 'info' }}
         />
-        
+
         <SectionHeader
           title="Favorites"
           isExpanded={sections.favorites}
           onToggle={() => toggleSection('favorites')}
           badge={{ text: '3', variant: 'warning' }}
         />
-        
+
         <SectionHeader
           title="Settings"
           isExpanded={sections.settings}
           onToggle={() => toggleSection('settings')}
-          rightContent={
-            <button className="btn btn-xs btn-ghost">⚙</button>
-          }
+          rightContent={<button className="btn btn-xs btn-ghost">⚙</button>}
           asButton={false}
         />
       </div>
@@ -352,34 +345,26 @@ export const StatesShowcase: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-4">All States</h3>
       </div>
-      
+
       <div className="border border-base-300 rounded-lg overflow-hidden">
-        <SectionHeader
-          title="Collapsed"
-          isExpanded={false}
-          onToggle={() => {}}
-        />
-        
-        <SectionHeader
-          title="Expanded"
-          isExpanded={true}
-          onToggle={() => {}}
-        />
-        
+        <SectionHeader title="Collapsed" isExpanded={false} onToggle={() => {}} />
+
+        <SectionHeader title="Expanded" isExpanded={true} onToggle={() => {}} />
+
         <SectionHeader
           title="With Badge"
           isExpanded={false}
           badge={{ text: '5', variant: 'primary' }}
           onToggle={() => {}}
         />
-        
+
         <SectionHeader
           title="With Right Content"
           isExpanded={true}
           rightContent={<span className="text-xs text-gray-500">Last modified</span>}
           onToggle={() => {}}
         />
-        
+
         <SectionHeader
           title="Disabled"
           isExpanded={false}
@@ -387,7 +372,7 @@ export const StatesShowcase: Story = {
           disabled={true}
           onToggle={() => {}}
         />
-        
+
         <SectionHeader
           title="Full Featured"
           isExpanded={true}
@@ -419,10 +404,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 SectionHeader Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the section headers below!
+          Enable tennis commentary in the toolbar above, then hover and click the section headers
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
@@ -434,17 +420,14 @@ export const InteractiveDemo: Story = {
             badge={{ text: '24', variant: 'primary' }}
             onToggle={() => alert('Source files toggled')}
             rightContent={
-              <button 
-                className="btn btn-xs btn-ghost"
-                onClick={() => alert('Add file clicked')}
-              >
+              <button className="btn btn-xs btn-ghost" onClick={() => alert('Add file clicked')}>
                 +
               </button>
             }
             asButton={false}
           />
         </div>
-        
+
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
             <h4 className="font-medium text-sm">Task Management</h4>
@@ -455,17 +438,14 @@ export const InteractiveDemo: Story = {
             badge={{ text: '7', variant: 'warning' }}
             onToggle={() => alert('Tasks toggled')}
             rightContent={
-              <button 
-                className="btn btn-xs btn-ghost"
-                onClick={() => alert('View all tasks')}
-              >
+              <button className="btn btn-xs btn-ghost" onClick={() => alert('View all tasks')}>
                 👁
               </button>
             }
             asButton={false}
           />
         </div>
-        
+
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
             <h4 className="font-medium text-sm">File Explorer</h4>
@@ -477,16 +457,10 @@ export const InteractiveDemo: Story = {
             onToggle={() => alert('Documents toggled')}
             rightContent={
               <div className="flex gap-1">
-                <button 
-                  className="btn btn-xs btn-ghost"
-                  onClick={() => alert('New document')}
-                >
+                <button className="btn btn-xs btn-ghost" onClick={() => alert('New document')}>
                   +
                 </button>
-                <button 
-                  className="btn btn-xs btn-ghost"
-                  onClick={() => alert('View options')}
-                >
+                <button className="btn btn-xs btn-ghost" onClick={() => alert('View options')}>
                   ⚙
                 </button>
               </div>
@@ -494,7 +468,7 @@ export const InteractiveDemo: Story = {
             asButton={false}
           />
         </div>
-        
+
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
             <h4 className="font-medium text-sm">Settings Panel</h4>
@@ -505,10 +479,7 @@ export const InteractiveDemo: Story = {
             badge={{ text: 'Active', variant: 'success' }}
             onToggle={() => alert('Configuration toggled')}
             rightContent={
-              <button 
-                className="btn btn-xs btn-ghost"
-                onClick={() => alert('Advanced settings')}
-              >
+              <button className="btn btn-xs btn-ghost" onClick={() => alert('Advanced settings')}>
                 ⚙
               </button>
             }
@@ -521,7 +492,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing section headers with tennis commentary. Enable commentary in the toolbar and interact with the headers!',
+        story:
+          'Interactive demo showcasing section headers with tennis commentary. Enable commentary in the toolbar and interact with the headers!',
       },
     },
   },

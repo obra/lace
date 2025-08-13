@@ -164,12 +164,14 @@ export const WithPulse: Story = {
 export const AllStatuses: Story = {
   render: () => (
     <div className="flex flex-wrap gap-6">
-      {(['online', 'offline', 'busy', 'away', 'error', 'success', 'warning', 'info'] as const).map((status) => (
-        <div key={status} className="text-center">
-          <StatusDot status={status} size="md" />
-          <p className="text-xs text-gray-500 mt-1 capitalize">{status}</p>
-        </div>
-      ))}
+      {(['online', 'offline', 'busy', 'away', 'error', 'success', 'warning', 'info'] as const).map(
+        (status) => (
+          <div key={status} className="text-center">
+            <StatusDot status={status} size="md" />
+            <p className="text-xs text-gray-500 mt-1 capitalize">{status}</p>
+          </div>
+        )
+      )}
     </div>
   ),
   parameters: {
@@ -230,26 +232,26 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the status dots below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-4 gap-4">
         <div className="text-center cursor-pointer">
           <StatusDot status="online" size="lg" pulse={true} />
           <p className="text-sm font-medium mt-2">Online</p>
           <p className="text-xs text-gray-500">Active & Ready</p>
         </div>
-        
+
         <div className="text-center cursor-pointer">
           <StatusDot status="busy" size="lg" pulse={true} />
           <p className="text-sm font-medium mt-2">Busy</p>
           <p className="text-xs text-gray-500">Hard at Work</p>
         </div>
-        
+
         <div className="text-center cursor-pointer">
           <StatusDot status="warning" size="lg" pulse={false} />
           <p className="text-sm font-medium mt-2">Warning</p>
           <p className="text-xs text-gray-500">Needs Attention</p>
         </div>
-        
+
         <div className="text-center cursor-pointer">
           <StatusDot status="success" size="lg" pulse={false} />
           <p className="text-sm font-medium mt-2">Success</p>
@@ -261,7 +263,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing status dots with tennis commentary. Enable commentary in the toolbar and interact with the dots!',
+        story:
+          'Interactive demo showcasing status dots with tennis commentary. Enable commentary in the toolbar and interact with the dots!',
       },
     },
   },

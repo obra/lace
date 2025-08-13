@@ -32,9 +32,12 @@ export function TimelineView({
   selectedAgent,
 }: TimelineViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Process events (filtering, aggregation, etc.)
-  const processedEvents = useProcessedEvents(events, selectedAgent ? asThreadId(selectedAgent) : undefined);
+  const processedEvents = useProcessedEvents(
+    events,
+    selectedAgent ? asThreadId(selectedAgent) : undefined
+  );
 
   useEffect(() => {
     if (containerRef.current) {
@@ -50,38 +53,33 @@ export function TimelineView({
             No conversation data loaded. {processedEvents.length} events.
           </div>
         )}
-        
+
         {processedEvents.map((event, index) => (
           <TimelineEntryErrorBoundary
             key={event.id || `${event.threadId}-${event.timestamp}-${index}`}
             event={event}
           >
-            <TimelineMessageWithDetails 
-              event={event} 
-              agents={agents}
-            />
+            <TimelineMessageWithDetails event={event} agents={agents} />
           </TimelineEntryErrorBoundary>
         ))}
 
-        {streamingContent && (() => {
-          const streamingEvent = {
-            id: 'streaming',
-            type: 'AGENT_STREAMING' as const,
-            threadId: currentAgent ? asThreadId(currentAgent) : STREAMING_THREAD_ID,
-            timestamp: new Date(),
-            data: { content: streamingContent },
-            transient: true,
-          };
-          
-          return (
-            <TimelineEntryErrorBoundary event={streamingEvent}>
-              <TimelineMessageWithDetails
-                event={streamingEvent}
-                agents={agents}
-              />
-            </TimelineEntryErrorBoundary>
-          );
-        })()}
+        {streamingContent &&
+          (() => {
+            const streamingEvent = {
+              id: 'streaming',
+              type: 'AGENT_STREAMING' as const,
+              threadId: currentAgent ? asThreadId(currentAgent) : STREAMING_THREAD_ID,
+              timestamp: new Date(),
+              data: { content: streamingContent },
+              transient: true,
+            };
+
+            return (
+              <TimelineEntryErrorBoundary event={streamingEvent}>
+                <TimelineMessageWithDetails event={streamingEvent} agents={agents} />
+              </TimelineEntryErrorBoundary>
+            );
+          })()}
 
         {isTyping && !streamingContent && <TypingIndicator agent={currentAgent} />}
       </div>

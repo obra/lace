@@ -12,7 +12,7 @@ const LLMModelBadge = ({ model, className }: LLMModelBadgeProps) => {
   // Map LLM model names to appropriate badge variants
   const getVariantForModel = (modelName: string) => {
     const normalizedModel = modelName.toLowerCase();
-    
+
     if (normalizedModel.includes('claude')) {
       return 'primary';
     }
@@ -22,7 +22,7 @@ const LLMModelBadge = ({ model, className }: LLMModelBadgeProps) => {
     if (normalizedModel.includes('gemini') || normalizedModel.includes('google')) {
       return 'info';
     }
-    
+
     // Default for unknown models
     return 'secondary';
   };
@@ -33,10 +33,7 @@ const LLMModelBadge = ({ model, className }: LLMModelBadgeProps) => {
   };
 
   return (
-    <Badge 
-      variant={getVariantForModel(model)} 
-      className={className}
-    >
+    <Badge variant={getVariantForModel(model)} className={className}>
       {formatModelName(model)}
     </Badge>
   );

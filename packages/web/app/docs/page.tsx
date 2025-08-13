@@ -22,7 +22,8 @@ export default function DocsPage() {
             <details className="collapse border border-base-300 rounded-lg">
               <summary className="collapse-title font-medium">How do I create a project?</summary>
               <div className="collapse-content text-base-content/80">
-                Click &ldquo;Create your first project&rdquo; on the home screen to open the onboarding wizard.
+                Click &ldquo;Create your first project&rdquo; on the home screen to open the
+                onboarding wizard.
               </div>
             </details>
 

@@ -21,20 +21,15 @@ interface FileEditDiffViewerProps {
  * Enhanced file edit renderer using FileDiffViewer
  * Can be used to replace or enhance the existing FileEditToolRenderer
  */
-export function FileEditDiffViewer({ 
-  arguments: args, 
+export function FileEditDiffViewer({
+  arguments: args,
   viewMode = 'side-by-side',
-  className = ''
+  className = '',
 }: FileEditDiffViewerProps) {
   const { file_path, old_text, new_text } = args;
   const language = detectLanguageFromPath(file_path);
-  
-  const diff = createFileDiffFromText(
-    old_text,
-    new_text,
-    file_path,
-    language
-  );
+
+  const diff = createFileDiffFromText(old_text, new_text, file_path, language);
 
   return (
     <FileDiffViewer
@@ -51,19 +46,14 @@ export function FileEditDiffViewer({
  * Minimal diff viewer for timeline entries
  * Optimized for space-constrained environments
  */
-export function MinimalFileDiffViewer({ 
+export function MinimalFileDiffViewer({
   arguments: args,
-  className = ''
+  className = '',
 }: FileEditDiffViewerProps) {
   const { file_path, old_text, new_text } = args;
   const language = detectLanguageFromPath(file_path);
-  
-  const diff = createFileDiffFromText(
-    old_text,
-    new_text,
-    file_path,
-    language
-  );
+
+  const diff = createFileDiffFromText(old_text, new_text, file_path, language);
 
   return (
     <FileDiffViewer
@@ -81,24 +71,19 @@ export function MinimalFileDiffViewer({
  * Example of how to create a custom diff viewer component
  * for specific use cases like PR reviews or code audits
  */
-export function CodeReviewDiffViewer({ 
+export function CodeReviewDiffViewer({
   arguments: args,
   onApprove,
   onReject,
-  className = ''
+  className = '',
 }: FileEditDiffViewerProps & {
   onApprove?: () => void;
   onReject?: () => void;
 }) {
   const { file_path, old_text, new_text } = args;
   const language = detectLanguageFromPath(file_path);
-  
-  const diff = createFileDiffFromText(
-    old_text,
-    new_text,
-    file_path,
-    language
-  );
+
+  const diff = createFileDiffFromText(old_text, new_text, file_path, language);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -108,14 +93,14 @@ export function CodeReviewDiffViewer({
         showLineNumbers={true}
         maxLines={200}
         onCopy={(content) => {
-          void ('Copied diff content for review');
+          void 'Copied diff content for review';
         }}
       />
-      
+
       {(onApprove || onReject) && (
         <div className="flex gap-2 justify-end">
           {onReject && (
-            <button 
+            <button
               onClick={onReject}
               className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
             >
@@ -123,7 +108,7 @@ export function CodeReviewDiffViewer({
             </button>
           )}
           {onApprove && (
-            <button 
+            <button
               onClick={onApprove}
               className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
             >

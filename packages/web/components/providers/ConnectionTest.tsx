@@ -38,16 +38,10 @@ export function ConnectionTest({ instanceId, onStatusChange }: ConnectionTestPro
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <StatusDot 
-            status={statusDisplay.dot} 
-            size="sm" 
-            pulse={status.status === 'testing'}
-          />
-          <span className={`text-sm ${statusDisplay.color}`}>
-            {statusDisplay.text}
-          </span>
+          <StatusDot status={statusDisplay.dot} size="sm" pulse={status.status === 'testing'} />
+          <span className={`text-sm ${statusDisplay.color}`}>{statusDisplay.text}</span>
         </div>
-        
+
         <button
           className="btn btn-outline btn-sm"
           onClick={handleTest}
@@ -71,9 +65,7 @@ export function ConnectionTest({ instanceId, onStatusChange }: ConnectionTestPro
       )}
 
       {status.error && (
-        <div className="bg-error/20 p-2 rounded text-sm text-error">
-          {status.error}
-        </div>
+        <div className="bg-error/20 p-2 rounded text-sm text-error">{status.error}</div>
       )}
     </div>
   );

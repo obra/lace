@@ -594,56 +594,56 @@ export function ProjectSelectorPanel({
     >
       {/* Header (hidden until at least one project exists) */}
       {projects.length > 0 && (
-      <div className="flex items-start justify-between mb-6 flex-shrink-0">
-        <div className="flex-1">
-          {/* Intentionally omit 'Select Project' title per UX request */}
-        
-          {/* Tabs and Filters */}
-          <div className="flex items-center gap-4 mt-4">
-            {/* Archive Filter Tabs */}
-            <div className="tabs tabs-boxed">
-              <button
-                className={`tab ${filter === 'active' ? 'tab-active' : ''}`}
-                onClick={() => setFilter('active')}
-              >
-                Active
-              </button>
-              <button
-                className={`tab ${filter === 'archived' ? 'tab-active' : ''}`}
-                onClick={() => setFilter('archived')}
-              >
-                Archived
-              </button>
-            </div>
+        <div className="flex items-start justify-between mb-6 flex-shrink-0">
+          <div className="flex-1">
+            {/* Intentionally omit 'Select Project' title per UX request */}
 
-            {/* Timeframe Filter (only for active projects) */}
-            {filter === 'active' && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-base-content/60">Show:</span>
-                <select
-                  data-testid="project-timeframe-filter"
-                  value={timeFrame}
-                  onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
-                  className="select select-bordered select-sm"
+            {/* Tabs and Filters */}
+            <div className="flex items-center gap-4 mt-4">
+              {/* Archive Filter Tabs */}
+              <div className="tabs tabs-boxed">
+                <button
+                  className={`tab ${filter === 'active' ? 'tab-active' : ''}`}
+                  onClick={() => setFilter('active')}
                 >
-                  <option value="week">This week</option>
-                  <option value="month">This month</option>
-                  <option value="all">All time</option>
-                </select>
+                  Active
+                </button>
+                <button
+                  className={`tab ${filter === 'archived' ? 'tab-active' : ''}`}
+                  onClick={() => setFilter('archived')}
+                >
+                  Archived
+                </button>
               </div>
-            )}
-          </div>
-        </div>
 
-        <button
-          onClick={() => setShowCreateProject(true)}
-          className="btn btn-accent ring-hover focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-          disabled={loading}
-        >
-          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-          New Project
-        </button>
-      </div>
+              {/* Timeframe Filter (only for active projects) */}
+              {filter === 'active' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-base-content/60">Show:</span>
+                  <select
+                    data-testid="project-timeframe-filter"
+                    value={timeFrame}
+                    onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
+                    className="select select-bordered select-sm"
+                  >
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="all">All time</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowCreateProject(true)}
+            className="btn btn-accent ring-hover focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+            disabled={loading}
+          >
+            <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+            New Project
+          </button>
+        </div>
       )}
 
       {/* Search */}
@@ -1099,12 +1099,14 @@ export function ProjectSelectorPanel({
                         {showDirHelp && (
                           <div className="collapse mt-3 text-sm text-base-content/60 space-y-2">
                             <input type="checkbox" checked readOnly />
-                            <div className="collapse-title font-medium">How to copy the full path</div>
+                            <div className="collapse-title font-medium">
+                              How to copy the full path
+                            </div>
                             <div className="collapse-content">
                               <ul className="list-disc pl-5 space-y-1">
                                 <li>
-                                  macOS Finder: hold <kbd>Option</kbd>, right‑click the folder → Copy “
-                                  <i>name</i>” as Pathname
+                                  macOS Finder: hold <kbd>Option</kbd>, right‑click the folder →
+                                  Copy “<i>name</i>” as Pathname
                                 </li>
                                 <li>
                                   Terminal: drag the folder into the Terminal window to paste its
@@ -1114,8 +1116,8 @@ export function ProjectSelectorPanel({
                               <p className="font-medium">Tips</p>
                               <ul className="list-disc pl-5 space-y-1">
                                 <li>
-                                  Pick the repository root (where your package.json, pyproject.toml, or
-                                  .git lives)
+                                  Pick the repository root (where your package.json, pyproject.toml,
+                                  or .git lives)
                                 </li>
                                 <li>You can change this later in Project Settings</li>
                               </ul>
@@ -1139,11 +1141,10 @@ export function ProjectSelectorPanel({
                         )}
 
                         {/* Advanced settings temporarily removed per UX request */}
+                      </GlassCard>
+                    )}
 
-                        </GlassCard>
-                      )}
-
-                      {createStep === 3 && (
+                    {createStep === 3 && (
                       <GlassCard className="p-6">
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="text-lg font-semibold">Set default AI provider</h4>

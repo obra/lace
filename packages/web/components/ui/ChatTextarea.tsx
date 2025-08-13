@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, KeyboardEvent, DragEvent } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  KeyboardEvent,
+  DragEvent,
+} from 'react';
 
 interface ChatTextareaProps {
   value: string;
@@ -22,96 +29,101 @@ export interface ChatTextareaRef {
   adjustHeight: () => void;
 }
 
-const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(({
-  value,
-  onChange,
-  onSubmit,
-  onKeyDown,
-  placeholder = 'Type a message...',
-  disabled = false,
-  isMobile = false,
-  isDragOver = false,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  className = '',
-  autoFocus = false,
-  'data-testid': testId,
-}, ref) => {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const adjustTextareaHeight = () => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-    }
-  };
-
-  useImperativeHandle(ref, () => ({
-    focus: () => {
-      textareaRef.current?.focus();
+const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(
+  (
+    {
+      value,
+      onChange,
+      onSubmit,
+      onKeyDown,
+      placeholder = 'Type a message...',
+      disabled = false,
+      isMobile = false,
+      isDragOver = false,
+      onDragOver,
+      onDragLeave,
+      onDrop,
+      className = '',
+      autoFocus = false,
+      'data-testid': testId,
     },
-    adjustHeight: adjustTextareaHeight,
-  }));
+    ref
+  ) => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [value]);
+    const adjustTextareaHeight = () => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+      }
+    };
 
-  useEffect(() => {
-    if (autoFocus && !disabled && textareaRef.current) {
-      setTimeout(() => {
+    useImperativeHandle(ref, () => ({
+      focus: () => {
         textareaRef.current?.focus();
-      }, 100);
-    }
-  }, [disabled, autoFocus]);
+      },
+      adjustHeight: adjustTextareaHeight,
+    }));
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && e.shiftKey && onSubmit) {
-      e.preventDefault();
-      if (!value.trim() || disabled) return;
-      onSubmit();
-    }
-    onKeyDown?.(e);
-  };
+    useEffect(() => {
+      adjustTextareaHeight();
+    }, [value]);
 
-  return (
-    <div
-      className={`relative ${className}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
+    useEffect(() => {
+      if (autoFocus && !disabled && textareaRef.current) {
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 100);
+      }
+    }, [disabled, autoFocus]);
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && e.shiftKey && onSubmit) {
+        e.preventDefault();
+        if (!value.trim() || disabled) return;
+        onSubmit();
+      }
+      onKeyDown?.(e);
+    };
+
+    return (
       <div
-        className={`relative ${
-          isDragOver ? 'ring-2 ring-primary ring-opacity-50 rounded-2xl' : ''
-        }`}
+        className={`relative ${className}`}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
       >
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={`w-full bg-base-200 border border-base-300 rounded-2xl px-4 py-3 resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base-content placeholder-base-content/60 text-base transition-all duration-200 ${
-            isDragOver ? 'border-primary bg-primary/5' : ''
+        <div
+          className={`relative ${
+            isDragOver ? 'ring-2 ring-primary ring-opacity-50 rounded-2xl' : ''
           }`}
-          placeholder={placeholder}
-          rows={1}
-          style={{ minHeight: '44px', maxHeight: '120px' }}
-          disabled={disabled}
-          data-testid={testId}
-        />
+        >
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={`w-full bg-base-200 border border-base-300 rounded-2xl px-4 py-3 resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base-content placeholder-base-content/60 text-base transition-all duration-200 ${
+              isDragOver ? 'border-primary bg-primary/5' : ''
+            }`}
+            placeholder={placeholder}
+            rows={1}
+            style={{ minHeight: '44px', maxHeight: '120px' }}
+            disabled={disabled}
+            data-testid={testId}
+          />
 
-        {isDragOver && (
-          <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl flex items-center justify-center pointer-events-none">
-            <span className="text-primary font-medium">Drop files here</span>
-          </div>
-        )}
+          {isDragOver && (
+            <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl flex items-center justify-center pointer-events-none">
+              <span className="text-primary font-medium">Drop files here</span>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
 ChatTextarea.displayName = 'ChatTextarea';
 

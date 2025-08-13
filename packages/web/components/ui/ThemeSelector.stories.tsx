@@ -93,7 +93,17 @@ A comprehensive theme selection molecule that provides visual theme previews, st
   argTypes: {
     currentTheme: {
       control: { type: 'select' },
-      options: ['light', 'dark', 'cupcake', 'corporate', 'synthwave', 'cyberpunk', 'business', 'emerald', 'lofi'],
+      options: [
+        'light',
+        'dark',
+        'cupcake',
+        'corporate',
+        'synthwave',
+        'cyberpunk',
+        'business',
+        'emerald',
+        'lofi',
+      ],
       description: 'Currently selected theme',
     },
     onThemeChange: {
@@ -125,25 +135,25 @@ export const Default: Story = {
 export const ControlledMode: Story = {
   render: () => {
     const [theme, setTheme] = useState('dark');
-    
+
     return (
       <div className="w-full max-w-md p-6 bg-base-100 rounded-lg border border-base-300">
         <div className="mb-4">
           <div className="text-sm text-base-content/60">External Controls:</div>
           <div className="flex gap-2 mt-2">
-            <button 
+            <button
               onClick={() => setTheme('light')}
               className={`btn btn-xs ${theme === 'light' ? 'btn-primary' : 'btn-ghost'}`}
             >
               Light
             </button>
-            <button 
+            <button
               onClick={() => setTheme('dark')}
               className={`btn btn-xs ${theme === 'dark' ? 'btn-primary' : 'btn-ghost'}`}
             >
               Dark
             </button>
-            <button 
+            <button
               onClick={() => setTheme('synthwave')}
               className={`btn btn-xs ${theme === 'synthwave' ? 'btn-primary' : 'btn-ghost'}`}
             >
@@ -167,14 +177,14 @@ export const ControlledMode: Story = {
 export const AllThemes: Story = {
   render: () => {
     const [selectedTheme, setSelectedTheme] = useState('dark');
-    
+
     return (
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">Available Themes</h3>
           <p className="text-sm text-base-content/60">All 9 built-in themes with color previews</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="p-6 bg-base-100 rounded-lg border border-base-300">
             <div className="mb-4">
@@ -183,7 +193,7 @@ export const AllThemes: Story = {
             </div>
             <ThemeSelector currentTheme={selectedTheme} onThemeChange={setSelectedTheme} />
           </div>
-          
+
           <div className="p-6 bg-base-100 rounded-lg border border-base-300">
             <div className="mb-4">
               <div className="text-sm font-medium text-base-content">Preview</div>
@@ -225,21 +235,19 @@ export const InSettingsPanel: Story = {
       notifications: true,
       autoSave: true,
     });
-    
+
     return (
       <div className="w-full max-w-lg bg-base-100 rounded-lg border border-base-300">
         <div className="p-4 border-b border-base-300">
           <h3 className="text-lg font-semibold">Application Settings</h3>
         </div>
-        
+
         <div className="p-4 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-base-content mb-2">
-              Font Size
-            </label>
-            <select 
+            <label className="block text-sm font-medium text-base-content mb-2">Font Size</label>
+            <select
               value={settings.fontSize}
-              onChange={(e) => setSettings(prev => ({ ...prev, fontSize: e.target.value }))}
+              onChange={(e) => setSettings((prev) => ({ ...prev, fontSize: e.target.value }))}
               className="select select-bordered w-full"
             >
               <option value="small">Small</option>
@@ -247,40 +255,40 @@ export const InSettingsPanel: Story = {
               <option value="large">Large</option>
             </select>
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-base-content mb-2">
-              Appearance
-            </label>
-            <ThemeSelector 
-              currentTheme={settings.theme} 
-              onThemeChange={(theme) => setSettings(prev => ({ ...prev, theme }))}
+            <label className="block text-sm font-medium text-base-content mb-2">Appearance</label>
+            <ThemeSelector
+              currentTheme={settings.theme}
+              onThemeChange={(theme) => setSettings((prev) => ({ ...prev, theme }))}
             />
           </div>
-          
+
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <input 
+              <input
                 type="checkbox"
                 checked={settings.notifications}
-                onChange={(e) => setSettings(prev => ({ ...prev, notifications: e.target.checked }))}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, notifications: e.target.checked }))
+                }
                 className="checkbox"
               />
               <label className="text-sm">Enable notifications</label>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <input 
+              <input
                 type="checkbox"
                 checked={settings.autoSave}
-                onChange={(e) => setSettings(prev => ({ ...prev, autoSave: e.target.checked }))}
+                onChange={(e) => setSettings((prev) => ({ ...prev, autoSave: e.target.checked }))}
                 className="checkbox"
               />
               <label className="text-sm">Auto-save changes</label>
             </div>
           </div>
         </div>
-        
+
         <div className="p-4 border-t border-base-300">
           <button className="btn btn-primary w-full">Save Settings</button>
         </div>
@@ -320,18 +328,22 @@ export const CompactMode: Story = {
 export const WithAnimation: Story = {
   render: () => {
     const [theme, setTheme] = useState('dark');
-    
+
     return (
       <div className="w-full max-w-md p-6 bg-base-100 rounded-lg border border-base-300">
         <div className="mb-4">
           <div className="text-sm font-medium text-base-content mb-2">Animated Theme Changes</div>
-          <div className="text-xs text-base-content/60">Watch the hover and selection animations</div>
+          <div className="text-xs text-base-content/60">
+            Watch the hover and selection animations
+          </div>
         </div>
-        
+
         <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
-        
+
         <div className="mt-4 p-3 bg-base-200 rounded transition-all duration-300">
-          <div className="text-sm">Current theme: <span className="font-medium capitalize">{theme}</span></div>
+          <div className="text-sm">
+            Current theme: <span className="font-medium capitalize">{theme}</span>
+          </div>
           <div className="text-xs text-base-content/60 mt-1">
             Notice how the background color changes smoothly
           </div>
@@ -354,16 +366,17 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 ThemeSelector Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then click on different themes to see them in action!
+          Enable tennis commentary in the toolbar above, then click on different themes to see them
+          in action!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer hover:shadow-lg transition-shadow border rounded-lg p-4">
           <h4 className="font-medium mb-3">Theme Selection</h4>
           <ThemeSelector />
         </div>
-        
+
         <div className="cursor-pointer hover:shadow-lg transition-shadow border rounded-lg p-4">
           <h4 className="font-medium mb-3">Settings Integration</h4>
           <div className="space-y-4">
@@ -376,16 +389,28 @@ export const InteractiveDemo: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">ThemeSelector Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Visual Previews</strong> - Color swatches show theme colors</li>
-          <li>• <strong>Instant Changes</strong> - Themes apply immediately</li>
-          <li>• <strong>Persistence</strong> - Saves selection to localStorage</li>
-          <li>• <strong>Controlled Mode</strong> - External state management support</li>
-          <li>• <strong>9 Built-in Themes</strong> - Complete theme collection</li>
-          <li>• <strong>Hover Effects</strong> - Smooth animations and feedback</li>
+          <li>
+            • <strong>Visual Previews</strong> - Color swatches show theme colors
+          </li>
+          <li>
+            • <strong>Instant Changes</strong> - Themes apply immediately
+          </li>
+          <li>
+            • <strong>Persistence</strong> - Saves selection to localStorage
+          </li>
+          <li>
+            • <strong>Controlled Mode</strong> - External state management support
+          </li>
+          <li>
+            • <strong>9 Built-in Themes</strong> - Complete theme collection
+          </li>
+          <li>
+            • <strong>Hover Effects</strong> - Smooth animations and feedback
+          </li>
         </ul>
       </div>
     </div>
@@ -393,7 +418,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing ThemeSelector with tennis commentary. Enable commentary in the toolbar and try different themes!',
+        story:
+          'Interactive demo showcasing ThemeSelector with tennis commentary. Enable commentary in the toolbar and try different themes!',
       },
     },
   },

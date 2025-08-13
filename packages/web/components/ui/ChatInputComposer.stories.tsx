@@ -148,7 +148,7 @@ const ChatInputWrapper = ({ initialValue = '', ...props }: ChatInputWrapperProps
   };
 
   const handleFileRemoved = (fileId: string) => {
-    setAttachedFiles(attachedFiles.filter(f => f.id !== fileId));
+    setAttachedFiles(attachedFiles.filter((f) => f.id !== fileId));
   };
 
   const handleFileCleared = () => {
@@ -181,40 +181,31 @@ export const Default: Story = {
 };
 
 export const WithPlaceholder: Story = {
-  render: () => (
-    <ChatInputWrapper placeholder="Ask me anything..." />
-  ),
+  render: () => <ChatInputWrapper placeholder="Ask me anything..." />,
 };
 
 export const WithInitialValue: Story = {
-  render: () => (
-    <ChatInputWrapper initialValue="Hello! How can I help you today?" />
-  ),
+  render: () => <ChatInputWrapper initialValue="Hello! How can I help you today?" />,
 };
 
 export const Disabled: Story = {
-  render: () => (
-    <ChatInputWrapper disabled={true} />
-  ),
+  render: () => <ChatInputWrapper disabled={true} />,
 };
 
 export const WithoutVoiceButton: Story = {
-  render: () => (
-    <ChatInputWrapper showVoiceButton={false} />
-  ),
+  render: () => <ChatInputWrapper showVoiceButton={false} />,
 };
 
 export const WithoutFileAttachment: Story = {
-  render: () => (
-    <ChatInputWrapper showFileAttachment={false} />
-  ),
+  render: () => <ChatInputWrapper showFileAttachment={false} />,
 };
 
 export const SafeFileAttachmentTest: Story = {
   render: () => (
     <div className="w-full max-w-2xl">
       <p className="text-sm text-gray-600 mb-4">
-        This story tests the chat input with file attachments disabled to avoid URL.createObjectURL issues.
+        This story tests the chat input with file attachments disabled to avoid URL.createObjectURL
+        issues.
       </p>
       <ChatInputComposer
         value=""
@@ -269,12 +260,12 @@ export const WithAttachedFiles: Story = {
     // Create proper mock File objects to avoid URL.createObjectURL issues
     const createMockFile = (name: string, size: number, type: string): File => {
       try {
-        const content = type.startsWith('image/') ? 
-          // Create a minimal valid JPEG header for image files
-          new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]) : 
-          // Create text content for other files
-          new TextEncoder().encode(`Mock content for ${name}`);
-        
+        const content = type.startsWith('image/')
+          ? // Create a minimal valid JPEG header for image files
+            new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+          : // Create text content for other files
+            new TextEncoder().encode(`Mock content for ${name}`);
+
         return new File([content], name, { type, lastModified: Date.now() });
       } catch (error) {
         // Fallback to minimal file if creation fails
@@ -322,17 +313,17 @@ export const AllStates: Story = {
         <h3 className="text-lg font-semibold mb-2">Default State</h3>
         <ChatInputWrapper />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">With Content</h3>
         <ChatInputWrapper initialValue="This is a sample message that shows how the input looks with content..." />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">Disabled State</h3>
         <ChatInputWrapper disabled={true} />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">Minimal (No Voice/Files)</h3>
         <ChatInputWrapper showVoiceButton={false} showFileAttachment={false} />
@@ -359,12 +350,12 @@ export const InteractiveDemo: Story = {
     // Create proper mock File objects
     const createMockFile = (name: string, size: number, type: string): File => {
       try {
-        const content = type.startsWith('image/') ? 
-          // Create a minimal valid JPEG header for image files
-          new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]) : 
-          // Create text content for other files
-          new TextEncoder().encode(`Mock content for ${name}`);
-        
+        const content = type.startsWith('image/')
+          ? // Create a minimal valid JPEG header for image files
+            new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+          : // Create text content for other files
+            new TextEncoder().encode(`Mock content for ${name}`);
+
         return new File([content], name, { type, lastModified: Date.now() });
       } catch (error) {
         // Fallback to minimal file if creation fails
@@ -376,12 +367,12 @@ export const InteractiveDemo: Story = {
       if (value.trim()) {
         setMessages([...messages, value]);
         setValue('');
-        
+
         // Simulate AI response
         setIsStreaming(true);
         setTimeout(() => {
           setIsStreaming(false);
-          setMessages(prev => [...prev, `AI: Thanks for your message! You said: "${value}"`]);
+          setMessages((prev) => [...prev, `AI: Thanks for your message! You said: "${value}"`]);
         }, 2000);
       }
     };
@@ -405,15 +396,15 @@ export const InteractiveDemo: Story = {
 
     const handleFilesAttached = (files: AttachedFile[]) => {
       // Ensure files have proper File objects
-      const filesWithMockData = files.map(file => ({
+      const filesWithMockData = files.map((file) => ({
         ...file,
-        file: file.file || createMockFile(file.name, file.size, file.type)
+        file: file.file || createMockFile(file.name, file.size, file.type),
       }));
       setAttachedFiles([...attachedFiles, ...filesWithMockData]);
     };
 
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(attachedFiles.filter(f => f.id !== fileId));
+      setAttachedFiles(attachedFiles.filter((f) => f.id !== fileId));
     };
 
     const handleFileCleared = () => {
@@ -423,12 +414,14 @@ export const InteractiveDemo: Story = {
     return (
       <div className="flex flex-col gap-6 p-6 w-full max-w-3xl">
         <div className="text-center">
-          <h3 className="text-lg font-semibold mb-2">🎾 Chat Input Composer Tennis Commentary Demo</h3>
+          <h3 className="text-lg font-semibold mb-2">
+            🎾 Chat Input Composer Tennis Commentary Demo
+          </h3>
           <p className="text-sm text-gray-600 mb-4">
             Enable tennis commentary in the toolbar above, then interact with the chat input below!
           </p>
         </div>
-        
+
         {/* Message History */}
         <div className="bg-gray-50 rounded-lg p-4 h-48 overflow-y-auto">
           <h4 className="font-medium mb-2">Chat History:</h4>
@@ -446,7 +439,7 @@ export const InteractiveDemo: Story = {
             </div>
           )}
         </div>
-        
+
         {/* Interactive Chat Input */}
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <ChatInputComposer
@@ -465,13 +458,21 @@ export const InteractiveDemo: Story = {
             placeholder="Type your message, try voice input, or attach files..."
           />
         </div>
-        
+
         {/* Instructions */}
         <div className="text-sm text-gray-600 space-y-1">
-          <p>• <strong>Type and send</strong> messages to see them appear above</p>
-          <p>• <strong>Voice button</strong> simulates voice input (3 second demo)</p>
-          <p>• <strong>File attachment</strong> supports drag & drop or click to select</p>
-          <p>• <strong>Hover and click</strong> elements for tennis commentary!</p>
+          <p>
+            • <strong>Type and send</strong> messages to see them appear above
+          </p>
+          <p>
+            • <strong>Voice button</strong> simulates voice input (3 second demo)
+          </p>
+          <p>
+            • <strong>File attachment</strong> supports drag & drop or click to select
+          </p>
+          <p>
+            • <strong>Hover and click</strong> elements for tennis commentary!
+          </p>
         </div>
       </div>
     );
@@ -479,7 +480,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing the chat input composer with tennis commentary. Enable commentary in the toolbar and interact with the input!',
+        story:
+          'Interactive demo showcasing the chat input composer with tennis commentary. Enable commentary in the toolbar and interact with the input!',
       },
     },
   },

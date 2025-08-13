@@ -161,27 +161,15 @@ export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-6">
       <div className="text-center">
-        <VoiceButton 
-          size="sm" 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton size="sm" isListening={false} onToggle={() => {}} />
         <p className="text-xs text-gray-500 mt-2">SM</p>
       </div>
       <div className="text-center">
-        <VoiceButton 
-          size="md" 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton size="md" isListening={false} onToggle={() => {}} />
         <p className="text-xs text-gray-500 mt-2">MD</p>
       </div>
       <div className="text-center">
-        <VoiceButton 
-          size="lg" 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton size="lg" isListening={false} onToggle={() => {}} />
         <p className="text-xs text-gray-500 mt-2">LG</p>
       </div>
     </div>
@@ -199,27 +187,15 @@ export const AllVariants: Story = {
   render: () => (
     <div className="flex items-center gap-6">
       <div className="text-center">
-        <VoiceButton 
-          variant="primary" 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton variant="primary" isListening={false} onToggle={() => {}} />
         <p className="text-xs text-gray-500 mt-2">Primary</p>
       </div>
       <div className="text-center">
-        <VoiceButton 
-          variant="ghost" 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton variant="ghost" isListening={false} onToggle={() => {}} />
         <p className="text-xs text-gray-500 mt-2">Ghost</p>
       </div>
       <div className="text-center">
-        <VoiceButton 
-          variant="outline" 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton variant="outline" isListening={false} onToggle={() => {}} />
         <p className="text-xs text-gray-500 mt-2">Outline</p>
       </div>
     </div>
@@ -237,36 +213,22 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <VoiceButton 
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton isListening={false} onToggle={() => {}} />
         <span className="text-sm">Ready to listen</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <VoiceButton 
-          isListening={true}
-          onToggle={() => {}}
-        />
+        <VoiceButton isListening={true} onToggle={() => {}} />
         <span className="text-sm">Currently listening (animated)</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <VoiceButton 
-          disabled={true}
-          isListening={false}
-          onToggle={() => {}}
-        />
+        <VoiceButton disabled={true} isListening={false} onToggle={() => {}} />
         <span className="text-sm">Disabled</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <VoiceButton 
-          disabled={true}
-          isListening={true}
-          onToggle={() => {}}
-        />
+        <VoiceButton disabled={true} isListening={true} onToggle={() => {}} />
         <span className="text-sm">Disabled while listening</span>
       </div>
     </div>
@@ -283,13 +245,10 @@ export const AllStates: Story = {
 export const Interactive: Story = {
   render: () => {
     const [isListening, setIsListening] = useState(false);
-    
+
     return (
       <div className="flex flex-col items-center gap-4">
-        <VoiceButton 
-          isListening={isListening}
-          onToggle={() => setIsListening(!isListening)}
-        />
+        <VoiceButton isListening={isListening} onToggle={() => setIsListening(!isListening)} />
         <p className="text-sm text-gray-600">
           {isListening ? 'Listening... Click to stop' : 'Click to start listening'}
         </p>
@@ -314,7 +273,7 @@ export const InteractiveDemo: Story = {
     });
 
     const toggleState = (variant: keyof typeof states) => {
-      setStates(prev => ({
+      setStates((prev) => ({
         ...prev,
         [variant]: !prev[variant],
       }));
@@ -325,14 +284,15 @@ export const InteractiveDemo: Story = {
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">🎾 Voice Button Tennis Commentary Demo</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Enable tennis commentary in the toolbar above, then hover and click the voice buttons below!
+            Enable tennis commentary in the toolbar above, then hover and click the voice buttons
+            below!
           </p>
         </div>
-        
+
         <div className="grid grid-cols-3 gap-6">
           <div className="text-center p-4 border rounded-lg">
             <div className="flex items-center justify-center mb-2">
-              <VoiceButton 
+              <VoiceButton
                 size="lg"
                 variant="primary"
                 isListening={states.primary}
@@ -344,10 +304,10 @@ export const InteractiveDemo: Story = {
               {states.primary ? 'Listening...' : 'Click to listen'}
             </p>
           </div>
-          
+
           <div className="text-center p-4 border rounded-lg">
             <div className="flex items-center justify-center mb-2">
-              <VoiceButton 
+              <VoiceButton
                 size="lg"
                 variant="ghost"
                 isListening={states.ghost}
@@ -359,10 +319,10 @@ export const InteractiveDemo: Story = {
               {states.ghost ? 'Listening...' : 'Click to listen'}
             </p>
           </div>
-          
+
           <div className="text-center p-4 border rounded-lg">
             <div className="flex items-center justify-center mb-2">
-              <VoiceButton 
+              <VoiceButton
                 size="lg"
                 variant="outline"
                 isListening={states.outline}
@@ -375,7 +335,7 @@ export const InteractiveDemo: Story = {
             </p>
           </div>
         </div>
-        
+
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Notice the pulse animation when listening and hover effects when idle!
@@ -387,7 +347,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing voice buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
+        story:
+          'Interactive demo showcasing voice buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
       },
     },
   },

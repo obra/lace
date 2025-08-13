@@ -9,17 +9,17 @@ import { EditInstanceModal } from './EditInstanceModal';
 
 // Mock the serialization utility
 vi.mock('@/lib/serialization', () => ({
-  parseResponse: vi.fn()
+  parseResponse: vi.fn(),
 }));
 
 // Mock UI components to focus on logic
 vi.mock('@/components/ui/Modal', () => ({
-  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) => 
-    isOpen ? <div role="dialog">{children}</div> : null
+  Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
+    isOpen ? <div role="dialog">{children}</div> : null,
 }));
 
 vi.mock('@/components/ui/Badge', () => ({
-  default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>
+  default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
 const mockParseResponse = vi.mocked((await import('@/lib/serialization')).parseResponse);
@@ -38,14 +38,14 @@ describe('EditInstanceModal', () => {
     displayName: 'Test Instance',
     catalogProviderId: 'openai',
     endpoint: 'https://api.openai.com/v1',
-    hasCredentials: true
+    hasCredentials: true,
   };
 
   const defaultProps = {
     isOpen: true,
     instance: mockInstance,
     onClose: vi.fn(),
-    onSuccess: vi.fn()
+    onSuccess: vi.fn(),
   };
 
   beforeEach(() => {
@@ -68,20 +68,20 @@ describe('EditInstanceModal', () => {
 
   it('should update instance configuration without credential', async () => {
     const user = userEvent.setup();
-    
+
     // Mock successful API response
     const mockUpdatedInstance = {
       ...mockInstance,
-      displayName: 'Updated Instance Name'
+      displayName: 'Updated Instance Name',
     };
-    
+
     mockParseResponse.mockResolvedValue({
-      instance: mockUpdatedInstance
+      instance: mockUpdatedInstance,
     });
-    
+
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      status: 200
+      status: 200,
     });
     global.fetch = mockFetch;
 
@@ -106,8 +106,8 @@ describe('EditInstanceModal', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: 'Updated Instance Name',
-          endpoint: 'https://custom.api.com'
-        })
+          endpoint: 'https://custom.api.com',
+        }),
       });
     });
 
@@ -117,14 +117,14 @@ describe('EditInstanceModal', () => {
 
   it('should update instance with new credential', async () => {
     const user = userEvent.setup();
-    
+
     mockParseResponse.mockResolvedValue({
-      instance: mockInstance
+      instance: mockInstance,
     });
-    
+
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      status: 200
+      status: 200,
     });
 
     render(<EditInstanceModal {...defaultProps} />);
@@ -144,15 +144,15 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Test Instance',
           endpoint: 'https://api.openai.com/v1',
-          credential: { apiKey: 'new-api-key' }
-        })
+          credential: { apiKey: 'new-api-key' },
+        }),
       });
     });
   });
 
   it('should validate required fields', async () => {
     const user = userEvent.setup();
-    
+
     render(<EditInstanceModal {...defaultProps} />);
 
     // Clear required display name
@@ -165,21 +165,21 @@ describe('EditInstanceModal', () => {
 
     // Should not make API call
     expect(global.fetch).not.toHaveBeenCalled();
-    
+
     // Form should show validation state (HTML5 validation)
     expect(nameInput).toBeInvalid();
   });
 
   it('should handle API errors gracefully', async () => {
     const user = userEvent.setup();
-    
+
     mockParseResponse.mockResolvedValue({
-      error: 'Instance validation failed'
+      error: 'Instance validation failed',
     });
-    
+
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
-      status: 400
+      status: 400,
     });
 
     render(<EditInstanceModal {...defaultProps} />);
@@ -197,13 +197,13 @@ describe('EditInstanceModal', () => {
 
   it('should not render when closed', () => {
     render(<EditInstanceModal {...defaultProps} isOpen={false} />);
-    
+
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('should close modal on cancel', async () => {
     const user = userEvent.setup();
-    
+
     render(<EditInstanceModal {...defaultProps} />);
 
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
@@ -214,15 +214,22 @@ describe('EditInstanceModal', () => {
 
   it('should show loading state during submission', async () => {
     const user = userEvent.setup();
-    
+
     // Mock delayed response
-    global.fetch = vi.fn().mockImplementation(() => 
-      new Promise(resolve => setTimeout(() => resolve({
-        ok: true,
-        status: 200
-      }), 100))
+    global.fetch = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                status: 200,
+              }),
+            100
+          )
+        )
     );
-    
+
     mockParseResponse.mockResolvedValue({ instance: mockInstance });
 
     render(<EditInstanceModal {...defaultProps} />);

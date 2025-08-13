@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "@fortawesome/fontawesome-svg-core/styles.css";
+@import 'tailwindcss';
+@import '@fortawesome/fontawesome-svg-core/styles.css';
 @plugin "daisyui";
 
 /* Typography: utilities bound to Next Fonts variables (set on <body>) */
@@ -9,20 +9,47 @@
 
 /* Use DM Sans for UI text where desired */
 .font-ui {
-  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans,
-    Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    var(--font-dm-sans),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Noto Sans,
+    Ubuntu,
+    Cantarell,
+    Helvetica Neue,
+    Arial,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol';
 }
 
 /* Use JetBrains Mono for code and technical content */
 .font-code {
-  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  font-family:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 }
 
 /* Use Lato where desired */
 .font-lato {
-  font-family: var(--font-lato), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans,
-    Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    var(--font-lato),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Noto Sans,
+    Ubuntu,
+    Cantarell,
+    Helvetica Neue,
+    Arial,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol';
 }
 
 /* Mobile-specific improvements */
@@ -108,18 +135,20 @@ select {
 
 /* Hide scrollbar for carousel */
 .hide-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 .hide-scrollbar::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari and Opera */
+  display: none; /* Chrome, Safari and Opera */
 }
 
 /* Monospace font utilities for code, terminal, and technical content */
 .font-mono {
   font-variant-ligatures: common-ligatures;
-  font-feature-settings: 'liga' 1, 'calt' 1;
+  font-feature-settings:
+    'liga' 1,
+    'calt' 1;
   text-rendering: optimizeLegibility;
 }
 
@@ -182,15 +211,15 @@ select {
 }
 
 /* Dark mode adjustments */
-[data-theme="dark"] .diff-line.added {
+[data-theme='dark'] .diff-line.added {
   @apply bg-green-900/20 border-green-400;
 }
 
-[data-theme="dark"] .diff-line.removed {
+[data-theme='dark'] .diff-line.removed {
   @apply bg-red-900/20 border-red-400;
 }
 
-[data-theme="dark"] .diff-line.highlighted {
+[data-theme='dark'] .diff-line.highlighted {
   @apply bg-yellow-900/20;
 }
 
@@ -360,7 +389,7 @@ select {
   pointer-events: none;
   background-image:
     radial-gradient(1200px 700px at 15% -10%, rgba(34, 197, 94, 0.14), transparent 60%),
-    radial-gradient(1000px 600px at 85% 0%, rgba(59, 130, 246, 0.10), transparent 60%),
+    radial-gradient(1000px 600px at 85% 0%, rgba(59, 130, 246, 0.1), transparent 60%),
     linear-gradient(180deg, #0b0f0e, #121614);
   background-repeat: no-repeat;
   background-size: cover;
@@ -371,7 +400,7 @@ select {
   inset: 0;
   background-image: repeating-linear-gradient(
     to bottom,
-    rgba(255, 105, 180, 0.10) 0 8px,
+    rgba(255, 105, 180, 0.1) 0 8px,
     transparent 8px 22px
   );
   opacity: 0.15;
@@ -396,7 +425,7 @@ select {
 /* High-contrast glass card for dim theme */
 .glass {
   background-color: rgba(12, 16, 14, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   outline: 1px solid rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -422,22 +451,24 @@ select {
 /* Vapor style button for purple-accent actions */
 .vapor-button {
   /* Pink/Purple CTA-like gradient */
-  background-image:
-    linear-gradient(135deg, #6366f1 0%, #a855f7 35%, #f472b6 100%);
+  background-image: linear-gradient(135deg, #6366f1 0%, #a855f7 35%, #f472b6 100%);
   color: rgba(249, 250, 251, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.14);
   outline: 1px solid rgba(0, 0, 0, 0.35);
   box-shadow:
     0 10px 28px rgba(168, 85, 247, 0.35),
     0 8px 22px rgba(99, 102, 241, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.2s ease;
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.2s ease;
 }
 .vapor-button:hover {
   transform: translateY(-1px);
   box-shadow:
     0 16px 38px rgba(168, 85, 247, 0.45),
-    0 12px 28px rgba(99, 102, 241, 0.30),
+    0 12px 28px rgba(99, 102, 241, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
   filter: saturate(1.06);
 }
@@ -456,5 +487,5 @@ select {
   color: hsl(0 0% 96% / 0.95);
 }
 .card-sub {
-  color: hsl(0 0% 92% / 0.80);
+  color: hsl(0 0% 92% / 0.8);
 }

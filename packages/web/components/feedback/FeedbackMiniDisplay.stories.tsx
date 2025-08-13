@@ -10,7 +10,8 @@ const meta: Meta<typeof FeedbackMiniDisplay> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Compact feedback display for minimal UI space. Shows latest feedback events in a streamlined format with expandable view and priority filtering.',
+        component:
+          'Compact feedback display for minimal UI space. Shows latest feedback events in a streamlined format with expandable view and priority filtering.',
       },
     },
   },
@@ -233,7 +234,7 @@ export const EmptyState: Story = {
 
 export const ErrorsOnly: Story = {
   args: {
-    events: sampleEvents.filter(event => event.type === 'error'),
+    events: sampleEvents.filter((event) => event.type === 'error'),
     maxEvents: 3,
     showOnlyHighPriority: false,
   },
@@ -248,7 +249,7 @@ export const ErrorsOnly: Story = {
 
 export const PerformanceOnly: Story = {
   args: {
-    events: sampleEvents.filter(event => event.type === 'performance'),
+    events: sampleEvents.filter((event) => event.type === 'performance'),
     maxEvents: 3,
     showOnlyHighPriority: false,
   },
@@ -263,7 +264,7 @@ export const PerformanceOnly: Story = {
 
 export const ActionableEvents: Story = {
   args: {
-    events: sampleEvents.filter(event => event.type === 'action'),
+    events: sampleEvents.filter((event) => event.type === 'action'),
     maxEvents: 3,
     showOnlyHighPriority: false,
   },
@@ -339,16 +340,10 @@ export const SidebarIntegration: Story = {
           <h3 className="text-sm font-medium mb-2">Project Status</h3>
           <div className="text-sm text-gray-600">All systems operational</div>
         </div>
-        <FeedbackMiniDisplay
-          events={sampleEvents}
-          maxEvents={3}
-          showOnlyHighPriority={false}
-        />
+        <FeedbackMiniDisplay events={sampleEvents} maxEvents={3} showOnlyHighPriority={false} />
         <div>
           <h3 className="text-sm font-medium mb-2">Quick Actions</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-700">
-            Run Tests
-          </button>
+          <button className="text-sm text-blue-600 hover:text-blue-700">Run Tests</button>
         </div>
       </div>
     </div>
@@ -367,19 +362,11 @@ export const Dashboard: Story = {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="bg-white p-4 rounded-lg border">
         <h3 className="font-semibold mb-3">High Priority Feedback</h3>
-        <FeedbackMiniDisplay
-          events={sampleEvents}
-          maxEvents={3}
-          showOnlyHighPriority={true}
-        />
+        <FeedbackMiniDisplay events={sampleEvents} maxEvents={3} showOnlyHighPriority={true} />
       </div>
       <div className="bg-white p-4 rounded-lg border">
         <h3 className="font-semibold mb-3">All Recent Feedback</h3>
-        <FeedbackMiniDisplay
-          events={sampleEvents}
-          maxEvents={4}
-          showOnlyHighPriority={false}
-        />
+        <FeedbackMiniDisplay events={sampleEvents} maxEvents={4} showOnlyHighPriority={false} />
       </div>
     </div>
   ),

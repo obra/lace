@@ -92,7 +92,9 @@ describe('useTaskManager Hook Logic', () => {
   });
 
   it('should handle error state transitions', async () => {
-    (mockClient.listTasks as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Test error'));
+    (mockClient.listTasks as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Test error')
+    );
 
     const { result } = renderHook(() => useTaskManager(mockProjectId, mockSessionId));
 
@@ -115,7 +117,9 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.refetch({ status: 'pending' });
     });
 
-    expect(mockClient.listTasks).toHaveBeenCalledWith(mockProjectId, mockSessionId, { status: 'pending' });
+    expect(mockClient.listTasks).toHaveBeenCalledWith(mockProjectId, mockSessionId, {
+      status: 'pending',
+    });
   });
 
   it('should call create API and trigger refetch', async () => {
@@ -136,7 +140,7 @@ describe('useTaskManager Hook Logic', () => {
     });
 
     expect(mockClient.createTask).toHaveBeenCalledWith(mockProjectId, mockSessionId, newTask);
-    
+
     // Wait for the refetch to occur
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2); // Initial + refetch
@@ -154,10 +158,15 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.updateTask('task_20240101_abc123', { status: 'completed' });
     });
 
-    expect(mockClient.updateTask).toHaveBeenCalledWith(mockProjectId, mockSessionId, 'task_20240101_abc123', {
-      status: 'completed',
-    });
-    
+    expect(mockClient.updateTask).toHaveBeenCalledWith(
+      mockProjectId,
+      mockSessionId,
+      'task_20240101_abc123',
+      {
+        status: 'completed',
+      }
+    );
+
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2);
     });
@@ -174,8 +183,12 @@ describe('useTaskManager Hook Logic', () => {
       await result.current.deleteTask('task_20240101_abc123');
     });
 
-    expect(mockClient.deleteTask).toHaveBeenCalledWith(mockProjectId, mockSessionId, 'task_20240101_abc123');
-    
+    expect(mockClient.deleteTask).toHaveBeenCalledWith(
+      mockProjectId,
+      mockSessionId,
+      'task_20240101_abc123'
+    );
+
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2);
     });
@@ -199,7 +212,7 @@ describe('useTaskManager Hook Logic', () => {
       'Test note',
       undefined
     );
-    
+
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2);
     });
@@ -220,7 +233,7 @@ describe('useTaskManager Hook Logic', () => {
     });
 
     expect(mockClient.createTask).toHaveBeenCalledTimes(2);
-    
+
     await waitFor(() => {
       expect(mockClient.listTasks).toHaveBeenCalledTimes(2); // Initial + batched refetch
     });

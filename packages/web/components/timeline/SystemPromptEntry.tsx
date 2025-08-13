@@ -14,10 +14,10 @@ interface SystemPromptEntryProps {
   isRecentMessage?: boolean;
 }
 
-export function SystemPromptEntry({ 
-  content, 
-  timestamp, 
-  isRecentMessage = false 
+export function SystemPromptEntry({
+  content,
+  timestamp,
+  isRecentMessage = false,
 }: SystemPromptEntryProps) {
   return (
     <div className="flex gap-3">
@@ -30,15 +30,9 @@ export function SystemPromptEntry({
         <div className="flex items-center gap-2 mb-2">
           <span className="font-medium text-sm text-base-content">System Prompt</span>
           <span className="text-xs text-base-content/50">{formatTime(timestamp)}</span>
-          <div className="badge badge-ghost badge-xs">
-            System
-          </div>
+          <div className="badge badge-ghost badge-xs">System</div>
         </div>
-        <MarkdownRenderer
-          content={content}
-          maxLines={10}
-          isRecentMessage={isRecentMessage}
-        />
+        <MarkdownRenderer content={content} maxLines={10} isRecentMessage={isRecentMessage} />
       </div>
     </div>
   );

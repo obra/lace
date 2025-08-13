@@ -38,14 +38,12 @@ export default function FileRenderer({
     const lines = content.split('\n');
     const total = lines.length;
     const needsExp = total > maxLines;
-    const preview = needsExp 
-      ? lines.slice(0, maxLines).join('\n')
-      : content;
-    
+    const preview = needsExp ? lines.slice(0, maxLines).join('\n') : content;
+
     return {
       previewContent: preview,
       totalLines: total,
-      needsExpansion: needsExp
+      needsExpansion: needsExp,
     };
   }, [content, maxLines]);
 
@@ -76,7 +74,7 @@ export default function FileRenderer({
           maxHeight="400px"
           className="border-0 bg-transparent"
         />
-        
+
         {/* Footer with file info and expansion */}
         {(needsExpansion || fileSize) && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-base-300">
@@ -109,13 +107,9 @@ export default function FileRenderer({
           {/* Modal header */}
           <div className="flex items-center justify-between p-4 border-b border-base-300 bg-base-50">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-base-content">
-                {displayName}
-              </h2>
+              <h2 className="text-lg font-semibold text-base-content">{displayName}</h2>
               {filename && (
-                <span className="text-sm text-base-content/60 font-mono">
-                  {filename}
-                </span>
+                <span className="text-sm text-base-content/60 font-mono">{filename}</span>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -124,8 +118,8 @@ export default function FileRenderer({
                 className="btn btn-sm btn-ghost"
                 title="Copy to clipboard"
               >
-                <FontAwesomeIcon 
-                  icon={copied ? faCheck : faCopy} 
+                <FontAwesomeIcon
+                  icon={copied ? faCheck : faCopy}
                   className={`w-4 h-4 ${copied ? 'text-success' : ''}`}
                 />
                 {copied ? 'Copied!' : 'Copy'}

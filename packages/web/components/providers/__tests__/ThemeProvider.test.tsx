@@ -14,7 +14,7 @@ import { ThemeProvider, useTheme } from '@/components/providers/ThemeProvider';
 // Test component that uses the theme hook
 function TestComponent() {
   const { theme, setTheme } = useTheme();
-  
+
   return (
     <div>
       <span data-testid="current-theme">{theme}</span>

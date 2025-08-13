@@ -12,54 +12,67 @@ interface FeedbackInsightCardProps {
   showRelatedEvents?: boolean;
 }
 
-export function FeedbackInsightCard({ 
-  insight, 
-  showRecommendations = true, 
-  showRelatedEvents = false 
+export function FeedbackInsightCard({
+  insight,
+  showRecommendations = true,
+  showRelatedEvents = false,
 }: FeedbackInsightCardProps) {
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'pattern': return 'bg-blue-100 text-blue-700';
-      case 'performance': return 'bg-green-100 text-green-700';
-      case 'error': return 'bg-red-100 text-red-700';
-      case 'optimization': return 'bg-orange-100 text-orange-700';
-      case 'prediction': return 'bg-purple-100 text-purple-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'pattern':
+        return 'bg-blue-100 text-blue-700';
+      case 'performance':
+        return 'bg-green-100 text-green-700';
+      case 'error':
+        return 'bg-red-100 text-red-700';
+      case 'optimization':
+        return 'bg-orange-100 text-orange-700';
+      case 'prediction':
+        return 'bg-purple-100 text-purple-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
-      case 'high': return 'text-red-600';
-      case 'medium': return 'text-yellow-600';
-      case 'low': return 'text-green-600';
-      default: return 'text-gray-600';
+      case 'high':
+        return 'text-red-600';
+      case 'medium':
+        return 'text-yellow-600';
+      case 'low':
+        return 'text-green-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'pattern': return '🔍';
-      case 'performance': return '⚡';
-      case 'error': return '🚨';
-      case 'optimization': return '🔧';
-      case 'prediction': return '🔮';
-      default: return '💭';
+      case 'pattern':
+        return '🔍';
+      case 'performance':
+        return '⚡';
+      case 'error':
+        return '🚨';
+      case 'optimization':
+        return '🔧';
+      case 'prediction':
+        return '🔮';
+      default:
+        return '💭';
     }
   };
 
   const getConfidenceBar = (confidence: number) => {
     const percentage = Math.round(confidence * 100);
-    const color = confidence > 0.8 ? 'bg-green-500' : 
-                  confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500';
-    
+    const color =
+      confidence > 0.8 ? 'bg-green-500' : confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500';
+
     return (
       <div className="flex items-center space-x-2">
         <div className="w-16 h-2 bg-gray-200 rounded-full">
-          <div 
-            className={`h-2 rounded-full ${color}`}
-            style={{ width: `${percentage}%` }}
-          />
+          <div className={`h-2 rounded-full ${color}`} style={{ width: `${percentage}%` }} />
         </div>
         <span className="text-xs text-gray-600">{percentage}%</span>
       </div>
@@ -98,9 +111,7 @@ export function FeedbackInsightCard({
       </div>
 
       {/* Description */}
-      <div className="text-sm text-gray-700 mb-3">
-        {insight.description}
-      </div>
+      <div className="text-sm text-gray-700 mb-3">{insight.description}</div>
 
       {/* Recommendations */}
       {showRecommendations && insight.recommendations && insight.recommendations.length > 0 && (

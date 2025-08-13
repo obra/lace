@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { 
-  ChatTextarea, 
-  VoiceButton, 
-  SendButton, 
-  FileAttachButton 
-} from '@/components/ui';
+import { ChatTextarea, VoiceButton, SendButton, FileAttachButton } from '@/components/ui';
 import type { ChatTextareaRef } from './ChatTextarea';
 import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
 
@@ -111,7 +106,7 @@ export default function ChatInputComposer({
 
   const handleFilesSelected = (files: FileList) => {
     if (!onFilesAttached) return;
-    
+
     const attachedFiles: AttachedFile[] = Array.from(files).map((file, index) => ({
       id: `${Date.now()}-${index}`,
       file,
@@ -155,7 +150,13 @@ export default function ChatInputComposer({
         </div>
       )}
 
-      <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="relative">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+        className="relative"
+      >
         <div className="flex gap-3 items-end">
           {/* Voice Input (Mobile Only) */}
           {isMobile && showVoiceButton && onStartVoice && (
@@ -223,9 +224,9 @@ export default function ChatInputComposer({
                 <div
                   key={index}
                   className="w-1 bg-teal-600 rounded-full animate-pulse"
-                  style={{ 
+                  style={{
                     height: `${height}px`,
-                    animationDelay: `${index * 0.1}s`
+                    animationDelay: `${index * 0.1}s`,
                   }}
                 />
               ))}
@@ -234,7 +235,6 @@ export default function ChatInputComposer({
           </div>
         )}
       </form>
-
     </div>
   );
 }

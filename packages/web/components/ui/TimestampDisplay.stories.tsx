@@ -9,7 +9,8 @@ const meta: Meta<typeof TimestampDisplay> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'TimestampDisplay component for showing formatted timestamps in different formats and sizes.',
+        component:
+          'TimestampDisplay component for showing formatted timestamps in different formats and sizes.',
       },
     },
   },
@@ -181,26 +182,26 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the timestamps below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-6">
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <div className="text-lg font-semibold">Current Time</div>
           <TimestampDisplay timestamp={now} format="full" size="md" />
           <p className="text-xs text-gray-500 mt-2">Full format display</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <div className="text-lg font-semibold">5 Minutes Ago</div>
           <TimestampDisplay timestamp={fiveMinutesAgo} format="relative" size="md" />
           <p className="text-xs text-gray-500 mt-2">Relative format display</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <div className="text-lg font-semibold">1 Hour Ago</div>
           <TimestampDisplay timestamp={oneHourAgo} format="relative" size="md" />
           <p className="text-xs text-gray-500 mt-2">Relative format display</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <div className="text-lg font-semibold">1 Day Ago</div>
           <TimestampDisplay timestamp={oneDayAgo} format="relative" size="md" />
@@ -212,7 +213,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing timestamp displays with tennis commentary. Enable commentary in the toolbar and interact with the timestamps!',
+        story:
+          'Interactive demo showcasing timestamp displays with tennis commentary. Enable commentary in the toolbar and interact with the timestamps!',
       },
     },
   },

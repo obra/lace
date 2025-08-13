@@ -8,11 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import { ModelDropdown } from '@/components/config/ModelDropdown';
-import type { 
-  ProviderInfo, 
-  ModelInfo, 
-  CreateAgentRequest 
-} from '@/types/api';
+import type { ProviderInfo, ModelInfo, CreateAgentRequest } from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 
@@ -33,25 +29,41 @@ interface SessionConfigPanelProps {
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
   providers: ProviderInfo[];
-  onSessionCreate: (sessionData: { 
-    name: string; 
-    description?: string; 
+  onSessionCreate: (sessionData: {
+    name: string;
+    description?: string;
     providerInstanceId?: string;
     modelId?: string;
-    configuration?: Record<string, unknown> 
+    configuration?: Record<string, unknown>;
   }) => void;
   onSessionSelect: (session: SessionInfo) => void;
   onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
   onAgentSelect?: (agentId: string) => void;
   onAgentUpdate?: () => void | Promise<void>;
-  onSessionUpdate?: (sessionId: string, updates: Partial<SessionInfo & { configuration?: SessionConfiguration }>) => void;
+  onSessionUpdate?: (
+    sessionId: string,
+    updates: Partial<SessionInfo & { configuration?: SessionConfiguration }>
+  ) => void;
   loading?: boolean;
 }
 
 const AVAILABLE_TOOLS = [
-  'bash', 'file_read', 'file_write', 'file_edit', 'file_list', 
-  'file_find', 'url_fetch', 'ripgrep_search', 'file_insert', 'delegate',
-  'task_add', 'task_list', 'task_complete', 'task_update', 'task_add_note', 'task_view'
+  'bash',
+  'file_read',
+  'file_write',
+  'file_edit',
+  'file_list',
+  'file_find',
+  'url_fetch',
+  'ripgrep_search',
+  'file_insert',
+  'delegate',
+  'task_add',
+  'task_list',
+  'task_complete',
+  'task_update',
+  'task_add_note',
+  'task_view',
 ];
 
 const DEFAULT_CONFIG: SessionConfiguration = {
@@ -80,19 +92,19 @@ export function SessionConfigPanel({
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [showEditAgent, setShowEditAgent] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<{ 
-    threadId: string; 
-    name: string; 
+  const [editingAgent, setEditingAgent] = useState<{
+    threadId: string;
+    name: string;
     providerInstanceId: string;
     modelId: string;
   } | null>(null);
-  
+
   // Session creation state
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionDescription, setNewSessionDescription] = useState('');
   const [sessionConfig, setSessionConfig] = useState<SessionConfiguration>(DEFAULT_CONFIG);
-  
-  // Agent creation state  
+
+  // Agent creation state
   const [newAgentName, setNewAgentName] = useState('');
   const [selectedInstanceId, setSelectedInstanceId] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
@@ -100,7 +112,7 @@ export function SessionConfigPanel({
   // Environment variables helper state
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
-  
+
   // Session edit state
   const [editSessionName, setEditSessionName] = useState('');
   const [editSessionDescription, setEditSessionDescription] = useState('');
@@ -108,10 +120,9 @@ export function SessionConfigPanel({
   const [editNewEnvKey, setEditNewEnvKey] = useState('');
   const [editNewEnvValue, setEditNewEnvValue] = useState('');
 
-
   // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
-    return providers.filter((p): p is ProviderInfo & { instanceId: string } => 
+    return providers.filter((p): p is ProviderInfo & { instanceId: string } =>
       Boolean(p.configured && p.instanceId)
     );
   }, [providers]);
@@ -146,10 +157,16 @@ export function SessionConfigPanel({
         defaultConfig.workingDirectory = projectConfiguration.workingDirectory as string;
       }
       if (projectConfiguration.environmentVariables) {
-        defaultConfig.environmentVariables = projectConfiguration.environmentVariables as Record<string, string>;
+        defaultConfig.environmentVariables = projectConfiguration.environmentVariables as Record<
+          string,
+          string
+        >;
       }
       if (projectConfiguration.toolPolicies) {
-        defaultConfig.toolPolicies = projectConfiguration.toolPolicies as Record<string, 'allow' | 'require-approval' | 'deny'>;
+        defaultConfig.toolPolicies = projectConfiguration.toolPolicies as Record<
+          string,
+          'allow' | 'require-approval' | 'deny'
+        >;
       }
     }
     setSessionConfig(defaultConfig);
@@ -182,7 +199,7 @@ export function SessionConfigPanel({
 
     // Extract provider and model from sessionConfig to send at top level
     const { providerInstanceId, modelId, ...restConfig } = sessionConfig;
-    
+
     onSessionCreate({
       name: newSessionName.trim(),
       description: newSessionDescription.trim() || undefined,
@@ -219,7 +236,7 @@ export function SessionConfigPanel({
   const handleAddEnvironmentVariable = () => {
     if (!newEnvKey.trim() || !newEnvValue.trim()) return;
 
-    setSessionConfig(prev => ({
+    setSessionConfig((prev) => ({
       ...prev,
       environmentVariables: {
         ...prev.environmentVariables,
@@ -232,7 +249,7 @@ export function SessionConfigPanel({
   };
 
   const handleRemoveEnvironmentVariable = (key: string) => {
-    setSessionConfig(prev => ({
+    setSessionConfig((prev) => ({
       ...prev,
       environmentVariables: Object.fromEntries(
         Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
@@ -241,7 +258,7 @@ export function SessionConfigPanel({
   };
 
   const handleToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
-    setSessionConfig(prev => ({
+    setSessionConfig((prev) => ({
       ...prev,
       toolPolicies: {
         ...prev.toolPolicies,
@@ -253,28 +270,28 @@ export function SessionConfigPanel({
   // Handle session edit
   const handleEditSessionClick = async () => {
     if (!selectedSession) return;
-    
+
     try {
       // Load session configuration from API
       const res = await fetch(`/api/sessions/${selectedSession.id}/configuration`);
-      
+
       if (res.ok) {
         const data = await parseResponse<{ configuration: SessionConfiguration }>(res);
         setEditSessionName(selectedSession.name);
         setEditSessionDescription(''); // Session descriptions not currently stored
-        
+
         // Merge with defaults and ensure provider instance is set
         const config = {
           ...DEFAULT_CONFIG,
           ...data.configuration,
         };
-        
+
         // If no provider instance configured, use first available
         if (!config.providerInstanceId && availableProviders.length > 0) {
           config.providerInstanceId = availableProviders[0].instanceId;
           config.modelId = availableProviders[0].models[0]?.id || '';
         }
-        
+
         setEditSessionConfig(config);
         setShowEditConfig(true);
       } else {
@@ -319,7 +336,7 @@ export function SessionConfigPanel({
       // Update session name/description if changed via PATCH endpoint
       const nameChanged = editSessionName.trim() !== selectedSession.name;
       const descChanged = (editSessionDescription.trim() || undefined) !== undefined;
-      
+
       if (nameChanged || descChanged) {
         const sessionRes = await fetch(`/api/sessions/${selectedSession.id}`, {
           method: 'PATCH',
@@ -344,7 +361,7 @@ export function SessionConfigPanel({
             configuration: editSessionConfig,
           });
         }
-        
+
         setShowEditConfig(false);
         resetEditSessionForm();
       } else {
@@ -360,7 +377,7 @@ export function SessionConfigPanel({
   const handleAddEditEnvironmentVariable = () => {
     if (!editNewEnvKey.trim() || !editNewEnvValue.trim()) return;
 
-    setEditSessionConfig(prev => ({
+    setEditSessionConfig((prev) => ({
       ...prev,
       environmentVariables: {
         ...prev.environmentVariables,
@@ -373,7 +390,7 @@ export function SessionConfigPanel({
   };
 
   const handleRemoveEditEnvironmentVariable = (key: string) => {
-    setEditSessionConfig(prev => ({
+    setEditSessionConfig((prev) => ({
       ...prev,
       environmentVariables: Object.fromEntries(
         Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
@@ -381,8 +398,11 @@ export function SessionConfigPanel({
     }));
   };
 
-  const handleEditToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
-    setEditSessionConfig(prev => ({
+  const handleEditToolPolicyChange = (
+    tool: string,
+    policy: 'allow' | 'require-approval' | 'deny'
+  ) => {
+    setEditSessionConfig((prev) => ({
       ...prev,
       toolPolicies: {
         ...prev.toolPolicies,
@@ -392,7 +412,11 @@ export function SessionConfigPanel({
   };
 
   // Handle agent edit
-  const handleEditAgentClick = async (agent: { threadId: string; name: string; status: string }) => {
+  const handleEditAgentClick = async (agent: {
+    threadId: string;
+    name: string;
+    status: string;
+  }) => {
     try {
       // Fetch agent's actual configuration
       const res = await fetch(`/api/agents/${agent.threadId}`);
@@ -400,31 +424,33 @@ export function SessionConfigPanel({
         console.error('Failed to fetch agent configuration');
         return;
       }
-      
-      const data = await parseResponse<{ agent: { 
-        threadId: string; 
-        name: string; 
-        providerInstanceId?: string;
-        modelId?: string;
-      } }>(res);
-      
+
+      const data = await parseResponse<{
+        agent: {
+          threadId: string;
+          name: string;
+          providerInstanceId?: string;
+          modelId?: string;
+        };
+      }>(res);
+
       if (!data.agent) {
         console.error('No agent data in response');
         return;
       }
-      
+
       // Use agent's actual provider/model or fall back to first available
       const provider = availableProviders[0];
       if (!provider) {
         console.error('No provider instances configured');
         return;
       }
-      
+
       setEditingAgent({
         threadId: data.agent.threadId,
         name: data.agent.name,
         providerInstanceId: data.agent.providerInstanceId || provider.instanceId,
-        modelId: data.agent.modelId || provider.models[0]?.id || 'unknown'
+        modelId: data.agent.modelId || provider.models[0]?.id || 'unknown',
       });
       setShowEditAgent(true);
     } catch (error) {
@@ -470,11 +496,14 @@ export function SessionConfigPanel({
         <div className="flex items-center gap-3">
           <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold text-base-content">{(selectedProject as { name: string }).name}</h2>
-            <p className="text-sm text-base-content/60">{(selectedProject as { description: string }).description}</p>
+            <h2 className="text-xl font-semibold text-base-content">
+              {(selectedProject as { name: string }).name}
+            </h2>
+            <p className="text-sm text-base-content/60">
+              {(selectedProject as { description: string }).description}
+            </p>
           </div>
         </div>
-        
       </div>
 
       {/* Sessions List */}
@@ -495,101 +524,109 @@ export function SessionConfigPanel({
             {sessions
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .map((session) => (
-              <div
-                key={session.id}
-                className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-                  selectedSession?.id === session.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-base-300 hover:border-primary/50'
-                }`}
-                onClick={() => onSessionSelect(session)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-base-content">{session.name}</h4>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-base-content/60">
-                      <span>Created {new Date(session.createdAt).toLocaleDateString()}</span>
-                      <span>{session.agents?.length || 0} agents</span>
+                <div
+                  key={session.id}
+                  className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+                    selectedSession?.id === session.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-base-300 hover:border-primary/50'
+                  }`}
+                  onClick={() => onSessionSelect(session)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-base-content">{session.name}</h4>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-base-content/60">
+                        <span>Created {new Date(session.createdAt).toLocaleDateString()}</span>
+                        <span>{session.agents?.length || 0} agents</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      {selectedSession?.id === session.id && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSessionClick();
+                            }}
+                            className="btn btn-ghost btn-xs"
+                            title="Edit Session"
+                          >
+                            <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCreateAgent(true);
+                            }}
+                            className="btn btn-primary btn-xs"
+                            title="Launch Agent"
+                          >
+                            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="flex gap-2">
-                    {selectedSession?.id === session.id && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditSessionClick();
-                          }}
-                          className="btn btn-ghost btn-xs"
-                          title="Edit Session"
-                        >
-                          <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowCreateAgent(true);
-                          }}
-                          className="btn btn-primary btn-xs"
-                          title="Launch Agent"
-                        >
-                          <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
 
-                {/* Agents List */}
-                {selectedSession?.id === session.id && selectedSession.agents && selectedSession.agents.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-base-300">
-                    <div className="grid gap-2">
-                      {selectedSession.agents.map((agent) => (
-                        <div
-                          key={agent.threadId}
-                          className="flex items-center justify-between p-2 bg-base-50 rounded border border-base-200 cursor-pointer hover:bg-base-100 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAgentSelect?.(agent.threadId);
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-primary" />
-                            <span className="text-sm font-medium">{agent.name}</span>
-                            <span className="text-xs text-base-content/60">
-                              {agent.providerInstanceId} • {agent.modelId}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
+                  {/* Agents List */}
+                  {selectedSession?.id === session.id &&
+                    selectedSession.agents &&
+                    selectedSession.agents.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-base-300">
+                        <div className="grid gap-2">
+                          {selectedSession.agents.map((agent) => (
+                            <div
+                              key={agent.threadId}
+                              className="flex items-center justify-between p-2 bg-base-50 rounded border border-base-200 cursor-pointer hover:bg-base-100 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleEditAgentClick(agent);
+                                onAgentSelect?.(agent.threadId);
                               }}
-                              className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
-                              title="Edit Agent"
                             >
-                              <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                            </button>
-                            <span className={`badge badge-xs ${
-                              agent.status === 'idle' ? 'badge-success' :
-                              (agent.status === 'streaming' || agent.status === 'thinking' || agent.status === 'tool_execution') ? 'badge-warning' :
-                              'badge-neutral'
-                            }`}>
-                              {agent.status}
-                            </span>
-                          </div>
+                              <div className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-primary" />
+                                <span className="text-sm font-medium">{agent.name}</span>
+                                <span className="text-xs text-base-content/60">
+                                  {agent.providerInstanceId} • {agent.modelId}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditAgentClick(agent);
+                                  }}
+                                  className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
+                                  title="Edit Agent"
+                                >
+                                  <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                                </button>
+                                <span
+                                  className={`badge badge-xs ${
+                                    agent.status === 'idle'
+                                      ? 'badge-success'
+                                      : agent.status === 'streaming' ||
+                                          agent.status === 'thinking' ||
+                                          agent.status === 'tool_execution'
+                                        ? 'badge-warning'
+                                        : 'badge-neutral'
+                                  }`}
+                                >
+                                  {agent.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                      </div>
+                    )}
+                </div>
+              ))}
           </div>
         )}
-        
+
         {/* New Session Button - moved to bottom */}
         <button
           onClick={() => {
@@ -610,10 +647,7 @@ export function SessionConfigPanel({
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Create New Session</h3>
-              <button
-                onClick={() => setShowCreateSession(false)}
-                className="btn btn-ghost btn-sm"
-              >
+              <button onClick={() => setShowCreateSession(false)} className="btn btn-ghost btn-sm">
                 ✕
               </button>
             </div>
@@ -636,7 +670,7 @@ export function SessionConfigPanel({
                       autoFocus
                     />
                   </div>
-                  
+
                   <div>
                     <label className="label">
                       <span className="label-text font-medium">Description</span>
@@ -656,8 +690,10 @@ export function SessionConfigPanel({
                   providers={providers}
                   providerInstanceId={sessionConfig.providerInstanceId}
                   modelId={sessionConfig.modelId}
-                  onProviderChange={(instanceId) => setSessionConfig(prev => ({ ...prev, providerInstanceId: instanceId }))}
-                  onModelChange={(modelId) => setSessionConfig(prev => ({ ...prev, modelId }))}
+                  onProviderChange={(instanceId) =>
+                    setSessionConfig((prev) => ({ ...prev, providerInstanceId: instanceId }))
+                  }
+                  onModelChange={(modelId) => setSessionConfig((prev) => ({ ...prev, modelId }))}
                 />
 
                 {/* Working Directory */}
@@ -667,8 +703,13 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={sessionConfig.workingDirectory || (selectedProject as { workingDirectory: string }).workingDirectory}
-                    onChange={(e) => setSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
+                    value={
+                      sessionConfig.workingDirectory ||
+                      (selectedProject as { workingDirectory: string }).workingDirectory
+                    }
+                    onChange={(e) =>
+                      setSessionConfig((prev) => ({ ...prev, workingDirectory: e.target.value }))
+                    }
                     className="input input-bordered w-full"
                     placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
                   />
@@ -680,30 +721,32 @@ export function SessionConfigPanel({
                     <span className="label-text font-medium">Environment Variables</span>
                   </label>
                   <div className="space-y-2">
-                    {Object.entries(sessionConfig.environmentVariables || {}).map(([key, value]) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={key}
-                          className="input input-bordered input-sm flex-1"
-                          readOnly
-                        />
-                        <span className="text-base-content/60">=</span>
-                        <input
-                          type="text"
-                          value={value}
-                          className="input input-bordered input-sm flex-1"
-                          readOnly
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEnvironmentVariable(key)}
-                          className="btn btn-error btn-sm btn-square"
-                        >
-                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
+                    {Object.entries(sessionConfig.environmentVariables || {}).map(
+                      ([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={key}
+                            className="input input-bordered input-sm flex-1"
+                            readOnly
+                          />
+                          <span className="text-base-content/60">=</span>
+                          <input
+                            type="text"
+                            value={value}
+                            className="input input-bordered input-sm flex-1"
+                            readOnly
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEnvironmentVariable(key)}
+                            className="btn btn-error btn-sm btn-square"
+                          >
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )
+                    )}
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -739,11 +782,19 @@ export function SessionConfigPanel({
                   </label>
                   <div className="grid md:grid-cols-2 gap-3">
                     {AVAILABLE_TOOLS.map((tool) => (
-                      <div key={tool} className="flex items-center justify-between p-3 border border-base-300 rounded-lg">
+                      <div
+                        key={tool}
+                        className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                      >
                         <span className="font-medium text-sm">{tool}</span>
                         <select
                           value={sessionConfig.toolPolicies?.[tool] || 'require-approval'}
-                          onChange={(e) => handleToolPolicyChange(tool, e.target.value as 'allow' | 'require-approval' | 'deny')}
+                          onChange={(e) =>
+                            handleToolPolicyChange(
+                              tool,
+                              e.target.value as 'allow' | 'require-approval' | 'deny'
+                            )
+                          }
                           className="select select-bordered select-sm w-40"
                         >
                           <option value="allow">Allow</option>
@@ -791,10 +842,7 @@ export function SessionConfigPanel({
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Launch Agent in {selectedSession.name}</h3>
-              <button
-                onClick={() => setShowCreateAgent(false)}
-                className="btn btn-ghost btn-sm"
-              >
+              <button onClick={() => setShowCreateAgent(false)} className="btn btn-ghost btn-sm">
                 ✕
               </button>
             </div>
@@ -836,7 +884,9 @@ export function SessionConfigPanel({
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={!newAgentName.trim() || loading || !selectedInstanceId || !selectedModelId}
+                  disabled={
+                    !newAgentName.trim() || loading || !selectedInstanceId || !selectedModelId
+                  }
                 >
                   {loading ? (
                     <>
@@ -859,10 +909,7 @@ export function SessionConfigPanel({
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Edit Session: {selectedSession.name}</h3>
-              <button
-                onClick={() => setShowEditConfig(false)}
-                className="btn btn-ghost btn-sm"
-              >
+              <button onClick={() => setShowEditConfig(false)} className="btn btn-ghost btn-sm">
                 ✕
               </button>
             </div>
@@ -885,7 +932,7 @@ export function SessionConfigPanel({
                       autoFocus
                     />
                   </div>
-                  
+
                   <div>
                     <label className="label">
                       <span className="label-text font-medium">Description</span>
@@ -905,8 +952,12 @@ export function SessionConfigPanel({
                   providers={providers}
                   providerInstanceId={editSessionConfig.providerInstanceId}
                   modelId={editSessionConfig.modelId}
-                  onProviderChange={(instanceId) => setEditSessionConfig(prev => ({ ...prev, providerInstanceId: instanceId }))}
-                  onModelChange={(modelId) => setEditSessionConfig(prev => ({ ...prev, modelId }))}
+                  onProviderChange={(instanceId) =>
+                    setEditSessionConfig((prev) => ({ ...prev, providerInstanceId: instanceId }))
+                  }
+                  onModelChange={(modelId) =>
+                    setEditSessionConfig((prev) => ({ ...prev, modelId }))
+                  }
                 />
 
                 {/* Working Directory */}
@@ -916,8 +967,16 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={editSessionConfig.workingDirectory || (selectedProject as { workingDirectory: string }).workingDirectory}
-                    onChange={(e) => setEditSessionConfig(prev => ({ ...prev, workingDirectory: e.target.value }))}
+                    value={
+                      editSessionConfig.workingDirectory ||
+                      (selectedProject as { workingDirectory: string }).workingDirectory
+                    }
+                    onChange={(e) =>
+                      setEditSessionConfig((prev) => ({
+                        ...prev,
+                        workingDirectory: e.target.value,
+                      }))
+                    }
                     className="input input-bordered w-full"
                     placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
                   />
@@ -929,30 +988,32 @@ export function SessionConfigPanel({
                     <span className="label-text font-medium">Environment Variables</span>
                   </label>
                   <div className="space-y-2">
-                    {Object.entries(editSessionConfig.environmentVariables || {}).map(([key, value]) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={key}
-                          className="input input-bordered input-sm flex-1"
-                          readOnly
-                        />
-                        <span className="text-base-content/60">=</span>
-                        <input
-                          type="text"
-                          value={value}
-                          className="input input-bordered input-sm flex-1"
-                          readOnly
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEditEnvironmentVariable(key)}
-                          className="btn btn-error btn-sm btn-square"
-                        >
-                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
+                    {Object.entries(editSessionConfig.environmentVariables || {}).map(
+                      ([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={key}
+                            className="input input-bordered input-sm flex-1"
+                            readOnly
+                          />
+                          <span className="text-base-content/60">=</span>
+                          <input
+                            type="text"
+                            value={value}
+                            className="input input-bordered input-sm flex-1"
+                            readOnly
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditEnvironmentVariable(key)}
+                            className="btn btn-error btn-sm btn-square"
+                          >
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )
+                    )}
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -988,11 +1049,19 @@ export function SessionConfigPanel({
                   </label>
                   <div className="grid md:grid-cols-2 gap-3">
                     {AVAILABLE_TOOLS.map((tool) => (
-                      <div key={tool} className="flex items-center justify-between p-3 border border-base-300 rounded-lg">
+                      <div
+                        key={tool}
+                        className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                      >
                         <span className="font-medium text-sm">{tool}</span>
                         <select
                           value={editSessionConfig.toolPolicies?.[tool] || 'require-approval'}
-                          onChange={(e) => handleEditToolPolicyChange(tool, e.target.value as 'allow' | 'require-approval' | 'deny')}
+                          onChange={(e) =>
+                            handleEditToolPolicyChange(
+                              tool,
+                              e.target.value as 'allow' | 'require-approval' | 'deny'
+                            )
+                          }
                           className="select select-bordered select-sm w-40"
                         >
                           <option value="allow">Allow</option>
@@ -1040,10 +1109,7 @@ export function SessionConfigPanel({
           <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Edit Agent: {editingAgent.name}</h3>
-              <button
-                onClick={() => setShowEditAgent(false)}
-                className="btn btn-ghost btn-sm"
-              >
+              <button onClick={() => setShowEditAgent(false)} className="btn btn-ghost btn-sm">
                 ✕
               </button>
             </div>
@@ -1056,7 +1122,9 @@ export function SessionConfigPanel({
                 <input
                   type="text"
                   value={editingAgent.name}
-                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  onChange={(e) =>
+                    setEditingAgent((prev) => (prev ? { ...prev, name: e.target.value } : null))
+                  }
                   className="input input-bordered w-full"
                   placeholder="e.g., Code Reviewer"
                   required
@@ -1072,13 +1140,17 @@ export function SessionConfigPanel({
                   value={editingAgent.providerInstanceId}
                   onChange={(e) => {
                     const newInstanceId = e.target.value;
-                    const provider = providers.find(p => p.instanceId === newInstanceId);
+                    const provider = providers.find((p) => p.instanceId === newInstanceId);
                     const providerModels = provider?.models || [];
-                    setEditingAgent(prev => prev ? {
-                      ...prev,
-                      providerInstanceId: newInstanceId,
-                      modelId: providerModels[0]?.id || prev.modelId,
-                    } : null);
+                    setEditingAgent((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            providerInstanceId: newInstanceId,
+                            modelId: providerModels[0]?.id || prev.modelId,
+                          }
+                        : null
+                    );
                   }}
                   className="select select-bordered w-full"
                 >
@@ -1096,14 +1168,18 @@ export function SessionConfigPanel({
                 </label>
                 <select
                   value={editingAgent.modelId}
-                  onChange={(e) => setEditingAgent(prev => prev ? { ...prev, modelId: e.target.value } : null)}
+                  onChange={(e) =>
+                    setEditingAgent((prev) => (prev ? { ...prev, modelId: e.target.value } : null))
+                  }
                   className="select select-bordered w-full"
                 >
-                  {providers.find(p => p.instanceId === editingAgent.providerInstanceId)?.models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.displayName}
-                    </option>
-                  )) || []}
+                  {providers
+                    .find((p) => p.instanceId === editingAgent.providerInstanceId)
+                    ?.models.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.displayName}
+                      </option>
+                    )) || []}
                 </select>
               </div>
 

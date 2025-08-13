@@ -24,29 +24,35 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
 
   // Extract tab IDs from children or use provided tabs config
   const childrenArray = Children.toArray(children);
-  
+
   // Type guard for elements with data-tab prop
-  const isElementWithDataTab = (node: React.ReactNode): node is React.ReactElement<{ 'data-tab': string }> => {
-    return isValidElement(node) && 
-           typeof node.props === 'object' && 
-           node.props !== null && 
-           'data-tab' in node.props &&
-           typeof (node.props as Record<string, unknown>)['data-tab'] === 'string';
+  const isElementWithDataTab = (
+    node: React.ReactNode
+  ): node is React.ReactElement<{ 'data-tab': string }> => {
+    return (
+      isValidElement(node) &&
+      typeof node.props === 'object' &&
+      node.props !== null &&
+      'data-tab' in node.props &&
+      typeof (node.props as Record<string, unknown>)['data-tab'] === 'string'
+    );
   };
-  
-  const tabIds = tabs 
-    ? tabs.map(tab => tab.id)
+
+  const tabIds = tabs
+    ? tabs.map((tab) => tab.id)
     : childrenArray
         .filter(isElementWithDataTab)
-        .map(child => child.props['data-tab'])
+        .map((child) => child.props['data-tab'])
         .filter((id): id is string => typeof id === 'string' && Boolean(id));
 
   // Generate tab labels if not provided
-  const tabConfigs: TabConfig[] = tabs || tabIds.map(id => ({
-    id,
-    label: id.charAt(0).toUpperCase() + id.slice(1),
-    icon: undefined,
-  }));
+  const tabConfigs: TabConfig[] =
+    tabs ||
+    tabIds.map((id) => ({
+      id,
+      label: id.charAt(0).toUpperCase() + id.slice(1),
+      icon: undefined,
+    }));
 
   const handleTabClick = (tabId: string) => {
     setActiveTab(tabId);
@@ -80,7 +86,7 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
   // Find active content
   const activeContent = childrenArray
     .filter(isElementWithDataTab)
-    .find(child => child.props['data-tab'] === activeTab);
+    .find((child) => child.props['data-tab'] === activeTab);
 
   return (
     <div className="flex flex-col h-full">
@@ -107,7 +113,9 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
                 onClick={() => handleTabClick(tab.id)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
               >
-                {tab.icon && <span className="mr-2 inline-flex items-center text-accent/90">{tab.icon}</span>}
+                {tab.icon && (
+                  <span className="mr-2 inline-flex items-center text-accent/90">{tab.icon}</span>
+                )}
                 {tab.label}
               </button>
             );

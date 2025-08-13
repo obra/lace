@@ -18,7 +18,7 @@ describe('SettingsPanel', () => {
         <div>Panel content</div>
       </SettingsPanel>
     );
-    
+
     expect(screen.getByText('General Settings')).toBeInTheDocument();
     expect(screen.getByText('Panel content')).toBeInTheDocument();
   });
@@ -29,7 +29,7 @@ describe('SettingsPanel', () => {
         <div>Panel content</div>
       </SettingsPanel>
     );
-    
+
     expect(screen.getByText('Panel content')).toBeInTheDocument();
     // Should not have a title element
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('SettingsPanel', () => {
         <div>Panel content</div>
       </SettingsPanel>
     );
-    
+
     expect(screen.getByText('General Settings')).toBeInTheDocument();
     expect(screen.getByText('Configure basic application settings')).toBeInTheDocument();
     expect(screen.getByText('Panel content')).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('SettingsPanel', () => {
         <div>Panel content</div>
       </SettingsPanel>
     );
-    
+
     expect(container.firstChild).toHaveClass('custom-panel');
   });
 
@@ -65,7 +65,7 @@ describe('SettingsPanel', () => {
         <button>Action button</button>
       </SettingsPanel>
     );
-    
+
     expect(screen.getByText('Multi-content Panel')).toBeInTheDocument();
     expect(screen.getByText('First content')).toBeInTheDocument();
     expect(screen.getByText('Second content')).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe('SettingsPanel', () => {
         <div>Content</div>
       </SettingsPanel>
     );
-    
+
     const heading = screen.getByRole('heading', { level: 3 });
     expect(heading).toHaveTextContent('Settings Panel');
   });
@@ -89,7 +89,7 @@ describe('SettingsPanel', () => {
         <div>Content</div>
       </SettingsPanel>
     );
-    
+
     expect(screen.getByText('⚙️')).toBeInTheDocument();
     expect(screen.getByText('Settings Panel')).toBeInTheDocument();
   });

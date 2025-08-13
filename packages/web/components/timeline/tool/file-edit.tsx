@@ -7,7 +7,10 @@ import React from 'react';
 import { faFileEdit, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileDiffViewer from '@/components/files/FileDiffViewer';
-import { createFileDiffFromText, detectLanguageFromPath } from '@/components/files/FileDiffViewer.utils';
+import {
+  createFileDiffFromText,
+  detectLanguageFromPath,
+} from '@/components/files/FileDiffViewer.utils';
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { FileEditDiffContext } from '@/types/core';
@@ -20,13 +23,13 @@ export const fileEditRenderer: ToolRenderer = {
   getSummary: (args: unknown): string => {
     if (typeof args === 'object' && args !== null) {
       const argsObj = args as { path?: unknown; edits?: unknown[] };
-      
+
       // Get the file path
       const path = typeof argsObj.path === 'string' ? argsObj.path : undefined;
-      
+
       // Count the number of edits
       const editCount = Array.isArray(argsObj.edits) ? argsObj.edits.length : 1;
-      
+
       if (path && editCount > 1) {
         return `Apply ${editCount} edits to ${path}`;
       } else if (path) {
@@ -50,41 +53,46 @@ export const fileEditRenderer: ToolRenderer = {
       );
     }
 
-    const content = result.content
-      .map(block => block.text || '')
-      .join('');
+    const content = result.content.map((block) => block.text || '').join('');
 
     const isError = fileEditRenderer.isError!(result);
 
     if (isError) {
       // Check for enhanced validation error metadata
-      const validationError = result.metadata?.validation_error as {
-        type?: string;
-        edit_index?: number;
-        total_edits?: number;
-        expected_occurrences?: number;
-        actual_occurrences?: number;
-        match_locations?: Array<{
-          line_number: number;
-          column_start: number;
-          line_content: string;
-        }>;
-        similar_content?: Array<{
-          line_number: number;
-          content: string;
-          similarity_score: number;
-        }>;
-      } | undefined;
+      const validationError = result.metadata?.validation_error as
+        | {
+            type?: string;
+            edit_index?: number;
+            total_edits?: number;
+            expected_occurrences?: number;
+            actual_occurrences?: number;
+            match_locations?: Array<{
+              line_number: number;
+              column_start: number;
+              line_content: string;
+            }>;
+            similar_content?: Array<{
+              line_number: number;
+              content: string;
+              similarity_score: number;
+            }>;
+          }
+        | undefined;
 
       return (
         <div className="bg-error/5 border border-error/20 rounded-lg">
           <div className="px-3 py-2 border-b border-error/20 bg-error/10">
             <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4 text-error flex-shrink-0" />
+              <FontAwesomeIcon
+                icon={faExclamationTriangle}
+                className="w-4 h-4 text-error flex-shrink-0"
+              />
               <span className="text-error font-medium text-sm">
-                {validationError?.type === 'WRONG_COUNT' ? 'Occurrence Count Mismatch' :
-                 validationError?.type === 'NO_MATCH' ? 'Text Not Found' :
-                 'Edit Failed'}
+                {validationError?.type === 'WRONG_COUNT'
+                  ? 'Occurrence Count Mismatch'
+                  : validationError?.type === 'NO_MATCH'
+                    ? 'Text Not Found'
+                    : 'Edit Failed'}
               </span>
               {validationError?.edit_index !== undefined && (
                 <span className="text-error/70 text-xs">
@@ -97,7 +105,7 @@ export const fileEditRenderer: ToolRenderer = {
             <div className="text-error/80 text-sm font-mono whitespace-pre-wrap break-words">
               {content}
             </div>
-            
+
             {/* Show match locations for WRONG_COUNT errors */}
             {validationError?.match_locations && validationError.match_locations.length > 0 && (
               <div className="bg-error/5 rounded border border-error/10 p-3">
@@ -105,13 +113,14 @@ export const fileEditRenderer: ToolRenderer = {
                 <div className="space-y-1 text-xs font-mono">
                   {validationError.match_locations.map((loc, i) => (
                     <div key={i} className="text-error/80">
-                      <span className="text-error/60">Line {loc.line_number}:</span> {loc.line_content}
+                      <span className="text-error/60">Line {loc.line_number}:</span>{' '}
+                      {loc.line_content}
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            
+
             {/* Show similar content for NO_MATCH errors */}
             {validationError?.similar_content && validationError.similar_content.length > 0 && (
               <div className="bg-warning/5 rounded border border-warning/10 p-3">
@@ -121,7 +130,8 @@ export const fileEditRenderer: ToolRenderer = {
                     <div key={i} className="text-warning/80">
                       <span className="text-warning/60">
                         Line {sim.line_number} ({Math.round(sim.similarity_score * 100)}% similar):
-                      </span> {sim.content}
+                      </span>{' '}
+                      {sim.content}
                     </div>
                   ))}
                 </div>
@@ -133,23 +143,25 @@ export const fileEditRenderer: ToolRenderer = {
     }
 
     // Check if we have the enhanced metadata from the tool
-    const resultMetadata = result.metadata as {
-      diff?: FileEditDiffContext;
-      path?: string;
-      edits_applied?: Array<{
-        old_text: string;
-        new_text: string;
-        occurrences_replaced: number;
-      }>;
-      total_replacements?: number;
-      dry_run?: boolean;
-    } | undefined;
+    const resultMetadata = result.metadata as
+      | {
+          diff?: FileEditDiffContext;
+          path?: string;
+          edits_applied?: Array<{
+            old_text: string;
+            new_text: string;
+            occurrences_replaced: number;
+          }>;
+          total_replacements?: number;
+          dry_run?: boolean;
+        }
+      | undefined;
 
     // If we have the enhanced diff context, use it
     if (resultMetadata?.diff) {
       const { diff, path } = resultMetadata;
       const language = path ? detectLanguageFromPath(path) : undefined;
-      
+
       // Create a FileDiff with the context-aware content
       const fileDiff = createFileDiffFromText(
         diff.oldContent,
@@ -157,19 +169,19 @@ export const fileEditRenderer: ToolRenderer = {
         path || 'file',
         language
       );
-      
+
       // Adjust line numbers only for localized diffs (single edits with context)
       // For full file diffs (multi-edit), startLine is 1 and no adjustment needed
       if (diff.startLine > 1 && diff.beforeContext && fileDiff.chunks[0]) {
         const chunk = fileDiff.chunks[0];
         chunk.oldStart = diff.startLine;
         chunk.newStart = diff.startLine;
-        
+
         // Update line numbers for all lines
         let oldLineNum = diff.startLine;
         let newLineNum = diff.startLine;
-        
-        chunk.lines.forEach(line => {
+
+        chunk.lines.forEach((line) => {
           if (line.type === 'removed') {
             line.oldLineNumber = oldLineNum++;
           } else if (line.type === 'added') {
@@ -180,11 +192,10 @@ export const fileEditRenderer: ToolRenderer = {
           }
         });
       }
-      
-      
+
       // Show the diff with smart context collapsing
       const isMultiEdit = resultMetadata.edits_applied && resultMetadata.edits_applied.length > 1;
-      
+
       return (
         <div className="bg-base-100/50">
           <FileDiffViewer
@@ -211,9 +222,7 @@ export const fileEditRenderer: ToolRenderer = {
             </div>
           </div>
           <div className="p-3">
-            <div className="text-info/80 text-sm">
-              {content}
-            </div>
+            <div className="text-info/80 text-sm">{content}</div>
             {editCount > 0 && (
               <div className="mt-2 text-xs text-info/70">
                 Would apply {editCount} edit{editCount === 1 ? '' : 's'}
@@ -223,11 +232,11 @@ export const fileEditRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     // Success message with edit details
     const editCount = resultMetadata?.edits_applied?.length || 0;
     const totalReplacements = resultMetadata?.total_replacements || 0;
-    
+
     return (
       <div className="bg-success/5 border border-success/20 rounded-lg">
         <div className="px-3 py-2 border-b border-success/20 bg-success/10">
@@ -237,24 +246,33 @@ export const fileEditRenderer: ToolRenderer = {
           </div>
         </div>
         <div className="p-3">
-          <div className="text-success/80 text-sm">
-            {content}
-          </div>
+          <div className="text-success/80 text-sm">{content}</div>
           {editCount > 0 && (
             <div className="mt-2 space-y-1">
               <div className="text-xs text-success/70">
                 Applied {editCount} edit{editCount === 1 ? '' : 's'}
-                {totalReplacements > 0 && ` with ${totalReplacements} total replacement${totalReplacements === 1 ? '' : 's'}`}
+                {totalReplacements > 0 &&
+                  ` with ${totalReplacements} total replacement${totalReplacements === 1 ? '' : 's'}`}
               </div>
               {resultMetadata?.edits_applied && resultMetadata.edits_applied.length <= 3 && (
                 <div className="space-y-1">
                   {resultMetadata.edits_applied.map((edit, i) => (
-                    <div key={i} className="text-xs font-mono text-success/60 bg-success/5 rounded p-2">
-                      <span className="text-success/50">Replace:</span> {edit.old_text.substring(0, 50)}{edit.old_text.length > 50 ? '...' : ''}
+                    <div
+                      key={i}
+                      className="text-xs font-mono text-success/60 bg-success/5 rounded p-2"
+                    >
+                      <span className="text-success/50">Replace:</span>{' '}
+                      {edit.old_text.substring(0, 50)}
+                      {edit.old_text.length > 50 ? '...' : ''}
                       <br />
-                      <span className="text-success/50">With:</span> {edit.new_text.substring(0, 50)}{edit.new_text.length > 50 ? '...' : ''}
+                      <span className="text-success/50">With:</span>{' '}
+                      {edit.new_text.substring(0, 50)}
+                      {edit.new_text.length > 50 ? '...' : ''}
                       {edit.occurrences_replaced > 1 && (
-                        <span className="text-success/40"> ({edit.occurrences_replaced} occurrences)</span>
+                        <span className="text-success/40">
+                          {' '}
+                          ({edit.occurrences_replaced} occurrences)
+                        </span>
                       )}
                     </div>
                   ))}

@@ -1,7 +1,13 @@
 // ABOUTME: Storybook story for SwipeableCard.stories.tsx
 import type { Meta, StoryObj, StoryContext } from '@storybook/react';
 import React, { useState } from 'react';
-import { SwipeableCard, SwipeableTimelineMessage, PullToRefresh, FloatingActionButton, LongPress } from './SwipeableCard';
+import {
+  SwipeableCard,
+  SwipeableTimelineMessage,
+  PullToRefresh,
+  FloatingActionButton,
+  LongPress,
+} from './SwipeableCard';
 
 const meta: Meta<typeof SwipeableCard> = {
   title: 'Molecules/SwipeableCard',
@@ -90,7 +96,7 @@ A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Interactive wrapper component  
+// Interactive wrapper component
 interface SwipeableCardDemoProps {
   swipeThreshold?: number;
   [key: string]: unknown;
@@ -102,17 +108,17 @@ const SwipeableCardDemo = ({ swipeThreshold = 100, ...props }: SwipeableCardDemo
 
   const handleSwipeLeft = () => {
     setLastAction('Swiped Left (Delete)');
-    setActionCount(prev => prev + 1);
+    setActionCount((prev) => prev + 1);
   };
 
   const handleSwipeRight = () => {
     setLastAction('Swiped Right (Reply)');
-    setActionCount(prev => prev + 1);
+    setActionCount((prev) => prev + 1);
   };
 
   const handleTap = () => {
     setLastAction('Tapped (Open)');
-    setActionCount(prev => prev + 1);
+    setActionCount((prev) => prev + 1);
   };
 
   return (
@@ -145,18 +151,18 @@ const SwipeableCardDemo = ({ swipeThreshold = 100, ...props }: SwipeableCardDemo
           </div>
           <div className="text-xs text-base-content/60">{actionCount} actions</div>
         </div>
-        
+
         <div className="mt-3 text-sm text-base-content">
           Hey there! This is a swipeable card. Try swiping left or right to see the actions!
         </div>
-        
+
         {lastAction && (
           <div className="mt-3 text-xs text-success bg-success/10 rounded-lg p-2">
             Last Action: {lastAction}
           </div>
         )}
       </SwipeableCard>
-      
+
       <div className="text-center text-xs text-base-content/60 space-y-1">
         <div>← Swipe left to delete</div>
         <div>→ Swipe right to reply</div>
@@ -175,7 +181,8 @@ export const HighThreshold: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Swipeable card with higher swipe threshold (150px) requiring more gesture distance.',
+        story:
+          'Swipeable card with higher swipe threshold (150px) requiring more gesture distance.',
       },
     },
   },
@@ -201,7 +208,7 @@ export const TimelineMessage: Story = {
     ]);
 
     const handleDelete = (id: number) => {
-      setMessages(prev => prev.filter(msg => msg.id !== id));
+      setMessages((prev) => prev.filter((msg) => msg.id !== id));
     };
 
     const handleReply = (id: number) => {
@@ -236,7 +243,7 @@ export const TimelineMessage: Story = {
             </div>
           </SwipeableTimelineMessage>
         ))}
-        
+
         <div className="text-center text-xs text-base-content/60 space-y-1 mt-4">
           <div>← Swipe left to delete</div>
           <div>→ Swipe right to reply</div>
@@ -248,7 +255,8 @@ export const TimelineMessage: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Specialized swipeable cards for timeline messages with delete, reply, and bookmark actions.',
+        story:
+          'Specialized swipeable cards for timeline messages with delete, reply, and bookmark actions.',
       },
     },
   },
@@ -256,16 +264,14 @@ export const TimelineMessage: Story = {
 
 export const PullToRefreshDemo: Story = {
   render: () => {
-    const [items, setItems] = useState([
-      'Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5'
-    ]);
+    const [items, setItems] = useState(['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5']);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const handleRefresh = async () => {
       setIsRefreshing(true);
       // Simulate refresh delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setItems(prev => [`New Item ${Date.now()}`, ...prev]);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setItems((prev) => [`New Item ${Date.now()}`, ...prev]);
       setIsRefreshing(false);
     };
 
@@ -330,7 +336,7 @@ export const FloatingActionButtonDemo: Story = {
             )}
           </div>
         </div>
-        
+
         <FloatingActionButton
           icon={<span>➕</span>}
           onClick={handleClick}
@@ -354,15 +360,13 @@ export const LongPressDemo: Story = {
     const [longPressCount, setLongPressCount] = useState(0);
 
     const handleLongPress = () => {
-      setLongPressCount(prev => prev + 1);
+      setLongPressCount((prev) => prev + 1);
     };
 
     return (
       <div className="w-full max-w-md space-y-4">
-        <div className="text-center text-sm font-medium text-base-content/60">
-          Long Press Demo
-        </div>
-        
+        <div className="text-center text-sm font-medium text-base-content/60">Long Press Demo</div>
+
         <LongPress
           onLongPress={handleLongPress}
           duration={1000}
@@ -374,7 +378,7 @@ export const LongPressDemo: Story = {
             Long press count: {longPressCount}
           </div>
         </LongPress>
-        
+
         <div className="text-center text-xs text-base-content/60">
           Press and hold the card above to trigger the long press action
         </div>
@@ -396,46 +400,84 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Swipeable Card Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then swipe, tap, and interact with the cards!
+          Enable tennis commentary in the toolbar above, then swipe, tap, and interact with the
+          cards!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Swipeable Card</h4>
           <SwipeableCardDemo />
         </div>
-        
+
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Long Press</h4>
-          {LongPressDemo.render ? LongPressDemo.render({ children: <div>Long Press Demo</div>, ...LongPressDemo.args }, {} as any) : <div>Long Press Demo</div>}
+          {LongPressDemo.render ? (
+            LongPressDemo.render(
+              { children: <div>Long Press Demo</div>, ...LongPressDemo.args },
+              {} as any
+            )
+          ) : (
+            <div>Long Press Demo</div>
+          )}
         </div>
-        
+
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Floating Action Button</h4>
-          {FloatingActionButtonDemo.render ? FloatingActionButtonDemo.render({ children: <div>Floating Action Button Demo</div>, ...FloatingActionButtonDemo.args }, {} as any) : <div>Floating Action Button Demo</div>}
+          {FloatingActionButtonDemo.render ? (
+            FloatingActionButtonDemo.render(
+              {
+                children: <div>Floating Action Button Demo</div>,
+                ...FloatingActionButtonDemo.args,
+              },
+              {} as any
+            )
+          ) : (
+            <div>Floating Action Button Demo</div>
+          )}
         </div>
-        
+
         <div className="cursor-pointer">
           <h4 className="font-medium mb-3">Pull to Refresh</h4>
-          {PullToRefreshDemo.render ? PullToRefreshDemo.render({ children: <div>Pull to Refresh Demo</div>, ...PullToRefreshDemo.args }, {} as any) : <div>Pull to Refresh Demo</div>}
+          {PullToRefreshDemo.render ? (
+            PullToRefreshDemo.render(
+              { children: <div>Pull to Refresh Demo</div>, ...PullToRefreshDemo.args },
+              {} as any
+            )
+          ) : (
+            <div>Pull to Refresh Demo</div>
+          )}
         </div>
       </div>
-      
+
       <div className="text-sm text-gray-600 space-y-1">
-        <p>• <strong>Swipe left/right</strong> on cards to trigger actions</p>
-        <p>• <strong>Tap cards</strong> to open them</p>
-        <p>• <strong>Long press</strong> the card to trigger hold action</p>
-        <p>• <strong>Click and drag</strong> the floating action button</p>
-        <p>• <strong>Pull down</strong> to refresh content</p>
-        <p>• <strong>Hover elements</strong> for tennis commentary feedback!</p>
+        <p>
+          • <strong>Swipe left/right</strong> on cards to trigger actions
+        </p>
+        <p>
+          • <strong>Tap cards</strong> to open them
+        </p>
+        <p>
+          • <strong>Long press</strong> the card to trigger hold action
+        </p>
+        <p>
+          • <strong>Click and drag</strong> the floating action button
+        </p>
+        <p>
+          • <strong>Pull down</strong> to refresh content
+        </p>
+        <p>
+          • <strong>Hover elements</strong> for tennis commentary feedback!
+        </p>
       </div>
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing swipeable cards with tennis commentary. Enable commentary in the toolbar and interact with the cards!',
+        story:
+          'Interactive demo showcasing swipeable cards with tennis commentary. Enable commentary in the toolbar and interact with the cards!',
       },
     },
   },

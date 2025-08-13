@@ -195,20 +195,32 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then explore the complete Lace interface!
         </p>
       </div>
-      
+
       <div className="h-96 border border-base-300 rounded-lg overflow-hidden">
         <LaceApp />
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">LaceApp Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Complete Interface</strong> - Full chat application with all features</li>
-          <li>• <strong>Voice Recognition</strong> - Speech-to-text input capabilities</li>
-          <li>• <strong>File Handling</strong> - Drag and drop file attachments</li>
-          <li>• <strong>Real-time Streaming</strong> - Live AI response streaming</li>
-          <li>• <strong>Task Management</strong> - Integrated task board functionality</li>
-          <li>• <strong>Responsive Design</strong> - Desktop and mobile layouts</li>
+          <li>
+            • <strong>Complete Interface</strong> - Full chat application with all features
+          </li>
+          <li>
+            • <strong>Voice Recognition</strong> - Speech-to-text input capabilities
+          </li>
+          <li>
+            • <strong>File Handling</strong> - Drag and drop file attachments
+          </li>
+          <li>
+            • <strong>Real-time Streaming</strong> - Live AI response streaming
+          </li>
+          <li>
+            • <strong>Task Management</strong> - Integrated task board functionality
+          </li>
+          <li>
+            • <strong>Responsive Design</strong> - Desktop and mobile layouts
+          </li>
         </ul>
       </div>
     </div>
@@ -216,7 +228,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing the complete LaceApp with tennis commentary. Enable commentary in the toolbar and explore all features!',
+        story:
+          'Interactive demo showcasing the complete LaceApp with tennis commentary. Enable commentary in the toolbar and explore all features!',
       },
     },
   },

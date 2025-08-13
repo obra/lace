@@ -53,7 +53,7 @@ export function AnimatedLaceApp({
   initialTimelines = [],
   initialCurrentTimeline,
   initialTasks = [],
-  initialRecentFiles = []
+  initialRecentFiles = [],
 }: AnimatedLaceAppProps = {}) {
   // UI State
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -87,7 +87,7 @@ export function AnimatedLaceApp({
   // Data State
   const [currentProject, setCurrentProject] = useState<Project>(
     initialCurrentProject || {
-      id: "1",
+      id: '1',
       name: 'AI Research',
       description: 'AI Research Project',
       workingDirectory: '/projects/ai-research',
@@ -308,8 +308,8 @@ export function AnimatedLaceApp({
   };
 
   const handleTaskCreate = (newTask: Omit<Task, 'id'>) => {
-    const task = { 
-      ...newTask, 
+    const task = {
+      ...newTask,
       id: `animated-task-${Date.now()}`,
     };
     addSystemMessage(`New task created: "${task.title}"`);
@@ -365,12 +365,12 @@ export function AnimatedLaceApp({
                     onClose={() => setShowMobileNav(false)}
                     onSettingsClick={onOpenSettings}
                   >
-                <div className="p-4">
-                  <h2 className="text-lg font-semibold mb-4">Demo Content</h2>
-                  <p className="text-sm text-base-content/70">
-                    This is a demo version of the mobile sidebar.
-                  </p>
-                </div>
+                    <div className="p-4">
+                      <h2 className="text-lg font-semibold mb-4">Demo Content</h2>
+                      <p className="text-sm text-base-content/70">
+                        This is a demo version of the mobile sidebar.
+                      </p>
+                    </div>
                   </MobileSidebar>
                 )}
               </SettingsContainer>
@@ -393,23 +393,17 @@ export function AnimatedLaceApp({
               onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
               onSettingsClick={onOpenSettings}
             >
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">Demo Sidebar</h2>
-            <p className="text-sm text-base-content/70 mb-4">
-              This is a demo version of the desktop sidebar.
-            </p>
-            <div className="space-y-2">
-              <div className="p-2 rounded bg-base-200">
-                Project: {currentProject.name}
+              <div className="p-4">
+                <h2 className="text-lg font-semibold mb-4">Demo Sidebar</h2>
+                <p className="text-sm text-base-content/70 mb-4">
+                  This is a demo version of the desktop sidebar.
+                </p>
+                <div className="space-y-2">
+                  <div className="p-2 rounded bg-base-200">Project: {currentProject.name}</div>
+                  <div className="p-2 rounded bg-base-200">Timeline: {currentTimeline.name}</div>
+                  <div className="p-2 rounded bg-base-200">Tasks: {activeTasks.length}</div>
+                </div>
               </div>
-              <div className="p-2 rounded bg-base-200">
-                Timeline: {currentTimeline.name}
-              </div>
-              <div className="p-2 rounded bg-base-200">
-                Tasks: {activeTasks.length}
-              </div>
-            </div>
-          </div>
             </Sidebar>
           )}
         </SettingsContainer>

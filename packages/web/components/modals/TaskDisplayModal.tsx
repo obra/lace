@@ -5,15 +5,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faSave, 
-  faUser, 
-  faFlag, 
-  faClipboard, 
-  faClock, 
+import {
+  faSave,
+  faUser,
+  faFlag,
+  faClipboard,
+  faClock,
   faEdit,
   faComment,
-  faPlus
+  faPlus,
 } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import type { AgentInfo } from '@/types/core';
@@ -75,11 +75,14 @@ export function TaskDisplayModal({
     }
   }, [task]);
 
-  const handleInputChange = (field: keyof TaskEditData, value: string | TaskPriority | Task['status'] | AssigneeId) => {
-    setEditData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof TaskEditData,
+    value: string | TaskPriority | Task['status'] | AssigneeId
+  ) => {
+    setEditData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -177,15 +180,15 @@ export function TaskDisplayModal({
   const getAssigneeName = (assigneeId?: AssigneeId) => {
     if (!assigneeId) return 'Unassigned';
     if (assigneeId === 'human') return 'Human';
-    
-    const agent = agents.find(a => a.threadId === assigneeId);
+
+    const agent = agents.find((a) => a.threadId === assigneeId);
     return agent ? `${agent.name} (${agent.modelId})` : assigneeId;
   };
 
   const getAuthorName = (author: string) => {
     if (author === 'human') return 'Human';
-    
-    const agent = agents.find(a => a.threadId === author);
+
+    const agent = agents.find((a) => a.threadId === author);
     return agent ? `${agent.name} (${agent.modelId})` : author;
   };
 
@@ -194,10 +197,10 @@ export function TaskDisplayModal({
   }
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
-      title={isEditing ? 'Edit Task' : 'Task Details'} 
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? 'Edit Task' : 'Task Details'}
       size="lg"
     >
       <div className="space-y-6">
@@ -214,14 +217,12 @@ export function TaskDisplayModal({
                   placeholder="Task title"
                   disabled={loading}
                 />
-                {errors.title && (
-                  <div className="text-error text-sm mt-1">{errors.title}</div>
-                )}
+                {errors.title && <div className="text-error text-sm mt-1">{errors.title}</div>}
               </div>
             ) : (
               <h2 className="text-xl font-semibold text-base-content">{task.title}</h2>
             )}
-            
+
             <div className="flex items-center gap-4 mt-2 text-sm text-base-content/60">
               <span>Task #{task.id}</span>
               <span>Created {formatDate(task.createdAt)}</span>
@@ -283,9 +284,9 @@ export function TaskDisplayModal({
               </select>
             ) : (
               <div className="mt-1">
-                <FontAwesomeIcon 
-                  icon={faFlag} 
-                  className={`w-4 h-4 ${getPriorityColor(task.priority)}`} 
+                <FontAwesomeIcon
+                  icon={faFlag}
+                  className={`w-4 h-4 ${getPriorityColor(task.priority)}`}
                 />
                 <span className="ml-2 capitalize">{task.priority}</span>
               </div>
@@ -313,9 +314,7 @@ export function TaskDisplayModal({
                 ))}
               </select>
             ) : (
-              <div className="mt-1 text-base-content">
-                {getAssigneeName(task.assignedTo)}
-              </div>
+              <div className="mt-1 text-base-content">{getAssigneeName(task.assignedTo)}</div>
             )}
           </div>
         </div>
@@ -335,7 +334,9 @@ export function TaskDisplayModal({
               />
             ) : (
               <div className="mt-1 text-base-content whitespace-pre-wrap">
-                {task.description || <span className="text-base-content/50 italic">No description</span>}
+                {task.description || (
+                  <span className="text-base-content/50 italic">No description</span>
+                )}
               </div>
             )}
           </div>
@@ -357,9 +358,7 @@ export function TaskDisplayModal({
                 rows={4}
                 disabled={loading}
               />
-              {errors.prompt && (
-                <div className="text-error text-sm mt-1">{errors.prompt}</div>
-              )}
+              {errors.prompt && <div className="text-error text-sm mt-1">{errors.prompt}</div>}
             </div>
           ) : (
             <div className="mt-1 bg-base-200 p-3 rounded-lg text-base-content whitespace-pre-wrap">
@@ -423,9 +422,7 @@ export function TaskDisplayModal({
           {/* Notes List */}
           <div className="space-y-3 max-h-60 overflow-y-auto">
             {task.notes.length === 0 ? (
-              <div className="text-center text-base-content/50 py-4">
-                No notes yet
-              </div>
+              <div className="text-center text-base-content/50 py-4">No notes yet</div>
             ) : (
               task.notes.map((note) => (
                 <div key={note.id} className="bg-base-100 border border-base-300 rounded-lg p-3">
@@ -435,9 +432,7 @@ export function TaskDisplayModal({
                     <span>•</span>
                     <span>{getAuthorName(note.author)}</span>
                   </div>
-                  <div className="text-base-content whitespace-pre-wrap">
-                    {note.content}
-                  </div>
+                  <div className="text-base-content whitespace-pre-wrap">{note.content}</div>
                 </div>
               ))
             )}
@@ -448,18 +443,10 @@ export function TaskDisplayModal({
         <div className="flex gap-3 justify-end pt-4 border-t border-base-300">
           {isEditing ? (
             <>
-              <button
-                onClick={handleCancel}
-                className="btn btn-ghost"
-                disabled={loading}
-              >
+              <button onClick={handleCancel} className="btn btn-ghost" disabled={loading}>
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                className="btn btn-primary"
-                disabled={loading}
-              >
+              <button onClick={handleSave} className="btn btn-primary" disabled={loading}>
                 {loading ? (
                   <>
                     <span className="loading loading-spinner loading-sm"></span>
@@ -474,10 +461,7 @@ export function TaskDisplayModal({
               </button>
             </>
           ) : (
-            <button
-              onClick={onClose}
-              className="btn btn-ghost"
-            >
+            <button onClick={onClose} className="btn btn-ghost">
               Close
             </button>
           )}

@@ -10,7 +10,8 @@ const meta: Meta<typeof FileAttachButton> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'FileAttachButton component for file upload functionality with different sizes, variants, and file type restrictions.',
+        component:
+          'FileAttachButton component for file upload functionality with different sizes, variants, and file type restrictions.',
       },
     },
   },
@@ -55,7 +56,10 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     onFilesSelected: (files: FileList) => {
-      console.log('Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -73,7 +77,10 @@ export const SmallSize: Story = {
   args: {
     size: 'sm',
     onFilesSelected: (files: FileList) => {
-      console.log('Small button - Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Small button - Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -82,7 +89,10 @@ export const MediumSize: Story = {
   args: {
     size: 'md',
     onFilesSelected: (files: FileList) => {
-      console.log('Medium button - Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Medium button - Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -91,7 +101,10 @@ export const LargeSize: Story = {
   args: {
     size: 'lg',
     onFilesSelected: (files: FileList) => {
-      console.log('Large button - Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Large button - Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -100,7 +113,10 @@ export const PrimaryVariant: Story = {
   args: {
     variant: 'primary',
     onFilesSelected: (files: FileList) => {
-      console.log('Primary variant - Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Primary variant - Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -109,7 +125,10 @@ export const GhostVariant: Story = {
   args: {
     variant: 'ghost',
     onFilesSelected: (files: FileList) => {
-      console.log('Ghost variant - Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Ghost variant - Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -118,7 +137,10 @@ export const OutlineVariant: Story = {
   args: {
     variant: 'outline',
     onFilesSelected: (files: FileList) => {
-      console.log('Outline variant - Files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Outline variant - Files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
 };
@@ -127,7 +149,10 @@ export const SingleFile: Story = {
   args: {
     maxFiles: 1,
     onFilesSelected: (files: FileList) => {
-      console.log('Single file selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Single file selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
   parameters: {
@@ -144,7 +169,10 @@ export const ImagesOnly: Story = {
     acceptedTypes: ['image/*'],
     title: 'Attach images only',
     onFilesSelected: (files: FileList) => {
-      console.log('Image files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Image files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
   parameters: {
@@ -161,7 +189,10 @@ export const DocumentsOnly: Story = {
     acceptedTypes: ['.pdf', '.doc', '.docx', '.txt', '.md'],
     title: 'Attach documents only',
     onFilesSelected: (files: FileList) => {
-      console.log('Document files selected:', Array.from(files).map(f => f.name));
+      console.log(
+        'Document files selected:',
+        Array.from(files).map((f) => f.name)
+      );
     },
   },
   parameters: {
@@ -177,22 +208,22 @@ export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-6">
       <div className="text-center">
-        <FileAttachButton 
-          size="sm" 
+        <FileAttachButton
+          size="sm"
           onFilesSelected={(files) => console.log('Small button')} // Small button
         />
         <p className="text-xs text-gray-500 mt-2">SM</p>
       </div>
       <div className="text-center">
-        <FileAttachButton 
-          size="md" 
+        <FileAttachButton
+          size="md"
           onFilesSelected={(files) => console.log('Medium button')} // Medium button
         />
         <p className="text-xs text-gray-500 mt-2">MD</p>
       </div>
       <div className="text-center">
-        <FileAttachButton 
-          size="lg" 
+        <FileAttachButton
+          size="lg"
           onFilesSelected={(files) => console.log('Large button')} // Large button
         />
         <p className="text-xs text-gray-500 mt-2">LG</p>
@@ -212,22 +243,22 @@ export const AllVariants: Story = {
   render: () => (
     <div className="flex items-center gap-6">
       <div className="text-center">
-        <FileAttachButton 
-          variant="primary" 
+        <FileAttachButton
+          variant="primary"
           onFilesSelected={(files) => console.log('Primary variant')} // Primary variant
         />
         <p className="text-xs text-gray-500 mt-2">Primary</p>
       </div>
       <div className="text-center">
-        <FileAttachButton 
-          variant="ghost" 
+        <FileAttachButton
+          variant="ghost"
           onFilesSelected={(files) => console.log('Ghost variant')} // Ghost variant
         />
         <p className="text-xs text-gray-500 mt-2">Ghost</p>
       </div>
       <div className="text-center">
-        <FileAttachButton 
-          variant="outline" 
+        <FileAttachButton
+          variant="outline"
           onFilesSelected={(files) => console.log('Outline variant')} // Outline variant
         />
         <p className="text-xs text-gray-500 mt-2">Outline</p>
@@ -247,30 +278,27 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <FileAttachButton 
+        <FileAttachButton
           onFilesSelected={(files) => console.log('Ready to attach')} // Ready to attach
         />
         <span className="text-sm">Ready to attach files</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <FileAttachButton 
-          disabled={true}
-          onFilesSelected={(files) => console.log('Disabled')}
-        />
+        <FileAttachButton disabled={true} onFilesSelected={(files) => console.log('Disabled')} />
         <span className="text-sm">Disabled</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <FileAttachButton 
+        <FileAttachButton
           maxFiles={1}
           onFilesSelected={(files) => console.log('Single file')} // Single file
         />
         <span className="text-sm">Single file only</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <FileAttachButton 
+        <FileAttachButton
           acceptedTypes={['image/*']}
           onFilesSelected={(files) => console.log('Images only')} // Images only
         />
@@ -290,34 +318,36 @@ export const AllStates: Story = {
 export const WithFileTracking: Story = {
   render: () => {
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-    
+
     const handleFilesSelected = (files: FileList) => {
       const newFiles = Array.from(files);
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const removeFile = (index: number) => {
-      setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+      setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
     };
-    
+
     return (
       <div className="flex flex-col gap-4 w-full max-w-md">
         <div className="flex items-center gap-2">
-          <FileAttachButton 
-            onFilesSelected={handleFilesSelected}
-            title="Click to attach files"
-          />
+          <FileAttachButton onFilesSelected={handleFilesSelected} title="Click to attach files" />
           <span className="text-sm text-gray-600">
-            {attachedFiles.length === 0 ? 'No files attached' : `${attachedFiles.length} file(s) attached`}
+            {attachedFiles.length === 0
+              ? 'No files attached'
+              : `${attachedFiles.length} file(s) attached`}
           </span>
         </div>
-        
+
         {attachedFiles.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-medium">Attached files:</p>
             <div className="space-y-1">
               {attachedFiles.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                >
                   <span className="text-sm truncate">{file.name}</span>
                   <button
                     onClick={() => removeFile(index)}
@@ -344,7 +374,7 @@ export const WithFileTracking: Story = {
 
 export const InteractiveDemo: Story = {
   render: () => {
-    const [selectedFiles, setSelectedFiles] = useState<{[key: string]: File[]}>({
+    const [selectedFiles, setSelectedFiles] = useState<{ [key: string]: File[] }>({
       primary: [],
       ghost: [],
       outline: [],
@@ -352,14 +382,14 @@ export const InteractiveDemo: Story = {
 
     const handleFilesSelected = (variant: string) => (files: FileList) => {
       const newFiles = Array.from(files);
-      setSelectedFiles(prev => ({
+      setSelectedFiles((prev) => ({
         ...prev,
         [variant]: [...prev[variant], ...newFiles],
       }));
     };
 
     const clearFiles = (variant: string) => {
-      setSelectedFiles(prev => ({
+      setSelectedFiles((prev) => ({
         ...prev,
         [variant]: [],
       }));
@@ -368,16 +398,19 @@ export const InteractiveDemo: Story = {
     return (
       <div className="flex flex-col gap-6 p-6 w-full max-w-2xl">
         <div className="text-center">
-          <h3 className="text-lg font-semibold mb-2">🎾 File Attach Button Tennis Commentary Demo</h3>
+          <h3 className="text-lg font-semibold mb-2">
+            🎾 File Attach Button Tennis Commentary Demo
+          </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Enable tennis commentary in the toolbar above, then hover and click the file attach buttons below!
+            Enable tennis commentary in the toolbar above, then hover and click the file attach
+            buttons below!
           </p>
         </div>
-        
+
         <div className="grid grid-cols-3 gap-6">
           <div className="text-center p-4 border rounded-lg">
             <div className="flex items-center justify-center mb-2">
-              <FileAttachButton 
+              <FileAttachButton
                 size="lg"
                 variant="primary"
                 onFilesSelected={handleFilesSelected('primary')}
@@ -396,10 +429,10 @@ export const InteractiveDemo: Story = {
               </button>
             )}
           </div>
-          
+
           <div className="text-center p-4 border rounded-lg">
             <div className="flex items-center justify-center mb-2">
-              <FileAttachButton 
+              <FileAttachButton
                 size="lg"
                 variant="ghost"
                 onFilesSelected={handleFilesSelected('ghost')}
@@ -418,10 +451,10 @@ export const InteractiveDemo: Story = {
               </button>
             )}
           </div>
-          
+
           <div className="text-center p-4 border rounded-lg">
             <div className="flex items-center justify-center mb-2">
-              <FileAttachButton 
+              <FileAttachButton
                 size="lg"
                 variant="outline"
                 onFilesSelected={handleFilesSelected('outline')}
@@ -441,7 +474,7 @@ export const InteractiveDemo: Story = {
             )}
           </div>
         </div>
-        
+
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Click the buttons above to select files and see the file tracking in action!
@@ -453,7 +486,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing file attach buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
+        story:
+          'Interactive demo showcasing file attach buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
       },
     },
   },

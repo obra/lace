@@ -11,7 +11,8 @@ const meta: Meta<typeof EnhancedChatInput> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Enhanced chat input component that provides a complete chat interface with advanced features like voice input, file attachments, and streaming support. This is a wrapper around ChatInputComposer with additional functionality for the main chat interface.',
+        component:
+          'Enhanced chat input component that provides a complete chat interface with advanced features like voice input, file attachments, and streaming support. This is a wrapper around ChatInputComposer with additional functionality for the main chat interface.',
       },
     },
   },
@@ -118,12 +119,12 @@ export const Default: Story = {
     const [files, setFiles] = useState<AttachedFile[]>(args.attachedFiles || []);
 
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setFiles(prev => [...prev, ...newFiles]);
+      setFiles((prev) => [...prev, ...newFiles]);
       args.onFilesAttached?.(newFiles);
     };
 
     const handleFileRemoved = (fileId: string) => {
-      setFiles(prev => prev.filter(f => f.id !== fileId));
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
       args.onFileRemoved?.(fileId);
     };
 
@@ -162,7 +163,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default enhanced chat input with full functionality including text input, file attachments, and voice controls.',
+        story:
+          'Default enhanced chat input with full functionality including text input, file attachments, and voice controls.',
       },
     },
   },
@@ -197,9 +199,7 @@ export const WithVoiceInput: Story = {
             Click the microphone to start voice input
           </p>
           <div className="flex items-center gap-2 mb-4">
-            <div className="badge badge-outline">
-              Voice: {isListening ? 'Listening' : 'Ready'}
-            </div>
+            <div className="badge badge-outline">Voice: {isListening ? 'Listening' : 'Ready'}</div>
           </div>
         </div>
         <EnhancedChatInput
@@ -216,7 +216,8 @@ export const WithVoiceInput: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Enhanced chat input with voice input functionality. Click the microphone button to toggle voice recognition.',
+        story:
+          'Enhanced chat input with voice input functionality. Click the microphone button to toggle voice recognition.',
       },
     },
   },
@@ -235,12 +236,12 @@ export const WithFileAttachments: Story = {
     const [files, setFiles] = useState<AttachedFile[]>(args.attachedFiles || []);
 
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setFiles(prev => [...prev, ...newFiles]);
+      setFiles((prev) => [...prev, ...newFiles]);
       args.onFilesAttached?.(newFiles);
     };
 
     const handleFileRemoved = (fileId: string) => {
-      setFiles(prev => prev.filter(f => f.id !== fileId));
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
       args.onFileRemoved?.(fileId);
     };
 
@@ -257,9 +258,7 @@ export const WithFileAttachments: Story = {
             Files can be attached to messages for context
           </p>
           <div className="flex items-center gap-2 mb-4">
-            <div className="badge badge-outline">
-              Files: {files.length}
-            </div>
+            <div className="badge badge-outline">Files: {files.length}</div>
           </div>
         </div>
         <EnhancedChatInput
@@ -277,7 +276,8 @@ export const WithFileAttachments: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Enhanced chat input with file attachments. Files can be attached and removed before sending.',
+        story:
+          'Enhanced chat input with file attachments. Files can be attached and removed before sending.',
       },
     },
   },
@@ -332,7 +332,8 @@ export const StreamingState: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Enhanced chat input in streaming state. When AI is responding, the interface shows appropriate controls.',
+        story:
+          'Enhanced chat input in streaming state. When AI is responding, the interface shows appropriate controls.',
       },
     },
   },
@@ -355,23 +356,18 @@ export const DisabledState: Story = {
             The input can be disabled during processing or when unavailable
           </p>
           <div className="flex items-center gap-2 mb-4">
-            <div className="badge badge-neutral">
-              Status: Disabled
-            </div>
+            <div className="badge badge-neutral">Status: Disabled</div>
           </div>
         </div>
-        <EnhancedChatInput
-          {...args}
-          value={value}
-          onChange={setValue}
-        />
+        <EnhancedChatInput {...args} value={value} onChange={setValue} />
       </div>
     );
   },
   parameters: {
     docs: {
       description: {
-        story: 'Enhanced chat input in disabled state. All controls are disabled when the input is not available.',
+        story:
+          'Enhanced chat input in disabled state. All controls are disabled when the input is not available.',
       },
     },
   },
@@ -395,12 +391,12 @@ export const FullFeatured: Story = {
     const [isStreaming, setIsStreaming] = useState(false);
 
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setFiles(prev => [...prev, ...newFiles]);
+      setFiles((prev) => [...prev, ...newFiles]);
       args.onFilesAttached?.(newFiles);
     };
 
     const handleFileRemoved = (fileId: string) => {
-      setFiles(prev => prev.filter(f => f.id !== fileId));
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
       args.onFileRemoved?.(fileId);
     };
 
@@ -444,12 +440,8 @@ export const FullFeatured: Story = {
             <div className={`badge ${isStreaming ? 'badge-warning' : 'badge-success'}`}>
               {isStreaming ? 'AI Responding...' : 'Ready'}
             </div>
-            <div className="badge badge-outline">
-              Voice: {isListening ? 'Listening' : 'Ready'}
-            </div>
-            <div className="badge badge-outline">
-              Files: {files.length}
-            </div>
+            <div className="badge badge-outline">Voice: {isListening ? 'Listening' : 'Ready'}</div>
+            <div className="badge badge-outline">Files: {files.length}</div>
           </div>
         </div>
         <EnhancedChatInput
@@ -473,7 +465,8 @@ export const FullFeatured: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Complete enhanced chat input with all features enabled including voice input, file attachments, and streaming state management.',
+        story:
+          'Complete enhanced chat input with all features enabled including voice input, file attachments, and streaming state management.',
       },
     },
   },
@@ -495,11 +488,7 @@ export const CustomPlaceholder: Story = {
             The placeholder text can be customized for different contexts
           </p>
         </div>
-        <EnhancedChatInput
-          {...args}
-          value={value}
-          onChange={setValue}
-        />
+        <EnhancedChatInput {...args} value={value} onChange={setValue} />
       </div>
     );
   },
@@ -533,21 +522,13 @@ export const ResponsiveDesign: Story = {
           <div className="border-2 border-dashed border-base-300 p-4 rounded-lg">
             <h4 className="text-sm font-medium mb-2">Mobile View</h4>
             <div className="w-full max-w-sm">
-              <EnhancedChatInput
-                {...args}
-                value={value}
-                onChange={setValue}
-              />
+              <EnhancedChatInput {...args} value={value} onChange={setValue} />
             </div>
           </div>
           <div className="border-2 border-dashed border-base-300 p-4 rounded-lg">
             <h4 className="text-sm font-medium mb-2">Desktop View</h4>
             <div className="w-full">
-              <EnhancedChatInput
-                {...args}
-                value={value}
-                onChange={setValue}
-              />
+              <EnhancedChatInput {...args} value={value} onChange={setValue} />
             </div>
           </div>
         </div>
@@ -557,7 +538,8 @@ export const ResponsiveDesign: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Enhanced chat input responsive design demonstration showing how it adapts to different screen sizes.',
+        story:
+          'Enhanced chat input responsive design demonstration showing how it adapts to different screen sizes.',
       },
     },
   },

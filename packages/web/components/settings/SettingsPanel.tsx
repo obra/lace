@@ -13,7 +13,13 @@ interface SettingsPanelProps {
   children: React.ReactNode;
 }
 
-export function SettingsPanel({ title, description, icon, className = '', children }: SettingsPanelProps) {
+export function SettingsPanel({
+  title,
+  description,
+  icon,
+  className = '',
+  children,
+}: SettingsPanelProps) {
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Panel header */}
@@ -23,16 +29,12 @@ export function SettingsPanel({ title, description, icon, className = '', childr
             {icon && <span>{icon}</span>}
             {title}
           </h3>
-          {description && (
-            <p className="text-sm text-base-content/60">{description}</p>
-          )}
+          {description && <p className="text-sm text-base-content/60">{description}</p>}
         </div>
       )}
-      
+
       {/* Panel content */}
-      <div className="space-y-4">
-        {children}
-      </div>
+      <div className="space-y-4">{children}</div>
     </div>
   );
 }

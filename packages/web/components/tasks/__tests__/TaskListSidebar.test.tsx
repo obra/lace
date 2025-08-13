@@ -32,7 +32,14 @@ vi.mock('@fortawesome/react-fontawesome', () => ({
 
 // Mock Sidebar components
 vi.mock('@/components/layout/Sidebar', () => ({
-  SidebarButton: ({ children, onClick, variant, size, className, title }: {
+  SidebarButton: ({
+    children,
+    onClick,
+    variant,
+    size,
+    className,
+    title,
+  }: {
     children: React.ReactNode;
     onClick?: () => void;
     variant?: string;
@@ -101,7 +108,7 @@ const mockTasks: Task[] = [
 describe('TaskListSidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Set up default mock return value
     mockUseTaskManager.mockReturnValue({
       tasks: mockTasks,
@@ -124,22 +131,14 @@ describe('TaskListSidebar', () => {
 
   it('should render task summary', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     expect(screen.getByText('3 tasks • 1 in progress')).toBeInTheDocument();
   });
 
   it('should show in progress tasks first', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     expect(screen.getByText('In Progress')).toBeInTheDocument();
     expect(screen.getByText('High Priority Task')).toBeInTheDocument();
@@ -147,11 +146,7 @@ describe('TaskListSidebar', () => {
 
   it('should show pending tasks', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     expect(screen.getByText('Pending')).toBeInTheDocument();
     expect(screen.getByText('Pending Task')).toBeInTheDocument();
@@ -159,11 +154,7 @@ describe('TaskListSidebar', () => {
 
   it('should show blocked tasks', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     expect(screen.getByText('Blocked')).toBeInTheDocument();
     expect(screen.getByText('Blocked Task')).toBeInTheDocument();
@@ -174,39 +165,27 @@ describe('TaskListSidebar', () => {
     const user = userEvent.setup();
 
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-        onOpenTaskBoard={mockOnOpenTaskBoard}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} onOpenTaskBoard={mockOnOpenTaskBoard} />);
 
     // Find the task item and click it
     const taskItem = screen.getByText('High Priority Task').closest('[role="button"]');
     expect(taskItem).toBeInTheDocument();
-    
+
     await user.click(taskItem!);
     expect(mockOnOpenTaskBoard).toHaveBeenCalled();
   });
-
 
   it('should call onCreateTask when create task button is clicked', async () => {
     const mockOnCreateTask = vi.fn();
     const user = userEvent.setup();
 
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-        onCreateTask={mockOnCreateTask}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} onCreateTask={mockOnCreateTask} />);
 
     // Look for the "Add task" button
     await user.click(screen.getByText('Add task'));
     expect(mockOnCreateTask).toHaveBeenCalled();
   });
-
 
   it('should show loading state', () => {
     mockUseTaskManager.mockReturnValue({
@@ -228,11 +207,7 @@ describe('TaskListSidebar', () => {
     });
 
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     expect(screen.getByRole('status')).toBeInTheDocument(); // loading spinner
   });
@@ -257,11 +232,7 @@ describe('TaskListSidebar', () => {
     });
 
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     expect(screen.getByText('No tasks yet')).toBeInTheDocument();
   });
@@ -318,11 +289,7 @@ describe('TaskListSidebar', () => {
     });
 
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
-    render(
-      <TaskListSidebar
-        taskManager={mockTaskManager}
-      />
-    );
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
 
     // Should show max 3 in progress tasks
     expect(screen.getByText('In Progress Task 1')).toBeInTheDocument();
@@ -336,6 +303,5 @@ describe('TaskListSidebar', () => {
     expect(screen.getByText('Pending Task 2')).toBeInTheDocument();
     expect(screen.queryByText('Pending Task 3')).not.toBeInTheDocument();
     expect(screen.queryByText('Pending Task 4')).not.toBeInTheDocument();
-
   });
 });

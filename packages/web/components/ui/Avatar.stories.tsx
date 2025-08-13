@@ -174,7 +174,7 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the avatars below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-8">
         <div className="text-center">
           <div className="cursor-pointer transition-transform hover:scale-110">
@@ -183,7 +183,7 @@ export const InteractiveDemo: Story = {
           <p className="text-sm font-medium mt-2">User Avatar</p>
           <p className="text-xs text-gray-500">Click & hover for commentary!</p>
         </div>
-        
+
         <div className="text-center">
           <div className="cursor-pointer transition-transform hover:scale-110">
             <Avatar role="assistant" size="lg" />
@@ -197,7 +197,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing avatars with tennis commentary. Enable commentary in the toolbar and interact with the avatars!',
+        story:
+          'Interactive demo showcasing avatars with tennis commentary. Enable commentary in the toolbar and interact with the avatars!',
       },
     },
   },

@@ -22,11 +22,11 @@ describe('fileWriteRenderer visual rendering', () => {
     expect(rendered).toBeDefined();
 
     const { container } = render(rendered as React.ReactElement);
-    
+
     // Check for success styling
     const successDiv = container.querySelector('.bg-success\\/5');
     expect(successDiv).toBeTruthy();
-    
+
     // Should not show file content when no metadata is provided
     // The component only shows empty success div when there's no file content to display
     expect(container.querySelector('.p-3')).toBeFalsy();
@@ -47,11 +47,11 @@ describe('fileWriteRenderer visual rendering', () => {
     expect(rendered).toBeDefined();
 
     const { container } = render(rendered as React.ReactElement);
-    
+
     // Check for error styling
     const errorDiv = container.querySelector('.bg-error\\/5');
     expect(errorDiv).toBeTruthy();
-    
+
     // Check for error text content
     expect(container.textContent).toContain('Write Failed');
     expect(container.textContent).toContain('Permission denied');
@@ -83,7 +83,7 @@ describe('fileWriteRenderer visual rendering', () => {
 
     const rendered = fileWriteRenderer.renderResult?.(detailedResult);
     const { container } = render(rendered as React.ReactElement);
-    
+
     // With the new behavior, without metadata we don't show content
     // Check for success styling
     const successDiv = container.querySelector('.bg-success\\/5');

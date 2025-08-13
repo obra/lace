@@ -50,7 +50,7 @@ export default function NavigationButton({
 
   const getVariantClasses = () => {
     const baseClasses = 'rounded-lg transition-colors';
-    
+
     if (disabled) {
       return `${baseClasses} opacity-50 cursor-not-allowed`;
     }

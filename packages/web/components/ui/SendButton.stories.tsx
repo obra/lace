@@ -151,27 +151,15 @@ export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-4">
       <div className="text-center">
-        <SendButton 
-          size="sm" 
-          hasContent={true}
-          onSubmit={() => console.log('Small send')}
-        />
+        <SendButton size="sm" hasContent={true} onSubmit={() => console.log('Small send')} />
         <p className="text-xs text-gray-500 mt-2">SM</p>
       </div>
       <div className="text-center">
-        <SendButton 
-          size="md" 
-          hasContent={true}
-          onSubmit={() => console.log('Medium send')}
-        />
+        <SendButton size="md" hasContent={true} onSubmit={() => console.log('Medium send')} />
         <p className="text-xs text-gray-500 mt-2">MD</p>
       </div>
       <div className="text-center">
-        <SendButton 
-          size="lg" 
-          hasContent={true}
-          onSubmit={() => console.log('Large send')}
-        />
+        <SendButton size="lg" hasContent={true} onSubmit={() => console.log('Large send')} />
         <p className="text-xs text-gray-500 mt-2">LG</p>
       </div>
     </div>
@@ -189,36 +177,26 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <SendButton 
-          hasContent={true}
-          onSubmit={() => console.log('Ready to send')}
-        />
+        <SendButton hasContent={true} onSubmit={() => console.log('Ready to send')} />
         <span className="text-sm">Ready to send</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <SendButton 
-          hasContent={false}
-          onSubmit={() => console.log('No content')}
-        />
+        <SendButton hasContent={false} onSubmit={() => console.log('No content')} />
         <span className="text-sm">No content (disabled)</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <SendButton 
+        <SendButton
           isStreaming={true}
           hasContent={true}
           onStop={() => console.log('Stop streaming')}
         />
         <span className="text-sm">Streaming (stop button)</span>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        <SendButton 
-          disabled={true}
-          hasContent={true}
-          onSubmit={() => console.log('Disabled')}
-        />
+        <SendButton disabled={true} hasContent={true} onSubmit={() => console.log('Disabled')} />
         <span className="text-sm">Disabled</span>
       </div>
     </div>
@@ -238,26 +216,23 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Send Button Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the send buttons below!
+          Enable tennis commentary in the toolbar above, then hover and click the send buttons
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-6">
         <div className="text-center p-4 border rounded-lg">
           <div className="flex items-center justify-center mb-2">
-            <SendButton 
-              size="lg"
-              hasContent={true}
-              onSubmit={() => console.log('Send message!')}
-            />
+            <SendButton size="lg" hasContent={true} onSubmit={() => console.log('Send message!')} />
           </div>
           <p className="text-sm font-medium">Send Message</p>
           <p className="text-xs text-gray-500">Click to send</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg">
           <div className="flex items-center justify-center mb-2">
-            <SendButton 
+            <SendButton
               size="lg"
               isStreaming={true}
               hasContent={true}
@@ -267,22 +242,18 @@ export const InteractiveDemo: Story = {
           <p className="text-sm font-medium">Stop Streaming</p>
           <p className="text-xs text-gray-500">Click to stop</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg">
           <div className="flex items-center justify-center mb-2">
-            <SendButton 
-              size="lg"
-              hasContent={false}
-              onSubmit={() => console.log('No content')}
-            />
+            <SendButton size="lg" hasContent={false} onSubmit={() => console.log('No content')} />
           </div>
           <p className="text-sm font-medium">No Content</p>
           <p className="text-xs text-gray-500">Disabled state</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg">
           <div className="flex items-center justify-center mb-2">
-            <SendButton 
+            <SendButton
               size="lg"
               disabled={true}
               hasContent={true}
@@ -298,7 +269,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing send buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
+        story:
+          'Interactive demo showcasing send buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
       },
     },
   },

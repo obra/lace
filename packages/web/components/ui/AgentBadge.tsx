@@ -17,14 +17,11 @@ export default function AgentBadge({ agent, size = 'xs', className = '' }: Agent
     md: 'text-base px-3 py-1.5',
   };
 
-  const badgeColorClass = agentBadgeColors[agent as keyof typeof agentBadgeColors] || 
+  const badgeColorClass =
+    agentBadgeColors[agent as keyof typeof agentBadgeColors] ||
     'bg-base-content/10 text-base-content/60';
 
   return (
-    <span
-      className={`${sizeClasses[size]} rounded ${badgeColorClass} ${className}`}
-    >
-      {agent}
-    </span>
+    <span className={`${sizeClasses[size]} rounded ${badgeColorClass} ${className}`}>{agent}</span>
   );
 }

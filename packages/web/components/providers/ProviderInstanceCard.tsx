@@ -23,25 +23,37 @@ interface ProviderInstanceCardProps {
   onEdit?: () => void; // Optional callback after edit success
 }
 
-export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: ProviderInstanceCardProps) {
+export function ProviderInstanceCard({
+  instance,
+  onTest,
+  onDelete,
+  onEdit,
+}: ProviderInstanceCardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const getStatusProps = (status?: string) => {
     switch (status) {
-      case 'connected': 
+      case 'connected':
         return { status: 'success' as const, text: 'Connected' };
-      case 'error': 
+      case 'error':
         return { status: 'error' as const, text: 'Connection Error' };
       case 'testing':
         return { status: 'info' as const, text: 'Testing...' };
-      default: 
-        return { status: 'warning' as const, text: instance.hasCredentials ? 'Untested' : 'No Credentials' };
+      default:
+        return {
+          status: 'warning' as const,
+          text: instance.hasCredentials ? 'Untested' : 'No Credentials',
+        };
     }
   };
 
   const statusProps = getStatusProps(instance.status);
 
   const handleDeleteClick = () => {
-    if (confirm(`Are you sure you want to delete "${instance.displayName}"? This will remove the instance and its credentials.`)) {
+    if (
+      confirm(
+        `Are you sure you want to delete "${instance.displayName}"? This will remove the instance and its credentials.`
+      )
+    ) {
       onDelete();
     }
   };
@@ -71,19 +83,23 @@ export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: Pro
                     <span>{instance.modelCount} models available</span>
                   )}
                   {instance.hasCredentials && (
-                    <Badge variant="success" size="xs">Configured</Badge>
+                    <Badge variant="success" size="xs">
+                      Configured
+                    </Badge>
                   )}
                   {!instance.hasCredentials && (
-                    <Badge variant="error" size="xs">Missing Credentials</Badge>
+                    <Badge variant="error" size="xs">
+                      Missing Credentials
+                    </Badge>
                   )}
                 </div>
-                
+
                 {instance.endpoint && (
                   <div className="text-xs text-base-content/40">
                     Custom endpoint: {instance.endpoint}
                   </div>
                 )}
-                
+
                 {instance.lastTested && (
                   <div className="text-xs text-base-content/40">
                     Last tested: {new Date(instance.lastTested).toLocaleDateString()}
@@ -92,13 +108,15 @@ export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: Pro
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
-            <button 
+            <button
               className="btn btn-ghost btn-sm"
               onClick={onTest}
               disabled={!instance.hasCredentials || instance.status === 'testing'}
-              title={!instance.hasCredentials ? 'Add credentials to test connection' : 'Test connection'}
+              title={
+                !instance.hasCredentials ? 'Add credentials to test connection' : 'Test connection'
+              }
             >
               {instance.status === 'testing' ? (
                 <>
@@ -109,13 +127,10 @@ export function ProviderInstanceCard({ instance, onTest, onDelete, onEdit }: Pro
                 'Test'
               )}
             </button>
-            <button 
-              className="btn btn-outline btn-sm"
-              onClick={() => setShowEditModal(true)}
-            >
+            <button className="btn btn-outline btn-sm" onClick={() => setShowEditModal(true)}>
               Edit
             </button>
-            <button 
+            <button
               className="btn btn-ghost btn-sm text-error hover:bg-error/10"
               onClick={handleDeleteClick}
             >

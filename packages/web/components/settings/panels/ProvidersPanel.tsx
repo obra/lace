@@ -22,8 +22,9 @@ export function ProvidersPanel() {
             <div className="text-sm">
               <div className="font-medium text-accent mb-1">Provider Instances</div>
               <div className="text-base-content/75 leading-relaxed">
-                Configure connections to providers like OpenAI, Anthropic, and local models. Each instance can
-                define endpoints, timeouts, and credentials for flexible routing and fallbacks.
+                Configure connections to providers like OpenAI, Anthropic, and local models. Each
+                instance can define endpoints, timeouts, and credentials for flexible routing and
+                fallbacks.
               </div>
             </div>
           </div>

@@ -9,7 +9,15 @@ interface MessageHeaderProps {
   avatar?: ReactNode;
   badge?: {
     text: string;
-    variant?: 'default' | 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'info';
+    variant?:
+      | 'default'
+      | 'primary'
+      | 'secondary'
+      | 'accent'
+      | 'success'
+      | 'warning'
+      | 'error'
+      | 'info';
     className?: string;
   };
   icon?: ReactNode;
@@ -28,7 +36,7 @@ export default function MessageHeader({
 }: MessageHeaderProps) {
   const getBadgeClasses = (variant: string = 'default') => {
     const baseClasses = 'text-xs px-1.5 py-0.5 rounded';
-    
+
     switch (variant) {
       case 'primary':
         return `${baseClasses} bg-primary/20 text-primary`;
@@ -51,37 +59,34 @@ export default function MessageHeader({
 
   const isLLMModel = (text: string) => {
     const lowerText = text.toLowerCase();
-    return lowerText.includes('claude') || lowerText.includes('gpt') || lowerText.includes('gemini');
+    return (
+      lowerText.includes('claude') || lowerText.includes('gpt') || lowerText.includes('gemini')
+    );
   };
 
   return (
     <div className={`flex gap-3 ${className}`}>
       {/* Avatar */}
-      <div className="flex-shrink-0">
-        {avatar || (role && <Avatar role={role} size="sm" />)}
-      </div>
+      <div className="flex-shrink-0">{avatar || (role && <Avatar role={role} size="sm" />)}</div>
 
       {/* Header content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
           <div className="flex items-center gap-2">
-            {icon && (
-              <span className="text-sm">{icon}</span>
-            )}
+            {icon && <span className="text-sm">{icon}</span>}
             <span className="font-medium text-sm text-base-content">{name}</span>
           </div>
           <span className="text-xs text-base-content/50">
             {typeof timestamp === 'string' ? timestamp : formatTime(timestamp)}
           </span>
-          {badge && (
-            isLLMModel(badge.text) ? (
+          {badge &&
+            (isLLMModel(badge.text) ? (
               <LLMModelBadge model={badge.text} className={badge.className} />
             ) : (
               <span className={badge.className || getBadgeClasses(badge.variant)}>
                 {badge.text}
               </span>
-            )
-          )}
+            ))}
         </div>
       </div>
     </div>

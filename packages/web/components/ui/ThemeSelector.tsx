@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 // Limit app-visible themes to core options for now. Others retained for quick restore.
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
-  { name: 'dark',  colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
+  { name: 'dark', colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
   // { name: 'cupcake', colors: { primary: '#65C3C8', secondary: '#EF9FBC', accent: '#EEAF3A' } },
   // { name: 'corporate', colors: { primary: '#4B6BFB', secondary: '#7C3AED', accent: '#37CDBE' } },
   // { name: 'synthwave', colors: { primary: '#E779C1', secondary: '#58C7F3', accent: '#F7CC50' } },

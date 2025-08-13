@@ -7,15 +7,28 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { TaskAPIClient } from '@/lib/client/task-api';
 
 // Import API routes to test against
-import { GET as listTasks, POST as createTask } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
-import { GET as getTask, PATCH as updateTask, DELETE as deleteTask } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/route';
+import {
+  GET as listTasks,
+  POST as createTask,
+} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
+import {
+  GET as getTask,
+  PATCH as updateTask,
+  DELETE as deleteTask,
+} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/route';
 import { POST as addNote } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes/route';
 import { NextRequest } from 'next/server';
 
@@ -27,7 +40,6 @@ vi.mock('@/lib/server/approval-manager', () => ({
   }),
 }));
 
-
 describe('TaskAPIClient E2E with Real API Routes', () => {
   const _tempLaceDir = setupWebTest();
   let sessionId: string;
@@ -38,7 +50,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
   beforeEach(async () => {
     setupTestProviderDefaults();
     Session.clearProviderCache();
-    
+
     // Set up environment for session service
     process.env = {
       ...process.env,
@@ -64,7 +76,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
       }
     );
     projectId = testProject.getId();
-    
+
     // Create session using Session.create (inherits provider from project)
     const session = Session.create({
       name: 'TaskAPIClient E2E Test Session',
@@ -73,98 +85,105 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
     sessionId = session.getId();
 
     // Mock fetch to route requests to real API handlers
-    global.fetch = vi.fn().mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
-      const urlString = typeof url === 'string' ? url : url.toString();
-      const method = init?.method || 'GET';
-      // Convert null signal to undefined for NextRequest compatibility
-      const sanitizedInit = init ? {
-        ...init,
-        signal: init.signal || undefined
-      } : undefined;
-      
-      // console.log(`Mock fetch: ${method} ${urlString}`);
-      
-      try {
-        // Route to appropriate API handler based on URL pattern - RESTful nested routes
-        if (urlString.includes('/api/projects/') && urlString.includes('/sessions/') && urlString.includes('/tasks')) {
-          // Parse RESTful URL to extract projectId, sessionId, taskId
-          // First, separate the path from query parameters
-          const [urlPath, _queryString] = urlString.split('?');
-          const urlParts = urlPath.split('/');
-          const projectIndex = urlParts.indexOf('projects');
-          const sessionIndex = urlParts.indexOf('sessions');
-          const tasksIndex = urlParts.indexOf('tasks');
-          
-          if (projectIndex === -1 || sessionIndex === -1 || tasksIndex === -1) {
-            throw new Error(`Invalid RESTful API route: ${urlString}`);
-          }
-          
-          const routeProjectId = urlParts[projectIndex + 1];
-          const routeSessionId = urlParts[sessionIndex + 1];
-          const taskIdFromUrl = urlParts[tasksIndex + 1];
-          
-          if (!routeProjectId || !routeSessionId) {
-            throw new Error(`Missing projectId or sessionId in route: ${urlString}`);
-          }
-          
-          const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
-          
-          if (urlPath.includes('/notes') && method === 'POST' && taskIdFromUrl) {
-            // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
-            return await addNote(request, { 
-              params: Promise.resolve({ 
-                projectId: routeProjectId, 
-                sessionId: routeSessionId, 
-                taskId: taskIdFromUrl 
-              }) 
-            });
-          } else if (taskIdFromUrl && !urlPath.includes('/notes')) {
-            // Handle individual task operations: GET/PATCH/DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
-            const response = await (method === 'GET' ? getTask : method === 'PATCH' ? updateTask : deleteTask)(
-              request, 
-              { 
-                params: Promise.resolve({ 
-                  projectId: routeProjectId, 
-                  sessionId: routeSessionId, 
-                  taskId: taskIdFromUrl 
-                }) 
+    global.fetch = vi
+      .fn()
+      .mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
+        const urlString = typeof url === 'string' ? url : url.toString();
+        const method = init?.method || 'GET';
+        // Convert null signal to undefined for NextRequest compatibility
+        const sanitizedInit = init
+          ? {
+              ...init,
+              signal: init.signal || undefined,
+            }
+          : undefined;
+
+        // console.log(`Mock fetch: ${method} ${urlString}`);
+
+        try {
+          // Route to appropriate API handler based on URL pattern - RESTful nested routes
+          if (
+            urlString.includes('/api/projects/') &&
+            urlString.includes('/sessions/') &&
+            urlString.includes('/tasks')
+          ) {
+            // Parse RESTful URL to extract projectId, sessionId, taskId
+            // First, separate the path from query parameters
+            const [urlPath, _queryString] = urlString.split('?');
+            const urlParts = urlPath.split('/');
+            const projectIndex = urlParts.indexOf('projects');
+            const sessionIndex = urlParts.indexOf('sessions');
+            const tasksIndex = urlParts.indexOf('tasks');
+
+            if (projectIndex === -1 || sessionIndex === -1 || tasksIndex === -1) {
+              throw new Error(`Invalid RESTful API route: ${urlString}`);
+            }
+
+            const routeProjectId = urlParts[projectIndex + 1];
+            const routeSessionId = urlParts[sessionIndex + 1];
+            const taskIdFromUrl = urlParts[tasksIndex + 1];
+
+            if (!routeProjectId || !routeSessionId) {
+              throw new Error(`Missing projectId or sessionId in route: ${urlString}`);
+            }
+
+            const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
+
+            if (urlPath.includes('/notes') && method === 'POST' && taskIdFromUrl) {
+              // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
+              return await addNote(request, {
+                params: Promise.resolve({
+                  projectId: routeProjectId,
+                  sessionId: routeSessionId,
+                  taskId: taskIdFromUrl,
+                }),
+              });
+            } else if (taskIdFromUrl && !urlPath.includes('/notes')) {
+              // Handle individual task operations: GET/PATCH/DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
+              const response = await (
+                method === 'GET' ? getTask : method === 'PATCH' ? updateTask : deleteTask
+              )(request, {
+                params: Promise.resolve({
+                  projectId: routeProjectId,
+                  sessionId: routeSessionId,
+                  taskId: taskIdFromUrl,
+                }),
+              });
+
+              if (method === 'GET') {
+                const responseText = await response.text();
+                return new Response(responseText, {
+                  status: response.status,
+                  headers: { 'Content-Type': 'application/json' },
+                });
               }
-            );
-            
-            if (method === 'GET') {
-              const responseText = await response.text();
-              return new Response(responseText, {
-                status: response.status,
-                headers: { 'Content-Type': 'application/json' }
+
+              return response;
+            } else if (method === 'POST' && urlPath.endsWith('/tasks')) {
+              // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
+              return await createTask(request, {
+                params: Promise.resolve({
+                  projectId: routeProjectId,
+                  sessionId: routeSessionId,
+                }),
+              });
+            } else if (method === 'GET' && urlPath.endsWith('/tasks')) {
+              // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks
+              return await listTasks(request, {
+                params: Promise.resolve({
+                  projectId: routeProjectId,
+                  sessionId: routeSessionId,
+                }),
               });
             }
-            
-            return response;
-          } else if (method === 'POST' && urlPath.endsWith('/tasks')) {
-            // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
-            return await createTask(request, { 
-              params: Promise.resolve({ 
-                projectId: routeProjectId, 
-                sessionId: routeSessionId 
-              }) 
-            });
-          } else if (method === 'GET' && urlPath.endsWith('/tasks')) {
-            // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks
-            return await listTasks(request, { 
-              params: Promise.resolve({ 
-                projectId: routeProjectId, 
-                sessionId: routeSessionId 
-              }) 
-            });
           }
+
+          throw new Error(`Unhandled API route: ${method} ${urlString}`);
+        } catch (error) {
+          console.error('API route error:', error);
+          throw error;
         }
-        
-        throw new Error(`Unhandled API route: ${method} ${urlString}`);
-      } catch (error) {
-        console.error('API route error:', error);
-        throw error;
-      }
-    });
+      });
 
     client = new TaskAPIClient();
   });

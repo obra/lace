@@ -15,7 +15,7 @@ export function AccentButton({ className, iconLeft, children, ...rest }: AccentB
         'bg-gradient-to-br from-emerald-500 to-cyan-400 text-black hover:from-emerald-400 hover:to-cyan-300',
         'border-0 shadow-[0_10px_30px_rgba(0,0,0,.35)]',
         'ring-hover',
-        className,
+        className
       )}
     >
       {iconLeft ? <span className="mr-2 inline-flex items-center">{iconLeft}</span> : null}

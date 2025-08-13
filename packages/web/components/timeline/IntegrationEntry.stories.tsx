@@ -9,7 +9,8 @@ const meta: Meta<typeof IntegrationEntry> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Integration entry component that displays timeline entries for external service integrations like Google Drive, Google Sheets, Slack, and GitHub. Shows action history, metadata, and provides links to external resources.',
+        component:
+          'Integration entry component that displays timeline entries for external service integrations like Google Drive, Google Sheets, Slack, and GitHub. Shows action history, metadata, and provides links to external resources.',
       },
     },
   },
@@ -40,7 +41,8 @@ export const GoogleDriveDocument: Story = {
       timestamp: baseTimestamp,
       action: 'created',
       title: 'Project Requirements.docx',
-      description: 'Created comprehensive project requirements document with detailed specifications',
+      description:
+        'Created comprehensive project requirements document with detailed specifications',
       url: 'https://drive.google.com/file/d/example',
       fileType: 'document',
       sharedWith: ['john@example.com', 'jane@example.com'],
@@ -54,7 +56,8 @@ export const GoogleDriveDocument: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Google Drive document integration entry showing file creation with sharing information.',
+        story:
+          'Google Drive document integration entry showing file creation with sharing information.',
       },
     },
   },
@@ -82,7 +85,8 @@ export const GoogleSheetsAnalysis: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Google Sheets integration entry showing data analysis updates with row counts and collaborators.',
+        story:
+          'Google Sheets integration entry showing data analysis updates with row counts and collaborators.',
       },
     },
   },
@@ -99,7 +103,8 @@ export const SlackMessage: Story = {
       description: 'Posted update about feature completion and upcoming deployments',
       url: 'https://workspace.slack.com/messages/example',
       channel: '#development',
-      messagePreview: 'Feature XYZ is now complete and ready for testing. Deployment scheduled for tomorrow.',
+      messagePreview:
+        'Feature XYZ is now complete and ready for testing. Deployment scheduled for tomorrow.',
       reactions: [
         { emoji: '👍', count: 5 },
         { emoji: '🚀', count: 3 },
@@ -114,7 +119,8 @@ export const SlackMessage: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Slack integration entry showing message posting with channel, preview, and reactions.',
+        story:
+          'Slack integration entry showing message posting with channel, preview, and reactions.',
       },
     },
   },
@@ -142,7 +148,8 @@ export const GitHubPullRequest: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'GitHub integration entry showing pull request creation with repository info and commit count.',
+        story:
+          'GitHub integration entry showing pull request creation with repository info and commit count.',
       },
     },
   },
@@ -328,7 +335,8 @@ export const WithoutURL: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Integration entry without external URL - shows how the component handles internal resources.',
+        story:
+          'Integration entry without external URL - shows how the component handles internal resources.',
       },
     },
   },
@@ -474,7 +482,8 @@ export const ResponsiveDesign: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Integration entry responsive design showing how it adapts to different screen sizes.',
+        story:
+          'Integration entry responsive design showing how it adapts to different screen sizes.',
       },
     },
   },

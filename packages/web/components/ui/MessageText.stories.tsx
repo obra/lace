@@ -215,7 +215,8 @@ The text should flow naturally without any special formatting.`,
 
 export const OnlyInlineCode: Story = {
   args: {
-    content: 'Common JavaScript methods include `Array.map()`, `Array.filter()`, `Array.reduce()`, and `Object.keys()`.',
+    content:
+      'Common JavaScript methods include `Array.map()`, `Array.filter()`, `Array.reduce()`, and `Object.keys()`.',
   },
 };
 
@@ -310,10 +311,11 @@ export const ChatMessageExample: Story = {
         <div className="text-sm font-medium mb-2">Developer</div>
         <MessageText content="I'm having trouble with this React component. Can you help me debug it?" />
       </div>
-      
+
       <div className="bg-primary/10 p-4 rounded-lg">
         <div className="text-sm font-medium mb-2">Assistant</div>
-        <MessageText content={`I'd be happy to help! Can you share the component code? In the meantime, here's a common debugging approach:
+        <MessageText
+          content={`I'd be happy to help! Can you share the component code? In the meantime, here's a common debugging approach:
 
 1. Check the console for errors using \`console.log()\`
 2. Use React DevTools to inspect component state
@@ -336,12 +338,14 @@ function MyComponent({ prop1, prop2 }) {
 }
 \`\`\`
 
-What specific error are you seeing?`} />
+What specific error are you seeing?`}
+        />
       </div>
-      
+
       <div className="bg-base-200 p-4 rounded-lg">
         <div className="text-sm font-medium mb-2">Developer</div>
-        <MessageText content={`Here's the component that's not working:
+        <MessageText
+          content={`Here's the component that's not working:
 
 \`\`\`jsx
 function UserList() {
@@ -361,7 +365,8 @@ function UserList() {
 }
 \`\`\`
 
-The error says "Cannot read property 'map' of undefined"`} />
+The error says "Cannot read property 'map' of undefined"`}
+        />
       </div>
     </div>
   ),
@@ -380,24 +385,26 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 MessageText Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the message content below!
+          Enable tennis commentary in the toolbar above, then hover and click the message content
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Simple Text Message</h4>
           <MessageText content="This is a simple message that demonstrates basic text rendering without any code formatting." />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">With Inline Code</h4>
           <MessageText content="You can use the `useState` hook to manage component state and `useEffect` for side effects." />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">With Code Block</h4>
-          <MessageText content={`Here's a React component:
+          <MessageText
+            content={`Here's a React component:
 
 \`\`\`jsx
 function Welcome({ name }) {
@@ -405,28 +412,40 @@ function Welcome({ name }) {
 }
 \`\`\`
 
-Simple and clean!`} />
+Simple and clean!`}
+          />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Mixed Content</h4>
-          <MessageText content={`Install with \`npm install react\` then:
+          <MessageText
+            content={`Install with \`npm install react\` then:
 
 \`\`\`bash
 npm start
 \`\`\`
 
-Your app will be running on \`localhost:3000\`!`} />
+Your app will be running on \`localhost:3000\`!`}
+          />
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">Content Processing Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Code Block Parsing</strong> - Extracts fenced code blocks with language detection</li>
-          <li>• <strong>Inline Code Support</strong> - Handles backtick-wrapped inline code snippets</li>
-          <li>• <strong>Mixed Content</strong> - Seamlessly integrates text and code formatting</li>
-          <li>• <strong>Line Break Handling</strong> - Converts newlines to proper HTML breaks</li>
+          <li>
+            • <strong>Code Block Parsing</strong> - Extracts fenced code blocks with language
+            detection
+          </li>
+          <li>
+            • <strong>Inline Code Support</strong> - Handles backtick-wrapped inline code snippets
+          </li>
+          <li>
+            • <strong>Mixed Content</strong> - Seamlessly integrates text and code formatting
+          </li>
+          <li>
+            • <strong>Line Break Handling</strong> - Converts newlines to proper HTML breaks
+          </li>
         </ul>
       </div>
     </div>
@@ -434,7 +453,8 @@ Your app will be running on \`localhost:3000\`!`} />
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing MessageText with tennis commentary. Enable commentary in the toolbar and interact with the content!',
+        story:
+          'Interactive demo showcasing MessageText with tennis commentary. Enable commentary in the toolbar and interact with the content!',
       },
     },
   },

@@ -117,7 +117,7 @@ const DragDropDemo = ({ disabled = false, ...props }: DragDropDemoProps) => {
       createMockFile('image.jpg', 2048000, 'image/jpeg'),
       createMockFile('report.txt', 5120, 'text/plain'),
     ];
-    
+
     // Create a mock FileList
     const mockFileList = {
       length: mockFiles.length,
@@ -128,7 +128,7 @@ const DragDropDemo = ({ disabled = false, ...props }: DragDropDemoProps) => {
         }
       },
     } as FileList;
-    
+
     // Add array access using object property assignment
     mockFiles.forEach((file, index) => {
       Object.defineProperty(mockFileList, index.toString(), {
@@ -137,24 +137,20 @@ const DragDropDemo = ({ disabled = false, ...props }: DragDropDemoProps) => {
         configurable: true,
       });
     });
-    
+
     handleFilesDropped(mockFileList);
   };
 
   return (
     <div className="w-full max-w-2xl space-y-6">
-      <DragDropOverlay
-        onFilesDropped={handleFilesDropped}
-        disabled={disabled}
-        {...props}
-      >
+      <DragDropOverlay onFilesDropped={handleFilesDropped} disabled={disabled} {...props}>
         <div className="bg-base-200 border border-base-300 rounded-lg p-8 min-h-[300px] flex flex-col items-center justify-center text-center">
           <div className="text-4xl mb-4">📁</div>
           <h3 className="text-lg font-semibold mb-2">Drag & Drop Demo Area</h3>
           <p className="text-sm text-base-content/60 mb-4">
             Drag files here or click the button below to simulate file drop
           </p>
-          
+
           <button
             onClick={simulateFileDrop}
             disabled={disabled}
@@ -162,7 +158,7 @@ const DragDropDemo = ({ disabled = false, ...props }: DragDropDemoProps) => {
           >
             Simulate File Drop
           </button>
-          
+
           {droppedFiles.length > 0 && (
             <div className="w-full max-w-md">
               <h4 className="font-medium mb-3">Dropped Files ({lastDropTime}):</h4>
@@ -207,11 +203,11 @@ export const ChatInputExample: Story = {
 
     const handleFilesDropped = (files: FileList) => {
       const fileArray = Array.from(files);
-      setAttachedFiles(prev => [...prev, ...fileArray]);
+      setAttachedFiles((prev) => [...prev, ...fileArray]);
     };
 
     const removeFile = (index: number) => {
-      setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+      setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     return (
@@ -221,13 +217,11 @@ export const ChatInputExample: Story = {
             <div className="text-center text-sm text-base-content/60">
               Chat Input with File Drop
             </div>
-            
+
             {/* Attached Files */}
             {attachedFiles.length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs font-medium text-base-content/60">
-                  Attached Files:
-                </div>
+                <div className="text-xs font-medium text-base-content/60">Attached Files:</div>
                 {attachedFiles.map((file, index) => (
                   <div
                     key={index}
@@ -247,7 +241,7 @@ export const ChatInputExample: Story = {
                 ))}
               </div>
             )}
-            
+
             {/* Text Input */}
             <div className="flex gap-2">
               <input
@@ -279,7 +273,7 @@ export const DocumentUploadExample: Story = {
 
     const handleFilesDropped = (files: FileList) => {
       const fileArray = Array.from(files);
-      setUploadedFiles(prev => [...prev, ...fileArray]);
+      setUploadedFiles((prev) => [...prev, ...fileArray]);
     };
 
     return (
@@ -288,15 +282,13 @@ export const DocumentUploadExample: Story = {
           <div className="bg-base-100 border-2 border-dashed border-base-300 rounded-lg p-12 text-center">
             <div className="text-6xl mb-4">📄</div>
             <h3 className="text-xl font-semibold mb-2">Document Upload</h3>
-            <p className="text-base-content/60 mb-6">
-              Drag and drop your documents here to upload
-            </p>
-            
+            <p className="text-base-content/60 mb-6">Drag and drop your documents here to upload</p>
+
             <div className="space-y-2 text-sm text-base-content/60">
               <div>Supported formats: PDF, DOC, DOCX, TXT</div>
               <div>Maximum file size: 10MB</div>
             </div>
-            
+
             {uploadedFiles.length > 0 && (
               <div className="mt-6 pt-6 border-t border-base-300">
                 <h4 className="font-medium mb-3">Uploaded Files:</h4>
@@ -344,23 +336,32 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then drag files or click simulate!
         </p>
       </div>
-      
+
       <div className="cursor-pointer transition-transform hover:scale-[1.01]">
         <DragDropDemo />
       </div>
-      
+
       <div className="text-sm text-gray-600 space-y-1">
-        <p>• <strong>Drag files</strong> into the drop zone to see the overlay</p>
-        <p>• <strong>Click simulate</strong> to test without actual files</p>
-        <p>• <strong>Watch animations</strong> during drag and drop states</p>
-        <p>• <strong>Hover elements</strong> for tennis commentary feedback!</p>
+        <p>
+          • <strong>Drag files</strong> into the drop zone to see the overlay
+        </p>
+        <p>
+          • <strong>Click simulate</strong> to test without actual files
+        </p>
+        <p>
+          • <strong>Watch animations</strong> during drag and drop states
+        </p>
+        <p>
+          • <strong>Hover elements</strong> for tennis commentary feedback!
+        </p>
       </div>
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing drag and drop overlay with tennis commentary. Enable commentary in the toolbar and interact with the interface!',
+        story:
+          'Interactive demo showcasing drag and drop overlay with tennis commentary. Enable commentary in the toolbar and interact with the interface!',
       },
     },
   },

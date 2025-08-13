@@ -127,7 +127,10 @@ export const Default: Story = {
             </div>
             <div className="bg-primary/10 p-4 rounded-lg text-left">
               <div className="text-sm font-medium mb-2">Claude</div>
-              <div className="text-sm">Quantum computing is a fascinating field that leverages quantum mechanical phenomena...</div>
+              <div className="text-sm">
+                Quantum computing is a fascinating field that leverages quantum mechanical
+                phenomena...
+              </div>
             </div>
           </div>
         </div>
@@ -229,7 +232,7 @@ export const AnimationDemo: Story = {
     const startStreaming = () => {
       setIsStreaming(true);
       setStreamingTime(0);
-      
+
       const interval = setInterval(() => {
         setStreamingTime((prev) => {
           if (prev >= 10) {
@@ -277,18 +280,15 @@ export const AnimationDemo: Story = {
             </div>
           </div>
         </div>
-        <StreamingIndicator
-          isVisible={isStreaming}
-          agent="Claude"
-          onInterrupt={stopStreaming}
-        />
+        <StreamingIndicator isVisible={isStreaming} agent="Claude" onInterrupt={stopStreaming} />
       </div>
     );
   },
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showing streaming indicator appearing and disappearing with timer.',
+        story:
+          'Interactive demo showing streaming indicator appearing and disappearing with timer.',
       },
     },
   },
@@ -299,16 +299,23 @@ export const InChatInterface: Story = {
     const [isStreaming, setIsStreaming] = useState(false);
     const [messages, setMessages] = useState([
       { role: 'user', content: 'Hello, how can you help me today?' },
-      { role: 'assistant', content: 'Hi! I\'m here to help you with any questions or tasks you have.' },
+      {
+        role: 'assistant',
+        content: "Hi! I'm here to help you with any questions or tasks you have.",
+      },
     ]);
 
     const simulateResponse = () => {
       setIsStreaming(true);
       setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: 'This is a simulated streaming response that demonstrates how the indicator works in a real chat interface.' 
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              'This is a simulated streaming response that demonstrates how the indicator works in a real chat interface.',
+          },
+        ]);
         setIsStreaming(false);
       }, 3000);
     };
@@ -319,7 +326,7 @@ export const InChatInterface: Story = {
           <div className="p-4 border-b border-base-300">
             <h3 className="text-lg font-semibold">Chat with Claude</h3>
           </div>
-          
+
           <div className="flex-1 p-4 overflow-y-auto">
             <div className="space-y-4">
               {messages.map((message, index) => (
@@ -340,7 +347,7 @@ export const InChatInterface: Story = {
               ))}
             </div>
           </div>
-          
+
           <div className="p-4 border-t border-base-300">
             <div className="flex gap-2">
               <input
@@ -358,7 +365,7 @@ export const InChatInterface: Story = {
             </div>
           </div>
         </div>
-        
+
         <StreamingIndicator
           isVisible={isStreaming}
           agent="Claude"
@@ -412,10 +419,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 StreamingIndicator Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then interact with the streaming indicators!
+          Enable tennis commentary in the toolbar above, then interact with the streaming
+          indicators!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Basic Streaming</h4>
@@ -433,7 +441,7 @@ export const InteractiveDemo: Story = {
             />
           </div>
         </div>
-        
+
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Without Interrupt</h4>
           <div className="h-64 bg-base-200 rounded-lg relative">
@@ -443,23 +451,32 @@ export const InteractiveDemo: Story = {
                 <div className="text-sm">Generating response...</div>
               </div>
             </div>
-            <StreamingIndicator
-              isVisible={true}
-              agent="GPT-4"
-            />
+            <StreamingIndicator isVisible={true} agent="GPT-4" />
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">StreamingIndicator Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Agent Identification</strong> - Shows which AI is responding</li>
-          <li>• <strong>Animated Status</strong> - Pulsing dots indicate active streaming</li>
-          <li>• <strong>Interrupt Control</strong> - Stop button for user control</li>
-          <li>• <strong>Floating Design</strong> - Non-intrusive overlay positioning</li>
-          <li>• <strong>Keyboard Support</strong> - ESC key for quick interruption</li>
-          <li>• <strong>Auto-hide</strong> - Appears only when streaming is active</li>
+          <li>
+            • <strong>Agent Identification</strong> - Shows which AI is responding
+          </li>
+          <li>
+            • <strong>Animated Status</strong> - Pulsing dots indicate active streaming
+          </li>
+          <li>
+            • <strong>Interrupt Control</strong> - Stop button for user control
+          </li>
+          <li>
+            • <strong>Floating Design</strong> - Non-intrusive overlay positioning
+          </li>
+          <li>
+            • <strong>Keyboard Support</strong> - ESC key for quick interruption
+          </li>
+          <li>
+            • <strong>Auto-hide</strong> - Appears only when streaming is active
+          </li>
         </ul>
       </div>
     </div>
@@ -467,7 +484,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing StreamingIndicator with tennis commentary. Enable commentary in the toolbar and interact with the indicators!',
+        story:
+          'Interactive demo showcasing StreamingIndicator with tennis commentary. Enable commentary in the toolbar and interact with the indicators!',
       },
     },
   },

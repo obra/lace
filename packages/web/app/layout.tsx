@@ -16,12 +16,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${dmSans.className} ${dmSans.variable} ${lato.variable} ${jetBrainsMono.variable} antialiased`}>
+      <body
+        className={`${dmSans.className} ${dmSans.variable} ${lato.variable} ${jetBrainsMono.variable} antialiased`}
+      >
         <ConsoleForwardScript />
         <ErrorBoundary>
-          <ThemeProvider>
-            {children}
-          </ThemeProvider>
+          <ThemeProvider>{children}</ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

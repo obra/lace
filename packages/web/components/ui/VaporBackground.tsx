@@ -5,7 +5,11 @@ export interface VaporBackgroundProps extends React.HTMLAttributes<HTMLDivElemen
   intensity?: 'soft' | 'normal' | 'strong';
 }
 
-export function VaporBackground({ className, intensity = 'normal', ...rest }: VaporBackgroundProps) {
+export function VaporBackground({
+  className,
+  intensity = 'normal',
+  ...rest
+}: VaporBackgroundProps) {
   return (
     <div
       aria-hidden
@@ -17,20 +21,25 @@ export function VaporBackground({ className, intensity = 'normal', ...rest }: Va
           'absolute inset-0',
           intensity === 'soft' && 'opacity-60',
           intensity === 'normal' && 'opacity-80',
-          intensity === 'strong' && 'opacity-100',
+          intensity === 'strong' && 'opacity-100'
         )}
         style={{
           backgroundImage:
             'radial-gradient(1200px 700px at 15% -10%, rgba(34,197,94,.14), transparent 60%),\
              radial-gradient(1000px 600px at 85% 0%, rgba(59,130,246,.10), transparent 60%),\
-             linear-gradient(180deg, #0b0f0e, #121614)'
+             linear-gradient(180deg, #0b0f0e, #121614)',
         }}
       />
-      <div className="sunlines absolute inset-0 opacity-20"
-           style={{ backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,105,180,.10) 0 8px, transparent 8px 22px)' }}
+      <div
+        className="sunlines absolute inset-0 opacity-20"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(to bottom, rgba(255,105,180,.10) 0 8px, transparent 8px 22px)',
+        }}
       />
       <div className="noise absolute inset-0 opacity-35 mix-blend-overlay" />
-      <style>{`
+      <style>
+        {`
         .noise::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:url("data:image/svg+xml;utf8,\
           <svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>\
             <filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .06 0'/></filter>\

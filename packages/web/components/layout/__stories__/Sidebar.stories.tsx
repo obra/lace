@@ -13,7 +13,8 @@ const meta: Meta<typeof Sidebar> = {
     layout: 'fullscreen',
     docs: {
       description: {
-        component: 'A flexible, composable sidebar that accepts custom content through composition rather than props.',
+        component:
+          'A flexible, composable sidebar that accepts custom content through composition rather than props.',
       },
     },
   },
@@ -64,9 +65,7 @@ export const ProjectsOnly: Story = {
                   <span>{project.name}</span>
                 </div>
                 {project.sessionCount > 0 && (
-                  <span className="text-xs text-base-content/40">
-                    {project.sessionCount}
-                  </span>
+                  <span className="text-xs text-base-content/40">{project.sessionCount}</span>
                 )}
               </div>
             </SidebarItem>
@@ -97,9 +96,7 @@ export const ProjectsAndSessions: Story = {
                   <span>{project.name}</span>
                 </div>
                 {project.sessionCount > 0 && (
-                  <span className="text-xs text-base-content/40">
-                    {project.sessionCount}
-                  </span>
+                  <span className="text-xs text-base-content/40">{project.sessionCount}</span>
                 )}
               </div>
             </SidebarItem>
@@ -114,9 +111,7 @@ export const ProjectsAndSessions: Story = {
                   <FontAwesomeIcon icon={faComments} className="w-4 h-4" />
                   <span>{session.name}</span>
                 </div>
-                <span className="text-xs text-base-content/40">
-                  {session.agentCount} agents
-                </span>
+                <span className="text-xs text-base-content/40">{session.agentCount} agents</span>
               </div>
             </SidebarItem>
           ))}
@@ -150,9 +145,7 @@ export const FullHierarchy: Story = {
                   <span>{project.name}</span>
                 </div>
                 {project.sessionCount > 0 && (
-                  <span className="text-xs text-base-content/40">
-                    {project.sessionCount}
-                  </span>
+                  <span className="text-xs text-base-content/40">{project.sessionCount}</span>
                 )}
               </div>
             </SidebarItem>
@@ -167,9 +160,7 @@ export const FullHierarchy: Story = {
                   <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
                   <span>{agent.name}</span>
                 </div>
-                <span className="text-xs text-base-content/40">
-                  {agent.provider}
-                </span>
+                <span className="text-xs text-base-content/40">{agent.provider}</span>
               </div>
             </SidebarItem>
           ))}
@@ -245,15 +236,9 @@ export const ButtonVariants: Story = {
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
             Ghost Button
           </SidebarButton>
-          <SidebarButton size="sm">
-            Small Button
-          </SidebarButton>
-          <SidebarButton disabled>
-            Disabled Button
-          </SidebarButton>
-          <SidebarButton loading>
-            Loading Button
-          </SidebarButton>
+          <SidebarButton size="sm">Small Button</SidebarButton>
+          <SidebarButton disabled>Disabled Button</SidebarButton>
+          <SidebarButton loading>Loading Button</SidebarButton>
         </SidebarSection>
       </Sidebar>
       <div className="flex-1 bg-base-200 flex items-center justify-center">

@@ -37,11 +37,11 @@ interface ModelSelectionFormProps {
   className?: string;
 }
 
-export function ModelSelectionForm({ 
-  onSelectionChange, 
+export function ModelSelectionForm({
+  onSelectionChange,
   selectedInstanceId = '',
   selectedModelId = '',
-  className = ''
+  className = '',
 }: ModelSelectionFormProps) {
   const [instances, setInstances] = useState<ProviderInstance[]>([]);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
@@ -53,31 +53,36 @@ export function ModelSelectionForm({
     loadInstances();
   }, []);
 
-  const loadModelsForInstance = useCallback(async (instanceId: string) => {
-    try {
-      setModelsLoading(true);
-      setError(null);
-      const response = await fetch(`/api/provider/catalog`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load models: ${response.status}`);
+  const loadModelsForInstance = useCallback(
+    async (instanceId: string) => {
+      try {
+        setModelsLoading(true);
+        setError(null);
+        const response = await fetch(`/api/provider/catalog`);
+
+        if (!response.ok) {
+          throw new Error(`Failed to load models: ${response.status}`);
+        }
+
+        const data = await parseResponse<{ providers: Array<{ id: string; models: Model[] }> }>(
+          response
+        );
+
+        // Find the instance and get its catalog provider
+        const instance = instances.find((inst) => inst.id === instanceId);
+        if (instance) {
+          const catalogProvider = data.providers.find((p) => p.id === instance.catalogProviderId);
+          setAvailableModels(catalogProvider?.models || []);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load models');
+        setAvailableModels([]);
+      } finally {
+        setModelsLoading(false);
       }
-      
-      const data = await parseResponse<{ providers: Array<{ id: string; models: Model[] }> }>(response);
-      
-      // Find the instance and get its catalog provider
-      const instance = instances.find(inst => inst.id === instanceId);
-      if (instance) {
-        const catalogProvider = data.providers.find(p => p.id === instance.catalogProviderId);
-        setAvailableModels(catalogProvider?.models || []);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load models');
-      setAvailableModels([]);
-    } finally {
-      setModelsLoading(false);
-    }
-  }, [instances]);
+    },
+    [instances]
+  );
 
   useEffect(() => {
     if (selectedInstanceId) {
@@ -92,14 +97,14 @@ export function ModelSelectionForm({
       setLoading(true);
       setError(null);
       const response = await fetch('/api/provider/instances');
-      
+
       if (!response.ok) {
         throw new Error(`Failed to load instances: ${response.status}`);
       }
-      
+
       const data = await parseResponse<{ instances: ProviderInstance[] }>(response);
       // Only show instances with credentials
-      const configuredInstances = data.instances.filter(instance => instance.hasCredentials);
+      const configuredInstances = data.instances.filter((instance) => instance.hasCredentials);
       setInstances(configuredInstances);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load instances');
@@ -127,9 +132,12 @@ export function ModelSelectionForm({
   const getStatusIcon = (instance: ProviderInstance) => {
     const status = instance.status || 'untested';
     switch (status) {
-      case 'connected': return <StatusDot status="success" size="sm" />;
-      case 'error': return <StatusDot status="error" size="sm" />;
-      default: return <StatusDot status="warning" size="sm" />;
+      case 'connected':
+        return <StatusDot status="success" size="sm" />;
+      case 'error':
+        return <StatusDot status="error" size="sm" />;
+      default:
+        return <StatusDot status="warning" size="sm" />;
     }
   };
 
@@ -140,7 +148,7 @@ export function ModelSelectionForm({
   };
 
   const getSelectedModel = () => {
-    return availableModels.find(m => m.id === selectedModelId);
+    return availableModels.find((m) => m.id === selectedModelId);
   };
 
   if (loading) {
@@ -175,30 +183,34 @@ export function ModelSelectionForm({
         <label className="label">
           <span className="label-text font-medium">Provider Instance</span>
         </label>
-        <select 
+        <select
           className="select select-bordered w-full"
           value={selectedInstanceId}
           onChange={(e) => handleInstanceChange(e.target.value)}
         >
           <option value="">Select provider instance</option>
-          {instances.map(instance => (
+          {instances.map((instance) => (
             <option key={instance.id} value={instance.id}>
               {instance.displayName}
             </option>
           ))}
         </select>
-        
+
         {selectedInstanceId && (
           <div className="flex items-center space-x-2 mt-2">
             {(() => {
-              const instance = instances.find(inst => inst.id === selectedInstanceId);
+              const instance = instances.find((inst) => inst.id === selectedInstanceId);
               return instance ? (
                 <>
                   {getStatusIcon(instance)}
                   <span className="text-xs text-base-content/60">
-                    {instance.status === 'connected' ? 'Connected' : 
-                     instance.status === 'error' ? 'Connection Error' : 'Untested'} • 
-                    {availableModels.length} model{availableModels.length !== 1 ? 's' : ''} available
+                    {instance.status === 'connected'
+                      ? 'Connected'
+                      : instance.status === 'error'
+                        ? 'Connection Error'
+                        : 'Untested'}{' '}
+                    •{availableModels.length} model{availableModels.length !== 1 ? 's' : ''}{' '}
+                    available
                   </span>
                 </>
               ) : null;
@@ -210,7 +222,9 @@ export function ModelSelectionForm({
       {instances.length === 0 && (
         <div className="alert alert-info">
           <span>No provider instances configured. </span>
-          <a href="/providers" className="link">Configure providers</a>
+          <a href="/providers" className="link">
+            Configure providers
+          </a>
         </div>
       )}
 
@@ -219,7 +233,7 @@ export function ModelSelectionForm({
           <label className="label">
             <span className="label-text font-medium">Model</span>
           </label>
-          
+
           {modelsLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -228,7 +242,7 @@ export function ModelSelectionForm({
             </div>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {availableModels.map(model => (
+              {availableModels.map((model) => (
                 <label key={model.id} className="cursor-pointer">
                   <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-base-200 transition-colors">
                     <input
@@ -264,7 +278,12 @@ export function ModelSelectionForm({
             <div className="bg-info/20 p-3 rounded-lg mt-4">
               <div className="text-sm">
                 <div className="font-medium">
-                  Estimated cost: ~{formatPrice(getSelectedModel()!.cost_per_1m_in * 10 + getSelectedModel()!.cost_per_1m_out * 5)} per conversation
+                  Estimated cost: ~
+                  {formatPrice(
+                    getSelectedModel()!.cost_per_1m_in * 10 +
+                      getSelectedModel()!.cost_per_1m_out * 5
+                  )}{' '}
+                  per conversation
                 </div>
                 <div className="text-xs text-base-content/60 mt-1">
                   Based on typical usage patterns (10K input, 5K output tokens)

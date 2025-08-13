@@ -55,7 +55,9 @@ export default function MessageDisplay({
           <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
             <div className="text-base-content/80 mb-2 font-mono">$ {content}</div>
             {result && (
-              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">{result}</div>
+              <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
+                {result}
+              </div>
             )}
           </div>
         </div>
@@ -68,11 +70,7 @@ export default function MessageDisplay({
     return (
       <div className={`flex gap-3 ${className}`}>
         <div className="flex-1 min-w-0">
-          <MessageHeader
-            name={name || 'You'}
-            timestamp={timestamp}
-            role="user"
-          />
+          <MessageHeader name={name || 'You'} timestamp={timestamp} role="user" />
           <MessageText content={content} />
         </div>
       </div>
@@ -105,10 +103,7 @@ export default function MessageDisplay({
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <MessageHeader
-          name={name || 'Unknown'}
-          timestamp={timestamp}
-        />
+        <MessageHeader name={name || 'Unknown'} timestamp={timestamp} />
         <MessageText content={content} />
       </div>
     </div>

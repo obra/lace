@@ -2,7 +2,18 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import NavigationButton from './NavigationButton';
-import { faHome, faUser, faCog, faSearch, faPlus, faBell, faHeart, faBookmark, faFolder, faChart } from '@/lib/fontawesome';
+import {
+  faHome,
+  faUser,
+  faCog,
+  faSearch,
+  faPlus,
+  faBell,
+  faHeart,
+  faBookmark,
+  faFolder,
+  faChart,
+} from '@/lib/fontawesome';
 
 const meta: Meta<typeof NavigationButton> = {
   title: 'Atoms/NavigationButton',
@@ -204,12 +215,7 @@ export const Variants: Story = {
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium w-16">Sidebar:</span>
-        <NavigationButton
-          icon={faHome}
-          onClick={() => {}}
-          title="Home"
-          variant="sidebar"
-        />
+        <NavigationButton icon={faHome} onClick={() => {}} title="Home" variant="sidebar" />
         <NavigationButton
           icon={faHome}
           onClick={() => {}}
@@ -218,15 +224,10 @@ export const Variants: Story = {
           isActive={true}
         />
       </div>
-      
+
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium w-16">Toolbar:</span>
-        <NavigationButton
-          icon={faHome}
-          onClick={() => {}}
-          title="Home"
-          variant="toolbar"
-        />
+        <NavigationButton icon={faHome} onClick={() => {}} title="Home" variant="toolbar" />
         <NavigationButton
           icon={faHome}
           onClick={() => {}}
@@ -235,15 +236,10 @@ export const Variants: Story = {
           isActive={true}
         />
       </div>
-      
+
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium w-16">Minimal:</span>
-        <NavigationButton
-          icon={faHome}
-          onClick={() => {}}
-          title="Home"
-          variant="minimal"
-        />
+        <NavigationButton icon={faHome} onClick={() => {}} title="Home" variant="minimal" />
         <NavigationButton
           icon={faHome}
           onClick={() => {}}
@@ -266,66 +262,16 @@ export const Variants: Story = {
 export const IconVariations: Story = {
   render: () => (
     <div className="flex flex-wrap gap-2">
-      <NavigationButton
-        icon={faHome}
-        onClick={() => {}}
-        title="Home"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faUser}
-        onClick={() => {}}
-        title="Profile"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faCog}
-        onClick={() => {}}
-        title="Settings"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faSearch}
-        onClick={() => {}}
-        title="Search"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faPlus}
-        onClick={() => {}}
-        title="Add"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faBell}
-        onClick={() => {}}
-        title="Notifications"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faHeart}
-        onClick={() => {}}
-        title="Favorites"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faBookmark}
-        onClick={() => {}}
-        title="Bookmarks"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faFolder}
-        onClick={() => {}}
-        title="Files"
-        variant="sidebar"
-      />
-      <NavigationButton
-        icon={faChart}
-        onClick={() => {}}
-        title="Analytics"
-        variant="sidebar"
-      />
+      <NavigationButton icon={faHome} onClick={() => {}} title="Home" variant="sidebar" />
+      <NavigationButton icon={faUser} onClick={() => {}} title="Profile" variant="sidebar" />
+      <NavigationButton icon={faCog} onClick={() => {}} title="Settings" variant="sidebar" />
+      <NavigationButton icon={faSearch} onClick={() => {}} title="Search" variant="sidebar" />
+      <NavigationButton icon={faPlus} onClick={() => {}} title="Add" variant="sidebar" />
+      <NavigationButton icon={faBell} onClick={() => {}} title="Notifications" variant="sidebar" />
+      <NavigationButton icon={faHeart} onClick={() => {}} title="Favorites" variant="sidebar" />
+      <NavigationButton icon={faBookmark} onClick={() => {}} title="Bookmarks" variant="sidebar" />
+      <NavigationButton icon={faFolder} onClick={() => {}} title="Files" variant="sidebar" />
+      <NavigationButton icon={faChart} onClick={() => {}} title="Analytics" variant="sidebar" />
     </div>
   ),
   parameters: {
@@ -340,17 +286,17 @@ export const IconVariations: Story = {
 export const Interactive: Story = {
   render: () => {
     const [activeItem, setActiveItem] = useState('home');
-    
+
     const navItems = [
       { id: 'home', icon: faHome, title: 'Home' },
       { id: 'profile', icon: faUser, title: 'Profile' },
       { id: 'settings', icon: faCog, title: 'Settings' },
       { id: 'search', icon: faSearch, title: 'Search' },
     ];
-    
+
     return (
       <div className="flex gap-2">
-        {navItems.map(item => (
+        {navItems.map((item) => (
           <NavigationButton
             key={item.id}
             icon={item.icon}
@@ -375,19 +321,19 @@ export const Interactive: Story = {
 export const SidebarExample: Story = {
   render: () => {
     const [activeItem, setActiveItem] = useState('home');
-    
+
     const navItems = [
       { id: 'home', icon: faHome, title: 'Home' },
       { id: 'profile', icon: faUser, title: 'Profile' },
       { id: 'files', icon: faFolder, title: 'Files' },
       { id: 'settings', icon: faCog, title: 'Settings' },
     ];
-    
+
     return (
       <div className="w-64 bg-base-200 p-4 rounded-lg">
         <h3 className="font-semibold mb-4">Navigation</h3>
         <div className="space-y-2">
-          {navItems.map(item => (
+          {navItems.map((item) => (
             <div key={item.id} className="flex items-center gap-3">
               <NavigationButton
                 icon={item.icon}
@@ -415,7 +361,7 @@ export const SidebarExample: Story = {
 export const ToolbarExample: Story = {
   render: () => {
     const [activeItem, setActiveItem] = useState('home');
-    
+
     const navItems = [
       { id: 'home', icon: faHome, title: 'Home' },
       { id: 'search', icon: faSearch, title: 'Search' },
@@ -423,11 +369,11 @@ export const ToolbarExample: Story = {
       { id: 'notifications', icon: faBell, title: 'Notifications' },
       { id: 'profile', icon: faUser, title: 'Profile' },
     ];
-    
+
     return (
       <div className="bg-base-100 border border-base-300 rounded-lg p-2">
         <div className="flex gap-1">
-          {navItems.map(item => (
+          {navItems.map((item) => (
             <NavigationButton
               key={item.id}
               icon={item.icon}
@@ -456,18 +402,13 @@ export const StatesShowcase: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-4">All States</h3>
       </div>
-      
+
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center space-y-2">
           <h4 className="font-medium text-sm">Normal</h4>
-          <NavigationButton
-            icon={faHome}
-            onClick={() => {}}
-            title="Home"
-            variant="sidebar"
-          />
+          <NavigationButton icon={faHome} onClick={() => {}} title="Home" variant="sidebar" />
         </div>
-        
+
         <div className="text-center space-y-2">
           <h4 className="font-medium text-sm">Active</h4>
           <NavigationButton
@@ -478,7 +419,7 @@ export const StatesShowcase: Story = {
             variant="sidebar"
           />
         </div>
-        
+
         <div className="text-center space-y-2">
           <h4 className="font-medium text-sm">Disabled</h4>
           <NavigationButton
@@ -490,7 +431,7 @@ export const StatesShowcase: Story = {
           />
         </div>
       </div>
-      
+
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center space-y-2">
           <h4 className="font-medium text-sm">Small</h4>
@@ -502,7 +443,7 @@ export const StatesShowcase: Story = {
             variant="sidebar"
           />
         </div>
-        
+
         <div className="text-center space-y-2">
           <h4 className="font-medium text-sm">Medium</h4>
           <NavigationButton
@@ -513,7 +454,7 @@ export const StatesShowcase: Story = {
             variant="sidebar"
           />
         </div>
-        
+
         <div className="text-center space-y-2">
           <h4 className="font-medium text-sm">Large</h4>
           <NavigationButton
@@ -542,10 +483,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 NavigationButton Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the navigation buttons below!
+          Enable tennis commentary in the toolbar above, then hover and click the navigation buttons
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Sidebar Navigation</h4>
@@ -580,7 +522,7 @@ export const InteractiveDemo: Story = {
             </div>
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Toolbar Navigation</h4>
           <div className="bg-base-100 border border-base-300 rounded-lg p-2">
@@ -613,7 +555,7 @@ export const InteractiveDemo: Story = {
             </div>
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Minimal Navigation</h4>
           <div className="flex gap-4">
@@ -644,7 +586,7 @@ export const InteractiveDemo: Story = {
             />
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Size Variations</h4>
           <div className="flex items-center gap-4">
@@ -677,7 +619,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing navigation buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
+        story:
+          'Interactive demo showcasing navigation buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
       },
     },
   },

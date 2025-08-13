@@ -165,7 +165,7 @@ export const LongTitle: Story = {
 export const Interactive: Story = {
   render: () => {
     const [isExpanded, setIsExpanded] = useState(false);
-    
+
     return (
       <div className="w-80">
         <ExpandableHeader
@@ -183,7 +183,7 @@ export const Interactive: Story = {
             />
           }
         />
-        
+
         {isExpanded && (
           <div className="p-4 bg-base-100 border-l-2 border-primary">
             <p className="text-sm">This content is revealed when the header is expanded.</p>
@@ -208,14 +208,14 @@ export const NavigationExample: Story = {
       files: true,
       settings: false,
     });
-    
+
     const toggleSection = (section: keyof typeof sections) => {
-      setSections(prev => ({
+      setSections((prev) => ({
         ...prev,
         [section]: !prev[section],
       }));
     };
-    
+
     return (
       <div className="w-80 border border-base-300 rounded-lg overflow-hidden">
         <ExpandableHeader
@@ -233,7 +233,7 @@ export const NavigationExample: Story = {
             />
           }
         />
-        
+
         <ExpandableHeader
           title="Recent Files"
           isExpanded={sections.files}
@@ -249,7 +249,7 @@ export const NavigationExample: Story = {
             />
           }
         />
-        
+
         <ExpandableHeader
           title="Settings"
           isExpanded={sections.settings}
@@ -282,27 +282,14 @@ export const StatesShowcase: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-4">All States</h3>
       </div>
-      
+
       <div className="border border-base-300 rounded-lg overflow-hidden">
-        <ExpandableHeader
-          title="Collapsed Section"
-          isExpanded={false}
-          onToggle={() => {}}
-        />
-        
-        <ExpandableHeader
-          title="Expanded Section"
-          isExpanded={true}
-          onToggle={() => {}}
-        />
-        
-        <ExpandableHeader
-          title="With Badge"
-          isExpanded={false}
-          badge="5"
-          onToggle={() => {}}
-        />
-        
+        <ExpandableHeader title="Collapsed Section" isExpanded={false} onToggle={() => {}} />
+
+        <ExpandableHeader title="Expanded Section" isExpanded={true} onToggle={() => {}} />
+
+        <ExpandableHeader title="With Badge" isExpanded={false} badge="5" onToggle={() => {}} />
+
         <ExpandableHeader
           title="With Actions"
           isExpanded={true}
@@ -348,7 +335,7 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the headers below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
@@ -370,7 +357,7 @@ export const InteractiveDemo: Story = {
             }
           />
         </div>
-        
+
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
             <h4 className="font-medium text-sm">Task Management</h4>
@@ -391,7 +378,7 @@ export const InteractiveDemo: Story = {
             }
           />
         </div>
-        
+
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
             <h4 className="font-medium text-sm">Settings Panel</h4>
@@ -411,7 +398,7 @@ export const InteractiveDemo: Story = {
             }
           />
         </div>
-        
+
         <div className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
           <div className="p-2 bg-base-200">
             <h4 className="font-medium text-sm">File Explorer</h4>
@@ -447,7 +434,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing expandable headers with tennis commentary. Enable commentary in the toolbar and interact with the headers!',
+        story:
+          'Interactive demo showcasing expandable headers with tennis commentary. Enable commentary in the toolbar and interact with the headers!',
       },
     },
   },

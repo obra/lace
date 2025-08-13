@@ -11,7 +11,8 @@ const meta: Meta<typeof Carousel> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Responsive carousel component with navigation, dots, auto-scroll, and touch/keyboard support. Displays multiple items per view with customizable breakpoints and smooth transitions.',
+        component:
+          'Responsive carousel component with navigation, dots, auto-scroll, and touch/keyboard support. Displays multiple items per view with customizable breakpoints and smooth transitions.',
       },
     },
   },
@@ -52,8 +53,18 @@ export default meta;
 type Story = StoryObj<typeof Carousel>;
 
 // Sample card component for testing
-const SampleCard = ({ title, content, color = 'bg-primary' }: { title: string; content: string; color?: string }) => (
-  <div className={`${color} text-primary-content rounded-lg p-4 min-h-[200px] flex flex-col justify-between w-full`}>
+const SampleCard = ({
+  title,
+  content,
+  color = 'bg-primary',
+}: {
+  title: string;
+  content: string;
+  color?: string;
+}) => (
+  <div
+    className={`${color} text-primary-content rounded-lg p-4 min-h-[200px] flex flex-col justify-between w-full`}
+  >
     <h3 className="font-semibold text-lg">{title}</h3>
     <p className="text-sm opacity-90">{content}</p>
     <div className="flex justify-between items-center mt-2">
@@ -129,12 +140,42 @@ export const Default: Story = {
       </div>
       <Carousel {...args}>
         {[
-          <SampleCard key="1" title="Product A" content="High-quality product with excellent features" color="bg-primary" />,
-          <SampleCard key="2" title="Product B" content="Innovative solution for modern challenges" color="bg-secondary" />,
-          <SampleCard key="3" title="Product C" content="Reliable and efficient performance" color="bg-accent" />,
-          <SampleCard key="4" title="Product D" content="User-friendly design with premium quality" color="bg-success" />,
-          <SampleCard key="5" title="Product E" content="Advanced technology with seamless integration" color="bg-warning" />,
-          <SampleCard key="6" title="Product F" content="Comprehensive solution for all your needs" color="bg-error" />,
+          <SampleCard
+            key="1"
+            title="Product A"
+            content="High-quality product with excellent features"
+            color="bg-primary"
+          />,
+          <SampleCard
+            key="2"
+            title="Product B"
+            content="Innovative solution for modern challenges"
+            color="bg-secondary"
+          />,
+          <SampleCard
+            key="3"
+            title="Product C"
+            content="Reliable and efficient performance"
+            color="bg-accent"
+          />,
+          <SampleCard
+            key="4"
+            title="Product D"
+            content="User-friendly design with premium quality"
+            color="bg-success"
+          />,
+          <SampleCard
+            key="5"
+            title="Product E"
+            content="Advanced technology with seamless integration"
+            color="bg-warning"
+          />,
+          <SampleCard
+            key="6"
+            title="Product F"
+            content="Comprehensive solution for all your needs"
+            color="bg-error"
+          />,
         ]}
       </Carousel>
     </div>
@@ -142,7 +183,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default carousel with navigation arrows, dots, and responsive design showing 1-3 items per view.',
+        story:
+          'Default carousel with navigation arrows, dots, and responsive design showing 1-3 items per view.',
       },
     },
   },
@@ -170,10 +212,30 @@ export const AutoScroll: Story = {
       </div>
       <Carousel {...args}>
         {[
-          <SampleCard key="1" title="Announcement 1" content="Important update about our services" color="bg-info" />,
-          <SampleCard key="2" title="Announcement 2" content="New features now available" color="bg-success" />,
-          <SampleCard key="3" title="Announcement 3" content="Upcoming maintenance schedule" color="bg-warning" />,
-          <SampleCard key="4" title="Announcement 4" content="Customer testimonials" color="bg-primary" />,
+          <SampleCard
+            key="1"
+            title="Announcement 1"
+            content="Important update about our services"
+            color="bg-info"
+          />,
+          <SampleCard
+            key="2"
+            title="Announcement 2"
+            content="New features now available"
+            color="bg-success"
+          />,
+          <SampleCard
+            key="3"
+            title="Announcement 3"
+            content="Upcoming maintenance schedule"
+            color="bg-warning"
+          />,
+          <SampleCard
+            key="4"
+            title="Announcement 4"
+            content="Customer testimonials"
+            color="bg-primary"
+          />,
         ]}
       </Carousel>
     </div>
@@ -181,7 +243,8 @@ export const AutoScroll: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Auto-scrolling carousel that automatically advances every 3 seconds. Interaction pauses auto-scroll.',
+        story:
+          'Auto-scrolling carousel that automatically advances every 3 seconds. Interaction pauses auto-scroll.',
       },
     },
   },
@@ -249,10 +312,30 @@ export const MinimalCarousel: Story = {
       </div>
       <Carousel {...args}>
         {[
-          <SampleCard key="1" title="Image 1" content="Beautiful landscape photo" color="bg-primary" />,
-          <SampleCard key="2" title="Image 2" content="Urban architecture shot" color="bg-secondary" />,
-          <SampleCard key="3" title="Image 3" content="Natural wildlife capture" color="bg-accent" />,
-          <SampleCard key="4" title="Image 4" content="Abstract art composition" color="bg-success" />,
+          <SampleCard
+            key="1"
+            title="Image 1"
+            content="Beautiful landscape photo"
+            color="bg-primary"
+          />,
+          <SampleCard
+            key="2"
+            title="Image 2"
+            content="Urban architecture shot"
+            color="bg-secondary"
+          />,
+          <SampleCard
+            key="3"
+            title="Image 3"
+            content="Natural wildlife capture"
+            color="bg-accent"
+          />,
+          <SampleCard
+            key="4"
+            title="Image 4"
+            content="Abstract art composition"
+            color="bg-success"
+          />,
         ]}
       </Carousel>
     </div>
@@ -260,7 +343,8 @@ export const MinimalCarousel: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Minimal carousel without navigation arrows or dots. Supports touch/swipe gestures and keyboard navigation.',
+        story:
+          'Minimal carousel without navigation arrows or dots. Supports touch/swipe gestures and keyboard navigation.',
       },
     },
   },
@@ -283,15 +367,24 @@ export const SingleItemView: Story = {
       </div>
       <Carousel {...args}>
         {[
-          <div key="1" className="w-full bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-lg p-8 min-h-[300px] flex flex-col justify-center items-center">
+          <div
+            key="1"
+            className="w-full bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-lg p-8 min-h-[300px] flex flex-col justify-center items-center"
+          >
             <h3 className="text-2xl font-bold mb-4">Welcome</h3>
             <p className="text-center opacity-90">Start your journey with us</p>
           </div>,
-          <div key="2" className="w-full bg-gradient-to-br from-blue-500 to-teal-500 text-white rounded-lg p-8 min-h-[300px] flex flex-col justify-center items-center">
+          <div
+            key="2"
+            className="w-full bg-gradient-to-br from-blue-500 to-teal-500 text-white rounded-lg p-8 min-h-[300px] flex flex-col justify-center items-center"
+          >
             <h3 className="text-2xl font-bold mb-4">Explore</h3>
             <p className="text-center opacity-90">Discover amazing features</p>
           </div>,
-          <div key="3" className="w-full bg-gradient-to-br from-green-500 to-blue-500 text-white rounded-lg p-8 min-h-[300px] flex flex-col justify-center items-center">
+          <div
+            key="3"
+            className="w-full bg-gradient-to-br from-green-500 to-blue-500 text-white rounded-lg p-8 min-h-[300px] flex flex-col justify-center items-center"
+          >
             <h3 className="text-2xl font-bold mb-4">Create</h3>
             <p className="text-center opacity-90">Build something amazing</p>
           </div>,
@@ -330,10 +423,10 @@ export const ResponsiveItems: Story = {
       </div>
       <Carousel {...args}>
         {Array.from({ length: 12 }, (_, i) => (
-          <SampleCard 
-            key={i} 
-            title={`Item ${i + 1}`} 
-            content={`Description for item ${i + 1}`} 
+          <SampleCard
+            key={i}
+            title={`Item ${i + 1}`}
+            content={`Description for item ${i + 1}`}
             color={`bg-${['primary', 'secondary', 'accent', 'success', 'warning', 'error'][i % 6]}`}
           />
         ))}
@@ -364,9 +457,7 @@ export const EmptyState: Story = {
           Carousel with no items (should render nothing)
         </p>
       </div>
-      <Carousel {...args}>
-        {[]}
-      </Carousel>
+      <Carousel {...args}>{[]}</Carousel>
       <div className="mt-4 p-4 bg-base-200 rounded-lg text-center">
         <p className="text-sm text-base-content/60">
           No carousel is rendered when there are no items
@@ -395,21 +486,28 @@ export const CustomStyling: Story = {
     <div className="w-full max-w-4xl mx-auto">
       <div className="mb-4">
         <h3 className="text-lg font-semibold mb-2">Custom Styling</h3>
-        <p className="text-sm text-base-content/60">
-          Carousel with custom background and padding
-        </p>
+        <p className="text-sm text-base-content/60">Carousel with custom background and padding</p>
       </div>
       <Carousel {...args}>
         {[
-          <div key="1" className="bg-white rounded-lg p-4 min-h-[200px] flex flex-col justify-center items-center shadow-lg">
+          <div
+            key="1"
+            className="bg-white rounded-lg p-4 min-h-[200px] flex flex-col justify-center items-center shadow-lg"
+          >
             <h3 className="text-lg font-semibold text-gray-800 mb-2">Custom Card 1</h3>
             <p className="text-sm text-gray-600 text-center">Styled with custom background</p>
           </div>,
-          <div key="2" className="bg-white rounded-lg p-4 min-h-[200px] flex flex-col justify-center items-center shadow-lg">
+          <div
+            key="2"
+            className="bg-white rounded-lg p-4 min-h-[200px] flex flex-col justify-center items-center shadow-lg"
+          >
             <h3 className="text-lg font-semibold text-gray-800 mb-2">Custom Card 2</h3>
             <p className="text-sm text-gray-600 text-center">Consistent styling theme</p>
           </div>,
-          <div key="3" className="bg-white rounded-lg p-4 min-h-[200px] flex flex-col justify-center items-center shadow-lg">
+          <div
+            key="3"
+            className="bg-white rounded-lg p-4 min-h-[200px] flex flex-col justify-center items-center shadow-lg"
+          >
             <h3 className="text-lg font-semibold text-gray-800 mb-2">Custom Card 3</h3>
             <p className="text-sm text-gray-600 text-center">Professional appearance</p>
           </div>,
@@ -438,9 +536,7 @@ export const InteractionDemo: Story = {
     <div className="w-full max-w-4xl mx-auto">
       <div className="mb-4">
         <h3 className="text-lg font-semibold mb-2">Interaction Demo</h3>
-        <p className="text-sm text-base-content/60">
-          Try different interaction methods:
-        </p>
+        <p className="text-sm text-base-content/60">Try different interaction methods:</p>
         <div className="flex flex-wrap gap-2 mt-2">
           <div className="badge badge-outline">Click arrows</div>
           <div className="badge badge-outline">Click dots</div>
@@ -451,23 +547,38 @@ export const InteractionDemo: Story = {
       </div>
       <Carousel {...args}>
         {[
-          <div key="1" className="bg-primary text-primary-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full">
+          <div
+            key="1"
+            className="bg-primary text-primary-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full"
+          >
             <h3 className="text-xl font-bold mb-2">🎯 Interaction 1</h3>
             <p className="text-center">Click the arrow buttons to navigate</p>
           </div>,
-          <div key="2" className="bg-secondary text-secondary-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full">
+          <div
+            key="2"
+            className="bg-secondary text-secondary-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full"
+          >
             <h3 className="text-xl font-bold mb-2">🎨 Interaction 2</h3>
             <p className="text-center">Click the dots below to jump to any page</p>
           </div>,
-          <div key="3" className="bg-accent text-accent-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full">
+          <div
+            key="3"
+            className="bg-accent text-accent-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full"
+          >
             <h3 className="text-xl font-bold mb-2">📱 Interaction 3</h3>
             <p className="text-center">Swipe or drag on touch devices</p>
           </div>,
-          <div key="4" className="bg-success text-success-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full">
+          <div
+            key="4"
+            className="bg-success text-success-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full"
+          >
             <h3 className="text-xl font-bold mb-2">⌨️ Interaction 4</h3>
             <p className="text-center">Use arrow keys when focused</p>
           </div>,
-          <div key="5" className="bg-warning text-warning-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full">
+          <div
+            key="5"
+            className="bg-warning text-warning-content rounded-lg p-6 min-h-[250px] flex flex-col justify-center items-center w-full"
+          >
             <h3 className="text-xl font-bold mb-2">🔄 Interaction 5</h3>
             <p className="text-center">Auto-scroll pauses when you interact</p>
           </div>,
@@ -478,7 +589,8 @@ export const InteractionDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive carousel demonstrating all supported interaction methods including navigation, touch, keyboard, and auto-scroll.',
+        story:
+          'Interactive carousel demonstrating all supported interaction methods including navigation, touch, keyboard, and auto-scroll.',
       },
     },
   },

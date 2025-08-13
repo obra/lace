@@ -21,13 +21,13 @@ export function ModelDropdown({
   selectedProvider,
   selectedModel,
   onChange,
-  className = "select select-bordered w-full",
+  className = 'select select-bordered w-full',
   disabled = false,
-  label
+  label,
 }: ModelDropdownProps) {
   // Get available models for the selected provider
   const availableModels = useMemo(() => {
-    const provider = providers.find(p => p.name === selectedProvider);
+    const provider = providers.find((p) => p.name === selectedProvider);
     return provider?.models || [];
   }, [providers, selectedProvider]);
 
@@ -52,7 +52,9 @@ export function ModelDropdown({
           ))
         ) : (
           <option disabled value="">
-            {selectedProvider ? `No models available for ${selectedProvider}` : 'Select a provider first'}
+            {selectedProvider
+              ? `No models available for ${selectedProvider}`
+              : 'Select a provider first'}
           </option>
         )}
       </select>

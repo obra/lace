@@ -40,9 +40,7 @@ export const fileWriteRenderer: ToolRenderer = {
       );
     }
 
-    const content = result.content
-      .map(block => block.text || '')
-      .join('');
+    const content = result.content.map((block) => block.text || '').join('');
 
     const isError = fileWriteRenderer.isError!(result);
 
@@ -51,7 +49,10 @@ export const fileWriteRenderer: ToolRenderer = {
         <div className="bg-error/5 border border-error/20 rounded-lg">
           <div className="px-3 py-2 border-b border-error/20 bg-error/10">
             <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4 text-error flex-shrink-0" />
+              <FontAwesomeIcon
+                icon={faExclamationTriangle}
+                className="w-4 h-4 text-error flex-shrink-0"
+              />
               <span className="text-error font-medium text-sm">Write Failed</span>
             </div>
           </div>
@@ -65,24 +66,29 @@ export const fileWriteRenderer: ToolRenderer = {
     }
 
     // Extract file path and content from arguments
-    const filePath = typeof metadata?.arguments === 'object' && metadata?.arguments !== null 
-      ? (metadata.arguments as { path?: string }).path 
-      : undefined;
-    
-    const fileContent = typeof metadata?.arguments === 'object' && metadata?.arguments !== null 
-      ? (metadata.arguments as { content?: string }).content 
-      : undefined;
-    
+    const filePath =
+      typeof metadata?.arguments === 'object' && metadata?.arguments !== null
+        ? (metadata.arguments as { path?: string }).path
+        : undefined;
+
+    const fileContent =
+      typeof metadata?.arguments === 'object' && metadata?.arguments !== null
+        ? (metadata.arguments as { content?: string }).content
+        : undefined;
+
     // Extract metadata from result
-    const resultMetadata = result.metadata as { 
-      bytesWritten?: number;
-      fileSize?: string;
-    } | undefined;
-    
+    const resultMetadata = result.metadata as
+      | {
+          bytesWritten?: number;
+          fileSize?: string;
+        }
+      | undefined;
+
     // Extract size info from the content message or metadata
     const sizeMatch = content.match(/(\d+(?:\.\d+)?)\s*(bytes?|KB|MB|GB)/i);
-    const displaySize = resultMetadata?.fileSize || (sizeMatch ? `${sizeMatch[1]} ${sizeMatch[2]}` : undefined);
-    
+    const displaySize =
+      resultMetadata?.fileSize || (sizeMatch ? `${sizeMatch[1]} ${sizeMatch[2]}` : undefined);
+
     return (
       <div className="bg-success/5 border border-success/20 rounded-lg">
         {/* File content that was written */}

@@ -7,11 +7,11 @@ interface TimestampDisplayProps {
   className?: string;
 }
 
-export default function TimestampDisplay({ 
-  timestamp, 
-  format = 'time', 
+export default function TimestampDisplay({
+  timestamp,
+  format = 'time',
   size = 'xs',
-  className = '' 
+  className = '',
 }: TimestampDisplayProps) {
   const sizeClasses = {
     xs: 'text-xs',
@@ -21,7 +21,7 @@ export default function TimestampDisplay({
 
   const formatTimestamp = (ts: Date | string): string => {
     const date = typeof ts === 'string' ? new Date(ts) : ts;
-    
+
     switch (format) {
       case 'time':
         return formatTime(date);
@@ -45,7 +45,7 @@ export default function TimestampDisplay({
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return date.toLocaleDateString();
   };
 

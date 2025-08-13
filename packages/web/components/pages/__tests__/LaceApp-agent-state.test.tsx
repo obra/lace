@@ -14,7 +14,7 @@ import type { SessionInfo, AgentInfo, AgentState } from '@/types/core';
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';
 
-// Use real theme provider instead of mocking internal business logic  
+// Use real theme provider instead of mocking internal business logic
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 // Use vi.hoisted to ensure mock functions are available during hoisting
@@ -27,21 +27,33 @@ const mockFetch = vi.hoisted(() => vi.fn());
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.ComponentProps<'div'>) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: React.ComponentProps<'button'>) => <button {...props}>{children}</button>,
+    button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+      <button {...props}>{children}</button>
+    ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 // Mock child components to avoid complex dependencies
 vi.mock('@/components/layout/Sidebar', () => ({
-  Sidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar">{children}</div>,
-  SidebarSection: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-section">{children}</div>,
-  SidebarItem: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-item">{children}</div>,
-  SidebarButton: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-button">{children}</div>,
+  Sidebar: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar">{children}</div>
+  ),
+  SidebarSection: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-section">{children}</div>
+  ),
+  SidebarItem: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-item">{children}</div>
+  ),
+  SidebarButton: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-button">{children}</div>
+  ),
 }));
 
 vi.mock('@/components/layout/MobileSidebar', () => ({
-  MobileSidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="mobile-sidebar">{children}</div>,
+  MobileSidebar: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="mobile-sidebar">{children}</div>
+  ),
 }));
 
 vi.mock('@/components/timeline/TimelineView', () => ({
@@ -71,7 +83,9 @@ vi.mock('@/components/config/SessionConfigPanel', () => ({
 }));
 
 vi.mock('@/components/config/ProjectSelectorPanel', () => ({
-  ProjectSelectorPanel: () => <div data-testid="project-selector-panel">Project Selector Panel</div>,
+  ProjectSelectorPanel: () => (
+    <div data-testid="project-selector-panel">Project Selector Panel</div>
+  ),
 }));
 
 vi.mock('@/lib/timeline-converter', () => ({
@@ -112,16 +126,12 @@ vi.mock('@/hooks/useEventStream', () => ({
   useEventStream: mockUseEventStream,
 }));
 
-// Mock fetch for API calls 
+// Mock fetch for API calls
 global.fetch = mockFetch as unknown as typeof fetch;
 
 // Helper to render with real theme provider
 const renderWithProviders = (component: React.ReactElement) => {
-  return render(
-    <ThemeProvider>
-      {component}
-    </ThemeProvider>
-  );
+  return render(<ThemeProvider>{component}</ThemeProvider>);
 };
 
 // Helper to render with proper act() wrapping to avoid warnings
@@ -129,7 +139,7 @@ const renderWithProvidersAsync = async (component: React.ReactElement) => {
   let result!: ReturnType<typeof renderWithProviders>;
   await act(async () => {
     result = renderWithProviders(component);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   });
   return result;
 };
@@ -139,7 +149,7 @@ describe('LaceApp agent state handling', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Set up default hash router state
     mockUseHashRouter.mockReturnValue({
       project: 'test-project',
@@ -167,7 +177,7 @@ describe('LaceApp agent state handling', () => {
         json: () => Promise.resolve(data),
         text: () => Promise.resolve(stringify(data)),
       });
-      
+
       if (url.includes('/api/projects')) {
         return Promise.resolve(mockResponse({ projects: [] }));
       }
@@ -208,13 +218,15 @@ describe('LaceApp agent state handling', () => {
       id: asThreadId('lace_20250101_sess01'),
       name: 'Test Session',
       createdAt: new Date(),
-      agents: [{
-        threadId: asThreadId('lace_20250101_agent1'),
-        name: 'Test Agent',
-        providerInstanceId: 'test-anthropic-instance',
-        modelId: 'claude-3-5-haiku-20241022',
-        status: 'idle' as AgentState,
-      }],
+      agents: [
+        {
+          threadId: asThreadId('lace_20250101_agent1'),
+          name: 'Test Agent',
+          providerInstanceId: 'test-anthropic-instance',
+          modelId: 'claude-3-5-haiku-20241022',
+          status: 'idle' as AgentState,
+        },
+      ],
     };
 
     // Act: Simulate agent state change to thinking
@@ -222,7 +234,7 @@ describe('LaceApp agent state handling', () => {
       if (onAgentStateChangeCallback) {
         onAgentStateChangeCallback('lace_20250101_agent1', 'idle', 'thinking');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Need to trigger a re-render to see the updated state
@@ -243,7 +255,7 @@ describe('LaceApp agent state handling', () => {
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act: Simulate agent state change to streaming
@@ -251,7 +263,7 @@ describe('LaceApp agent state handling', () => {
       if (onAgentStateChangeCallback) {
         onAgentStateChangeCallback('lace_20250101_agent1', 'thinking', 'streaming');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Trigger re-render
@@ -271,7 +283,7 @@ describe('LaceApp agent state handling', () => {
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act: Simulate agent state change to tool_execution
@@ -279,7 +291,7 @@ describe('LaceApp agent state handling', () => {
       if (onAgentStateChangeCallback) {
         onAgentStateChangeCallback('lace_20250101_agent1', 'streaming', 'tool_execution');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Trigger re-render
@@ -299,7 +311,7 @@ describe('LaceApp agent state handling', () => {
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act: Simulate agent state change back to idle
@@ -307,7 +319,7 @@ describe('LaceApp agent state handling', () => {
       if (onAgentStateChangeCallback) {
         onAgentStateChangeCallback('lace_20250101_agent1', 'tool_execution', 'idle');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Trigger re-render
@@ -327,7 +339,7 @@ describe('LaceApp agent state handling', () => {
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act: Simulate state changes for different agents
@@ -337,7 +349,7 @@ describe('LaceApp agent state handling', () => {
         onAgentStateChangeCallback('lace_20250101_agent3', 'idle', 'streaming');
         onAgentStateChangeCallback('lace_20250101_agent1', 'idle', 'tool_execution');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Trigger re-render
@@ -357,7 +369,7 @@ describe('LaceApp agent state handling', () => {
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act: Simulate state change for a different agent
@@ -365,7 +377,7 @@ describe('LaceApp agent state handling', () => {
       if (onAgentStateChangeCallback) {
         onAgentStateChangeCallback('lace_20250101_other1', 'idle', 'thinking');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Trigger re-render
@@ -385,7 +397,7 @@ describe('LaceApp agent state handling', () => {
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act: Simulate malformed state change calls
@@ -395,7 +407,7 @@ describe('LaceApp agent state handling', () => {
         onAgentStateChangeCallback('', '', '');
         onAgentStateChangeCallback('lace_20250101_agent1', 'invalid-from', 'invalid-to');
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Trigger re-render
@@ -412,13 +424,13 @@ describe('LaceApp agent state handling', () => {
   it('should update selectedSessionDetails when agent state changes', async () => {
     // This test verifies the internal logic of handleAgentStateChange
     // We can't directly test the state update, but we can verify the callback structure
-    
+
     // Arrange: Render component
     renderWithProviders(<LaceApp />);
 
     // Wait for initial setup
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
 
     // Act & Assert: Verify the callback was registered correctly

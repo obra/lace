@@ -10,8 +10,9 @@ const PORT_FILE = join(process.cwd(), '.playwright-server-url');
 
 function startServer() {
   // Use E2E test server for tool approval tests, regular server otherwise
-  const serverFile = process.env.E2E_TOOL_APPROVAL_MOCK === 'true' ? 'e2e-test-server.ts' : 'server.ts';
-  
+  const serverFile =
+    process.env.E2E_TOOL_APPROVAL_MOCK === 'true' ? 'e2e-test-server.ts' : 'server.ts';
+
   // Start the server with our test port
   const serverProcess = spawn('npx', ['tsx', serverFile, '--port', TEST_PORT_START.toString()], {
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -25,7 +26,7 @@ function startServer() {
       VITEST_RUNNING: 'true',
       // Enable tool approval mock provider for E2E tests
       E2E_TOOL_APPROVAL_MOCK: process.env.E2E_TOOL_APPROVAL_MOCK || 'false',
-    }
+    },
   });
 
   let serverUrl = null;
@@ -34,13 +35,13 @@ function startServer() {
   serverProcess.stdout.on('data', (data) => {
     const output = data.toString();
     process.stdout.write(output); // Forward output for logging
-    
+
     // Look for the URL line: "🌐 URL: http://localhost:PORT"
     const urlMatch = output.match(/🌐 URL: (http:\/\/[^:\s]+:\d+)/);
     if (urlMatch) {
       serverUrl = urlMatch[1];
       console.log(`📝 Detected server URL: ${serverUrl}`);
-      
+
       // Write URL to file for Playwright to read
       writeFileSync(PORT_FILE, serverUrl, 'utf8');
       console.log(`✅ Server URL written to ${PORT_FILE}`);

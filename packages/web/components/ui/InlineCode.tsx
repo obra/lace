@@ -45,16 +45,12 @@ export default function InlineCode({
 
   if (shouldRenderAsHtml) {
     return (
-      <code 
+      <code
         className={`inline-code ${className}`}
         dangerouslySetInnerHTML={{ __html: highlightedCode }}
       />
     );
   }
 
-  return (
-    <code className={`inline-code ${className}`}>
-      {code}
-    </code>
-  );
+  return <code className={`inline-code ${className}`}>{code}</code>;
 }

@@ -19,13 +19,13 @@ export function FeedbackMiniDisplay({
   events,
   maxEvents = 3,
   showOnlyHighPriority = false,
-  className = ''
+  className = '',
 }: FeedbackMiniDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Filter and sort events
   const filteredEvents = events
-    .filter(event => !showOnlyHighPriority || event.priority === 'high')
+    .filter((event) => !showOnlyHighPriority || event.priority === 'high')
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
     .slice(0, isExpanded ? maxEvents * 2 : maxEvents);
 
@@ -40,15 +40,24 @@ export function FeedbackMiniDisplay({
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'action': return '⚡';
-      case 'performance': return '📊';
-      case 'educational': return '🎓';
-      case 'predictive': return '🔮';
-      case 'error': return '❌';
-      case 'optimization': return '⚡';
-      case 'insight': return '💡';
-      case 'celebration': return '🎉';
-      default: return '📝';
+      case 'action':
+        return '⚡';
+      case 'performance':
+        return '📊';
+      case 'educational':
+        return '🎓';
+      case 'predictive':
+        return '🔮';
+      case 'error':
+        return '❌';
+      case 'optimization':
+        return '⚡';
+      case 'insight':
+        return '💡';
+      case 'celebration':
+        return '🎉';
+      default:
+        return '📝';
     }
   };
 

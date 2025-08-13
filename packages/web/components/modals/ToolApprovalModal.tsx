@@ -1,4 +1,4 @@
-// ABOUTME: Tool approval modal component for interactive approval decisions  
+// ABOUTME: Tool approval modal component for interactive approval decisions
 // ABOUTME: Updated to support multiple approvals per spec Phase 3.4
 
 import React, { useEffect, useState } from 'react';
@@ -19,7 +19,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
   // Keyboard shortcuts
   useEffect(() => {
     if (!currentApproval) return;
-    
+
     const handleKeyPress = (e: KeyboardEvent) => {
       switch (e.key.toLowerCase()) {
         case 'y':
@@ -69,7 +69,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
     switch (riskLevel) {
       case 'safe':
         return 'text-success border-success';
-      case 'moderate': 
+      case 'moderate':
         return 'text-warning border-warning';
       case 'destructive':
         return 'text-error border-error';
@@ -127,7 +127,9 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
             <div>
               <h3 className="text-lg font-mono font-semibold text-base-content">{toolName}</h3>
               {request.toolAnnotations?.title && (
-                <div className="text-sm text-base-content/60 mt-1">{request.toolAnnotations.title}</div>
+                <div className="text-sm text-base-content/60 mt-1">
+                  {request.toolAnnotations.title}
+                </div>
               )}
               {toolDescription && (
                 <p className="text-sm text-base-content/80 mt-2">{toolDescription}</p>
@@ -139,24 +141,16 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
           {request.toolAnnotations && (
             <div className="flex gap-2 mt-3 flex-wrap">
               {request.toolAnnotations.readOnlyHint && (
-                <span className="badge badge-success badge-sm">
-                  Read-only
-                </span>
+                <span className="badge badge-success badge-sm">Read-only</span>
               )}
               {request.toolAnnotations.idempotentHint && (
-                <span className="badge badge-info badge-sm">
-                  Idempotent
-                </span>
+                <span className="badge badge-info badge-sm">Idempotent</span>
               )}
               {request.toolAnnotations.destructiveHint && (
-                <span className="badge badge-error badge-sm">
-                  Destructive
-                </span>
+                <span className="badge badge-error badge-sm">Destructive</span>
               )}
               {request.toolAnnotations.safeInternal && (
-                <span className="badge badge-neutral badge-sm">
-                  Internal
-                </span>
+                <span className="badge badge-neutral badge-sm">Internal</span>
               )}
             </div>
           )}
@@ -166,7 +160,9 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
         <div className="flex-1 overflow-auto mb-4 min-h-0">
           <h4 className="text-sm font-semibold text-base-content/70 mb-2">Parameters:</h4>
           <div className="mockup-code">
-            <pre className="text-sm"><code>{formatInput(input)}</code></pre>
+            <pre className="text-sm">
+              <code>{formatInput(input)}</code>
+            </pre>
           </div>
         </div>
 
@@ -181,16 +177,13 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
               ← Previous
               <span className="text-xs opacity-70 ml-1">[←]</span>
             </button>
-            <span className="text-sm text-base-content/70">
-              Navigate between pending approvals
-            </span>
+            <span className="text-sm text-base-content/70">Navigate between pending approvals</span>
             <button
               onClick={() => setCurrentIndex(Math.min(approvals.length - 1, currentIndex + 1))}
               disabled={currentIndex === approvals.length - 1}
               className="btn btn-sm btn-ghost"
             >
-              Next →
-              <span className="text-xs opacity-70 ml-1">[→]</span>
+              Next →<span className="text-xs opacity-70 ml-1">[→]</span>
             </button>
           </div>
         )}

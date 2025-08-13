@@ -12,7 +12,9 @@ import type { Task, AssigneeId, TaskPriority, AgentInfo } from '@/types/core';
 interface TaskCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>) => void;
+  onCreateTask: (
+    task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>
+  ) => void;
   agents?: AgentInfo[];
   loading?: boolean;
 }
@@ -44,11 +46,14 @@ export function TaskCreationModal({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (field: keyof NewTaskData, value: string | TaskPriority | Task['status'] | AssigneeId) => {
-    setTaskData(prev => ({ ...prev, [field]: value as NewTaskData[typeof field] }));
+  const handleInputChange = (
+    field: keyof NewTaskData,
+    value: string | TaskPriority | Task['status'] | AssigneeId
+  ) => {
+    setTaskData((prev) => ({ ...prev, [field]: value as NewTaskData[typeof field] }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -69,7 +74,7 @@ export function TaskCreationModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -114,12 +119,7 @@ export function TaskCreationModal({
   };
 
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={handleClose} 
-      title="Create New Task" 
-      size="md"
-    >
+    <Modal isOpen={isOpen} onClose={handleClose} title="Create New Task" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Title Field */}
         <div>
@@ -243,19 +243,10 @@ export function TaskCreationModal({
 
         {/* Action Buttons */}
         <div className="flex gap-3 justify-end pt-4 border-t border-base-300">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="btn btn-ghost"
-            disabled={loading}
-          >
+          <button type="button" onClick={handleClose} className="btn btn-ghost" disabled={loading}>
             Cancel
           </button>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-          >
+          <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? (
               <>
                 <span className="loading loading-spinner loading-sm"></span>

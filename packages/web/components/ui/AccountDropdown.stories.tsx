@@ -148,7 +148,7 @@ export const InSidebar: Story = {
       <div className="p-4 border-b border-base-300">
         <h2 className="text-lg font-semibold text-base-content">Lace</h2>
       </div>
-      
+
       <div className="flex-1 p-4">
         <div className="space-y-4">
           <div className="space-y-2">
@@ -159,7 +159,7 @@ export const InSidebar: Story = {
               <div className="p-2 hover:bg-base-200 rounded text-sm">Project Gamma</div>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <div className="text-sm font-medium text-base-content/60">Timeline</div>
             <div className="space-y-1">
@@ -169,7 +169,7 @@ export const InSidebar: Story = {
           </div>
         </div>
       </div>
-      
+
       <AccountDropdown />
     </div>
   ),
@@ -242,7 +242,7 @@ export const UserVariations: Story = {
           <AccountDropdown />
         </div>
       </div>
-      
+
       <div className="w-80 bg-base-100 p-4 rounded-lg border border-base-300">
         <div className="text-sm font-medium text-base-content/60 mb-4">Free User (Mock)</div>
         <div className="h-80 flex flex-col">
@@ -284,10 +284,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 AccountDropdown Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then click on the account dropdown to explore!
+          Enable tennis commentary in the toolbar above, then click on the account dropdown to
+          explore!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Sidebar Context</h4>
@@ -305,7 +306,7 @@ export const InteractiveDemo: Story = {
             <AccountDropdown />
           </div>
         </div>
-        
+
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Standalone Usage</h4>
           <div className="w-80 h-96 bg-base-100 border border-base-300 rounded-lg flex flex-col">
@@ -326,16 +327,28 @@ export const InteractiveDemo: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">AccountDropdown Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>User Profile</strong> - Avatar, name, and plan display</li>
-          <li>• <strong>Real-time Usage</strong> - Live API usage and billing data</li>
-          <li>• <strong>Account Actions</strong> - Profile, settings, billing access</li>
-          <li>• <strong>Plan Management</strong> - Current subscription tier display</li>
-          <li>• <strong>Responsive Design</strong> - Works in sidebar and standalone</li>
-          <li>• <strong>Accessibility</strong> - Full keyboard navigation support</li>
+          <li>
+            • <strong>User Profile</strong> - Avatar, name, and plan display
+          </li>
+          <li>
+            • <strong>Real-time Usage</strong> - Live API usage and billing data
+          </li>
+          <li>
+            • <strong>Account Actions</strong> - Profile, settings, billing access
+          </li>
+          <li>
+            • <strong>Plan Management</strong> - Current subscription tier display
+          </li>
+          <li>
+            • <strong>Responsive Design</strong> - Works in sidebar and standalone
+          </li>
+          <li>
+            • <strong>Accessibility</strong> - Full keyboard navigation support
+          </li>
         </ul>
       </div>
     </div>
@@ -343,7 +356,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing AccountDropdown with tennis commentary. Enable commentary in the toolbar and interact with the dropdown!',
+        story:
+          'Interactive demo showcasing AccountDropdown with tennis commentary. Enable commentary in the toolbar and interact with the dropdown!',
       },
     },
   },

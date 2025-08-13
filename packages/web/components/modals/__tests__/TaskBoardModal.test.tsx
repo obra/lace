@@ -69,7 +69,7 @@ describe('TaskBoardModal', () => {
 
   it('should handle task status updates via drag and drop', async () => {
     const mockTaskUpdate = vi.fn();
-    
+
     render(
       <TaskBoardModal
         isOpen={true}
@@ -83,7 +83,7 @@ describe('TaskBoardModal', () => {
     // Test drag and drop functionality with real DOM events
     const taskCard = screen.getByText('Test Task').closest('[draggable="true"]');
     const inProgressColumn = screen.getByText('In Progress').closest('[data-testid="task-column"]');
-    
+
     expect(taskCard).toBeInTheDocument();
     expect(inProgressColumn).toBeInTheDocument();
 

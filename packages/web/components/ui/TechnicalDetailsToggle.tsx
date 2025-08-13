@@ -16,18 +16,17 @@ interface TechnicalDetailsToggleProps {
   children?: ReactNode;
 }
 
-
-export function TechnicalDetailsToggle({ 
-  details, 
+export function TechnicalDetailsToggle({
+  details,
   label = 'Event Details',
   className = '',
   buttonClassName = '',
-  children
+  children,
 }: TechnicalDetailsToggleProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
-  
+
   const handleCopy = async () => {
     try {
       setCopyError(null);
@@ -42,18 +41,21 @@ export function TechnicalDetailsToggle({
       setTimeout(() => setCopyError(null), 3000);
     }
   };
-  
+
   return (
     <div className={`relative ${className || ''}`}>
       {children}
-      
+
       <button
         onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-        className={buttonClassName || "text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200"}
+        className={
+          buttonClassName ||
+          'text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200'
+        }
       >
         {showTechnicalDetails ? 'Hide' : 'Show'} Details
       </button>
-      
+
       {showTechnicalDetails && (
         <div className="mt-2 px-3 py-2 bg-base-50 border border-base-200 rounded-lg">
           <div className="flex items-center justify-between mb-1">
@@ -61,7 +63,9 @@ export function TechnicalDetailsToggle({
             <button
               onClick={handleCopy}
               className={`text-xs px-2 py-1 rounded hover:bg-base-200 flex items-center gap-1 ${
-                copyError ? 'text-error hover:text-error' : 'text-base-content/50 hover:text-base-content'
+                copyError
+                  ? 'text-error hover:text-error'
+                  : 'text-base-content/50 hover:text-base-content'
               }`}
               title={copyError || undefined}
             >

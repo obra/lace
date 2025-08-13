@@ -104,7 +104,8 @@ const agentMessageEvent: LaceEvent = {
   threadId: asThreadId('lace_20240115_abc123.1'),
   timestamp: new Date('2024-01-15T10:30:30Z'),
   data: {
-    content: "I'd be happy to help you write a React component! What kind of component would you like to create? Please provide some details about:\n\n- What the component should do\n- Any specific features or functionality\n- Whether you need TypeScript or JavaScript\n- Any styling preferences (CSS, Tailwind, etc.)",
+    content:
+      "I'd be happy to help you write a React component! What kind of component would you like to create? Please provide some details about:\n\n- What the component should do\n- Any specific features or functionality\n- Whether you need TypeScript or JavaScript\n- Any styling preferences (CSS, Tailwind, etc.)",
     tokenUsage: {
       message: {
         promptTokens: 25,

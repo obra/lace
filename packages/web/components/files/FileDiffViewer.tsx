@@ -56,7 +56,7 @@ export default function FileDiffViewer({
   showFullFile = false,
   maxLines = 500,
   onCopy,
-  className = ''
+  className = '',
 }: FileDiffViewerProps) {
   const [viewMode, setViewMode] = useState<'side-by-side' | 'unified'>(initialViewMode);
   const [isExpanded, setIsExpanded] = useState(showFullFile);
@@ -70,8 +70,8 @@ export default function FileDiffViewer({
     let removed = 0;
     let unchanged = 0;
 
-    diff.chunks.forEach(chunk => {
-      chunk.lines.forEach(line => {
+    diff.chunks.forEach((chunk) => {
+      chunk.lines.forEach((line) => {
         switch (line.type) {
           case 'added':
             added++;
@@ -98,18 +98,18 @@ export default function FileDiffViewer({
 
       try {
         setIsHighlighting(true);
-        
+
         // Highlight all lines using highlight.js directly
         const newHighlightedLines = new Map<string, string>();
-        const allLines = diff.chunks.flatMap(chunk => chunk.lines);
-        
+        const allLines = diff.chunks.flatMap((chunk) => chunk.lines);
+
         for (const line of allLines) {
           if (line.content.trim()) {
             try {
-              const result = diff.language 
+              const result = diff.language
                 ? hljs.highlight(line.content, { language: diff.language })
                 : hljs.highlightAuto(line.content);
-              
+
               if (!isCancelled) {
                 const key = `${line.oldLineNumber || 'new'}-${line.newLineNumber || 'old'}`;
                 newHighlightedLines.set(key, result.value);
@@ -141,7 +141,7 @@ export default function FileDiffViewer({
 
   // Process lines for display
   const processedLines = useMemo(() => {
-    const allLines = diff.chunks.flatMap(chunk => chunk.lines);
+    const allLines = diff.chunks.flatMap((chunk) => chunk.lines);
     return isExpanded ? allLines : allLines.slice(0, maxLines);
   }, [diff.chunks, isExpanded, maxLines]);
 
@@ -168,8 +168,8 @@ export default function FileDiffViewer({
   // Copy all diff content
   const copyAllDiff = () => {
     const content = diff.chunks
-      .flatMap(chunk => chunk.lines)
-      .map(line => {
+      .flatMap((chunk) => chunk.lines)
+      .map((line) => {
         const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
         return `${prefix}${line.content}`;
       })
@@ -183,12 +183,8 @@ export default function FileDiffViewer({
 
     return (
       <div className="flex text-xs text-base-content/40 select-none">
-        <span className="w-8 text-right pr-1">
-          {line.oldLineNumber ? line.oldLineNumber : ''}
-        </span>
-        <span className="w-8 text-right pr-2">
-          {line.newLineNumber ? line.newLineNumber : ''}
-        </span>
+        <span className="w-8 text-right pr-1">{line.oldLineNumber ? line.oldLineNumber : ''}</span>
+        <span className="w-8 text-right pr-2">{line.newLineNumber ? line.newLineNumber : ''}</span>
       </div>
     );
   };
@@ -196,16 +192,14 @@ export default function FileDiffViewer({
   // Render diff indicator
   const renderDiffIndicator = (line: DiffLine) => {
     const indicator = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
-    const colorClass = 
-      line.type === 'added' ? 'text-green-600' :
-      line.type === 'removed' ? 'text-red-600' :
-      'text-base-content/40';
+    const colorClass =
+      line.type === 'added'
+        ? 'text-green-600'
+        : line.type === 'removed'
+          ? 'text-red-600'
+          : 'text-base-content/40';
 
-    return (
-      <span className={`w-4 text-center select-none ${colorClass}`}>
-        {indicator}
-      </span>
-    );
+    return <span className={`w-4 text-center select-none ${colorClass}`}>{indicator}</span>;
   };
 
   // Get highlighted content for a line with sanitization
@@ -224,43 +218,36 @@ export default function FileDiffViewer({
             // Special rendering for folded sections
             if (line.isFolded) {
               return (
-                <div
-                  key={index}
-                  className="diff-line bg-base-100/50 border-y border-base-300 my-1"
-                >
+                <div key={index} className="diff-line bg-base-100/50 border-y border-base-300 my-1">
                   <div className="flex items-center gap-2 px-4 py-2">
                     <div className="w-8 text-center">
-                      <FontAwesomeIcon 
-                        icon={faCompress} 
-                        className="text-xs text-base-content/40" 
-                      />
+                      <FontAwesomeIcon icon={faCompress} className="text-xs text-base-content/40" />
                     </div>
-                    <div className="flex-1 text-base-content/60 italic text-xs">
-                      {line.content}
-                    </div>
+                    <div className="flex-1 text-base-content/60 italic text-xs">{line.content}</div>
                   </div>
                 </div>
               );
             }
 
-            const bgClass = 
-              line.type === 'added' ? 'diff-line added' :
-              line.type === 'removed' ? 'diff-line removed' :
-              line.isHighlighted ? 'diff-line highlighted' : 'diff-line';
+            const bgClass =
+              line.type === 'added'
+                ? 'diff-line added'
+                : line.type === 'removed'
+                  ? 'diff-line removed'
+                  : line.isHighlighted
+                    ? 'diff-line highlighted'
+                    : 'diff-line';
 
             const highlightedContent = getHighlightedContent(line);
             const hasHighlighting = highlightedContent !== line.content;
 
             return (
-              <div
-                key={index}
-                className={`${bgClass} hover:bg-base-200`}
-              >
+              <div key={index} className={`${bgClass} hover:bg-base-200`}>
                 {renderLineNumbers(line)}
                 {renderDiffIndicator(line)}
                 <div className="flex-1 px-2 py-1 min-w-0">
                   {hasHighlighting ? (
-                    <code 
+                    <code
                       className="whitespace-pre hljs"
                       dangerouslySetInnerHTML={{ __html: highlightedContent }}
                     />
@@ -287,7 +274,7 @@ export default function FileDiffViewer({
     let oldIndex = 0;
     let newIndex = 0;
 
-    processedLines.forEach(line => {
+    processedLines.forEach((line) => {
       if (line.isFolded) {
         // Folded lines span both columns
         oldLines.push(line);
@@ -320,35 +307,23 @@ export default function FileDiffViewer({
               // Special rendering for folded sections
               if (line.isFolded) {
                 return (
-                  <div
-                    key={index}
-                    className="bg-base-100/50 border-y border-base-300 my-1 py-2"
-                  >
+                  <div key={index} className="bg-base-100/50 border-y border-base-300 my-1 py-2">
                     <div className="flex items-center gap-2 px-2">
-                      <FontAwesomeIcon 
-                        icon={faCompress} 
-                        className="text-xs text-base-content/40" 
-                      />
-                      <div className="text-base-content/60 italic text-xs">
-                        {line.content}
-                      </div>
+                      <FontAwesomeIcon icon={faCompress} className="text-xs text-base-content/40" />
+                      <div className="text-base-content/60 italic text-xs">{line.content}</div>
                     </div>
                   </div>
                 );
               }
 
-              const bgClass = 
-                line.type === 'removed' ? 'bg-red-50' :
-                line.isHighlighted ? 'bg-yellow-50' : '';
+              const bgClass =
+                line.type === 'removed' ? 'bg-red-50' : line.isHighlighted ? 'bg-yellow-50' : '';
 
               const highlightedContent = getHighlightedContent(line);
               const hasHighlighting = highlightedContent !== line.content;
 
               return (
-                <div
-                  key={index}
-                  className={`flex items-start hover:bg-base-200 ${bgClass}`}
-                >
+                <div key={index} className={`flex items-start hover:bg-base-200 ${bgClass}`}>
                   {showLineNumbers && (
                     <span className="w-8 text-right pr-2 text-xs text-base-content/40 select-none">
                       {line.oldLineNumber || ''}
@@ -356,7 +331,7 @@ export default function FileDiffViewer({
                   )}
                   <div className="flex-1 px-2 py-1 min-w-0">
                     {hasHighlighting ? (
-                      <code 
+                      <code
                         className="whitespace-pre hljs"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
@@ -386,35 +361,23 @@ export default function FileDiffViewer({
               // Special rendering for folded sections
               if (line.isFolded) {
                 return (
-                  <div
-                    key={index}
-                    className="bg-base-100/50 border-y border-base-300 my-1 py-2"
-                  >
+                  <div key={index} className="bg-base-100/50 border-y border-base-300 my-1 py-2">
                     <div className="flex items-center gap-2 px-2">
-                      <FontAwesomeIcon 
-                        icon={faCompress} 
-                        className="text-xs text-base-content/40" 
-                      />
-                      <div className="text-base-content/60 italic text-xs">
-                        {line.content}
-                      </div>
+                      <FontAwesomeIcon icon={faCompress} className="text-xs text-base-content/40" />
+                      <div className="text-base-content/60 italic text-xs">{line.content}</div>
                     </div>
                   </div>
                 );
               }
 
-              const bgClass = 
-                line.type === 'added' ? 'bg-green-50' :
-                line.isHighlighted ? 'bg-yellow-50' : '';
+              const bgClass =
+                line.type === 'added' ? 'bg-green-50' : line.isHighlighted ? 'bg-yellow-50' : '';
 
               const highlightedContent = getHighlightedContent(line);
               const hasHighlighting = highlightedContent !== line.content;
 
               return (
-                <div
-                  key={index}
-                  className={`flex items-start hover:bg-base-200 ${bgClass}`}
-                >
+                <div key={index} className={`flex items-start hover:bg-base-200 ${bgClass}`}>
                   {showLineNumbers && (
                     <span className="w-8 text-right pr-2 text-xs text-base-content/40 select-none">
                       {line.newLineNumber || ''}
@@ -422,7 +385,7 @@ export default function FileDiffViewer({
                   )}
                   <div className="flex-1 px-2 py-1 min-w-0">
                     {hasHighlighting ? (
-                      <code 
+                      <code
                         className="whitespace-pre hljs"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
@@ -444,7 +407,10 @@ export default function FileDiffViewer({
   // Handle binary files
   if (diff.isBinary) {
     return (
-      <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`} data-testid="file-diff-viewer">
+      <div
+        className={`border border-base-300 rounded-lg overflow-hidden ${className}`}
+        data-testid="file-diff-viewer"
+      >
         <div className="bg-base-200 px-4 py-3 border-b border-base-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -464,19 +430,22 @@ export default function FileDiffViewer({
   }
 
   return (
-    <div className={`border border-base-300 rounded-lg overflow-hidden ${className}`} data-testid="file-diff-viewer">
+    <div
+      className={`border border-base-300 rounded-lg overflow-hidden ${className}`}
+      data-testid="file-diff-viewer"
+    >
       {/* Header */}
       <div className="bg-base-200 px-4 py-3 border-b border-base-300">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FontAwesomeIcon icon={faEye} className="w-4 h-4 text-base-content/60" />
             <span className="font-medium text-sm">
-              {diff.oldFilePath === diff.newFilePath ? diff.oldFilePath : `${diff.oldFilePath} → ${diff.newFilePath}`}
+              {diff.oldFilePath === diff.newFilePath
+                ? diff.oldFilePath
+                : `${diff.oldFilePath} → ${diff.newFilePath}`}
             </span>
             {diff.language && (
-              <span className="text-xs bg-base-300 px-2 py-1 rounded">
-                {diff.language}
-              </span>
+              <span className="text-xs bg-base-300 px-2 py-1 rounded">{diff.language}</span>
             )}
             {isHighlighting && (
               <span className="text-xs text-base-content/60 flex items-center gap-1">
@@ -485,15 +454,15 @@ export default function FileDiffViewer({
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2">
             {/* View mode toggle */}
             <div className="flex bg-base-300 rounded overflow-hidden">
               <button
                 onClick={() => setViewMode('side-by-side')}
                 className={`px-2 py-1 text-xs ${
-                  viewMode === 'side-by-side' 
-                    ? 'bg-primary text-primary-content' 
+                  viewMode === 'side-by-side'
+                    ? 'bg-primary text-primary-content'
                     : 'hover:bg-base-200'
                 }`}
                 title="Side by side"
@@ -503,9 +472,7 @@ export default function FileDiffViewer({
               <button
                 onClick={() => setViewMode('unified')}
                 className={`px-2 py-1 text-xs ${
-                  viewMode === 'unified' 
-                    ? 'bg-primary text-primary-content' 
-                    : 'hover:bg-base-200'
+                  viewMode === 'unified' ? 'bg-primary text-primary-content' : 'hover:bg-base-200'
                 }`}
                 title="Unified"
               >
@@ -523,7 +490,7 @@ export default function FileDiffViewer({
             </button>
 
             {/* Expand/collapse button */}
-            {!showFullFile && diff.chunks.flatMap(c => c.lines).length > maxLines && (
+            {!showFullFile && diff.chunks.flatMap((c) => c.lines).length > maxLines && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="px-2 py-1 text-xs bg-base-300 hover:bg-base-200 rounded"
@@ -545,9 +512,7 @@ export default function FileDiffViewer({
             <span className="text-red-600">-{stats.removed}</span>
             <span>deletions</span>
           </span>
-          {stats.unchanged > 0 && (
-            <span>{stats.unchanged} unchanged</span>
-          )}
+          {stats.unchanged > 0 && <span>{stats.unchanged} unchanged</span>}
         </div>
       </div>
 
@@ -557,13 +522,10 @@ export default function FileDiffViewer({
       </div>
 
       {/* Truncation indicator */}
-      {!isExpanded && !showFullFile && diff.chunks.flatMap(c => c.lines).length > maxLines && (
+      {!isExpanded && !showFullFile && diff.chunks.flatMap((c) => c.lines).length > maxLines && (
         <div className="bg-base-200 px-4 py-2 text-center text-xs text-base-content/60 border-t border-base-300">
-          Showing {maxLines} of {diff.chunks.flatMap(c => c.lines).length} lines
-          <button
-            onClick={() => setIsExpanded(true)}
-            className="ml-2 text-primary hover:underline"
-          >
+          Showing {maxLines} of {diff.chunks.flatMap((c) => c.lines).length} lines
+          <button onClick={() => setIsExpanded(true)} className="ml-2 text-primary hover:underline">
             Show all
           </button>
         </div>

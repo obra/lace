@@ -25,7 +25,7 @@ function truncateText(text: string, maxLines: number): { truncated: string; isTr
   }
   return {
     truncated: lines.slice(0, maxLines).join('\n'),
-    isTruncated: true
+    isTruncated: true,
   };
 }
 
@@ -55,13 +55,13 @@ function formatTimestamp(timestamp: Date): string {
   return 'Just now';
 }
 
-export function UnknownEventEntry({ 
-  id, 
-  eventType, 
-  content, 
-  timestamp, 
+export function UnknownEventEntry({
+  id,
+  eventType,
+  content,
+  timestamp,
   metadata = {},
-  compact = false 
+  compact = false,
 }: UnknownEventEntryProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
@@ -88,9 +88,9 @@ export function UnknownEventEntry({
             onClick={() => setIsExpanded(!isExpanded)}
             className="btn btn-xs btn-ghost text-base-content/60"
           >
-            <FontAwesomeIcon 
-              icon={isExpanded ? faChevronDown : faChevronRight} 
-              className="w-3 h-3" 
+            <FontAwesomeIcon
+              icon={isExpanded ? faChevronDown : faChevronRight}
+              className="w-3 h-3"
             />
           </button>
         )}
@@ -108,7 +108,8 @@ export function UnknownEventEntry({
           </div>
           <div>
             <div className="text-sm font-medium text-base-content">
-              Unknown Event: <code className="font-mono text-xs bg-base-200 px-1 rounded">{eventType}</code>
+              Unknown Event:{' '}
+              <code className="font-mono text-xs bg-base-200 px-1 rounded">{eventType}</code>
             </div>
             <div className="text-xs text-base-content/60">
               System Event • {formatTimestamp(timestamp)}
@@ -127,13 +128,10 @@ export function UnknownEventEntry({
             </button>
           )}
           {isTruncated && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="btn btn-xs btn-ghost"
-            >
-              <FontAwesomeIcon 
-                icon={isExpanded ? faChevronDown : faChevronRight} 
-                className="w-3 h-3" 
+            <button onClick={() => setIsExpanded(!isExpanded)} className="btn btn-xs btn-ghost">
+              <FontAwesomeIcon
+                icon={isExpanded ? faChevronDown : faChevronRight}
+                className="w-3 h-3"
               />
               {isExpanded ? 'Collapse' : 'Expand'}
             </button>
@@ -176,9 +174,7 @@ export function UnknownEventEntry({
                   {Object.entries(metadata).map(([key, value]: [string, unknown]) => (
                     <tr key={key}>
                       <td className="font-mono text-xs">{key}</td>
-                      <td className="font-mono text-xs break-all">
-                        {formatMetadataValue(value)}
-                      </td>
+                      <td className="font-mono text-xs break-all">{formatMetadataValue(value)}</td>
                       <td className="text-xs text-base-content/60">
                         {value === null ? 'null' : typeof value}
                       </td>

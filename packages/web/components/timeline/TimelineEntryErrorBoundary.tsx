@@ -32,14 +32,14 @@ export default class TimelineEntryErrorBoundary extends Component<Props, State> 
     console.error('Timeline entry rendering error', {
       error: safeStringify(error),
       errorInfo: safeStringify(errorInfo),
-      event: safeStringify(this.props.event)
+      event: safeStringify(this.props.event),
     });
   }
 
   render() {
     if (this.state.hasError) {
       const { event } = this.props;
-      
+
       // Display the raw event as JSON in a code block
       return (
         <div className="bg-error/10 border border-error/30 rounded-lg p-4">

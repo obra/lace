@@ -1,4 +1,4 @@
-// ABOUTME: Tests for ProjectSelectorPanel component 
+// ABOUTME: Tests for ProjectSelectorPanel component
 // ABOUTME: Tests project selection, creation, and management functionality
 
 import React from 'react';
@@ -22,14 +22,14 @@ const mockProjects: ProjectInfo[] = [
   },
   {
     id: 'project-2',
-    name: 'Test Project 2', 
+    name: 'Test Project 2',
     description: 'Second test project',
     workingDirectory: '/path/to/project2',
     isArchived: false,
     createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
     lastUsedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago - always passes week filter
     sessionCount: 3,
-  }
+  },
 ];
 
 describe('ProjectSelectorPanel', () => {

@@ -5,18 +5,18 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faClipboardList, 
-  faPlus, 
-  faCheck, 
-  faEdit, 
-  faStickyNote, 
+import {
+  faClipboardList,
+  faPlus,
+  faCheck,
+  faEdit,
+  faStickyNote,
   faEye,
   faExclamationTriangle,
   faClock,
   faFlag,
   faUser,
-  faArrowRight
+  faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
@@ -30,13 +30,17 @@ import InlineCode from '@/components/ui/InlineCode';
 const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
   const getVariant = (priority: string) => {
     switch (priority) {
-      case 'high': return 'error';
-      case 'medium': return 'warning';
-      case 'low': return 'info';
-      default: return 'warning';
+      case 'high':
+        return 'error';
+      case 'medium':
+        return 'warning';
+      case 'low':
+        return 'info';
+      default:
+        return 'warning';
     }
   };
-  
+
   return (
     <Badge variant={getVariant(priority)} size="xs">
       {priority}
@@ -50,16 +54,23 @@ const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const getVariant = (status: string) => {
     switch (status) {
-      case 'completed': return 'success';
-      case 'in_progress': return 'primary';
-      case 'cancelled': return 'outline';
-      case 'failed': return 'error';
-      case 'aborted': return 'warning';
-      case 'denied': return 'outline';
-      default: return 'default';
+      case 'completed':
+        return 'success';
+      case 'in_progress':
+        return 'primary';
+      case 'cancelled':
+        return 'outline';
+      case 'failed':
+        return 'error';
+      case 'aborted':
+        return 'warning';
+      case 'denied':
+        return 'outline';
+      default:
+        return 'default';
     }
   };
-  
+
   return (
     <Badge variant={getVariant(status)} size="xs">
       {status.replaceAll('_', ' ')}
@@ -72,11 +83,9 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
  */
 function parseToolResult(result: ToolResult): unknown {
   if (!result.content || result.content.length === 0) return null;
-  
-  const rawOutput = result.content
-    .map(block => block.text || '')
-    .join('');
-    
+
+  const rawOutput = result.content.map((block) => block.text || '').join('');
+
   try {
     return JSON.parse(rawOutput);
   } catch {
@@ -92,16 +101,16 @@ const taskAddRenderer: ToolRenderer = {
     if (!result) {
       return 'Creating task';
     }
-    
+
     if (result.status !== 'completed') {
       return 'Failed to create task';
     }
-    
+
     const parsed = parseToolResult(result);
     if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
       return 'Failed to create task';
     }
-    
+
     return 'Created task';
   },
 
@@ -129,16 +138,19 @@ const taskAddRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
+
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
-    
+
     // Handle errors only
-    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (
+      result.status !== 'completed' ||
+      (typeof parsed === 'object' && parsed !== null && 'error' in parsed)
+    ) {
       const error = parsed as { error: string; code?: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3 mt-2">
@@ -147,16 +159,14 @@ const taskAddRenderer: ToolRenderer = {
             Failed to create task
           </div>
           <div className="text-error/80 text-sm">{error?.error || 'Unknown error'}</div>
-          {error?.code && (
-            <div className="text-error/60 text-xs mt-1">Code: {error.code}</div>
-          )}
+          {error?.code && <div className="text-error/60 text-xs mt-1">Code: {error.code}</div>}
         </div>
       );
     }
-    
+
     // Success case - get task data from result metadata (structured data from task tools)
     const resultMetadata = result.metadata as { task?: Task; tasks?: Task[] } | undefined;
-    
+
     // Handle single task metadata
     const singleTask = resultMetadata?.task;
     if (singleTask && singleTask.id) {
@@ -172,7 +182,7 @@ const taskAddRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     // Handle multiple tasks metadata (array-based)
     const multipleTasks = resultMetadata?.tasks;
     if (Array.isArray(multipleTasks) && multipleTasks.length > 0) {
@@ -191,11 +201,11 @@ const taskAddRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     // Fallback: try to extract from parsed text (backwards compatibility)
     const task = parsed as { taskId?: string; title?: string; id?: string };
     const taskId = task.taskId || task.id;
-    
+
     if (taskId) {
       return (
         <div className="p-3">
@@ -209,13 +219,11 @@ const taskAddRenderer: ToolRenderer = {
         </div>
       );
     }
-    
-    // Fallback: No task data found  
+
+    // Fallback: No task data found
     return (
       <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <div className="text-yellow-600 text-sm">
-          No task metadata found
-        </div>
+        <div className="text-yellow-600 text-sm">No task metadata found</div>
       </div>
     );
   },
@@ -233,7 +241,7 @@ const taskListRenderer: ToolRenderer = {
       if (typeof filter === 'string') {
         const filterNames = {
           mine: 'my tasks',
-          created: 'created tasks', 
+          created: 'created tasks',
           thread: 'thread tasks',
           all: 'all tasks',
         };
@@ -245,16 +253,19 @@ const taskListRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
+
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
-    
+
     // Handle errors first
-    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (
+      result.status !== 'completed' ||
+      (typeof parsed === 'object' && parsed !== null && 'error' in parsed)
+    ) {
       const error = parsed as { error: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">
@@ -262,11 +273,11 @@ const taskListRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     // Get tasks from metadata (structured data from task tools)
     const resultMetadata = result.metadata as { tasks?: Task[] } | undefined;
     const tasks = resultMetadata?.tasks;
-    
+
     if (!tasks || tasks.length === 0) {
       return (
         <div className="bg-base-100 border border-base-300 rounded-lg p-4 text-center">
@@ -274,7 +285,7 @@ const taskListRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     return (
       <div className="bg-base-100 border border-base-300 rounded-lg">
         <div className="p-3 border-b border-base-300 bg-base-200/50">
@@ -283,26 +294,22 @@ const taskListRenderer: ToolRenderer = {
             {tasks.length} tasks
           </div>
         </div>
-        
+
         <div className="divide-y divide-base-300">
           {tasks.map((task, index) => (
             <div key={task.id || index} className="p-4 hover:bg-base-50">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-base-content truncate">
-                    {task.title}
-                  </div>
-                  <div className="text-xs text-base-content/60 font-mono mt-1">
-                    {task.id}
-                  </div>
+                  <div className="font-medium text-base-content truncate">{task.title}</div>
+                  <div className="text-xs text-base-content/60 font-mono mt-1">{task.id}</div>
                 </div>
-                
+
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <StatusBadge status={task.status} />
                   <PriorityBadge priority={task.priority} />
                 </div>
               </div>
-              
+
               {task.assignedTo && (
                 <div className="flex items-center gap-1 mt-2 text-xs text-base-content/60">
                   <FontAwesomeIcon icon={faUser} className="w-3 h-3" />
@@ -341,16 +348,19 @@ const taskCompleteRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
+
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
   renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
     const parsed = parseToolResult(result);
-    
+
     // Handle errors
-    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (
+      result.status !== 'completed' ||
+      (typeof parsed === 'object' && parsed !== null && 'error' in parsed)
+    ) {
       const error = parsed as { error: string };
       return (
         <div className="alert alert-error">
@@ -362,30 +372,38 @@ const taskCompleteRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     // Get task data from metadata (structured data from task tools)
     const resultMetadata = result.metadata as { task?: Task } | undefined;
     const task = resultMetadata?.task;
-    
-    // Extract task title from result content 
+
+    // Extract task title from result content
     // The result content contains: "Completed task task_20250731_n9q0qi: Remove unused build artifacts from _build directory"
     let taskTitle: string | null = null;
     if (result.content && result.content.length > 0) {
-      const textContent = result.content.map(block => block.text || '').join('').trim();
+      const textContent = result.content
+        .map((block) => block.text || '')
+        .join('')
+        .trim();
       // Extract title after the colon
       const match = textContent.match(/Completed task [^:]+:\s*(.+)$/);
       if (match) {
         taskTitle = match[1];
       }
     }
-    
+
     // Get completion message from tool arguments
     // From Technical Details: Arguments: { "id": "...", "message": "Successfully cleaned up..." }
     let completionMessage: string | null = null;
-    if (metadata?.arguments && typeof metadata.arguments === 'object' && metadata.arguments !== null && 'message' in metadata.arguments) {
+    if (
+      metadata?.arguments &&
+      typeof metadata.arguments === 'object' &&
+      metadata.arguments !== null &&
+      'message' in metadata.arguments
+    ) {
       completionMessage = (metadata.arguments as { message: string }).message;
     }
-    
+
     return (
       <div className="card bg-base-100 border border-base-300">
         <div className="card-body p-4">
@@ -394,31 +412,24 @@ const taskCompleteRenderer: ToolRenderer = {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-base-content">{taskTitle}</h3>
               {task?.id && (
-                <a
-                  href={`#/tasks/${task.id}`}
-                  className="btn btn-ghost btn-xs gap-1"
-                >
+                <a href={`#/tasks/${task.id}`} className="btn btn-ghost btn-xs gap-1">
                   <FontAwesomeIcon icon={faEye} className="w-3 h-3" />
                   View
                 </a>
               )}
             </div>
           )}
-          
+
           {/* Show completion message if available */}
           {completionMessage && (
             <div className="bg-base-200/50 rounded-lg p-3 text-sm text-base-content mb-3">
               {completionMessage}
             </div>
           )}
-          
+
           {/* Show metadata */}
           <div className="flex items-center gap-2 text-xs">
-            {task?.id && (
-              <span className="font-mono text-base-content/50">
-                {task.id}
-              </span>
-            )}
+            {task?.id && <span className="font-mono text-base-content/50">{task.id}</span>}
             <StatusBadge status="completed" />
             {task?.priority && <PriorityBadge priority={task.priority} />}
           </div>
@@ -446,16 +457,19 @@ const taskUpdateRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
+
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
-    
+
     // Handle errors
-    if (result.status !== 'completed' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (
+      result.status !== 'completed' ||
+      (typeof parsed === 'object' && parsed !== null && 'error' in parsed)
+    ) {
       const error = parsed as { error: string };
       return (
         <div className="alert alert-error">
@@ -467,12 +481,14 @@ const taskUpdateRenderer: ToolRenderer = {
         </div>
       );
     }
-    
+
     // Get task data from metadata (structured data from task tools)
-    const resultMetadata = result.metadata as { task?: Task; changes?: Record<string, { from: unknown; to: unknown }> } | undefined;
+    const resultMetadata = result.metadata as
+      | { task?: Task; changes?: Record<string, { from: unknown; to: unknown }> }
+      | undefined;
     const task = resultMetadata?.task;
     const changes = resultMetadata?.changes;
-    
+
     return (
       <div className="card bg-base-100 border border-base-300">
         <div className="card-body p-4">
@@ -482,22 +498,15 @@ const taskUpdateRenderer: ToolRenderer = {
               <h3 className="font-semibold text-base-content">Task Updated</h3>
             </div>
             {task?.id && (
-              <a
-                href={`#/tasks/${task.id}`}
-                className="btn btn-ghost btn-xs gap-1"
-              >
+              <a href={`#/tasks/${task.id}`} className="btn btn-ghost btn-xs gap-1">
                 <FontAwesomeIcon icon={faEye} className="w-3 h-3" />
                 View
               </a>
             )}
           </div>
-          
-          {task?.title && (
-            <div className="font-medium text-base-content mb-3">
-              {task.title}
-            </div>
-          )}
-          
+
+          {task?.title && <div className="font-medium text-base-content mb-3">{task.title}</div>}
+
           {/* Show what changed */}
           {changes && Object.keys(changes).length > 0 && (
             <div className="bg-base-200/50 rounded-lg p-3 mb-3">
@@ -510,9 +519,18 @@ const taskUpdateRenderer: ToolRenderer = {
                         {field.replace(/([A-Z])/g, ' $1').trim()}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <InlineCode code={String(change.from) || '(empty)'} className="text-xs bg-base-300" />
-                        <FontAwesomeIcon icon={faArrowRight} className="w-3 h-3 text-base-content/40" />
-                        <InlineCode code={String(change.to) || '(empty)'} className="text-xs bg-primary/10 text-primary" />
+                        <InlineCode
+                          code={String(change.from) || '(empty)'}
+                          className="text-xs bg-base-300"
+                        />
+                        <FontAwesomeIcon
+                          icon={faArrowRight}
+                          className="w-3 h-3 text-base-content/40"
+                        />
+                        <InlineCode
+                          code={String(change.to) || '(empty)'}
+                          className="text-xs bg-primary/10 text-primary"
+                        />
                       </div>
                     </div>
                   </div>
@@ -520,13 +538,9 @@ const taskUpdateRenderer: ToolRenderer = {
               </div>
             </div>
           )}
-          
+
           <div className="flex items-center gap-2 flex-wrap">
-            {task?.id && (
-              <div className="text-xs text-base-content/50 font-mono">
-                {task.id}
-              </div>
-            )}
+            {task?.id && <div className="text-xs text-base-content/50 font-mono">{task.id}</div>}
             {task?.status && <StatusBadge status={task.status} />}
             {task?.priority && <PriorityBadge priority={task.priority} />}
           </div>
@@ -554,62 +568,61 @@ const taskAddNoteRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
+
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
-    
+
     // Check for error statuses first
-    if (result.status === 'failed' || result.status === 'denied' || result.status === 'aborted' || (typeof parsed === 'object' && parsed !== null && 'error' in parsed)) {
+    if (
+      result.status === 'failed' ||
+      result.status === 'denied' ||
+      result.status === 'aborted' ||
+      (typeof parsed === 'object' && parsed !== null && 'error' in parsed)
+    ) {
       const error = parsed as { error: string };
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="text-error text-sm">{error?.error || `Failed to add note (${result.status})`}</div>
+          <div className="text-error text-sm">
+            {error?.error || `Failed to add note (${result.status})`}
+          </div>
         </div>
       );
     }
-    
+
     if (!parsed) {
-      return (
-        <div className="text-sm text-base-content/60 italic">
-          Note added to task
-        </div>
-      );
+      return <div className="text-sm text-base-content/60 italic">Note added to task</div>;
     }
-    
+
     const data = parsed as { taskId?: string; noteId?: string; note?: string; addedAt?: string };
-    
+
     return (
       <div className="bg-info/5 border border-info/20 rounded-lg p-4">
         <div className="flex items-center gap-2 text-info text-sm font-medium mb-3">
           <FontAwesomeIcon icon={faStickyNote} className="w-4 h-4" />
           Note added successfully
         </div>
-        
+
         <div className="space-y-2">
           {data.note && (
             <div className="bg-base-100 border border-base-300 rounded p-3 text-sm">
               {data.note}
             </div>
           )}
-          
+
           <div className="flex items-center gap-3 text-sm">
             {data.taskId && (
-              <span className="font-mono text-base-content/60">
-                Task: {data.taskId}
-              </span>
+              <span className="font-mono text-base-content/60">Task: {data.taskId}</span>
             )}
-            
+
             {data.noteId && (
-              <span className="font-mono text-base-content/60">
-                Note ID: {data.noteId}
-              </span>
+              <span className="font-mono text-base-content/60">Note ID: {data.noteId}</span>
             )}
           </div>
-          
+
           {data.addedAt && (
             <div className="text-xs text-base-content/50">
               Added: {new Date(data.addedAt).toLocaleString()}
@@ -639,22 +652,18 @@ const taskViewRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
+
     const parsed = parseToolResult(result);
     return typeof parsed === 'object' && parsed !== null && 'error' in parsed;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
     const parsed = parseToolResult(result);
-    
+
     if (!parsed) {
-      return (
-        <div className="text-sm text-base-content/60 italic">
-          Task details not available
-        </div>
-      );
+      return <div className="text-sm text-base-content/60 italic">Task details not available</div>;
     }
-    
+
     if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
       const error = parsed as { error: string; code?: string };
       return (
@@ -664,24 +673,22 @@ const taskViewRenderer: ToolRenderer = {
             Task not found
           </div>
           <div className="text-error/80 text-sm">{error.error}</div>
-          {error.code && (
-            <div className="text-error/60 text-xs mt-1">Code: {error.code}</div>
-          )}
+          {error.code && <div className="text-error/60 text-xs mt-1">Code: {error.code}</div>}
         </div>
       );
     }
-    
-    const task = parsed as { 
-      id?: string; 
-      title?: string; 
+
+    const task = parsed as {
+      id?: string;
+      title?: string;
       description?: string;
-      status?: string; 
-      priority?: string; 
+      status?: string;
+      priority?: string;
       createdAt?: string;
       assignedTo?: string;
       notes?: Array<{ id: string; content: string; addedAt: string }>;
     };
-    
+
     return (
       <div className="bg-base-100 border border-base-300 rounded-lg">
         {/* Header */}
@@ -691,7 +698,7 @@ const taskViewRenderer: ToolRenderer = {
             Task Details
           </div>
         </div>
-        
+
         {/* Task Info */}
         <div className="p-4 space-y-4">
           {task.title && (
@@ -702,18 +709,16 @@ const taskViewRenderer: ToolRenderer = {
               )}
             </div>
           )}
-          
+
           {task.description && (
-            <div className="bg-base-200/50 rounded p-3 text-sm">
-              {task.description}
-            </div>
+            <div className="bg-base-200/50 rounded p-3 text-sm">{task.description}</div>
           )}
-          
+
           <div className="flex items-center gap-3 flex-wrap">
             {task.status && <StatusBadge status={task.status} />}
             {task.priority && <PriorityBadge priority={task.priority} />}
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             {task.createdAt && (
               <div className="flex items-center gap-2 text-base-content/70">
@@ -721,7 +726,7 @@ const taskViewRenderer: ToolRenderer = {
                 Created: {new Date(task.createdAt).toLocaleString()}
               </div>
             )}
-            
+
             {task.assignedTo && (
               <div className="flex items-center gap-2 text-base-content/70">
                 <FontAwesomeIcon icon={faUser} className="w-4 h-4" />
@@ -729,7 +734,7 @@ const taskViewRenderer: ToolRenderer = {
               </div>
             )}
           </div>
-          
+
           {/* Notes Section */}
           {task.notes && task.notes.length > 0 && (
             <div>
@@ -737,10 +742,13 @@ const taskViewRenderer: ToolRenderer = {
                 <FontAwesomeIcon icon={faStickyNote} className="w-4 h-4" />
                 Notes ({task.notes.length})
               </div>
-              
+
               <div className="space-y-3">
                 {task.notes.map((note, index) => (
-                  <div key={note.id || index} className="bg-info/5 border border-info/20 rounded p-3">
+                  <div
+                    key={note.id || index}
+                    className="bg-info/5 border border-info/20 rounded p-3"
+                  >
                     <div className="text-sm text-base-content">{note.content}</div>
                     <div className="text-xs text-base-content/50 mt-2">
                       {new Date(note.addedAt).toLocaleString()}

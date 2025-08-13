@@ -21,7 +21,7 @@ describe('SettingField', () => {
         </select>
       </SettingField>
     );
-    
+
     expect(screen.getByText('Theme Setting')).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
@@ -32,7 +32,7 @@ describe('SettingField', () => {
         <input type="text" placeholder="Enter value" />
       </SettingField>
     );
-    
+
     expect(screen.getByPlaceholderText('Enter value')).toBeInTheDocument();
     // Should not have a label element
     expect(screen.queryByText(/label/i)).not.toBeInTheDocument();
@@ -44,7 +44,7 @@ describe('SettingField', () => {
         <input type="checkbox" />
       </SettingField>
     );
-    
+
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Control how you receive notifications')).toBeInTheDocument();
     expect(screen.getByRole('checkbox')).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe('SettingField', () => {
         <input type="text" />
       </SettingField>
     );
-    
+
     expect(container.firstChild).toHaveClass('custom-field');
   });
 
@@ -66,7 +66,7 @@ describe('SettingField', () => {
         <input type="checkbox" />
       </SettingField>
     );
-    
+
     expect(container.firstChild).toHaveClass('flex-row');
     expect(screen.getByText('Auto-save')).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('SettingField', () => {
         <input type="text" />
       </SettingField>
     );
-    
+
     expect(container.firstChild).toHaveClass('flex-col');
   });
 
@@ -91,7 +91,7 @@ describe('SettingField', () => {
         <button>Apply</button>
       </SettingField>
     );
-    
+
     expect(screen.getByText('Theme Options')).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toBeInTheDocument();
     expect(screen.getByText('Apply')).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('SettingField', () => {
         <input type="text" />
       </SettingField>
     );
-    
+
     expect(screen.getByText('API Key')).toBeInTheDocument();
     expect(screen.getByText('*')).toBeInTheDocument();
   });
@@ -114,7 +114,7 @@ describe('SettingField', () => {
         <input type="email" aria-describedby="email-desc" />
       </SettingField>
     );
-    
+
     expect(screen.getByText('Email Address')).toBeInTheDocument();
     expect(screen.getByText("We'll never share your email")).toBeInTheDocument();
   });

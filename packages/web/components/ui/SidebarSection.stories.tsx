@@ -233,7 +233,7 @@ export const BadgeVariants: Story = {
     });
 
     const toggleSection = (section: keyof typeof sections) => {
-      setSections(prev => ({
+      setSections((prev) => ({
         ...prev,
         [section]: !prev[section],
       }));
@@ -324,7 +324,7 @@ export const NavigationExample: Story = {
     });
 
     const toggleSection = (section: keyof typeof sections) => {
-      setSections(prev => ({
+      setSections((prev) => ({
         ...prev,
         [section]: !prev[section],
       }));
@@ -353,9 +353,7 @@ export const NavigationExample: Story = {
           isExpanded={sections.projects}
           onToggle={() => toggleSection('projects')}
           badge={{ text: '5', variant: 'info' }}
-          rightContent={
-            <button className="btn btn-xs btn-ghost">+</button>
-          }
+          rightContent={<button className="btn btn-xs btn-ghost">+</button>}
         >
           <div className="space-y-1">
             <div className="p-2 hover:bg-base-200 rounded cursor-pointer">🚀 Web App</div>
@@ -383,9 +381,7 @@ export const NavigationExample: Story = {
           title="Settings"
           isExpanded={sections.settings}
           onToggle={() => toggleSection('settings')}
-          rightContent={
-            <button className="btn btn-xs btn-ghost">⚙</button>
-          }
+          rightContent={<button className="btn btn-xs btn-ghost">⚙</button>}
         >
           <div className="space-y-1">
             <div className="p-2 hover:bg-base-200 rounded cursor-pointer">👤 Profile</div>
@@ -416,7 +412,7 @@ export const FileTreeExample: Story = {
     });
 
     const toggleSection = (section: keyof typeof sections) => {
-      setSections(prev => ({
+      setSections((prev) => ({
         ...prev,
         [section]: !prev[section],
       }));
@@ -438,7 +434,7 @@ export const FileTreeExample: Story = {
             <div className="p-2 hover:bg-base-200 rounded cursor-pointer">📄 index.ts</div>
             <div className="p-2 hover:bg-base-200 rounded cursor-pointer">📄 app.tsx</div>
             <div className="p-2 hover:bg-base-200 rounded cursor-pointer">📄 types.ts</div>
-            
+
             <SidebarSection
               title="components"
               isExpanded={sections.components}
@@ -501,7 +497,7 @@ export const CustomStyling: Story = {
     });
 
     const toggleSection = (section: keyof typeof sections) => {
-      setSections(prev => ({
+      setSections((prev) => ({
         ...prev,
         [section]: !prev[section],
       }));
@@ -518,9 +514,15 @@ export const CustomStyling: Story = {
           contentClassName="bg-white/50 rounded-lg p-2"
         >
           <div className="space-y-1">
-            <div className="p-2 bg-white/80 rounded cursor-pointer hover:bg-white">Custom item 1</div>
-            <div className="p-2 bg-white/80 rounded cursor-pointer hover:bg-white">Custom item 2</div>
-            <div className="p-2 bg-white/80 rounded cursor-pointer hover:bg-white">Custom item 3</div>
+            <div className="p-2 bg-white/80 rounded cursor-pointer hover:bg-white">
+              Custom item 1
+            </div>
+            <div className="p-2 bg-white/80 rounded cursor-pointer hover:bg-white">
+              Custom item 2
+            </div>
+            <div className="p-2 bg-white/80 rounded cursor-pointer hover:bg-white">
+              Custom item 3
+            </div>
           </div>
         </SidebarSection>
 
@@ -556,10 +558,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 SidebarSection Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and interact with the sidebar sections below!
+          Enable tennis commentary in the toolbar above, then hover and interact with the sidebar
+          sections below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Navigation Sidebar</h4>
@@ -578,7 +581,7 @@ export const InteractiveDemo: Story = {
             </SidebarSection>
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">File Explorer</h4>
           <div className="w-full bg-base-100 border border-base-300 rounded-lg overflow-hidden">
@@ -588,7 +591,7 @@ export const InteractiveDemo: Story = {
               onToggle={() => alert('Projects toggled')}
               badge={{ text: '8', variant: 'info' }}
               rightContent={
-                <button 
+                <button
                   className="btn btn-xs btn-ghost"
                   onClick={() => alert('Add project clicked')}
                 >
@@ -603,7 +606,7 @@ export const InteractiveDemo: Story = {
             </SidebarSection>
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Task Management</h4>
           <div className="w-full bg-base-100 border border-base-300 rounded-lg overflow-hidden">
@@ -621,7 +624,7 @@ export const InteractiveDemo: Story = {
             </SidebarSection>
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Settings Panel</h4>
           <div className="w-full bg-base-100 border border-base-300 rounded-lg overflow-hidden">
@@ -630,10 +633,7 @@ export const InteractiveDemo: Story = {
               isExpanded={false}
               onToggle={() => alert('Settings toggled')}
               rightContent={
-                <button 
-                  className="btn btn-xs btn-ghost"
-                  onClick={() => alert('Settings opened')}
-                >
+                <button className="btn btn-xs btn-ghost" onClick={() => alert('Settings opened')}>
                   ⚙
                 </button>
               }
@@ -646,16 +646,28 @@ export const InteractiveDemo: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">SidebarSection Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Collapsible Content</strong> - Smooth expand/collapse with state management</li>
-          <li>• <strong>Badge Support</strong> - Status indicators with semantic colors</li>
-          <li>• <strong>Right Content</strong> - Action buttons and additional controls</li>
-          <li>• <strong>Custom Styling</strong> - Flexible styling for different contexts</li>
-          <li>• <strong>Nested Sections</strong> - Support for hierarchical organization</li>
-          <li>• <strong>Accessibility</strong> - Full keyboard navigation and screen reader support</li>
+          <li>
+            • <strong>Collapsible Content</strong> - Smooth expand/collapse with state management
+          </li>
+          <li>
+            • <strong>Badge Support</strong> - Status indicators with semantic colors
+          </li>
+          <li>
+            • <strong>Right Content</strong> - Action buttons and additional controls
+          </li>
+          <li>
+            • <strong>Custom Styling</strong> - Flexible styling for different contexts
+          </li>
+          <li>
+            • <strong>Nested Sections</strong> - Support for hierarchical organization
+          </li>
+          <li>
+            • <strong>Accessibility</strong> - Full keyboard navigation and screen reader support
+          </li>
         </ul>
       </div>
     </div>
@@ -663,7 +675,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing SidebarSection with tennis commentary. Enable commentary in the toolbar and interact with the sections!',
+        story:
+          'Interactive demo showcasing SidebarSection with tennis commentary. Enable commentary in the toolbar and interact with the sections!',
       },
     },
   },

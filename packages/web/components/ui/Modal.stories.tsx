@@ -142,21 +142,20 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div>
         <button onClick={() => setIsOpen(true)} className="btn btn-primary">
           Open Modal
         </button>
-        
-        <Modal
-          {...args}
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-        >
+
+        <Modal {...args} isOpen={isOpen} onClose={() => setIsOpen(false)}>
           <div className="space-y-4">
             <p>This is a basic modal with default settings.</p>
-            <p>You can close it by clicking the X button, pressing Escape, or clicking outside the modal.</p>
+            <p>
+              You can close it by clicking the X button, pressing Escape, or clicking outside the
+              modal.
+            </p>
           </div>
         </Modal>
       </div>
@@ -174,7 +173,7 @@ export const Default: Story = {
 export const Sizes: Story = {
   render: () => {
     const [openModal, setOpenModal] = useState<string | null>(null);
-    
+
     const sizes = [
       { id: 'sm', name: 'Small', description: 'Perfect for simple confirmations' },
       { id: 'md', name: 'Medium', description: 'Default size for most content' },
@@ -182,7 +181,7 @@ export const Sizes: Story = {
       { id: 'xl', name: 'Extra Large', description: 'For rich content and data' },
       { id: 'full', name: 'Full Screen', description: 'For immersive experiences' },
     ];
-    
+
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -196,20 +195,28 @@ export const Sizes: Story = {
             </button>
           ))}
         </div>
-        
+
         {sizes.map((size) => (
           <Modal
             key={size.id}
             isOpen={openModal === size.id}
             onClose={() => setOpenModal(null)}
             title={`${size.name} Modal`}
-            size={size.id as "sm" | "md" | "lg" | "xl" | "full"}
+            size={size.id as 'sm' | 'md' | 'lg' | 'xl' | 'full'}
           >
             <div className="space-y-4">
-              <p><strong>Size:</strong> {size.name}</p>
-              <p><strong>Description:</strong> {size.description}</p>
-              <p>This modal demonstrates the {size.name.toLowerCase()} size variant. The content automatically adjusts to fit the modal&apos;s constraints while maintaining proper spacing and readability.</p>
-              
+              <p>
+                <strong>Size:</strong> {size.name}
+              </p>
+              <p>
+                <strong>Description:</strong> {size.description}
+              </p>
+              <p>
+                This modal demonstrates the {size.name.toLowerCase()} size variant. The content
+                automatically adjusts to fit the modal&apos;s constraints while maintaining proper
+                spacing and readability.
+              </p>
+
               {size.id === 'full' && (
                 <div className="bg-base-200 p-4 rounded-lg">
                   <h4 className="font-medium mb-2">Full Screen Features:</h4>
@@ -244,26 +251,21 @@ export const WithForm: Story = {
       email: '',
       message: '',
     });
-    
+
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       console.log('Form submitted:', formData);
       setIsOpen(false);
       setFormData({ name: '', email: '', message: '' });
     };
-    
+
     return (
       <div>
         <button onClick={() => setIsOpen(true)} className="btn btn-primary">
           Contact Us
         </button>
-        
-        <Modal
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-          title="Contact Us"
-          size="md"
-        >
+
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Contact Us" size="md">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="label">
@@ -277,7 +279,7 @@ export const WithForm: Story = {
                 required
               />
             </div>
-            
+
             <div>
               <label className="label">
                 <span className="label-text">Email</span>
@@ -290,7 +292,7 @@ export const WithForm: Story = {
                 required
               />
             </div>
-            
+
             <div>
               <label className="label">
                 <span className="label-text">Message</span>
@@ -303,13 +305,9 @@ export const WithForm: Story = {
                 required
               />
             </div>
-            
+
             <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="btn btn-ghost"
-              >
+              <button type="button" onClick={() => setIsOpen(false)} className="btn btn-ghost">
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary">
@@ -334,24 +332,22 @@ export const ConfirmationDialog: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(false);
     const [result, setResult] = useState<string>('');
-    
+
     const handleConfirm = () => {
       setResult('Action confirmed!');
       setTimeout(() => setResult(''), 3000);
     };
-    
+
     return (
       <div className="space-y-4">
         {result && (
-          <div className="bg-success/20 text-success p-3 rounded-lg text-sm">
-            {result}
-          </div>
+          <div className="bg-success/20 text-success p-3 rounded-lg text-sm">{result}</div>
         )}
-        
+
         <button onClick={() => setIsOpen(true)} className="btn btn-error">
           Delete Item
         </button>
-        
+
         <ConfirmModal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -377,7 +373,7 @@ export const ConfirmationDialog: Story = {
 export const BehaviorOptions: Story = {
   render: () => {
     const [openModal, setOpenModal] = useState<string | null>(null);
-    
+
     const behaviors = [
       {
         id: 'no-backdrop',
@@ -404,7 +400,7 @@ export const BehaviorOptions: Story = {
         description: 'Can only be closed by the cancel button',
       },
     ];
-    
+
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -418,7 +414,7 @@ export const BehaviorOptions: Story = {
             </button>
           ))}
         </div>
-        
+
         {behaviors.map((behavior) => (
           <Modal
             key={behavior.id}
@@ -429,14 +425,16 @@ export const BehaviorOptions: Story = {
             {...behavior.props}
           >
             <div className="space-y-4">
-              <p><strong>Behavior:</strong> {behavior.description}</p>
-              <p>This modal demonstrates different closing behaviors. Try using the escape key, clicking outside, or looking for the close button.</p>
-              
+              <p>
+                <strong>Behavior:</strong> {behavior.description}
+              </p>
+              <p>
+                This modal demonstrates different closing behaviors. Try using the escape key,
+                clicking outside, or looking for the close button.
+              </p>
+
               <div className="flex justify-end">
-                <button
-                  onClick={() => setOpenModal(null)}
-                  className="btn btn-primary"
-                >
+                <button onClick={() => setOpenModal(null)} className="btn btn-primary">
                   Close Modal
                 </button>
               </div>
@@ -458,23 +456,18 @@ export const BehaviorOptions: Story = {
 export const NoHeader: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div>
         <button onClick={() => setIsOpen(true)} className="btn btn-primary">
           Open Headerless Modal
         </button>
-        
-        <Modal
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-          showCloseButton={false}
-          size="md"
-        >
+
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} showCloseButton={false} size="md">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Custom Header</h3>
             <p>This modal has no default header, allowing for custom header styling and layout.</p>
-            
+
             <div className="flex justify-between items-center">
               <span className="text-sm text-base-content/60">Custom footer content</span>
               <button onClick={() => setIsOpen(false)} className="btn btn-sm btn-primary">
@@ -499,17 +492,18 @@ export const MultipleModals: Story = {
   render: () => {
     const [firstModal, setFirstModal] = useState(false);
     const [secondModal, setSecondModal] = useState(false);
-    
+
     return (
       <div className="space-y-4">
         <div className="bg-warning/20 text-warning p-3 rounded-lg text-sm">
-          <strong>Note:</strong> While technically possible, nesting modals is not recommended for UX reasons.
+          <strong>Note:</strong> While technically possible, nesting modals is not recommended for
+          UX reasons.
         </div>
-        
+
         <button onClick={() => setFirstModal(true)} className="btn btn-primary">
           Open First Modal
         </button>
-        
+
         <Modal
           isOpen={firstModal}
           onClose={() => setFirstModal(false)}
@@ -517,13 +511,16 @@ export const MultipleModals: Story = {
           size="md"
         >
           <div className="space-y-4">
-            <p>This is the first modal. You can open a second modal from here, but it&apos;s not recommended.</p>
+            <p>
+              This is the first modal. You can open a second modal from here, but it&apos;s not
+              recommended.
+            </p>
             <button onClick={() => setSecondModal(true)} className="btn btn-secondary">
               Open Second Modal (Not Recommended)
             </button>
           </div>
         </Modal>
-        
+
         <Modal
           isOpen={secondModal}
           onClose={() => setSecondModal(false)}
@@ -531,7 +528,9 @@ export const MultipleModals: Story = {
           size="sm"
         >
           <div className="space-y-4">
-            <p>This is a second modal. Multiple modals can create confusion and accessibility issues.</p>
+            <p>
+              This is a second modal. Multiple modals can create confusion and accessibility issues.
+            </p>
             <button onClick={() => setSecondModal(false)} className="btn btn-primary">
               Close This Modal
             </button>
@@ -552,13 +551,13 @@ export const MultipleModals: Story = {
 export const RichContent: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div>
         <button onClick={() => setIsOpen(true)} className="btn btn-primary">
           View Rich Content
         </button>
-        
+
         <Modal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
@@ -576,7 +575,7 @@ export const RichContent: Story = {
                   <li>• Interactive elements</li>
                 </ul>
               </div>
-              
+
               <div className="bg-base-200 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Benefits</h4>
                 <ul className="text-sm space-y-1">
@@ -587,20 +586,23 @@ export const RichContent: Story = {
                 </ul>
               </div>
             </div>
-            
+
             <div className="bg-gradient-to-r from-primary/20 to-secondary/20 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Interactive Example</h4>
-              <p className="text-sm mb-3">This modal can contain any content, including interactive elements:</p>
+              <p className="text-sm mb-3">
+                This modal can contain any content, including interactive elements:
+              </p>
               <div className="flex gap-2">
                 <button className="btn btn-xs btn-primary">Action 1</button>
                 <button className="btn btn-xs btn-secondary">Action 2</button>
                 <button className="btn btn-xs btn-accent">Action 3</button>
               </div>
             </div>
-            
+
             <div className="text-center">
               <p className="text-sm text-base-content/60">
-                This modal demonstrates how rich content can be effectively displayed while maintaining accessibility and user experience.
+                This modal demonstrates how rich content can be effectively displayed while
+                maintaining accessibility and user experience.
               </p>
             </div>
           </div>
@@ -623,10 +625,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Modal Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and interact with the modal triggers below!
+          Enable tennis commentary in the toolbar above, then hover and interact with the modal
+          triggers below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Confirmation Modal</h4>
@@ -643,15 +646,13 @@ export const InteractiveDemo: Story = {
           />
           <button className="btn btn-error btn-sm">Delete Item</button>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Form Modal</h4>
-          <p className="text-sm text-gray-600 mb-3">
-            Modal with form inputs and validation.
-          </p>
+          <p className="text-sm text-gray-600 mb-3">Modal with form inputs and validation.</p>
           <button className="btn btn-primary btn-sm">Open Form</button>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Large Content Modal</h4>
           <p className="text-sm text-gray-600 mb-3">
@@ -659,25 +660,35 @@ export const InteractiveDemo: Story = {
           </p>
           <button className="btn btn-secondary btn-sm">View Content</button>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Settings Modal</h4>
-          <p className="text-sm text-gray-600 mb-3">
-            Configuration modal with various options.
-          </p>
+          <p className="text-sm text-gray-600 mb-3">Configuration modal with various options.</p>
           <button className="btn btn-accent btn-sm">Open Settings</button>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">Modal Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Accessibility</strong> - Full keyboard navigation and screen reader support</li>
-          <li>• <strong>Focus Management</strong> - Automatic focus trapping and restoration</li>
-          <li>• <strong>Backdrop Control</strong> - Configurable backdrop click behavior</li>
-          <li>• <strong>Size Variants</strong> - Multiple size options for different content types</li>
-          <li>• <strong>Escape Key</strong> - Keyboard dismissal with escape key</li>
-          <li>• <strong>Smooth Animations</strong> - Enter/exit animations for better UX</li>
+          <li>
+            • <strong>Accessibility</strong> - Full keyboard navigation and screen reader support
+          </li>
+          <li>
+            • <strong>Focus Management</strong> - Automatic focus trapping and restoration
+          </li>
+          <li>
+            • <strong>Backdrop Control</strong> - Configurable backdrop click behavior
+          </li>
+          <li>
+            • <strong>Size Variants</strong> - Multiple size options for different content types
+          </li>
+          <li>
+            • <strong>Escape Key</strong> - Keyboard dismissal with escape key
+          </li>
+          <li>
+            • <strong>Smooth Animations</strong> - Enter/exit animations for better UX
+          </li>
         </ul>
       </div>
     </div>
@@ -685,7 +696,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing Modal with tennis commentary. Enable commentary in the toolbar and interact with the modal triggers!',
+        story:
+          'Interactive demo showcasing Modal with tennis commentary. Enable commentary in the toolbar and interact with the modal triggers!',
       },
     },
   },

@@ -115,7 +115,10 @@ export const UserMessage: Story = {
     },
     children: (
       <div>
-        <p>Hey there! I&apos;m working on a new project and could use some help with the implementation.</p>
+        <p>
+          Hey there! I&apos;m working on a new project and could use some help with the
+          implementation.
+        </p>
       </div>
     ),
   },
@@ -127,13 +130,14 @@ export const AssistantMessage: Story = {
     header: {
       name: 'Claude',
       timestamp: '2:31 PM',
-      badges: [
-        { text: 'AI Assistant', variant: 'primary' },
-      ],
+      badges: [{ text: 'AI Assistant', variant: 'primary' }],
     },
     children: (
       <div>
-        <p>I&apos;d be happy to help! What kind of project are you working on? Please share more details about the specific implementation you need assistance with.</p>
+        <p>
+          I&apos;d be happy to help! What kind of project are you working on? Please share more
+          details about the specific implementation you need assistance with.
+        </p>
       </div>
     ),
   },
@@ -172,7 +176,10 @@ export const WithMultipleBadges: Story = {
     },
     children: (
       <div>
-        <p>I&apos;m an advanced AI assistant with multiple capabilities including code generation, analysis, and problem-solving.</p>
+        <p>
+          I&apos;m an advanced AI assistant with multiple capabilities including code generation,
+          analysis, and problem-solving.
+        </p>
       </div>
     ),
   },
@@ -184,13 +191,14 @@ export const WithActions: Story = {
     header: {
       name: 'Claude',
       timestamp: '2:34 PM',
-      badges: [
-        { text: 'AI Assistant', variant: 'primary' },
-      ],
+      badges: [{ text: 'AI Assistant', variant: 'primary' }],
     },
     children: (
       <div>
-        <p>Here&apos;s a comprehensive solution to your problem. You can like, share, or bookmark this response for future reference.</p>
+        <p>
+          Here&apos;s a comprehensive solution to your problem. You can like, share, or bookmark
+          this response for future reference.
+        </p>
       </div>
     ),
     actions: (
@@ -211,13 +219,14 @@ export const HighlightedMessage: Story = {
     header: {
       name: 'Claude',
       timestamp: '2:35 PM',
-      badges: [
-        { text: 'Important', variant: 'warning' },
-      ],
+      badges: [{ text: 'Important', variant: 'warning' }],
     },
     children: (
       <div>
-        <p>🔥 This is a highlighted message that contains important information you should pay attention to!</p>
+        <p>
+          🔥 This is a highlighted message that contains important information you should pay
+          attention to!
+        </p>
       </div>
     ),
   },
@@ -230,13 +239,14 @@ export const ErrorMessage: Story = {
     header: {
       name: 'System',
       timestamp: '2:36 PM',
-      badges: [
-        { text: 'Error', variant: 'error' },
-      ],
+      badges: [{ text: 'Error', variant: 'error' }],
     },
     children: (
       <div>
-        <p>⚠️ An error occurred while processing your request. Please try again or contact support if the problem persists.</p>
+        <p>
+          ⚠️ An error occurred while processing your request. Please try again or contact support if
+          the problem persists.
+        </p>
       </div>
     ),
   },
@@ -249,13 +259,14 @@ export const SystemMessage: Story = {
     header: {
       name: 'System',
       timestamp: '2:37 PM',
-      badges: [
-        { text: 'System', variant: 'info' },
-      ],
+      badges: [{ text: 'System', variant: 'info' }],
     },
     children: (
       <div>
-        <p>ℹ️ The conversation has been automatically saved. Your progress is secure and can be resumed at any time.</p>
+        <p>
+          ℹ️ The conversation has been automatically saved. Your progress is secure and can be
+          resumed at any time.
+        </p>
       </div>
     ),
   },
@@ -267,9 +278,7 @@ export const LongMessage: Story = {
     header: {
       name: 'Claude',
       timestamp: '2:38 PM',
-      badges: [
-        { text: 'AI Assistant', variant: 'primary' },
-      ],
+      badges: [{ text: 'AI Assistant', variant: 'primary' }],
     },
     children: (
       <div className="space-y-4">
@@ -280,7 +289,10 @@ export const LongMessage: Story = {
           <li>Next, we&apos;ll dive into advanced techniques</li>
           <li>Finally, we&apos;ll discuss best practices and optimization</li>
         </ul>
-        <p>This approach ensures you get a complete understanding of the subject matter while maintaining clarity and practical applicability.</p>
+        <p>
+          This approach ensures you get a complete understanding of the subject matter while
+          maintaining clarity and practical applicability.
+        </p>
       </div>
     ),
     actions: (
@@ -299,10 +311,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Message Bubble Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the message bubbles below!
+          Enable tennis commentary in the toolbar above, then hover and click the message bubbles
+          below!
         </p>
       </div>
-      
+
       <div className="space-y-4">
         <div className="cursor-pointer transition-transform hover:scale-[1.02]">
           <MessageBubble
@@ -316,7 +329,7 @@ export const InteractiveDemo: Story = {
             <p>Hey! Can you help me understand how Storybook works?</p>
           </MessageBubble>
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.02]">
           <MessageBubble
             role="assistant"
@@ -337,10 +350,14 @@ export const InteractiveDemo: Story = {
               </div>
             }
           >
-            <p>Absolutely! Storybook is a powerful tool for building and testing UI components in isolation. It allows you to develop components independently and create interactive documentation.</p>
+            <p>
+              Absolutely! Storybook is a powerful tool for building and testing UI components in
+              isolation. It allows you to develop components independently and create interactive
+              documentation.
+            </p>
           </MessageBubble>
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.02]">
           <MessageBubble
             role="user"
@@ -353,7 +370,7 @@ export const InteractiveDemo: Story = {
             <p>That sounds amazing! Can you show me how to create stories?</p>
           </MessageBubble>
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.02]">
           <MessageBubble
             role="assistant"
@@ -361,12 +378,13 @@ export const InteractiveDemo: Story = {
             header={{
               name: 'System',
               timestamp: '2:33 PM',
-              badges: [
-                { text: 'Tutorial', variant: 'info' },
-              ],
+              badges: [{ text: 'Tutorial', variant: 'info' }],
             }}
           >
-            <p>🎾 Tennis commentary is perfect for interactive demos like this! Try hovering and clicking on these message bubbles to see the commentary in action.</p>
+            <p>
+              🎾 Tennis commentary is perfect for interactive demos like this! Try hovering and
+              clicking on these message bubbles to see the commentary in action.
+            </p>
           </MessageBubble>
         </div>
       </div>
@@ -375,7 +393,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing message bubbles with tennis commentary. Enable commentary in the toolbar and interact with the messages!',
+        story:
+          'Interactive demo showcasing message bubbles with tennis commentary. Enable commentary in the toolbar and interact with the messages!',
       },
     },
   },

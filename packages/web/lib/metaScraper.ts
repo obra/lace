@@ -1,4 +1,4 @@
-// ABOUTME: Utility for extracting Open Graph and meta tags from web pages  
+// ABOUTME: Utility for extracting Open Graph and meta tags from web pages
 // ABOUTME: Provides client-side interface to meta data scraping API
 
 interface MetaData {

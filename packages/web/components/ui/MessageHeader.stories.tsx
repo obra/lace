@@ -296,22 +296,17 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Message Header Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the message headers below!
+          Enable tennis commentary in the toolbar above, then hover and click the message headers
+          below!
         </p>
       </div>
-      
+
       <div className="space-y-4">
         <div className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-          <MessageHeader
-            name="You"
-            timestamp={new Date(Date.now() - 5 * 60 * 1000)}
-            role="user"
-          />
-          <div className="mt-2 text-sm text-gray-600">
-            User message header - simple and clean
-          </div>
+          <MessageHeader name="You" timestamp={new Date(Date.now() - 5 * 60 * 1000)} role="user" />
+          <div className="mt-2 text-sm text-gray-600">User message header - simple and clean</div>
         </div>
-        
+
         <div className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
           <MessageHeader
             name="Claude"
@@ -323,7 +318,7 @@ export const InteractiveDemo: Story = {
             Assistant with primary badge - professional look
           </div>
         </div>
-        
+
         <div className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
           <MessageHeader
             name="GPT-4"
@@ -331,11 +326,9 @@ export const InteractiveDemo: Story = {
             role="assistant"
             badge={{ text: 'GPT-4' }}
           />
-          <div className="mt-2 text-sm text-gray-600">
-            GPT-4 with custom green badge styling
-          </div>
+          <div className="mt-2 text-sm text-gray-600">GPT-4 with custom green badge styling</div>
         </div>
-        
+
         <div className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
           <MessageHeader
             name="System"
@@ -343,11 +336,9 @@ export const InteractiveDemo: Story = {
             role="assistant"
             badge={{ text: 'Success', variant: 'success' }}
           />
-          <div className="mt-2 text-sm text-gray-600">
-            System message with success badge
-          </div>
+          <div className="mt-2 text-sm text-gray-600">System message with success badge</div>
         </div>
-        
+
         <div className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
           <MessageHeader
             name="Alert System"
@@ -355,9 +346,7 @@ export const InteractiveDemo: Story = {
             role="assistant"
             badge={{ text: 'Warning', variant: 'warning' }}
           />
-          <div className="mt-2 text-sm text-gray-600">
-            Warning message header for attention
-          </div>
+          <div className="mt-2 text-sm text-gray-600">Warning message header for attention</div>
         </div>
       </div>
     </div>
@@ -365,7 +354,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing message headers with tennis commentary. Enable commentary in the toolbar and interact with the headers!',
+        story:
+          'Interactive demo showcasing message headers with tennis commentary. Enable commentary in the toolbar and interact with the headers!',
       },
     },
   },

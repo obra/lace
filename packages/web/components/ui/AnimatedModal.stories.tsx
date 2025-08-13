@@ -131,26 +131,18 @@ const AnimatedModalDemo = ({ initialOpen = false, ...props }: AnimatedModalDemoP
   return (
     <div className="w-full max-w-md space-y-4">
       <div className="text-center">
-        <button
-          onClick={handleOpen}
-          className="btn btn-primary"
-        >
+        <button onClick={handleOpen} className="btn btn-primary">
           Open Modal
         </button>
       </div>
-      
-      <AnimatedModal
-        isOpen={isOpen}
-        onClose={handleClose}
-        title="Example Modal"
-        {...props}
-      >
+
+      <AnimatedModal isOpen={isOpen} onClose={handleClose} title="Example Modal" {...props}>
         <div className="space-y-4">
           <p className="text-base-content/80">
-            This is an animated modal with smooth entrance and exit transitions. 
-            It supports various sizes and interaction options.
+            This is an animated modal with smooth entrance and exit transitions. It supports various
+            sizes and interaction options.
           </p>
-          
+
           <div className="space-y-2">
             <div className="text-sm font-medium text-base-content/60">Features:</div>
             <ul className="text-sm text-base-content/80 space-y-1 list-disc list-inside">
@@ -162,18 +154,12 @@ const AnimatedModalDemo = ({ initialOpen = false, ...props }: AnimatedModalDemoP
               <li>Multiple size options</li>
             </ul>
           </div>
-          
+
           <div className="flex gap-2 justify-end">
-            <button
-              onClick={handleClose}
-              className="btn btn-ghost btn-sm"
-            >
+            <button onClick={handleClose} className="btn btn-ghost btn-sm">
               Cancel
             </button>
-            <button
-              onClick={handleClose}
-              className="btn btn-primary btn-sm"
-            >
+            <button onClick={handleClose} className="btn btn-primary btn-sm">
               Save
             </button>
           </div>
@@ -234,20 +220,15 @@ export const ConfirmModal: Story = {
     return (
       <div className="w-full max-w-md space-y-4">
         <div className="text-center space-y-2">
-          <button
-            onClick={handleOpen}
-            className="btn btn-error"
-          >
+          <button onClick={handleOpen} className="btn btn-error">
             Delete Item
           </button>
-          
+
           {result && (
-            <div className="text-sm text-success bg-success/10 rounded-lg p-2">
-              {result}
-            </div>
+            <div className="text-sm text-success bg-success/10 rounded-lg p-2">{result}</div>
           )}
         </div>
-        
+
         <AnimatedConfirmModal
           isOpen={isOpen}
           onClose={handleClose}
@@ -289,20 +270,15 @@ export const WarningModal: Story = {
     return (
       <div className="w-full max-w-md space-y-4">
         <div className="text-center space-y-2">
-          <button
-            onClick={handleOpen}
-            className="btn btn-warning"
-          >
+          <button onClick={handleOpen} className="btn btn-warning">
             Proceed with Warning
           </button>
-          
+
           {result && (
-            <div className="text-sm text-success bg-success/10 rounded-lg p-2">
-              {result}
-            </div>
+            <div className="text-sm text-success bg-success/10 rounded-lg p-2">{result}</div>
           )}
         </div>
-        
+
         <AnimatedConfirmModal
           isOpen={isOpen}
           onClose={handleClose}
@@ -344,20 +320,15 @@ export const InfoModal: Story = {
     return (
       <div className="w-full max-w-md space-y-4">
         <div className="text-center space-y-2">
-          <button
-            onClick={handleOpen}
-            className="btn btn-info"
-          >
+          <button onClick={handleOpen} className="btn btn-info">
             Show Info
           </button>
-          
+
           {result && (
-            <div className="text-sm text-success bg-success/10 rounded-lg p-2">
-              {result}
-            </div>
+            <div className="text-sm text-success bg-success/10 rounded-lg p-2">{result}</div>
           )}
         </div>
-        
+
         <AnimatedConfirmModal
           isOpen={isOpen}
           onClose={handleClose}
@@ -401,59 +372,40 @@ export const FormModal: Story = {
     return (
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
-          <button
-            onClick={handleOpen}
-            className="btn btn-primary"
-          >
+          <button onClick={handleOpen} className="btn btn-primary">
             Open Form
           </button>
         </div>
-        
-        <AnimatedModal
-          isOpen={isOpen}
-          onClose={handleClose}
-          title="User Information"
-          size="md"
-        >
+
+        <AnimatedModal isOpen={isOpen} onClose={handleClose} title="User Information" size="md">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-base-content/60 mb-1">
-                Name
-              </label>
+              <label className="block text-sm font-medium text-base-content/60 mb-1">Name</label>
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                 required
               />
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-base-content/60 mb-1">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-base-content/60 mb-1">Email</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                 required
               />
             </div>
-            
+
             <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="btn btn-ghost btn-sm"
-              >
+              <button type="button" onClick={handleClose} className="btn btn-ghost btn-sm">
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="btn btn-primary btn-sm"
-              >
+              <button type="submit" className="btn btn-primary btn-sm">
                 Submit
               </button>
             </div>
@@ -480,43 +432,100 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then open and interact with the modals!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer">
           <AnimatedModalDemo />
         </div>
-        
+
         <div className="cursor-pointer">
-          {FormModal.render ? FormModal.render({ isOpen: true, onClose: () => {}, children: <div>Form content</div>, ...FormModal.args }, {} as any) : <div>Form Modal</div>}
+          {FormModal.render ? (
+            FormModal.render(
+              {
+                isOpen: true,
+                onClose: () => {},
+                children: <div>Form content</div>,
+                ...FormModal.args,
+              },
+              {} as any
+            )
+          ) : (
+            <div>Form Modal</div>
+          )}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="cursor-pointer">
-          {ConfirmModal.render ? ConfirmModal.render({ isOpen: true, onClose: () => {}, children: <div>Confirm content</div>, ...ConfirmModal.args }, {} as any) : <div>Confirm Modal</div>}
+          {ConfirmModal.render ? (
+            ConfirmModal.render(
+              {
+                isOpen: true,
+                onClose: () => {},
+                children: <div>Confirm content</div>,
+                ...ConfirmModal.args,
+              },
+              {} as any
+            )
+          ) : (
+            <div>Confirm Modal</div>
+          )}
         </div>
-        
+
         <div className="cursor-pointer">
-          {WarningModal.render ? WarningModal.render({ isOpen: true, onClose: () => {}, children: <div>Warning content</div>, ...WarningModal.args }, {} as any) : <div>Warning Modal</div>}
+          {WarningModal.render ? (
+            WarningModal.render(
+              {
+                isOpen: true,
+                onClose: () => {},
+                children: <div>Warning content</div>,
+                ...WarningModal.args,
+              },
+              {} as any
+            )
+          ) : (
+            <div>Warning Modal</div>
+          )}
         </div>
-        
+
         <div className="cursor-pointer">
-          {InfoModal.render ? InfoModal.render({ isOpen: true, onClose: () => {}, children: <div>Info content</div>, ...InfoModal.args }, {} as any) : <div>Info Modal</div>}
+          {InfoModal.render ? (
+            InfoModal.render(
+              {
+                isOpen: true,
+                onClose: () => {},
+                children: <div>Info content</div>,
+                ...InfoModal.args,
+              },
+              {} as any
+            )
+          ) : (
+            <div>Info Modal</div>
+          )}
         </div>
       </div>
-      
+
       <div className="text-sm text-gray-600 space-y-1">
-        <p>• <strong>Click buttons</strong> to open different modal types</p>
-        <p>• <strong>Try keyboard navigation</strong> with Tab and Escape</p>
-        <p>• <strong>Click backdrop</strong> to close modals</p>
-        <p>• <strong>Hover elements</strong> for tennis commentary feedback!</p>
+        <p>
+          • <strong>Click buttons</strong> to open different modal types
+        </p>
+        <p>
+          • <strong>Try keyboard navigation</strong> with Tab and Escape
+        </p>
+        <p>
+          • <strong>Click backdrop</strong> to close modals
+        </p>
+        <p>
+          • <strong>Hover elements</strong> for tennis commentary feedback!
+        </p>
       </div>
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing animated modals with tennis commentary. Enable commentary in the toolbar and interact with the modals!',
+        story:
+          'Interactive demo showcasing animated modals with tennis commentary. Enable commentary in the toolbar and interact with the modals!',
       },
     },
   },

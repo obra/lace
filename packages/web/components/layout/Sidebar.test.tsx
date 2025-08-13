@@ -37,12 +37,12 @@ describe('Sidebar', () => {
   it('calls onToggle when toggle button clicked', () => {
     const mockOnToggle = vi.fn();
     render(<Sidebar {...defaultProps} onToggle={mockOnToggle} />);
-    
+
     // Use more specific query - there are two buttons, get the one without title
     const buttons = screen.getAllByRole('button');
-    const toggleButton = buttons.find(button => !button.hasAttribute('title'));
+    const toggleButton = buttons.find((button) => !button.hasAttribute('title'));
     expect(toggleButton).toBeDefined();
-    
+
     fireEvent.click(toggleButton!);
     expect(mockOnToggle).toHaveBeenCalledTimes(1);
   });
@@ -50,14 +50,8 @@ describe('Sidebar', () => {
   // NEW TESTS FOR TASK 3 - These should fail initially
   it('calls onSettingsClick when settings button clicked (collapsed)', () => {
     const mockOnSettingsClick = vi.fn();
-    render(
-      <Sidebar 
-        {...defaultProps} 
-        isOpen={false} 
-        onSettingsClick={mockOnSettingsClick}
-      />
-    );
-    
+    render(<Sidebar {...defaultProps} isOpen={false} onSettingsClick={mockOnSettingsClick} />);
+
     const settingsButton = screen.getByTitle('Settings');
     fireEvent.click(settingsButton);
     expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
@@ -65,14 +59,8 @@ describe('Sidebar', () => {
 
   it('calls onSettingsClick when settings button clicked (expanded)', () => {
     const mockOnSettingsClick = vi.fn();
-    render(
-      <Sidebar 
-        {...defaultProps} 
-        isOpen={true}
-        onSettingsClick={mockOnSettingsClick}
-      />
-    );
-    
+    render(<Sidebar {...defaultProps} isOpen={true} onSettingsClick={mockOnSettingsClick} />);
+
     const settingsButton = screen.getByTitle('Settings');
     fireEvent.click(settingsButton);
     expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
@@ -104,13 +92,13 @@ describe('Sidebar', () => {
   // REGRESSION TESTS - These should still pass
   it('maintains existing functionality after theme removal', () => {
     render(<Sidebar {...defaultProps} />);
-    
+
     // Should still render content area
     expect(screen.getByText('Sidebar Content')).toBeInTheDocument();
-    
+
     // Should still have header
     expect(screen.getByText('Lace')).toBeInTheDocument();
-    
+
     // Should still have toggle functionality
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThan(0);

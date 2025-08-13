@@ -10,7 +10,8 @@ const meta: Meta<typeof AnimatedTimelineMessage> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Animated timeline message component with Framer Motion animations, supporting various message types including human, AI, tool calls, integrations, and carousels. Features spring physics, staggered animations, and hover effects.',
+        component:
+          'Animated timeline message component with Framer Motion animations, supporting various message types including human, AI, tool calls, integrations, and carousels. Features spring physics, staggered animations, and hover effects.',
       },
     },
   },
@@ -41,7 +42,8 @@ const humanMessage: TimelineEntry = {
 const aiMessage: TimelineEntry = {
   id: 2,
   type: 'ai',
-  content: "I'll analyze the recent code changes for you. Let me examine the commits and create a comprehensive summary.\n\nHere's what I found:\n```typescript\nfunction analyzeChanges() {\n  const changes = getRecentCommits();\n  return changes.map(change => ({\n    impact: calculateImpact(change),\n    complexity: assessComplexity(change)\n  }));\n}\n```\n\nThe analysis shows several important patterns in the recent changes.",
+  content:
+    "I'll analyze the recent code changes for you. Let me examine the commits and create a comprehensive summary.\n\nHere's what I found:\n```typescript\nfunction analyzeChanges() {\n  const changes = getRecentCommits();\n  return changes.map(change => ({\n    impact: calculateImpact(change),\n    complexity: assessComplexity(change)\n  }));\n}\n```\n\nThe analysis shows several important patterns in the recent changes.",
   agent: 'Claude',
   timestamp: new Date(Date.now() - 3500000),
 };
@@ -52,11 +54,16 @@ const toolMessage: TimelineEntry = {
   tool: 'bash',
   content: 'git log --oneline --since="1 week ago"',
   result: {
-    content: [{ type: 'text', text: `a1b2c3d feat: add user authentication system
+    content: [
+      {
+        type: 'text',
+        text: `a1b2c3d feat: add user authentication system
 e4f5g6h fix: resolve memory leak in timeline component
 i7j8k9l refactor: reorganize component structure
 m1n2o3p docs: update API documentation
-q4r5s6t test: add integration tests for auth flow` }],
+q4r5s6t test: add integration tests for auth flow`,
+      },
+    ],
     status: 'completed' as const,
   },
   timestamp: new Date(Date.now() - 3400000),
@@ -146,14 +153,16 @@ export const ClaudeMessage: Story = {
     entry: {
       ...aiMessage,
       agent: 'Claude',
-      content: 'I can help you with that! Let me analyze the codebase and provide insights.\n\n```python\ndef analyze_code(repo_path):\n    """Analyze code quality and patterns"""\n    metrics = {\n        "complexity": calculate_complexity(repo_path),\n        "coverage": get_test_coverage(repo_path),\n        "maintainability": assess_maintainability(repo_path)\n    }\n    return generate_report(metrics)\n```\n\nThis analysis will help identify areas for improvement.',
+      content:
+        'I can help you with that! Let me analyze the codebase and provide insights.\n\n```python\ndef analyze_code(repo_path):\n    """Analyze code quality and patterns"""\n    metrics = {\n        "complexity": calculate_complexity(repo_path),\n        "coverage": get_test_coverage(repo_path),\n        "maintainability": assess_maintainability(repo_path)\n    }\n    return generate_report(metrics)\n```\n\nThis analysis will help identify areas for improvement.',
     },
     index: 0,
   },
   parameters: {
     docs: {
       description: {
-        story: 'Claude AI message with orange branding, animated agent badge, and syntax-highlighted code.',
+        story:
+          'Claude AI message with orange branding, animated agent badge, and syntax-highlighted code.',
       },
     },
   },
@@ -164,7 +173,8 @@ export const GPT4Message: Story = {
     entry: {
       ...aiMessage,
       agent: 'GPT-4',
-      content: 'I\'ll help you optimize this code. Here\'s a more efficient approach:\n\n```javascript\nconst optimizedFunction = useMemo(() => {\n  return data.reduce((acc, item) => {\n    acc[item.id] = processItem(item);\n    return acc;\n  }, {});\n}, [data]);\n```\n\nThis reduces computational complexity from O(n²) to O(n).',
+      content:
+        "I'll help you optimize this code. Here's a more efficient approach:\n\n```javascript\nconst optimizedFunction = useMemo(() => {\n  return data.reduce((acc, item) => {\n    acc[item.id] = processItem(item);\n    return acc;\n  }, {});\n}, [data]);\n```\n\nThis reduces computational complexity from O(n²) to O(n).",
     },
     index: 0,
   },
@@ -182,7 +192,8 @@ export const GeminiMessage: Story = {
     entry: {
       ...aiMessage,
       agent: 'Gemini',
-      content: 'Let me provide a comprehensive analysis of your request:\n\n**Key Points:**\n- Performance optimization opportunities\n- Code structure improvements\n- Testing strategy recommendations\n\n```css\n.optimized-layout {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));\n  gap: 1rem;\n  container-type: inline-size;\n}\n```',
+      content:
+        'Let me provide a comprehensive analysis of your request:\n\n**Key Points:**\n- Performance optimization opportunities\n- Code structure improvements\n- Testing strategy recommendations\n\n```css\n.optimized-layout {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));\n  gap: 1rem;\n  container-type: inline-size;\n}\n```',
     },
     index: 0,
   },
@@ -203,7 +214,8 @@ export const ToolMessage: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Tool execution message with terminal-style display, pulsing avatar, and command output.',
+        story:
+          'Tool execution message with terminal-style display, pulsing avatar, and command output.',
       },
     },
   },
@@ -238,7 +250,10 @@ export const ComplexToolMessage: Story = {
       tool: 'file-read',
       content: 'package.json',
       result: {
-        content: [{ type: 'text', text: `{
+        content: [
+          {
+            type: 'text',
+            text: `{
   "name": "lace",
   "version": "1.0.0",
   "scripts": {
@@ -252,7 +267,9 @@ export const ComplexToolMessage: Story = {
     "next": "^14.0.0",
     "framer-motion": "^10.16.0"
   }
-}` }],
+}`,
+          },
+        ],
         status: 'completed' as const,
       },
     },
@@ -343,7 +360,8 @@ export const CarouselMessage: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Carousel message with multiple code change cards, animations, and interactive elements.',
+        story:
+          'Carousel message with multiple code change cards, animations, and interactive elements.',
       },
     },
   },
@@ -363,7 +381,8 @@ export const ConversationFlow: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Complete conversation flow showing all message types with staggered entrance animations.',
+        story:
+          'Complete conversation flow showing all message types with staggered entrance animations.',
       },
     },
   },
@@ -372,51 +391,55 @@ export const ConversationFlow: Story = {
 export const MultiAgentConversation: Story = {
   render: () => (
     <div className="space-y-6 max-w-4xl">
-      <AnimatedTimelineMessage 
+      <AnimatedTimelineMessage
         entry={{
           id: 1,
           type: 'human',
           content: 'Compare the performance of different AI models for code analysis',
           timestamp: new Date(Date.now() - 600000),
-        }} 
-        index={0} 
+        }}
+        index={0}
       />
-      <AnimatedTimelineMessage 
+      <AnimatedTimelineMessage
         entry={{
           id: 2,
           type: 'ai',
-          content: 'I\'ll analyze code complexity and suggest optimizations:\n\n```typescript\ninterface PerformanceMetrics {\n  latency: number;\n  throughput: number;\n  accuracy: number;\n}\n```',
+          content:
+            "I'll analyze code complexity and suggest optimizations:\n\n```typescript\ninterface PerformanceMetrics {\n  latency: number;\n  throughput: number;\n  accuracy: number;\n}\n```",
           agent: 'Claude',
           timestamp: new Date(Date.now() - 550000),
-        }} 
-        index={1} 
+        }}
+        index={1}
       />
-      <AnimatedTimelineMessage 
+      <AnimatedTimelineMessage
         entry={{
           id: 3,
           type: 'ai',
-          content: 'Based on benchmarks, here are my findings:\n\n**Model Comparison:**\n- Processing speed: 95% faster\n- Memory usage: 40% reduction\n- Error rate: 99.2% accuracy',
+          content:
+            'Based on benchmarks, here are my findings:\n\n**Model Comparison:**\n- Processing speed: 95% faster\n- Memory usage: 40% reduction\n- Error rate: 99.2% accuracy',
           agent: 'GPT-4',
           timestamp: new Date(Date.now() - 500000),
-        }} 
-        index={2} 
+        }}
+        index={2}
       />
-      <AnimatedTimelineMessage 
+      <AnimatedTimelineMessage
         entry={{
           id: 4,
           type: 'ai',
-          content: 'I can provide additional context on optimization strategies:\n\n```python\ndef optimize_pipeline(data):\n    return pipeline.transform(data, parallel=True)\n```',
+          content:
+            'I can provide additional context on optimization strategies:\n\n```python\ndef optimize_pipeline(data):\n    return pipeline.transform(data, parallel=True)\n```',
           agent: 'Gemini',
           timestamp: new Date(Date.now() - 450000),
-        }} 
-        index={3} 
+        }}
+        index={3}
       />
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Multi-agent conversation showing different AI assistants with distinct branding and animations.',
+        story:
+          'Multi-agent conversation showing different AI assistants with distinct branding and animations.',
       },
     },
   },
@@ -426,10 +449,12 @@ export const AnimationShowcase: Story = {
   render: () => (
     <div className="space-y-8 max-w-4xl">
       <div className="text-lg font-semibold mb-4">🎬 Animation Features Showcase</div>
-      
+
       <div className="space-y-6">
         <div>
-          <div className="text-sm font-medium mb-2 text-base-content/70">Staggered Entrance (index: 0-3)</div>
+          <div className="text-sm font-medium mb-2 text-base-content/70">
+            Staggered Entrance (index: 0-3)
+          </div>
           <div className="space-y-4">
             <AnimatedTimelineMessage entry={humanMessage} index={0} />
             <AnimatedTimelineMessage entry={aiMessage} index={1} />
@@ -437,21 +462,28 @@ export const AnimationShowcase: Story = {
             <AnimatedTimelineMessage entry={adminMessage} index={3} />
           </div>
         </div>
-        
+
         <div>
-          <div className="text-sm font-medium mb-2 text-base-content/70">Different Agent Styles</div>
+          <div className="text-sm font-medium mb-2 text-base-content/70">
+            Different Agent Styles
+          </div>
           <div className="space-y-4">
-            <AnimatedTimelineMessage 
-              entry={{...aiMessage, agent: 'Claude'}} 
-              index={0} 
+            <AnimatedTimelineMessage entry={{ ...aiMessage, agent: 'Claude' }} index={0} />
+            <AnimatedTimelineMessage
+              entry={{
+                ...aiMessage,
+                agent: 'GPT-4',
+                content: 'GPT-4 response with green branding',
+              }}
+              index={0}
             />
-            <AnimatedTimelineMessage 
-              entry={{...aiMessage, agent: 'GPT-4', content: 'GPT-4 response with green branding'}} 
-              index={0} 
-            />
-            <AnimatedTimelineMessage 
-              entry={{...aiMessage, agent: 'Gemini', content: 'Gemini response with blue branding'}} 
-              index={0} 
+            <AnimatedTimelineMessage
+              entry={{
+                ...aiMessage,
+                agent: 'Gemini',
+                content: 'Gemini response with blue branding',
+              }}
+              index={0}
             />
           </div>
         </div>
@@ -461,7 +493,8 @@ export const AnimationShowcase: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Showcase of animation features including staggered entrances and agent-specific styling.',
+        story:
+          'Showcase of animation features including staggered entrances and agent-specific styling.',
       },
     },
   },
@@ -479,7 +512,7 @@ export const InteractiveDemo: Story = {
           <li>• Carousel cards have hover animations and buttons</li>
         </ul>
       </div>
-      
+
       <AnimatedTimelineMessage entry={aiMessage} index={0} />
       <AnimatedTimelineMessage entry={toolMessage} index={1} />
       <AnimatedTimelineMessage entry={carouselMessage} index={2} />
@@ -488,7 +521,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demonstration of hover effects, animations, and user interaction features.',
+        story:
+          'Interactive demonstration of hover effects, animations, and user interaction features.',
       },
     },
   },

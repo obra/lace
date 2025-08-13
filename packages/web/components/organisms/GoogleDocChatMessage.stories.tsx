@@ -131,7 +131,8 @@ const sampleDocument = {
   lastModified: new Date('2024-01-15'),
   owner: 'Sarah Johnson',
   permissions: 'edit' as const,
-  preview: 'This document outlines our quarterly planning process and includes templates for project kickoffs, milestone tracking, and stakeholder communication. The template is designed to be flexible enough for various project types while maintaining consistency across teams.',
+  preview:
+    'This document outlines our quarterly planning process and includes templates for project kickoffs, milestone tracking, and stakeholder communication. The template is designed to be flexible enough for various project types while maintaining consistency across teams.',
 };
 
 export const Default: Story = {
@@ -160,13 +161,15 @@ export const AgentMessage: Story = {
     message: {
       ...baseChatMessage,
       role: 'assistant',
-      content: 'I\'ve analyzed the document and found several areas where we can improve our workflow.',
+      content:
+        "I've analyzed the document and found several areas where we can improve our workflow.",
       document: {
         ...sampleDocument,
         title: 'Workflow Analysis Report - January 2024',
         owner: 'Lace AI Assistant',
         permissions: 'view',
-        preview: 'This automated analysis identifies bottlenecks in our current workflow and suggests improvements based on best practices from similar teams. The report includes metrics, recommendations, and implementation timelines.',
+        preview:
+          'This automated analysis identifies bottlenecks in our current workflow and suggests improvements based on best practices from similar teams. The report includes metrics, recommendations, and implementation timelines.',
       },
     },
   },
@@ -193,7 +196,7 @@ export const PermissionVariants: Story = {
           <GoogleDocChatMessage
             message={{
               ...baseChatMessage,
-              content: 'Here\'s the document with edit permissions.',
+              content: "Here's the document with edit permissions.",
               document: {
                 ...sampleDocument,
                 permissions: 'edit',
@@ -240,12 +243,13 @@ export const WithoutThumbnail: Story = {
   args: {
     message: {
       ...baseChatMessage,
-      content: 'This document doesn\'t have a thumbnail preview.',
+      content: "This document doesn't have a thumbnail preview.",
       document: {
         ...sampleDocument,
         thumbnailUrl: undefined,
         title: 'Internal Meeting Notes - No Thumbnail',
-        preview: 'Weekly team meeting notes covering project updates, blockers, and next steps. This document is updated collaboratively by all team members.',
+        preview:
+          'Weekly team meeting notes covering project updates, blockers, and next steps. This document is updated collaboratively by all team members.',
       },
     },
   },
@@ -267,11 +271,13 @@ export const LongContent: Story = {
   args: {
     message: {
       ...baseChatMessage,
-      content: 'This document has extensive content that demonstrates the expand/collapse functionality.',
+      content:
+        'This document has extensive content that demonstrates the expand/collapse functionality.',
       document: {
         ...sampleDocument,
         title: 'Comprehensive Project Documentation - Detailed Content',
-        preview: 'This comprehensive project documentation covers all aspects of our development process, from initial planning through deployment and maintenance. It includes detailed sections on architecture decisions, coding standards, testing procedures, deployment processes, monitoring strategies, and post-launch support. The document serves as a single source of truth for all project-related information and is regularly updated by the development team. Additional sections cover risk management, timeline tracking, resource allocation, and stakeholder communication protocols. This extensive documentation ensures that all team members have access to the information they need to contribute effectively to the project.',
+        preview:
+          'This comprehensive project documentation covers all aspects of our development process, from initial planning through deployment and maintenance. It includes detailed sections on architecture decisions, coding standards, testing procedures, deployment processes, monitoring strategies, and post-launch support. The document serves as a single source of truth for all project-related information and is regularly updated by the development team. Additional sections cover risk management, timeline tracking, resource allocation, and stakeholder communication protocols. This extensive documentation ensures that all team members have access to the information they need to contribute effectively to the project.',
       },
     },
   },
@@ -292,17 +298,14 @@ export const LongContent: Story = {
 export const LoadingState: Story = {
   render: () => {
     const [isLoading, setIsLoading] = useState(true);
-    
+
     // Simulate loading completion after 2 seconds
     setTimeout(() => setIsLoading(false), 2000);
-    
+
     return (
       <div className="w-full max-w-3xl mx-auto p-6 bg-base-100">
         <div className="mb-4">
-          <button 
-            onClick={() => setIsLoading(true)}
-            className="btn btn-primary btn-sm"
-          >
+          <button onClick={() => setIsLoading(true)} className="btn btn-primary btn-sm">
             Simulate Loading
           </button>
         </div>
@@ -310,10 +313,12 @@ export const LoadingState: Story = {
           message={{
             ...baseChatMessage,
             content: 'Loading document preview...',
-            document: isLoading ? {
-              ...sampleDocument,
-              thumbnailUrl: undefined,
-            } : sampleDocument,
+            document: isLoading
+              ? {
+                  ...sampleDocument,
+                  thumbnailUrl: undefined,
+                }
+              : sampleDocument,
           }}
         />
       </div>
@@ -342,32 +347,36 @@ export const ChatConversation: Story = {
               ...sampleDocument,
               title: 'Q4 Project Proposal - Review Required',
               permissions: 'edit',
-              preview: 'This proposal outlines our plans for the Q4 initiatives including timeline, budget, and resource requirements.',
+              preview:
+                'This proposal outlines our plans for the Q4 initiatives including timeline, budget, and resource requirements.',
             },
           }}
         />
         <GoogleDocChatMessage
           message={{
             id: 'msg-2',
-            content: 'I\'ve reviewed the proposal and created a feedback document with my suggestions.',
+            content:
+              "I've reviewed the proposal and created a feedback document with my suggestions.",
             role: 'assistant',
             timestamp: new Date(Date.now() - 240000),
             document: {
               id: 'doc-2',
               title: 'Proposal Feedback - Lace Analysis',
               url: 'https://docs.google.com/document/d/feedback123/edit',
-              thumbnailUrl: 'https://via.placeholder.com/400x300/fff3e0/f57c00?text=Feedback+Document',
+              thumbnailUrl:
+                'https://via.placeholder.com/400x300/fff3e0/f57c00?text=Feedback+Document',
               lastModified: new Date(),
               owner: 'Lace AI Assistant',
               permissions: 'comment',
-              preview: 'Detailed feedback on the Q4 proposal including budget optimization suggestions, timeline adjustments, and resource allocation recommendations.',
+              preview:
+                'Detailed feedback on the Q4 proposal including budget optimization suggestions, timeline adjustments, and resource allocation recommendations.',
             },
           }}
         />
         <GoogleDocChatMessage
           message={{
             id: 'msg-3',
-            content: 'Thanks! I\'ll incorporate your feedback and update the proposal.',
+            content: "Thanks! I'll incorporate your feedback and update the proposal.",
             role: 'user',
             timestamp: new Date(Date.now() - 180000),
           }}
@@ -395,7 +404,8 @@ export const MobileView: Story = {
           document: {
             ...sampleDocument,
             title: 'Mobile-Optimized Document',
-            preview: 'This document is optimized for mobile viewing with shorter content sections and clear formatting.',
+            preview:
+              'This document is optimized for mobile viewing with shorter content sections and clear formatting.',
           },
         }}
       />
@@ -414,12 +424,14 @@ export const InteractiveDemo: Story = {
   render: () => (
     <div className="flex flex-col gap-6 p-6 w-full max-w-4xl">
       <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2">🎾 GoogleDocChatMessage Tennis Commentary Demo</h3>
+        <h3 className="text-lg font-semibold mb-2">
+          🎾 GoogleDocChatMessage Tennis Commentary Demo
+        </h3>
         <p className="text-sm text-gray-600 mb-4">
           Enable tennis commentary in the toolbar above, then interact with the document previews!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Document with Thumbnail</h4>
@@ -436,7 +448,7 @@ export const InteractiveDemo: Story = {
             />
           </div>
         </div>
-        
+
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Permission Variants</h4>
           <div className="bg-base-100 border border-base-300 rounded-lg p-4 space-y-3">
@@ -455,16 +467,28 @@ export const InteractiveDemo: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">GoogleDocChatMessage Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Document Previews</strong> - Rich thumbnails and content previews</li>
-          <li>• <strong>Permission Management</strong> - Visual indicators for access levels</li>
-          <li>• <strong>Expandable Content</strong> - Collapsible document previews</li>
-          <li>• <strong>Loading States</strong> - Skeleton loading for async operations</li>
-          <li>• <strong>Error Handling</strong> - Graceful fallbacks for failed images</li>
-          <li>• <strong>Google Docs Integration</strong> - Direct link to documents</li>
+          <li>
+            • <strong>Document Previews</strong> - Rich thumbnails and content previews
+          </li>
+          <li>
+            • <strong>Permission Management</strong> - Visual indicators for access levels
+          </li>
+          <li>
+            • <strong>Expandable Content</strong> - Collapsible document previews
+          </li>
+          <li>
+            • <strong>Loading States</strong> - Skeleton loading for async operations
+          </li>
+          <li>
+            • <strong>Error Handling</strong> - Graceful fallbacks for failed images
+          </li>
+          <li>
+            • <strong>Google Docs Integration</strong> - Direct link to documents
+          </li>
         </ul>
       </div>
     </div>
@@ -472,7 +496,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing GoogleDocChatMessage with tennis commentary. Enable commentary in the toolbar and interact with the documents!',
+        story:
+          'Interactive demo showcasing GoogleDocChatMessage with tennis commentary. Enable commentary in the toolbar and interact with the documents!',
       },
     },
   },

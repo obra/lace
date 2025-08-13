@@ -20,10 +20,10 @@ export default function MessageText({ content, className = '' }: MessageTextProp
   const processInlineCode = useCallback((text: string): ContentPart[] => {
     const parts: ContentPart[] = [];
     let currentIndex = 0;
-    
+
     const inlineCodeRegex = /`([^`]+)`/g;
     let match;
-    
+
     while ((match = inlineCodeRegex.exec(text)) !== null) {
       // Add text before inline code
       if (match.index > currentIndex) {
@@ -32,12 +32,12 @@ export default function MessageText({ content, className = '' }: MessageTextProp
           parts.push({ type: 'text', content: textContent });
         }
       }
-      
+
       // Add inline code
       parts.push({ type: 'inline-code', content: match[1] });
       currentIndex = match.index + match[0].length;
     }
-    
+
     // Add remaining text
     if (currentIndex < text.length) {
       const remainingText = text.slice(currentIndex);
@@ -45,14 +45,14 @@ export default function MessageText({ content, className = '' }: MessageTextProp
         parts.push({ type: 'text', content: remainingText });
       }
     }
-    
+
     return parts.length > 0 ? parts : [{ type: 'text', content: text }];
   }, []);
 
   const parsedContent = useMemo(() => {
     const parts: ContentPart[] = [];
     let currentIndex = 0;
-    
+
     // First pass: Extract code blocks
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const codeBlockMatches: Array<{
@@ -60,7 +60,7 @@ export default function MessageText({ content, className = '' }: MessageTextProp
       language: string;
       code: string;
     }> = [];
-    
+
     let match;
     while ((match = codeBlockRegex.exec(content)) !== null) {
       codeBlockMatches.push({
@@ -69,10 +69,10 @@ export default function MessageText({ content, className = '' }: MessageTextProp
         code: match[2].trim(),
       });
     }
-    
+
     // Sort matches by index to process them in order
     codeBlockMatches.sort((a, b) => a.match.index - b.match.index);
-    
+
     // Process content with code blocks
     for (const { match, language, code } of codeBlockMatches) {
       // Add text before code block
@@ -82,12 +82,12 @@ export default function MessageText({ content, className = '' }: MessageTextProp
           parts.push({ type: 'text', content: textContent });
         }
       }
-      
+
       // Add code block
       parts.push({ type: 'code-block', content: code, language });
       currentIndex = match.index + match[0].length;
     }
-    
+
     // Add remaining text
     if (currentIndex < content.length) {
       const remainingText = content.slice(currentIndex);
@@ -95,10 +95,10 @@ export default function MessageText({ content, className = '' }: MessageTextProp
         parts.push({ type: 'text', content: remainingText });
       }
     }
-    
+
     // Second pass: Process inline code in text parts
     const processedParts: ContentPart[] = [];
-    
+
     for (const part of parts) {
       if (part.type === 'text') {
         const textParts = processInlineCode(part.content);
@@ -107,7 +107,7 @@ export default function MessageText({ content, className = '' }: MessageTextProp
         processedParts.push(part);
       }
     }
-    
+
     return processedParts;
   }, [content, processInlineCode]);
 
@@ -133,16 +133,10 @@ export default function MessageText({ content, className = '' }: MessageTextProp
                 />
               </div>
             );
-          
+
           case 'inline-code':
-            return (
-              <InlineCode
-                key={index}
-                code={part.content}
-                enableHighlighting={false}
-              />
-            );
-          
+            return <InlineCode key={index} code={part.content} enableHighlighting={false} />;
+
           case 'text':
           default:
             return (

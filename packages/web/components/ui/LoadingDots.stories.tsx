@@ -9,7 +9,8 @@ const meta: Meta<typeof LoadingDots> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'LoadingDots component for displaying animated loading indicators with different sizes.',
+        component:
+          'LoadingDots component for displaying animated loading indicators with different sizes.',
       },
     },
   },
@@ -87,12 +88,12 @@ export const InContext: Story = {
         <LoadingDots size="sm" />
         <span className="text-sm">Processing your request...</span>
       </div>
-      
+
       <div className="flex items-center gap-2 p-4 bg-base-200 rounded-lg">
         <LoadingDots size="md" />
         <span className="text-base">Generating response...</span>
       </div>
-      
+
       <div className="flex items-center gap-2 p-4 bg-base-200 rounded-lg">
         <LoadingDots size="lg" />
         <span className="text-lg">Loading conversation...</span>
@@ -114,29 +115,30 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Loading Dots Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the loading indicators below!
+          Enable tennis commentary in the toolbar above, then hover and click the loading indicators
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <LoadingDots size="lg" />
           <p className="text-sm font-medium mt-2">Processing</p>
           <p className="text-xs text-gray-500">Large loading dots</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <LoadingDots size="md" />
           <p className="text-sm font-medium mt-2">Thinking</p>
           <p className="text-xs text-gray-500">Medium loading dots</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <LoadingDots size="sm" />
           <p className="text-sm font-medium mt-2">Loading</p>
           <p className="text-xs text-gray-500">Small loading dots</p>
         </div>
-        
+
         <div className="text-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
           <LoadingDots size="xs" />
           <p className="text-sm font-medium mt-2">Saving</p>
@@ -148,7 +150,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing loading dots with tennis commentary. Enable commentary in the toolbar and interact with the loading indicators!',
+        story:
+          'Interactive demo showcasing loading dots with tennis commentary. Enable commentary in the toolbar and interact with the loading indicators!',
       },
     },
   },

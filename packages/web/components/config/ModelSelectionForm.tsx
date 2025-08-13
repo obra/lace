@@ -19,27 +19,27 @@ export function ModelSelectionForm({
   modelId,
   onProviderChange,
   onModelChange,
-  className = ''
+  className = '',
 }: ModelSelectionFormProps) {
   // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
-    return providers.filter((p): p is ProviderInfo & { instanceId: string } => 
+    return providers.filter((p): p is ProviderInfo & { instanceId: string } =>
       Boolean(p.configured && p.instanceId)
     );
   }, [providers]);
 
   // Get available models for selected provider
   const availableModels = useMemo(() => {
-    const provider = providers.find(p => p.instanceId === providerInstanceId);
+    const provider = providers.find((p) => p.instanceId === providerInstanceId);
     return provider?.models || [];
   }, [providers, providerInstanceId]);
 
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newInstanceId = e.target.value;
     onProviderChange(newInstanceId);
-    
+
     // Auto-select first model when provider changes
-    const provider = providers.find(p => p.instanceId === newInstanceId);
+    const provider = providers.find((p) => p.instanceId === newInstanceId);
     const providerModels = provider?.models || [];
     if (providerModels.length > 0 && providerModels[0]) {
       onModelChange(providerModels[0].id);

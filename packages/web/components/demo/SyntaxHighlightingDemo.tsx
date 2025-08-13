@@ -580,7 +580,7 @@ BEGIN
     COMMIT;
 END$$
 
-DELIMITER ;`
+DELIMITER ;`,
 };
 
 export default function SyntaxHighlightingDemo() {
@@ -591,31 +591,31 @@ export default function SyntaxHighlightingDemo() {
   const runTests = async () => {
     setIsRunningTests(true);
     setTestResults({});
-    
+
     const results: TestResults = {};
-    
+
     for (const [lang, code] of Object.entries(SAMPLE_CODE)) {
       try {
         const startTime = performance.now();
         // CodeBlock handles highlighting internally now
         const endTime = performance.now();
-        
+
         results[lang] = {
           success: true,
           language: lang,
           highlightedLength: code.length,
           originalLength: code.length,
           processingTime: endTime - startTime,
-          error: null
+          error: null,
         };
       } catch (error) {
         results[lang] = {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         };
       }
     }
-    
+
     setTestResults(results);
     setIsRunningTests(false);
   };
@@ -631,20 +631,13 @@ export default function SyntaxHighlightingDemo() {
         <p className="text-base-content/70 mb-4">
           Test the syntax highlighting system with various programming languages.
         </p>
-        
+
         <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={runTests}
-            disabled={isRunningTests}
-            className="btn btn-primary"
-          >
+          <button onClick={runTests} disabled={isRunningTests} className="btn btn-primary">
             {isRunningTests ? 'Running Tests...' : 'Run All Tests'}
           </button>
-          
-          <button
-            onClick={() => setTestResults({})}
-            className="btn btn-secondary"
-          >
+
+          <button onClick={() => setTestResults({})} className="btn btn-secondary">
             Clear Results
           </button>
         </div>
@@ -723,7 +716,9 @@ export default function SyntaxHighlightingDemo() {
                     <td>
                       {!result.success && (
                         <div className="text-error text-sm" title={result.error}>
-                          {result.error.length > 50 ? `\${result.error.substring(0, 50)}...` : result.error}
+                          {result.error.length > 50
+                            ? `\${result.error.substring(0, 50)}...`
+                            : result.error}
                         </div>
                       )}
                     </td>
@@ -746,7 +741,12 @@ export default function SyntaxHighlightingDemo() {
           </p>
           <p>
             You can also use inline code with language hints:{' '}
-            <InlineCode code="console.log('Hello, world!');" language="javascript" enableHighlighting={true} />.
+            <InlineCode
+              code="console.log('Hello, world!');"
+              language="javascript"
+              enableHighlighting={true}
+            />
+            .
           </p>
         </div>
       </div>

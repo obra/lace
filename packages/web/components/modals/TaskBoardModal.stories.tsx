@@ -140,7 +140,8 @@ const sampleTasks: Task[] = [
     id: 'taskboard-task-001',
     title: 'AI Model Integration',
     description: 'Integrate latest language model with improved performance and reduced latency',
-    prompt: 'Integrate the latest language model to improve performance and reduce latency in our AI system',
+    prompt:
+      'Integrate the latest language model to improve performance and reduce latency in our AI system',
     priority: 'high',
     assignedTo: asThreadId('lace_20240115_session001.1'),
     status: 'in_progress',
@@ -182,7 +183,8 @@ const sampleTasks: Task[] = [
     id: 'taskboard-task-004',
     title: 'Performance Optimization',
     description: 'Optimize database queries and implement caching strategies',
-    prompt: 'Optimize our database performance through query optimization and caching implementation',
+    prompt:
+      'Optimize our database performance through query optimization and caching implementation',
     priority: 'medium',
     assignedTo: 'human',
     status: 'pending',
@@ -238,7 +240,8 @@ const sampleTasks: Task[] = [
     id: 'taskboard-task-008',
     title: 'Unit Test Coverage',
     description: 'Improve test coverage to 90% across all components',
-    prompt: 'Increase our unit test coverage to 90% to improve code reliability and maintainability',
+    prompt:
+      'Increase our unit test coverage to 90% to improve code reliability and maintainability',
     priority: 'low',
     assignedTo: 'human',
     status: 'pending',
@@ -337,7 +340,7 @@ export const HighPriorityTasks: Story = {
   args: {
     isOpen: true,
     onClose: () => {},
-    tasks: sampleTasks.filter(task => task.priority === 'high'),
+    tasks: sampleTasks.filter((task) => task.priority === 'high'),
     onTaskUpdate: (task) => console.log('Task updated:', task), // Task updated
     onTaskCreate: (task) => console.log('Task created:', task), // Task created
   },
@@ -354,7 +357,7 @@ export const CompletedTasks: Story = {
   args: {
     isOpen: true,
     onClose: () => {},
-    tasks: sampleTasks.filter(task => task.status === 'completed'),
+    tasks: sampleTasks.filter((task) => task.status === 'completed'),
     onTaskUpdate: (task) => console.log('Task updated:', task), // Task updated
     onTaskCreate: (task) => console.log('Task created:', task), // Task created
   },
@@ -568,18 +571,30 @@ export const InteractiveDemo: Story = {
           Complete Kanban-style task management with drag-and-drop functionality!
         </p>
       </div>
-      
+
       <TaskBoardModal {...args} />
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">TaskBoardModal Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Drag-and-Drop</strong> - Move tasks between status columns</li>
-          <li>• <strong>Task Creation</strong> - Form-based task creation with validation</li>
-          <li>• <strong>Priority Management</strong> - Visual priority indicators</li>
-          <li>• <strong>Status Tracking</strong> - Four-column Kanban board</li>
-          <li>• <strong>Responsive Design</strong> - Works on all screen sizes</li>
-          <li>• <strong>Real-time Updates</strong> - Immediate task status changes</li>
+          <li>
+            • <strong>Drag-and-Drop</strong> - Move tasks between status columns
+          </li>
+          <li>
+            • <strong>Task Creation</strong> - Form-based task creation with validation
+          </li>
+          <li>
+            • <strong>Priority Management</strong> - Visual priority indicators
+          </li>
+          <li>
+            • <strong>Status Tracking</strong> - Four-column Kanban board
+          </li>
+          <li>
+            • <strong>Responsive Design</strong> - Works on all screen sizes
+          </li>
+          <li>
+            • <strong>Real-time Updates</strong> - Immediate task status changes
+          </li>
         </ul>
       </div>
     </div>

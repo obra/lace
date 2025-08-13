@@ -151,7 +151,6 @@ export function TaskBoardModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="full" className="h-[90vh]">
       <div className="flex flex-col" style={{ height: 'calc(90vh - 140px)' }}>
-
         {/* New task form */}
         {showNewTaskForm && (
           <div className="bg-base-200 p-4 rounded-lg mb-4">
@@ -240,9 +239,7 @@ export function TaskBoardModal({
                             <h4 className="font-medium text-sm text-base-content leading-tight">
                               {task.title}
                             </h4>
-                            <span
-                              className={`badge badge-xs ${getPriorityColor(task.priority)}`}
-                            >
+                            <span className={`badge badge-xs ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
                           </div>

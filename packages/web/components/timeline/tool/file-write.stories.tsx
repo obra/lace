@@ -108,10 +108,10 @@ A specialized tool renderer molecule that transforms file write operation result
 - **Icons**: FontAwesome with faFileCode for consistency
 - **Parsing**: Regex-based extraction of file paths and sizes
 - **Testing**: Comprehensive test coverage with visual rendering tests
-        `
-      }
-    }
-  }
+        `,
+      },
+    },
+  },
 };
 
 export default meta;
@@ -293,7 +293,7 @@ export const EmptyContent: Story = {
 };
 
 export const SmallFileWrite: Story = {
-  name: 'Small File Write', 
+  name: 'Small File Write',
   render: () => {
     const smallFileResult: ToolResult = {
       content: [
@@ -324,28 +324,48 @@ export const AllVariants: Story = {
       {
         title: 'Success - Regular File',
         result: {
-          content: [{ type: 'text' as const, text: 'Successfully wrote 2.1 KB to src/components/Header.tsx' }],
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Successfully wrote 2.1 KB to src/components/Header.tsx',
+            },
+          ],
           status: 'completed' as const,
         },
       },
       {
         title: 'Success - Large File',
         result: {
-          content: [{ type: 'text' as const, text: 'Successfully wrote 8.9 MB to assets/images/hero-background.jpg' }],
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Successfully wrote 8.9 MB to assets/images/hero-background.jpg',
+            },
+          ],
           status: 'completed' as const,
         },
       },
       {
         title: 'Error - Permission Denied',
         result: {
-          content: [{ type: 'text' as const, text: 'Permission denied writing to /root/config.txt. Check file permissions or choose a different location.' }],
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Permission denied writing to /root/config.txt. Check file permissions or choose a different location.',
+            },
+          ],
           status: 'failed' as const,
         },
       },
       {
         title: 'Error - Disk Full',
         result: {
-          content: [{ type: 'text' as const, text: 'Insufficient disk space to write file. Free up disk space and try again. File system error: ENOSPC' }],
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Insufficient disk space to write file. Free up disk space and try again. File system error: ENOSPC',
+            },
+          ],
           status: 'failed' as const,
         },
       },
@@ -366,7 +386,7 @@ export const AllVariants: Story = {
             Complete showcase of all file write renderer states and variations.
           </p>
         </div>
-        
+
         {variants.map((variant, index) => (
           <div key={index} className="space-y-2">
             <h4 className="font-medium text-base-content/80">{variant.title}</h4>
@@ -377,12 +397,24 @@ export const AllVariants: Story = {
         <div className="mt-8 p-4 bg-primary/5 border border-primary/20 rounded-lg">
           <h4 className="font-medium mb-2">📋 Renderer Features:</h4>
           <ul className="text-sm text-base-content/80 space-y-1 list-disc list-inside">
-            <li><strong>Success States:</strong> Green theming with file details and size formatting</li>
-            <li><strong>Error States:</strong> Red theming with actionable error messages</li>
-            <li><strong>File Information:</strong> Prominent filename, path display, size indicators</li>
-            <li><strong>Smart Parsing:</strong> Automatic extraction of file data from tool output</li>
-            <li><strong>Responsive Design:</strong> Text wrapping and mobile-friendly layouts</li>
-            <li><strong>Icon Integration:</strong> File-themed icons with semantic meaning</li>
+            <li>
+              <strong>Success States:</strong> Green theming with file details and size formatting
+            </li>
+            <li>
+              <strong>Error States:</strong> Red theming with actionable error messages
+            </li>
+            <li>
+              <strong>File Information:</strong> Prominent filename, path display, size indicators
+            </li>
+            <li>
+              <strong>Smart Parsing:</strong> Automatic extraction of file data from tool output
+            </li>
+            <li>
+              <strong>Responsive Design:</strong> Text wrapping and mobile-friendly layouts
+            </li>
+            <li>
+              <strong>Icon Integration:</strong> File-themed icons with semantic meaning
+            </li>
           </ul>
         </div>
       </div>

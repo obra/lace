@@ -121,17 +121,17 @@ export const AllAgents: Story = {
         <h3 className="text-sm font-medium text-gray-700 mb-2">Claude</h3>
         <TypingIndicator agent="Claude" />
       </div>
-      
+
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">GPT-4</h3>
         <TypingIndicator agent="GPT-4" />
       </div>
-      
+
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Gemini</h3>
         <TypingIndicator agent="Gemini" />
       </div>
-      
+
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Custom Agent</h3>
         <TypingIndicator agent="Custom Agent" />
@@ -157,12 +157,10 @@ export const ConversationContext: Story = {
           </div>
         </div>
         <div className="bg-base-100 border border-base-300 rounded-2xl px-4 py-3">
-          <p className="text-base-content">
-            Can you help me understand how React hooks work?
-          </p>
+          <p className="text-base-content">Can you help me understand how React hooks work?</p>
         </div>
       </div>
-      
+
       <TypingIndicator agent="Claude" />
     </div>
   ),
@@ -190,7 +188,7 @@ export const MultipleAgents: Story = {
           </p>
         </div>
       </div>
-      
+
       <TypingIndicator agent="Claude" />
       <TypingIndicator agent="GPT-4" />
       <TypingIndicator agent="Gemini" />
@@ -221,7 +219,7 @@ export const DarkMode: Story = {
             </p>
           </div>
         </div>
-        
+
         <TypingIndicator agent="Claude" />
       </div>
     </div>
@@ -238,19 +236,23 @@ export const DarkMode: Story = {
 export const InteractiveDemo: Story = {
   render: () => {
     const agents = ['Claude', 'GPT-4', 'Gemini', 'Custom Agent'];
-    
+
     return (
       <div className="flex flex-col gap-6 p-6 w-full max-w-3xl">
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">🎾 Typing Indicator Tennis Commentary Demo</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Enable tennis commentary in the toolbar above, then hover and click the typing indicators below!
+            Enable tennis commentary in the toolbar above, then hover and click the typing
+            indicators below!
           </p>
         </div>
-        
+
         <div className="space-y-6">
           {agents.map((agent) => (
-            <div key={agent} className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+            <div
+              key={agent}
+              className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+            >
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-medium">{agent}</h4>
                 <span className="text-sm text-gray-500">is typing...</span>
@@ -259,7 +261,7 @@ export const InteractiveDemo: Story = {
             </div>
           ))}
         </div>
-        
+
         <div className="bg-blue-50 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Conversation Simulation</h4>
           <div className="space-y-3">
@@ -275,17 +277,23 @@ export const InteractiveDemo: Story = {
                 </p>
               </div>
             </div>
-            
+
             <div className="cursor-pointer hover:bg-blue-100 p-2 rounded transition-colors">
               <TypingIndicator agent="Claude" />
             </div>
           </div>
         </div>
-        
+
         <div className="text-sm text-gray-600 space-y-1">
-          <p>• <strong>Notice the colors</strong> - each agent has a unique color scheme</p>
-          <p>• <strong>Hover and click</strong> the indicators for tennis commentary</p>
-          <p>• <strong>Animated dots</strong> show the typing progress with staggered animation</p>
+          <p>
+            • <strong>Notice the colors</strong> - each agent has a unique color scheme
+          </p>
+          <p>
+            • <strong>Hover and click</strong> the indicators for tennis commentary
+          </p>
+          <p>
+            • <strong>Animated dots</strong> show the typing progress with staggered animation
+          </p>
         </div>
       </div>
     );
@@ -293,7 +301,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing typing indicators with tennis commentary. Enable commentary in the toolbar and interact with the indicators!',
+        story:
+          'Interactive demo showcasing typing indicators with tennis commentary. Enable commentary in the toolbar and interact with the indicators!',
       },
     },
   },

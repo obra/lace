@@ -137,7 +137,8 @@ export const HumanMessage: Story = {
 export const AIMessage: Story = {
   args: {
     type: 'ai',
-    content: 'I\'d be happy to help you with your React application! Can you provide more details about the specific feature you want to implement?',
+    content:
+      "I'd be happy to help you with your React application! Can you provide more details about the specific feature you want to implement?",
     timestamp: new Date(),
     agent: 'Claude',
   },
@@ -157,14 +158,16 @@ export const ToolMessage: Story = {
     content: 'npm install react-router-dom',
     timestamp: new Date(),
     tool: 'bash',
-    result: 'added 15 packages, and audited 1527 packages in 2s\n\n237 packages are looking for funding\n  run `npm fund` for details\n\nfound 0 vulnerabilities',
+    result:
+      'added 15 packages, and audited 1527 packages in 2s\n\n237 packages are looking for funding\n  run `npm fund` for details\n\nfound 0 vulnerabilities',
   },
 };
 
 export const AIMessageWithGPT4: Story = {
   args: {
     type: 'ai',
-    content: 'Here\'s a comprehensive solution using TypeScript and modern React patterns. This approach ensures type safety and maintainability.',
+    content:
+      "Here's a comprehensive solution using TypeScript and modern React patterns. This approach ensures type safety and maintainability.",
     timestamp: new Date(),
     agent: 'GPT-4',
   },
@@ -173,7 +176,8 @@ export const AIMessageWithGPT4: Story = {
 export const AIMessageWithGemini: Story = {
   args: {
     type: 'ai',
-    content: 'I can help you optimize this code for better performance and readability. Let me break down the improvements we can make.',
+    content:
+      'I can help you optimize this code for better performance and readability. Let me break down the improvements we can make.',
     timestamp: new Date(),
     agent: 'Gemini',
   },
@@ -185,14 +189,16 @@ export const ToolMessageWithError: Story = {
     content: 'git push origin main',
     timestamp: new Date(),
     tool: 'bash',
-    result: 'error: failed to push some refs to \'origin\'\nhint: Updates were rejected because the remote contains work that you do\nhint: not have locally. This is usually caused by another repository pushing\nhint: to the same ref. You may want to first integrate the remote changes\nhint: (e.g., \'git pull ...\') before pushing again.',
+    result:
+      "error: failed to push some refs to 'origin'\nhint: Updates were rejected because the remote contains work that you do\nhint: not have locally. This is usually caused by another repository pushing\nhint: to the same ref. You may want to first integrate the remote changes\nhint: (e.g., 'git pull ...') before pushing again.",
   },
 };
 
 export const LongAIMessage: Story = {
   args: {
     type: 'ai',
-    content: 'Here\'s a comprehensive explanation of React hooks and their usage patterns:\n\n1. **useState**: Manages local component state\n2. **useEffect**: Handles side effects and lifecycle events\n3. **useContext**: Consumes context values\n4. **useReducer**: Manages complex state logic\n5. **useMemo**: Optimizes expensive calculations\n6. **useCallback**: Memoizes function references\n\nEach hook serves a specific purpose and can be combined to create powerful, reusable components. The key is understanding when and how to use each one effectively.',
+    content:
+      "Here's a comprehensive explanation of React hooks and their usage patterns:\n\n1. **useState**: Manages local component state\n2. **useEffect**: Handles side effects and lifecycle events\n3. **useContext**: Consumes context values\n4. **useReducer**: Manages complex state logic\n5. **useMemo**: Optimizes expensive calculations\n6. **useCallback**: Memoizes function references\n\nEach hook serves a specific purpose and can be combined to create powerful, reusable components. The key is understanding when and how to use each one effectively.",
     timestamp: new Date(),
     agent: 'Claude',
   },
@@ -206,21 +212,21 @@ export const ConversationFlow: Story = {
         content="New conversation started"
         timestamp={new Date(Date.now() - 10 * 60 * 1000)}
       />
-      
+
       <MessageDisplay
         type="human"
         content="Can you help me understand React hooks?"
         timestamp={new Date(Date.now() - 8 * 60 * 1000)}
         name="Developer"
       />
-      
+
       <MessageDisplay
         type="ai"
         content="Absolutely! React hooks are functions that let you use state and other React features in functional components. Let me show you some examples."
         timestamp={new Date(Date.now() - 7 * 60 * 1000)}
         agent="Claude"
       />
-      
+
       <MessageDisplay
         type="tool"
         content="npx create-react-app hooks-demo"
@@ -228,14 +234,14 @@ export const ConversationFlow: Story = {
         tool="bash"
         result="Creating a new React app in /Users/dev/hooks-demo.\n\nInstalling packages. This might take a couple of minutes.\nInstalling react, react-dom, and react-scripts with corepack..."
       />
-      
+
       <MessageDisplay
         type="ai"
         content="Perfect! Now let's create a simple component using useState. This is the most common hook you'll use."
         timestamp={new Date(Date.now() - 3 * 60 * 1000)}
         agent="Claude"
       />
-      
+
       <MessageDisplay
         type="human"
         content="That's really helpful! Can you show me useEffect next?"
@@ -260,7 +266,7 @@ export const AllMessageTypes: Story = {
         <h3 className="text-lg font-semibold mb-2">All Message Types</h3>
         <p className="text-sm text-gray-600">Different message types with their unique styling</p>
       </div>
-      
+
       <div className="space-y-4">
         <MessageDisplay
           type="human"
@@ -268,20 +274,20 @@ export const AllMessageTypes: Story = {
           timestamp={new Date()}
           name="John Doe"
         />
-        
+
         <MessageDisplay
           type="ai"
           content="This is an AI message with assistant styling and agent badge"
           timestamp={new Date()}
           agent="Claude"
         />
-        
+
         <MessageDisplay
           type="admin"
           content="This is an admin message displayed in the center"
           timestamp={new Date()}
         />
-        
+
         <MessageDisplay
           type="tool"
           content="ls -la"
@@ -310,7 +316,7 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the messages below!
         </p>
       </div>
-      
+
       <div className="space-y-4">
         <div className="cursor-pointer transition-transform hover:scale-[1.01]">
           <MessageDisplay
@@ -320,7 +326,7 @@ export const InteractiveDemo: Story = {
             name="Product Manager"
           />
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.01]">
           <MessageDisplay
             type="ai"
@@ -329,7 +335,7 @@ export const InteractiveDemo: Story = {
             agent="Claude"
           />
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.01]">
           <MessageDisplay
             type="admin"
@@ -337,7 +343,7 @@ export const InteractiveDemo: Story = {
             timestamp={new Date(Date.now() - 3 * 60 * 1000)}
           />
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.01]">
           <MessageDisplay
             type="tool"
@@ -347,7 +353,7 @@ export const InteractiveDemo: Story = {
             result="Creating a new Next.js app in /Users/dev/my-project.\n\nUsing npm.\n\nInstalling dependencies:\n- react\n- react-dom\n- next\n- typescript\n- tailwindcss\n\n✅ Success! Created my-project at /Users/dev/my-project"
           />
         </div>
-        
+
         <div className="cursor-pointer transition-transform hover:scale-[1.01]">
           <MessageDisplay
             type="ai"
@@ -362,7 +368,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing message displays with tennis commentary. Enable commentary in the toolbar and interact with the messages!',
+        story:
+          'Interactive demo showcasing message displays with tennis commentary. Enable commentary in the toolbar and interact with the messages!',
       },
     },
   },

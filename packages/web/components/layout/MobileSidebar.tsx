@@ -43,11 +43,13 @@ export function MobileSidebar({ isOpen, onClose, onSettingsClick, children }: Mo
           <div className="flex items-center justify-between">
             <div className="flex-1 gap-3">
               <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-800 text-xs text-neutral-200">✦</span>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-800 text-xs text-neutral-200">
+                  ✦
+                </span>
                 <span className="text-lg">Lace</span>
               </Link>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <button
                 onClick={onClose}
@@ -60,9 +62,7 @@ export function MobileSidebar({ isOpen, onClose, onSettingsClick, children }: Mo
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
 
         {/* Footer */}
         <div className="p-4 border-t border-base-300">

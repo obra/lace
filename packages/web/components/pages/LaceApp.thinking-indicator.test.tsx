@@ -6,17 +6,24 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useState, useEffect } from 'react';
 
 // Test the core thinking indicator logic in isolation
-function useThinkingIndicatorLogic(events: unknown[], sendingMessage: boolean, setSendingMessage: (value: boolean) => void) {
+function useThinkingIndicatorLogic(
+  events: unknown[],
+  sendingMessage: boolean,
+  setSendingMessage: (value: boolean) => void
+) {
   // This mirrors the logic from LaceApp
   useEffect(() => {
     if (events?.length > 0) {
       const lastEvent = events[events.length - 1] as { type: string; data?: { content?: string } };
-      if (sendingMessage && (lastEvent.type === 'AGENT_MESSAGE' || 
-          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' && 
-           lastEvent.data?.content && 
-           (lastEvent.data.content.toLowerCase().includes('error') || 
-            lastEvent.data.content.toLowerCase().includes('failed') ||
-            lastEvent.data.content.toLowerCase().includes('connection lost'))))) {
+      if (
+        sendingMessage &&
+        (lastEvent.type === 'AGENT_MESSAGE' ||
+          (lastEvent.type === 'LOCAL_SYSTEM_MESSAGE' &&
+            lastEvent.data?.content &&
+            (lastEvent.data.content.toLowerCase().includes('error') ||
+              lastEvent.data.content.toLowerCase().includes('failed') ||
+              lastEvent.data.content.toLowerCase().includes('connection lost'))))
+      ) {
         setSendingMessage(false);
       }
     }
@@ -29,12 +36,10 @@ describe('LaceApp thinking indicator logic', () => {
     const setSendingMessage = vi.fn();
     const events = [
       { type: 'USER_MESSAGE', timestamp: new Date() },
-      { type: 'AGENT_MESSAGE', timestamp: new Date() }
+      { type: 'AGENT_MESSAGE', timestamp: new Date() },
     ];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should call setSendingMessage(false) when AGENT_MESSAGE is received
     expect(setSendingMessage).toHaveBeenCalledWith(false);
@@ -45,12 +50,10 @@ describe('LaceApp thinking indicator logic', () => {
     const setSendingMessage = vi.fn();
     const events = [
       { type: 'USER_MESSAGE', timestamp: new Date() },
-      { type: 'TOOL_CALL', timestamp: new Date() }
+      { type: 'TOOL_CALL', timestamp: new Date() },
     ];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should not call setSendingMessage for non-AGENT_MESSAGE events
     expect(setSendingMessage).not.toHaveBeenCalled();
@@ -59,13 +62,9 @@ describe('LaceApp thinking indicator logic', () => {
   it('should not reset sendingMessage when already false', () => {
     let sendingMessage = false;
     const setSendingMessage = vi.fn();
-    const events = [
-      { type: 'AGENT_MESSAGE', timestamp: new Date() }
-    ];
+    const events = [{ type: 'AGENT_MESSAGE', timestamp: new Date() }];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should not call setSendingMessage when sendingMessage is already false
     expect(setSendingMessage).not.toHaveBeenCalled();
@@ -75,12 +74,14 @@ describe('LaceApp thinking indicator logic', () => {
     let sendingMessage = true;
     const setSendingMessage = vi.fn();
     const events = [
-      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connection failed' }, timestamp: new Date() }
+      {
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: { content: 'Connection failed' },
+        timestamp: new Date(),
+      },
     ];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should call setSendingMessage(false) for error messages
     expect(setSendingMessage).toHaveBeenCalledWith(false);
@@ -90,12 +91,10 @@ describe('LaceApp thinking indicator logic', () => {
     let sendingMessage = true;
     const setSendingMessage = vi.fn();
     const events = [
-      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connection lost' }, timestamp: new Date() }
+      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connection lost' }, timestamp: new Date() },
     ];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should call setSendingMessage(false) for connection lost messages
     expect(setSendingMessage).toHaveBeenCalledWith(false);
@@ -105,12 +104,14 @@ describe('LaceApp thinking indicator logic', () => {
     let sendingMessage = true;
     const setSendingMessage = vi.fn();
     const events = [
-      { type: 'LOCAL_SYSTEM_MESSAGE', data: { content: 'Connected to session stream' }, timestamp: new Date() }
+      {
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: { content: 'Connected to session stream' },
+        timestamp: new Date(),
+      },
     ];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should not call setSendingMessage for non-error system messages
     expect(setSendingMessage).not.toHaveBeenCalled();
@@ -121,9 +122,7 @@ describe('LaceApp thinking indicator logic', () => {
     const setSendingMessage = vi.fn();
     const events: unknown[] = [];
 
-    renderHook(() => 
-      useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage)
-    );
+    renderHook(() => useThinkingIndicatorLogic(events, sendingMessage, setSendingMessage));
 
     // Should not call setSendingMessage when no events
     expect(setSendingMessage).not.toHaveBeenCalled();

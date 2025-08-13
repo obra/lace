@@ -15,7 +15,7 @@ interface TimelineMessageWithDetailsProps {
 
 export function TimelineMessageWithDetails({ event, agents }: TimelineMessageWithDetailsProps) {
   return (
-    <TechnicalDetailsToggle 
+    <TechnicalDetailsToggle
       details={event}
       label="Event Details"
       buttonClassName="absolute top-2 right-2 text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200"

@@ -19,7 +19,7 @@ describe('SettingsTabs', () => {
         <div data-tab="advanced">Advanced Content</div>
       </SettingsTabs>
     );
-    
+
     expect(screen.getByText('General Content')).toBeInTheDocument();
     expect(screen.queryByText('Advanced Content')).not.toBeInTheDocument();
   });
@@ -31,9 +31,9 @@ describe('SettingsTabs', () => {
         <div data-tab="advanced">Advanced Content</div>
       </SettingsTabs>
     );
-    
+
     expect(screen.getByText('General Content')).toBeInTheDocument();
-    
+
     fireEvent.click(screen.getByText('Advanced'));
     expect(screen.getByText('Advanced Content')).toBeInTheDocument();
     expect(screen.queryByText('General Content')).not.toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('SettingsTabs', () => {
         <div data-tab="advanced">Advanced Content</div>
       </SettingsTabs>
     );
-    
+
     fireEvent.click(screen.getByText('Advanced'));
     expect(mockOnTabChange).toHaveBeenCalledWith('advanced');
   });
@@ -60,13 +60,13 @@ describe('SettingsTabs', () => {
         <div data-tab="privacy">Privacy Content</div>
       </SettingsTabs>
     );
-    
+
     const generalTab = screen.getByText('General');
     generalTab.focus();
-    
+
     fireEvent.keyDown(generalTab, { key: 'ArrowRight' });
     expect(screen.getByText('Advanced')).toHaveFocus();
-    
+
     fireEvent.keyDown(screen.getByText('Advanced'), { key: 'ArrowRight' });
     expect(screen.getByText('Privacy')).toHaveFocus();
   });
@@ -78,15 +78,15 @@ describe('SettingsTabs', () => {
         <div data-tab="advanced">Advanced Content</div>
       </SettingsTabs>
     );
-    
+
     const advancedTab = screen.getByText('Advanced');
     advancedTab.focus();
-    
+
     // Arrow right from last tab should wrap to first
     fireEvent.keyDown(advancedTab, { key: 'ArrowRight' });
     expect(screen.getByText('General')).toHaveFocus();
-    
-    // Arrow left from first tab should wrap to last  
+
+    // Arrow left from first tab should wrap to last
     fireEvent.keyDown(screen.getByText('General'), { key: 'ArrowLeft' });
     expect(screen.getByText('Advanced')).toHaveFocus();
   });
@@ -98,10 +98,10 @@ describe('SettingsTabs', () => {
         <div data-tab="advanced">Advanced Content</div>
       </SettingsTabs>
     );
-    
+
     const advancedTab = screen.getByText('Advanced');
     fireEvent.keyDown(advancedTab, { key: 'Enter' });
-    
+
     expect(screen.getByText('Advanced Content')).toBeInTheDocument();
     expect(screen.queryByText('General Content')).not.toBeInTheDocument();
   });
@@ -109,16 +109,16 @@ describe('SettingsTabs', () => {
   it('renders custom tab labels', () => {
     const tabs = [
       { id: 'ui', label: 'UI Settings', icon: '🎨' },
-      { id: 'system', label: 'System', icon: '⚙️' }
+      { id: 'system', label: 'System', icon: '⚙️' },
     ];
-    
+
     render(
       <SettingsTabs defaultTab="ui" tabs={tabs}>
         <div data-tab="ui">UI Content</div>
         <div data-tab="system">System Content</div>
       </SettingsTabs>
     );
-    
+
     expect(screen.getByText('🎨')).toBeInTheDocument();
     expect(screen.getByText('UI Settings')).toBeInTheDocument();
     expect(screen.getByText('⚙️')).toBeInTheDocument();

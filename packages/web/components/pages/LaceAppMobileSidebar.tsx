@@ -54,15 +54,11 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 lg:hidden"
         >
-          <MobileSidebar
-            isOpen={showMobileNav}
-            onClose={onClose}
-            onSettingsClick={onSettingsClick}
-          >
+          <MobileSidebar isOpen={showMobileNav} onClose={onClose} onSettingsClick={onSettingsClick}>
             {/* Current Project - Show only when project selected */}
             {selectedProject && (
-              <SidebarSection 
-                title="Current Project" 
+              <SidebarSection
+                title="Current Project"
                 icon={faFolder}
                 defaultCollapsed={false}
                 collapsible={false}
@@ -81,7 +77,7 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
                     {sessions.length} sessions
                   </div>
                 </div>
-                
+
                 {/* Switch Project Button */}
                 <SidebarButton
                   onClick={() => {
@@ -98,8 +94,8 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
 
             {/* Session Management - Show session context and agent selection */}
             {selectedSessionDetails && (
-              <SidebarSection 
-                title="Current Session" 
+              <SidebarSection
+                title="Current Session"
                 icon={faComments}
                 defaultCollapsed={false}
                 collapsible={false}
@@ -138,19 +134,27 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <FontAwesomeIcon 
-                          icon={faRobot} 
+                        <FontAwesomeIcon
+                          icon={faRobot}
                           className={`w-4 h-4 ${
-                            selectedAgent === agent.threadId ? 'text-primary' : 'text-base-content/60'
-                          }`} 
+                            selectedAgent === agent.threadId
+                              ? 'text-primary'
+                              : 'text-base-content/60'
+                          }`}
                         />
                         <span className="font-medium">{agent.name}</span>
                       </div>
-                      <span className={`text-xs badge badge-xs ${
-                        agent.status === 'idle' ? 'badge-success' :
-                        (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
-                        'badge-neutral'
-                      }`}>
+                      <span
+                        className={`text-xs badge badge-xs ${
+                          agent.status === 'idle'
+                            ? 'badge-success'
+                            : agent.status === 'thinking' ||
+                                agent.status === 'tool_execution' ||
+                                agent.status === 'streaming'
+                              ? 'badge-warning'
+                              : 'badge-neutral'
+                        }`}
+                      >
                         {agent.status}
                       </span>
                     </div>
@@ -161,7 +165,7 @@ export const LaceAppMobileSidebar = memo(function LaceAppMobileSidebar({
 
             {/* Tasks Section - Show when session is selected */}
             {selectedSessionDetails && selectedProject && taskManager && (
-              <SidebarSection 
+              <SidebarSection
                 title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
                 icon={faTasks}
                 defaultCollapsed={false}

@@ -15,7 +15,8 @@ const meta: Meta<typeof MobileSidebar> = {
     layout: 'fullscreen',
     docs: {
       description: {
-        component: 'A mobile-optimized sidebar with overlay and backdrop, using the same composition pattern as the desktop sidebar.',
+        component:
+          'A mobile-optimized sidebar with overlay and backdrop, using the same composition pattern as the desktop sidebar.',
       },
     },
   },
@@ -50,19 +51,22 @@ const mockAgents = [
 ];
 
 // Interactive wrapper component for controlling the open state
-function InteractiveMobileSidebar({ children, ...props }: { children: React.ReactNode; isOpen?: boolean }) {
+function InteractiveMobileSidebar({
+  children,
+  ...props
+}: {
+  children: React.ReactNode;
+  isOpen?: boolean;
+}) {
   const [isOpen, setIsOpen] = useState(props.isOpen || false);
-  
+
   return (
     <div style={{ height: '100vh', position: 'relative' }}>
       {/* Mobile viewport simulation */}
       <div className="w-full h-full bg-base-200 flex flex-col">
         <div className="p-4 border-b border-base-300 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Mobile App</h1>
-          <button 
-            className="btn btn-primary btn-sm lg:hidden"
-            onClick={() => setIsOpen(true)}
-          >
+          <button className="btn btn-primary btn-sm lg:hidden" onClick={() => setIsOpen(true)}>
             Open Sidebar
           </button>
         </div>
@@ -72,11 +76,8 @@ function InteractiveMobileSidebar({ children, ...props }: { children: React.Reac
           </p>
         </div>
       </div>
-      
-      <MobileSidebar 
-        isOpen={isOpen} 
-        onClose={() => setIsOpen(false)}
-      >
+
+      <MobileSidebar isOpen={isOpen} onClose={() => setIsOpen(false)}>
         {children}
       </MobileSidebar>
     </div>
@@ -99,9 +100,7 @@ export const ProjectsOnly: Story = {
                 <span>{project.name}</span>
               </div>
               {project.sessionCount > 0 && (
-                <span className="text-xs text-base-content/40">
-                  {project.sessionCount}
-                </span>
+                <span className="text-xs text-base-content/40">{project.sessionCount}</span>
               )}
             </div>
           </SidebarItem>
@@ -127,9 +126,7 @@ export const ProjectsAndSessions: Story = {
                 <span>{project.name}</span>
               </div>
               {project.sessionCount > 0 && (
-                <span className="text-xs text-base-content/40">
-                  {project.sessionCount}
-                </span>
+                <span className="text-xs text-base-content/40">{project.sessionCount}</span>
               )}
             </div>
           </SidebarItem>
@@ -144,9 +141,7 @@ export const ProjectsAndSessions: Story = {
                 <FontAwesomeIcon icon={faComments} className="w-4 h-4" />
                 <span>{session.name}</span>
               </div>
-              <span className="text-xs text-base-content/40">
-                {session.agentCount} agents
-              </span>
+              <span className="text-xs text-base-content/40">{session.agentCount} agents</span>
             </div>
           </SidebarItem>
         ))}
@@ -175,9 +170,7 @@ export const FullHierarchy: Story = {
                 <span>{project.name}</span>
               </div>
               {project.sessionCount > 0 && (
-                <span className="text-xs text-base-content/40">
-                  {project.sessionCount}
-                </span>
+                <span className="text-xs text-base-content/40">{project.sessionCount}</span>
               )}
             </div>
           </SidebarItem>
@@ -192,9 +185,7 @@ export const FullHierarchy: Story = {
                 <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
                 <span>{agent.name}</span>
               </div>
-              <span className="text-xs text-base-content/40">
-                {agent.provider}
-              </span>
+              <span className="text-xs text-base-content/40">{agent.provider}</span>
             </div>
           </SidebarItem>
         ))}

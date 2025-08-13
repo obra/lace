@@ -174,7 +174,8 @@ export const AllVariants: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'All available badge variants displayed together. Great for testing tennis commentary!',
+        story:
+          'All available badge variants displayed together. Great for testing tennis commentary!',
       },
     },
   },
@@ -183,10 +184,18 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <div className="flex flex-wrap items-center gap-4">
-      <Badge variant="primary" size="xs">XS</Badge>
-      <Badge variant="primary" size="sm">SM</Badge>
-      <Badge variant="primary" size="md">MD</Badge>
-      <Badge variant="primary" size="lg">LG</Badge>
+      <Badge variant="primary" size="xs">
+        XS
+      </Badge>
+      <Badge variant="primary" size="sm">
+        SM
+      </Badge>
+      <Badge variant="primary" size="md">
+        MD
+      </Badge>
+      <Badge variant="primary" size="lg">
+        LG
+      </Badge>
     </div>
   ),
   parameters: {
@@ -207,7 +216,7 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the badges below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
           <Badge variant="primary" size="lg" className="cursor-pointer">
@@ -215,21 +224,21 @@ export const InteractiveDemo: Story = {
           </Badge>
           <p className="text-xs text-gray-500 mt-1">Primary Badge</p>
         </div>
-        
+
         <div className="text-center">
           <Badge variant="accent" size="lg" className="cursor-pointer">
             Click Me!
           </Badge>
           <p className="text-xs text-gray-500 mt-1">Accent Badge</p>
         </div>
-        
+
         <div className="text-center">
           <Badge variant="secondary" size="lg" className="cursor-pointer">
             Try Both!
           </Badge>
           <p className="text-xs text-gray-500 mt-1">Secondary Badge</p>
         </div>
-        
+
         <div className="text-center">
           <Badge variant="outline" size="lg" className="cursor-pointer">
             Amazing!
@@ -242,7 +251,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing the tennis commentary system. Enable commentary in the toolbar and interact with the badges!',
+        story:
+          'Interactive demo showcasing the tennis commentary system. Enable commentary in the toolbar and interact with the badges!',
       },
     },
   },

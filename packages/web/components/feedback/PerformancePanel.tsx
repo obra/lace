@@ -13,19 +13,27 @@ interface PerformancePanelProps {
 export function PerformancePanel({ analysis }: PerformancePanelProps) {
   const getTrendColor = (trend: string) => {
     switch (trend) {
-      case 'improving': return 'text-green-600';
-      case 'stable': return 'text-blue-600';
-      case 'degrading': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'improving':
+        return 'text-green-600';
+      case 'stable':
+        return 'text-blue-600';
+      case 'degrading':
+        return 'text-red-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
-      case 'improving': return '📈';
-      case 'stable': return '📊';
-      case 'degrading': return '📉';
-      default: return '📊';
+      case 'improving':
+        return '📈';
+      case 'stable':
+        return '📊';
+      case 'degrading':
+        return '📉';
+      default:
+        return '📊';
     }
   };
 
@@ -75,7 +83,9 @@ export function PerformancePanel({ analysis }: PerformancePanelProps) {
             <div className="text-sm text-gray-500">95th Percentile</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold ${getTrendColor(analysis.responseTimeAnalysis.trend)}`}>
+            <div
+              className={`text-2xl font-bold ${getTrendColor(analysis.responseTimeAnalysis.trend)}`}
+            >
               {getTrendIcon(analysis.responseTimeAnalysis.trend)}
             </div>
             <div className="text-sm text-gray-500 capitalize">
@@ -93,13 +103,13 @@ export function PerformancePanel({ analysis }: PerformancePanelProps) {
         </h3>
         <div className="space-y-3">
           {analysis.toolEfficiency.map((tool, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div
+              key={index}
+              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+            >
               <div className="flex items-center space-x-3">
                 <span className="font-medium text-gray-900">{tool.toolName}</span>
-                <Badge 
-                  variant="secondary" 
-                  className={`${getSuccessRateColor(tool.successRate)}`}
-                >
+                <Badge variant="secondary" className={`${getSuccessRateColor(tool.successRate)}`}>
                   {Math.round(tool.successRate * 100)}% success
                 </Badge>
               </div>

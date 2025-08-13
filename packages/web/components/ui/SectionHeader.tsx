@@ -7,7 +7,15 @@ interface SectionHeaderProps {
   onToggle: () => void;
   badge?: {
     text: string | number;
-    variant?: 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'error' | 'info' | 'teal';
+    variant?:
+      | 'primary'
+      | 'secondary'
+      | 'accent'
+      | 'success'
+      | 'warning'
+      | 'error'
+      | 'info'
+      | 'teal';
   };
   rightContent?: ReactNode;
   className?: string;
@@ -27,7 +35,7 @@ export default function SectionHeader({
 }: SectionHeaderProps) {
   const getBadgeClasses = (variant: string = 'primary') => {
     const baseClasses = 'badge badge-sm border-0';
-    
+
     switch (variant) {
       case 'primary':
         return `${baseClasses} bg-primary text-primary-content`;
@@ -53,16 +61,12 @@ export default function SectionHeader({
   const content = (
     <>
       <span className="text-sm font-medium text-base-content">{title}</span>
-      
+
       <div className="flex items-center gap-2">
-        {badge && (
-          <span className={getBadgeClasses(badge.variant)}>
-            {badge.text}
-          </span>
-        )}
-        
+        {badge && <span className={getBadgeClasses(badge.variant)}>{badge.text}</span>}
+
         {rightContent}
-        
+
         {/* Expand/Collapse Icon */}
         {isExpanded ? (
           <ChevronDownIcon className="w-4 h-4 transition-transform text-base-content/60" />
@@ -82,11 +86,7 @@ export default function SectionHeader({
 
   if (asButton) {
     return (
-      <button
-        onClick={onToggle}
-        disabled={disabled}
-        className={baseClasses}
-      >
+      <button onClick={onToggle} disabled={disabled} className={baseClasses}>
         {content}
       </button>
     );

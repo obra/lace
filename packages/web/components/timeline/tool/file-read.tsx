@@ -40,9 +40,7 @@ export const fileReadRenderer: ToolRenderer = {
       );
     }
 
-    const content = result.content
-      .map(block => block.text || '')
-      .join('');
+    const content = result.content.map((block) => block.text || '').join('');
 
     const isError = fileReadRenderer.isError!(result);
 
@@ -50,12 +48,13 @@ export const fileReadRenderer: ToolRenderer = {
       return (
         <div className="bg-error/10 border border-error/20 rounded-lg p-3">
           <div className="flex items-start gap-2">
-            <FontAwesomeIcon icon={faFileCode} className="w-4 h-4 text-error mt-0.5 flex-shrink-0" />
+            <FontAwesomeIcon
+              icon={faFileCode}
+              className="w-4 h-4 text-error mt-0.5 flex-shrink-0"
+            />
             <div className="flex-1 min-w-0">
               <div className="text-error font-medium text-sm mb-1">File Read Failed</div>
-              <div className="text-error/80 text-sm whitespace-pre-wrap break-words">
-                {content}
-              </div>
+              <div className="text-error/80 text-sm whitespace-pre-wrap break-words">{content}</div>
             </div>
           </div>
         </div>
@@ -63,23 +62,25 @@ export const fileReadRenderer: ToolRenderer = {
     }
 
     // Extract file path from arguments
-    const filePath = typeof metadata?.arguments === 'object' && metadata?.arguments !== null 
-      ? (metadata.arguments as { path?: string }).path 
-      : undefined;
+    const filePath =
+      typeof metadata?.arguments === 'object' && metadata?.arguments !== null
+        ? (metadata.arguments as { path?: string }).path
+        : undefined;
 
     // Extract result metadata
-    const resultMetadata = result.metadata as { 
-      totalLines?: number;
-      linesReturned?: number; 
-      fileSize?: string;
-    } | undefined;
-    
+    const resultMetadata = result.metadata as
+      | {
+          totalLines?: number;
+          linesReturned?: number;
+          fileSize?: string;
+        }
+      | undefined;
+
     // Extract filename for display
     const filename = filePath ? filePath.split('/').pop() || filePath : undefined;
 
     return (
       <div className="bg-primary/5 border border-primary/20 rounded-lg">
-
         {/* Content display with syntax highlighting and modal expansion */}
         <div className="p-3">
           <FileRenderer

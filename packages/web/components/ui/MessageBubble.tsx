@@ -30,13 +30,13 @@ const MessageBubble = ({
   children,
   actions,
   variant = 'default',
-  className = ''
+  className = '',
 }: MessageBubbleProps) => {
   const variantClasses = {
     default: 'bg-base-100 border-base-300',
     highlighted: 'bg-primary/5 border-primary/20',
-    error: 'bg-error/5 border-error/20', 
-    system: 'bg-info/5 border-info/20'
+    error: 'bg-error/5 border-error/20',
+    system: 'bg-info/5 border-info/20',
   };
 
   return (
@@ -57,28 +57,23 @@ const MessageBubble = ({
           {/* Header */}
           {header && (
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-medium text-base-content">
-                {header.name}
-              </span>
-              
-              {header.badges && header.badges.map((badge, index) => (
-                <Badge key={index} variant={badge.variant} size="xs">
-                  {badge.text}
-                </Badge>
-              ))}
-              
+              <span className="font-medium text-base-content">{header.name}</span>
+
+              {header.badges &&
+                header.badges.map((badge, index) => (
+                  <Badge key={index} variant={badge.variant} size="xs">
+                    {badge.text}
+                  </Badge>
+                ))}
+
               {header.timestamp && (
-                <span className="text-xs text-base-content/60 ml-auto">
-                  {header.timestamp}
-                </span>
+                <span className="text-xs text-base-content/60 ml-auto">{header.timestamp}</span>
               )}
             </div>
           )}
 
           {/* Message Content */}
-          <div className="text-base-content">
-            {children}
-          </div>
+          <div className="text-base-content">{children}</div>
 
           {/* Actions */}
           {actions && (

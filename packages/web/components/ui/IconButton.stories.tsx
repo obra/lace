@@ -1,7 +1,7 @@
 // ABOUTME: Storybook story for IconButton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import IconButton from './IconButton';
-import { 
+import {
   faSearch,
   faTerminal,
   faTasks,
@@ -110,7 +110,21 @@ A fundamental action atom that provides consistent interactive elements with Fon
   argTypes: {
     icon: {
       control: { type: 'select' },
-      options: ['faSearch', 'faTerminal', 'faTasks', 'faFolder', 'faMicrophone', 'faPaperPlane', 'faPaperclip', 'faPlus', 'faCheck', 'faCog', 'faEdit', 'faStop', 'faShare'],
+      options: [
+        'faSearch',
+        'faTerminal',
+        'faTasks',
+        'faFolder',
+        'faMicrophone',
+        'faPaperPlane',
+        'faPaperclip',
+        'faPlus',
+        'faCheck',
+        'faCog',
+        'faEdit',
+        'faStop',
+        'faShare',
+      ],
       mapping: {
         faSearch,
         faTerminal,
@@ -130,7 +144,16 @@ A fundamental action atom that provides consistent interactive elements with Fon
     },
     variant: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'accent', 'ghost', 'outline', 'error', 'warning', 'success'],
+      options: [
+        'primary',
+        'secondary',
+        'accent',
+        'ghost',
+        'outline',
+        'error',
+        'warning',
+        'success',
+      ],
       description: 'Button variant/style',
     },
     size: {
@@ -338,7 +361,13 @@ export const WithBadges: Story = {
         <p className="text-xs text-gray-500 mt-1">Badge: 3</p>
       </div>
       <div className="text-center">
-        <IconButton icon={faComments} variant="ghost" size="md" badge="99+" tooltip="Many messages" />
+        <IconButton
+          icon={faComments}
+          variant="ghost"
+          size="md"
+          badge="99+"
+          tooltip="Many messages"
+        />
         <p className="text-xs text-gray-500 mt-1">Badge: 99+</p>
       </div>
       <div className="text-center">
@@ -365,51 +394,51 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then hover and click the buttons below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-4 gap-4">
         <div className="text-center">
-          <IconButton 
-            icon={faSearch} 
-            variant="error" 
-            size="lg" 
-            tooltip="Search" 
+          <IconButton
+            icon={faSearch}
+            variant="error"
+            size="lg"
+            tooltip="Search"
             onClick={() => alert('Searching!')}
           />
           <p className="text-sm font-medium mt-2">Search</p>
           <p className="text-xs text-gray-500">Find content</p>
         </div>
-        
+
         <div className="text-center">
-          <IconButton 
-            icon={faComments} 
-            variant="warning" 
-            size="lg" 
-            badge="5" 
-            tooltip="Messages" 
+          <IconButton
+            icon={faComments}
+            variant="warning"
+            size="lg"
+            badge="5"
+            tooltip="Messages"
             onClick={() => alert('5 messages!')}
           />
           <p className="text-sm font-medium mt-2">Messages</p>
           <p className="text-xs text-gray-500">5 new messages</p>
         </div>
-        
+
         <div className="text-center">
-          <IconButton 
-            icon={faPaperPlane} 
-            variant="success" 
-            size="lg" 
-            tooltip="Send message" 
+          <IconButton
+            icon={faPaperPlane}
+            variant="success"
+            size="lg"
+            tooltip="Send message"
             onClick={() => alert('Sending...')}
           />
           <p className="text-sm font-medium mt-2">Send</p>
           <p className="text-xs text-gray-500">Send message</p>
         </div>
-        
+
         <div className="text-center">
-          <IconButton 
-            icon={faCog} 
-            variant="ghost" 
-            size="lg" 
-            tooltip="Settings" 
+          <IconButton
+            icon={faCog}
+            variant="ghost"
+            size="lg"
+            tooltip="Settings"
             onClick={() => alert('Opening settings...')}
           />
           <p className="text-sm font-medium mt-2">Settings</p>
@@ -421,7 +450,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing icon buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
+        story:
+          'Interactive demo showcasing icon buttons with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
       },
     },
   },

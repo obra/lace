@@ -10,13 +10,22 @@ import { createMockResponse } from '@/test-utils/mock-fetch';
 const mockProps = {
   projects: [],
   selectedProject: null,
-  providers: [{
-    name: 'anthropic',
-    displayName: 'Anthropic',
-    configured: true,
-    requiresApiKey: true,
-    models: [{ id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4', contextWindow: 200000, maxOutputTokens: 8192 }]
-  }],
+  providers: [
+    {
+      name: 'anthropic',
+      displayName: 'Anthropic',
+      configured: true,
+      requiresApiKey: true,
+      models: [
+        {
+          id: 'claude-sonnet-4-20250514',
+          displayName: 'Claude Sonnet 4',
+          contextWindow: 200000,
+          maxOutputTokens: 8192,
+        },
+      ],
+    },
+  ],
   onProjectSelect: vi.fn(),
   onProjectCreate: vi.fn(),
   onProjectUpdate: vi.fn(),
@@ -28,7 +37,7 @@ global.fetch = vi.fn();
 describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       createMockResponse({ project: { id: '1', name: 'Test' } })
     );
@@ -36,18 +45,14 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show wizard and proceed to directory step in auto-open mode', async () => {
     render(
-      <ProjectSelectorPanel 
-        {...mockProps} 
-        autoOpenCreate={true}
-        onAutoCreateHandled={vi.fn()}
-      />
+      <ProjectSelectorPanel {...mockProps} autoOpenCreate={true} onAutoCreateHandled={vi.fn()} />
     );
 
     // In simplified onboarding flow, modal opens directly at directory step (step 2)
     expect(await screen.findByText('Create New Project')).toBeInTheDocument();
     expect(await screen.findByText('Set project directory')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
-    
+
     // Should not show advanced options in simplified mode
     expect(screen.queryByText('Default Provider')).not.toBeInTheDocument();
     expect(screen.queryByText('Tool Access Policies')).not.toBeInTheDocument();
@@ -55,11 +60,7 @@ describe('ProjectSelectorPanel', () => {
 
   it('should auto-populate project name from directory', async () => {
     render(
-      <ProjectSelectorPanel 
-        {...mockProps} 
-        autoOpenCreate={true}
-        onAutoCreateHandled={vi.fn()}
-      />
+      <ProjectSelectorPanel {...mockProps} autoOpenCreate={true} onAutoCreateHandled={vi.fn()} />
     );
 
     // In simplified onboarding flow, modal opens directly at directory step
@@ -77,11 +78,7 @@ describe('ProjectSelectorPanel', () => {
 
   it('should allow switching to advanced setup', async () => {
     render(
-      <ProjectSelectorPanel 
-        {...mockProps} 
-        autoOpenCreate={true}
-        onAutoCreateHandled={vi.fn()}
-      />
+      <ProjectSelectorPanel {...mockProps} autoOpenCreate={true} onAutoCreateHandled={vi.fn()} />
     );
 
     await waitFor(() => {

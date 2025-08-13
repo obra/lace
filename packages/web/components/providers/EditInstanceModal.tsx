@@ -21,19 +21,19 @@ interface EditInstanceModalProps {
   onSuccess: () => void;
 }
 
-export function EditInstanceModal({ 
-  isOpen, 
-  instance, 
-  onClose, 
-  onSuccess 
+export function EditInstanceModal({
+  isOpen,
+  instance,
+  onClose,
+  onSuccess,
 }: EditInstanceModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     displayName: instance.displayName,
     endpoint: instance.endpoint || '',
-    apiKey: ''
+    apiKey: '',
   });
 
   // Update form data when instance changes
@@ -41,17 +41,17 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
-      apiKey: ''
+      apiKey: '',
     });
   }, [instance]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setSubmitting(true);
       setError(null);
-      
+
       const updateData: Record<string, unknown> = {
         displayName: formData.displayName,
         endpoint: formData.endpoint || undefined,
@@ -65,11 +65,13 @@ export function EditInstanceModal({
       const response = await fetch(`/api/provider/instances/${instance.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
-        const errorData = await parseResponse<{ error?: string }>(response).catch(() => ({ error: undefined }));
+        const errorData = await parseResponse<{ error?: string }>(response).catch(() => ({
+          error: undefined,
+        }));
         throw new Error(errorData.error || `Failed to update instance: ${response.status}`);
       }
 
@@ -87,18 +89,13 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
-      apiKey: ''
+      apiKey: '',
     });
     onClose();
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title={`Edit ${instance.displayName}`}
-      size="md"
-    >
+    <Modal isOpen={isOpen} onClose={handleClose} title={`Edit ${instance.displayName}`} size="md">
       {error && (
         <div className="alert alert-error mb-4">
           <span className="text-sm">{error}</span>
@@ -114,7 +111,7 @@ export function EditInstanceModal({
             type="text"
             className="input input-bordered w-full"
             value={formData.displayName}
-            onChange={(e) => setFormData({...formData, displayName: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
             placeholder="My Instance"
             required
           />
@@ -128,15 +125,14 @@ export function EditInstanceModal({
             type="password"
             className="input input-bordered w-full"
             value={formData.apiKey}
-            onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
             placeholder="Leave empty to keep current key"
           />
           <div className="label">
             <span className="label-text-alt">
-              {instance.hasCredentials 
-                ? 'Leave empty to keep existing key' 
-                : 'No API key currently configured'
-              }
+              {instance.hasCredentials
+                ? 'Leave empty to keep existing key'
+                : 'No API key currently configured'}
             </span>
           </div>
         </div>
@@ -146,7 +142,9 @@ export function EditInstanceModal({
             <span className="label-text">Provider</span>
           </label>
           <div className="flex items-center space-x-2">
-            <Badge variant="primary" size="sm">{instance.catalogProviderId}</Badge>
+            <Badge variant="primary" size="sm">
+              {instance.catalogProviderId}
+            </Badge>
             <span className="text-sm text-base-content/60">from catalog (cannot be changed)</span>
           </div>
         </div>
@@ -159,7 +157,7 @@ export function EditInstanceModal({
             type="url"
             className="input input-bordered w-full"
             value={formData.endpoint}
-            onChange={(e) => setFormData({...formData, endpoint: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, endpoint: e.target.value })}
             placeholder="Leave empty to use default"
           />
           <div className="label">
@@ -167,21 +165,16 @@ export function EditInstanceModal({
           </div>
         </div>
 
-
         <div className="flex justify-end space-x-3 pt-4">
-          <button 
-            type="button" 
-            className="btn btn-ghost" 
+          <button
+            type="button"
+            className="btn btn-ghost"
             onClick={handleClose}
             disabled={submitting}
           >
             Cancel
           </button>
-          <button 
-            type="submit" 
-            className="btn btn-primary vapor-button"
-            disabled={submitting}
-          >
+          <button type="submit" className="btn btn-primary vapor-button" disabled={submitting}>
             {submitting ? (
               <>
                 <span className="loading loading-spinner loading-sm"></span>

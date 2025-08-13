@@ -48,39 +48,39 @@ export default function CodeBlock({
       const ext = filename.split('.').pop()?.toLowerCase();
       // Map common extensions to highlight.js language names
       const extMap: Record<string, string> = {
-        'ts': 'typescript',
-        'tsx': 'typescript',
-        'js': 'javascript', 
-        'jsx': 'javascript',
-        'py': 'python',
-        'rb': 'ruby',
-        'go': 'go',
-        'rs': 'rust',
-        'cpp': 'cpp',
-        'c': 'c',
-        'h': 'c',
-        'hpp': 'cpp',
-        'java': 'java',
-        'cs': 'csharp',
-        'php': 'php',
-        'swift': 'swift',
-        'kt': 'kotlin',
-        'sh': 'bash',
-        'yml': 'yaml',
-        'yaml': 'yaml',
-        'json': 'json',
-        'xml': 'xml',
-        'html': 'html',
-        'css': 'css',
-        'scss': 'scss',
-        'sass': 'sass',
-        'less': 'less',
-        'sql': 'sql',
-        'md': 'markdown',
+        ts: 'typescript',
+        tsx: 'typescript',
+        js: 'javascript',
+        jsx: 'javascript',
+        py: 'python',
+        rb: 'ruby',
+        go: 'go',
+        rs: 'rust',
+        cpp: 'cpp',
+        c: 'c',
+        h: 'c',
+        hpp: 'cpp',
+        java: 'java',
+        cs: 'csharp',
+        php: 'php',
+        swift: 'swift',
+        kt: 'kotlin',
+        sh: 'bash',
+        yml: 'yaml',
+        yaml: 'yaml',
+        json: 'json',
+        xml: 'xml',
+        html: 'html',
+        css: 'css',
+        scss: 'scss',
+        sass: 'sass',
+        less: 'less',
+        sql: 'sql',
+        md: 'markdown',
       };
       lang = extMap[ext || ''];
     }
-    
+
     if (!lang) {
       try {
         const result = hljs.highlightAuto(code);
@@ -155,18 +155,10 @@ export default function CodeBlock({
       {showHeader && (
         <div className="code-block-header">
           <div className="flex items-center gap-2">
-            {filename && (
-              <span className="text-sm font-mono text-base-content/80">
-                {filename}
-              </span>
-            )}
-            {showLanguageLabel && (
-              <span className="code-block-language">
-                {displayLanguage}
-              </span>
-            )}
+            {filename && <span className="text-sm font-mono text-base-content/80">{filename}</span>}
+            {showLanguageLabel && <span className="code-block-language">{displayLanguage}</span>}
           </div>
-          
+
           <div className="flex items-center gap-2">
             {collapsible && (
               <button
@@ -177,16 +169,16 @@ export default function CodeBlock({
                 <FontAwesomeIcon icon={isExpanded ? faCompress : faExpand} className="w-3 h-3" />
               </button>
             )}
-            
+
             {showCopyButton && (
               <button
                 onClick={handleCopy}
                 className="code-block-copy px-2 py-1 rounded hover:bg-base-200"
                 title="Copy code"
               >
-                <FontAwesomeIcon 
-                  icon={copied ? faCheck : faCopy} 
-                  className={`w-3 h-3 ${copied ? 'text-success' : ''}`} 
+                <FontAwesomeIcon
+                  icon={copied ? faCheck : faCopy}
+                  className={`w-3 h-3 ${copied ? 'text-success' : ''}`}
                 />
               </button>
             )}
@@ -195,18 +187,13 @@ export default function CodeBlock({
       )}
 
       {isExpanded && (
-        <div 
-          className="code-block-content"
-          style={{ maxHeight }}
-        >
+        <div className="code-block-content" style={{ maxHeight }}>
           <div className="font-mono text-sm">
             <div className="code-line">
               {showLineNumbers && renderLineNumbers(lines)}
               <div className="code-line-content">
                 {detectedLanguage === 'plaintext' ? (
-                  <pre className="whitespace-pre-wrap p-4">
-                    {code}
-                  </pre>
+                  <pre className="whitespace-pre-wrap p-4">{code}</pre>
                 ) : (
                   <code
                     className="hljs"

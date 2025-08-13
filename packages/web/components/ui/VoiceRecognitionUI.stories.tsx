@@ -112,7 +112,10 @@ interface VoiceRecognitionWrapperProps {
   [key: string]: unknown;
 }
 
-const VoiceRecognitionWrapper = ({ initialListening = false, ...props }: VoiceRecognitionWrapperProps) => {
+const VoiceRecognitionWrapper = ({
+  initialListening = false,
+  ...props
+}: VoiceRecognitionWrapperProps) => {
   const [isListening, setIsListening] = useState(initialListening);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -124,18 +127,18 @@ const VoiceRecognitionWrapper = ({ initialListening = false, ...props }: VoiceRe
     setError('');
     setTranscript('');
     setInterimTranscript('');
-    
+
     // Simulate voice recognition progress
     setTimeout(() => {
       setInterimTranscript('Hello, I need help with...');
       setConfidence(0.4);
     }, 1000);
-    
+
     setTimeout(() => {
       setInterimTranscript('Hello, I need help with implementing voice recognition...');
       setConfidence(0.7);
     }, 2000);
-    
+
     setTimeout(() => {
       setTranscript('Hello, I need help with implementing voice recognition in my application.');
       setInterimTranscript('');
@@ -219,7 +222,7 @@ export const HighConfidence: Story = {
 export const CompactVoiceButtonDemo: Story = {
   render: () => {
     const [isListening, setIsListening] = useState(false);
-    
+
     const handleToggle = () => {
       setIsListening(!isListening);
       if (!isListening) {
@@ -231,33 +234,13 @@ export const CompactVoiceButtonDemo: Story = {
       <div className="flex flex-col items-center gap-6">
         <h3 className="text-lg font-semibold">Compact Voice Button</h3>
         <div className="flex gap-4 items-center">
-          <CompactVoiceButton
-            isListening={isListening}
-            onToggle={handleToggle}
-            size="sm"
-          />
-          <CompactVoiceButton
-            isListening={isListening}
-            onToggle={handleToggle}
-            size="md"
-          />
-          <CompactVoiceButton
-            isListening={isListening}
-            onToggle={handleToggle}
-            size="lg"
-          />
+          <CompactVoiceButton isListening={isListening} onToggle={handleToggle} size="sm" />
+          <CompactVoiceButton isListening={isListening} onToggle={handleToggle} size="md" />
+          <CompactVoiceButton isListening={isListening} onToggle={handleToggle} size="lg" />
         </div>
         <div className="flex gap-4 items-center">
-          <CompactVoiceButton
-            isListening={isListening}
-            onToggle={handleToggle}
-            variant="ghost"
-          />
-          <CompactVoiceButton
-            isListening={isListening}
-            onToggle={handleToggle}
-            variant="outline"
-          />
+          <CompactVoiceButton isListening={isListening} onToggle={handleToggle} variant="ghost" />
+          <CompactVoiceButton isListening={isListening} onToggle={handleToggle} variant="outline" />
         </div>
       </div>
     );
@@ -277,26 +260,36 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 Voice Recognition Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then interact with the voice recognition interface!
+          Enable tennis commentary in the toolbar above, then interact with the voice recognition
+          interface!
         </p>
       </div>
-      
+
       <div className="cursor-pointer transition-transform hover:scale-[1.02]">
         <VoiceRecognitionWrapper />
       </div>
-      
+
       <div className="text-sm text-gray-600 space-y-1">
-        <p>• <strong>Click microphone</strong> to start voice recognition simulation</p>
-        <p>• <strong>Watch animations</strong> during recording state</p>
-        <p>• <strong>View transcript</strong> progress and confidence indicators</p>
-        <p>• <strong>Hover elements</strong> for tennis commentary feedback!</p>
+        <p>
+          • <strong>Click microphone</strong> to start voice recognition simulation
+        </p>
+        <p>
+          • <strong>Watch animations</strong> during recording state
+        </p>
+        <p>
+          • <strong>View transcript</strong> progress and confidence indicators
+        </p>
+        <p>
+          • <strong>Hover elements</strong> for tennis commentary feedback!
+        </p>
       </div>
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing voice recognition with tennis commentary. Enable commentary in the toolbar and interact with the interface!',
+        story:
+          'Interactive demo showcasing voice recognition with tennis commentary. Enable commentary in the toolbar and interact with the interface!',
       },
     },
   },

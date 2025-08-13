@@ -3,7 +3,12 @@
 
 import React, { useState } from 'react';
 import FileDiffViewer from './FileDiffViewer';
-import { createFileDiffFromText, createNewFileDiff, createDeletedFileDiff, createBinaryFileDiff } from './FileDiffViewer.utils';
+import {
+  createFileDiffFromText,
+  createNewFileDiff,
+  createDeletedFileDiff,
+  createBinaryFileDiff,
+} from './FileDiffViewer.utils';
 
 const sampleOldCode = `import React from 'react';
 import { Button } from './Button';
@@ -87,7 +92,7 @@ export default function FileDiffViewerDemo() {
     { key: 'modified', label: 'Modified File', description: 'Shows changes to an existing file' },
     { key: 'new', label: 'New File', description: 'Shows a newly created file' },
     { key: 'deleted', label: 'Deleted File', description: 'Shows a deleted file' },
-    { key: 'binary', label: 'Binary File', description: 'Shows a binary file change' }
+    { key: 'binary', label: 'Binary File', description: 'Shows a binary file change' },
   ];
 
   const getDemoContent = () => {
@@ -100,24 +105,18 @@ export default function FileDiffViewerDemo() {
           'typescript'
         );
       case 'new':
-        return createNewFileDiff(
-          sampleNewFileCode,
-          'src/utils/dateUtils.ts',
-          'typescript'
-        );
+        return createNewFileDiff(sampleNewFileCode, 'src/utils/dateUtils.ts', 'typescript');
       case 'deleted':
-        return createDeletedFileDiff(
-          sampleDeletedCode,
-          'src/utils/deprecated.ts',
+        return createDeletedFileDiff(sampleDeletedCode, 'src/utils/deprecated.ts', 'typescript');
+      case 'binary':
+        return createBinaryFileDiff('assets/images/old-logo.png', 'assets/images/new-logo.png');
+      default:
+        return createFileDiffFromText(
+          sampleOldCode,
+          sampleNewCode,
+          'src/components/MyComponent.tsx',
           'typescript'
         );
-      case 'binary':
-        return createBinaryFileDiff(
-          'assets/images/old-logo.png',
-          'assets/images/new-logo.png'
-        );
-      default:
-        return createFileDiffFromText(sampleOldCode, sampleNewCode, 'src/components/MyComponent.tsx', 'typescript');
     }
   };
 
@@ -151,7 +150,7 @@ export default function FileDiffViewerDemo() {
       {/* Description */}
       <div className="bg-base-200 p-3 rounded-lg">
         <p className="text-sm text-base-content/70">
-          {demoOptions.find(opt => opt.key === selectedDemo)?.description}
+          {demoOptions.find((opt) => opt.key === selectedDemo)?.description}
         </p>
       </div>
 
@@ -171,11 +170,11 @@ export default function FileDiffViewerDemo() {
       {/* Usage examples */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Usage Examples</h3>
-        
+
         <div className="bg-base-200 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Basic Usage</h4>
           <pre className="text-sm bg-base-300 p-3 rounded font-mono overflow-x-auto">
-{`import { FileDiffViewer } from '@/components/ui';
+            {`import { FileDiffViewer } from '@/components/ui';
 import { createFileDiffFromText } from '@/components/ui/FileDiffViewer.utils';
 
 const diff = createFileDiffFromText(
@@ -192,7 +191,7 @@ const diff = createFileDiffFromText(
         <div className="bg-base-200 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Advanced Configuration</h4>
           <pre className="text-sm bg-base-300 p-3 rounded font-mono overflow-x-auto">
-{`<FileDiffViewer
+            {`<FileDiffViewer
   diff={diff}
   viewMode="unified"
   showLineNumbers={true}

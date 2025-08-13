@@ -9,7 +9,8 @@ const meta: Meta<typeof AnimatedTypingIndicator> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Animated typing indicator component with agent-specific styling, pulsing effects, and smooth animations. Used in timeline views to show when AI agents are actively thinking and responding.',
+        component:
+          'Animated typing indicator component with agent-specific styling, pulsing effects, and smooth animations. Used in timeline views to show when AI agents are actively thinking and responding.',
       },
     },
   },
@@ -96,7 +97,9 @@ export const AllAgents: Story = {
             <AnimatedTypingIndicator agent="Gemini" />
           </div>
           <div>
-            <div className="text-sm font-medium mb-2 text-base-content/70">Unknown Agent (Gray)</div>
+            <div className="text-sm font-medium mb-2 text-base-content/70">
+              Unknown Agent (Gray)
+            </div>
             <AnimatedTypingIndicator agent="Unknown Agent" />
           </div>
         </div>
@@ -106,7 +109,8 @@ export const AllAgents: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Comparison of all typing indicators showing different agent branding and color schemes.',
+        story:
+          'Comparison of all typing indicators showing different agent branding and color schemes.',
       },
     },
   },
@@ -152,9 +156,11 @@ export const AnimationFeatures: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="space-y-4">
-        <div className="text-sm font-medium text-base-content/70">Try hovering over the indicators:</div>
+        <div className="text-sm font-medium text-base-content/70">
+          Try hovering over the indicators:
+        </div>
         <div className="space-y-4">
           <AnimatedTypingIndicator agent="Claude" />
           <AnimatedTypingIndicator agent="GPT-4" />
@@ -166,7 +172,8 @@ export const AnimationFeatures: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Showcase of all animation features including hover effects, pulsing, and entrance animations.',
+        story:
+          'Showcase of all animation features including hover effects, pulsing, and entrance animations.',
       },
     },
   },
@@ -221,7 +228,7 @@ export const ConversationContext: Story = {
           This shows how the typing indicator appears in a real conversation context
         </p>
       </div>
-      
+
       <div className="space-y-4">
         {/* Human message */}
         <div className="flex gap-3">
@@ -235,7 +242,7 @@ export const ConversationContext: Story = {
             </div>
           </div>
         </div>
-        
+
         {/* Typing indicator */}
         <AnimatedTypingIndicator agent="Claude" />
       </div>
@@ -275,7 +282,7 @@ export const InteractiveDemo: Story = {
           Hover over the indicators to see lift effects and smooth transitions
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <div className="text-sm font-medium mb-2 text-base-content/70">Claude Assistant</div>
@@ -299,7 +306,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demonstration of all typing indicators with hover effects and animations.',
+        story:
+          'Interactive demonstration of all typing indicators with hover effects and animations.',
       },
     },
   },

@@ -4,7 +4,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FeedbackEvent, FeedbackInsight, PerformanceAnalysis, PredictiveInsight } from '@/feedback/types';
+import {
+  FeedbackEvent,
+  FeedbackInsight,
+  PerformanceAnalysis,
+  PredictiveInsight,
+} from '@/feedback/types';
 import { FeedbackEventCard } from './FeedbackEventCard';
 import { FeedbackInsightCard } from './FeedbackInsightCard';
 import { PerformancePanel } from './PerformancePanel';
@@ -32,9 +37,11 @@ export function FeedbackDisplay({
   showPredictions = false,
   showInsights = true,
   maxEventsShown = 10,
-  className = ''
+  className = '',
 }: FeedbackDisplayProps) {
-  const [activeTab, setActiveTab] = useState<'events' | 'insights' | 'performance' | 'predictions'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'insights' | 'performance' | 'predictions'>(
+    'events'
+  );
   const [filteredEvents, setFilteredEvents] = useState<FeedbackEvent[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
 
@@ -44,7 +51,7 @@ export function FeedbackDisplay({
 
     // Filter by type if any are selected
     if (selectedTypes.size > 0) {
-      filtered = filtered.filter(event => selectedTypes.has(event.type));
+      filtered = filtered.filter((event) => selectedTypes.has(event.type));
     }
 
     // Sort by timestamp (newest first)
@@ -68,7 +75,7 @@ export function FeedbackDisplay({
 
   const getEventTypeCounts = () => {
     const counts: Record<string, number> = {};
-    events.forEach(event => {
+    events.forEach((event) => {
       counts[event.type] = (counts[event.type] || 0) + 1;
     });
     return counts;
@@ -103,7 +110,7 @@ export function FeedbackDisplay({
             </Badge>
           )}
         </button>
-        
+
         {showInsights && (
           <button
             onClick={() => setActiveTab('insights')}
@@ -182,9 +189,7 @@ export function FeedbackDisplay({
             {/* Events list */}
             <div className="events-list space-y-3">
               {filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => (
-                  <FeedbackEventCard key={event.id} event={event} />
-                ))
+                filteredEvents.map((event) => <FeedbackEventCard key={event.id} event={event} />)
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   {selectedTypes.size > 0 ? (

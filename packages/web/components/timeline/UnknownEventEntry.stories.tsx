@@ -11,7 +11,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Timeline entry for unknown events with expandable content and metadata display.',
+        component:
+          'Timeline entry for unknown events with expandable content and metadata display.',
       },
     },
   },

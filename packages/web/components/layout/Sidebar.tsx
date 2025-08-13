@@ -75,7 +75,9 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
           <div className="flex items-center justify-between">
             <div className="flex-1 gap-3">
               <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-800 text-xs text-neutral-200">✦</span>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-800 text-xs text-neutral-200">
+                  ✦
+                </span>
                 <span className="text-lg">Lace</span>
               </Link>
             </div>
@@ -90,10 +92,7 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          {children}
-        </div>
-
+        <div className="flex-1 overflow-y-auto">{children}</div>
 
         {/* Toggle Button */}
         <button
@@ -107,9 +106,15 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
   );
 }
 
-export function SidebarSection({ title, icon, children, collapsible = true, defaultCollapsed = false }: SidebarSectionProps) {
+export function SidebarSection({
+  title,
+  icon,
+  children,
+  collapsible = true,
+  defaultCollapsed = false,
+}: SidebarSectionProps) {
   const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
-  
+
   // Sync internal state with prop changes
   React.useEffect(() => {
     setCollapsed(defaultCollapsed);
@@ -128,28 +133,30 @@ export function SidebarSection({ title, icon, children, collapsible = true, defa
           <span className="uppercase tracking-wide">{title}</span>
         </div>
         {collapsible && (
-          <ChevronRightIcon 
-            className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`} 
+          <ChevronRightIcon
+            className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`}
           />
         )}
       </button>
-      
-      {!collapsed && (
-        <div className="space-y-1">
-          {children}
-        </div>
-      )}
+
+      {!collapsed && <div className="space-y-1">{children}</div>}
     </div>
   );
 }
 
-export function SidebarItem({ children, onClick, active = false, disabled = false, className = '' }: SidebarItemProps) {
-  const baseClasses = "w-full text-left p-3 rounded-lg text-sm transition-colors";
-  const stateClasses = disabled 
-    ? "text-base-content/40 cursor-not-allowed"
-    : active 
-    ? "bg-primary text-primary-content"
-    : "text-base-content/80 hover:bg-base-200 hover:text-base-content";
+export function SidebarItem({
+  children,
+  onClick,
+  active = false,
+  disabled = false,
+  className = '',
+}: SidebarItemProps) {
+  const baseClasses = 'w-full text-left p-3 rounded-lg text-sm transition-colors';
+  const stateClasses = disabled
+    ? 'text-base-content/40 cursor-not-allowed'
+    : active
+      ? 'bg-primary text-primary-content'
+      : 'text-base-content/80 hover:bg-base-200 hover:text-base-content';
 
   return (
     <button
@@ -162,31 +169,30 @@ export function SidebarItem({ children, onClick, active = false, disabled = fals
   );
 }
 
-export function SidebarButton({ 
-  children, 
-  onClick, 
-  variant = 'primary', 
+export function SidebarButton({
+  children,
+  onClick,
+  variant = 'primary',
   size = 'md',
   disabled = false,
   loading = false,
-  className = ''
+  className = '',
 }: SidebarButtonProps) {
-  const baseClasses = "w-full border rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2";
-  
+  const baseClasses =
+    'w-full border rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2';
+
   const variantClasses = {
-    primary: "border-primary bg-primary text-primary-content hover:bg-primary/90",
-    secondary: "border-base-300 bg-base-200 text-base-content hover:bg-base-300",
-    ghost: "border-transparent bg-transparent text-base-content hover:bg-base-200"
+    primary: 'border-primary bg-primary text-primary-content hover:bg-primary/90',
+    secondary: 'border-base-300 bg-base-200 text-base-content hover:bg-base-300',
+    ghost: 'border-transparent bg-transparent text-base-content hover:bg-base-200',
   };
 
   const sizeClasses = {
-    sm: "p-2",
-    md: "p-3"
+    sm: 'p-2',
+    md: 'p-3',
   };
 
-  const stateClasses = disabled || loading
-    ? "opacity-50 cursor-not-allowed"
-    : "cursor-pointer";
+  const stateClasses = disabled || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
 
   return (
     <button

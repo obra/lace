@@ -175,36 +175,49 @@ export const AllLanguages: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-4">Syntax Highlighting Examples</h3>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">JavaScript</h4>
-          <p>Function call: <InlineCode code='console.log("Hello");' language="javascript" enableHighlighting /></p>
+          <p>
+            Function call:{' '}
+            <InlineCode code='console.log("Hello");' language="javascript" enableHighlighting />
+          </p>
         </div>
-        
+
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">TypeScript</h4>
-          <p>Interface: <InlineCode code='User[]' language="typescript" enableHighlighting /></p>
+          <p>
+            Interface: <InlineCode code="User[]" language="typescript" enableHighlighting />
+          </p>
         </div>
-        
+
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">Python</h4>
-          <p>Function: <InlineCode code='print("Hello")' language="python" enableHighlighting /></p>
+          <p>
+            Function: <InlineCode code='print("Hello")' language="python" enableHighlighting />
+          </p>
         </div>
-        
+
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">HTML</h4>
-          <p>Tag: <InlineCode code='<button>' language="html" enableHighlighting /></p>
+          <p>
+            Tag: <InlineCode code="<button>" language="html" enableHighlighting />
+          </p>
         </div>
-        
+
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">CSS</h4>
-          <p>Property: <InlineCode code='color: blue;' language="css" enableHighlighting /></p>
+          <p>
+            Property: <InlineCode code="color: blue;" language="css" enableHighlighting />
+          </p>
         </div>
-        
+
         <div className="p-3 border rounded-lg">
           <h4 className="font-medium mb-2">JSON</h4>
-          <p>Object: <InlineCode code='{"key": "value"}' language="json" enableHighlighting /></p>
+          <p>
+            Object: <InlineCode code='{"key": "value"}' language="json" enableHighlighting />
+          </p>
         </div>
       </div>
     </div>
@@ -212,7 +225,8 @@ export const AllLanguages: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Examples of inline code with different programming languages and syntax highlighting.',
+        story:
+          'Examples of inline code with different programming languages and syntax highlighting.',
       },
     },
   },
@@ -222,30 +236,28 @@ export const InTextContext: Story = {
   render: () => (
     <div className="max-w-2xl p-4">
       <h3 className="text-lg font-semibold mb-4">Inline Code in Text Context</h3>
-      
+
       <div className="space-y-4 text-sm">
         <p>
           To create a new React component, you can use the{' '}
-          <InlineCode code="useState" language="javascript" enableHighlighting />{' '}
-          hook for state management.
+          <InlineCode code="useState" language="javascript" enableHighlighting /> hook for state
+          management.
         </p>
-        
+
         <p>
-          The API endpoint{' '}
-          <InlineCode code="/api/users" language="plaintext" />{' '}
-          returns a list of users in JSON format.
+          The API endpoint <InlineCode code="/api/users" language="plaintext" /> returns a list of
+          users in JSON format.
         </p>
-        
+
         <p>
           Install the package with{' '}
-          <InlineCode code="npm install react" language="bash" enableHighlighting />{' '}
-          to get started.
+          <InlineCode code="npm install react" language="bash" enableHighlighting /> to get started.
         </p>
-        
+
         <p>
           The configuration object should include{' '}
-          <InlineCode code='{"timeout": 5000}' language="json" enableHighlighting />{' '}
-          for proper error handling.
+          <InlineCode code='{"timeout": 5000}' language="json" enableHighlighting /> for proper
+          error handling.
         </p>
       </div>
     </div>
@@ -265,10 +277,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 InlineCode Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and click the code snippets below!
+          Enable tennis commentary in the toolbar above, then hover and click the code snippets
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-2">JavaScript Function</h4>
@@ -277,7 +290,7 @@ export const InteractiveDemo: Story = {
             <InlineCode code="getUserData()" language="javascript" enableHighlighting />
           </p>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-2">TypeScript Interface</h4>
           <p className="text-sm">
@@ -285,7 +298,7 @@ export const InteractiveDemo: Story = {
             <InlineCode code="User | null" language="typescript" enableHighlighting />
           </p>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-2">Python Method</h4>
           <p className="text-sm">
@@ -293,7 +306,7 @@ export const InteractiveDemo: Story = {
             <InlineCode code="self.process_data()" language="python" enableHighlighting />
           </p>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-2">Terminal Command</h4>
           <p className="text-sm">
@@ -302,14 +315,22 @@ export const InteractiveDemo: Story = {
           </p>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">Usage Tips:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Hover</strong> over code snippets for tennis commentary</li>
-          <li>• <strong>Click</strong> to interact with the highlighting</li>
-          <li>• <strong>Enable highlighting</strong> for better code readability</li>
-          <li>• <strong>Use appropriate languages</strong> for accurate highlighting</li>
+          <li>
+            • <strong>Hover</strong> over code snippets for tennis commentary
+          </li>
+          <li>
+            • <strong>Click</strong> to interact with the highlighting
+          </li>
+          <li>
+            • <strong>Enable highlighting</strong> for better code readability
+          </li>
+          <li>
+            • <strong>Use appropriate languages</strong> for accurate highlighting
+          </li>
         </ul>
       </div>
     </div>
@@ -317,7 +338,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing inline code with tennis commentary. Enable commentary in the toolbar and interact with the code snippets!',
+        story:
+          'Interactive demo showcasing inline code with tennis commentary. Enable commentary in the toolbar and interact with the code snippets!',
       },
     },
   },

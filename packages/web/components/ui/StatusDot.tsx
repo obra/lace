@@ -5,17 +5,12 @@ interface StatusDotProps {
   className?: string;
 }
 
-const StatusDot = ({ 
-  status, 
-  size = 'sm', 
-  pulse = false, 
-  className = '' 
-}: StatusDotProps) => {
+const StatusDot = ({ status, size = 'sm', pulse = false, className = '' }: StatusDotProps) => {
   const sizeClasses = {
     xs: 'w-1.5 h-1.5',
     sm: 'w-2 h-2',
     md: 'w-3 h-3',
-    lg: 'w-4 h-4'
+    lg: 'w-4 h-4',
   };
 
   const statusClasses = {
@@ -26,13 +21,13 @@ const StatusDot = ({
     error: 'bg-error',
     success: 'bg-success',
     warning: 'bg-warning',
-    info: 'bg-info'
+    info: 'bg-info',
   };
 
   const pulseClass = pulse ? 'animate-pulse' : '';
 
   return (
-    <div 
+    <div
       className={`${sizeClasses[size]} ${statusClasses[status]} ${pulseClass} rounded-full ${className}`}
       aria-label={`Status: ${status}`}
     />

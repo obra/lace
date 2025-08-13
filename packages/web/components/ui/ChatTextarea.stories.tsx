@@ -10,7 +10,8 @@ const meta: Meta<typeof ChatTextarea> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'ChatTextarea component for multi-line text input with auto-resize, drag-and-drop support, and keyboard shortcuts.',
+        component:
+          'ChatTextarea component for multi-line text input with auto-resize, drag-and-drop support, and keyboard shortcuts.',
       },
     },
   },
@@ -69,7 +70,7 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: ChatTextareaWrappe
 
   const handleSubmit = () => {
     if (value.trim()) {
-      setSubmitted(prev => [...prev, value]);
+      setSubmitted((prev) => [...prev, value]);
       setValue('');
       console.log('Message submitted:', value);
     }
@@ -96,7 +97,10 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: ChatTextareaWrappe
     e.preventDefault();
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
-    console.log('Files dropped:', files.map(f => f.name));
+    console.log(
+      'Files dropped:',
+      files.map((f) => f.name)
+    );
   };
 
   return (
@@ -113,7 +117,7 @@ const ChatTextareaWrapper = ({ initialValue = '', ...props }: ChatTextareaWrappe
         onDrop={handleDrop}
         {...props}
       />
-      
+
       {submitted.length > 0 && (
         <div className="p-4 bg-gray-50 rounded-lg">
           <p className="text-sm font-medium mb-2">Submitted messages:</p>
@@ -135,9 +139,7 @@ export const Default: Story = {
 };
 
 export const WithPlaceholder: Story = {
-  render: () => (
-    <ChatTextareaWrapper placeholder="Ask me anything..." />
-  ),
+  render: () => <ChatTextareaWrapper placeholder="Ask me anything..." />,
 };
 
 export const WithInitialValue: Story = {
@@ -148,19 +150,12 @@ export const WithInitialValue: Story = {
 
 export const LongText: Story = {
   render: () => (
-    <ChatTextareaWrapper 
-      initialValue="This is a longer text that demonstrates how the textarea handles multiple lines and auto-resizing. It will grow until it reaches the maximum height and then start scrolling. This is useful for longer messages and complex queries."
-    />
+    <ChatTextareaWrapper initialValue="This is a longer text that demonstrates how the textarea handles multiple lines and auto-resizing. It will grow until it reaches the maximum height and then start scrolling. This is useful for longer messages and complex queries." />
   ),
 };
 
 export const Disabled: Story = {
-  render: () => (
-    <ChatTextareaWrapper 
-      disabled={true}
-      initialValue="This textarea is disabled"
-    />
-  ),
+  render: () => <ChatTextareaWrapper disabled={true} initialValue="This textarea is disabled" />,
 };
 
 export const MobileMode: Story = {
@@ -169,7 +164,7 @@ export const MobileMode: Story = {
       <p className="text-sm text-gray-600">
         Mobile mode: Enter key creates new lines instead of submitting
       </p>
-      <ChatTextareaWrapper 
+      <ChatTextareaWrapper
         isMobile={true}
         placeholder="In mobile mode, use Enter for new lines..."
       />
@@ -183,20 +178,14 @@ export const DragOverState: Story = {
       <p className="text-sm text-gray-600">
         This shows how the textarea looks when files are dragged over it
       </p>
-      <ChatTextareaWrapper 
-        isDragOver={true}
-        placeholder="Files are being dragged over..."
-      />
+      <ChatTextareaWrapper isDragOver={true} placeholder="Files are being dragged over..." />
     </div>
   ),
 };
 
 export const AutoFocus: Story = {
   render: () => (
-    <ChatTextareaWrapper 
-      autoFocus={true}
-      placeholder="This textarea should be auto-focused"
-    />
+    <ChatTextareaWrapper autoFocus={true} placeholder="This textarea should be auto-focused" />
   ),
 };
 
@@ -207,36 +196,25 @@ export const AllStates: Story = {
         <h3 className="text-lg font-semibold mb-2">Default State</h3>
         <ChatTextareaWrapper placeholder="Default textarea..." />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">With Content</h3>
-        <ChatTextareaWrapper 
-          initialValue="This textarea has some content that shows auto-resizing."
-        />
+        <ChatTextareaWrapper initialValue="This textarea has some content that shows auto-resizing." />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">Disabled State</h3>
-        <ChatTextareaWrapper 
-          disabled={true}
-          initialValue="This textarea is disabled"
-        />
+        <ChatTextareaWrapper disabled={true} initialValue="This textarea is disabled" />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">Mobile Mode</h3>
-        <ChatTextareaWrapper 
-          isMobile={true}
-          placeholder="Mobile mode - Enter creates new lines"
-        />
+        <ChatTextareaWrapper isMobile={true} placeholder="Mobile mode - Enter creates new lines" />
       </div>
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-2">Drag Over State</h3>
-        <ChatTextareaWrapper 
-          isDragOver={true}
-          placeholder="Files are being dragged over..."
-        />
+        <ChatTextareaWrapper isDragOver={true} placeholder="Files are being dragged over..." />
       </div>
     </div>
   ),
@@ -256,7 +234,7 @@ export const KeyboardShortcuts: Story = {
     const textareaRef = useRef<ChatTextareaRef>(null);
 
     const addLog = (message: string) => {
-      setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+      setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
     };
 
     const handleSubmit = () => {
@@ -278,12 +256,18 @@ export const KeyboardShortcuts: Story = {
         <div className="p-4 bg-blue-50 rounded-lg">
           <h4 className="font-medium mb-2">Keyboard Shortcuts:</h4>
           <ul className="text-sm text-gray-700 space-y-1">
-            <li>• <strong>Enter</strong> - Submit message (desktop mode)</li>
-            <li>• <strong>Shift + Enter</strong> - New line</li>
-            <li>• <strong>Escape</strong> - Clear textarea</li>
+            <li>
+              • <strong>Enter</strong> - Submit message (desktop mode)
+            </li>
+            <li>
+              • <strong>Shift + Enter</strong> - New line
+            </li>
+            <li>
+              • <strong>Escape</strong> - Clear textarea
+            </li>
           </ul>
         </div>
-        
+
         <ChatTextarea
           ref={textareaRef}
           value={value}
@@ -292,7 +276,7 @@ export const KeyboardShortcuts: Story = {
           onKeyDown={handleKeyDown}
           placeholder="Try the keyboard shortcuts..."
         />
-        
+
         {logs.length > 0 && (
           <div className="p-4 bg-gray-50 rounded-lg">
             <h4 className="font-medium mb-2">Action Log:</h4>
@@ -328,7 +312,7 @@ export const InteractiveDemo: Story = {
 
     const handleSubmit = () => {
       if (value.trim()) {
-        setSubmitted(prev => [...prev, value]);
+        setSubmitted((prev) => [...prev, value]);
         setValue('');
       }
     };
@@ -353,7 +337,7 @@ export const InteractiveDemo: Story = {
       e.preventDefault();
       setIsDragOver(false);
       const files = Array.from(e.dataTransfer.files);
-      setDroppedFiles(prev => [...prev, ...files.map(f => f.name)]);
+      setDroppedFiles((prev) => [...prev, ...files.map((f) => f.name)]);
     };
 
     return (
@@ -364,7 +348,7 @@ export const InteractiveDemo: Story = {
             Enable tennis commentary in the toolbar above, then interact with the textarea below!
           </p>
         </div>
-        
+
         <div className="flex gap-4 justify-center">
           <button
             onClick={() => setIsMobile(!isMobile)}
@@ -374,7 +358,7 @@ export const InteractiveDemo: Story = {
           >
             {isMobile ? 'Mobile Mode' : 'Desktop Mode'}
           </button>
-          
+
           <button
             onClick={() => textareaRef.current?.focus()}
             className="px-3 py-1 rounded text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -382,7 +366,7 @@ export const InteractiveDemo: Story = {
             Focus Textarea
           </button>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <ChatTextarea
             ref={textareaRef}
@@ -398,7 +382,7 @@ export const InteractiveDemo: Story = {
             placeholder="Type your message, try drag & drop, or use keyboard shortcuts..."
           />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {submitted.length > 0 && (
             <div className="p-4 bg-green-50 rounded-lg">
@@ -412,7 +396,7 @@ export const InteractiveDemo: Story = {
               </div>
             </div>
           )}
-          
+
           {droppedFiles.length > 0 && (
             <div className="p-4 bg-blue-50 rounded-lg">
               <h4 className="font-medium mb-2">Dropped Files:</h4>
@@ -426,12 +410,20 @@ export const InteractiveDemo: Story = {
             </div>
           )}
         </div>
-        
+
         <div className="text-sm text-gray-600 space-y-1">
-          <p>• <strong>Type and submit</strong> messages to see them appear above</p>
-          <p>• <strong>Toggle mobile/desktop</strong> mode to see different Enter behavior</p>
-          <p>• <strong>Drag & drop files</strong> to see the drop zone animation</p>
-          <p>• <strong>Use keyboard shortcuts</strong> for quick actions</p>
+          <p>
+            • <strong>Type and submit</strong> messages to see them appear above
+          </p>
+          <p>
+            • <strong>Toggle mobile/desktop</strong> mode to see different Enter behavior
+          </p>
+          <p>
+            • <strong>Drag & drop files</strong> to see the drop zone animation
+          </p>
+          <p>
+            • <strong>Use keyboard shortcuts</strong> for quick actions
+          </p>
         </div>
       </div>
     );
@@ -439,7 +431,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing the chat textarea with tennis commentary. Enable commentary in the toolbar and interact with the textarea!',
+        story:
+          'Interactive demo showcasing the chat textarea with tennis commentary. Enable commentary in the toolbar and interact with the textarea!',
       },
     },
   },

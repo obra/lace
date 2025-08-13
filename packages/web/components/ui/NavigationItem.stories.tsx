@@ -2,12 +2,12 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import NavigationItem from './NavigationItem';
 import IconButton from './IconButton';
-import { 
-  faFolder, 
-  faFile, 
-  faComment, 
-  faCog, 
-  faUser, 
+import {
+  faFolder,
+  faFile,
+  faComment,
+  faCog,
+  faUser,
   faRobot,
   faEllipsisV,
   faEdit,
@@ -18,7 +18,7 @@ import {
   faBookmark,
   faBell,
   faInbox,
-  faStar
+  faStar,
 } from '@/lib/fontawesome';
 
 const meta: Meta<typeof NavigationItem> = {
@@ -416,10 +416,11 @@ export const InteractiveDemo: Story = {
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">🎾 Navigation Item Tennis Commentary Demo</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Enable tennis commentary in the toolbar above, then hover and click the navigation items below!
+            Enable tennis commentary in the toolbar above, then hover and click the navigation items
+            below!
           </p>
         </div>
-        
+
         <div className="flex flex-col gap-2">
           {items.map((item, index) => (
             <div key={item.id} className="cursor-pointer transition-transform hover:scale-[1.02]">
@@ -441,12 +442,20 @@ export const InteractiveDemo: Story = {
             </div>
           ))}
         </div>
-        
+
         <div className="text-sm text-gray-600 space-y-1">
-          <p>• <strong>Hover</strong> over items to see hover effects</p>
-          <p>• <strong>Click</strong> items to see console logs</p>
-          <p>• <strong>Action buttons</strong> have separate click handlers</p>
-          <p>• <strong>Tennis commentary</strong> provides feedback on interactions!</p>
+          <p>
+            • <strong>Hover</strong> over items to see hover effects
+          </p>
+          <p>
+            • <strong>Click</strong> items to see console logs
+          </p>
+          <p>
+            • <strong>Action buttons</strong> have separate click handlers
+          </p>
+          <p>
+            • <strong>Tennis commentary</strong> provides feedback on interactions!
+          </p>
         </div>
       </div>
     );
@@ -454,7 +463,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing navigation items with tennis commentary. Enable commentary in the toolbar and interact with the items!',
+        story:
+          'Interactive demo showcasing navigation items with tennis commentary. Enable commentary in the toolbar and interact with the items!',
       },
     },
   },

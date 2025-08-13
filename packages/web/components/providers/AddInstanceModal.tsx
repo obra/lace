@@ -40,11 +40,11 @@ interface AddInstanceModalProps {
   preselectedProvider?: CatalogProvider | null;
 }
 
-export function AddInstanceModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  preselectedProvider 
+export function AddInstanceModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  preselectedProvider,
 }: AddInstanceModalProps) {
   const [step, setStep] = useState<'select' | 'configure'>('select');
   const [providers, setProviders] = useState<CatalogProvider[]>([]);
@@ -52,12 +52,12 @@ export function AddInstanceModal({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     displayName: '',
     endpoint: '',
     timeout: 30000,
-    apiKey: ''
+    apiKey: '',
   });
 
   useEffect(() => {
@@ -66,9 +66,9 @@ export function AddInstanceModal({
     } else if (preselectedProvider) {
       setProviders([]);
       setSelectedProvider(preselectedProvider);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        displayName: preselectedProvider.name
+        displayName: preselectedProvider.name,
       }));
       setStep('configure');
       setLoading(false);
@@ -80,11 +80,11 @@ export function AddInstanceModal({
       setLoading(true);
       setError(null);
       const response = await fetch('/api/provider/catalog');
-      
+
       if (!response.ok) {
         throw new Error(`Failed to load providers: ${response.status}`);
       }
-      
+
       const data = await parseResponse<{ providers: CatalogProvider[] }>(response);
       setProviders(data.providers);
     } catch (err) {
@@ -96,7 +96,7 @@ export function AddInstanceModal({
 
   const handleProviderSelect = (provider: CatalogProvider) => {
     setSelectedProvider(provider);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       displayName: provider.name, // Use provider name directly
     }));
@@ -111,7 +111,7 @@ export function AddInstanceModal({
       .replace(/\s+/g, '-') // Replace spaces with hyphens
       .replace(/-+/g, '-') // Replace multiple hyphens with single
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-    
+
     // Add timestamp suffix to ensure uniqueness
     const timestamp = Date.now().toString().slice(-4);
     return `${cleanName}-${timestamp}`;
@@ -119,15 +119,15 @@ export function AddInstanceModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedProvider) return;
-    
+
     try {
       setSubmitting(true);
       setError(null);
-      
+
       const instanceId = generateInstanceId(formData.displayName, selectedProvider.id);
-      
+
       const response = await fetch('/api/provider/instances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,14 +137,16 @@ export function AddInstanceModal({
           catalogProviderId: selectedProvider.id,
           endpoint: formData.endpoint || undefined,
           timeout: formData.timeout,
-          credential: { 
-            apiKey: formData.apiKey 
-          }
-        })
+          credential: {
+            apiKey: formData.apiKey,
+          },
+        }),
       });
 
       if (!response.ok) {
-        const errorData = await parseResponse<{ error?: string }>(response).catch(() => ({ error: undefined }));
+        const errorData = await parseResponse<{ error?: string }>(response).catch(() => ({
+          error: undefined,
+        }));
         throw new Error(errorData.error || `Failed to create instance: ${response.status}`);
       }
 
@@ -178,12 +180,7 @@ export function AddInstanceModal({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title={getStepTitle()}
-      size="md"
-    >
+    <Modal isOpen={isOpen} onClose={handleClose} title={getStepTitle()} size="md">
       {error && (
         <div className="alert alert-error mb-4">
           <span className="text-sm">{error}</span>
@@ -195,7 +192,7 @@ export function AddInstanceModal({
           <p className="text-sm text-base-content/60">
             Choose a provider from the catalog to create a new instance.
           </p>
-          
+
           {loading ? (
             <div className="grid gap-3">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -225,10 +222,13 @@ export function AddInstanceModal({
                       <div>
                         <h4 className="font-medium">{provider.name}</h4>
                         <p className="text-xs text-base-content/60">
-                          {provider.models.length} model{provider.models.length !== 1 ? 's' : ''} available
+                          {provider.models.length} model{provider.models.length !== 1 ? 's' : ''}{' '}
+                          available
                         </p>
                       </div>
-                      <Badge variant="outline" size="sm">{provider.type}</Badge>
+                      <Badge variant="outline" size="sm">
+                        {provider.type}
+                      </Badge>
                     </div>
                   </div>
                 </button>
@@ -246,7 +246,7 @@ export function AddInstanceModal({
               type="text"
               className="input input-bordered w-full"
               value={formData.displayName}
-              onChange={(e) => setFormData({...formData, displayName: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
               placeholder="My OpenAI Instance"
               required
             />
@@ -263,7 +263,7 @@ export function AddInstanceModal({
               type="password"
               className="input input-bordered w-full"
               value={formData.apiKey}
-              onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
               placeholder="sk-..."
               required
             />
@@ -277,7 +277,9 @@ export function AddInstanceModal({
               <span className="label-text">Provider</span>
             </label>
             <div className="flex items-center space-x-2">
-              <Badge variant="primary" size="sm">{selectedProvider?.name}</Badge>
+              <Badge variant="primary" size="sm">
+                {selectedProvider?.name}
+              </Badge>
               <span className="text-sm text-base-content/60">from catalog</span>
             </div>
           </div>
@@ -290,7 +292,7 @@ export function AddInstanceModal({
               type="url"
               className="input input-bordered w-full"
               value={formData.endpoint}
-              onChange={(e) => setFormData({...formData, endpoint: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, endpoint: e.target.value })}
               placeholder={selectedProvider?.api_endpoint || 'Leave empty to use default'}
             />
             <div className="label">
@@ -306,7 +308,9 @@ export function AddInstanceModal({
               type="number"
               className="input input-bordered w-full"
               value={formData.timeout / 1000}
-              onChange={(e) => setFormData({...formData, timeout: parseInt(e.target.value) * 1000})}
+              onChange={(e) =>
+                setFormData({ ...formData, timeout: parseInt(e.target.value) * 1000 })
+              }
               min={5}
               max={300}
             />
@@ -316,14 +320,15 @@ export function AddInstanceModal({
             <div className="bg-base-200 p-3 rounded-lg">
               <p className="text-sm font-medium mb-1">This will enable access to:</p>
               <div className="text-xs text-base-content/60 space-y-1">
-                {selectedProvider.models.slice(0, 3).map(model => (
+                {selectedProvider.models.slice(0, 3).map((model) => (
                   <div key={model.id}>
                     • {model.name} ({model.context_window / 1000}K context)
                   </div>
                 ))}
                 {selectedProvider.models.length > 3 && (
                   <div>
-                    • And {selectedProvider.models.length - 3} more model{selectedProvider.models.length - 3 !== 1 ? 's' : ''}
+                    • And {selectedProvider.models.length - 3} more model
+                    {selectedProvider.models.length - 3 !== 1 ? 's' : ''}
                   </div>
                 )}
               </div>
@@ -332,28 +337,24 @@ export function AddInstanceModal({
 
           <div className="flex justify-end space-x-3 pt-4">
             {!preselectedProvider && (
-              <button 
-                type="button" 
-                className="btn btn-ghost" 
+              <button
+                type="button"
+                className="btn btn-ghost"
                 onClick={() => setStep('select')}
                 disabled={submitting}
               >
                 Back
               </button>
             )}
-            <button 
-              type="button" 
-              className="btn btn-ghost" 
+            <button
+              type="button"
+              className="btn btn-ghost"
               onClick={handleClose}
               disabled={submitting}
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
-              className="btn btn-primary vapor-button"
-              disabled={submitting}
-            >
+            <button type="submit" className="btn btn-primary vapor-button" disabled={submitting}>
               {submitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>

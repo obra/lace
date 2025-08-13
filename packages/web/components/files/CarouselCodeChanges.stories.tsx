@@ -9,7 +9,8 @@ const meta: Meta<typeof CarouselCodeChanges> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Code changes carousel component that displays commit changes with file details, impact indicators, and addition/deletion statistics. Perfect for showing git commit history, code reviews, and deployment summaries.',
+        component:
+          'Code changes carousel component that displays commit changes with file details, impact indicators, and addition/deletion statistics. Perfect for showing git commit history, code reviews, and deployment summaries.',
       },
     },
   },
@@ -253,7 +254,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default code changes carousel showing feature and bugfix commits with file details and impact indicators.',
+        story:
+          'Default code changes carousel showing feature and bugfix commits with file details and impact indicators.',
       },
     },
   },
@@ -279,7 +281,8 @@ export const RefactoringChanges: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Refactoring changes showing file moves and reorganization with paired additions/deletions.',
+        story:
+          'Refactoring changes showing file moves and reorganization with paired additions/deletions.',
       },
     },
   },
@@ -292,7 +295,8 @@ export const MixedChangeTypes: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Mixed change types including features, documentation updates, and maintenance tasks.',
+        story:
+          'Mixed change types including features, documentation updates, and maintenance tasks.',
       },
     },
   },
@@ -305,7 +309,8 @@ export const LargeChangeset: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Large changeset with many files showing truncated file list and "more files" indicator.',
+        story:
+          'Large changeset with many files showing truncated file list and "more files" indicator.',
       },
     },
   },
@@ -321,9 +326,24 @@ export const AllChangeTypes: Story = {
         commitHash: 'abc123f',
         totalFiles: 5,
         files: [
-          { path: 'src/notifications/NotificationService.ts', additions: 89, deletions: 0, impact: 'high' as const },
-          { path: 'src/notifications/types.ts', additions: 34, deletions: 0, impact: 'medium' as const },
-          { path: 'src/hooks/useNotifications.ts', additions: 45, deletions: 0, impact: 'medium' as const },
+          {
+            path: 'src/notifications/NotificationService.ts',
+            additions: 89,
+            deletions: 0,
+            impact: 'high' as const,
+          },
+          {
+            path: 'src/notifications/types.ts',
+            additions: 34,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
+          {
+            path: 'src/hooks/useNotifications.ts',
+            additions: 45,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
         ],
       },
       {
@@ -334,7 +354,12 @@ export const AllChangeTypes: Story = {
         totalFiles: 2,
         files: [
           { path: 'src/api/DataService.ts', additions: 12, deletions: 8, impact: 'high' as const },
-          { path: 'src/api/DataService.test.ts', additions: 23, deletions: 5, impact: 'low' as const },
+          {
+            path: 'src/api/DataService.test.ts',
+            additions: 23,
+            deletions: 5,
+            impact: 'low' as const,
+          },
         ],
       },
       {
@@ -345,8 +370,18 @@ export const AllChangeTypes: Story = {
         totalFiles: 8,
         maxDisplayFiles: 2,
         files: [
-          { path: 'src/utils/formatters.ts', additions: 67, deletions: 0, impact: 'medium' as const },
-          { path: 'src/utils/validators.ts', additions: 45, deletions: 0, impact: 'medium' as const },
+          {
+            path: 'src/utils/formatters.ts',
+            additions: 67,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
+          {
+            path: 'src/utils/validators.ts',
+            additions: 45,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
         ],
       },
       {
@@ -368,7 +403,12 @@ export const AllChangeTypes: Story = {
         commitHash: 'mno345d',
         totalFiles: 4,
         files: [
-          { path: 'docs/components/Button.md', additions: 56, deletions: 0, impact: 'low' as const },
+          {
+            path: 'docs/components/Button.md',
+            additions: 56,
+            deletions: 0,
+            impact: 'low' as const,
+          },
           { path: 'docs/components/Modal.md', additions: 78, deletions: 0, impact: 'low' as const },
           { path: 'docs/README.md', additions: 12, deletions: 3, impact: 'low' as const },
         ],
@@ -378,7 +418,8 @@ export const AllChangeTypes: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Comprehensive showcase of all change types with their distinct color coding and styling.',
+        story:
+          'Comprehensive showcase of all change types with their distinct color coding and styling.',
       },
     },
   },
@@ -395,9 +436,24 @@ export const HighImpactChanges: Story = {
         totalFiles: 6,
         maxDisplayFiles: 3,
         files: [
-          { path: 'src/security/AuthGuard.ts', additions: 78, deletions: 34, impact: 'high' as const },
-          { path: 'src/security/TokenValidator.ts', additions: 45, deletions: 23, impact: 'high' as const },
-          { path: 'src/security/EncryptionService.ts', additions: 67, deletions: 12, impact: 'high' as const },
+          {
+            path: 'src/security/AuthGuard.ts',
+            additions: 78,
+            deletions: 34,
+            impact: 'high' as const,
+          },
+          {
+            path: 'src/security/TokenValidator.ts',
+            additions: 45,
+            deletions: 23,
+            impact: 'high' as const,
+          },
+          {
+            path: 'src/security/EncryptionService.ts',
+            additions: 67,
+            deletions: 12,
+            impact: 'high' as const,
+          },
         ],
       },
       {
@@ -407,10 +463,30 @@ export const HighImpactChanges: Story = {
         commitHash: 'fix001x',
         totalFiles: 4,
         files: [
-          { path: 'src/database/DataIntegrity.ts', additions: 89, deletions: 45, impact: 'high' as const },
-          { path: 'src/database/BackupService.ts', additions: 34, deletions: 12, impact: 'high' as const },
-          { path: 'src/database/DataValidator.ts', additions: 56, deletions: 23, impact: 'high' as const },
-          { path: 'src/database/RecoveryService.ts', additions: 78, deletions: 0, impact: 'high' as const },
+          {
+            path: 'src/database/DataIntegrity.ts',
+            additions: 89,
+            deletions: 45,
+            impact: 'high' as const,
+          },
+          {
+            path: 'src/database/BackupService.ts',
+            additions: 34,
+            deletions: 12,
+            impact: 'high' as const,
+          },
+          {
+            path: 'src/database/DataValidator.ts',
+            additions: 56,
+            deletions: 23,
+            impact: 'high' as const,
+          },
+          {
+            path: 'src/database/RecoveryService.ts',
+            additions: 78,
+            deletions: 0,
+            impact: 'high' as const,
+          },
         ],
       },
     ],
@@ -418,7 +494,8 @@ export const HighImpactChanges: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'High-impact changes showing critical security and bug fixes with prominent impact indicators.',
+        story:
+          'High-impact changes showing critical security and bug fixes with prominent impact indicators.',
       },
     },
   },
@@ -446,9 +523,7 @@ export const MinimalChanges: Story = {
         title: 'Fix typo in README',
         commitHash: 'typo01x',
         totalFiles: 1,
-        files: [
-          { path: 'README.md', additions: 1, deletions: 1, impact: 'low' as const },
-        ],
+        files: [{ path: 'README.md', additions: 1, deletions: 1, impact: 'low' as const }],
       },
       {
         id: 'minimal-2',
@@ -456,9 +531,7 @@ export const MinimalChanges: Story = {
         title: 'Update version number',
         commitHash: 'ver02x',
         totalFiles: 1,
-        files: [
-          { path: 'package.json', additions: 1, deletions: 1, impact: 'low' as const },
-        ],
+        files: [{ path: 'package.json', additions: 1, deletions: 1, impact: 'low' as const }],
       },
     ],
   },
@@ -482,12 +555,37 @@ export const FileTypeVariety: Story = {
         totalFiles: 8,
         maxDisplayFiles: 6,
         files: [
-          { path: 'src/i18n/translations.json', additions: 234, deletions: 0, impact: 'medium' as const },
-          { path: 'src/components/LanguageSelector.tsx', additions: 67, deletions: 0, impact: 'medium' as const },
-          { path: 'src/styles/rtl-support.css', additions: 45, deletions: 0, impact: 'low' as const },
-          { path: 'docs/internationalization.md', additions: 89, deletions: 0, impact: 'low' as const },
+          {
+            path: 'src/i18n/translations.json',
+            additions: 234,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
+          {
+            path: 'src/components/LanguageSelector.tsx',
+            additions: 67,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
+          {
+            path: 'src/styles/rtl-support.css',
+            additions: 45,
+            deletions: 0,
+            impact: 'low' as const,
+          },
+          {
+            path: 'docs/internationalization.md',
+            additions: 89,
+            deletions: 0,
+            impact: 'low' as const,
+          },
           { path: 'config/i18n-config.js', additions: 23, deletions: 0, impact: 'low' as const },
-          { path: 'src/utils/locale-detector.ts', additions: 34, deletions: 0, impact: 'medium' as const },
+          {
+            path: 'src/utils/locale-detector.ts',
+            additions: 34,
+            deletions: 0,
+            impact: 'medium' as const,
+          },
         ],
       },
     ],
@@ -495,7 +593,8 @@ export const FileTypeVariety: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Showcase of different file types with appropriate icons: TypeScript, CSS, JSON, Markdown, and JavaScript files.',
+        story:
+          'Showcase of different file types with appropriate icons: TypeScript, CSS, JSON, Markdown, and JavaScript files.',
       },
     },
   },

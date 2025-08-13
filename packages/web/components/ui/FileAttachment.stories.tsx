@@ -146,19 +146,19 @@ const createMockFile = (name: string, size: number, type: string): AttachedFile 
 export const Default: Story = {
   render: () => {
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -186,19 +186,19 @@ export const WithFiles: Story = {
       createMockFile('image.jpg', 1024000, 'image/jpeg'),
       createMockFile('code.ts', 5120, 'text/typescript'),
     ]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -227,19 +227,19 @@ export const ImageFiles: Story = {
       createMockFile('diagram.svg', 51200, 'image/svg+xml'),
       createMockFile('screenshot.png', 1536000, 'image/png'),
     ]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -269,19 +269,19 @@ export const CodeFiles: Story = {
       createMockFile('styles.css', 1024, 'text/css'),
       createMockFile('config.json', 512, 'application/json'),
     ]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -306,25 +306,25 @@ export const CodeFiles: Story = {
 export const RestrictedFiles: Story = {
   render: () => {
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl space-y-4">
         <div className="bg-info/20 text-info p-3 rounded-lg text-sm">
           <strong>Restrictions:</strong> Max 3 files, 1MB each, images only
         </div>
-        
+
         <FileAttachment
           attachedFiles={attachedFiles}
           onFilesAttached={handleFilesAttached}
@@ -352,19 +352,19 @@ export const Disabled: Story = {
       createMockFile('locked.pdf', 2048576, 'application/pdf'),
       createMockFile('readonly.txt', 1024, 'text/plain'),
     ]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -398,19 +398,19 @@ export const ManyFiles: Story = {
       createMockFile('image2.png', 2048000, 'image/png'),
       createMockFile('script.js', 3072, 'text/javascript'),
     ]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -436,24 +436,36 @@ export const DocumentTypes: Story = {
   render: () => {
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([
       createMockFile('report.pdf', 5242880, 'application/pdf'),
-      createMockFile('presentation.pptx', 10485760, 'application/vnd.openxmlformats-officedocument.presentationml.presentation'),
-      createMockFile('spreadsheet.xlsx', 3145728, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
-      createMockFile('document.docx', 2097152, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+      createMockFile(
+        'presentation.pptx',
+        10485760,
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      ),
+      createMockFile(
+        'spreadsheet.xlsx',
+        3145728,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ),
+      createMockFile(
+        'document.docx',
+        2097152,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ),
       createMockFile('archive.zip', 15728640, 'application/zip'),
     ]);
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <FileAttachment
@@ -483,19 +495,19 @@ export const CustomConfiguration: Story = {
       maxSizeBytes: 5 * 1024 * 1024, // 5MB
       acceptedTypes: ['image/*', 'text/*', '.pdf'],
     });
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     return (
       <div className="max-w-2xl space-y-4">
         <div className="bg-base-200 p-4 rounded-lg">
@@ -508,13 +520,15 @@ export const CustomConfiguration: Story = {
               <input
                 type="number"
                 value={config.maxFiles}
-                onChange={(e) => setConfig(prev => ({ ...prev, maxFiles: parseInt(e.target.value) }))}
+                onChange={(e) =>
+                  setConfig((prev) => ({ ...prev, maxFiles: parseInt(e.target.value) }))
+                }
                 className="input input-bordered input-sm w-full"
                 min="1"
                 max="20"
               />
             </div>
-            
+
             <div>
               <label className="label">
                 <span className="label-text">Max Size (MB)</span>
@@ -522,20 +536,27 @@ export const CustomConfiguration: Story = {
               <input
                 type="number"
                 value={config.maxSizeBytes / (1024 * 1024)}
-                onChange={(e) => setConfig(prev => ({ ...prev, maxSizeBytes: parseInt(e.target.value) * 1024 * 1024 }))}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    maxSizeBytes: parseInt(e.target.value) * 1024 * 1024,
+                  }))
+                }
                 className="input input-bordered input-sm w-full"
                 min="1"
                 max="100"
               />
             </div>
-            
+
             <div>
               <label className="label">
                 <span className="label-text">File Types</span>
               </label>
               <select
                 value={config.acceptedTypes.join(',')}
-                onChange={(e) => setConfig(prev => ({ ...prev, acceptedTypes: e.target.value.split(',') }))}
+                onChange={(e) =>
+                  setConfig((prev) => ({ ...prev, acceptedTypes: e.target.value.split(',') }))
+                }
                 className="select select-bordered select-sm w-full"
               >
                 <option value="image/*,text/*,.pdf">Images, Text, PDF</option>
@@ -546,7 +567,7 @@ export const CustomConfiguration: Story = {
             </div>
           </div>
         </div>
-        
+
         <FileAttachment
           attachedFiles={attachedFiles}
           onFilesAttached={handleFilesAttached}
@@ -576,25 +597,28 @@ export const FormIntegration: Story = {
       description: '',
       category: 'general',
     });
-    
+
     const handleFilesAttached = (newFiles: AttachedFile[]) => {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
     };
-    
+
     const handleFileRemoved = (fileId: string) => {
-      setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+      setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
     };
-    
+
     const handleFileCleared = () => {
       setAttachedFiles([]);
     };
-    
+
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      console.log('Form submitted with files:', attachedFiles.map(f => f.file.name));
+      console.log(
+        'Form submitted with files:',
+        attachedFiles.map((f) => f.file.name)
+      );
       alert(`Form submitted with ${attachedFiles.length} files!`);
     };
-    
+
     return (
       <div className="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -605,31 +629,31 @@ export const FormIntegration: Story = {
             <input
               type="text"
               value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
               className="input input-bordered w-full"
               required
             />
           </div>
-          
+
           <div>
             <label className="label">
               <span className="label-text">Description</span>
             </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               className="textarea textarea-bordered w-full"
               rows={3}
             />
           </div>
-          
+
           <div>
             <label className="label">
               <span className="label-text">Category</span>
             </label>
             <select
               value={formData.category}
-              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
               className="select select-bordered w-full"
             >
               <option value="general">General</option>
@@ -638,7 +662,7 @@ export const FormIntegration: Story = {
               <option value="documentation">Documentation</option>
             </select>
           </div>
-          
+
           <div>
             <label className="label">
               <span className="label-text">Attachments</span>
@@ -652,7 +676,7 @@ export const FormIntegration: Story = {
               maxSizeBytes={10 * 1024 * 1024} // 10MB
             />
           </div>
-          
+
           <div className="flex justify-end">
             <button type="submit" className="btn btn-primary">
               Submit ({attachedFiles.length} files attached)
@@ -677,10 +701,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 FileAttachment Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then try dragging files onto the drop zone below!
+          Enable tennis commentary in the toolbar above, then try dragging files onto the drop zone
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Image Gallery</h4>
@@ -696,7 +721,7 @@ export const InteractiveDemo: Story = {
             maxFiles={5}
           />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Document Upload</h4>
           <FileAttachment
@@ -711,7 +736,7 @@ export const InteractiveDemo: Story = {
             maxFiles={10}
           />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Code Files</h4>
           <FileAttachment
@@ -726,7 +751,7 @@ export const InteractiveDemo: Story = {
             maxFiles={8}
           />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Empty Drop Zone</h4>
           <FileAttachment
@@ -739,16 +764,28 @@ export const InteractiveDemo: Story = {
           />
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">FileAttachment Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Drag & Drop</strong> - Intuitive file dropping with visual feedback</li>
-          <li>• <strong>File Validation</strong> - Size, type, and count restrictions</li>
-          <li>• <strong>Preview System</strong> - Image and text file previews</li>
-          <li>• <strong>File Management</strong> - Individual removal and bulk clearing</li>
-          <li>• <strong>Modal Preview</strong> - Full-screen file content viewing</li>
-          <li>• <strong>Mobile Support</strong> - Touch-friendly interface</li>
+          <li>
+            • <strong>Drag & Drop</strong> - Intuitive file dropping with visual feedback
+          </li>
+          <li>
+            • <strong>File Validation</strong> - Size, type, and count restrictions
+          </li>
+          <li>
+            • <strong>Preview System</strong> - Image and text file previews
+          </li>
+          <li>
+            • <strong>File Management</strong> - Individual removal and bulk clearing
+          </li>
+          <li>
+            • <strong>Modal Preview</strong> - Full-screen file content viewing
+          </li>
+          <li>
+            • <strong>Mobile Support</strong> - Touch-friendly interface
+          </li>
         </ul>
       </div>
     </div>
@@ -756,7 +793,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing FileAttachment with tennis commentary. Enable commentary in the toolbar and try dragging files!',
+        story:
+          'Interactive demo showcasing FileAttachment with tennis commentary. Enable commentary in the toolbar and try dragging files!',
       },
     },
   },

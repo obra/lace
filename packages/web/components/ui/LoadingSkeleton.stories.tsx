@@ -1,7 +1,13 @@
 // ABOUTME: Storybook story for LoadingSkeleton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState, useEffect } from 'react';
-import { LoadingSkeleton, ChatMessageSkeleton, TimelineSkeleton, CarouselSkeleton, CardGridSkeleton } from './LoadingSkeleton';
+import {
+  LoadingSkeleton,
+  ChatMessageSkeleton,
+  TimelineSkeleton,
+  CarouselSkeleton,
+  CardGridSkeleton,
+} from './LoadingSkeleton';
 
 const meta: Meta<typeof LoadingSkeleton> = {
   title: 'Atoms/LoadingSkeleton',
@@ -152,12 +158,12 @@ export const MultipleItems: Story = {
         <h4 className="font-medium mb-3">Multiple Text Lines</h4>
         <LoadingSkeleton variant="text" count={3} />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Multiple Cards</h4>
         <LoadingSkeleton variant="card" count={2} />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Multiple Avatars</h4>
         <LoadingSkeleton variant="avatar" count={3} />
@@ -180,22 +186,22 @@ export const AllVariants: Story = {
         <h4 className="font-medium mb-3">Text Skeleton</h4>
         <LoadingSkeleton variant="text" />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Card Skeleton</h4>
         <LoadingSkeleton variant="card" />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Avatar Skeleton</h4>
         <LoadingSkeleton variant="avatar" />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Timeline Skeleton</h4>
         <LoadingSkeleton variant="timeline" />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Carousel Skeleton</h4>
         <LoadingSkeleton variant="carousel" />
@@ -222,17 +228,17 @@ export const SpecializedComponents: Story = {
           <ChatMessageSkeleton />
         </div>
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Timeline Skeleton</h4>
         <TimelineSkeleton />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Carousel Skeleton</h4>
         <CarouselSkeleton />
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Card Grid Skeleton</h4>
         <CardGridSkeleton count={3} />
@@ -251,32 +257,29 @@ export const SpecializedComponents: Story = {
 export const LoadingSimulation: Story = {
   render: () => {
     const [isLoading, setIsLoading] = React.useState(true);
-    
+
     React.useEffect(() => {
       const timer = setTimeout(() => {
         setIsLoading(false);
       }, 3000);
-      
+
       return () => clearTimeout(timer);
     }, []);
-    
+
     const handleReload = () => {
       setIsLoading(true);
       setTimeout(() => setIsLoading(false), 3000);
     };
-    
+
     return (
       <div className="w-full max-w-2xl space-y-4">
         <div className="flex items-center justify-between">
           <h4 className="font-medium">Loading Simulation</h4>
-          <button 
-            onClick={handleReload}
-            className="btn btn-sm btn-primary"
-          >
+          <button onClick={handleReload} className="btn btn-sm btn-primary">
             Reload
           </button>
         </div>
-        
+
         {isLoading ? (
           <div className="space-y-4">
             <ChatMessageSkeleton />
@@ -294,7 +297,7 @@ export const LoadingSimulation: Story = {
                 <div className="text-sm text-gray-600">Just now</div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-secondary text-secondary-content rounded-md flex items-center justify-center text-sm font-medium">
                 U
@@ -304,7 +307,7 @@ export const LoadingSimulation: Story = {
                 <div className="text-sm text-gray-600">2 minutes ago</div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-accent text-accent-content rounded-md flex items-center justify-center text-sm font-medium">
                 AI
@@ -337,7 +340,7 @@ export const ResponsiveExample: Story = {
           <LoadingSkeleton variant="card" count={2} />
         </div>
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Desktop Layout</h4>
         <div className="max-w-4xl">
@@ -367,7 +370,7 @@ export const CustomSizes: Story = {
           <LoadingSkeleton variant="text" className="w-1/4" />
         </div>
       </div>
-      
+
       <div>
         <h4 className="font-medium mb-3">Custom Height Text</h4>
         <div className="space-y-2">
@@ -394,10 +397,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 LoadingSkeleton Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover over the loading skeletons below!
+          Enable tennis commentary in the toolbar above, then hover over the loading skeletons
+          below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Chat Loading</h4>
@@ -406,30 +410,38 @@ export const InteractiveDemo: Story = {
             <ChatMessageSkeleton />
           </div>
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Card Loading</h4>
           <LoadingSkeleton variant="card" />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Timeline Loading</h4>
           <LoadingSkeleton variant="timeline" />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <h4 className="font-medium mb-3">Carousel Loading</h4>
           <LoadingSkeleton variant="carousel" />
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">Loading Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Shimmer Animation</strong> - Smooth gradient animation indicates loading</li>
-          <li>• <strong>Staggered Appearance</strong> - Sequential loading of multiple items</li>
-          <li>• <strong>Multiple Variants</strong> - Different skeleton types for various content</li>
-          <li>• <strong>Responsive Design</strong> - Adapts to different screen sizes</li>
+          <li>
+            • <strong>Shimmer Animation</strong> - Smooth gradient animation indicates loading
+          </li>
+          <li>
+            • <strong>Staggered Appearance</strong> - Sequential loading of multiple items
+          </li>
+          <li>
+            • <strong>Multiple Variants</strong> - Different skeleton types for various content
+          </li>
+          <li>
+            • <strong>Responsive Design</strong> - Adapts to different screen sizes
+          </li>
         </ul>
       </div>
     </div>
@@ -437,7 +449,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing loading skeletons with tennis commentary. Enable commentary in the toolbar and hover over the skeletons!',
+        story:
+          'Interactive demo showcasing loading skeletons with tennis commentary. Enable commentary in the toolbar and hover over the skeletons!',
       },
     },
   },

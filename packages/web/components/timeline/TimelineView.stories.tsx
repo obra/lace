@@ -96,7 +96,7 @@ const mockAgents: AgentInfo[] = [
     status: 'idle',
   },
   {
-    threadId: asThreadId('lace_20240115_abc123.2'), 
+    threadId: asThreadId('lace_20240115_abc123.2'),
     name: 'Research Assistant',
     modelId: 'gpt-4',
     providerInstanceId: 'openai',
@@ -119,7 +119,8 @@ const sampleEvents: LaceEvent[] = [
     threadId: asThreadId('lace_20240115_abc123.1'),
     timestamp: new Date('2024-01-15T10:30:15Z'),
     data: {
-      content: "I'd be happy to explain React hooks! React hooks are functions that let you use state and other React features in functional components.\n\nThe most common hooks are:\n\n1. **useState** - Manages local component state\n2. **useEffect** - Handles side effects\n3. **useContext** - Accesses context values\n4. **useMemo** - Memoizes expensive computations\n5. **useCallback** - Memoizes callback functions",
+      content:
+        "I'd be happy to explain React hooks! React hooks are functions that let you use state and other React features in functional components.\n\nThe most common hooks are:\n\n1. **useState** - Manages local component state\n2. **useEffect** - Handles side effects\n3. **useContext** - Accesses context values\n4. **useMemo** - Memoizes expensive computations\n5. **useCallback** - Memoizes callback functions",
       tokenUsage: {
         message: {
           promptTokens: 15,
@@ -154,7 +155,8 @@ const sampleEvents: LaceEvent[] = [
       name: 'file_write',
       arguments: {
         path: '/tmp/useState-example.tsx',
-        content: 'import { useState } from "react";\n\nfunction Counter() {\n  const [count, setCount] = useState(0);\n  \n  return (\n    <div>\n      <p>Count: {count}</p>\n      <button onClick={() => setCount(count + 1)}>Increment</button>\n    </div>\n  );\n}',
+        content:
+          'import { useState } from "react";\n\nfunction Counter() {\n  const [count, setCount] = useState(0);\n  \n  return (\n    <div>\n      <p>Count: {count}</p>\n      <button onClick={() => setCount(count + 1)}>Increment</button>\n    </div>\n  );\n}',
       },
     },
   },
@@ -180,7 +182,8 @@ const sampleEvents: LaceEvent[] = [
     threadId: asThreadId('lace_20240115_abc123.1'),
     timestamp: new Date('2024-01-15T10:31:15Z'),
     data: {
-      content: "I've created a simple example of `useState` in a file. This Counter component demonstrates:\n\n- Declaring state with `useState(0)` - initial value is 0\n- Reading the current state value (`count`)\n- Updating state with `setCount`\n\nWhen you click the button, it increments the counter by calling `setCount(count + 1)`, which triggers a re-render with the new value.",
+      content:
+        "I've created a simple example of `useState` in a file. This Counter component demonstrates:\n\n- Declaring state with `useState(0)` - initial value is 0\n- Reading the current state value (`count`)\n- Updating state with `setCount`\n\nWhen you click the button, it increments the counter by calling `setCount(count + 1)`, which triggers a re-render with the new value.",
       tokenUsage: {
         message: {
           promptTokens: 120,
@@ -266,7 +269,8 @@ export const StreamingResponse: Story = {
     isTyping: false,
     currentAgent: asThreadId('lace_20240115_abc123.1'),
     selectedAgent: asThreadId('lace_20240115_abc123.1'),
-    streamingContent: 'Let me create a more advanced example that shows how to use multiple hooks together...',
+    streamingContent:
+      'Let me create a more advanced example that shows how to use multiple hooks together...',
   },
 };
 
@@ -299,7 +303,8 @@ export const MultiAgent: Story = {
         threadId: asThreadId('lace_20240115_abc123.2'),
         timestamp: new Date('2024-01-15T10:33:30Z'),
         data: {
-          content: 'I found some best practices for React hooks:\n\n1. Only call hooks at the top level\n2. Only call hooks from React functions\n3. Use the ESLint plugin for hooks\n4. Keep effects focused and small',
+          content:
+            'I found some best practices for React hooks:\n\n1. Only call hooks at the top level\n2. Only call hooks from React functions\n3. Use the ESLint plugin for hooks\n4. Keep effects focused and small',
           tokenUsage: {
             message: {
               promptTokens: 45,

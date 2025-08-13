@@ -9,7 +9,8 @@ const meta: Meta<typeof ChatInterface> = {
     layout: 'fullscreen',
     docs: {
       description: {
-        component: 'Chat interface page wrapper that provides the main Lace application interface. This is a simple wrapper around the LaceApp component for routing purposes.',
+        component:
+          'Chat interface page wrapper that provides the main Lace application interface. This is a simple wrapper around the LaceApp component for routing purposes.',
       },
     },
   },
@@ -23,7 +24,8 @@ export const Default: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default chat interface showing the complete Lace application with sidebar, timeline, and chat input.',
+        story:
+          'Default chat interface showing the complete Lace application with sidebar, timeline, and chat input.',
       },
     },
   },

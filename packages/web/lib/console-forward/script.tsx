@@ -1,4 +1,4 @@
-// ABOUTME: React component for console forwarding script injection  
+// ABOUTME: React component for console forwarding script injection
 // ABOUTME: Only injects in development mode to avoid production overhead
 //
 // This component automatically initializes console forwarding when mounted
@@ -12,10 +12,10 @@ import { DEFAULT_CONFIG } from './index';
 
 /**
  * React component that initializes console forwarding in development mode
- * 
+ *
  * Include this component in your app layout to automatically enable
  * browser console forwarding to your development server terminal.
- * 
+ *
  * The component renders nothing and only runs the initialization side effect.
  */
 export function ConsoleForwardScript() {

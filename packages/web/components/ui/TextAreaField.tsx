@@ -30,7 +30,7 @@ export function TextAreaField({
   disabled = false,
   error = false,
   helpText,
-  className = ''
+  className = '',
 }: TextAreaFieldProps) {
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onChange?.(e.target.value);
@@ -41,8 +41,10 @@ export function TextAreaField({
     'textarea-bordered',
     'w-full',
     error ? 'textarea-error' : '',
-    className
-  ].filter(Boolean).join(' ');
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className="form-control w-full">

@@ -19,17 +19,17 @@ export function ProviderDropdown({
   providers,
   selectedProvider,
   onChange,
-  className = "select select-bordered w-full",
+  className = 'select select-bordered w-full',
   disabled = false,
-  label
+  label,
 }: ProviderDropdownProps) {
   // Get available providers (only those that are configured)
   const availableProviders = useMemo(() => {
-    return providers.filter(p => p.configured);
+    return providers.filter((p) => p.configured);
   }, [providers]);
 
   const handleProviderChange = (providerName: string) => {
-    const provider = providers.find(p => p.name === providerName);
+    const provider = providers.find((p) => p.name === providerName);
     const availableModels = provider?.models || [];
     onChange(providerName, availableModels);
   };

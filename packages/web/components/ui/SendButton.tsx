@@ -74,17 +74,10 @@ export default function SendButton({
         ${className}
       `}
       title={
-        isStreaming
-          ? 'Stop response (ESC)'
-          : hasContent
-            ? 'Send message'
-            : 'Type a message to send'
+        isStreaming ? 'Stop response (ESC)' : hasContent ? 'Send message' : 'Type a message to send'
       }
     >
-      <FontAwesomeIcon 
-        icon={isStreaming ? faStop : faPaperPlane} 
-        className={getIconSize()} 
-      />
+      <FontAwesomeIcon icon={isStreaming ? faStop : faPaperPlane} className={getIconSize()} />
     </button>
   );
 }

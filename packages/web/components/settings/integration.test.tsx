@@ -16,7 +16,7 @@ describe('Settings Components Integration', () => {
   it('renders complete settings modal with tabs and panels', () => {
     const mockOnClose = vi.fn();
     const mockOnThemeChange = vi.fn();
-    
+
     render(
       <Modal isOpen={true} onClose={mockOnClose} title="Settings">
         <SettingsTabs defaultTab="ui">
@@ -82,14 +82,14 @@ describe('Settings Components Integration', () => {
     expect(screen.queryByText('Privacy Settings')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Privacy'));
-    
+
     expect(screen.getByText('Privacy Settings')).toBeInTheDocument();
     expect(screen.queryByText('UI Settings')).not.toBeInTheDocument();
   });
 
   it('handles form interactions within settings', () => {
     const mockOnThemeChange = vi.fn();
-    
+
     render(
       <Modal isOpen={true} onClose={() => {}}>
         <SettingsTabs defaultTab="ui">
@@ -109,7 +109,7 @@ describe('Settings Components Integration', () => {
 
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: 'dark' } });
-    
+
     expect(mockOnThemeChange).toHaveBeenCalled();
   });
 

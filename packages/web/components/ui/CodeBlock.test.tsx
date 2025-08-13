@@ -27,32 +27,27 @@ describe('CodeBlock', () => {
       // Mock console.error to suppress highlight.js warning about unknown language
       const originalConsoleError = console.error;
       console.error = vi.fn();
-      
-      render(
-        <CodeBlock 
-          code="const test = 'hello';" 
-          language="unknown-lang" 
-        />
-      );
-      
+
+      render(<CodeBlock code="const test = 'hello';" language="unknown-lang" />);
+
       // highlight.js will auto-detect and highlight the code
       const codeElement = screen.getByRole('code');
       expect(codeElement.innerHTML).toContain('const');
       expect(codeElement.innerHTML).toContain('test');
       expect(codeElement.innerHTML).toContain('hello');
-      
+
       // Verify the warning was called (expected behavior)
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining("Could not find the language 'unknown-lang'")
       );
-      
+
       // Restore console.error
       console.error = originalConsoleError;
     });
 
     it('renders plain text when no language is specified', () => {
       render(<CodeBlock code="plain text content" />);
-      
+
       // highlight.js will auto-detect the language, might not be 'text'
       const codeElement = screen.getByRole('code');
       expect(codeElement.textContent).toContain('plain');
@@ -64,27 +59,16 @@ describe('CodeBlock', () => {
     });
 
     it('renders with filename when provided', () => {
-      render(
-        <CodeBlock 
-          code="console.log('test');" 
-          filename="test.js"
-          language="javascript"
-        />
-      );
-      
+      render(<CodeBlock code="console.log('test');" filename="test.js" language="javascript" />);
+
       expect(screen.getByText('test.js')).toBeInTheDocument();
     });
   });
 
   describe('Syntax Highlighting Integration', () => {
     it('highlights JavaScript code correctly', () => {
-      render(
-        <CodeBlock 
-          code='console.log("hello");' 
-          language="javascript" 
-        />
-      );
-      
+      render(<CodeBlock code='console.log("hello");' language="javascript" />);
+
       // Should contain highlighted HTML with hljs classes
       const codeElement = screen.getByRole('code');
       expect(codeElement.innerHTML).toContain('hljs');
@@ -93,13 +77,8 @@ describe('CodeBlock', () => {
     });
 
     it('highlights TypeScript code correctly', () => {
-      render(
-        <CodeBlock 
-          code='const greeting: string = "hello";' 
-          language="typescript" 
-        />
-      );
-      
+      render(<CodeBlock code='const greeting: string = "hello";' language="typescript" />);
+
       const codeElement = screen.getByRole('code');
       expect(codeElement.innerHTML).toContain('hljs');
       expect(codeElement.innerHTML).toContain('const');
@@ -108,13 +87,8 @@ describe('CodeBlock', () => {
 
     it('formats JSON code automatically', () => {
       const uglyJson = '{"name":"test","value":123}';
-      render(
-        <CodeBlock 
-          code={uglyJson} 
-          language="json" 
-        />
-      );
-      
+      render(<CodeBlock code={uglyJson} language="json" />);
+
       // Should be formatted with proper indentation
       const codeElement = screen.getByRole('code');
       expect(codeElement.innerHTML).toContain('name');
@@ -123,10 +97,8 @@ describe('CodeBlock', () => {
     });
 
     it('handles auto-detection for unspecified language', () => {
-      render(
-        <CodeBlock code='function test() { return "hello"; }' />
-      );
-      
+      render(<CodeBlock code='function test() { return "hello"; }' />);
+
       // highlight.js will auto-detect and highlight the code
       const codeElement = screen.getByRole('code');
       expect(codeElement.textContent).toContain('function test()');
@@ -134,13 +106,8 @@ describe('CodeBlock', () => {
     });
 
     it('falls back gracefully for invalid JSON', () => {
-      render(
-        <CodeBlock 
-          code='{"invalid": json}' 
-          language="json" 
-        />
-      );
-      
+      render(<CodeBlock code='{"invalid": json}' language="json" />);
+
       // Should still render the invalid JSON, possibly highlighted
       const codeElement = screen.getByRole('code');
       expect(codeElement.innerHTML).toContain('invalid');
@@ -150,50 +117,34 @@ describe('CodeBlock', () => {
 
   describe('UI Features', () => {
     it('shows language label by default', () => {
-      render(
-        <CodeBlock 
-          code="test code" 
-          language="javascript" 
-        />
-      );
-      
+      render(<CodeBlock code="test code" language="javascript" />);
+
       expect(screen.getByText('javascript')).toBeInTheDocument();
     });
 
     it('hides language label when showLanguageLabel is false', () => {
-      render(
-        <CodeBlock 
-          code="test code" 
-          language="javascript" 
-          showLanguageLabel={false}
-        />
-      );
-      
+      render(<CodeBlock code="test code" language="javascript" showLanguageLabel={false} />);
+
       expect(screen.queryByText('javascript')).not.toBeInTheDocument();
     });
 
     it('shows copy button by default', () => {
       render(<CodeBlock code="test code" />);
-      
+
       expect(screen.getByTitle('Copy code')).toBeInTheDocument();
     });
 
     it('hides copy button when showCopyButton is false', () => {
       render(<CodeBlock code="test code" showCopyButton={false} />);
-      
+
       expect(screen.queryByTitle('Copy code')).not.toBeInTheDocument();
     });
 
     it('hides header when showHeader is false', () => {
       render(
-        <CodeBlock 
-          code="test code" 
-          language="javascript" 
-          filename="test.js"
-          showHeader={false} 
-        />
+        <CodeBlock code="test code" language="javascript" filename="test.js" showHeader={false} />
       );
-      
+
       expect(screen.queryByText('javascript')).not.toBeInTheDocument();
       expect(screen.queryByText('test.js')).not.toBeInTheDocument();
       expect(screen.queryByTitle('Copy code')).not.toBeInTheDocument();
@@ -202,29 +153,24 @@ describe('CodeBlock', () => {
 
   describe('Line Numbers', () => {
     it('shows line numbers when enabled', () => {
-      render(
-        <CodeBlock 
-          code="line 1\nline 2\nline 3" 
-          showLineNumbers={true}
-        />
-      );
-      
+      render(<CodeBlock code="line 1\nline 2\nline 3" showLineNumbers={true} />);
+
       // Line numbers are rendered in a separate container
       const lineNumbersContainer = document.querySelector('.line-numbers');
       expect(lineNumbersContainer).toBeInTheDocument();
-      
+
       // Check that line numbers exist - the exact rendering may depend on highlight.js behavior
       const lineNumbers = lineNumbersContainer?.querySelectorAll('div');
       expect(lineNumbers).toBeDefined();
       expect(lineNumbers!.length).toBeGreaterThan(0);
-      
+
       // The first line number should be "1"
       expect(lineNumbers![0].textContent).toBe('1');
     });
 
     it('hides line numbers by default', () => {
       render(<CodeBlock code="line 1\nline 2" />);
-      
+
       // Line numbers div should not be present
       const lineNumbersContainer = document.querySelector('.line-numbers');
       expect(lineNumbersContainer).not.toBeInTheDocument();
@@ -235,44 +181,47 @@ describe('CodeBlock', () => {
     it('copies code to clipboard when copy button is clicked', async () => {
       const testCode = 'console.log("test");';
       render(<CodeBlock code={testCode} />);
-      
+
       const copyButton = screen.getByTitle('Copy code');
-      
+
       await act(async () => {
         fireEvent.click(copyButton);
       });
-      
+
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(testCode);
     });
 
     it('shows success feedback after copying', async () => {
       render(<CodeBlock code="test code" />);
-      
+
       const copyButton = screen.getByTitle('Copy code');
-      
+
       await act(async () => {
         fireEvent.click(copyButton);
       });
-      
+
       // Should show checkmark icon briefly
-      await waitFor(() => {
-        const icon = copyButton.querySelector('svg');
-        expect(icon).toHaveClass('text-success');
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          const icon = copyButton.querySelector('svg');
+          expect(icon).toHaveClass('text-success');
+        },
+        { timeout: 1000 }
+      );
     });
 
     it('calls custom onCopy handler when provided', async () => {
       const customCopy = vi.fn();
       const testCode = 'test code';
-      
+
       render(<CodeBlock code={testCode} onCopy={customCopy} />);
-      
+
       const copyButton = screen.getByTitle('Copy code');
-      
+
       await act(async () => {
         fireEvent.click(copyButton);
       });
-      
+
       expect(customCopy).toHaveBeenCalledWith(testCode);
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
     });
@@ -280,45 +229,28 @@ describe('CodeBlock', () => {
 
   describe('Collapsible Functionality', () => {
     it('shows expand/collapse button when collapsible is true', () => {
-      render(
-        <CodeBlock 
-          code="test code" 
-          collapsible={true} 
-        />
-      );
-      
+      render(<CodeBlock code="test code" collapsible={true} />);
+
       expect(screen.getByTitle('Collapse')).toBeInTheDocument();
     });
 
     it('starts collapsed when collapsed prop is true', () => {
-      render(
-        <CodeBlock 
-          code="test code" 
-          collapsible={true}
-          collapsed={true}
-        />
-      );
-      
+      render(<CodeBlock code="test code" collapsible={true} collapsed={true} />);
+
       expect(screen.getByTitle('Expand')).toBeInTheDocument();
       expect(screen.queryByText('test code')).not.toBeInTheDocument();
     });
 
     it('toggles visibility when expand/collapse button is clicked', () => {
-      render(
-        <CodeBlock 
-          code="test code" 
-          collapsible={true}
-          collapsed={true}
-        />
-      );
-      
+      render(<CodeBlock code="test code" collapsible={true} collapsed={true} />);
+
       // Code should not be visible when collapsed
       const codeContent = document.querySelector('.code-block-content');
       expect(codeContent).not.toBeInTheDocument();
-      
+
       const expandButton = screen.getByTitle('Expand');
       fireEvent.click(expandButton);
-      
+
       // After expanding, code should be visible
       const expandedCodeContent = document.querySelector('.code-block-content');
       expect(expandedCodeContent).toBeInTheDocument();
@@ -331,19 +263,22 @@ describe('CodeBlock', () => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
       const writeTextMock = vi.mocked(navigator.clipboard.writeText);
       writeTextMock.mockRejectedValueOnce(new Error('Clipboard failed'));
-      
+
       render(<CodeBlock code="test code" />);
-      
+
       const copyButton = screen.getByTitle('Copy code');
-      
+
       await act(async () => {
         fireEvent.click(copyButton);
       });
-      
-      await waitFor(() => {
-        expect(consoleError).toHaveBeenCalledWith('Failed to copy code:', expect.any(Error));
-      }, { timeout: 1000 });
-      
+
+      await waitFor(
+        () => {
+          expect(consoleError).toHaveBeenCalledWith('Failed to copy code:', expect.any(Error));
+        },
+        { timeout: 1000 }
+      );
+
       consoleError.mockRestore();
     });
   });
@@ -351,14 +286,14 @@ describe('CodeBlock', () => {
   describe('Styling and Layout', () => {
     it('applies custom className', () => {
       render(<CodeBlock code="test" className="custom-class" />);
-      
+
       const codeBlock = screen.getByText('test').closest('.code-block');
       expect(codeBlock).toHaveClass('custom-class');
     });
 
     it('applies maxHeight style', () => {
       render(<CodeBlock code="test" maxHeight="200px" />);
-      
+
       const contentDiv = screen.getByText('test').closest('.code-block-content');
       expect(contentDiv).toHaveStyle({ maxHeight: '200px' });
     });

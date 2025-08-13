@@ -219,9 +219,9 @@ export const LoadingStates: Story = {
     });
 
     const handleClick = (type: keyof typeof loadingStates) => {
-      setLoadingStates(prev => ({ ...prev, [type]: true }));
+      setLoadingStates((prev) => ({ ...prev, [type]: true }));
       setTimeout(() => {
-        setLoadingStates(prev => ({ ...prev, [type]: false }));
+        setLoadingStates((prev) => ({ ...prev, [type]: false }));
       }, 2000);
     };
 
@@ -312,25 +312,25 @@ export const FormExample: Story = {
           <AnimatedInput
             label="Name"
             value={formData.name}
-            onChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
+            onChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
             icon={<span>👤</span>}
           />
-          
+
           <AnimatedInput
             label="Email"
             type="email"
             value={formData.email}
-            onChange={(value) => setFormData(prev => ({ ...prev, email: value }))}
+            onChange={(value) => setFormData((prev) => ({ ...prev, email: value }))}
             icon={<span>📧</span>}
           />
-          
+
           <AnimatedInput
             label="Message"
             value={formData.message}
-            onChange={(value) => setFormData(prev => ({ ...prev, message: value }))}
+            onChange={(value) => setFormData((prev) => ({ ...prev, message: value }))}
             icon={<span>💬</span>}
           />
-          
+
           <div className="flex gap-2">
             <AnimatedButton
               type="submit"
@@ -340,12 +340,7 @@ export const FormExample: Story = {
             >
               Send Message
             </AnimatedButton>
-            <AnimatedButton
-              type="button"
-              variant="ghost"
-              onClick={handleReset}
-              disabled={loading}
-            >
+            <AnimatedButton type="button" variant="ghost" onClick={handleReset} disabled={loading}>
               Reset
             </AnimatedButton>
           </div>
@@ -356,7 +351,8 @@ export const FormExample: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Complete form example with AnimatedInput and AnimatedButton components working together.',
+        story:
+          'Complete form example with AnimatedInput and AnimatedButton components working together.',
       },
     },
   },
@@ -415,10 +411,8 @@ export const ButtonGroup: Story = {
             Right
           </AnimatedButton>
         </div>
-        
-        <div className="text-sm text-base-content/60">
-          Selected: {selected}
-        </div>
+
+        <div className="text-sm text-base-content/60">Selected: {selected}</div>
       </div>
     );
   },
@@ -437,10 +431,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 AnimatedButton Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then click, hover, and interact with the buttons!
+          Enable tennis commentary in the toolbar above, then click, hover, and interact with the
+          buttons!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="cursor-pointer hover:shadow-lg transition-shadow border rounded-lg p-4">
           <h4 className="font-medium mb-3">Button Variants</h4>
@@ -459,7 +454,7 @@ export const InteractiveDemo: Story = {
             </div>
           </div>
         </div>
-        
+
         <div className="cursor-pointer hover:shadow-lg transition-shadow border rounded-lg p-4">
           <h4 className="font-medium mb-3">Icon Buttons</h4>
           <div className="space-y-3">
@@ -479,16 +474,28 @@ export const InteractiveDemo: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">AnimatedButton Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Smooth Animations</strong> - Hover, tap, and loading animations</li>
-          <li>• <strong>Multiple Variants</strong> - 7 different button styles</li>
-          <li>• <strong>Size Options</strong> - From extra small to large</li>
-          <li>• <strong>Loading States</strong> - Animated spinners and disabled states</li>
-          <li>• <strong>Icon Support</strong> - Left and right positioned icons</li>
-          <li>• <strong>Accessibility</strong> - Full keyboard navigation and ARIA support</li>
+          <li>
+            • <strong>Smooth Animations</strong> - Hover, tap, and loading animations
+          </li>
+          <li>
+            • <strong>Multiple Variants</strong> - 7 different button styles
+          </li>
+          <li>
+            • <strong>Size Options</strong> - From extra small to large
+          </li>
+          <li>
+            • <strong>Loading States</strong> - Animated spinners and disabled states
+          </li>
+          <li>
+            • <strong>Icon Support</strong> - Left and right positioned icons
+          </li>
+          <li>
+            • <strong>Accessibility</strong> - Full keyboard navigation and ARIA support
+          </li>
         </ul>
       </div>
     </div>
@@ -496,7 +503,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing AnimatedButton with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
+        story:
+          'Interactive demo showcasing AnimatedButton with tennis commentary. Enable commentary in the toolbar and interact with the buttons!',
       },
     },
   },

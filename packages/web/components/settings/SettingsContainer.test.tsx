@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { vi , beforeEach, afterEach, expect, describe, it } from 'vitest';
+import { vi, beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
 
@@ -30,39 +30,39 @@ Object.defineProperty(global, 'fetch', {
 
 describe('SettingsContainer', () => {
   // Helper function to render with proper async handling
-  const renderSettingsContainer = async (children: (props: { onOpenSettings: () => void }) => React.ReactNode) => {
+  const renderSettingsContainer = async (
+    children: (props: { onOpenSettings: () => void }) => React.ReactNode
+  ) => {
     let component: ReturnType<typeof render>;
-    
+
     await act(async () => {
-      component = render(
-        <SettingsContainer>
-          {children}
-        </SettingsContainer>
-      );
+      component = render(<SettingsContainer>{children}</SettingsContainer>);
     });
-    
+
     // Wait for async effects to complete outside of act
     await waitFor(() => {
       // Component should be rendered
       expect(component.container.firstChild).not.toBeNull();
     });
-    
+
     return component!;
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue('dark'); // Default theme
-    
+
     // Mock document.documentElement.setAttribute
     vi.spyOn(document.documentElement, 'setAttribute').mockImplementation(vi.fn());
-    
+
     // Mock fetch API responses with resolved Promise
-    mockFetch.mockImplementation(() => Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ instances: [] }),
-      text: () => Promise.resolve(JSON.stringify({ instances: [] })),
-    } as Response));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ instances: [] }),
+        text: () => Promise.resolve(JSON.stringify({ instances: [] })),
+      } as Response)
+    );
   });
 
   afterEach(() => {
@@ -117,7 +117,7 @@ describe('SettingsContainer', () => {
 
   it('loads initial theme from localStorage', () => {
     localStorageMock.getItem.mockReturnValue('light');
-    
+
     render(
       <SettingsContainer>
         {({ onOpenSettings }) => (
@@ -134,7 +134,7 @@ describe('SettingsContainer', () => {
 
   it('defaults to dark theme when no theme in localStorage', () => {
     localStorageMock.getItem.mockReturnValue(null);
-    
+
     render(
       <SettingsContainer>
         {({ onOpenSettings }) => (
@@ -159,13 +159,13 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
-    
+
     // Switch to UI tab to access theme controls
     await act(async () => {
       const uiTab = screen.getByRole('tab', { name: /ui/i });
       fireEvent.click(uiTab);
     });
-    
+
     // Find and click light theme button
     await act(async () => {
       const lightButton = screen.getByRole('button', { name: /light/i });
@@ -191,7 +191,7 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
-    
+
     // Should show Providers panel by default
     expect(screen.getByText('AI Provider Configuration')).toBeInTheDocument();
   });
@@ -227,13 +227,13 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
-    
+
     // Switch to UI tab to access theme controls
     await act(async () => {
       const uiTab = screen.getByRole('tab', { name: /ui/i });
       fireEvent.click(uiTab);
     });
-    
+
     await act(async () => {
       const lightButton = screen.getByRole('button', { name: /light/i });
       fireEvent.click(lightButton);
@@ -249,7 +249,7 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
-    
+
     // Switch to UI tab to access theme controls
     await act(async () => {
       const uiTab = screen.getByRole('tab', { name: /ui/i });
@@ -271,7 +271,7 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
-    
+
     // Should show tabs
     expect(screen.getByText('Providers')).toBeInTheDocument();
     expect(screen.getByText('UI')).toBeInTheDocument();
@@ -291,7 +291,7 @@ describe('SettingsContainer', () => {
     );
 
     render(<TestComponent />);
-    
+
     expect(screen.getByText('Test Content')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
   });
@@ -306,16 +306,16 @@ describe('SettingsContainer', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
-    
+
     // Check that User tab is available
     const userTab = screen.getByRole('tab', { name: /user/i });
     expect(userTab).toBeInTheDocument();
-    
+
     // Click on User tab
     await act(async () => {
       fireEvent.click(userTab);
     });
-    
+
     // Verify UserSettingsPanel content is displayed
     expect(screen.getByText('User Settings')).toBeInTheDocument();
     expect(screen.getByLabelText('Display Name')).toBeInTheDocument();

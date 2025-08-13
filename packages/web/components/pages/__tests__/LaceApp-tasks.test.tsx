@@ -17,27 +17,38 @@ import { asThreadId, asAssigneeId } from '@/types/core';
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.ComponentProps<'div'>) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: React.ComponentProps<'button'>) => <button {...props}>{children}</button>,
+    button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+      <button {...props}>{children}</button>
+    ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 // Mock all the child components that we're not testing
 vi.mock('@/components/layout/Sidebar', () => ({
-  Sidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar">{children}</div>,
+  Sidebar: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar">{children}</div>
+  ),
   SidebarSection: ({ children, title }: { children?: React.ReactNode; title?: string }) => (
     <div data-testid="sidebar-section">
       {title && <div data-testid="sidebar-section-title">{title}</div>}
       {children}
     </div>
   ),
-  SidebarItem: ({ children }: { children?: React.ReactNode }) => <div data-testid="sidebar-item">{children}</div>,
-  SidebarButton: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => 
-    <button data-testid="sidebar-button" onClick={onClick}>{children}</button>,
+  SidebarItem: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sidebar-item">{children}</div>
+  ),
+  SidebarButton: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => (
+    <button data-testid="sidebar-button" onClick={onClick}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock('@/components/layout/MobileSidebar', () => ({
-  MobileSidebar: ({ children }: { children?: React.ReactNode }) => <div data-testid="mobile-sidebar">{children}</div>,
+  MobileSidebar: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="mobile-sidebar">{children}</div>
+  ),
 }));
 
 vi.mock('@/components/timeline/TimelineView', () => ({
@@ -57,7 +68,9 @@ vi.mock('@/components/config/SessionConfigPanel', () => ({
 }));
 
 vi.mock('@/components/config/ProjectSelectorPanel', () => ({
-  ProjectSelectorPanel: () => <div data-testid="project-selector-panel">Project Selector Panel</div>,
+  ProjectSelectorPanel: () => (
+    <div data-testid="project-selector-panel">Project Selector Panel</div>
+  ),
 }));
 
 vi.mock('@/lib/timeline-converter', () => ({
@@ -87,42 +100,41 @@ vi.mock('@/hooks/useTaskManager', () => ({
 
 // Helper to render with real theme provider
 const renderWithProviders = (component: React.ReactElement) => {
-  return render(
-    <ThemeProvider>
-      {component}
-    </ThemeProvider>
-  );
+  return render(<ThemeProvider>{component}</ThemeProvider>);
 };
-
 
 describe('LaceApp Task Sidebar Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock fetch using the new utility that handles superjson properly
-    global.fetch = vi.fn().mockImplementation(createFetchMock({
-      '/api/projects': { 
-        projects: [{
-          id: 'test-project',
-          name: 'Test Project',
-          description: 'Test project description',
-          workingDirectory: '/test',
-          isArchived: false,
-          createdAt: new Date(),
-          lastUsedAt: new Date(),
-          sessionCount: 1
-        }]
-      },
-      '/api/providers': { providers: [] },
-      '/api/sessions/lace_20250101_sess01': { 
-        session: { 
-          id: 'lace_20250101_sess01', 
-          name: 'Test Session',
-          agents: [] 
-        } 
-      }
-    }));
-    
+    global.fetch = vi.fn().mockImplementation(
+      createFetchMock({
+        '/api/projects': {
+          projects: [
+            {
+              id: 'test-project',
+              name: 'Test Project',
+              description: 'Test project description',
+              workingDirectory: '/test',
+              isArchived: false,
+              createdAt: new Date(),
+              lastUsedAt: new Date(),
+              sessionCount: 1,
+            },
+          ],
+        },
+        '/api/providers': { providers: [] },
+        '/api/sessions/lace_20250101_sess01': {
+          session: {
+            id: 'lace_20250101_sess01',
+            name: 'Test Session',
+            agents: [],
+          },
+        },
+      })
+    );
+
     // Default hash router mock with session
     vi.mocked(useHashRouter).mockReturnValue({
       project: 'test-project',
@@ -136,7 +148,7 @@ describe('LaceApp Task Sidebar Integration', () => {
       updateState: vi.fn(),
       isHydrated: true,
     });
-    
+
     // Default task manager mock
     vi.mocked(useTaskManager).mockReturnValue({
       tasks: [],
@@ -161,9 +173,12 @@ describe('LaceApp Task Sidebar Integration', () => {
     renderWithProviders(<LaceApp />);
 
     // Check if the task section elements are there
-    await waitFor(() => {
-      expect(screen.getByText('Add task')).toBeInTheDocument(); // Add task button
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText('Add task')).toBeInTheDocument(); // Add task button
+      },
+      { timeout: 3000 }
+    );
   });
 
   it('should not show task sidebar when no session selected', async () => {
@@ -222,7 +237,7 @@ describe('LaceApp Task Sidebar Integration', () => {
       handleTaskDeleted: vi.fn(),
       handleTaskNoteAdded: vi.fn(),
     };
-    
+
     vi.mocked(useTaskManager).mockReturnValue(mockTaskManager);
 
     renderWithProviders(<LaceApp />);

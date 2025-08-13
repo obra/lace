@@ -30,7 +30,7 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
     // Update state and localStorage immediately for consistency
     setCurrentTheme(theme);
     localStorage.setItem('theme', theme);
-    
+
     // Batch DOM operation to avoid unnecessary reflows
     requestAnimationFrame(() => {
       document.documentElement.setAttribute('data-theme', theme);
@@ -41,30 +41,30 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
   const handleCloseSettings = useCallback(() => setIsOpen(false), []);
 
   // Memoize the children callback props to prevent unnecessary re-renders
-  const childrenProps = useMemo(() => ({ 
-    onOpenSettings: handleOpenSettings 
-  }), [handleOpenSettings]);
+  const childrenProps = useMemo(
+    () => ({
+      onOpenSettings: handleOpenSettings,
+    }),
+    [handleOpenSettings]
+  );
 
   // Memoize the settings panels to avoid recreating on every render
-  const uiSettingsPanel = useMemo(() => (
-    <UISettingsPanel 
-      currentTheme={currentTheme}
-      onThemeChange={handleThemeChange}
-    />
-  ), [currentTheme, handleThemeChange]);
+  const uiSettingsPanel = useMemo(
+    () => <UISettingsPanel currentTheme={currentTheme} onThemeChange={handleThemeChange} />,
+    [currentTheme, handleThemeChange]
+  );
 
-  const userSettingsPanel = useMemo(() => (
-    <UserSettingsPanel />
-  ), []);
+  const userSettingsPanel = useMemo(() => <UserSettingsPanel />, []);
 
-  const providersPanel = useMemo(() => (
-    <ProvidersPanel />
-  ), []);
-
+  const providersPanel = useMemo(() => <ProvidersPanel />, []);
 
   // Tab configuration with icons
   const tabConfig = [
-    { id: 'providers', label: 'Providers', icon: <FontAwesomeIcon icon={faPlug} className="w-4 h-4" /> },
+    {
+      id: 'providers',
+      label: 'Providers',
+      icon: <FontAwesomeIcon icon={faPlug} className="w-4 h-4" />,
+    },
     { id: 'ui', label: 'UI', icon: <FontAwesomeIcon icon={faCog} className="w-4 h-4" /> },
     { id: 'user', label: 'User', icon: <FontAwesomeIcon icon={faUser} className="w-4 h-4" /> },
   ];
@@ -72,9 +72,9 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
   return (
     <>
       {children(childrenProps)}
-      
-      <Modal 
-        isOpen={isOpen} 
+
+      <Modal
+        isOpen={isOpen}
         onClose={handleCloseSettings}
         title="Configuration"
         size="full"

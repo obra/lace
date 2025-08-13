@@ -1,6 +1,5 @@
 'use client';
 
-
 // Using FontAwesome instead of Heroicons
 
 export function AccountDropdown() {
@@ -63,7 +62,6 @@ export function AccountDropdown() {
           </li>
         </ul>
       </div>
-
     </div>
   );
 }

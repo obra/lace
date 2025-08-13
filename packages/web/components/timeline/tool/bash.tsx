@@ -24,10 +24,10 @@ export const bashRenderer: ToolRenderer = {
 
   isError: (result: ToolResult): boolean => {
     if (result.status !== 'completed') return true;
-    
-    // Check for non-zero exit code in structured output  
+
+    // Check for non-zero exit code in structured output
     try {
-      const rawOutput = result.content?.map(block => block.text || '').join('') || '';
+      const rawOutput = result.content?.map((block) => block.text || '').join('') || '';
       const bashOutput = JSON.parse(rawOutput) as { exitCode?: number };
       return bashOutput.exitCode != null && bashOutput.exitCode !== 0;
     } catch {
@@ -44,9 +44,7 @@ export const bashRenderer: ToolRenderer = {
       );
     }
 
-    const rawOutput = result.content
-      .map(block => block.text || '')
-      .join('');
+    const rawOutput = result.content.map((block) => block.text || '').join('');
 
     // Try to parse structured bash output
     let bashOutput: { stdout?: string; stderr?: string; exitCode?: number };
@@ -55,11 +53,13 @@ export const bashRenderer: ToolRenderer = {
     } catch {
       // Fallback to raw output if not structured
       return (
-        <div className={`font-mono text-sm whitespace-pre-wrap ${
-          result.status !== 'completed' 
-            ? 'text-error bg-error/10 border border-error/20' 
-            : 'text-base-content/80 bg-base-200 border border-base-300'
-        } rounded-lg p-3`}>
+        <div
+          className={`font-mono text-sm whitespace-pre-wrap ${
+            result.status !== 'completed'
+              ? 'text-error bg-error/10 border border-error/20'
+              : 'text-base-content/80 bg-base-200 border border-base-300'
+          } rounded-lg p-3`}
+        >
           {rawOutput}
         </div>
       );
@@ -78,7 +78,7 @@ export const bashRenderer: ToolRenderer = {
             {stdout}
           </div>
         )}
-        
+
         {/* Stderr output */}
         {hasStderr && (
           <div className="font-mono text-sm whitespace-pre-wrap text-error bg-error/10 border border-error/20 rounded-lg p-3">
@@ -86,14 +86,14 @@ export const bashRenderer: ToolRenderer = {
             {stderr}
           </div>
         )}
-        
+
         {/* Exit code (only show if non-zero) */}
         {hasNonZeroExit && (
           <div className="text-sm text-error/80 bg-error/5 border border-error/20 rounded px-2 py-1">
             <span className="font-semibold">Exit code:</span> {exitCode}
           </div>
         )}
-        
+
         {/* Show success indicator if no output but successful */}
         {!hasStdout && !hasStderr && !hasNonZeroExit && (
           <div className="text-sm text-success/80 bg-success/5 border border-success/20 rounded px-2 py-1">

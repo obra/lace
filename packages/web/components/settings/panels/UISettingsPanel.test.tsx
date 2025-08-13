@@ -35,10 +35,10 @@ describe('UISettingsPanel', () => {
   it('calls onThemeChange when theme selected', () => {
     const mockOnThemeChange = vi.fn();
     render(<UISettingsPanel onThemeChange={mockOnThemeChange} />);
-    
+
     // Click on the light theme button (not the header text)
     const lightButtons = screen.getAllByText('light');
-    const lightButton = lightButtons.find(el => el.closest('button'));
+    const lightButton = lightButtons.find((el) => el.closest('button'));
     expect(lightButton).toBeDefined();
     fireEvent.click(lightButton!);
     expect(mockOnThemeChange).toHaveBeenCalledWith('light');
@@ -53,21 +53,21 @@ describe('UISettingsPanel', () => {
 
   it('renders all available themes from ThemeSelector', () => {
     render(<UISettingsPanel />);
-    
+
     // Check for some of the theme names from ThemeSelector (as buttons)
     expect(screen.getByRole('button', { name: /light/i })).toBeInTheDocument();
   });
 
   it('integrates properly with SettingsPanel structure', () => {
     render(<UISettingsPanel />);
-    
+
     // Should have the panel title as heading
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('UI Settings');
   });
 
   it('uses SettingField for consistent layout', () => {
     render(<UISettingsPanel />);
-    
+
     // The Theme label should be present from ThemeSelector
     expect(screen.getByText('Theme')).toBeInTheDocument();
     // ThemeSelector is wrapped in SettingField for consistent layout

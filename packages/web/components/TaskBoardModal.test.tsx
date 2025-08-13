@@ -29,7 +29,7 @@ const mockTasks: Task[] = [
     id: 'task-2',
     title: 'Test Task 2',
     description: 'Second test task',
-    prompt: 'Test prompt 2', 
+    prompt: 'Test prompt 2',
     status: 'in_progress',
     priority: 'medium',
     assignedTo: 'agent-2' as AssigneeId,
@@ -38,7 +38,7 @@ const mockTasks: Task[] = [
     createdAt: new Date('2024-01-02T00:00:00Z'),
     updatedAt: new Date('2024-01-02T00:00:00Z'),
     notes: [],
-  }
+  },
 ];
 
 describe('TaskBoardModal', () => {

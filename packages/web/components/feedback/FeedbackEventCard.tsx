@@ -13,45 +13,67 @@ interface FeedbackEventCardProps {
   compact?: boolean;
 }
 
-export function FeedbackEventCard({ 
-  event, 
-  showContext = false, 
-  compact = false 
+export function FeedbackEventCard({
+  event,
+  showContext = false,
+  compact = false,
 }: FeedbackEventCardProps) {
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'action': return 'bg-blue-100 text-blue-700';
-      case 'performance': return 'bg-green-100 text-green-700';
-      case 'educational': return 'bg-purple-100 text-purple-700';
-      case 'predictive': return 'bg-yellow-100 text-yellow-700';
-      case 'error': return 'bg-red-100 text-red-700';
-      case 'optimization': return 'bg-orange-100 text-orange-700';
-      case 'insight': return 'bg-indigo-100 text-indigo-700';
-      case 'celebration': return 'bg-emerald-100 text-emerald-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'action':
+        return 'bg-blue-100 text-blue-700';
+      case 'performance':
+        return 'bg-green-100 text-green-700';
+      case 'educational':
+        return 'bg-purple-100 text-purple-700';
+      case 'predictive':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'error':
+        return 'bg-red-100 text-red-700';
+      case 'optimization':
+        return 'bg-orange-100 text-orange-700';
+      case 'insight':
+        return 'bg-indigo-100 text-indigo-700';
+      case 'celebration':
+        return 'bg-emerald-100 text-emerald-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'high': return '🔴';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
-      default: return '⚪';
+      case 'high':
+        return '🔴';
+      case 'medium':
+        return '🟡';
+      case 'low':
+        return '🟢';
+      default:
+        return '⚪';
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'action': return '⚡';
-      case 'performance': return '📊';
-      case 'educational': return '🎓';
-      case 'predictive': return '🔮';
-      case 'error': return '❌';
-      case 'optimization': return '⚡';
-      case 'insight': return '💡';
-      case 'celebration': return '🎉';
-      default: return '📝';
+      case 'action':
+        return '⚡';
+      case 'performance':
+        return '📊';
+      case 'educational':
+        return '🎓';
+      case 'predictive':
+        return '🔮';
+      case 'error':
+        return '❌';
+      case 'optimization':
+        return '⚡';
+      case 'insight':
+        return '💡';
+      case 'celebration':
+        return '🎉';
+      default:
+        return '📝';
     }
   };
 
@@ -68,9 +90,7 @@ export function FeedbackEventCard({
             <Badge variant="secondary" className={getTypeColor(event.type)}>
               {event.type}
             </Badge>
-            <span className="text-xs text-gray-500">
-              {getPriorityIcon(event.priority)}
-            </span>
+            <span className="text-xs text-gray-500">{getPriorityIcon(event.priority)}</span>
           </div>
           <p className="text-sm text-gray-900 mt-1 truncate">{event.content}</p>
         </div>
@@ -107,18 +127,13 @@ export function FeedbackEventCard({
       </div>
 
       {/* Content */}
-      <div className="text-sm text-gray-700 mb-3">
-        {event.content}
-      </div>
+      <div className="text-sm text-gray-700 mb-3">{event.content}</div>
 
       {/* Tags */}
       {event.tags && event.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
           {event.tags.map((tag, index) => (
-            <span
-              key={index}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full"
-            >
+            <span key={index} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
               #{tag}
             </span>
           ))}
@@ -133,17 +148,23 @@ export function FeedbackEventCard({
               Context Details
             </summary>
             <div className="mt-2 space-y-1">
-              <div><strong>Thread:</strong> {event.context.threadId}</div>
+              <div>
+                <strong>Thread:</strong> {event.context.threadId}
+              </div>
               {event.context.agentState && (
-                <div><strong>Agent State:</strong> {event.context.agentState}</div>
+                <div>
+                  <strong>Agent State:</strong> {event.context.agentState}
+                </div>
               )}
               {event.context.currentTool && (
-                <div><strong>Current Tool:</strong> {event.context.currentTool}</div>
+                <div>
+                  <strong>Current Tool:</strong> {event.context.currentTool}
+                </div>
               )}
               {event.context.turnMetrics && (
                 <div>
-                  <strong>Turn:</strong> {event.context.turnMetrics.turnId} 
-                  ({event.context.turnMetrics.elapsedMs}ms)
+                  <strong>Turn:</strong> {event.context.turnMetrics.turnId}(
+                  {event.context.turnMetrics.elapsedMs}ms)
                 </div>
               )}
               {event.metadata && (

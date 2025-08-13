@@ -2,7 +2,12 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import FileDiffViewer from './FileDiffViewer';
-import { createFileDiffFromText, createNewFileDiff, createDeletedFileDiff, createBinaryFileDiff } from './FileDiffViewer.utils';
+import {
+  createFileDiffFromText,
+  createNewFileDiff,
+  createDeletedFileDiff,
+  createBinaryFileDiff,
+} from './FileDiffViewer.utils';
 
 const meta: Meta<typeof FileDiffViewer> = {
   title: 'Organisms/FileDiffViewer',
@@ -211,9 +216,7 @@ export const Default: Story = {
     <div className="w-full h-screen bg-base-100 p-4">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">File Diff Viewer</h3>
-        <p className="text-sm text-base-content/60">
-          Showing changes in {args.diff.newFilePath}
-        </p>
+        <p className="text-sm text-base-content/60">Showing changes in {args.diff.newFilePath}</p>
       </div>
       <FileDiffViewer {...args} />
     </div>
@@ -237,9 +240,7 @@ export const UnifiedView: Story = {
     <div className="w-full h-screen bg-base-100 p-4">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">Unified Diff View</h3>
-        <p className="text-sm text-base-content/60">
-          Single-column unified diff format
-        </p>
+        <p className="text-sm text-base-content/60">Single-column unified diff format</p>
       </div>
       <FileDiffViewer {...args} />
     </div>
@@ -256,7 +257,7 @@ export const UnifiedView: Story = {
 export const ViewModeComparison: Story = {
   render: () => {
     const [viewMode, setViewMode] = useState<'side-by-side' | 'unified'>('side-by-side');
-    
+
     return (
       <div className="w-full h-screen bg-base-100 p-4">
         <div className="mb-4">
@@ -276,11 +277,7 @@ export const ViewModeComparison: Story = {
             </button>
           </div>
         </div>
-        <FileDiffViewer
-          diff={sampleDiff}
-          viewMode={viewMode}
-          showLineNumbers={true}
-        />
+        <FileDiffViewer diff={sampleDiff} viewMode={viewMode} showLineNumbers={true} />
       </div>
     );
   },
@@ -321,15 +318,9 @@ export default NewComponent;`,
       <div className="w-full h-screen bg-base-100 p-4">
         <div className="mb-4">
           <h3 className="text-lg font-semibold">New File</h3>
-          <p className="text-sm text-base-content/60">
-            Showing a newly created file
-          </p>
+          <p className="text-sm text-base-content/60">Showing a newly created file</p>
         </div>
-        <FileDiffViewer
-          diff={newFileDiff}
-          viewMode="side-by-side"
-          showLineNumbers={true}
-        />
+        <FileDiffViewer diff={newFileDiff} viewMode="side-by-side" showLineNumbers={true} />
       </div>
     );
   },
@@ -365,15 +356,9 @@ export default OldComponent;`,
       <div className="w-full h-screen bg-base-100 p-4">
         <div className="mb-4">
           <h3 className="text-lg font-semibold">Deleted File</h3>
-          <p className="text-sm text-base-content/60">
-            Showing a deleted file with all removals
-          </p>
+          <p className="text-sm text-base-content/60">Showing a deleted file with all removals</p>
         </div>
-        <FileDiffViewer
-          diff={deletedFileDiff}
-          viewMode="side-by-side"
-          showLineNumbers={true}
-        />
+        <FileDiffViewer diff={deletedFileDiff} viewMode="side-by-side" showLineNumbers={true} />
       </div>
     );
   },
@@ -388,24 +373,15 @@ export default OldComponent;`,
 
 export const BinaryFile: Story = {
   render: () => {
-    const binaryFileDiff = createBinaryFileDiff(
-      'assets/logo.png',
-      'assets/logo.png'
-    );
+    const binaryFileDiff = createBinaryFileDiff('assets/logo.png', 'assets/logo.png');
 
     return (
       <div className="w-full h-screen bg-base-100 p-4">
         <div className="mb-4">
           <h3 className="text-lg font-semibold">Binary File</h3>
-          <p className="text-sm text-base-content/60">
-            Showing binary file changes
-          </p>
+          <p className="text-sm text-base-content/60">Showing binary file changes</p>
         </div>
-        <FileDiffViewer
-          diff={binaryFileDiff}
-          viewMode="side-by-side"
-          showLineNumbers={true}
-        />
+        <FileDiffViewer diff={binaryFileDiff} viewMode="side-by-side" showLineNumbers={true} />
       </div>
     );
   },
@@ -428,9 +404,7 @@ export const WithoutLineNumbers: Story = {
     <div className="w-full h-screen bg-base-100 p-4">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">Without Line Numbers</h3>
-        <p className="text-sm text-base-content/60">
-          Clean diff view without line numbers
-        </p>
+        <p className="text-sm text-base-content/60">Clean diff view without line numbers</p>
       </div>
       <FileDiffViewer {...args} />
     </div>
@@ -453,7 +427,7 @@ export const InteractiveDemo: Story = {
           Enable tennis commentary in the toolbar above, then explore the diff viewer features!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Side-by-Side View</h4>
@@ -466,7 +440,7 @@ export const InteractiveDemo: Story = {
             />
           </div>
         </div>
-        
+
         <div className="cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Unified View</h4>
           <div className="bg-base-100 border border-base-300 rounded-lg p-4 h-64 overflow-hidden">
@@ -479,16 +453,28 @@ export const InteractiveDemo: Story = {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">FileDiffViewer Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Syntax Highlighting</strong> - Language-aware code highlighting</li>
-          <li>• <strong>Multiple View Modes</strong> - Side-by-side and unified diff views</li>
-          <li>• <strong>Line Numbers</strong> - Original and modified line numbering</li>
-          <li>• <strong>Change Indicators</strong> - Visual markers for additions and deletions</li>
-          <li>• <strong>File Type Support</strong> - Handles text, code, and binary files</li>
-          <li>• <strong>Performance</strong> - Optimized for large files and complex diffs</li>
+          <li>
+            • <strong>Syntax Highlighting</strong> - Language-aware code highlighting
+          </li>
+          <li>
+            • <strong>Multiple View Modes</strong> - Side-by-side and unified diff views
+          </li>
+          <li>
+            • <strong>Line Numbers</strong> - Original and modified line numbering
+          </li>
+          <li>
+            • <strong>Change Indicators</strong> - Visual markers for additions and deletions
+          </li>
+          <li>
+            • <strong>File Type Support</strong> - Handles text, code, and binary files
+          </li>
+          <li>
+            • <strong>Performance</strong> - Optimized for large files and complex diffs
+          </li>
         </ul>
       </div>
     </div>
@@ -496,7 +482,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing FileDiffViewer with tennis commentary. Enable commentary in the toolbar and explore the diff features!',
+        story:
+          'Interactive demo showcasing FileDiffViewer with tennis commentary. Enable commentary in the toolbar and explore the diff features!',
       },
     },
   },

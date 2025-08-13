@@ -34,16 +34,21 @@ interface ProviderCatalogCardProps {
 }
 
 export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalogCardProps) {
-  const minInputPrice = Math.min(...provider.models.map(m => m.cost_per_1m_in));
-  const maxOutputPrice = Math.max(...provider.models.map(m => m.cost_per_1m_out));
-  
+  const minInputPrice = Math.min(...provider.models.map((m) => m.cost_per_1m_in));
+  const maxOutputPrice = Math.max(...provider.models.map((m) => m.cost_per_1m_out));
+
   const getTypeColor = (type: string): 'primary' | 'success' | 'info' | 'accent' | 'outline' => {
     switch (type.toLowerCase()) {
-      case 'anthropic': return 'primary';
-      case 'openai': return 'success';
-      case 'ollama': return 'info';
-      case 'openrouter': return 'accent';
-      default: return 'outline';
+      case 'anthropic':
+        return 'primary';
+      case 'openai':
+        return 'success';
+      case 'ollama':
+        return 'info';
+      case 'openrouter':
+        return 'accent';
+      default:
+        return 'outline';
     }
   };
 
@@ -55,14 +60,14 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
 
   const getModelFeatures = () => {
     const features = [];
-    const hasReasoning = provider.models.some(m => m.can_reason);
-    const hasAttachments = provider.models.some(m => m.supports_attachments);
-    const maxContext = Math.max(...provider.models.map(m => m.context_window));
-    
+    const hasReasoning = provider.models.some((m) => m.can_reason);
+    const hasAttachments = provider.models.some((m) => m.supports_attachments);
+    const maxContext = Math.max(...provider.models.map((m) => m.context_window));
+
     if (hasReasoning) features.push('Reasoning');
     if (hasAttachments) features.push('Attachments');
     features.push(`${Math.floor(maxContext / 1000)}K context`);
-    
+
     return features;
   };
 
@@ -75,10 +80,7 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
           <div className="flex-1">
             <h3 className="card-title text-lg">{provider.name}</h3>
             <div className="flex items-center space-x-2 mt-1">
-              <Badge 
-                variant={getTypeColor(provider.type)} 
-                size="xs"
-              >
+              <Badge variant={getTypeColor(provider.type)} size="xs">
                 {provider.type}
               </Badge>
               <Badge variant="outline" size="xs">
@@ -87,7 +89,7 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
             </div>
           </div>
         </div>
-        
+
         <div className="space-y-3">
           <div className="text-sm">
             <div className="font-medium text-base-content/80">Pricing Range</div>
@@ -98,34 +100,32 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
 
           <div className="text-sm">
             <div className="font-medium text-base-content/80 mb-1">Features</div>
-            <div className="text-base-content/60 text-xs">
-              {features.join(' • ')}
-            </div>
+            <div className="text-base-content/60 text-xs">{features.join(' • ')}</div>
           </div>
 
           <div className="text-sm">
             <div className="font-medium text-base-content/80 mb-1">Popular Models</div>
             <div className="space-y-1 text-xs text-base-content/60">
-              {provider.models.slice(0, 3).map(model => (
+              {provider.models.slice(0, 3).map((model) => (
                 <div key={model.id} className="flex justify-between">
                   <span>{model.name}</span>
-                  <span>{formatPrice(model.cost_per_1m_in)}/{formatPrice(model.cost_per_1m_out)}</span>
+                  <span>
+                    {formatPrice(model.cost_per_1m_in)}/{formatPrice(model.cost_per_1m_out)}
+                  </span>
                 </div>
               ))}
               {provider.models.length > 3 && (
                 <div className="text-base-content/40">
-                  +{provider.models.length - 3} more model{provider.models.length - 3 !== 1 ? 's' : ''}
+                  +{provider.models.length - 3} more model
+                  {provider.models.length - 3 !== 1 ? 's' : ''}
                 </div>
               )}
             </div>
           </div>
         </div>
-        
+
         <div className="card-actions justify-end mt-4">
-          <button 
-            className="btn btn-primary btn-sm"
-            onClick={onAddInstance}
-          >
+          <button className="btn btn-primary btn-sm" onClick={onAddInstance}>
             Add Instance
           </button>
         </div>

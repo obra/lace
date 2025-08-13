@@ -214,8 +214,8 @@ export default function GoogleDocDemo() {
                 </li>
               </ul>
               <p className="text-sm text-base-content/60 mt-2">
-                The &quot;Dynamic OG Image&quot; scenario demonstrates real-time OG image extraction from the
-                live Google Doc URL.
+                The &quot;Dynamic OG Image&quot; scenario demonstrates real-time OG image extraction
+                from the live Google Doc URL.
               </p>
 
               <p className="text-sm text-base-content/60 mt-4">

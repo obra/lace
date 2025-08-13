@@ -13,36 +13,43 @@ interface PredictivePanelProps {
 export function PredictivePanel({ insights }: PredictivePanelProps) {
   const getTimeframeColor = (timeframe: string) => {
     switch (timeframe) {
-      case 'immediate': return 'bg-red-100 text-red-700';
-      case 'short': return 'bg-orange-100 text-orange-700';
-      case 'medium': return 'bg-yellow-100 text-yellow-700';
-      case 'long': return 'bg-green-100 text-green-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'immediate':
+        return 'bg-red-100 text-red-700';
+      case 'short':
+        return 'bg-orange-100 text-orange-700';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'long':
+        return 'bg-green-100 text-green-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
   const getTimeframeIcon = (timeframe: string) => {
     switch (timeframe) {
-      case 'immediate': return '🚨';
-      case 'short': return '⏰';
-      case 'medium': return '📅';
-      case 'long': return '🗓️';
-      default: return '⏳';
+      case 'immediate':
+        return '🚨';
+      case 'short':
+        return '⏰';
+      case 'medium':
+        return '📅';
+      case 'long':
+        return '🗓️';
+      default:
+        return '⏳';
     }
   };
 
   const getConfidenceBar = (confidence: number) => {
     const percentage = Math.round(confidence * 100);
-    const color = confidence > 0.8 ? 'bg-green-500' : 
-                  confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500';
-    
+    const color =
+      confidence > 0.8 ? 'bg-green-500' : confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500';
+
     return (
       <div className="flex items-center space-x-2">
         <div className="w-16 h-2 bg-gray-200 rounded-full">
-          <div 
-            className={`h-2 rounded-full ${color}`}
-            style={{ width: `${percentage}%` }}
-          />
+          <div className={`h-2 rounded-full ${color}`} style={{ width: `${percentage}%` }} />
         </div>
         <span className="text-xs text-gray-600">{percentage}%</span>
       </div>
@@ -62,7 +69,10 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
   return (
     <div className="predictive-panel space-y-4">
       {insights.map((insight, index) => (
-        <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+        <div
+          key={index}
+          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+        >
           {/* Header */}
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center space-x-3">

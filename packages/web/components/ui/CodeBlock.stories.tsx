@@ -86,7 +86,17 @@ A sophisticated content molecule that combines multiple atoms (buttons, loading 
     },
     language: {
       control: { type: 'select' },
-      options: ['javascript', 'typescript', 'python', 'jsx', 'css', 'html', 'json', 'bash', 'markdown'],
+      options: [
+        'javascript',
+        'typescript',
+        'python',
+        'jsx',
+        'css',
+        'html',
+        'json',
+        'bash',
+        'markdown',
+      ],
       description: 'Programming language for syntax highlighting',
     },
     filename: {
@@ -303,13 +313,16 @@ console.log(greeting);`,
 export const LargeCodeBlock: Story = {
   args: {
     code: `// This is a large code block example
-${Array.from({ length: 50 }, (_, i) => `function example${i}() {
+${Array.from(
+  { length: 50 },
+  (_, i) => `function example${i}() {
   return "This is example function number ${i}";
 }
 
 const result${i} = example${i}();
 console.log(result${i});
-`).join('\n')}`,
+`
+).join('\n')}`,
     language: 'javascript',
     filename: 'large-example.js',
     showLineNumbers: true,
@@ -340,7 +353,7 @@ export const DifferentLanguages: Story = {
         filename="index.html"
         showLineNumbers={true}
       />
-      
+
       <CodeBlock
         code={`body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -366,7 +379,7 @@ h1 {
         filename="styles.css"
         showLineNumbers={true}
       />
-      
+
       <CodeBlock
         code={`#!/bin/bash
 
@@ -403,21 +416,19 @@ echo "Deployment complete!"`}
 export const InteractiveCopy: Story = {
   render: () => {
     const [copyFeedback, setCopyFeedback] = useState<string>('');
-    
+
     const handleCopy = (code: string) => {
       navigator.clipboard.writeText(code);
       setCopyFeedback(`Copied ${code.length} characters!`);
       setTimeout(() => setCopyFeedback(''), 3000);
     };
-    
+
     return (
       <div className="space-y-4">
         {copyFeedback && (
-          <div className="bg-success/20 text-success p-2 rounded text-sm">
-            {copyFeedback}
-          </div>
+          <div className="bg-success/20 text-success p-2 rounded text-sm">{copyFeedback}</div>
         )}
-        
+
         <CodeBlock
           code={`function greet(name) {
   return \`Hello, \${name}!\`;
@@ -447,14 +458,14 @@ export const ErrorHandling: Story = {
       <div className="text-sm text-base-content/70 mb-4">
         These examples demonstrate graceful error handling and fallback rendering:
       </div>
-      
+
       <CodeBlock
         code="This is plain text without syntax highlighting"
         language="unknown-language"
         filename="plain.txt"
         showLineNumbers={true}
       />
-      
+
       <CodeBlock
         code={`// This code will fallback to plain text if highlighting fails
 const example = "Hello World";
@@ -487,7 +498,7 @@ export const AllFeatures: Story = {
             showLineNumbers={false}
           />
         </div>
-        
+
         <div>
           <h4 className="font-medium mb-2">With Line Numbers</h4>
           <CodeBlock
@@ -500,7 +511,7 @@ console.log(add(2, 3));`}
             showLineNumbers={true}
           />
         </div>
-        
+
         <div>
           <h4 className="font-medium mb-2">With Filename</h4>
           <CodeBlock
@@ -512,7 +523,7 @@ console.log(add(2, 3));`}
             showLineNumbers={true}
           />
         </div>
-        
+
         <div>
           <h4 className="font-medium mb-2">Collapsible</h4>
           <CodeBlock
@@ -553,10 +564,11 @@ export const InteractiveDemo: Story = {
       <div className="text-center">
         <h3 className="text-lg font-semibold mb-2">🎾 CodeBlock Tennis Commentary Demo</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Enable tennis commentary in the toolbar above, then hover and interact with the code blocks below!
+          Enable tennis commentary in the toolbar above, then hover and interact with the code
+          blocks below!
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">JavaScript Function</h4>
@@ -573,7 +585,7 @@ console.log(calculateFibonacci(10));`}
             showCopyButton={true}
           />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">React Component</h4>
           <CodeBlock
@@ -597,7 +609,7 @@ export function Counter() {
             showCopyButton={true}
           />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Python Class</h4>
           <CodeBlock
@@ -621,7 +633,7 @@ export function Counter() {
             showCopyButton={true}
           />
         </div>
-        
+
         <div className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow">
           <h4 className="font-medium mb-3">Configuration JSON</h4>
           <CodeBlock
@@ -645,16 +657,28 @@ export function Counter() {
           />
         </div>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">CodeBlock Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Syntax Highlighting</strong> - Multi-language support with theme integration</li>
-          <li>• <strong>Copy Functionality</strong> - One-click code copying with visual feedback</li>
-          <li>• <strong>Language Detection</strong> - Automatic language identification and labeling</li>
-          <li>• <strong>Performance</strong> - Optimized handling of large code blocks</li>
-          <li>• <strong>Line Numbers</strong> - Optional line numbering for reference</li>
-          <li>• <strong>Collapsible</strong> - Expandable/collapsible code sections</li>
+          <li>
+            • <strong>Syntax Highlighting</strong> - Multi-language support with theme integration
+          </li>
+          <li>
+            • <strong>Copy Functionality</strong> - One-click code copying with visual feedback
+          </li>
+          <li>
+            • <strong>Language Detection</strong> - Automatic language identification and labeling
+          </li>
+          <li>
+            • <strong>Performance</strong> - Optimized handling of large code blocks
+          </li>
+          <li>
+            • <strong>Line Numbers</strong> - Optional line numbering for reference
+          </li>
+          <li>
+            • <strong>Collapsible</strong> - Expandable/collapsible code sections
+          </li>
         </ul>
       </div>
     </div>
@@ -662,7 +686,8 @@ export function Counter() {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing CodeBlock with tennis commentary. Enable commentary in the toolbar and interact with the code blocks!',
+        story:
+          'Interactive demo showcasing CodeBlock with tennis commentary. Enable commentary in the toolbar and interact with the code blocks!',
       },
     },
   },

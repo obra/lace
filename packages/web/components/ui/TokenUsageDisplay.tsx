@@ -17,14 +17,16 @@ interface TokenUsageDisplayProps {
   className?: string;
 }
 
-export default function TokenUsageDisplay({ 
-  tokenUsage, 
-  loading = false, 
-  className = '' 
+export default function TokenUsageDisplay({
+  tokenUsage,
+  loading = false,
+  className = '',
 }: TokenUsageDisplayProps) {
   if (loading || !tokenUsage) {
     return (
-      <div className={`flex items-center justify-between text-xs text-base-content/60 py-2 ${className}`}>
+      <div
+        className={`flex items-center justify-between text-xs text-base-content/60 py-2 ${className}`}
+      >
         <div className="flex items-center gap-2">
           <StatusDot status="info" size="xs" pulse />
           <span>Loading token usage...</span>
@@ -56,38 +58,33 @@ export default function TokenUsageDisplay({
     return `${remaining.toFixed(0)}% until auto-compaction`;
   };
 
-
   const percentAsPercentage = tokenUsage.percentUsed * 100;
   const usageStatus = getUsageStatus(percentAsPercentage);
   const compactionDistance = getCompactionDistance(percentAsPercentage);
 
   return (
-    <div className={`flex items-center justify-between text-xs text-base-content/70 py-2 px-1 ${className}`}>
+    <div
+      className={`flex items-center justify-between text-xs text-base-content/70 py-2 px-1 ${className}`}
+    >
       {/* Left side: Token usage */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
-          <StatusDot 
-            status={usageStatus.status} 
-            size="xs"
-            pulse={tokenUsage.nearLimit}
-          />
-          <span className="font-medium">
-            {formatTokenCount(tokenUsage.totalTokens)} tokens
-          </span>
+          <StatusDot status={usageStatus.status} size="xs" pulse={tokenUsage.nearLimit} />
+          <span className="font-medium">{formatTokenCount(tokenUsage.totalTokens)} tokens</span>
           <Badge variant={usageStatus.status} size="xs">
             {(tokenUsage.percentUsed * 100).toFixed(0)}%
           </Badge>
         </div>
-        
+
         {/* Context limit indicator */}
-        <span className="text-base-content/50">
-          of {formatTokenCount(tokenUsage.contextLimit)}
-        </span>
+        <span className="text-base-content/50">of {formatTokenCount(tokenUsage.contextLimit)}</span>
       </div>
 
       {/* Right side: Compaction status */}
       <div className="flex items-center gap-2">
-        <span className={`text-base-content/60 ${tokenUsage.percentUsed >= 80 ? 'text-warning' : ''}`}>
+        <span
+          className={`text-base-content/60 ${tokenUsage.percentUsed >= 80 ? 'text-warning' : ''}`}
+        >
           {compactionDistance}
         </span>
       </div>

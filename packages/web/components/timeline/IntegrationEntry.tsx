@@ -139,7 +139,9 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
         const slackEntry = entry as SlackEntry;
         return (
           <div className="text-xs text-base-content/60 space-y-1">
-            <div>Channel: <span className="font-mono">{slackEntry.channel}</span></div>
+            <div>
+              Channel: <span className="font-mono">{slackEntry.channel}</span>
+            </div>
             {slackEntry.messagePreview && (
               <div className="italic">&quot;{slackEntry.messagePreview}&quot;</div>
             )}
@@ -159,8 +161,14 @@ export function IntegrationTimelineEntry({ entry, compact = false }: Integration
         const githubEntry = entry as GitHubEntry;
         return (
           <div className="text-xs text-base-content/60 space-y-1">
-            <div>Repository: <span className="font-mono">{githubEntry.repository}</span></div>
-            {githubEntry.pullRequest && <div>PR <span className="font-mono">#{githubEntry.pullRequest}</span></div>}
+            <div>
+              Repository: <span className="font-mono">{githubEntry.repository}</span>
+            </div>
+            {githubEntry.pullRequest && (
+              <div>
+                PR <span className="font-mono">#{githubEntry.pullRequest}</span>
+              </div>
+            )}
             {githubEntry.commitCount && <div>{githubEntry.commitCount} commits</div>}
           </div>
         );
