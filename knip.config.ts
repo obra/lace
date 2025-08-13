@@ -3,7 +3,6 @@
 
 export default {
   ignore: [
-    'debug-provider-defaults.js', // Debug script
     'packages/web/eslint.config.js', // ESLint config causes issues when run from root
   ],
   workspaces: {
