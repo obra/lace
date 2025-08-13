@@ -3,28 +3,20 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { withTempLaceDir } from './utils/withTempLaceDir';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 test.describe('Basic Messaging', () => {
   test('can send and display user messages reliably', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-basic-messaging-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Basic Messaging Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-basic-messaging-', async (tempDir) => {
+      const projectName = 'E2E Basic Messaging Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
-      const projectPath = path.join(tempDir, 'basic-messaging-project');
-      await fs.promises.mkdir(projectPath, { recursive: true });
+      const projectPath = join(tempDir, 'basic-messaging-project');
+      await fs.mkdir(projectPath, { recursive: true });
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -41,37 +33,18 @@ test.describe('Basic Messaging', () => {
       await expect(chatInterface.messageInput).toBeVisible();
       
       console.log('Basic messaging: Single message sent and displayed successfully');
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
   test('interface shows appropriate state during message processing', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-processing-state-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Processing State Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-processing-state-', async (tempDir) => {
+      const projectName = 'E2E Processing State Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
-      const projectPath = path.join(tempDir, 'processing-state-project');
-      await fs.promises.mkdir(projectPath, { recursive: true });
+      const projectPath = join(tempDir, 'processing-state-project');
+      await fs.mkdir(projectPath, { recursive: true });
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -100,37 +73,18 @@ test.describe('Basic Messaging', () => {
       // Wait for interface to be ready for next interaction
       await page.waitForTimeout(2000);
       await expect(chatInterface.messageInput).toBeVisible();
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
   test('documents current streaming behavior without breaking', async ({ page }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-streaming-behavior-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Streaming Behavior Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+    await withTempLaceDir('lace-e2e-streaming-behavior-', async (tempDir) => {
+      const projectName = 'E2E Streaming Behavior Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
-      const projectPath = path.join(tempDir, 'streaming-behavior-project');
-      await fs.promises.mkdir(projectPath, { recursive: true });
+      const projectPath = join(tempDir, 'streaming-behavior-project');
+      await fs.mkdir(projectPath, { recursive: true });
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -169,17 +123,6 @@ test.describe('Basic Messaging', () => {
       
       // The test succeeds if we can document the behavior without errors
       expect(streamingBehavior.messageAccepted).toBeTruthy();
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 });

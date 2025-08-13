@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/test-environment';
+import { test, expect } from './mocks/setup';
 
 test('essential UI elements have data-testid attributes', async ({ page }) => {
   await page.goto('/');

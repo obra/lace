@@ -29,21 +29,25 @@ export class ProjectSelector {
 
   // Actions
   async clickNewProject(): Promise<void> {
+    await this.newProjectButton.waitFor({ state: 'visible', timeout: 5000 });
     await this.newProjectButton.click();
   }
 
   async fillProjectForm(name: string, path: string): Promise<void> {
-    // Fill path input (always available)
+    // Wait for project path input to be available and fill it
+    await this.projectPathInput.waitFor({ state: 'visible', timeout: 5000 });
     await this.projectPathInput.fill(path);
     
     // Fill name input only if it's visible (advanced mode)
     const nameInputCount = await this.projectNameInput.count();
     if (nameInputCount > 0) {
+      await this.projectNameInput.waitFor({ state: 'visible', timeout: 2000 });
       await this.projectNameInput.fill(name);
     }
   }
 
   async submitProjectCreation(): Promise<void> {
+    await this.createProjectSubmitButton.waitFor({ state: 'visible', timeout: 5000 });
     await this.createProjectSubmitButton.click();
   }
 
@@ -51,6 +55,25 @@ export class ProjectSelector {
     await this.clickNewProject();
     await this.fillProjectForm(name, path);
     await this.submitProjectCreation();
+  }
+
+  // Improved visibility checks
+  async isNewProjectButtonVisible(): Promise<boolean> {
+    try {
+      await this.newProjectButton.waitFor({ state: 'visible', timeout: 1000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async waitForProjectSelector(): Promise<void> {
+    // Wait for either project list or new project button to be visible
+    await Promise.race([
+      this.newProjectButton.waitFor({ state: 'visible', timeout: 10000 }),
+      this.page.locator('h1:has-text("Select a Project")').waitFor({ state: 'visible', timeout: 10000 }),
+      this.page.locator('h3').first().waitFor({ state: 'visible', timeout: 10000 }) // Existing project cards
+    ]);
   }
 
   // Get project list items (for selecting existing projects)

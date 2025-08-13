@@ -1,7 +1,7 @@
 // ABOUTME: End-to-end test for console forwarding system
 // ABOUTME: Tests browser console messages forwarding to server logs
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './mocks/setup';
 
 interface ApiRequest {
   status: number;

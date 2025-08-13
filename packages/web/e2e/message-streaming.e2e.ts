@@ -3,29 +3,23 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
-import { http, HttpResponse } from 'msw';
+import { withTempLaceDir } from './utils/withTempLaceDir';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 test.describe('Message Streaming', () => {
-  test('displays user messages immediately when sent', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-message-immediate-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Message Immediate Display Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('displays user messages immediately when sent', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-message-immediate-', async (tempDir) => {
+      const projectName = 'E2E Message Immediate Display Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
       const projectPath = path.join(tempDir, 'immediate-message-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
+      
+      // Verify project directory was created successfully
+      expect(await fs.promises.stat(projectPath).then(() => true).catch(() => false)).toBe(true);
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -47,37 +41,21 @@ test.describe('Message Streaming', () => {
       
       // Verify the chat interface is in a responsive state
       await expect(chatInterface.messageInput).toBeVisible();
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('shows loading/thinking state during message processing', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-thinking-state-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Thinking State Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('shows loading/thinking state during message processing', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-thinking-state-', async (tempDir) => {
+      const projectName = 'E2E Thinking State Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
       const projectPath = path.join(tempDir, 'thinking-state-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
+      
+      // Verify project directory was created successfully
+      expect(await fs.promises.stat(projectPath).then(() => true).catch(() => false)).toBe(true);
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -124,37 +102,21 @@ test.describe('Message Streaming', () => {
         console.log('No obvious processing indicators found - testing message acceptance');
         expect(testMessage).toBeTruthy(); // At least verify the message was sent
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('handles concurrent message sending appropriately', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-concurrent-messages-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Concurrent Messages Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('handles concurrent message sending appropriately', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-concurrent-messages-', async (tempDir) => {
+      const projectName = 'E2E Concurrent Messages Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
       const projectPath = path.join(tempDir, 'concurrent-messages-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
+      
+      // Verify project directory was created successfully
+      expect(await fs.promises.stat(projectPath).then(() => true).catch(() => false)).toBe(true);
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -190,37 +152,21 @@ test.describe('Message Streaming', () => {
         await chatInterface.sendMessage(secondMessage);
         await expect(chatInterface.getMessage(secondMessage)).toBeVisible({ timeout: 10000 });
       }
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 
-  test('maintains message order in conversation history', async ({ page, worker }) => {
-    // Set up isolated LACE_DIR for this test
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'lace-e2e-message-order-')
-    );
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
-
-    const projectName = 'E2E Message Order Project';
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    try {
+  test('maintains message order in conversation history', async ({ page }) => {
+    await withTempLaceDir('lace-e2e-message-order-', async (tempDir) => {
+      const projectName = 'E2E Message Order Project';
+      const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
       
       const projectPath = path.join(tempDir, 'message-order-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
+      
+      // Verify project directory was created successfully
+      expect(await fs.promises.stat(projectPath).then(() => true).catch(() => false)).toBe(true);
       
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
@@ -251,17 +197,6 @@ test.describe('Message Streaming', () => {
       await expect(chatInterface.getMessage(finalMessage)).toBeVisible({ timeout: 10000 });
       
       console.log('Message order test: All messages displayed correctly in sequence');
-    } finally {
-      // Cleanup
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      if (fs.existsSync(tempDir)) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-    }
+    });
   });
 });

@@ -1,7 +1,7 @@
 // ABOUTME: End-to-end tests for directory browser functionality
 // ABOUTME: Tests complete user workflows for project creation with directory selection
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './mocks/setup';
 import { homedir } from 'os';
 import {
   setupTestEnvironment,

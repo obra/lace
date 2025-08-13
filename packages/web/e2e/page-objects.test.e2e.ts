@@ -1,7 +1,7 @@
-import { test, expect } from './fixtures/test-environment';
+import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
 
-test('page objects provide clean interface for UI interactions', async ({ page, testEnv }) => {
+test('page objects provide clean interface for UI interactions', async ({ page }) => {
   const { projectSelector, chatInterface } = createPageObjects(page);
   
   await page.goto('/');

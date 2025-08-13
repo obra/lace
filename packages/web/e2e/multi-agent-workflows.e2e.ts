@@ -70,8 +70,11 @@ test.describe('Multi-Agent Workflows', () => {
         delete process.env.LACE_DIR;
       }
 
-      if (fs.existsSync(tempDir)) {
+      try {
+        await fs.promises.stat(tempDir);
         await fs.promises.rm(tempDir, { recursive: true, force: true });
+      } catch {
+        // Directory already removed or doesn't exist - ignore
       }
     }
   });
@@ -240,8 +243,11 @@ test.describe('Multi-Agent Workflows', () => {
         delete process.env.LACE_DIR;
       }
 
-      if (fs.existsSync(tempDir)) {
+      try {
+        await fs.promises.stat(tempDir);
         await fs.promises.rm(tempDir, { recursive: true, force: true });
+      } catch {
+        // Directory already removed or doesn't exist - ignore
       }
     }
   });
@@ -368,8 +374,11 @@ test.describe('Multi-Agent Workflows', () => {
         delete process.env.LACE_DIR;
       }
 
-      if (fs.existsSync(tempDir)) {
+      try {
+        await fs.promises.stat(tempDir);
         await fs.promises.rm(tempDir, { recursive: true, force: true });
+      } catch {
+        // Directory already removed or doesn't exist - ignore
       }
     }
   });
@@ -515,8 +524,11 @@ test.describe('Multi-Agent Workflows', () => {
         delete process.env.LACE_DIR;
       }
 
-      if (fs.existsSync(tempDir)) {
+      try {
+        await fs.promises.stat(tempDir);
         await fs.promises.rm(tempDir, { recursive: true, force: true });
+      } catch {
+        // Directory already removed or doesn't exist - ignore
       }
     }
   });

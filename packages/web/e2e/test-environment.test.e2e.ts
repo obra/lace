@@ -1,10 +1,23 @@
-import { test, expect } from './fixtures/test-environment';
+import { test, expect } from './mocks/setup';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment
+} from './helpers/test-utils';
 
-test('test environment fixture provides isolated LACE_DIR', async ({ testEnv }) => {
-  // Verify we have a temp directory
-  expect(testEnv.tempDir).toMatch(/lace-e2e-worker-\d+-/);
-  expect(testEnv.projectName).toContain('E2E Test Project Worker');
+test('test environment provides isolated LACE_DIR', async ({ page }) => {
+  let testEnv: TestEnvironment;
   
-  // Verify LACE_DIR is set
-  expect(process.env.LACE_DIR).toBe(testEnv.tempDir);
+  testEnv = await setupTestEnvironment();
+  
+  try {
+    // Verify we have a temp directory
+    expect(testEnv.tempDir).toMatch(/lace-test-/);
+    expect(testEnv.projectName).toContain('E2E Test Project');
+    
+    // Verify LACE_DIR is set
+    expect(process.env.LACE_DIR).toBe(testEnv.tempDir);
+  } finally {
+    await cleanupTestEnvironment(testEnv);
+  }
 });
