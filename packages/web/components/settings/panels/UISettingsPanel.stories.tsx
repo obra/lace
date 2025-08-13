@@ -77,7 +77,17 @@ Works seamlessly with:
   argTypes: {
     currentTheme: {
       control: { type: 'select' },
-      options: ['light', 'dark', 'cupcake', 'corporate', 'synthwave', 'cyberpunk', 'business', 'emerald', 'lofi'],
+      options: [
+        'light',
+        'dark',
+        'cupcake',
+        'corporate',
+        'synthwave',
+        'cyberpunk',
+        'business',
+        'emerald',
+        'lofi',
+      ],
       description: 'Currently selected theme',
     },
     onThemeChange: {
@@ -94,7 +104,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: (args) => {
     const [theme, setTheme] = useState(args.currentTheme || 'dark');
-    
+
     return (
       <div className="w-96 p-6 border border-base-300 rounded-lg bg-base-100">
         <UISettingsPanel
@@ -116,7 +126,7 @@ export const Default: Story = {
 export const LightTheme: Story = {
   render: (args) => {
     const [theme, setTheme] = useState('light');
-    
+
     return (
       <div className="w-96 p-6 border border-base-300 rounded-lg bg-base-100">
         <UISettingsPanel
@@ -145,7 +155,7 @@ export const LightTheme: Story = {
 export const ColorfulThemes: Story = {
   render: (args) => {
     const [theme, setTheme] = useState('synthwave');
-    
+
     return (
       <div className="w-96 p-6 border border-base-300 rounded-lg bg-base-100">
         <UISettingsPanel
@@ -175,18 +185,14 @@ export const InModal: Story = {
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
     const [theme, setTheme] = useState(args.currentTheme || 'dark');
-    
+
     return (
       <div>
-        <button onClick={() => setIsOpen(true)} className="btn btn-primary">
+        <button onClick={() => setIsOpen(true)} className="btn btn-primary vapor-button ring-hover">
           Open UI Settings
         </button>
-        
-        <Modal
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-          title="UI Settings"
-        >
+
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="UI Settings">
           <UISettingsPanel
             {...args}
             currentTheme={theme}
@@ -216,31 +222,28 @@ export const Interactive: Story = {
     const [theme, setTheme] = useState('dark');
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [autoSave, setAutoSave] = useState(false);
-    
+
     return (
       <div className="max-w-2xl space-y-6 p-6">
         <div className="border border-base-300 rounded-lg p-6 bg-base-100">
-          <UISettingsPanel
-            currentTheme={theme}
-            onThemeChange={setTheme}
-          />
+          <UISettingsPanel currentTheme={theme} onThemeChange={setTheme} />
         </div>
-        
+
         <div className="border border-base-300 rounded-lg p-6 bg-base-100">
           <h3 className="text-lg font-semibold text-base-content mb-4">Additional Settings</h3>
           <div className="space-y-3">
             <label className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                className="checkbox" 
+              <input
+                type="checkbox"
+                className="checkbox"
                 checked={notificationsEnabled}
                 onChange={(e) => setNotificationsEnabled(e.target.checked)}
               />
               <span>Enable notifications</span>
             </label>
             <label className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 className="checkbox"
                 checked={autoSave}
                 onChange={(e) => setAutoSave(e.target.checked)}
@@ -249,13 +252,19 @@ export const Interactive: Story = {
             </label>
           </div>
         </div>
-        
+
         <div className="bg-info/10 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Current Settings:</h4>
           <ul className="text-sm space-y-1">
-            <li>• <strong>Theme:</strong> {theme}</li>
-            <li>• <strong>Notifications:</strong> {notificationsEnabled ? 'Enabled' : 'Disabled'}</li>
-            <li>• <strong>Auto-save:</strong> {autoSave ? 'Enabled' : 'Disabled'}</li>
+            <li>
+              • <strong>Theme:</strong> {theme}
+            </li>
+            <li>
+              • <strong>Notifications:</strong> {notificationsEnabled ? 'Enabled' : 'Disabled'}
+            </li>
+            <li>
+              • <strong>Auto-save:</strong> {autoSave ? 'Enabled' : 'Disabled'}
+            </li>
           </ul>
         </div>
       </div>
@@ -264,7 +273,8 @@ export const Interactive: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showing the UI settings panel in action with live theme switching and additional settings.',
+        story:
+          'Interactive demo showing the UI settings panel in action with live theme switching and additional settings.',
       },
     },
   },
@@ -283,7 +293,7 @@ export const AllThemes: Story = {
       { name: 'emerald', label: 'Emerald' },
       { name: 'lofi', label: 'Lo-Fi' },
     ];
-    
+
     return (
       <div className="max-w-4xl space-y-6">
         <div className="text-center mb-6">
@@ -292,10 +302,13 @@ export const AllThemes: Story = {
             Preview of the UI settings panel with different theme selections.
           </p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {themes.map((themeOption) => (
-            <div key={themeOption.name} className="border border-base-300 rounded-lg p-4 bg-base-100">
+            <div
+              key={themeOption.name}
+              className="border border-base-300 rounded-lg p-4 bg-base-100"
+            >
               <h4 className="font-medium mb-3 text-center">{themeOption.label} Theme</h4>
               <UISettingsPanel
                 currentTheme={themeOption.name}

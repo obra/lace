@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef, Children, cloneElement, isValidElem
 interface TabConfig {
   id: string;
   label: string;
-  icon?: string;
+  icon?: React.ReactNode;
 }
 
 interface SettingsTabsProps {
@@ -85,8 +85,8 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
   return (
     <div className="flex flex-col h-full">
       {/* Tab navigation */}
-      <div className="border-b border-base-300">
-        <nav className="flex space-x-0" role="tablist">
+      <div className="border-b border-base-300/70 bg-base-100/40 backdrop-blur-sm">
+        <nav className="flex space-x-0 px-2" role="tablist">
           {tabConfigs.map((tab, index) => {
             const isActive = activeTab === tab.id;
             return (
@@ -99,15 +99,15 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
                 aria-selected={isActive}
                 aria-controls={`tabpanel-${tab.id}`}
                 tabIndex={isActive ? 0 : -1}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-accent/50 focus:ring-offset-0 ${
                   isActive
-                    ? 'border-primary text-primary bg-primary/5'
-                    : 'border-transparent text-base-content/60 hover:text-base-content hover:border-base-300'
+                    ? 'border-accent text-accent bg-accent/5'
+                    : 'border-transparent text-base-content/70 hover:text-base-content hover:border-base-300/70'
                 }`}
                 onClick={() => handleTabClick(tab.id)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
               >
-                {tab.icon && <span className="mr-2">{tab.icon}</span>}
+                {tab.icon && <span className="mr-2 inline-flex items-center text-accent/90">{tab.icon}</span>}
                 {tab.label}
               </button>
             );

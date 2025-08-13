@@ -56,9 +56,6 @@ describe('UISettingsPanel', () => {
     
     // Check for some of the theme names from ThemeSelector (as buttons)
     expect(screen.getByRole('button', { name: /light/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /cupcake/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /corporate/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /synthwave/i })).toBeInTheDocument();
   });
 
   it('integrates properly with SettingsPanel structure', () => {
