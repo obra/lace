@@ -73,6 +73,7 @@
     "eslint-plugin-storybook": "^9.1.2",
     "jsdom": "^26.1.0",
     "msw": "^2.7.0",
+    "playwright-msw": "^3.0.1",
     "postcss": "^8.4.38",
     "storybook": "^9.1.2",
     "tailwindcss": "4.1.11",

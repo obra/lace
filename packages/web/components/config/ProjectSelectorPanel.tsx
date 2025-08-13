@@ -638,6 +638,7 @@ export function ProjectSelectorPanel({
           <button
             onClick={() => setShowCreateProject(true)}
             className="btn btn-accent ring-hover focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+            data-testid="new-project-button"
             disabled={loading}
           >
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
@@ -1297,7 +1298,7 @@ export function ProjectSelectorPanel({
                             </AccentButton>
                           )}
                           {createStep === 4 && (
-                            <AccentButton type="submit" disabled={!createWorkingDirectory.trim()}>
+                            <AccentButton type="submit" disabled={!createWorkingDirectory.trim()} data-testid="create-project-submit">
                               {loading ? (
                                 <>
                                   <div className="loading loading-spinner loading-sm"></div>
@@ -1326,6 +1327,7 @@ export function ProjectSelectorPanel({
                           value={createName}
                           onChange={(e) => setCreateName(e.target.value)}
                           className="input input-bordered w-full"
+                          data-testid="project-name-input"
                           placeholder="Enter project name"
                           required
                           autoFocus
@@ -1519,6 +1521,7 @@ export function ProjectSelectorPanel({
                   <button
                     type="submit"
                     className="btn btn-primary"
+                    data-testid="create-project-submit"
                     disabled={!createName.trim() || !createWorkingDirectory.trim() || loading}
                   >
                     {loading ? (
