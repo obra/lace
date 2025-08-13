@@ -32,7 +32,7 @@ export async function GET(
       });
     }
 
-    return createSuperjsonResponse({ session });
+    return createSuperjsonResponse(session);
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch session',
@@ -63,7 +63,7 @@ export async function PATCH(
       });
     }
 
-    return createSuperjsonResponse({ session });
+    return createSuperjsonResponse(session);
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid request data', 400, {

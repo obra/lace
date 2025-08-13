@@ -2,15 +2,7 @@
 // ABOUTME: Provides methods for CRUD operations on sessions and agents
 
 import { useState, useCallback } from 'react';
-import {
-  CreateSessionRequest,
-  CreateAgentRequest,
-  SessionResponse,
-  SessionsResponse,
-  AgentResponse,
-  isApiError,
-  isApiSuccess,
-} from '@/types/api';
+import { CreateSessionRequest, CreateAgentRequest, isApiError, isApiSuccess } from '@/types/api';
 import type { ThreadId, SessionInfo, AgentInfo } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
@@ -46,11 +38,8 @@ export function useSessionAPI() {
           throw new Error('Failed to create session');
         }
 
-        const data: unknown = parse(await response.text());
-        if (isApiSuccess<SessionResponse>(data) && 'session' in data) {
-          return data['session'] as SessionInfo;
-        }
-        throw new Error('Invalid response format');
+        const data = parse(await response.text()) as SessionInfo;
+        return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
         return null;
@@ -73,11 +62,8 @@ export function useSessionAPI() {
         throw new Error('Failed to get session');
       }
 
-      const data: unknown = parse(await response.text());
-      if (isApiSuccess<SessionResponse>(data) && 'session' in data) {
-        return data['session'] as SessionInfo;
-      }
-      throw new Error('Invalid response format');
+      const data = parse(await response.text()) as SessionInfo;
+      return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return null;
@@ -103,11 +89,8 @@ export function useSessionAPI() {
           throw new Error('Failed to spawn agent');
         }
 
-        const data: unknown = parse(await response.text());
-        if (isApiSuccess<AgentResponse>(data) && 'agent' in data) {
-          return data['agent'] as AgentInfo;
-        }
-        throw new Error('Invalid response format');
+        const data = parse(await response.text()) as AgentInfo;
+        return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
         return null;
@@ -131,8 +114,8 @@ export function useSessionAPI() {
       }
 
       const data: unknown = parse(await response.text());
-      if (isApiSuccess<{ agents: AgentInfo[] }>(data) && 'agents' in data) {
-        return data['agents'] as AgentInfo[];
+      if (isApiSuccess<AgentInfo[]>(data) && Array.isArray(data)) {
+        return data as AgentInfo[];
       }
       throw new Error('Invalid response format');
     } catch (error) {

@@ -129,7 +129,7 @@ export async function POST(
     };
     sseManager.broadcast(testEvent);
 
-    return createSuperjsonResponse({ agent: agentResponse }, { status: 201 });
+    return createSuperjsonResponse(agentResponse, { status: 201 });
   } catch (error: unknown) {
     if (isError(error) && error.message === 'Session not found') {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -161,12 +161,12 @@ export async function GET(
 
     // Get agents from Session instance
     const agents = session.getAgents();
-    return createSuperjsonResponse({
-      agents: agents.map((agent) => ({
+    return createSuperjsonResponse(
+      agents.map((agent) => ({
         ...agent,
         createdAt: new Date(),
-      })),
-    });
+      }))
+    );
   } catch (_error: unknown) {
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }

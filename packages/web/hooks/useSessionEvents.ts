@@ -3,11 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { LaceEvent } from '@/types/core';
-import type {
-  PendingApproval,
-  SessionHistoryResponse,
-  PendingApprovalsResponse,
-} from '@/types/api';
+import type { PendingApproval } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
@@ -94,11 +90,11 @@ export function useSessionEvents(
         fetch(`/api/threads/${selectedAgent}/approvals/pending`)
           .then(async (res) => {
             const text = await res.text();
-            return parse(text) as PendingApprovalsResponse;
+            return parse(text) as PendingApproval[];
           })
           .then((data) => {
-            if (data.pendingApprovals?.length > 0) {
-              setPendingApprovals(data.pendingApprovals);
+            if (data?.length > 0) {
+              setPendingApprovals(data);
             }
           })
           .catch((error) => {
@@ -131,15 +127,13 @@ export function useSessionEvents(
     fetch(`/api/sessions/${sessionId}/history`)
       .then(async (res) => {
         const text = await res.text();
-        return parse(text) as SessionHistoryResponse;
+        return parse(text) as LaceEvent[];
       })
       .then((data) => {
-        if (data.events) {
+        if (data) {
           // Events are already properly typed LaceEvents from superjson
           // Filter out internal workflow events (they're handled separately)
-          const timelineEvents = data.events.filter(
-            (event) => !isInternalWorkflowEvent(event.type)
-          );
+          const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
 
           setEvents(timelineEvents);
         }
@@ -161,11 +155,11 @@ export function useSessionEvents(
     fetch(`/api/threads/${selectedAgent}/approvals/pending`)
       .then(async (res) => {
         const text = await res.text();
-        return parse(text) as PendingApprovalsResponse;
+        return parse(text) as PendingApproval[];
       })
       .then((data) => {
-        if (data.pendingApprovals?.length > 0) {
-          const approvals = data.pendingApprovals.map((approval: PendingApproval) => ({
+        if (data?.length > 0) {
+          const approvals = data.map((approval: PendingApproval) => ({
             toolCallId: approval.toolCallId,
             toolCall: approval.toolCall,
             requestedAt: approval.requestedAt, // Keep as string now

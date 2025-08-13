@@ -22,10 +22,7 @@ import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type {
-  SessionsResponse,
-  SessionResponse,
   ProviderInfo,
-  ProvidersResponse,
   CreateAgentRequest,
   MessageRequest,
   MessageResponse,
@@ -218,8 +215,8 @@ export const LaceApp = memo(function LaceApp() {
         return;
       }
 
-      const providersData = data as ProvidersResponse;
-      setProviders(providersData.providers || []);
+      const providersData = data as ProviderInfo[];
+      setProviders(providersData || []);
     } catch (error) {
       console.error('Failed to load providers:', error);
       setProviders([]);
@@ -249,8 +246,8 @@ export const LaceApp = memo(function LaceApp() {
         return;
       }
 
-      const sessionsData = data as SessionsResponse;
-      setSessions(sessionsData.sessions || []);
+      const sessionsData = data as SessionInfo[];
+      setSessions(sessionsData || []);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
@@ -286,8 +283,8 @@ export const LaceApp = memo(function LaceApp() {
           return;
         }
 
-        const sessionResponse = data as SessionResponse;
-        setSelectedSessionDetails(sessionResponse.session);
+        const sessionResponse = data as SessionInfo;
+        setSelectedSessionDetails(sessionResponse);
       } catch (error) {
         console.error('Failed to load session details:', error);
         // On network or other errors, also clear the invalid session

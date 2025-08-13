@@ -15,20 +15,7 @@ vi.mock('server-only', () => ({}));
 import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
 import { parseResponse } from '@/lib/serialization';
 import { Session } from '@/lib/server/lace-imports';
-
-// Type interfaces for API responses
-interface ProjectResponse {
-  project: {
-    id: string;
-    name: string;
-    description: string;
-    workingDirectory: string;
-    isArchived: boolean;
-    createdAt: string;
-    lastUsedAt: string;
-    sessionCount: number;
-  };
-}
+import type { ProjectInfo } from '@/types/core';
 
 interface ErrorResponse {
   error: string;
@@ -81,17 +68,17 @@ describe('Individual Project API Integration Tests', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.id).toBe(testProject.getId());
-      expect(data.project.name).toBe('Test Project');
-      expect(data.project.description).toBe('A test project');
-      expect(data.project.workingDirectory).toBe('/test/path');
-      expect(data.project.isArchived).toBe(false);
-      expect(data.project.sessionCount).toBe(1); // Project.create() auto-creates a default session
-      expect(data.project.createdAt).toBeDefined();
-      expect(data.project.lastUsedAt).toBeDefined();
+      expect(data.id).toBe(testProject.getId());
+      expect(data.name).toBe('Test Project');
+      expect(data.description).toBe('A test project');
+      expect(data.workingDirectory).toBe('/test/path');
+      expect(data.isArchived).toBe(false);
+      expect(data.sessionCount).toBe(1); // Project.create() auto-creates a default session
+      expect(data.createdAt).toBeDefined();
+      expect(data.lastUsedAt).toBeDefined();
     });
 
     it('should return project with correct session count', async () => {
@@ -109,10 +96,10 @@ describe('Individual Project API Integration Tests', () => {
       const response = await GET(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
+      expect(data.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -140,12 +127,12 @@ describe('Individual Project API Integration Tests', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.name).toBe('Updated Project Name');
-      expect(data.project.description).toBe('A test project'); // Should remain unchanged
-      expect(data.project.workingDirectory).toBe('/test/path'); // Should remain unchanged
+      expect(data.name).toBe('Updated Project Name');
+      expect(data.description).toBe('A test project'); // Should remain unchanged
+      expect(data.workingDirectory).toBe('/test/path'); // Should remain unchanged
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
@@ -164,11 +151,11 @@ describe('Individual Project API Integration Tests', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.description).toBe('Updated description');
-      expect(data.project.name).toBe('Test Project'); // Should remain unchanged
+      expect(data.description).toBe('Updated description');
+      expect(data.name).toBe('Test Project'); // Should remain unchanged
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
@@ -187,10 +174,10 @@ describe('Individual Project API Integration Tests', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.workingDirectory).toBe('/updated/path');
+      expect(data.workingDirectory).toBe('/updated/path');
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
@@ -230,10 +217,10 @@ describe('Individual Project API Integration Tests', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.isArchived).toBe(true);
+      expect(data.isArchived).toBe(true);
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
@@ -255,10 +242,10 @@ describe('Individual Project API Integration Tests', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.isArchived).toBe(false);
+      expect(data.isArchived).toBe(false);
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
@@ -284,13 +271,13 @@ describe('Individual Project API Integration Tests', () => {
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: testProject.getId() }),
       });
-      const data = await parseResponse<ProjectResponse>(response);
+      const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.project.name).toBe('Multi-Update Project');
-      expect(data.project.description).toBe('Multiple fields updated');
-      expect(data.project.workingDirectory).toBe('/multi/path');
-      expect(data.project.isArchived).toBe(true);
+      expect(data.name).toBe('Multi-Update Project');
+      expect(data.description).toBe('Multiple fields updated');
+      expect(data.workingDirectory).toBe('/multi/path');
+      expect(data.isArchived).toBe(true);
 
       // Verify all updates were persisted
       const { Project } = await import('@/lib/server/lace-imports');

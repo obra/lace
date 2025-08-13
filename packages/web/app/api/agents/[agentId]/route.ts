@@ -73,7 +73,7 @@ export async function GET(
       createdAt: new Date(), // TODO: Get actual creation time
     };
 
-    return createSuperjsonResponse({ agent: agentResponse });
+    return createSuperjsonResponse(agentResponse);
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch agent',
@@ -207,7 +207,7 @@ export async function PUT(
       createdAt: new Date(), // TODO: Get actual creation time
     };
 
-    return createSuperjsonResponse({ agent: agentResponse });
+    return createSuperjsonResponse(agentResponse);
   } catch (error: unknown) {
     // Zod errors are now handled above with better messages
 

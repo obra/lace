@@ -46,7 +46,7 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
 import type { ThreadId } from '@/types/core';
-import type { AgentResponse } from '@/types/api';
+import type { AgentWithTokenUsage } from '@/types/api';
 
 describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   const _tempLaceDir = setupWebTest();
@@ -418,14 +418,14 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     });
 
     expect(response.status).toBe(200);
-    const agentData = (await parseResponse(response)) as AgentResponse;
+    const agentData = (await parseResponse(response)) as AgentWithTokenUsage;
 
     // Token usage should be available with proper structure
-    expect(agentData.agent.tokenUsage).toBeDefined();
-    expect(agentData.agent.tokenUsage).toHaveProperty('totalTokens');
-    expect(agentData.agent.tokenUsage).toHaveProperty('contextLimit');
-    expect(agentData.agent.tokenUsage).toHaveProperty('percentUsed');
-    expect(agentData.agent.tokenUsage).toHaveProperty('nearLimit');
+    expect(agentData.tokenUsage).toBeDefined();
+    expect(agentData.tokenUsage).toHaveProperty('totalTokens');
+    expect(agentData.tokenUsage).toHaveProperty('contextLimit');
+    expect(agentData.tokenUsage).toHaveProperty('percentUsed');
+    expect(agentData.tokenUsage).toHaveProperty('nearLimit');
   });
 
   it('should handle manual /compact command and emit events', async () => {

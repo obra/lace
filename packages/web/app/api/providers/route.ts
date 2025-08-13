@@ -18,9 +18,7 @@ export interface ProviderWithModels extends ProviderInfo {
   instanceId?: string;
 }
 
-export interface ProvidersResponse {
-  providers: ProviderWithModels[];
-}
+// Providers response now returns ProviderWithModels[] directly (no wrapper)
 
 export async function GET(): Promise<NextResponse> {
   try {
@@ -31,7 +29,7 @@ export async function GET(): Promise<NextResponse> {
 
     // If no instances are configured, return empty array
     if (configuredInstances.length === 0) {
-      return createSuperjsonResponse({ providers: [] });
+      return createSuperjsonResponse([]);
     }
 
     // Get catalog manager to access provider and model information
@@ -75,7 +73,7 @@ export async function GET(): Promise<NextResponse> {
       };
     });
 
-    return createSuperjsonResponse({ providers });
+    return createSuperjsonResponse(providers);
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to retrieve providers';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });

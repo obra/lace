@@ -21,8 +21,8 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
 import { GET as getSession } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
-import type { ThreadId } from '@/types/core';
-import type { AgentResponse, SessionResponse } from '@/types/api';
+import type { ThreadId, SessionInfo } from '@/types/core';
+import type { AgentWithTokenUsage } from '@/types/api';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -128,10 +128,10 @@ describe('Token Usage Integration Tests', () => {
     });
 
     expect(sessionResponse.status).toBe(200);
-    const sessionData = (await parseResponse(sessionResponse)) as SessionResponse;
+    const sessionData = (await parseResponse(sessionResponse)) as SessionInfo;
 
     // CRITICAL: Session should NOT have token usage data
-    expect(sessionData.session).toBeDefined();
+    expect(sessionData).toBeDefined();
     expect('tokenUsage' in sessionData).toBe(false);
 
     // Test Agent API - should include token usage
@@ -141,12 +141,12 @@ describe('Token Usage Integration Tests', () => {
     });
 
     expect(agentResponse.status).toBe(200);
-    const agentData = (await parseResponse(agentResponse)) as AgentResponse;
+    const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
 
     // Agent should have token usage data (even if zeros initially)
-    expect(agentData.agent.tokenUsage).toBeDefined();
-    expect(typeof agentData.agent.tokenUsage?.totalTokens).toBe('number');
-    expect(typeof agentData.agent.tokenUsage?.contextLimit).toBe('number');
+    expect(agentData.tokenUsage).toBeDefined();
+    expect(typeof agentData.tokenUsage?.totalTokens).toBe('number');
+    expect(typeof agentData.tokenUsage?.contextLimit).toBe('number');
   });
 
   it('should track token usage through actual agent interactions', async () => {
@@ -210,14 +210,14 @@ describe('Token Usage Integration Tests', () => {
     });
 
     expect(agentResponse.status).toBe(200);
-    const agentData = (await parseResponse(agentResponse)) as AgentResponse;
+    const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
 
     // Verify token usage is calculated correctly
-    expect(agentData.agent.tokenUsage).toBeDefined();
+    expect(agentData.tokenUsage).toBeDefined();
 
     // The token budget manager should aggregate the token usage
     // If it's not working, we'll get 0s, which will help us debug
-    const tokenUsage = agentData.agent.tokenUsage!;
+    const tokenUsage = agentData.tokenUsage!;
     expect(tokenUsage.totalPromptTokens).toBeGreaterThanOrEqual(0);
     expect(tokenUsage.totalCompletionTokens).toBeGreaterThanOrEqual(0);
     expect(tokenUsage.totalTokens).toBeGreaterThanOrEqual(0);
@@ -232,13 +232,13 @@ describe('Token Usage Integration Tests', () => {
     });
 
     expect(agentResponse.status).toBe(200);
-    const agentData = (await parseResponse(agentResponse)) as AgentResponse;
+    const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
 
     // Should return default values, not undefined
-    expect(agentData.agent.tokenUsage).toBeDefined();
-    expect(agentData.agent.tokenUsage?.totalTokens).toBe(0);
-    expect(agentData.agent.tokenUsage?.contextLimit).toBeGreaterThan(0);
-    expect(agentData.agent.tokenUsage?.nearLimit).toBe(false);
+    expect(agentData.tokenUsage).toBeDefined();
+    expect(agentData.tokenUsage?.totalTokens).toBe(0);
+    expect(agentData.tokenUsage?.contextLimit).toBeGreaterThan(0);
+    expect(agentData.tokenUsage?.nearLimit).toBe(false);
   });
 
   it('should track token usage after compaction', async () => {
@@ -284,10 +284,10 @@ describe('Token Usage Integration Tests', () => {
       params: Promise.resolve({ agentId: sessionId }),
     });
 
-    const agentData = (await parseResponse(agentResponse)) as AgentResponse;
+    const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
 
     // Token usage should still be available and may have been updated by compaction
-    expect(agentData.agent.tokenUsage).toBeDefined();
-    expect(agentData.agent.tokenUsage?.contextLimit).toBeGreaterThan(0);
+    expect(agentData.tokenUsage).toBeDefined();
+    expect(agentData.tokenUsage?.contextLimit).toBeGreaterThan(0);
   });
 });

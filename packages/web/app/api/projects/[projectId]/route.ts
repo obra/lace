@@ -29,7 +29,7 @@ export async function GET(
 
     const projectInfo = project.getInfo();
 
-    return createSuperjsonResponse({ project: projectInfo });
+    return createSuperjsonResponse(projectInfo);
   } catch (error) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch project',
@@ -58,7 +58,7 @@ export async function PATCH(
 
     const updatedProjectInfo = project.getInfo();
 
-    return createSuperjsonResponse({ project: updatedProjectInfo });
+    return createSuperjsonResponse(updatedProjectInfo);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid request data', 400, {

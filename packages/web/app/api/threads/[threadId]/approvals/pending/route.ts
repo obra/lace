@@ -95,7 +95,7 @@ export async function GET(
       };
     });
 
-    return createSuperjsonResponse({ pendingApprovals });
+    return createSuperjsonResponse(pendingApprovals);
   } catch (_error) {
     return createErrorResponse('Failed to get pending approvals', 500, {
       code: 'INTERNAL_SERVER_ERROR',

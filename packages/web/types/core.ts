@@ -11,7 +11,7 @@ export type {
   AgentStateChangeData,
 } from '~/threads/types';
 
-export type { CombinedTokenUsage } from '~/token-management/types';
+export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';
 
 export type { ToolCall, ToolResult, ToolAnnotations } from '~/tools/types';
 
