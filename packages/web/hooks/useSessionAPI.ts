@@ -113,7 +113,11 @@ export function useSessionAPI() {
         throw new Error('Failed to list agents');
       }
 
-      const data = parse(await response.text()) as AgentInfo[];
+      const text = await response.text();
+      const data: unknown = parse(text);
+      if (!Array.isArray(data) || !data.every(isAgentInfo)) {
+        throw new Error('Invalid agents payload');
+      }
       return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
