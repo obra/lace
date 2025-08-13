@@ -115,10 +115,8 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /new project/i }));
-    // Modal should open with form in simplified mode by default
-    expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
-    // Should have both the card heading and modal heading - just check for the input instead
-    expect(screen.getAllByText('Create New Project')).toHaveLength(2);
+    // Wizard now opens directly on Directory step
+    expect(await screen.findByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
   });
 
   it('should handle empty project list', () => {
