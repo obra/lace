@@ -4,6 +4,7 @@
 import { createServer } from 'http';
 import next from 'next';
 import { parseArgs } from 'util';
+import open from 'open';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -11,7 +12,6 @@ const { values } = parseArgs({
     port: {
       type: 'string',
       short: 'p',
-      default: '3000',
     },
     host: {
       type: 'string',
@@ -34,35 +34,45 @@ Lace Web Server
 Usage: npm start -- [options]
 
 Options:
-  -p, --port <port>    Port to listen on (default: 3000)
+  -p, --port <port>    Port to listen on (default: 31337, auto-finds available)
   -h, --host <host>    Host to bind to (default: localhost)
                        Use '0.0.0.0' to allow external connections
   --help               Show this help message
 
 Examples:
-  npm start                        # Start on localhost:3000
-  npm start -- --port 8080         # Start on localhost:8080
+  npm start                        # Start on localhost:31337 (or next available)
+  npm start -- --port 8080         # Start on localhost:8080 (exact port required)
   npm start -- --host 0.0.0.0      # Allow external connections
-  npm run dev -- --port 3001       # Development mode on port 3001
+  npm run dev -- --port 3001       # Development mode on port 3001 (exact port)
 `);
   process.exit(0);
 }
 
-const requestedPort = parseInt(values.port || '3000', 10);
+const userSpecifiedPort = !!values.port; // Track if user manually specified port
+const requestedPort = parseInt(values.port || '31337', 10);
 const hostname = values.host || 'localhost';
 const dev = process.env.NODE_ENV !== 'production';
-const userSpecifiedPort = !!values.port; // Track if user manually specified port
+
+// Detect if running interactively (both stdin and stdout are TTYs)
+export function isInteractive(
+  stdin: { isTTY?: boolean } = process.stdin,
+  stdout: { isTTY?: boolean } = process.stdout
+): boolean {
+  return !!(stdin.isTTY && stdout.isTTY);
+}
+
+const shouldOpenBrowser = isInteractive();
 
 // Validate port
 if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
-  console.error(`Error: Invalid port number: ${values.port}`);
+  console.error(`Error: Invalid port number: "${values.port}" (parsed as ${requestedPort})`);
   process.exit(1);
 }
 
 // Function to attempt starting the server on a specific port
 async function tryStartServer(
-  server: ReturnType<typeof createServer>, 
-  port: number, 
+  server: ReturnType<typeof createServer>,
+  port: number,
   hostname: string
 ): Promise<boolean> {
   return new Promise((resolve) => {
@@ -70,18 +80,18 @@ async function tryStartServer(
       server.removeListener('error', onError);
       resolve(true);
     };
-    
+
     const onError = (err: NodeJS.ErrnoException) => {
       server.removeListener('listening', onListening);
       if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
         resolve(false);
       } else {
         // For other errors, we should fail
-        console.error(`Server error on port ${port}:`, err.message);
+        console.error(`Server error on port ${port} (${err.code || 'unknown'}):`, err.message);
         process.exit(1);
       }
     };
-    
+
     server.once('listening', onListening);
     server.once('error', onError);
     server.listen(port, hostname);
@@ -91,7 +101,7 @@ async function tryStartServer(
 // Function to find an available port and start server
 async function startServerOnAvailablePort(
   server: ReturnType<typeof createServer>,
-  startPort: number, 
+  startPort: number,
   userSpecified: boolean,
   hostname: string
 ): Promise<number> {
@@ -146,17 +156,35 @@ app
       }
     });
 
-    const port = await startServerOnAvailablePort(server, requestedPort, userSpecifiedPort, hostname);
-    
+    const port = await startServerOnAvailablePort(
+      server,
+      requestedPort,
+      userSpecifiedPort,
+      hostname
+    );
+
+    const url = `http://${hostname}:${port}`;
+
     console.log(`
 ✅ Lace is ready!
    
-   🌐 URL: http://${hostname}:${port}
+   🌐 URL: ${url}
    🔧 Mode: ${dev ? 'development' : 'production'}
    🔒 Process: Single-process mode (PID: ${process.pid})
    
    Press Ctrl+C to stop
 `);
+
+    // Open browser if running interactively
+    if (shouldOpenBrowser) {
+      try {
+        await open(url);
+      } catch (error) {
+        // Silently ignore browser opening errors - not critical to server operation
+        const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
+        console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+      }
+    }
   })
   .catch((err) => {
     console.error('Error starting server:', err);
