@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GET, POST } from '@/app/api/projects/[projectId]/sessions/route';
 import { parseResponse } from '@/lib/serialization';
+import type { SessionInfo } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
@@ -135,7 +136,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{ id: string; name: string; createdAt: Date }>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();
@@ -202,7 +203,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{ id: string; name: string; createdAt: Date }>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();
@@ -222,7 +223,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ projectId }) });
-      const data = await parseResponse<{ id: string; name: string; createdAt: Date }>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();

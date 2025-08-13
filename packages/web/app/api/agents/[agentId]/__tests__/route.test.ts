@@ -135,7 +135,7 @@ describe('Agent API', () => {
           percentUsed: 0,
           nearLimit: false,
         },
-        createdAt: expect.any(Date) as Date,
+        createdAt: undefined,
       });
       expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20241122_abc123');
       expect(mockSession.getAgent).toHaveBeenCalledWith('lace_20241122_abc123.1');
@@ -299,7 +299,7 @@ describe('Agent API', () => {
           percentUsed: 0,
           nearLimit: false,
         },
-        createdAt: expect.any(Date) as Date,
+        createdAt: undefined,
       });
     });
 

@@ -51,7 +51,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = await parseResponse<typeof mockSession>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(200);
       expect(data.id).toBe('session1');
@@ -96,7 +96,7 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = await parseResponse<typeof mockSession>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(200);
       expect(data).toBeDefined();
@@ -164,7 +164,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = await parseResponse<typeof updatedSession>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(200);
       expect(data.name).toBe('Updated Session');
@@ -255,7 +255,7 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = await parseResponse<typeof updatedSession>(response);
+      const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(200);
       expect(data.name).toBe('Partially Updated Session');
