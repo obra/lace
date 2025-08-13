@@ -34,7 +34,7 @@ describe('ProjectSelectorPanel', () => {
     );
   });
 
-  it('should show simplified creation form in auto-open mode', async () => {
+  it('should show wizard and proceed to directory step in auto-open mode', async () => {
     render(
       <ProjectSelectorPanel 
         {...mockProps} 
@@ -43,11 +43,9 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Welcome to Lace')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Choose your project directory')).toBeInTheDocument();
+    // In simplified onboarding flow, modal opens directly at directory step (step 2)
+    expect(await screen.findByText('Create New Project')).toBeInTheDocument();
+    expect(await screen.findByText('Set project directory')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
     
     // Should not show advanced options in simplified mode
@@ -64,6 +62,7 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
+    // In simplified onboarding flow, modal opens directly at directory step
     await waitFor(() => {
       expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
     });
@@ -76,7 +75,7 @@ describe('ProjectSelectorPanel', () => {
     });
   });
 
-  it('should show advanced options toggle', async () => {
+  it('should allow switching to advanced setup', async () => {
     render(
       <ProjectSelectorPanel 
         {...mockProps} 
@@ -86,10 +85,10 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Advanced Options')).toBeInTheDocument();
+      expect(screen.getByText('Advanced setup')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Advanced Options'));
+    fireEvent.click(screen.getByText('Advanced setup'));
 
     await waitFor(() => {
       expect(screen.getByText('Default Provider')).toBeInTheDocument();
