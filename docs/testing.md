@@ -1131,7 +1131,7 @@ MSW (Mock Service Worker) mocks external APIs only, while testing real applicati
 
 ```typescript
 import { test, expect } from './mocks/setup'; // Includes MSW setup
-import { http } from './mocks/setup';
+import { HttpResponse } from './mocks/setup';
 
 test('API interaction test', async ({ page, worker, http }) => {
   // Mock external API calls
@@ -1149,7 +1149,6 @@ test('API interaction test', async ({ page, worker, http }) => {
   await chatInterface.sendMessage('Test message');
   // Application makes real API call → MSW intercepts → returns mock response
 });
-```
 
 #### What to Mock vs What to Test
 
