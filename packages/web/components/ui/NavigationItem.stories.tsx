@@ -19,7 +19,7 @@ import {
   faBell,
   faInbox,
   faStar
-} from '~/lib/fontawesome';
+} from '@/lib/fontawesome';
 
 const meta: Meta<typeof NavigationItem> = {
   title: 'Molecules/NavigationItem',

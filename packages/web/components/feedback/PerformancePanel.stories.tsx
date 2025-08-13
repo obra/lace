@@ -1,7 +1,7 @@
 // ABOUTME: Storybook story for PerformancePanel.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { PerformancePanel } from './PerformancePanel';
-import { PerformanceAnalysis } from '~/feedback/types';
+import { PerformanceAnalysis } from '@/feedback/types';
 
 const meta: Meta<typeof PerformancePanel> = {
   title: 'Organisms/PerformancePanel',
@@ -10,7 +10,8 @@ const meta: Meta<typeof PerformancePanel> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Performance analysis panel for contextual feedback. Displays performance metrics, trends, and resource usage including response times, tool efficiency, conversation flow, and resource consumption.',
+        component:
+          'Performance analysis panel for contextual feedback. Displays performance metrics, trends, and resource usage including response times, tool efficiency, conversation flow, and resource consumption.',
       },
     },
   },

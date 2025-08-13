@@ -1,8 +1,8 @@
 // ABOUTME: Storybook story for TaskBoardModal.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { TaskBoardModal } from './TaskBoardModal';
-import { Task } from '~/types/core';
-import { asThreadId } from '~/types/core';
+import { Task } from '@/types/core';
+import { asThreadId } from '@/types/core';
 
 // Demo columns definition for stories
 interface TaskColumn {

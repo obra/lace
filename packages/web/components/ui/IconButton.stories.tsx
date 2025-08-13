@@ -43,7 +43,7 @@ import {
   faCopy,
   faExpand,
   faCompress,
-} from '~/lib/fontawesome';
+} from '@/lib/fontawesome';
 
 const meta: Meta<typeof IconButton> = {
   title: 'Atoms/IconButton',

@@ -1,8 +1,8 @@
 // ABOUTME: Storybook story for TimelineMessage.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { TimelineMessage } from './TimelineMessage';
-import type { LaceEvent, AgentInfo } from '~/types/core';
-import { asThreadId } from '~/types/core';
+import type { LaceEvent, AgentInfo } from '@/types/core';
+import { asThreadId } from '@/types/core';
 
 const meta: Meta<typeof TimelineMessage> = {
   title: 'Organisms/TimelineMessage',

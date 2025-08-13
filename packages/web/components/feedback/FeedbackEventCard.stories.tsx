@@ -1,7 +1,7 @@
 // ABOUTME: Storybook story for FeedbackEventCard.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackEventCard } from './FeedbackEventCard';
-import { FeedbackEvent } from '~/feedback/types';
+import { FeedbackEvent } from '@/feedback/types';
 
 const meta: Meta<typeof FeedbackEventCard> = {
   title: 'Organisms/FeedbackEventCard',
@@ -10,7 +10,8 @@ const meta: Meta<typeof FeedbackEventCard> = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Individual feedback event card component that displays a single feedback event with contextual styling and information. Supports compact mode and expandable context details.',
+        component:
+          'Individual feedback event card component that displays a single feedback event with contextual styling and information. Supports compact mode and expandable context details.',
       },
     },
   },
@@ -64,7 +65,8 @@ export const ActionEvent: Story = {
       type: 'action',
       priority: 'high',
       title: 'Quick Action Available',
-      content: 'You can optimize this code by extracting the common validation logic into a reusable function.',
+      content:
+        'You can optimize this code by extracting the common validation logic into a reusable function.',
       tags: ['optimization', 'refactoring', 'code-quality'],
     },
     showContext: false,
@@ -86,7 +88,8 @@ export const PerformanceEvent: Story = {
       type: 'performance',
       priority: 'medium',
       title: 'Performance Insight',
-      content: 'The TimelineView component is re-rendering frequently. Consider memoizing expensive calculations.',
+      content:
+        'The TimelineView component is re-rendering frequently. Consider memoizing expensive calculations.',
       tags: ['performance', 'react', 'optimization'],
     },
     showContext: false,
@@ -108,7 +111,8 @@ export const EducationalEvent: Story = {
       type: 'educational',
       priority: 'low',
       title: 'Learning Opportunity',
-      content: 'Did you know? TypeScript\'s strict mode can help catch common errors at compile time. Consider enabling it for better type safety.',
+      content:
+        "Did you know? TypeScript's strict mode can help catch common errors at compile time. Consider enabling it for better type safety.",
       tags: ['typescript', 'learning', 'best-practices'],
     },
     showContext: false,
@@ -130,7 +134,8 @@ export const PredictiveEvent: Story = {
       type: 'predictive',
       priority: 'high',
       title: 'Potential Issue Ahead',
-      content: 'Based on current patterns, this component might have memory leaks. Consider adding cleanup in useEffect.',
+      content:
+        'Based on current patterns, this component might have memory leaks. Consider adding cleanup in useEffect.',
       tags: ['prediction', 'memory-leak', 'react-hooks'],
     },
     showContext: false,
@@ -152,7 +157,8 @@ export const ErrorEvent: Story = {
       type: 'error',
       priority: 'high',
       title: 'Error Detected',
-      content: 'Unhandled promise rejection in async function. This could cause the application to crash.',
+      content:
+        'Unhandled promise rejection in async function. This could cause the application to crash.',
       tags: ['error', 'promise', 'async'],
     },
     showContext: false,
@@ -174,7 +180,8 @@ export const OptimizationEvent: Story = {
       type: 'optimization',
       priority: 'medium',
       title: 'Optimization Opportunity',
-      content: 'Bundle size can be reduced by 15% by implementing tree shaking for unused utility functions.',
+      content:
+        'Bundle size can be reduced by 15% by implementing tree shaking for unused utility functions.',
       tags: ['optimization', 'bundle-size', 'tree-shaking'],
     },
     showContext: false,
@@ -196,7 +203,8 @@ export const InsightEvent: Story = {
       type: 'insight',
       priority: 'medium',
       title: 'Development Insight',
-      content: 'You tend to write longer functions on Fridays. Consider breaking down complex logic into smaller, more testable functions.',
+      content:
+        'You tend to write longer functions on Fridays. Consider breaking down complex logic into smaller, more testable functions.',
       tags: ['insight', 'patterns', 'code-quality'],
     },
     showContext: false,
@@ -218,7 +226,8 @@ export const CelebrationEvent: Story = {
       type: 'celebration',
       priority: 'low',
       title: 'Great Work!',
-      content: 'You\'ve successfully implemented error boundaries across all major components. This will greatly improve user experience!',
+      content:
+        "You've successfully implemented error boundaries across all major components. This will greatly improve user experience!",
       tags: ['celebration', 'milestone', 'error-handling'],
     },
     showContext: false,
@@ -240,7 +249,8 @@ export const WithContext: Story = {
       type: 'action',
       priority: 'high',
       title: 'Context-Rich Event',
-      content: 'This event includes detailed context information that can be expanded for debugging.',
+      content:
+        'This event includes detailed context information that can be expanded for debugging.',
       tags: ['context', 'debugging', 'detailed'],
     },
     showContext: true,
@@ -249,7 +259,8 @@ export const WithContext: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Event card with expandable context details showing thread information, agent state, and metadata.',
+        story:
+          'Event card with expandable context details showing thread information, agent state, and metadata.',
       },
     },
   },
@@ -306,8 +317,17 @@ export const LongContent: Story = {
       type: 'educational',
       priority: 'medium',
       title: 'Detailed Learning Content',
-      content: 'This is a longer educational event that demonstrates how the card handles extended content. It includes multiple sentences and provides comprehensive information about React performance optimization techniques, including the use of useMemo, useCallback, and React.memo for preventing unnecessary re-renders in complex component hierarchies.',
-      tags: ['education', 'react', 'performance', 'optimization', 'useMemo', 'useCallback', 'React.memo'],
+      content:
+        'This is a longer educational event that demonstrates how the card handles extended content. It includes multiple sentences and provides comprehensive information about React performance optimization techniques, including the use of useMemo, useCallback, and React.memo for preventing unnecessary re-renders in complex component hierarchies.',
+      tags: [
+        'education',
+        'react',
+        'performance',
+        'optimization',
+        'useMemo',
+        'useCallback',
+        'React.memo',
+      ],
     },
     showContext: false,
     compact: false,
@@ -315,7 +335,8 @@ export const LongContent: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Event card with longer content and multiple tags demonstrating text wrapping and tag layout.',
+        story:
+          'Event card with longer content and multiple tags demonstrating text wrapping and tag layout.',
       },
     },
   },
@@ -335,7 +356,7 @@ export const AllPriorities: Story = {
           tags: ['error', 'critical'],
         }}
       />
-      
+
       <h3 className="text-lg font-semibold">Medium Priority</h3>
       <FeedbackEventCard
         event={{
@@ -347,7 +368,7 @@ export const AllPriorities: Story = {
           tags: ['performance', 'optimization'],
         }}
       />
-      
+
       <h3 className="text-lg font-semibold">Low Priority</h3>
       <FeedbackEventCard
         event={{
@@ -375,13 +396,37 @@ export const AllTypes: Story = {
     <div className="space-y-4">
       {[
         { type: 'action' as const, title: 'Action Event', content: 'Quick action available' },
-        { type: 'performance' as const, title: 'Performance Event', content: 'Performance optimization suggestion' },
-        { type: 'educational' as const, title: 'Educational Event', content: 'Learning opportunity' },
-        { type: 'predictive' as const, title: 'Predictive Event', content: 'Potential future issue' },
+        {
+          type: 'performance' as const,
+          title: 'Performance Event',
+          content: 'Performance optimization suggestion',
+        },
+        {
+          type: 'educational' as const,
+          title: 'Educational Event',
+          content: 'Learning opportunity',
+        },
+        {
+          type: 'predictive' as const,
+          title: 'Predictive Event',
+          content: 'Potential future issue',
+        },
         { type: 'error' as const, title: 'Error Event', content: 'Critical error detected' },
-        { type: 'optimization' as const, title: 'Optimization Event', content: 'Code optimization opportunity' },
-        { type: 'insight' as const, title: 'Insight Event', content: 'Development pattern insight' },
-        { type: 'celebration' as const, title: 'Celebration Event', content: 'Achievement unlocked!' },
+        {
+          type: 'optimization' as const,
+          title: 'Optimization Event',
+          content: 'Code optimization opportunity',
+        },
+        {
+          type: 'insight' as const,
+          title: 'Insight Event',
+          content: 'Development pattern insight',
+        },
+        {
+          type: 'celebration' as const,
+          title: 'Celebration Event',
+          content: 'Achievement unlocked!',
+        },
       ].map((eventData, index) => (
         <FeedbackEventCard
           key={index}
@@ -412,11 +457,31 @@ export const CompactList: Story = {
     <div className="space-y-2">
       <h3 className="text-lg font-semibold mb-4">Compact Event List</h3>
       {[
-        { type: 'action' as const, priority: 'high' as const, content: 'Quick action available for optimization' },
-        { type: 'performance' as const, priority: 'medium' as const, content: 'Component re-render detected' },
-        { type: 'educational' as const, priority: 'low' as const, content: 'Learning tip about TypeScript' },
-        { type: 'error' as const, priority: 'high' as const, content: 'Unhandled promise rejection' },
-        { type: 'celebration' as const, priority: 'low' as const, content: 'Test coverage milestone reached!' },
+        {
+          type: 'action' as const,
+          priority: 'high' as const,
+          content: 'Quick action available for optimization',
+        },
+        {
+          type: 'performance' as const,
+          priority: 'medium' as const,
+          content: 'Component re-render detected',
+        },
+        {
+          type: 'educational' as const,
+          priority: 'low' as const,
+          content: 'Learning tip about TypeScript',
+        },
+        {
+          type: 'error' as const,
+          priority: 'high' as const,
+          content: 'Unhandled promise rejection',
+        },
+        {
+          type: 'celebration' as const,
+          priority: 'low' as const,
+          content: 'Test coverage milestone reached!',
+        },
       ].map((eventData, index) => (
         <FeedbackEventCard
           key={index}
@@ -450,7 +515,8 @@ export const InteractiveDemo: Story = {
       type: 'action',
       priority: 'high',
       title: 'Interactive Demo Event',
-      content: 'Try toggling the context and compact modes using the controls below to see how the card adapts.',
+      content:
+        'Try toggling the context and compact modes using the controls below to see how the card adapts.',
       tags: ['demo', 'interactive', 'storybook'],
     },
     showContext: true,
@@ -459,7 +525,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showing all features including context expansion and compact mode toggle.',
+        story:
+          'Interactive demo showing all features including context expansion and compact mode toggle.',
       },
     },
   },

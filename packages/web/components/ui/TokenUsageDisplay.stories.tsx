@@ -1,6 +1,6 @@
 // ABOUTME: Storybook story for TokenUsageDisplay.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
-import TokenUsageDisplay, { type TokenUsageData } from '~/components/ui/TokenUsageDisplay';
+import TokenUsageDisplay, { type TokenUsageData } from '@/components/ui/TokenUsageDisplay';
 
 const meta = {
   title: 'UI/TokenUsageDisplay',
