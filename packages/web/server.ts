@@ -5,7 +5,7 @@ import { createServer } from 'http';
 import next from 'next';
 import { parseArgs } from 'util';
 import open from 'open';
-import { logger } from '../../src/utils/logger';
+import { logger } from '~/utils/logger';
 
 // Parse command line arguments
 const { values } = parseArgs({
