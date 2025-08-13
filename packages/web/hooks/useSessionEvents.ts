@@ -87,15 +87,13 @@ export function useSessionEvents(
 
       // Trigger a fetch of pending approvals if we have a selected agent
       if (selectedAgent) {
-        fetch(`/api/threads/${selectedAgent}/approvals/pending`)
+        void fetch(`/api/threads/${selectedAgent}/approvals/pending`)
           .then(async (res) => {
             const text = await res.text();
             return parse(text) as PendingApproval[];
           })
           .then((data) => {
-            if (data?.length > 0) {
-              setPendingApprovals(data);
-            }
+            setPendingApprovals(data || []);
           })
           .catch((error) => {
             console.error('[SESSION_EVENTS] Failed to fetch pending approvals:', error);

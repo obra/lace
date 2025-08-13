@@ -283,14 +283,12 @@ describe('useSessionAPI', () => {
       // Test successful operation clears any previous error
       mockFetch.mockResolvedValueOnce(
         createMockResponse({
-          session: {
-            id: 'lace_20250101_sess01' as ThreadId,
-            name: 'Test',
-            provider: 'anthropic',
-            model: 'claude-3-5-haiku-20241022',
-            createdAt: new Date().toISOString(),
-            agents: [],
-          },
+          id: 'lace_20250101_sess01' as ThreadId,
+          name: 'Test',
+          provider: 'anthropic',
+          model: 'claude-3-5-haiku-20241022',
+          createdAt: new Date().toISOString(),
+          agents: [],
         })
       );
 

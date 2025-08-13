@@ -113,11 +113,8 @@ export function useSessionAPI() {
         throw new Error('Failed to list agents');
       }
 
-      const data: unknown = parse(await response.text());
-      if (isApiSuccess<AgentInfo[]>(data) && Array.isArray(data)) {
-        return data as AgentInfo[];
-      }
-      throw new Error('Invalid response format');
+      const data = parse(await response.text()) as AgentInfo[];
+      return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
       return [];
