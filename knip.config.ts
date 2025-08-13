@@ -17,6 +17,9 @@ export default {
         'server.ts',
         // Storybook (auto-detected, but keep explicit)
         '**/*.stories.{ts,tsx}',
+        // E2E test files
+        'e2e/**/*.e2e.ts',
+        'e2e/**/*.test.e2e.ts',
       ],
       // Disable ESLint plugin to avoid module resolution issues
       eslint: false,
