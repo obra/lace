@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
-import { safeStringify } from '~/utils/safeStringify';
+import { safeStringify } from '@/lib/utils/safeStringify';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];

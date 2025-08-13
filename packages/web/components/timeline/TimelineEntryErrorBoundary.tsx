@@ -6,7 +6,7 @@
 import React, { Component, ReactNode } from 'react';
 import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
 import CodeBlock from '@/components/ui/CodeBlock';
-import { safeStringify } from '~/utils/safeStringify';
+import { safeStringify } from '@/lib/utils/safeStringify';
 
 interface Props {
   children: ReactNode;
