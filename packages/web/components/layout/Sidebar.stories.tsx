@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for Sidebar.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
@@ -279,11 +280,7 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
 
   return (
     <div className="flex h-screen bg-base-100">
-      <Sidebar
-        isOpen={isOpen}
-        onToggle={handleToggle}
-        onSettingsClick={handleSettingsClick}
-      >
+      <Sidebar isOpen={isOpen} onToggle={handleToggle} onSettingsClick={handleSettingsClick}>
         {/* Sidebar content rendered as children */}
         <div className="p-4">
           <p className="text-sm text-base-content/60">
@@ -298,7 +295,7 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
             This is the main content area. The sidebar can be toggled open/closed and contains
             various sections for navigation and project management.
           </p>
-          
+
           <div className="space-y-4">
             <div className="p-4 bg-gray-50 rounded-lg">
               <h3 className="font-semibold mb-2">Current State:</h3>
@@ -306,7 +303,7 @@ const SidebarWrapper = ({ initialOpen = true, ...props }: SidebarWrapperProps) =
               <p>Timeline: {currentTimeline.name}</p>
               <p>Sidebar: {isOpen ? 'Open' : 'Closed'}</p>
             </div>
-            
+
             <div className="p-4 bg-blue-50 rounded-lg">
               <h3 className="font-semibold mb-2">Try These Actions:</h3>
               <ul className="text-sm space-y-1">
@@ -411,7 +408,7 @@ export const SidebarStates: Story = {
           <SidebarWrapper initialOpen={false} />
         </div>
       </div>
-      
+
       <div className="flex flex-col items-center">
         <h3 className="text-lg font-semibold mb-4">Expanded</h3>
         <div className="bg-base-100 rounded-lg shadow-lg overflow-hidden">
@@ -437,7 +434,7 @@ export const InteractiveDemo: Story = {
     const [actions, setActions] = useState<string[]>([]);
 
     const addAction = (action: string) => {
-      setActions(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${action}`]);
+      setActions((prev) => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${action}`]);
     };
 
     const handleToggle = () => {
@@ -495,13 +492,9 @@ export const InteractiveDemo: Story = {
             Enable tennis commentary in the toolbar above, then interact with the sidebar below!
           </p>
         </div>
-        
+
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar
-            isOpen={isOpen}
-            onToggle={handleToggle}
-            onSettingsClick={handleSettingsClick}
-          >
+          <Sidebar isOpen={isOpen} onToggle={handleToggle} onSettingsClick={handleSettingsClick}>
             {/* Interactive demo sidebar content */}
             <div className="p-4">
               <p className="text-sm text-base-content/60">
@@ -509,11 +502,11 @@ export const InteractiveDemo: Story = {
               </p>
             </div>
           </Sidebar>
-          
+
           <div className="flex-1 p-8 overflow-y-auto">
             <div className="max-w-2xl">
               <h1 className="text-2xl font-bold mb-4">Interactive Sidebar Demo</h1>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold mb-2">Current State:</h3>
@@ -521,7 +514,7 @@ export const InteractiveDemo: Story = {
                   <p className="text-sm">Timeline: {currentTimeline.name}</p>
                   <p className="text-sm">Sidebar: {isOpen ? 'Open' : 'Closed'}</p>
                 </div>
-                
+
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h3 className="font-semibold mb-2">Recent Actions:</h3>
                   <div className="text-sm space-y-1 max-h-32 overflow-y-auto">
@@ -537,17 +530,31 @@ export const InteractiveDemo: Story = {
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-4 bg-green-50 rounded-lg">
                 <h3 className="font-semibold mb-2">Try These Interactions:</h3>
                 <ul className="text-sm space-y-1">
-                  <li>• <strong>Toggle sidebar</strong> - Click the chevron button</li>
-                  <li>• <strong>Switch projects</strong> - Use the project dropdown</li>
-                  <li>• <strong>Change timelines</strong> - Click on different conversations</li>
-                  <li>• <strong>Expand sections</strong> - Click on Tasks, Files, Settings</li>
-                  <li>• <strong>Click tasks and files</strong> - Interact with list items</li>
-                  <li>• <strong>Open settings</strong> - Click the settings button</li>
-                  <li>• <strong>Hover and click</strong> everything for tennis commentary!</li>
+                  <li>
+                    • <strong>Toggle sidebar</strong> - Click the chevron button
+                  </li>
+                  <li>
+                    • <strong>Switch projects</strong> - Use the project dropdown
+                  </li>
+                  <li>
+                    • <strong>Change timelines</strong> - Click on different conversations
+                  </li>
+                  <li>
+                    • <strong>Expand sections</strong> - Click on Tasks, Files, Settings
+                  </li>
+                  <li>
+                    • <strong>Click tasks and files</strong> - Interact with list items
+                  </li>
+                  <li>
+                    • <strong>Open settings</strong> - Click the settings button
+                  </li>
+                  <li>
+                    • <strong>Hover and click</strong> everything for tennis commentary!
+                  </li>
                 </ul>
               </div>
             </div>
@@ -559,7 +566,8 @@ export const InteractiveDemo: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive demo showcasing the sidebar with tennis commentary. Enable commentary in the toolbar and interact with all the sidebar elements!',
+        story:
+          'Interactive demo showcasing the sidebar with tennis commentary. Enable commentary in the toolbar and interact with all the sidebar elements!',
       },
     },
   },
