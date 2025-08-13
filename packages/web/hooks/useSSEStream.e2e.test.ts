@@ -79,8 +79,8 @@ describe('SSE Stream E2E Tests', () => {
     });
     expect(sessionResponse.status).toBe(201);
 
-    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
-    sessionId = sessionData.session.id as string;
+    const sessionData = await parseResponse<SessionInfo>(sessionResponse);
+    sessionId = sessionData.id as string;
   });
 
   afterEach(async () => {

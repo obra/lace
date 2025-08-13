@@ -31,10 +31,6 @@ import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId, AgentInfo } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
-interface AgentsListResponse {
-  agents: AgentInfo[];
-}
-
 interface ErrorResponse {
   error: string;
 }

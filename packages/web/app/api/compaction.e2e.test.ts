@@ -676,24 +676,13 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       params: Promise.resolve({ agentId: sessionId }),
     });
 
-    const agentData = (await parseResponse(response)) as {
-      agent: {
-        tokenUsage?: {
-          totalPromptTokens: number;
-          totalCompletionTokens: number;
-          totalTokens: number;
-          percentUsed?: number;
-          nearLimit?: boolean;
-          contextLimit?: number;
-        };
-      };
-    };
+    const agentData = (await parseResponse(response)) as AgentWithTokenUsage;
 
     // Verify cumulative token counts
     const expectedTotalInput = tokenUsages.reduce((sum, u) => sum + u.input, 0);
     const expectedTotalOutput = tokenUsages.reduce((sum, u) => sum + u.output, 0);
 
-    expect(agentData.agent.tokenUsage).toMatchObject({
+    expect(agentData.tokenUsage).toMatchObject({
       totalPromptTokens: expectedTotalInput,
       totalCompletionTokens: expectedTotalOutput,
       totalTokens: expectedTotalInput + expectedTotalOutput,

@@ -124,9 +124,9 @@ describe('Full Conversation Flow', () => {
     }
 
     expect(sessionResponse.status).toBe(201);
-    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
-    expect(sessionData.session.name).toBe(sessionName);
-    const sessionId: ThreadId = sessionData.session.id as ThreadId;
+    const sessionData = await parseResponse<SessionInfo>(sessionResponse);
+    expect(sessionData.name).toBe(sessionName);
+    const sessionId: ThreadId = sessionData.id as ThreadId;
 
     // 2. Spawn agent
     const agentName = 'assistant';
@@ -148,11 +148,9 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(agentResponse.status).toBe(201);
-    const agentData = await parseResponse<{
-      agent: { threadId: ThreadId; name: string };
-    }>(agentResponse);
-    expect(agentData.agent.name).toBe(agentName);
-    const agentThreadId: ThreadId = agentData.agent.threadId as ThreadId;
+    const agentData = await parseResponse<{ threadId: ThreadId; name: string }>(agentResponse);
+    expect(agentData.name).toBe(agentName);
+    const agentThreadId: ThreadId = agentData.threadId as ThreadId;
 
     // 3. Connect to SSE stream
     const streamRequest = new NextRequest(
@@ -215,8 +213,8 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ projectId }),
     });
     expect(sessionResponse.status).toBe(201);
-    const sessionData = await parseResponse<{ session: SessionInfo }>(sessionResponse);
-    const sessionId: ThreadId = sessionData.session.id as ThreadId;
+    const sessionData = await parseResponse<SessionInfo>(sessionResponse);
+    const sessionId: ThreadId = sessionData.id as ThreadId;
 
     // Spawn first agent
     const spawnAgent1Request = new NextRequest(
@@ -262,8 +260,7 @@ describe('Full Conversation Flow', () => {
       params: Promise.resolve({ sessionId: sessionId as string }),
     });
     expect(listResponse.status).toBe(200);
-    const listData = await parseResponse<{ agents: Array<{ name: string }> }>(listResponse);
-    const { agents } = listData;
+    const agents = await parseResponse<Array<{ name: string }>>(listResponse);
 
     expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
     expect(agents.find((a) => a.name === 'pm')).toBeDefined();
@@ -305,8 +302,8 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId1 }) }
     );
-    const session1Data = await parseResponse<{ session: SessionInfo }>(session1Response);
-    const session1Id: ThreadId = session1Data.session.id as ThreadId;
+    const session1Data = await parseResponse<SessionInfo>(session1Response);
+    const session1Id: ThreadId = session1Data.id as ThreadId;
 
     const session2Response = await createProjectSession(
       new NextRequest(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
@@ -320,8 +317,8 @@ describe('Full Conversation Flow', () => {
       }),
       { params: Promise.resolve({ projectId: projectId2 }) }
     );
-    const session2Data = await parseResponse<{ session: SessionInfo }>(session2Response);
-    const session2Id: ThreadId = session2Data.session.id as ThreadId;
+    const session2Data = await parseResponse<SessionInfo>(session2Response);
+    const session2Id: ThreadId = session2Data.id as ThreadId;
 
     // Connect to streams
     await streamEvents(

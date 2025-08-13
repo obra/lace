@@ -67,25 +67,25 @@ describe('Provider Discovery API', () => {
       }>(response);
 
       // Should return providers with configured instances
-      expect(data.providers.length).toBeGreaterThan(0);
+      expect(data.length).toBeGreaterThan(0);
 
       // All returned providers should be configured
-      data.providers.forEach((provider) => {
+      data.forEach((provider) => {
         expect(provider.configured).toBe(true);
         expect(provider.instanceId).toBeDefined();
         expect(provider.instanceId).toEqual(expect.stringMatching(/^test-/));
       });
 
       // Should have unique provider types (no duplicates for same type)
-      const providerTypes = data.providers.map((p) => p.type);
+      const providerTypes = data.map((p) => p.type);
       const uniqueTypes = [...new Set(providerTypes)];
       expect(providerTypes).toHaveLength(uniqueTypes.length);
 
       // Should NOT include providers without configured instances (like lmstudio, ollama)
-      const lmstudioProvider = data.providers.find((p) => p.type === 'lmstudio');
+      const lmstudioProvider = data.find((p) => p.type === 'lmstudio');
       expect(lmstudioProvider).toBeUndefined();
 
-      const ollamaProvider = data.providers.find((p) => p.type === 'ollama');
+      const ollamaProvider = data.find((p) => p.type === 'ollama');
       expect(ollamaProvider).toBeUndefined();
     });
 
@@ -119,7 +119,7 @@ describe('Provider Discovery API', () => {
       }>(response);
 
       // Each provider should have its models listed
-      data.providers.forEach((provider) => {
+      data.forEach((provider) => {
         expect(provider.models).toBeInstanceOf(Array);
         expect(provider.models.length).toBeGreaterThan(0);
 

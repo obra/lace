@@ -179,13 +179,13 @@ describe('LaceApp agent state handling', () => {
       });
 
       if (url.includes('/api/projects')) {
-        return Promise.resolve(mockResponse({ projects: [] }));
+        return Promise.resolve(mockResponse([]));
       }
       if (url.includes('/api/sessions')) {
-        return Promise.resolve(mockResponse({ sessions: [] }));
+        return Promise.resolve(mockResponse([]));
       }
       if (url.includes('/api/providers')) {
-        return Promise.resolve(mockResponse({ providers: [] }));
+        return Promise.resolve(mockResponse([]));
       }
       return Promise.resolve(mockResponse({}));
     });

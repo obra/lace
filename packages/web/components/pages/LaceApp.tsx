@@ -192,10 +192,10 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProjects(true);
     try {
       const res = await fetch('/api/projects');
-      const data = await parseResponse<{ projects: ProjectInfo[] }>(res);
-      setProjects(data.projects);
+      const data = await parseResponse<ProjectInfo[]>(res);
+      setProjects(data);
       setLoadingProjects(false);
-      return data.projects;
+      return data;
     } catch (error) {
       console.error('Failed to load projects:', error);
     }
@@ -261,12 +261,12 @@ export const LaceApp = memo(function LaceApp() {
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
-    if (projects.length === 0 && !loadingProjects) {
+    if ((projects?.length || 0) === 0 && !loadingProjects) {
       setAutoOpenCreateProject(true);
     } else {
       setAutoOpenCreateProject(false);
     }
-  }, [projects.length, loadingProjects]);
+  }, [projects?.length, loadingProjects]);
 
   const loadSessionDetails = useCallback(
     async (sessionId: ThreadId) => {
@@ -618,7 +618,9 @@ export const LaceApp = memo(function LaceApp() {
 
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
-  const foundProject = selectedProject ? projects.find((p) => p.id === selectedProject) : null;
+  const foundProject = selectedProject
+    ? (projects || []).find((p) => p.id === selectedProject)
+    : null;
   const currentProject = useMemo(
     () =>
       foundProject || {

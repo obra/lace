@@ -51,12 +51,12 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = await parseResponse<{ session: typeof mockSession }>(response);
+      const data = await parseResponse<typeof mockSession>(response);
 
       expect(response.status).toBe(200);
-      expect(data.session.id).toBe('session1');
-      expect(data.session.name).toBe('Test Session');
-      expect(data.session.projectId).toBe('project1');
+      expect(data.id).toBe('session1');
+      expect(data.name).toBe('Test Session');
+      expect(data.projectId).toBe('project1');
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -96,11 +96,11 @@ describe('Individual session API endpoints', () => {
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
-      const data = await parseResponse<{ session: typeof mockSession }>(response);
+      const data = await parseResponse<typeof mockSession>(response);
 
       expect(response.status).toBe(200);
       expect(data.session).toBeDefined();
-      expect(data.session.id).toBe('session1');
+      expect(data.id).toBe('session1');
 
       // CRITICAL: Should NOT have tokenUsage field
       expect('tokenUsage' in data).toBe(false);
@@ -164,12 +164,12 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = await parseResponse<{ session: typeof updatedSession }>(response);
+      const data = await parseResponse<typeof updatedSession>(response);
 
       expect(response.status).toBe(200);
-      expect(data.session.name).toBe('Updated Session');
-      expect(data.session.description).toBe('Updated description');
-      expect(data.session.status).toBe('completed');
+      expect(data.name).toBe('Updated Session');
+      expect(data.description).toBe('Updated description');
+      expect(data.status).toBe('completed');
     });
 
     it('should return 404 when project does not exist', async () => {
@@ -255,11 +255,11 @@ describe('Individual session API endpoints', () => {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
       });
 
-      const data = await parseResponse<{ session: typeof updatedSession }>(response);
+      const data = await parseResponse<typeof updatedSession>(response);
 
       expect(response.status).toBe(200);
-      expect(data.session.name).toBe('Partially Updated Session');
-      expect(data.session.description).toBe('A test session'); // Should remain unchanged
+      expect(data.name).toBe('Partially Updated Session');
+      expect(data.description).toBe('A test session'); // Should remain unchanged
     });
 
     it('should handle database errors during update', async () => {
