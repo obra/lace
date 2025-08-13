@@ -28,8 +28,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
-import type { AgentInfo } from '@/types/core';
-import type { ThreadId } from '@/types/core';
+import type { ThreadId, AgentInfo } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
 interface AgentsListResponse {
@@ -444,9 +443,9 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       const listResponse = await GET(listRequest, { params: Promise.resolve({ sessionId }) });
-      const listData = await parseResponse<AgentsListResponse>(listResponse);
+      const listData = await parseResponse<AgentInfo[]>(listResponse);
 
-      const apiAgent = listData.agents.find((a) => a.threadId === agentThreadId);
+      const apiAgent = listData.find((a) => a.threadId === agentThreadId);
       expect(apiAgent).toBeDefined();
       expect(apiAgent!.name).toBe('integration-agent');
     });

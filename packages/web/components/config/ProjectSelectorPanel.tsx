@@ -129,7 +129,7 @@ export function ProjectSelectorPanel({
 
   // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
-    return providers.filter((p): p is ProviderInfo & { instanceId: string } =>
+    return (providers || []).filter((p): p is ProviderInfo & { instanceId: string } =>
       Boolean(p.configured && p.instanceId)
     );
   }, [providers]);
@@ -474,8 +474,8 @@ export function ProjectSelectorPanel({
         return;
       }
 
-      const projectData = await parseResponse<{ project: ProjectInfo }>(projectRes);
-      const projectId = projectData.project.id;
+      const projectData = await parseResponse<ProjectInfo>(projectRes);
+      const projectId = projectData.id;
 
       // Call the callback to refresh projects list if available
       if (onProjectCreate) {

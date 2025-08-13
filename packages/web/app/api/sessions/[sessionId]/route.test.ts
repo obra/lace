@@ -128,8 +128,8 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ session: SessionInfo }>(response);
-      expect(data.session).toEqual(
+      const data = await parseResponse<SessionInfo>(response);
+      expect(data).toEqual(
         expect.objectContaining({
           id: sessionId,
           name: 'Test Session',
@@ -220,8 +220,8 @@ describe('Session Detail API Route', () => {
       }
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ session: SessionInfo }>(response);
-      expect(data.session).toEqual(
+      const data = await parseResponse<SessionInfo>(response);
+      expect(data).toEqual(
         expect.objectContaining({
           id: sessionId,
           name: 'Updated Session Name',
@@ -329,8 +329,8 @@ describe('Session Detail API Route', () => {
 
       expect(response.status).toBe(200);
 
-      const data = await parseResponse<{ session: SessionInfo }>(response);
-      expect(data.session).toEqual(
+      const data = await parseResponse<SessionInfo>(response);
+      expect(data).toEqual(
         expect.objectContaining({
           id: sessionId,
           name: 'Partially Updated Session',
