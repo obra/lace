@@ -11,7 +11,6 @@ const { values } = parseArgs({
     port: {
       type: 'string',
       short: 'p',
-      default: '3000',
     },
     host: {
       type: 'string',
@@ -34,24 +33,24 @@ Lace Web Server
 Usage: npm start -- [options]
 
 Options:
-  -p, --port <port>    Port to listen on (default: 3000)
+  -p, --port <port>    Port to listen on (default: 3000, auto-finds available)
   -h, --host <host>    Host to bind to (default: localhost)
                        Use '0.0.0.0' to allow external connections
   --help               Show this help message
 
 Examples:
-  npm start                        # Start on localhost:3000
-  npm start -- --port 8080         # Start on localhost:8080
+  npm start                        # Start on localhost:3000 (or next available)
+  npm start -- --port 8080         # Start on localhost:8080 (exact port required)
   npm start -- --host 0.0.0.0      # Allow external connections
-  npm run dev -- --port 3001       # Development mode on port 3001
+  npm run dev -- --port 3001       # Development mode on port 3001 (exact port)
 `);
   process.exit(0);
 }
 
+const userSpecifiedPort = !!values.port; // Track if user manually specified port
 const requestedPort = parseInt(values.port || '3000', 10);
 const hostname = values.host || 'localhost';
 const dev = process.env.NODE_ENV !== 'production';
-const userSpecifiedPort = !!values.port; // Track if user manually specified port
 
 // Validate port
 if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
