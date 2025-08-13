@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 test.describe('Browser Navigation Support', () => {
-  test('handles browser back and forward navigation correctly', async ({ page, worker }) => {
+  test('handles browser back and forward navigation correctly', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-navigation-')
@@ -114,7 +114,7 @@ test.describe('Browser Navigation Support', () => {
     }
   });
 
-  test('preserves application state during URL hash changes', async ({ page, worker }) => {
+  test('preserves application state during URL hash changes', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-hash-navigation-')
@@ -234,7 +234,7 @@ test.describe('Browser Navigation Support', () => {
     }
   });
 
-  test('handles direct URL access and deep linking', async ({ page, worker }) => {
+  test('handles direct URL access and deep linking', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-deep-linking-')
@@ -385,7 +385,7 @@ test.describe('Browser Navigation Support', () => {
     }
   });
 
-  test('validates browser refresh and reload behavior', async ({ page, worker }) => {
+  test('validates browser refresh and reload behavior', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-refresh-behavior-')

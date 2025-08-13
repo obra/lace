@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 test.describe('Basic Messaging', () => {
-  test('can send and display user messages reliably', async ({ page, worker }) => {
+  test('can send and display user messages reliably', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-basic-messaging-')
@@ -55,7 +55,7 @@ test.describe('Basic Messaging', () => {
     }
   });
 
-  test('interface shows appropriate state during message processing', async ({ page, worker }) => {
+  test('interface shows appropriate state during message processing', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-processing-state-')
@@ -114,7 +114,7 @@ test.describe('Basic Messaging', () => {
     }
   });
 
-  test('documents current streaming behavior without breaking', async ({ page, worker }) => {
+  test('documents current streaming behavior without breaking', async ({ page }) => {
     // Set up isolated LACE_DIR for this test
     const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'lace-e2e-streaming-behavior-')

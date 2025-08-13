@@ -17,6 +17,3 @@ export const test = baseTest.extend<{
 
 // Re-export expect for convenience
 export { expect } from '@playwright/test';
-
-// For backwards compatibility, export the worker fixture
-export const mockServiceWorker = createWorkerFixture(handlers);

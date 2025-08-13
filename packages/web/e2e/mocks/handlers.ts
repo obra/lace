@@ -65,17 +65,52 @@ export const handlers = [
   openaiSuccessHandler,
 ];
 
-// Type guard for Anthropic request body
+// Type for Anthropic content blocks
+type ContentBlock = {
+  type: string;
+  text: string;
+};
+
+// Type guard for Anthropic request body - supports both string content and content blocks
 function isAnthropicRequest(body: unknown): body is { 
   model: string; 
-  messages: Array<{ role: string; content: string }>; 
+  messages: Array<{ role: string; content: string | ContentBlock[] }>; 
 } {
-  return (
-    typeof body === 'object' &&
-    body !== null &&
-    'model' in body &&
-    'messages' in body &&
-    typeof (body as { model: unknown }).model === 'string' &&
-    Array.isArray((body as { messages: unknown }).messages)
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('model' in body) ||
+    !('messages' in body) ||
+    typeof (body as { model: unknown }).model !== 'string' ||
+    !Array.isArray((body as { messages: unknown }).messages)
+  ) {
+    return false;
+  }
+
+  const messages = (body as { messages: unknown[] }).messages;
+  
+  // Validate each message has role and content (string or content blocks)
+  return messages.every(msg => 
+    typeof msg === 'object' &&
+    msg !== null &&
+    'role' in msg &&
+    'content' in msg &&
+    typeof (msg as { role: unknown }).role === 'string' &&
+    (
+      // Content is string
+      typeof (msg as { content: unknown }).content === 'string' ||
+      // Content is array of content blocks
+      (
+        Array.isArray((msg as { content: unknown }).content) &&
+        ((msg as { content: unknown[] }).content as unknown[]).every(block =>
+          typeof block === 'object' &&
+          block !== null &&
+          'type' in block &&
+          'text' in block &&
+          typeof (block as { type: unknown }).type === 'string' &&
+          typeof (block as { text: unknown }).text === 'string'
+        )
+      )
+    )
   );
 }
