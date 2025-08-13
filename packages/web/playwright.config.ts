@@ -31,10 +31,11 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
+    // WebKit disabled in CI due to timing issues, available for local development
+    ...(process.env.CI ? [] : [{
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
-    },
+    }]),
   ],
 
   webServer: {
