@@ -5,7 +5,6 @@ import { createServer } from 'http';
 import next from 'next';
 import { parseArgs } from 'util';
 import open from 'open';
-import { logger } from '~/utils/logger';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -66,7 +65,6 @@ const shouldOpenBrowser = isInteractive();
 
 // Validate port
 if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
-  logger.error(`Invalid port number: "${values.port}" (parsed as ${requestedPort})`);
   console.error(`Error: Invalid port number: "${values.port}" (parsed as ${requestedPort})`);
   process.exit(1);
 }
@@ -89,7 +87,6 @@ async function tryStartServer(
         resolve(false);
       } else {
         // For other errors, we should fail
-        logger.error(`Server error on port ${port}`, { code: err.code, message: err.message });
         console.error(`Server error on port ${port} (${err.code || 'unknown'}):`, err.message);
         process.exit(1);
       }
@@ -112,7 +109,6 @@ async function startServerOnAvailablePort(
   if (userSpecified) {
     const success = await tryStartServer(server, startPort, hostname);
     if (!success) {
-      logger.error(`Port ${startPort} is already in use`);
       console.error(`Error: Port ${startPort} is already in use`);
       process.exit(1);
     }
@@ -127,7 +123,6 @@ async function startServerOnAvailablePort(
     }
   }
 
-  logger.error(`Could not find an available port starting from ${startPort}`);
   console.error(`Error: Could not find an available port starting from ${startPort}`);
   process.exit(1);
 }
@@ -187,13 +182,11 @@ app
       } catch (error) {
         // Silently ignore browser opening errors - not critical to server operation
         const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
-        logger.warn('Could not open browser automatically', { error: errorCode });
         console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
       }
     }
   })
   .catch((err) => {
-    logger.error('Error starting server', { error: err.message });
     console.error('Error starting server:', err);
     process.exit(1);
   });
