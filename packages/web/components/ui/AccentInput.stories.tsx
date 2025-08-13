@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AccentInput.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { AccentInput, type AccentInputProps } from './AccentInput';
 

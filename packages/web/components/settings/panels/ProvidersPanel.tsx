@@ -6,25 +6,31 @@
 import React from 'react';
 import { ProviderInstanceList } from '@/components/providers/ProviderInstanceList';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlug, faInfoCircle } from '@/lib/fontawesome';
 
 export function ProvidersPanel() {
   return (
     <SettingsPanel title="AI Provider Configuration">
-      <div className="space-y-4">
-        <div className="bg-info/10 border border-info/20 rounded-lg p-4">
+      <div className="space-y-6">
+        {/* Intro card */}
+        <div className="rounded-xl p-5 bg-base-100/60 backdrop-blur-sm border border-base-300/60 shadow-sm">
           <div className="flex items-start gap-3">
-            <div className="text-info text-lg">🔗</div>
+            <div className="mt-0.5 text-accent">
+              <FontAwesomeIcon icon={faPlug} className="w-5 h-5" />
+            </div>
             <div className="text-sm">
-              <div className="font-medium text-info mb-1">Provider Instances</div>
-              <div className="text-base-content/70">
-                Configure connections to AI providers like OpenAI, Anthropic, and local models. 
-                Each instance can have custom endpoints, timeouts, and credentials.
+              <div className="font-medium text-accent mb-1">Provider Instances</div>
+              <div className="text-base-content/75 leading-relaxed">
+                Configure connections to providers like OpenAI, Anthropic, and local models. Each instance can
+                define endpoints, timeouts, and credentials for flexible routing and fallbacks.
               </div>
             </div>
           </div>
         </div>
-        
-        <div className="border border-base-300 rounded-lg p-4">
+
+        {/* List card */}
+        <div className="rounded-xl p-5 bg-base-100/60 backdrop-blur-sm border border-base-300/60 shadow-sm">
           <ProviderInstanceList />
         </div>
       </div>

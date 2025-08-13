@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for SkeletonLoader.stories.tsx
 import type { Meta, StoryObj, StoryContext } from '@storybook/react';
 import React, { useState, useEffect } from 'react';
 import SkeletonLoader, { DocumentSkeleton } from './SkeletonLoader';

@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for OnboardingActions.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { OnboardingActions, type OnboardingActionsProps } from './OnboardingActions';
 

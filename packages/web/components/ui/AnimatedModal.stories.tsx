@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AnimatedModal.stories.tsx
 import type { Meta, StoryObj, StoryContext } from '@storybook/react';
 import { useState } from 'react';
 import { AnimatedModal, AnimatedConfirmModal } from './AnimatedModal';

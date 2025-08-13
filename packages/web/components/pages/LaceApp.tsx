@@ -43,6 +43,7 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
+import Link from 'next/link';
 
 // Safe error message extractor to satisfy strict TS/ESLint rules
 function getErrorMessage(err: unknown): string {
@@ -118,8 +119,6 @@ export const LaceApp = memo(function LaceApp() {
   const [showTaskDisplay, setShowTaskDisplay] = useState(false);
   const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
   const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
-  // Developer toggle to simulate first-time visit and trigger onboarding
-  const [simulateFirstTime, setSimulateFirstTime] = useState(false);
 
   // Business Logic State (from current app/page.tsx)
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -283,33 +282,9 @@ export const LaceApp = memo(function LaceApp() {
     void loadProviders();
   }, [loadProjects, loadProviders]);
 
-  // Load persisted simulate-first-time flag
-  useEffect(() => {
-    try {
-      const persisted = localStorage.getItem('lace_simulate_first_time');
-      if (persisted === '1') setSimulateFirstTime(true);
-    } catch {
-      // ignore
-    }
-  }, []);
+  // Removed simulate-first-time dev toggle and persistence
 
-  // Persist simulate-first-time flag
-  useEffect(() => {
-    try {
-      localStorage.setItem('lace_simulate_first_time', simulateFirstTime ? '1' : '0');
-    } catch {
-      // ignore
-    }
-  }, [simulateFirstTime]);
-
-  // Auto-open project creation modal when no projects exist
-  useEffect(() => {
-    if (projects.length === 0 && !loadingProjects) {
-      setAutoOpenCreateProject(true);
-    } else {
-      setAutoOpenCreateProject(false);
-    }
-  }, [projects.length, loadingProjects]);
+  // Do not auto-open the project creation modal; only open via explicit user action (CTA)
 
   const loadSessionDetails = useCallback(
     async (sessionId: ThreadId) => {
@@ -1024,23 +999,7 @@ export const LaceApp = memo(function LaceApp() {
                   />
                 </SidebarSection>
               )}
-              {/* Dev Utilities */}
-              <SidebarSection title="Dev" icon={faCog} defaultCollapsed={true}>
-                <div className="form-control">
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="toggle toggle-sm"
-                      checked={simulateFirstTime}
-                      onChange={(e) => setSimulateFirstTime(e.target.checked)}
-                    />
-                    <span className="label-text">Simulate first-time visit</span>
-                  </label>
-                </div>
-                <p className="text-xs text-base-content/60 mt-2">
-                  Forces onboarding panel and opens create project.
-                </p>
-              </SidebarSection>
+              {/* Dev Utilities removed */}
             </Sidebar>
           )}
         </SettingsContainer>
@@ -1074,11 +1033,11 @@ export const LaceApp = memo(function LaceApp() {
                           ? `${currentAgent.name} - ${currentAgent.modelId}`
                           : selectedProject
                             ? currentProject.name
-                            : 'Select a Project';
+                            : '';
                       })()
                     : selectedProject
                       ? currentProject.name
-                      : 'Select a Project'}
+                      : ''}
                 </h1>
               </div>
             </motion.div>
@@ -1094,7 +1053,7 @@ export const LaceApp = memo(function LaceApp() {
                 <span>Loading...</span>
               </div>
             </div>
-          ) : selectedProject && foundProject && !simulateFirstTime ? (
+          ) : selectedProject && foundProject ? (
             selectedAgent ? (
               <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
                 {/* Conversation Display */}
@@ -1171,20 +1130,20 @@ export const LaceApp = memo(function LaceApp() {
                         >
                           Create your first project
                         </button>
-                        <a
+                        <Link
                           className="btn btn-outline border-white/20 text-white hover:border-white/40 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
                           href="/docs"
                           target="_blank"
                           rel="noreferrer"
                         >
                           View docs
-                        </a>
+                        </Link>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
-              {(projects.length > 0 || autoOpenCreateProject || simulateFirstTime) && (
+              {(projects.length > 0 || autoOpenCreateProject) && (
                 <ProjectSelectorPanel
                   projects={projectsForSidebar}
                   selectedProject={currentProject.id ? currentProject : null}
@@ -1193,7 +1152,8 @@ export const LaceApp = memo(function LaceApp() {
                   onProjectCreate={() => void loadProjects()}
                   onProjectUpdate={handleProjectUpdate}
                   loading={loadingProjects}
-                  autoOpenCreate={autoOpenCreateProject || simulateFirstTime}
+                  autoOpenCreate={autoOpenCreateProject}
+                  // When the user cancels/finishes, reset flag so CTA can re-open reliably
                   onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
                   onOnboardingComplete={handleOnboardingComplete}
                 />

@@ -1,8 +1,9 @@
+// ABOUTME: Storybook story for AnimatedLaceApp.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnimatedLaceApp } from './AnimatedLaceApp';
-import { asThreadId } from '@/types/core';
-import type { Timeline, RecentFile } from '@/types/design-system';
-import type { ProjectInfo as Project, Task } from '@/types/core';
+import { asThreadId } from '~/types/core';
+import type { Timeline, RecentFile } from '~/types/design-system';
+import type { ProjectInfo as Project, Task } from '~/types/core';
 
 // Mock data for stories
 const mockProjects: Project[] = [

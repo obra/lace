@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for NavigationItem.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import NavigationItem from './NavigationItem';
 import IconButton from './IconButton';
@@ -18,7 +19,7 @@ import {
   faBell,
   faInbox,
   faStar
-} from '@/lib/fontawesome';
+} from '~/lib/fontawesome';
 
 const meta: Meta<typeof NavigationItem> = {
   title: 'Molecules/NavigationItem',

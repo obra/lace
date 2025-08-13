@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for InfoSection.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { InfoSection, type InfoSectionProps } from './InfoSection';
 

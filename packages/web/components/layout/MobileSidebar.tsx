@@ -4,6 +4,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faCog } from '@/lib/fontawesome';
@@ -40,22 +41,11 @@ export function MobileSidebar({ isOpen, onClose, onSettingsClick, children }: Mo
         {/* Header */}
         <div className="p-4 border-b border-base-300">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative">
-                <div className="absolute inset-0 opacity-20">
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px), repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)`,
-                    }}
-                  ></div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-white/30 rounded transform rotate-45"></div>
-                  <div className="absolute w-3 h-3 border border-white/20 rounded transform rotate-45"></div>
-                </div>
-              </div>
-              <span className="font-semibold text-base-content">Lace</span>
+            <div className="flex-1 gap-3">
+              <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-800 text-xs text-neutral-200">✦</span>
+                <span className="text-lg">Lace</span>
+              </Link>
             </div>
             
             <div className="flex items-center gap-2">

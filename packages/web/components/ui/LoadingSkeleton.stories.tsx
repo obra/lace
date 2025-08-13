@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for LoadingSkeleton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState, useEffect } from 'react';
 import { LoadingSkeleton, ChatMessageSkeleton, TimelineSkeleton, CarouselSkeleton, CardGridSkeleton } from './LoadingSkeleton';

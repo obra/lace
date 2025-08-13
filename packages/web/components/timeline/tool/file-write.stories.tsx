@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for file-write.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { fileWriteRenderer } from './file-write';
 import type { ToolResult } from './types';

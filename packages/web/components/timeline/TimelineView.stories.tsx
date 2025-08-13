@@ -1,7 +1,8 @@
+// ABOUTME: Storybook story for TimelineView.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { TimelineView } from './TimelineView';
-import type { LaceEvent, AgentInfo } from '@/types/core';
-import { asThreadId } from '@/types/core';
+import type { LaceEvent, AgentInfo } from '~/types/core';
+import { asThreadId } from '~/types/core';
 
 const meta: Meta<typeof TimelineView> = {
   title: 'Organisms/TimelineView',

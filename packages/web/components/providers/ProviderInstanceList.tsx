@@ -159,7 +159,7 @@ export function ProviderInstanceList() {
                 </p>
               </div>
               <button 
-                className="btn btn-primary"
+                className="btn btn-primary vapor-button"
                 onClick={() => setShowAddModal(true)}
               >
                 Add Your First Instance
@@ -173,7 +173,7 @@ export function ProviderInstanceList() {
                 {instances.length} instance{instances.length !== 1 ? 's' : ''} configured
               </span>
               <button 
-                className="btn btn-primary btn-sm"
+                className="btn btn-primary vapor-button btn-sm"
                 onClick={() => setShowAddModal(true)}
               >
                 Add Instance

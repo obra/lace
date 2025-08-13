@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for InlineCode.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import InlineCode from './InlineCode';
 

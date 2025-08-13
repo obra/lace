@@ -1,8 +1,9 @@
+// ABOUTME: Storybook story for ExpandableHeader.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import ExpandableHeader from './ExpandableHeader';
 import IconButton from './IconButton';
-import { faPlus, faCog, faEye } from '@/lib/fontawesome';
+import { faPlus, faCog, faEye } from '~/lib/fontawesome';
 
 const meta: Meta<typeof ExpandableHeader> = {
   title: 'Atoms/ExpandableHeader',

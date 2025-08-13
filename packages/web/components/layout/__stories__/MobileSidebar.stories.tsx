@@ -3,9 +3,9 @@
 
 import type { Meta, StoryObj } from '@storybook/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faComments, faRobot, faPlus, faTasks } from '@/lib/fontawesome';
-import { MobileSidebar } from '@/components/layout/MobileSidebar';
-import { SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
+import { faFolder, faComments, faRobot, faPlus, faTasks } from '~/lib/fontawesome';
+import { MobileSidebar } from '~/components/layout/MobileSidebar';
+import { SidebarSection, SidebarItem, SidebarButton } from '~/components/layout/Sidebar';
 import { useState } from 'react';
 
 const meta: Meta<typeof MobileSidebar> = {

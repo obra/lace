@@ -1,6 +1,7 @@
+// ABOUTME: Storybook story for PerformancePanel.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { PerformancePanel } from './PerformancePanel';
-import { PerformanceAnalysis } from '@/feedback/types';
+import { PerformanceAnalysis } from '~/feedback/types';
 
 const meta: Meta<typeof PerformancePanel> = {
   title: 'Organisms/PerformancePanel',

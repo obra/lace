@@ -1,6 +1,7 @@
+// ABOUTME: Storybook story for FeedbackEventCard.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackEventCard } from './FeedbackEventCard';
-import { FeedbackEvent } from '@/feedback/types';
+import { FeedbackEvent } from '~/feedback/types';
 
 const meta: Meta<typeof FeedbackEventCard> = {
   title: 'Organisms/FeedbackEventCard',

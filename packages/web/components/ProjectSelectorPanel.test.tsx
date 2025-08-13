@@ -115,10 +115,7 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /new project/i }));
-    // Wizard opens on Welcome step
-    expect(await screen.findByText('Welcome to Lace')).toBeInTheDocument();
-    // Proceed to Directory step
-    await user.click(screen.getByRole('button', { name: 'Get started' }));
+    // Wizard now opens directly on Directory step
     expect(await screen.findByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
   });
 

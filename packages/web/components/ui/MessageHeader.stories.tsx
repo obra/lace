@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for MessageHeader.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import MessageHeader from './MessageHeader';
 

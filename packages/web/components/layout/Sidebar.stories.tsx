@@ -1,9 +1,10 @@
+// ABOUTME: Storybook story for Sidebar.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Timeline, RecentFile } from '@/types/design-system';
-import type { ProjectInfo as Project, Task } from '@/types/core';
-import { asThreadId, asNewAgentSpec } from '@/types/core';
+import { Timeline, RecentFile } from '~/types/design-system';
+import type { ProjectInfo as Project, Task } from '~/types/core';
+import { asThreadId, asNewAgentSpec } from '~/types/core';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Organisms/Sidebar',

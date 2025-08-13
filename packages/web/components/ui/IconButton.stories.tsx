@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for IconButton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import IconButton from './IconButton';
 import { 
@@ -42,7 +43,7 @@ import {
   faCopy,
   faExpand,
   faCompress,
-} from '@/lib/fontawesome';
+} from '~/lib/fontawesome';
 
 const meta: Meta<typeof IconButton> = {
   title: 'Atoms/IconButton',

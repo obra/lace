@@ -1,7 +1,8 @@
+// ABOUTME: Storybook story for EnhancedChatInput.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { EnhancedChatInput } from './EnhancedChatInput';
-import { AttachedFile } from '@/components/ui/FileAttachment';
+import { AttachedFile } from '~/components/ui/FileAttachment';
 
 const meta: Meta<typeof EnhancedChatInput> = {
   title: 'Organisms/EnhancedChatInput',

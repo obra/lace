@@ -1,7 +1,8 @@
+// ABOUTME: Storybook story for NavigationButton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import NavigationButton from './NavigationButton';
-import { faHome, faUser, faCog, faSearch, faPlus, faBell, faHeart, faBookmark, faFolder, faChart } from '@/lib/fontawesome';
+import { faHome, faUser, faCog, faSearch, faPlus, faBell, faHeart, faBookmark, faFolder, faChart } from '~/lib/fontawesome';
 
 const meta: Meta<typeof NavigationButton> = {
   title: 'Atoms/NavigationButton',

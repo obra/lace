@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for AccountDropdown.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { AccountDropdown } from './AccountDropdown';
 

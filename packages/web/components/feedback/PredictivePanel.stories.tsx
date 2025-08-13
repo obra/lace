@@ -1,6 +1,7 @@
+// ABOUTME: Storybook story for PredictivePanel.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { PredictivePanel } from './PredictivePanel';
-import { PredictiveInsight } from '@/feedback/types';
+import { PredictiveInsight } from '~/feedback/types';
 
 const meta: Meta<typeof PredictivePanel> = {
   title: 'Organisms/PredictivePanel',

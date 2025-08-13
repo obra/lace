@@ -1,6 +1,7 @@
+// ABOUTME: Storybook story for FeedbackMiniDisplay.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { FeedbackMiniDisplay } from './FeedbackMiniDisplay';
-import { FeedbackEvent } from '@/feedback/types';
+import { FeedbackEvent } from '~/feedback/types';
 
 const meta: Meta<typeof FeedbackMiniDisplay> = {
   title: 'Organisms/FeedbackMiniDisplay',

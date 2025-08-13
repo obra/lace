@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for VaporBackground.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 import { VaporBackground } from './VaporBackground';

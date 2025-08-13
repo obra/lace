@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for TypingIndicator.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { TypingIndicator } from './TypingIndicator';
 

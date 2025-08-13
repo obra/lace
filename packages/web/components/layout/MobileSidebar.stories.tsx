@@ -1,9 +1,10 @@
+// ABOUTME: Storybook story for MobileSidebar.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { MobileSidebar } from './MobileSidebar';
-import { Timeline } from '@/types/design-system';
-import type { ProjectInfo as Project, Task } from '@/types/core';
-import { asThreadId } from '@/types/core';
+import { Timeline } from '~/types/design-system';
+import type { ProjectInfo as Project, Task } from '~/types/core';
+import { asThreadId } from '~/types/core';
 
 const meta: Meta<typeof MobileSidebar> = {
   title: 'Organisms/MobileSidebar',

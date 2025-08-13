@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for DragDropOverlay.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { DragDropOverlay } from './DragDropOverlay';

@@ -351,7 +351,7 @@ export function AddInstanceModal({
             </button>
             <button 
               type="submit" 
-              className="btn btn-primary"
+              className="btn btn-primary vapor-button"
               disabled={submitting}
             >
               {submitting ? (

@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -120,7 +120,7 @@ export function ProjectSelectorPanel({
   // State for simplified mode - default to simplified for all project creation
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const isSimplifiedMode = !showAdvancedOptions;
-  const isFtuxTakeover = autoOpenCreate && isSimplifiedMode;
+  // FTUX takeover disabled; users open modal explicitly via button
 
   // Help/Tips toggles for onboarding steps
   const [showDirHelp, setShowDirHelp] = useState(false);
@@ -145,22 +145,29 @@ export function ProjectSelectorPanel({
     }
   }, [availableProviders, createConfig.providerInstanceId]);
 
-  // Auto-open project creation modal when requested
+  // External trigger: open modal when parent requests (e.g., empty-state button)
+  // Only open once per toggle of autoOpenCreate to avoid reopening after user closes
+  const autoOpenHandledRef = useRef(false);
   useEffect(() => {
-    if (autoOpenCreate && !showCreateProject) {
-      setShowCreateProject(true);
-      // Don't call onAutoCreateHandled here - keep autoOpenCreate true for simplified mode
+    if (autoOpenCreate && !autoOpenHandledRef.current) {
+      autoOpenHandledRef.current = true;
+      if (!showCreateProject) {
+        setShowCreateProject(true);
+        setCreateStep(2);
+      }
+      // Do not call onAutoCreateHandled here to avoid unmounting before user interacts
     }
-  }, [autoOpenCreate, showCreateProject]);
+    if (!autoOpenCreate) {
+      autoOpenHandledRef.current = false;
+    }
+  }, [autoOpenCreate, showCreateProject, onAutoCreateHandled]);
 
-  // When the modal opens, decide the starting step:
-  // - First launch (autoOpenCreate): start at step 1 (Welcome)
-  // - Subsequent launches: start at step 2 (Directory)
+  // When the modal opens, start at step 2 (Directory)
   useEffect(() => {
     if (showCreateProject) {
-      setCreateStep(autoOpenCreate ? 1 : 2);
+      setCreateStep(2);
     }
-  }, [showCreateProject, autoOpenCreate]);
+  }, [showCreateProject]);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -174,12 +181,7 @@ export function ProjectSelectorPanel({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [showCreateProject]);
 
-  // Initialize wizard when modal opens
-  useEffect(() => {
-    if (showCreateProject) {
-      setCreateStep(1);
-    }
-  }, [showCreateProject]);
+  // Removed redundant initialization to step 1; we now start at step 2
 
   // Auto-populate name from directory in simplified mode
   const handleCreateDirectoryChange = (directory: string) => {
@@ -536,11 +538,8 @@ export function ProjectSelectorPanel({
     setCreateNewEnvKey('');
     setCreateNewEnvValue('');
     setShowAdvancedOptions(false); // Reset simplified mode state
-
-    // Clear auto-open state when cancelled
-    if (autoOpenCreate) {
-      onAutoCreateHandled?.();
-    }
+    // Notify parent so CTA can be toggled again cleanly
+    onAutoCreateHandled?.();
   };
 
   // Handle create project environment variables
@@ -592,14 +591,12 @@ export function ProjectSelectorPanel({
       className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full"
       onClick={handleBackdropClick}
     >
-      {/* Header */}
+      {/* Header (hidden until at least one project exists) */}
+      {projects.length > 0 && (
       <div className="flex items-start justify-between mb-6 flex-shrink-0">
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold text-base-content">Select Project</h1>
-          <p className="text-base-content/60 mt-1">
-            Choose a project to manage sessions and agents
-          </p>
-
+          {/* Intentionally omit 'Select Project' title per UX request */}
+        
           {/* Tabs and Filters */}
           <div className="flex items-center gap-4 mt-4">
             {/* Archive Filter Tabs */}
@@ -646,6 +643,7 @@ export function ProjectSelectorPanel({
           New Project
         </button>
       </div>
+      )}
 
       {/* Search */}
       {projects.length > 6 && (
@@ -1058,26 +1056,10 @@ export function ProjectSelectorPanel({
 
       {/* Create Project Modal */}
       {showCreateProject && (
-        <div
-          className={
-            isFtuxTakeover
-              ? 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50'
-              : 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
-          }
-        >
-          <div
-            className={
-              isFtuxTakeover
-                ? 'bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col'
-                : 'bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col'
-            }
-          >
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              {!isFtuxTakeover && (
-                <h3 className="text-xl font-semibold">
-                  {autoOpenCreate && isSimplifiedMode ? 'Welcome to Lace' : 'Create New Project'}
-                </h3>
-              )}
+              <h3 className="text-xl font-semibold">Create New Project</h3>
               <button onClick={handleCancelCreateProject} className="btn btn-ghost btn-sm">
                 ✕
               </button>
@@ -1089,17 +1071,6 @@ export function ProjectSelectorPanel({
                   // Simplified Mode Wizard (DaisyUI steps)
                   <>
                     {/* Stepper moved to footer; more vertical room for content/help */}
-
-                    {createStep === 1 && (
-                      <div className="py-6">
-                        <GlassCard className="mx-auto max-w-2xl text-center">
-                          <h4 className="text-2xl font-semibold mb-2">Welcome to Lace</h4>
-                          <p className="text-base-content/80">
-                            We’ll help you create a project and jump right into chat.
-                          </p>
-                        </GlassCard>
-                      </div>
-                    )}
 
                     {createStep === 2 && (
                       <GlassCard className="p-6">
@@ -1175,6 +1146,8 @@ export function ProjectSelectorPanel({
                             </div>
                           </div>
                         )}
+
+                        {/* Advanced settings temporarily removed per UX request */}
 
                         </GlassCard>
                       )}
@@ -1252,32 +1225,6 @@ export function ProjectSelectorPanel({
                             </ul>
                           </div>
                         )}
-                        <div className="collapse mt-4 border border-accent/40 rounded-lg hover:border-accent/60">
-                          <input type="checkbox" />
-                          <div className="collapse-title font-medium text-accent">Advanced settings</div>
-                          <div className="collapse-content space-y-3">
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-medium">Description</span>
-                              </label>
-                              <textarea
-                                className="textarea textarea-bordered w-full"
-                                value={createDescription}
-                                onChange={(e) => setCreateDescription(e.target.value)}
-                              />
-                            </div>
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-medium">
-                                  Environment Variables
-                                </span>
-                              </label>
-                              <p className="text-xs text-base-content/60">
-                                Used for tools and CI/CD commands. Values are stored locally.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
                       </GlassCard>
                     )}
 
@@ -1311,7 +1258,7 @@ export function ProjectSelectorPanel({
                     {/* Bottom footer: back, step indicators, primary action */}
                     <div className="mt-auto flex justify-between items-center pt-4">
                       <div>
-                        {(autoOpenCreate ? createStep > 1 : createStep > 2) && (
+                        {createStep > 2 && (
                           <button
                             type="button"
                             className="btn btn-link text-base-content/70 no-underline"
@@ -1331,19 +1278,14 @@ export function ProjectSelectorPanel({
                           </div>
                         )}
                         <div className="flex items-center gap-2">
-                          {createStep === 1 && (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-ghost"
-                                onClick={() => setShowAdvancedOptions(true)}
-                              >
-                                Advanced setup
-                              </button>
-                              <AccentButton type="button" onClick={() => setCreateStep(2)}>
-                                Get started
-                              </AccentButton>
-                            </>
+                          {createStep === 2 && (
+                            <button
+                              type="button"
+                              className="btn btn-link text-base-content/70 no-underline"
+                              onClick={() => setShowAdvancedOptions(true)}
+                            >
+                              Advanced setup
+                            </button>
                           )}
                           {createStep > 1 && createStep < 4 && (
                             <AccentButton

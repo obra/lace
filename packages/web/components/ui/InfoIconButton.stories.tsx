@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for InfoIconButton.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { InfoIconButton, type InfoIconButtonProps } from './InfoIconButton';
 
