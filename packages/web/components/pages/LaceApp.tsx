@@ -43,6 +43,8 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
+import Link from 'next/link';
+
 
 // Token usage section component
 const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId: ThreadId }) {
@@ -667,6 +669,158 @@ export const LaceApp = memo(function LaceApp() {
                   onClose={() => setShowMobileNav(false)}
                   onSettingsClick={onOpenSettings}
                 >
+                  {/* Current Project - Show only when project selected */}
+                  {selectedProject && (
+                    <SidebarSection
+                      title="Current Project"
+                      icon={faFolder}
+                      defaultCollapsed={false}
+                      collapsible={false}
+                    >
+                      <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
+                          <span
+                            data-testid="current-project-name"
+                            className="font-medium text-base-content truncate"
+                          >
+                            {currentProject.name}
+                          </span>
+                        </div>
+                        <div className="text-xs text-base-content/60 truncate">
+                          {currentProject.description}
+                        </div>
+                        <div className="text-xs text-base-content/50 mt-1">
+                          {sessions.length} sessions
+                        </div>
+                      </div>
+
+                      {/* Switch Project Button */}
+                      <SidebarButton
+                        onClick={() => {
+                          setSelectedProject(null);
+                          setShowMobileNav(false);
+                        }}
+                        variant="ghost"
+                      >
+                        <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
+                        Switch Project
+                      </SidebarButton>
+                    </SidebarSection>
+                  )}
+
+                  {/* Session Management - Show session context and agent selection */}
+                  {selectedSessionDetails && (
+                    <SidebarSection
+                      title="Current Session"
+                      icon={faComments}
+                      defaultCollapsed={false}
+                      collapsible={false}
+                    >
+                      {/* Session Info */}
+                      <div className="px-3 py-2 bg-base-50 rounded border border-base-200 mb-2">
+                        <div className="text-sm font-medium text-base-content truncate">
+                          {selectedSessionDetails.name}
+                        </div>
+                        <div className="text-xs text-base-content/60">
+                          {selectedSessionDetails.agents?.length || 0} agents available
+                        </div>
+                      </div>
+
+                      {/* Back to Session Config */}
+                      <SidebarButton
+                        onClick={() => {
+                          setSelectedAgent(null);
+                          setShowMobileNav(false);
+                        }}
+                        variant="ghost"
+                      >
+                        <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
+                        Configure Session
+                      </SidebarButton>
+
+                      {/* Agent Selection */}
+                      {selectedSessionDetails.agents?.map((agent) => (
+                        <SidebarItem
+                          key={agent.threadId}
+                          active={selectedAgent === agent.threadId}
+                          onClick={() => {
+                            handleAgentSelect(agent.threadId);
+                            setShowMobileNav(false);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FontAwesomeIcon
+                                icon={faRobot}
+                                className={`w-4 h-4 ${
+                                  selectedAgent === agent.threadId
+                                    ? 'text-primary'
+                                    : 'text-base-content/60'
+                                }`}
+                              />
+                              <span className="font-medium">{agent.name}</span>
+                            </div>
+                            <span
+                              className={`text-xs badge badge-xs ${
+                                agent.status === 'idle'
+                                  ? 'badge-success'
+                                  : agent.status === 'thinking' ||
+                                      agent.status === 'tool_execution' ||
+                                      agent.status === 'streaming'
+                                    ? 'badge-warning'
+                                    : 'badge-neutral'
+                              }`}
+                            >
+                              {agent.status}
+                            </span>
+                          </div>
+                        </SidebarItem>
+                      )) || []}
+                    </SidebarSection>
+                  )}
+
+                  {/* Tasks Section - Show when session is selected */}
+                  {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
+                    <SidebarSection
+                      title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+                      icon={faTasks}
+                      defaultCollapsed={false}
+                      collapsible={false}
+                    >
+                      <TaskListSidebar
+                        taskManager={taskManager}
+                        onTaskClick={(taskId) => {
+                          // For now, just close mobile nav - could open task detail modal in future
+                          setShowMobileNav(false); // Close mobile nav when task is clicked
+                        }}
+                        onOpenTaskBoard={() => {
+                          setShowTaskBoard(true);
+                          setShowMobileNav(false); // Close mobile nav when opening task board
+                        }}
+                        onCreateTask={() => {
+                          setShowTaskCreation(true);
+                          setShowMobileNav(false); // Close mobile nav when creating task
+                        }}
+                      />
+                    </SidebarSection>
+                  )}
+                </MobileSidebar>
+              )}
+            </SettingsContainer>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block flex-shrink-0">
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <Sidebar
+              isOpen={showDesktopSidebar}
+              onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
+              onSettingsClick={onOpenSettings}
+            >
               {/* Current Project - Show only when project selected */}
               {selectedProject && (
                 <SidebarSection 
@@ -692,12 +846,11 @@ export const LaceApp = memo(function LaceApp() {
                       {sessions.length} sessions
                     </div>
                   </div>
-                  
+
                   {/* Switch Project Button */}
                   <SidebarButton
                     onClick={() => {
                       setSelectedProject(null);
-                      setShowMobileNav(false);
                     }}
                     variant="ghost"
                   >
@@ -729,7 +882,6 @@ export const LaceApp = memo(function LaceApp() {
                   <SidebarButton
                     onClick={() => {
                       setSelectedAgent(null);
-                      setShowMobileNav(false);
                     }}
                     variant="ghost"
                   >
@@ -742,10 +894,7 @@ export const LaceApp = memo(function LaceApp() {
                     <SidebarItem
                       key={agent.threadId}
                       active={selectedAgent === agent.threadId}
-                      onClick={() => {
-                        handleAgentSelect(agent.threadId);
-                        setShowMobileNav(false);
-                      }}
+                      onClick={() => handleAgentSelect(agent.threadId)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -776,156 +925,17 @@ export const LaceApp = memo(function LaceApp() {
                   title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
                   icon={faTasks}
                   defaultCollapsed={false}
-                  collapsible={false}
                 >
                   <TaskListSidebar
                     taskManager={taskManager}
                     onTaskClick={(taskId) => {
-                      // For now, just close mobile nav - could open task detail modal in future
-                      setShowMobileNav(false); // Close mobile nav when task is clicked
+                      // For now, just ignore - could open task detail modal in future
                     }}
-                    onOpenTaskBoard={() => {
-                      setShowTaskBoard(true);
-                      setShowMobileNav(false); // Close mobile nav when opening task board
-                    }}
-                    onCreateTask={() => {
-                      setShowTaskCreation(true);
-                      setShowMobileNav(false); // Close mobile nav when creating task
-                    }}
+                    onOpenTaskBoard={() => setShowTaskBoard(true)}
+                    onCreateTask={() => setShowTaskCreation(true)}
                   />
                 </SidebarSection>
               )}
-                </MobileSidebar>
-              )}
-            </SettingsContainer>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block flex-shrink-0">
-        <SettingsContainer>
-          {({ onOpenSettings }) => (
-            <Sidebar
-              isOpen={showDesktopSidebar}
-              onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
-              onSettingsClick={onOpenSettings}
-            >
-          {/* Current Project - Show only when project selected */}
-          {selectedProject && (
-            <SidebarSection 
-              title="Current Project" 
-              icon={faFolder} 
-              defaultCollapsed={false}
-              collapsible={false}
-            >
-              <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
-                <div className="flex items-center gap-2 mb-1">
-                  <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                  <span 
-                    data-testid="current-project-name-desktop"
-                    className="font-medium text-base-content truncate"
-                  >
-                    {currentProject.name}
-                  </span>
-                </div>
-                <div className="text-xs text-base-content/60 truncate">
-                  {currentProject.description}
-                </div>
-                <div className="text-xs text-base-content/50 mt-1">
-                  {sessions.length} sessions
-                </div>
-              </div>
-              
-              {/* Switch Project Button */}
-              <SidebarButton
-                onClick={() => {
-                  setSelectedProject(null);
-                }}
-                variant="ghost"
-              >
-                <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
-                Switch Project
-              </SidebarButton>
-            </SidebarSection>
-          )}
-
-          {/* Session Management - Show session context and agent selection */}
-          {selectedSessionDetails && (
-            <SidebarSection 
-              title="Current Session" 
-              icon={faComments}
-              defaultCollapsed={false}
-              collapsible={false}
-            >
-              {/* Session Info */}
-              <div className="px-3 py-2 bg-base-50 rounded border border-base-200 mb-2">
-                <div className="text-sm font-medium text-base-content truncate">
-                  {selectedSessionDetails.name}
-                </div>
-                <div className="text-xs text-base-content/60">
-                  {selectedSessionDetails.agents?.length || 0} agents available
-                </div>
-              </div>
-
-              {/* Back to Session Config */}
-              <SidebarButton
-                onClick={() => {
-                  setSelectedAgent(null);
-                }}
-                variant="ghost"
-              >
-                <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
-                Configure Session
-              </SidebarButton>
-
-              {/* Agent Selection */}
-              {selectedSessionDetails.agents?.map((agent) => (
-                <SidebarItem
-                  key={agent.threadId}
-                  active={selectedAgent === agent.threadId}
-                  onClick={() => handleAgentSelect(agent.threadId)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FontAwesomeIcon 
-                        icon={faRobot} 
-                        className={`w-4 h-4 ${
-                          selectedAgent === agent.threadId ? 'text-primary' : 'text-base-content/60'
-                        }`} 
-                      />
-                      <span className="font-medium">{agent.name}</span>
-                    </div>
-                    <span className={`text-xs badge badge-xs ${
-                      agent.status === 'idle' ? 'badge-success' :
-                      (agent.status === 'thinking' || agent.status === 'tool_execution' || agent.status === 'streaming') ? 'badge-warning' :
-                      'badge-neutral'
-                    }`}>
-                      {agent.status}
-                    </span>
-                  </div>
-                </SidebarItem>
-              )) || []}
-            </SidebarSection>
-          )}
-
-          {/* Tasks Section - Show when session is selected */}
-          {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
-            <SidebarSection 
-              title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
-              icon={faTasks}
-              defaultCollapsed={false}
-            >
-              <TaskListSidebar
-                taskManager={taskManager}
-                onTaskClick={(taskId) => {
-                  // For now, just ignore - could open task detail modal in future
-                }}
-                onOpenTaskBoard={() => setShowTaskBoard(true)}
-                onCreateTask={() => setShowTaskCreation(true)}
-              />
-            </SidebarSection>
-          )}
             </Sidebar>
           )}
         </SettingsContainer>
@@ -950,13 +960,20 @@ export const LaceApp = memo(function LaceApp() {
               </motion.button>
               <div className="flex items-center gap-2">
                 <h1 className="font-semibold text-base-content truncate">
-                  {selectedAgent && selectedSessionDetails?.agents ? 
-                    (() => {
-                      const currentAgent = selectedSessionDetails.agents.find(a => a.threadId === selectedAgent);
-                      return currentAgent ? `${currentAgent.name} - ${currentAgent.modelId}` : (selectedProject ? currentProject.name : 'Select a Project');
-                    })() :
-                    (selectedProject ? currentProject.name : 'Select a Project')
-                  }
+                  {selectedAgent && selectedSessionDetails?.agents
+                    ? (() => {
+                        const currentAgent = selectedSessionDetails.agents.find(
+                          (a) => a.threadId === selectedAgent
+                        );
+                        return currentAgent
+                          ? `${currentAgent.name} - ${currentAgent.modelId}`
+                          : selectedProject
+                            ? currentProject.name
+                            : '';
+                      })()
+                    : selectedProject
+                      ? currentProject.name
+                      : ''}
                 </h1>
               </div>
             </motion.div>
@@ -1023,20 +1040,57 @@ export const LaceApp = memo(function LaceApp() {
               </div>
             )
           ) : (
-            /* Project Selection Panel - When no project selected or invalid project ID */
-            <div className="flex-1 p-6 min-h-0">
-              <ProjectSelectorPanel
-                projects={projectsForSidebar}
-                selectedProject={currentProject.id ? currentProject : null}
-                providers={providers}
-                onProjectSelect={handleProjectSelect}
-                onProjectCreate={() => void loadProjects()}
-                onProjectUpdate={handleProjectUpdate}
-                loading={loadingProjects}
-                autoOpenCreate={autoOpenCreateProject}
-                onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
-                onOnboardingComplete={handleOnboardingComplete}
-              />
+            /* Project Selection Panel - When no project selected, invalid project ID, or simulate-first-time */
+            <div className="flex-1 p-6 min-h-0 space-y-6">
+              {projects.length === 0 && (
+                <div className="glass ring-hover p-8">
+                  <div className="text-center">
+                    <div className="max-w-2xl mx-auto">
+                      <h2 className="text-3xl md:text-4xl font-bold text-white">
+                        Code with clarity.
+                        <br />
+                        <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
+                          Not complexity.
+                        </span>
+                      </h2>
+                      <p className="py-4 text-white/85">
+                        Create your first project to start collaborating with agents.
+                      </p>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          className="btn btn-accent ring-hover focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+                          onClick={() => setAutoOpenCreateProject(true)}
+                        >
+                          Create your first project
+                        </button>
+                        <Link
+                          className="btn btn-outline border-white/20 text-white hover:border-white/40 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+                          href="/docs"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View docs
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {(projects.length > 0 || autoOpenCreateProject) && (
+                <ProjectSelectorPanel
+                  projects={projectsForSidebar}
+                  selectedProject={currentProject.id ? currentProject : null}
+                  providers={providers}
+                  onProjectSelect={handleProjectSelect}
+                  onProjectCreate={() => void loadProjects()}
+                  onProjectUpdate={handleProjectUpdate}
+                  loading={loadingProjects}
+                  autoOpenCreate={autoOpenCreateProject}
+                  // When the user cancels/finishes, reset flag so CTA can re-open reliably
+                  onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
+                  onOnboardingComplete={handleOnboardingComplete}
+                />
+              )}
             </div>
           )}
         </div>
