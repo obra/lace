@@ -17,11 +17,16 @@ const compat = new FlatCompat({
 
 const config = [
   {
-    ignores: ['.next/**/*', 'node_modules/**/*', '.storybook/**/*'],
+    ignores: ['.next/**/*', 'node_modules/**/*'],
   },
   // Add Next.js specific configuration
   ...compat.config({
     extends: ['next/core-web-vitals'],
+  }),
+  // Add Storybook recommended rules for stories and config files
+  ...compat.config({
+    extends: ['plugin:storybook/recommended'],
+    files: ['**/*.stories.tsx', '**/*.stories.ts', '**/*.stories.jsx', '**/*.stories.js', '.storybook/**/*'],
   }),
   // Extend selected rules from root config
   {

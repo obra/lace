@@ -329,7 +329,7 @@ export function AnimatedLaceApp({
 
   return (
     <motion.div
-      className="flex h-screen bg-base-200 text-base-content font-sans overflow-hidden"
+      className="flex h-screen bg-base-200 text-base-content font-ui overflow-hidden"
       variants={pageTransition}
       initial="initial"
       animate="animate"

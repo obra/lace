@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import '@/app/globals.css';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { lato, dmSans, jetBrainsMono } from '@/app/fonts';
 
 export const metadata: Metadata = {
   title: 'Lace Web Terminal',
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className={`${dmSans.className} ${dmSans.variable} ${lato.variable} ${jetBrainsMono.variable} antialiased`}>
         <ErrorBoundary>
           <ThemeProvider>
             {children}
