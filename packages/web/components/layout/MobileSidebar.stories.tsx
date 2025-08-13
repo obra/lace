@@ -1,3 +1,4 @@
+// ABOUTME: Storybook story for MobileSidebar.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { MobileSidebar } from './MobileSidebar';
@@ -104,7 +105,7 @@ type Story = StoryObj<typeof meta>;
 
 // Sample data for stories
 const sampleProjects: Project[] = [
-  { 
+  {
     id: 'ai-research-project',
     name: 'AI Research',
     description: 'Advanced AI research and development project',
@@ -114,7 +115,7 @@ const sampleProjects: Project[] = [
     lastUsedAt: new Date('2024-01-15T10:00:00Z'),
     sessionCount: 25,
   },
-  { 
+  {
     id: 'web-application',
     name: 'Web Application',
     description: 'Full-stack web application development',
@@ -124,7 +125,7 @@ const sampleProjects: Project[] = [
     lastUsedAt: new Date('2024-01-14T15:30:00Z'),
     sessionCount: 18,
   },
-  { 
+  {
     id: 'data-pipeline',
     name: 'Data Pipeline',
     description: 'ETL data processing pipeline',
@@ -134,7 +135,7 @@ const sampleProjects: Project[] = [
     lastUsedAt: new Date('2024-01-13T09:15:00Z'),
     sessionCount: 32,
   },
-  { 
+  {
     id: 'mobile-app',
     name: 'Mobile App',
     description: 'Cross-platform mobile application',
@@ -162,9 +163,9 @@ const sampleTasks: Task[] = [
     description: 'Integrate latest language model',
     prompt: 'Integrate the latest language model version with proper error handling and testing',
     priority: 'high',
-    assignedTo: asThreadId('lace_20240115_session001.1'),
-    createdBy: asThreadId('lace_20240115_session001'),
-    threadId: asThreadId('lace_20240115_session001'),
+    assignedTo: asThreadId('lace_20240115_abc123.1'),
+    createdBy: asThreadId('lace_20240115_abc123'),
+    threadId: asThreadId('lace_20240115_abc123'),
     status: 'in_progress',
     createdAt: new Date('2024-01-15T09:00:00Z'),
     updatedAt: new Date('2024-01-15T10:30:00Z'),
@@ -177,8 +178,8 @@ const sampleTasks: Task[] = [
     prompt: 'Investigate and fix authentication timeout issue in production environment',
     priority: 'medium',
     assignedTo: 'human',
-    createdBy: asThreadId('lace_20240114_session001'),
-    threadId: asThreadId('lace_20240114_session001'),
+    createdBy: asThreadId('lace_20240114_def456'),
+    threadId: asThreadId('lace_20240114_def456'),
     status: 'pending',
     createdAt: new Date('2024-01-14T14:00:00Z'),
     updatedAt: new Date('2024-01-14T14:00:00Z'),
@@ -190,9 +191,9 @@ const sampleTasks: Task[] = [
     description: 'API documentation',
     prompt: 'Update API documentation to reflect latest endpoint changes and authentication flow',
     priority: 'low',
-    assignedTo: asThreadId('lace_20240115_session001.1'),
-    createdBy: asThreadId('lace_20240115_session001'),
-    threadId: asThreadId('lace_20240115_session001'),
+    assignedTo: asThreadId('lace_20240115_abc123.1'),
+    createdBy: asThreadId('lace_20240115_abc123'),
+    threadId: asThreadId('lace_20240115_abc123'),
     status: 'blocked',
     createdAt: new Date('2024-01-13T11:00:00Z'),
     updatedAt: new Date('2024-01-13T15:30:00Z'),
@@ -205,8 +206,8 @@ const sampleTasks: Task[] = [
     prompt: 'Optimize database queries for improved application performance and reduced latency',
     priority: 'high',
     assignedTo: 'human',
-    createdBy: asThreadId('lace_20240114_session001'),
-    threadId: asThreadId('lace_20240114_session001'),
+    createdBy: asThreadId('lace_20240114_def456'),
+    threadId: asThreadId('lace_20240114_def456'),
     status: 'pending',
     createdAt: new Date('2024-01-12T16:00:00Z'),
     updatedAt: new Date('2024-01-12T16:00:00Z'),
@@ -218,9 +219,9 @@ const sampleTasks: Task[] = [
     description: 'Responsive layout fixes',
     prompt: 'Fix responsive layout issues across different mobile screen sizes and orientations',
     priority: 'medium',
-    assignedTo: asThreadId('lace_20240115_session001.1'),
-    createdBy: asThreadId('lace_20240115_session001'),
-    threadId: asThreadId('lace_20240115_session001'),
+    assignedTo: asThreadId('lace_20240115_abc123.1'),
+    createdBy: asThreadId('lace_20240115_abc123'),
+    threadId: asThreadId('lace_20240115_abc123'),
     status: 'completed',
     createdAt: new Date('2024-01-11T10:00:00Z'),
     updatedAt: new Date('2024-01-11T17:45:00Z'),
@@ -228,13 +229,14 @@ const sampleTasks: Task[] = [
   },
 ];
 
+// Showing only core themes for now; others kept commented for quick restore
 const availableThemes = [
   { name: 'light', colors: { primary: '#570DF8', secondary: '#F000B8', accent: '#37CDBE' } },
   { name: 'dark', colors: { primary: '#661AE6', secondary: '#D926AA', accent: '#1FB2A5' } },
-  { name: 'cupcake', colors: { primary: '#65C3C8', secondary: '#EF9FBC', accent: '#EEAF3A' } },
-  { name: 'corporate', colors: { primary: '#4B6BFB', secondary: '#7C3AED', accent: '#37CDBE' } },
-  { name: 'synthwave', colors: { primary: '#E779C1', secondary: '#58C7F3', accent: '#F7CC50' } },
-  { name: 'cyberpunk', colors: { primary: '#FF7598', secondary: '#75D1F0', accent: '#C07F00' } },
+  // { name: 'cupcake',   colors: { primary: '#65C3C8', secondary: '#EF9FBC', accent: '#EEAF3A' } },
+  // { name: 'corporate', colors: { primary: '#4B6BFB', secondary: '#7C3AED', accent: '#37CDBE' } },
+  // { name: 'synthwave', colors: { primary: '#E779C1', secondary: '#58C7F3', accent: '#F7CC50' } },
+  // { name: 'cyberpunk', colors: { primary: '#FF7598', secondary: '#75D1F0', accent: '#C07F00' } },
 ];
 
 const defaultArgs = {
@@ -246,7 +248,7 @@ export const Default: Story = {
   args: defaultArgs,
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -254,19 +256,12 @@ export const Default: Story = {
           <p className="text-sm text-gray-600 mb-4">
             Default mobile sidebar with all navigation sections and sample data.
           </p>
-          <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="btn btn-primary"
-          >
+          <button onClick={() => setIsOpen(!isOpen)} className="btn btn-primary">
             {isOpen ? 'Close' : 'Open'} Mobile Sidebar
           </button>
         </div>
-        
-        <MobileSidebar 
-          {...args} 
-          isOpen={isOpen} 
-          onClose={() => setIsOpen(false)}
-        />
+
+        <MobileSidebar {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
       </div>
     );
   },
@@ -299,7 +294,7 @@ export const MinimalProjects: Story = {
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -307,19 +302,12 @@ export const MinimalProjects: Story = {
           <p className="text-sm text-gray-600 mb-4">
             Mobile sidebar with minimal project and timeline options.
           </p>
-          <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="btn btn-primary"
-          >
+          <button onClick={() => setIsOpen(!isOpen)} className="btn btn-primary">
             {isOpen ? 'Close' : 'Open'} Mobile Sidebar
           </button>
         </div>
-        
-        <MobileSidebar 
-          {...args} 
-          isOpen={isOpen} 
-          onClose={() => setIsOpen(false)}
-        />
+
+        <MobileSidebar {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
       </div>
     );
   },
@@ -338,7 +326,7 @@ export const NoActiveTasks: Story = {
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -346,19 +334,12 @@ export const NoActiveTasks: Story = {
           <p className="text-sm text-gray-600 mb-4">
             Mobile sidebar with no active tasks to display.
           </p>
-          <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="btn btn-primary"
-          >
+          <button onClick={() => setIsOpen(!isOpen)} className="btn btn-primary">
             {isOpen ? 'Close' : 'Open'} Mobile Sidebar
           </button>
         </div>
-        
-        <MobileSidebar 
-          {...args} 
-          isOpen={isOpen} 
-          onClose={() => setIsOpen(false)}
-        />
+
+        <MobileSidebar {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
       </div>
     );
   },
@@ -390,27 +371,18 @@ export const LightTheme: Story = {
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div className="space-y-6">
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">📱 Light Theme</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Mobile sidebar with light theme selected.
-          </p>
-          <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="btn btn-primary"
-          >
+          <p className="text-sm text-gray-600 mb-4">Mobile sidebar with light theme selected.</p>
+          <button onClick={() => setIsOpen(!isOpen)} className="btn btn-primary">
             {isOpen ? 'Close' : 'Open'} Mobile Sidebar
           </button>
         </div>
-        
-        <MobileSidebar 
-          {...args} 
-          isOpen={isOpen} 
-          onClose={() => setIsOpen(false)}
-        />
+
+        <MobileSidebar {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
       </div>
     );
   },
@@ -472,29 +444,51 @@ export const InteractionDemo: Story = {
           Mobile-optimized navigation with touch-friendly controls!
         </p>
       </div>
-      
+
       <div className="bg-blue-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">Interaction Guide:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Project/Timeline</strong> - Use dropdowns to switch context</li>
-          <li>• <strong>Quick Actions</strong> - Tap any action button to trigger tools</li>
-          <li>• <strong>Tasks</strong> - Tap task cards to view details</li>
-          <li>• <strong>Themes</strong> - Tap theme colors to change appearance</li>
-          <li>• <strong>Close</strong> - Tap backdrop or close button to dismiss</li>
+          <li>
+            • <strong>Project/Timeline</strong> - Use dropdowns to switch context
+          </li>
+          <li>
+            • <strong>Quick Actions</strong> - Tap any action button to trigger tools
+          </li>
+          <li>
+            • <strong>Tasks</strong> - Tap task cards to view details
+          </li>
+          <li>
+            • <strong>Themes</strong> - Tap theme colors to change appearance
+          </li>
+          <li>
+            • <strong>Close</strong> - Tap backdrop or close button to dismiss
+          </li>
         </ul>
       </div>
-      
+
       <MobileSidebar {...args} />
-      
+
       <div className="bg-green-50 p-4 rounded-lg">
         <h4 className="font-medium mb-2">MobileSidebar Features:</h4>
         <ul className="text-sm space-y-1">
-          <li>• <strong>Overlay Presentation</strong> - Full-screen modal with backdrop</li>
-          <li>• <strong>Animated Transitions</strong> - Smooth slide-in from left</li>
-          <li>• <strong>Project Management</strong> - Quick project/timeline switching</li>
-          <li>• <strong>Quick Actions</strong> - One-tap access to common tools</li>
-          <li>• <strong>Task Preview</strong> - Active tasks with priority indicators</li>
-          <li>• <strong>Theme Switching</strong> - Visual theme selection</li>
+          <li>
+            • <strong>Overlay Presentation</strong> - Full-screen modal with backdrop
+          </li>
+          <li>
+            • <strong>Animated Transitions</strong> - Smooth slide-in from left
+          </li>
+          <li>
+            • <strong>Project Management</strong> - Quick project/timeline switching
+          </li>
+          <li>
+            • <strong>Quick Actions</strong> - One-tap access to common tools
+          </li>
+          <li>
+            • <strong>Task Preview</strong> - Active tasks with priority indicators
+          </li>
+          <li>
+            • <strong>Theme Switching</strong> - Visual theme selection
+          </li>
         </ul>
       </div>
     </div>
@@ -515,35 +509,34 @@ export const AnimationDemo: Story = {
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div className="space-y-6">
         <div className="text-center">
           <h3 className="text-lg font-semibold mb-2">🎬 Animation Demo</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Watch the smooth slide-in animation!
-          </p>
-          <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="btn btn-primary"
-          >
+          <p className="text-sm text-gray-600 mb-4">Watch the smooth slide-in animation!</p>
+          <button onClick={() => setIsOpen(!isOpen)} className="btn btn-primary">
             {isOpen ? 'Close' : 'Open'} Mobile Sidebar
           </button>
         </div>
-        
-        <MobileSidebar 
-          {...args} 
-          isOpen={isOpen} 
-          onClose={() => setIsOpen(false)}
-        />
-        
+
+        <MobileSidebar {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
+
         <div className="bg-purple-50 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Animation Features:</h4>
           <ul className="text-sm space-y-1">
-            <li>• <strong>Slide Transition</strong> - Smooth left-to-right animation</li>
-            <li>• <strong>Backdrop Fade</strong> - Overlay appears with fade effect</li>
-            <li>• <strong>Transform Animation</strong> - CSS transform for performance</li>
-            <li>• <strong>Easing</strong> - Smooth ease-out timing function</li>
+            <li>
+              • <strong>Slide Transition</strong> - Smooth left-to-right animation
+            </li>
+            <li>
+              • <strong>Backdrop Fade</strong> - Overlay appears with fade effect
+            </li>
+            <li>
+              • <strong>Transform Animation</strong> - CSS transform for performance
+            </li>
+            <li>
+              • <strong>Easing</strong> - Smooth ease-out timing function
+            </li>
           </ul>
         </div>
       </div>
