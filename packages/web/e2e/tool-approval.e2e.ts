@@ -136,7 +136,13 @@ test.describe('Tool Approval Workflow', () => {
               try {
                 await page.locator('[data-testid="approve-tool-button"]').click();
                 console.log('Successfully clicked approve button');
-                await page.waitForTimeout(1000);
+                // Wait for modal to disappear or interface to be ready
+                await Promise.race([
+                  page.locator('[data-testid="tool-approval-modal"]').waitFor({ state: 'hidden', timeout: 3000 }),
+                  chatInterface.messageInput.waitFor({ state: 'visible', timeout: 3000 })
+                ]).catch(() => {
+                  console.log('Modal close/interface ready timeout - continuing');
+                });
               } catch (error) {
                 console.log('Could not click approve button:', error);
               }
@@ -145,8 +151,13 @@ test.describe('Tool Approval Workflow', () => {
             break; // Exit loop if we found approval UI
           }
           
-          // Wait between messages to avoid overwhelming the system
-          await page.waitForTimeout(3000);
+          // Wait for interface to be ready for next message
+          await Promise.race([
+            chatInterface.messageInput.waitFor({ state: 'visible', timeout: 5000 }),
+            page.waitForLoadState('networkidle', { timeout: 3000 })
+          ]).catch(() => {
+            console.log('Interface ready timeout - continuing with next message');
+          });
           
         } catch (error) {
           console.log(`Error sending message "${message}":`, error);
@@ -225,14 +236,16 @@ test.describe('Tool Approval Workflow', () => {
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
       
-      // Wait for all initial API calls to complete
-      await page.waitForTimeout(5000);
-      
       // Send a message that might involve tool use
       await chatInterface.sendMessage('Please help me understand what files are in this project');
       
-      // Wait for potential tool-related API activity
-      await page.waitForTimeout(5000);
+      // Wait for message processing or network activity to settle
+      await Promise.race([
+        page.waitForLoadState('networkidle', { timeout: 8000 }),
+        chatInterface.messageInput.waitFor({ state: 'visible', timeout: 5000 })
+      ]).catch(() => {
+        console.log('Message processing timeout - continuing with analysis');
+      });
       
       const apiDocumentation = {
         totalRequests: apiActivity.allRequests.length,

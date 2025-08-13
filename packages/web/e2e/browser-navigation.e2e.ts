@@ -43,7 +43,9 @@ test.describe('Browser Navigation Support', () => {
       // Test browser back button
       console.log('Testing browser back navigation');
       await page.goBack();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+        console.log('Navigation load state timeout - continuing');
+      });
       
       const backUrl = page.url();
       navigationTest.urlChanges.push(`back: ${backUrl}`);
@@ -56,7 +58,9 @@ test.describe('Browser Navigation Support', () => {
       // Test browser forward button
       console.log('Testing browser forward navigation');
       await page.goForward();
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+        console.log('Forward navigation load state timeout - continuing');
+      });
       
       const forwardUrl = page.url();
       navigationTest.urlChanges.push(`forward: ${forwardUrl}`);
