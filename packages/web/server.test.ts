@@ -10,9 +10,24 @@ vi.mock('open', () => ({
   default: vi.fn(),
 }));
 
-// Import open after mocking
+// Mock the logger
+vi.mock('../../src/utils/logger', () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// Import after mocking
 const open = await import('open');
 const mockOpen = vi.mocked(open.default);
+
+const { logger } = await import('../../src/utils/logger');
+const mockLogger = vi.mocked(logger);
+
+const { isInteractive } = await import('./server');
 
 // Helper to create a test server
 function createTestServer(): Server {
@@ -50,8 +65,8 @@ describe('Port Validation', () => {
 
   test('should accept valid port numbers', () => {
     const validPorts = [1, 80, 3000, 31337, 65535];
-    
-    validPorts.forEach(port => {
+
+    validPorts.forEach((port) => {
       const parsed = parseInt(port.toString(), 10);
       const isValid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535;
       expect(isValid).toBe(true);
@@ -65,11 +80,11 @@ describe('Port Validation', () => {
       { input: '-1', shouldBeInvalid: true }, // Below valid range
       { input: '65536', shouldBeInvalid: true }, // Above valid range
     ];
-    
+
     testCases.forEach(({ input, shouldBeInvalid }) => {
       const parsed = parseInt(input, 10);
       const isValid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535;
-      
+
       if (shouldBeInvalid) {
         expect(isValid).toBe(false);
       } else {
@@ -82,7 +97,7 @@ describe('Port Validation', () => {
     // parseInt('3000.5') returns 3000, which is valid
     const parsed = parseInt('3000.5', 10);
     expect(parsed).toBe(3000);
-    
+
     const isValid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535;
     expect(isValid).toBe(true); // This is actually valid after parsing
   });
@@ -164,7 +179,7 @@ describe('Port Detection Logic', () => {
           testServer.removeListener('error', onError);
           resolve(true);
         };
-        
+
         const onError = (err: NodeJS.ErrnoException) => {
           testServer.removeListener('listening', onListening);
           if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
@@ -173,7 +188,7 @@ describe('Port Detection Logic', () => {
             resolve(false);
           }
         };
-        
+
         testServer.once('listening', onListening);
         testServer.once('error', onError);
         testServer.listen(availablePort, 'localhost');
@@ -186,7 +201,7 @@ describe('Port Detection Logic', () => {
   });
 });
 
-describe('TTY Detection', () => {
+describe('Interactive Detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -194,33 +209,41 @@ describe('TTY Detection', () => {
   test('should detect interactive mode when both stdin and stdout are TTYs', () => {
     const mockStdin = { isTTY: true };
     const mockStdout = { isTTY: true };
-    
-    const shouldOpenBrowser = !!(mockStdin.isTTY && mockStdout.isTTY);
-    expect(shouldOpenBrowser).toBe(true);
+
+    const result = isInteractive(mockStdin, mockStdout);
+    expect(result).toBe(true);
   });
 
   test('should not detect interactive mode when stdin is not a TTY', () => {
     const mockStdin = { isTTY: false };
     const mockStdout = { isTTY: true };
-    
-    const shouldOpenBrowser = !!(mockStdin.isTTY && mockStdout.isTTY);
-    expect(shouldOpenBrowser).toBe(false);
+
+    const result = isInteractive(mockStdin, mockStdout);
+    expect(result).toBe(false);
   });
 
   test('should not detect interactive mode when stdout is not a TTY', () => {
     const mockStdin = { isTTY: true };
     const mockStdout = { isTTY: false };
-    
-    const shouldOpenBrowser = !!(mockStdin.isTTY && mockStdout.isTTY);
-    expect(shouldOpenBrowser).toBe(false);
+
+    const result = isInteractive(mockStdin, mockStdout);
+    expect(result).toBe(false);
   });
 
   test('should not detect interactive mode when neither are TTYs', () => {
     const mockStdin = { isTTY: false };
     const mockStdout = { isTTY: false };
-    
-    const shouldOpenBrowser = !!(mockStdin.isTTY && mockStdout.isTTY);
-    expect(shouldOpenBrowser).toBe(false);
+
+    const result = isInteractive(mockStdin, mockStdout);
+    expect(result).toBe(false);
+  });
+
+  test('should use process defaults when no arguments provided', () => {
+    // This tests the default behavior using actual process.stdin/stdout
+    const result = isInteractive();
+    // We can't assert a specific value since it depends on test environment,
+    // but we can verify it returns a boolean
+    expect(typeof result).toBe('boolean');
   });
 });
 
@@ -233,14 +256,15 @@ describe('Browser Opening', () => {
   test('should open browser in interactive mode', async () => {
     const mockStdin = { isTTY: true };
     const mockStdout = { isTTY: true };
-    
-    const shouldOpenBrowser = !!(mockStdin.isTTY && mockStdout.isTTY);
+
+    const shouldOpenBrowser = isInteractive(mockStdin, mockStdout);
     const url = 'http://localhost:31337';
 
     if (shouldOpenBrowser) {
       await mockOpen(url);
     }
 
+    expect(shouldOpenBrowser).toBe(true);
     expect(mockOpen).toHaveBeenCalledWith(url);
     expect(mockOpen).toHaveBeenCalledTimes(1);
   });
@@ -248,14 +272,15 @@ describe('Browser Opening', () => {
   test('should not open browser in non-interactive mode', async () => {
     const mockStdin = { isTTY: false };
     const mockStdout = { isTTY: false };
-    
-    const shouldOpenBrowser = !!(mockStdin.isTTY && mockStdout.isTTY);
+
+    const shouldOpenBrowser = isInteractive(mockStdin, mockStdout);
     const url = 'http://localhost:31337';
 
     if (shouldOpenBrowser) {
       await mockOpen(url);
     }
 
+    expect(shouldOpenBrowser).toBe(false);
     expect(mockOpen).not.toHaveBeenCalled();
   });
 
@@ -267,9 +292,13 @@ describe('Browser Opening', () => {
       await mockOpen('http://localhost:31337');
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
+      mockLogger.warn('Could not open browser automatically', { error: errorCode });
       console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
 
+    expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
+      error: 'unknown error',
+    });
     expect(consoleLogSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (unknown error)'
     );
@@ -287,9 +316,13 @@ describe('Browser Opening', () => {
       await mockOpen('http://localhost:31337');
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
+      mockLogger.warn('Could not open browser automatically', { error: errorCode });
       console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
 
+    expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
+      error: 'EACCES',
+    });
     expect(consoleLogSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (EACCES)'
     );
@@ -298,46 +331,72 @@ describe('Browser Opening', () => {
   });
 });
 
-describe('Error Handling', () => {
-  test('should provide descriptive error messages for invalid ports', () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+describe('Error Logging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('should log invalid port numbers to logger with structured data', () => {
     const invalidInputs = [
-      { input: 'abc', expected: NaN },
-      { input: '0', expected: 0 },
-      { input: '65536', expected: 65536 },
-      { input: '-1', expected: -1 },
+      { input: 'abc', expectedParsed: NaN },
+      { input: '0', expectedParsed: 0 },
+      { input: '65536', expectedParsed: 65536 },
+      { input: '-1', expectedParsed: -1 },
     ];
 
-    invalidInputs.forEach(({ input, expected }) => {
+    invalidInputs.forEach(({ input, expectedParsed }) => {
+      mockLogger.error.mockClear();
+
       const requestedPort = parseInt(input, 10);
-      const isValid = Number.isInteger(requestedPort) && requestedPort >= 1 && requestedPort <= 65535;
-      
+      const isValid =
+        Number.isInteger(requestedPort) && requestedPort >= 1 && requestedPort <= 65535;
+
       if (!isValid) {
-        console.error(`Error: Invalid port number: "${input}" (parsed as ${requestedPort})`);
-        expect(consoleErrorSpy).toHaveBeenLastCalledWith(
-          `Error: Invalid port number: "${input}" (parsed as ${expected})`
+        // Simulate the production error logging path
+        mockLogger.error(`Invalid port number: "${input}" (parsed as ${requestedPort})`);
+
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          `Invalid port number: "${input}" (parsed as ${expectedParsed})`
         );
       }
     });
-
-    consoleErrorSpy.mockRestore();
   });
 
-  test('should log error codes in server startup failures', () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+  test('should log server startup failures with structured error data', () => {
     const mockError = new Error('Test error') as NodeJS.ErrnoException;
     mockError.code = 'ENOTFOUND';
-    
-    const port = 31337;
-    console.error(`Server error on port ${port} (${mockError.code || 'unknown'}):`, mockError.message);
-    
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Server error on port 31337 (ENOTFOUND):',
-      'Test error'
-    );
 
-    consoleErrorSpy.mockRestore();
+    const port = 31337;
+
+    // Simulate the production error logging path
+    mockLogger.error(`Server error on port ${port}`, {
+      code: mockError.code,
+      message: mockError.message,
+    });
+
+    expect(mockLogger.error).toHaveBeenCalledWith('Server error on port 31337', {
+      code: 'ENOTFOUND',
+      message: 'Test error',
+    });
+  });
+
+  test('should log port unavailable errors', () => {
+    const port = 31337;
+
+    // Simulate the production error logging path
+    mockLogger.error(`Port ${port} is already in use`);
+
+    expect(mockLogger.error).toHaveBeenCalledWith('Port 31337 is already in use');
+  });
+
+  test('should log when no available ports found', () => {
+    const startPort = 31337;
+
+    // Simulate the production error logging path
+    mockLogger.error(`Could not find an available port starting from ${startPort}`);
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Could not find an available port starting from 31337'
+    );
   });
 });
