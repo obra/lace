@@ -1536,9 +1536,13 @@ export const handlers = [
 #### Using MSW in Tests
 
 ```typescript
-import { test } from './mocks/setup'; // Automatically includes MSW
+import { test, expect } from './mocks/setup'; // Automatically includes MSW
+import { HttpResponse } from './mocks/setup';
+import { createPageObjects } from './page-objects';
 
 test('external API integration', async ({ page, worker, http }) => {
+  const { chatInterface } = createPageObjects(page);
+
   // Override default handlers for specific test
   await worker.use(
     http.post('https://api.anthropic.com/v1/messages', () => {
@@ -1552,7 +1556,6 @@ test('external API integration', async ({ page, worker, http }) => {
   await chatInterface.sendMessage('Test message');
   await expect(chatInterface.getMessage('Custom test response')).toBeVisible();
 });
-```
 
 ### Browser Console Integration
 
