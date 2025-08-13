@@ -61,7 +61,7 @@ test.describe('Error Handling and Recovery', () => {
         
       } catch (error) {
         // If the UI prevents invalid input, that's also good error handling
-        console.log('Invalid path prevented by UI validation:', error.message);
+        console.log('Invalid path prevented by UI validation:', error instanceof Error ? error.message : String(error));
         expect(true).toBeTruthy(); // Test passes - UI validation is working
       }
     } finally {
@@ -130,7 +130,7 @@ test.describe('Error Handling and Recovery', () => {
           // Don't wait for each message to complete - stress test
           await page.waitForTimeout(100);
         } catch (error) {
-          console.log(`Network stress: Message "${message}" encountered error:`, error.message);
+          console.log(`Network stress: Message "${message}" encountered error:`, error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -327,7 +327,7 @@ test.describe('Error Handling and Recovery', () => {
             }
           }
         } catch (error) {
-          console.log(`URL error handling test failed for ${malformedUrl}:`, error.message);
+          console.log(`URL error handling test failed for ${malformedUrl}:`, error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -424,7 +424,7 @@ test.describe('Error Handling and Recovery', () => {
           await page.waitForTimeout(2000);
           postErrorState.canSendMessage = await chatInterface.getMessage(recoveryMessage).isVisible().catch(() => false);
         } catch (error) {
-          console.log('Interface interaction failed after JS error:', error.message);
+          console.log('Interface interaction failed after JS error:', error instanceof Error ? error.message : String(error));
         }
       }
       

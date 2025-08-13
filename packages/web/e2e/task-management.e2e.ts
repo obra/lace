@@ -273,7 +273,7 @@ test.describe('Task Management CRUD Operations', () => {
               console.log('CREATE: Task created successfully');
             }
           } catch (error) {
-            console.log('CREATE: Task creation failed:', error.message);
+            console.log('CREATE: Task creation failed:', error instanceof Error ? error.message : String(error));
           }
         }
         
@@ -285,7 +285,7 @@ test.describe('Task Management CRUD Operations', () => {
             console.log(`READ: Found ${taskElements} task elements`);
           }
         } catch (error) {
-          console.log('READ: Task reading failed:', error.message);
+          console.log('READ: Task reading failed:', error instanceof Error ? error.message : String(error));
         }
         
         // UPDATE: Try to toggle or edit a task
@@ -310,7 +310,7 @@ test.describe('Task Management CRUD Operations', () => {
             }
           }
         } catch (error) {
-          console.log('UPDATE: Task update failed:', error.message);
+          console.log('UPDATE: Task update failed:', error instanceof Error ? error.message : String(error));
         }
         
         // DELETE: Try to delete a task
@@ -325,7 +325,7 @@ test.describe('Task Management CRUD Operations', () => {
             console.log('DELETE: Task delete triggered');
           }
         } catch (error) {
-          console.log('DELETE: Task deletion failed:', error.message);
+          console.log('DELETE: Task deletion failed:', error instanceof Error ? error.message : String(error));
         }
       } else {
         console.log('No task UI available - documenting current state');
@@ -524,7 +524,7 @@ test.describe('Task Management CRUD Operations', () => {
           }
         }
       } catch (error) {
-        console.log('Could not capture task texts:', error.message);
+        console.log('Could not capture task texts:', error instanceof Error ? error.message : String(error));
       }
       
       // Also check if tasks are mentioned in the conversation
@@ -557,7 +557,7 @@ test.describe('Task Management CRUD Operations', () => {
           }
         }
       } catch (error) {
-        console.log('Could not capture persisted task texts:', error.message);
+        console.log('Could not capture persisted task texts:', error instanceof Error ? error.message : String(error));
       }
       
       const persistenceAnalysis = {
