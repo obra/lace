@@ -9,6 +9,7 @@ import { faFolder, faPlus, faFileText, faHistory, faEllipsisV, faEdit, faTrash }
 import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
 import { parseResponse, parseTyped } from '@/lib/serialization';
+import { DirectoryField } from '@/components/ui';
 
 interface ProjectSelectorPanelProps {
   projects: ProjectInfo[];
@@ -767,19 +768,13 @@ export function ProjectSelectorPanel({
                 </div>
 
                 {/* Working Directory */}
-                <div>
-                  <label className="label">
-                    <span className="label-text font-medium">Working Directory *</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editWorkingDirectory}
-                    onChange={(e) => setEditWorkingDirectory(e.target.value)}
-                    className="input input-bordered w-full"
-                    placeholder="/path/to/project"
-                    required
-                  />
-                </div>
+                <DirectoryField
+                  label="Working Directory *"
+                  value={editWorkingDirectory}
+                  onChange={setEditWorkingDirectory}
+                  placeholder="/path/to/project"
+                  required
+                />
 
                 {/* Default Provider and Model Configuration */}
                 <div className="grid md:grid-cols-3 gap-4">
@@ -981,21 +976,14 @@ export function ProjectSelectorPanel({
                       </div>
                     )}
 
-                    <div>
-                      <label className="label">
-                        <span className="label-text font-medium text-lg">Choose your project directory</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={createWorkingDirectory}
-                        onChange={(e) => handleCreateDirectoryChange(e.target.value)}
-                        className="input input-bordered w-full input-lg"
-                        data-testid="project-path-input"
-                        placeholder="/path/to/your/project"
-                        required
-                        autoFocus
-                      />
-                    </div>
+                    <DirectoryField
+                      label="Choose your project directory"
+                      value={createWorkingDirectory}
+                      onChange={handleCreateDirectoryChange}
+                      placeholder="/path/to/your/project"
+                      required
+                      className="input-lg"
+                    />
 
                     {createName && (
                       <div>
@@ -1057,19 +1045,13 @@ export function ProjectSelectorPanel({
                 </div>
 
                 {/* Working Directory */}
-                <div>
-                  <label className="label">
-                    <span className="label-text font-medium">Working Directory *</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={createWorkingDirectory}
-                    onChange={(e) => setCreateWorkingDirectory(e.target.value)}
-                    className="input input-bordered w-full"
-                    placeholder="/path/to/project"
-                    required
-                  />
-                </div>
+                <DirectoryField
+                  label="Working Directory *"
+                  value={createWorkingDirectory}
+                  onChange={setCreateWorkingDirectory}
+                  placeholder="/path/to/project"
+                  required
+                />
 
                 {/* Default Provider and Model Configuration */}
                 <div className="grid md:grid-cols-3 gap-4">

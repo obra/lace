@@ -74,4 +74,6 @@ export {
   faSave,
   faGlobe,
   faExclamationTriangle,
+  faSpinner,
+  faChevronLeft,
 } from '@fortawesome/free-solid-svg-icons';
