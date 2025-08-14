@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { ChatTextarea, VoiceButton, SendButton, FileAttachButton } from '@/components/ui';
 import type { ChatTextareaRef } from './ChatTextarea';

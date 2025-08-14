@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { PredictiveInsight } from '@/feedback/types';
 import { Badge } from '@/components/ui';
 

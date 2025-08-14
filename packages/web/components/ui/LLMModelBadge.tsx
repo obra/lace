@@ -1,6 +1,7 @@
 // ABOUTME: Specialized badge component for LLM model names with consistent styling
 // ABOUTME: Maps model names like 'claude', 'gpt-4', 'gemini' to appropriate badge variants
 
+import React from 'react';
 import Badge from './Badge';
 
 interface LLMModelBadgeProps {
