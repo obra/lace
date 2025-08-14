@@ -169,11 +169,11 @@ select {
 
 /* Code block styling */
 .code-block {
-  @apply bg-base-300 border border-base-content/20 rounded-lg overflow-hidden;
+  @apply bg-base-300 border border-base-300 rounded-lg overflow-hidden;
 }
 
 .code-block-header {
-  @apply bg-base-200 px-4 py-2 border-b border-base-content/20 flex items-center justify-between;
+  @apply bg-base-200 px-4 py-2 border-b border-base-300 flex items-center justify-between;
 }
 
 .code-block-content {
@@ -181,11 +181,11 @@ select {
 }
 
 .code-block-language {
-  @apply text-xs text-base-content/60 font-mono;
+  @apply text-xs text-base-content opacity-60 font-mono;
 }
 
 .code-block-copy {
-  @apply text-xs text-base-content/60 hover:text-base-content cursor-pointer;
+  @apply text-xs text-base-content opacity-60 hover:text-base-content hover:opacity-100 cursor-pointer;
 }
 
 /* Inline code styling */
@@ -212,15 +212,15 @@ select {
 
 /* Dark mode adjustments */
 [data-theme='dark'] .diff-line.added {
-  @apply bg-green-900/20 border-green-400;
+  @apply bg-green-100 border-green-400;
 }
 
 [data-theme='dark'] .diff-line.removed {
-  @apply bg-red-900/20 border-red-400;
+  @apply bg-red-100 border-red-400;
 }
 
 [data-theme='dark'] .diff-line.highlighted {
-  @apply bg-yellow-900/20;
+  @apply bg-yellow-100;
 }
 
 /* Syntax highlighting using DaisyUI theme colors */
@@ -243,7 +243,7 @@ select {
 .hljs-comment,
 .hljs-quote,
 .hljs-deletion {
-  @apply text-base-content/50;
+  @apply text-base-content opacity-50;
 }
 
 .hljs-number,
@@ -342,16 +342,16 @@ select {
 }
 
 .code-block-content::-webkit-scrollbar-thumb {
-  @apply bg-base-content/20 rounded-full;
+  @apply bg-base-300 rounded-full;
 }
 
 .code-block-content::-webkit-scrollbar-thumb:hover {
-  @apply bg-base-content/40;
+  @apply bg-base-content;
 }
 
 /* Line numbers styling */
 .line-numbers {
-  @apply text-base-content/40 select-none pr-4 text-right;
+  @apply text-base-content opacity-40 select-none pr-4 text-right;
   min-width: 2.5rem;
 }
 

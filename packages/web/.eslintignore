@@ -1,0 +1,7 @@
+# Exclude non-production and parked files from Next.js build linting
+stories_parked/**
+**/__tests__/**
+**/*.test.ts
+**/*.test.tsx
+**/*.stories.tsx
+components/**/__stories__/**
