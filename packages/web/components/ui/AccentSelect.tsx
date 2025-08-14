@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-export interface AccentSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+interface AccentSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   helperText?: string;
   invalid?: boolean;

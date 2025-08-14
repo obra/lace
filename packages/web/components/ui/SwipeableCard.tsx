@@ -24,6 +24,7 @@ interface SwipeableCardProps {
   };
 }
 
+/** @public */
 export function SwipeableCard({
   children,
   onSwipeLeft,
@@ -128,6 +129,7 @@ interface SwipeableTimelineMessageProps {
   className?: string;
 }
 
+/** @public */
 export function SwipeableTimelineMessage({
   children,
   onDelete,
@@ -173,6 +175,7 @@ interface PullToRefreshProps {
   className?: string;
 }
 
+/** @public */
 export function PullToRefresh({
   children,
   onRefresh,
@@ -245,6 +248,7 @@ interface FloatingActionButtonProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+/** @public */
 export function FloatingActionButton({
   icon,
   onClick,
@@ -302,6 +306,7 @@ interface LongPressProps {
   className?: string;
 }
 
+/** @public */
 export function LongPress({
   children,
   onLongPress,

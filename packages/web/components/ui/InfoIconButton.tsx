@@ -3,7 +3,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfo } from '@fortawesome/free-solid-svg-icons';
 
-export interface InfoIconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface InfoIconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   label?: string;
   active?: boolean;
 }

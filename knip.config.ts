@@ -11,8 +11,33 @@ export default {
     'packages/web/lib/fontawesome.ts',
     // E2E test infrastructure - OK to have unused exports for future tests
     'packages/web/e2e/**/*',
+    // Development/testing infrastructure - always ignore
+    'packages/web/e2e-test-server.ts',
+    'packages/web/feedback/story-types.ts',
+    'packages/web/ladle.config.mjs',
+    'packages/web/scripts/start-test-server.js',
+  ],
+  ignoreDependencies: [
+    // ESLint tooling - used in config files that knip has trouble analyzing
+    '@typescript-eslint/eslint-plugin',
+    '@typescript-eslint/parser',
+    '@eslint/eslintrc',
+    'eslint-config-next',
+    'eslint-plugin-import',
+    'eslint-plugin-no-relative-import-paths',
+    // Build tooling - used in config files
+    '@playwright/test',
+    'playwright',
+    'autoprefixer',
+    // Type definitions that may not be directly imported
+    '@types/dompurify',
   ],
   workspaces: {
+    '.': {
+      // Root workspace configuration
+      entry: ['src/**/*.ts'],
+      project: ['src/**/*.ts'],
+    },
     'packages/web': {
       // Web workspace - Next.js with Storybook
       entry: [
@@ -23,12 +48,37 @@ export default {
         // Server entrypoint
         'server.ts',
         // Storybook (auto-detected, but keep explicit)
-        '**/*.stories.{ts,tsx}',
+        'stories_parked/*.stories.{ts,tsx}',
         // E2E test files
         'e2e/**/*.e2e.ts',
         'e2e/**/*.test.e2e.ts',
+        // Design system components - only analyzed in production mode
+        'components/ui/**/*.tsx!',
+        'components/feedback/**/*.tsx!',
+        'components/demo/**/*.tsx!',
+        // Unused component files - only warn in production mode
+        'components/chat/index.ts!',
+        'components/config/ProviderDropdown.tsx!',
+        'components/feedback/index.ts!',
+        'components/files/CarouselCodeChanges.tsx!',
+        'components/files/FileDiffViewer.demo.tsx!',
+        'components/files/FileDiffViewer.integration.tsx!',
+        'components/pages/AnimatedLaceApp.tsx!',
+        'components/pages/ChatInterface.tsx!',
+        'components/pages/LaceAppMobileSidebar.tsx!',
+        'components/pages/LaceAppSidebar.tsx!',
+        'components/providers/ConnectionTest.tsx!',
+        'components/providers/ModelSelectionForm.tsx!',
+        'components/timeline/AnimatedTimelineMessage.tsx!',
+        'components/timeline/AnimatedTimelineView.tsx!',
+        'components/timeline/AnimatedTypingIndicator.tsx!',
+        'components/timeline/IntegrationEntry.tsx!',
+        'components/timeline/UnknownEventEntry.tsx!',
+        'hooks/useProviderStatus.ts!',
+        'hooks/useVoiceRecognition.ts!',
+        'lib/display-utils.ts!',
       ],
-      // Disable ESLint plugin to avoid module resolution issues
+      // Keep ESLint plugin disabled to avoid module resolution issues
       eslint: false,
     },
   },

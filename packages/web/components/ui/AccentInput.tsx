@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-export interface AccentInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface AccentInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   helperText?: string;
   invalid?: boolean;

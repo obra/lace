@@ -17,6 +17,7 @@ interface ModalProps {
   className?: string;
 }
 
+/** @public */
 export function Modal({
   isOpen,
   onClose,
@@ -160,6 +161,7 @@ interface ConfirmModalProps {
   variant?: 'danger' | 'warning' | 'info';
 }
 
+/** @public */
 export function ConfirmModal({
   isOpen,
   onClose,

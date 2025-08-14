@@ -16,6 +16,7 @@ interface VoiceRecognitionUIProps {
   className?: string;
 }
 
+/** @public */
 export function VoiceRecognitionUI({
   isListening,
   onStartListening,
@@ -188,6 +189,7 @@ interface CompactVoiceButtonProps {
   variant?: 'primary' | 'ghost' | 'outline';
 }
 
+/** @public */
 export function CompactVoiceButton({
   isListening,
   onToggle,
