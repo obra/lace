@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Badge, StatusDot } from '@/components/ui';
 
 export interface TokenUsageData {

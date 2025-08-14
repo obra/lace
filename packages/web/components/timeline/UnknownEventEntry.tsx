@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronRight, faQuestion, faCode } from '@/lib/fontawesome';
