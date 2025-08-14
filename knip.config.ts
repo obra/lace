@@ -4,6 +4,7 @@
 export default {
   ignore: [
     'packages/web/eslint.config.js', // ESLint config causes issues when run from root
+    'packages/web/stories_parked/**/*', // Parked story files - not active in build
   ],
   workspaces: {
     'packages/web': {
