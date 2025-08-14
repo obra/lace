@@ -1,3 +1,4 @@
+import React from 'react';
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui';
 import { formatTime } from '@/lib/format';

@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { FeedbackEvent } from '@/feedback/types';
 import { Badge, TimestampDisplay } from '@/components/ui';
 import { formatTime } from '@/lib/format';

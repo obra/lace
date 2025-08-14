@@ -1,5 +1,3 @@
-import daisyui from 'daisyui';
-
 /** @type {import('tailwindcss').Config} */
 const config = {
   content: [
@@ -27,7 +25,7 @@ const config = {
       },
     },
   },
-  plugins: [daisyui],
+  plugins: [require('daisyui')],
   daisyui: {
     themes: [
       'light',

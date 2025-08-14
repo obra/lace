@@ -1,0 +1,45 @@
+# SwipeableCard
+
+### Purpose
+A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of swipe-based interactions. Handles touch gestures, visual feedback, action triggers, and smooth animations in a single, gesture-enabled component.
+### When to Use
+
+## Usage
+
+```tsx
+import SwipeableCard from '@/components/ui/SwipeableCard';
+
+// Basic usage
+<SwipeableCard />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `children` | `React.ReactNode` | Required | - |
+| `onSwipeLeft` | `() => void` | Optional | - |
+| `onSwipeRight` | `() => void` | Optional | - |
+| `onTap` | `() => void` | Optional | - |
+| `swipeThreshold` | `number` | Optional | - |
+| `className` | `string` | Optional | - |
+| `leftAction` | `{` | Optional | - |
+| `icon` | `React.ReactNode` | Required | - |
+| `color` | `string` | Required | - |
+| `label` | `string` | Required | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

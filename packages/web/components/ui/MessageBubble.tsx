@@ -1,3 +1,4 @@
+import React from 'react';
 import { ReactNode } from 'react';
 import Avatar from './Avatar';
 import Badge from './Badge';

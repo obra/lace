@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface StatusDotProps {
   status: 'online' | 'offline' | 'busy' | 'away' | 'error' | 'success' | 'warning' | 'info';
   size?: 'xs' | 'sm' | 'md' | 'lg';

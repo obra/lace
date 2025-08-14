@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { ChatInputComposer } from '@/components/ui';
 import { AttachedFile } from '@/components/ui/FileAttachment';
 

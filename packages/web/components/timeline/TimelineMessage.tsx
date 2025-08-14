@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import type { LaceEvent, AgentInfo } from '@/types/core';
 import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
 import { MessageHeader, MessageText } from '@/components/ui';
