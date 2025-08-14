@@ -32,7 +32,7 @@ const fileReadSchema = z
 
 export class FileReadTool extends Tool {
   name = 'file_read';
-  description = `Read file contents. Full reads limited to 32KB, use line ranges (startLine/endLine) for larger files.`;
+  description = `Read file contents. Full reads limited to 32KB, use ranges of up to ${MAX_RANGE_SIZE} lines (startLine/endLine) for larger files.`;
   schema = fileReadSchema;
   annotations = {
     readOnlyHint: true,
