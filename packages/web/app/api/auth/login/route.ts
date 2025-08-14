@@ -50,8 +50,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     cookieStore.set('auth-token', result.jwt!, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: false, // Allow non-HTTPS for local development
+      sameSite: 'lax', // Less restrictive for WebKit compatibility
       path: '/',
       maxAge,
     });

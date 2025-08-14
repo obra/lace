@@ -78,6 +78,12 @@ test.describe('Login Form JavaScript Tests', () => {
         consoleLogs.push(`${msg.type()}: ${msg.text()}`);
       });
       
+      // Monitor page errors
+      const pageErrors: string[] = [];
+      page.on('pageerror', err => {
+        pageErrors.push(`Page error: ${err.message}`);
+      });
+      
       // Fill form with correct password
       await page.locator('[data-testid="password-input"]').fill(password);
       await page.locator('[data-testid="login-button"]').click();
@@ -96,6 +102,7 @@ test.describe('Login Form JavaScript Tests', () => {
       
       // Log console messages for debugging
       console.log('Console logs during login:', consoleLogs);
+      console.log('Page errors during login:', pageErrors);
       console.log('API Response status:', responses[0].status);
       console.log('API Response body:', responses[0].body);
       
@@ -109,8 +116,25 @@ test.describe('Login Form JavaScript Tests', () => {
       const urlAfterWait = page.url();
       console.log('URL after 1 second wait:', urlAfterWait);
       
+      // Wait a bit more for WebKit which seems to need more time
+      await page.waitForTimeout(2000);
+      
+      const urlAfterLongerWait = page.url();
+      console.log('URL after 3 seconds total wait:', urlAfterLongerWait);
+      
+      // Check cookies to see if auth token was set
+      const cookies = await page.context().cookies();
+      const authCookie = cookies.find(c => c.name === 'auth-token');
+      console.log('Auth cookie present:', !!authCookie);
+      console.log('Auth cookie value:', authCookie?.value?.substring(0, 20) + '...');
+      
+      // Wait one more time and check URL stability
+      await page.waitForTimeout(1000);
+      const finalUrl = page.url();
+      console.log('Final URL after 4 seconds:', finalUrl);
+      
       // The page SHOULD redirect to / after successful login
-      // If this fails, it indicates the JavaScript redirect logic is broken
+      // WebKit redirects between 1-3 seconds, so give it enough time
       await expect(page).toHaveURL('/', { timeout: 5000 });
     });
   });

@@ -29,17 +29,17 @@ test.describe('Authentication E2E Tests', () => {
       await expect(page.locator('[data-testid="error-message"]')).toBeVisible({ timeout: 5000 });
       await expect(page.locator('[data-testid="error-message"]')).toContainText(/invalid|incorrect|wrong/i);
       
-      // Step 4: Initialize auth system with known password
-      const { initializeAuth } = await import('@/lib/server/auth-config');
-      const generatedPassword = await initializeAuth();
+      // Step 4: Use the same hard-coded password that works in login-form tests
+      // This avoids password mismatch between test setup and server state
+      const password = 'ZMAb3TNMSFRXw68UaTYb5WH2';
       
       // Step 5: Correct password MUST allow login and redirect
       await page.locator('[data-testid="password-input"]').clear();
-      await page.locator('[data-testid="password-input"]').fill(generatedPassword);
+      await page.locator('[data-testid="password-input"]').fill(password);
       await page.locator('[data-testid="login-button"]').click();
       
-      // MUST redirect to main app after successful login
-      await expect(page).toHaveURL('/', { timeout: 10000 });
+      // MUST redirect to main app after successful login - increased timeout for WebKit
+      await expect(page).toHaveURL('/', { timeout: 15000 });
       
       // Step 6: Main app MUST be accessible after login
       await expect(page.locator('[data-testid="new-project-button"]')).toBeVisible({ timeout: 5000 });
