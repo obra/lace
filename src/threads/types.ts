@@ -138,11 +138,11 @@ export interface AgentMessageData {
 }
 
 // Data types for transient events
-export interface AgentTokenData {
+interface AgentTokenData {
   token: string;
 }
 
-export interface AgentStreamingData {
+interface AgentStreamingData {
   content: string;
 }
 
@@ -152,11 +152,11 @@ export interface AgentStateChangeData {
   to: string;
 }
 
-export interface CompactionStartData {
+interface CompactionStartData {
   auto: boolean;
 }
 
-export interface CompactionCompleteData {
+interface CompactionCompleteData {
   success: boolean;
   error?: string;
   summary?: string;
@@ -165,7 +165,7 @@ export interface CompactionCompleteData {
 }
 
 // Task event data types
-export interface TaskCreatedData {
+interface TaskCreatedData {
   taskId: string;
   task: Task;
   context: TaskContext;
@@ -173,7 +173,7 @@ export interface TaskCreatedData {
   type: 'task:created'; // For compatibility with existing handlers
 }
 
-export interface TaskUpdatedData {
+interface TaskUpdatedData {
   taskId: string;
   task: Task;
   context: TaskContext;
@@ -181,7 +181,7 @@ export interface TaskUpdatedData {
   type: 'task:updated'; // For compatibility
 }
 
-export interface TaskDeletedData {
+interface TaskDeletedData {
   taskId: string;
   task?: Task;
   context: TaskContext;
@@ -189,7 +189,7 @@ export interface TaskDeletedData {
   type: 'task:deleted'; // For compatibility
 }
 
-export interface TaskNoteAddedData {
+interface TaskNoteAddedData {
   taskId: string;
   task: Task;
   context: TaskContext;
@@ -198,7 +198,7 @@ export interface TaskNoteAddedData {
 }
 
 // Agent lifecycle event data
-export interface AgentSpawnedData {
+interface AgentSpawnedData {
   type: 'agent:spawned'; // For compatibility with existing handlers
   taskId?: string;
   agentThreadId: ThreadId;
@@ -212,7 +212,7 @@ export interface AgentSpawnedData {
 }
 
 // Project event data types
-export interface ProjectCreatedData {
+interface ProjectCreatedData {
   projectId: string;
   project: {
     id: string;
@@ -228,7 +228,7 @@ export interface ProjectCreatedData {
   type: 'project:created'; // For compatibility
 }
 
-export interface ProjectUpdatedData {
+interface ProjectUpdatedData {
   projectId: string;
   project: {
     id: string;
@@ -244,7 +244,7 @@ export interface ProjectUpdatedData {
   type: 'project:updated'; // For compatibility
 }
 
-export interface ProjectDeletedData {
+interface ProjectDeletedData {
   projectId: string;
   project: {
     id: string;
@@ -261,7 +261,7 @@ export interface ProjectDeletedData {
 }
 
 // System event data
-export interface SystemNotificationData {
+interface SystemNotificationData {
   message: string;
   severity: 'info' | 'warning' | 'error';
   context: {
@@ -370,9 +370,6 @@ export type LaceEvent =
       type: 'SYSTEM_NOTIFICATION';
       data: SystemNotificationData;
     });
-
-// Helper type to extract valid data types for addEvent method
-export type LaceEventData = LaceEvent['data'];
 
 export interface Thread {
   id: string;

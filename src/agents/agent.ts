@@ -75,7 +75,7 @@ export interface CurrentTurnMetrics {
 }
 
 // Event type definitions for TypeScript
-export interface AgentEvents {
+interface AgentEvents {
   agent_thinking_start: [];
   agent_token: [{ token: string }]; // Raw tokens including thinking block content during streaming
   agent_thinking_complete: [];

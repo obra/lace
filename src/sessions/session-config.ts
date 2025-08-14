@@ -29,7 +29,7 @@ export const AgentConfigurationSchema = SessionConfigurationSchema.extend({
 export type SessionConfiguration = z.infer<typeof SessionConfigurationSchema>;
 export type AgentConfiguration = z.infer<typeof AgentConfigurationSchema>;
 
-export interface ConfigurationPreset {
+interface ConfigurationPreset {
   id: string;
   name: string;
   description: string;

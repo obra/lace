@@ -3,7 +3,7 @@
 
 import type { LaceEvent } from '~/threads/types';
 
-export interface TokenSummary {
+interface TokenSummary {
   totalPromptTokens: number;
   totalCompletionTokens: number;
   totalTokens: number;

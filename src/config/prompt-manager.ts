@@ -16,7 +16,7 @@ import {
 import { getLaceDir } from '~/config/lace-dir';
 import { logger } from '~/utils/logger';
 
-export interface PromptManagerOptions {
+interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;
   templateDirs?: string[];
   session?: { getWorkingDirectory(): string };

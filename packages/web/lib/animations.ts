@@ -54,6 +54,7 @@ const _fadeInDown: Variants = {
   },
 };
 
+/** @public Design system animation - OK to be unused */
 export const fadeInLeft: Variants = {
   initial: {
     opacity: 0,
@@ -106,6 +107,7 @@ export const scaleIn: Variants = {
   },
 };
 
+/** @public Design system animation - OK to be unused */
 export const popIn: Variants = {
   initial: {
     scale: 0,

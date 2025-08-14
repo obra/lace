@@ -46,7 +46,7 @@ export interface ToolInputSchema {
   [k: string]: unknown;
 }
 
-export interface ToolProperty {
+interface ToolProperty {
   type: string;
   description?: string;
   enum?: string[];
@@ -71,7 +71,7 @@ export interface ToolResult {
 }
 
 // Helper to check if a result indicates an error
-export function isToolError(result: ToolResult): boolean {
+function _isToolError(result: ToolResult): boolean {
   return result.status !== 'completed';
 }
 

@@ -4,7 +4,7 @@
 import { Task } from '~/tools/implementations/task-manager/types';
 import { ThreadId, AssigneeId } from '~/threads/types';
 
-export interface FormatOptions {
+interface FormatOptions {
   showAssignee?: boolean;
   showNotes?: boolean;
   groupBy?: 'status' | 'assignee' | 'priority';

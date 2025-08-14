@@ -5,7 +5,7 @@ import { Page } from '@playwright/test';
 import { ProjectSelector } from './ProjectSelector';
 import { ChatInterface } from './ChatInterface';
 
-export { ProjectSelector, ChatInterface };
+// Note: Classes available via createPageObjects function
 
 // Convenience function to create all page objects for a given page
 export function createPageObjects(page: Page) {

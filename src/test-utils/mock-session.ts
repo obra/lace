@@ -19,7 +19,7 @@ interface MockSession {
  * @param overrides - Optional overrides for specific methods
  * @returns A mock Session object with default test behavior
  */
-export function createMockSession(
+function createMockSession(
   overrides: {
     getToolPolicy?: (toolName: string) => 'allow' | 'require-approval' | 'deny';
     getEffectiveConfiguration?: () => Record<string, unknown>;

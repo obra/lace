@@ -5,7 +5,7 @@ import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/b
 import { Tool } from '~/tools/tool';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 
-export interface TestProviderConfig extends ProviderConfig {
+interface TestProviderConfig extends ProviderConfig {
   mockResponse?: string;
   shouldError?: boolean;
   delay?: number;

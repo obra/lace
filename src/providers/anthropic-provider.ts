@@ -15,7 +15,7 @@ import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { convertToAnthropicFormat } from '~/providers/format-converters';
 
-export interface AnthropicProviderConfig extends ProviderConfig {
+interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
   [key: string]: unknown; // Allow for additional properties
 }

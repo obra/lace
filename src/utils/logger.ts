@@ -4,7 +4,7 @@
 import { appendFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   error: 0,

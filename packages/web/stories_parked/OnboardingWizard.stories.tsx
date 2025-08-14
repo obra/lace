@@ -14,8 +14,18 @@ const mockProviders = [
     requiresApiKey: true,
     instanceId: 'anthropic:default',
     models: [
-      { id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4', contextWindow: 200000, maxOutputTokens: 8192 },
-      { id: 'claude-haiku-4-20240307', displayName: 'Claude Haiku 4', contextWindow: 200000, maxOutputTokens: 4096 },
+      {
+        id: 'claude-sonnet-4-20250514',
+        displayName: 'Claude Sonnet 4',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+      },
+      {
+        id: 'claude-haiku-4-20240307',
+        displayName: 'Claude Haiku 4',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+      },
     ],
   },
 ];

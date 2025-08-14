@@ -8,7 +8,7 @@ import { execSync, type StdioOptions } from 'child_process';
 import { logger } from '~/utils/logger';
 import { TemplateContext } from '~/config/template-engine';
 
-export interface VariableProvider {
+interface VariableProvider {
   getVariables(): Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 

@@ -5,7 +5,7 @@ import { ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
-export interface StopReasonHandlerConfig {
+interface StopReasonHandlerConfig {
   logTokenExhaustion?: boolean;
   requireAllParameters?: boolean;
 }

@@ -6,7 +6,7 @@
 /**
  * For individual message/request token counts
  */
-export interface MessageTokenUsage {
+interface MessageTokenUsage {
   promptTokens: number; // Tokens in this specific message's prompt
   completionTokens: number; // Tokens in this specific message's completion
   totalTokens: number; // promptTokens + completionTokens for this message
@@ -33,9 +33,4 @@ export interface ThreadTokenUsage {
 export interface CombinedTokenUsage {
   message?: MessageTokenUsage; // Current message token usage
   thread: ThreadTokenUsage; // Thread-level cumulative usage
-}
-
-export interface ConversationMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
 }

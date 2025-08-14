@@ -25,7 +25,7 @@ interface LMStudioModel {
   internalIgnoreServerSessionConfig: boolean;
 }
 
-export interface LMStudioProviderConfig extends ProviderConfig {
+interface LMStudioProviderConfig extends ProviderConfig {
   baseUrl?: string;
   verbose?: boolean;
   [key: string]: unknown; // Allow for additional properties

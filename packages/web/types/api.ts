@@ -108,25 +108,6 @@ export type ModelInfo = BackendModelInfo;
 
 // Project management types - now using core types directly (no wrappers)
 
-export interface CreateProjectRequest {
-  name: string;
-  description?: string;
-  workingDirectory: string;
-  configuration?: Record<string, unknown>;
-}
-
-export interface UpdateProjectRequest {
-  name?: string;
-  description?: string;
-  workingDirectory?: string;
-  configuration?: Record<string, unknown>;
-  isArchived?: boolean;
-}
-
-export interface DeleteProjectResponse {
-  success: boolean;
-}
-
 // Agent type with token usage for API responses
 export type AgentWithTokenUsage = AgentInfo & {
   tokenUsage?: ThreadTokenUsage;
