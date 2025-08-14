@@ -26,10 +26,6 @@ describe('POST /api/auth/logout', () => {
     mockCookies.mockReturnValue({ delete: mockDelete } as never);
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should delete auth cookie and return success', async () => {
     const request = new NextRequest('http://localhost:3000/api/auth/logout', {
       method: 'POST',
@@ -63,6 +59,11 @@ describe('POST /api/auth/logout', () => {
   });
 
   it('should handle cookie deletion errors gracefully', async () => {
+    // Mock console.error for this specific test to capture expected error logs
+    const originalConsoleError = console.error;
+    const mockConsoleError = vi.fn();
+    console.error = mockConsoleError;
+    
     mockDelete.mockImplementation(() => {
       throw new Error('Cookie deletion failed');
     });
@@ -78,5 +79,9 @@ describe('POST /api/auth/logout', () => {
     expect(data).toEqual({
       error: 'Logout failed',
     });
+    expect(mockConsoleError).toHaveBeenCalledWith('Logout API error:', expect.any(Error));
+    
+    // Restore console.error
+    console.error = originalConsoleError;
   });
 });

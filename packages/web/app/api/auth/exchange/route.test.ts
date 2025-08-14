@@ -31,10 +31,6 @@ describe('POST /api/auth/exchange', () => {
     mockCookies.mockReturnValue({ set: mockSet } as never);
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should exchange valid one-time token for JWT', async () => {
     mockConsumeOneTimeToken.mockReturnValue('valid-jwt-token');
 
@@ -188,6 +184,11 @@ describe('POST /api/auth/exchange', () => {
   });
 
   it('should handle token service errors', async () => {
+    // Mock console.error for this specific test to capture expected error logs
+    const originalConsoleError = console.error;
+    const mockConsoleError = vi.fn();
+    console.error = mockConsoleError;
+    
     mockConsumeOneTimeToken.mockImplementation(() => {
       throw new Error('Token service unavailable');
     });
@@ -209,5 +210,9 @@ describe('POST /api/auth/exchange', () => {
     expect(data).toEqual({
       error: 'Token exchange failed',
     });
+    expect(mockConsoleError).toHaveBeenCalledWith('Token exchange API error:', expect.any(Error));
+    
+    // Restore console.error
+    console.error = originalConsoleError;
   });
 });

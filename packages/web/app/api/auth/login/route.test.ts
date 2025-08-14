@@ -31,10 +31,6 @@ describe('POST /api/auth/login', () => {
     mockCookies.mockReturnValue({ set: mockSet } as never);
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should authenticate user with valid password', async () => {
     mockLogin.mockResolvedValue({
       success: true,
@@ -209,6 +205,11 @@ describe('POST /api/auth/login', () => {
   });
 
   it('should handle auth service errors', async () => {
+    // Mock console.error for this specific test to capture expected error logs
+    const originalConsoleError = console.error;
+    const mockConsoleError = vi.fn();
+    console.error = mockConsoleError;
+    
     mockLogin.mockRejectedValue(new Error('Database connection failed'));
 
     const request = new NextRequest('http://localhost:3000/api/auth/login', {
@@ -229,6 +230,10 @@ describe('POST /api/auth/login', () => {
     expect(data).toEqual({
       error: 'Authentication failed',
     });
+    expect(mockConsoleError).toHaveBeenCalledWith('Login API error:', expect.any(Error));
+    
+    // Restore console.error
+    console.error = originalConsoleError;
   });
 
   it('should default rememberMe to false when not provided', async () => {
