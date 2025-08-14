@@ -1,0 +1,42 @@
+# FileDiffViewer
+
+### Purpose
+A comprehensive file difference viewer organism that provides professional-grade code comparison capabilities. Supports side-by-side and unified diff views with syntax highlighting, line numbers, and interactive features for code review and version control workflows.
+### When to Use
+
+## Usage
+
+```tsx
+import FileDiffViewer from '@/components/ui/FileDiffViewer';
+
+// Basic usage
+<FileDiffViewer />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `diff` | `FileDiff` | Required | - |
+| `viewMode` | `'side-by-side' | 'unified'` | Optional | - |
+| `showLineNumbers` | `boolean` | Optional | - |
+| `showFullFile` | `boolean` | Optional | - |
+| `maxLines` | `number` | Optional | - |
+| `onCopy` | `(content` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

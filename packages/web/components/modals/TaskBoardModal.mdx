@@ -1,0 +1,44 @@
+# TaskBoardModal
+
+### Purpose
+
+A comprehensive task management modal that provides a Kanban-style board interface for organizing, creating, and updating project tasks across different status columns with drag-and-drop functionality.
+
+### When to Use
+
+## Usage
+
+```tsx
+import TaskBoardModal from '@/components/ui/TaskBoardModal';
+
+// Basic usage
+<TaskBoardModal />;
+```
+
+## Props
+
+| Prop           | Type                   | Required | Description |
+| -------------- | ---------------------- | -------- | ----------- |
+| `isOpen`       | `boolean`              | Required | -           |
+| `onClose`      | `() => void`           | Required | -           |
+| `tasks`        | `Task[]`               | Required | -           |
+| `columns`      | `TaskColumn[]`         | Optional | -           |
+| `onTaskUpdate` | `(task: Task) => void` | Optional | -           |
+| `onTaskCreate` | `(task: Task) => void` | Optional | -           |
+| `onTaskClick`  | `(task: Task) => void` | Optional | -           |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface AgentBadgeProps {
   agent: string;
   size?: 'xs' | 'sm' | 'md';

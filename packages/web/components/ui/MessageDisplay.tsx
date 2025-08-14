@@ -1,3 +1,4 @@
+import React from 'react';
 import { MessageHeader, MessageText, Avatar, AgentBadge, TimestampDisplay } from '@/components/ui';
 
 interface MessageDisplayProps {
