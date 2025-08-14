@@ -1,0 +1,50 @@
+# MessageHeader
+
+### Purpose
+A cohesive molecule that combines 2-3 atoms to solve the specific UI pattern of message attribution. Handles user/assistant identification, timing context, and status badges in a single, reusable component.
+### When to Use
+
+## Usage
+
+```tsx
+import MessageHeader from '@/components/ui/MessageHeader';
+
+// Basic usage
+<MessageHeader />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `name` | `string` | Required | - |
+| `timestamp` | `Date | string` | Required | - |
+| `avatar` | `ReactNode` | Optional | - |
+| `badge` | `{` | Optional | - |
+| `text` | `string` | Required | - |
+| `variant` | `` | Optional | - |
+| `| 'default'` | `undefined` | Required | - |
+| `| 'primary'` | `undefined` | Required | - |
+| `| 'secondary'` | `undefined` | Required | - |
+| `| 'accent'` | `undefined` | Required | - |
+| `| 'success'` | `undefined` | Required | - |
+| `| 'warning'` | `undefined` | Required | - |
+| `| 'error'` | `undefined` | Required | - |
+| `| 'info'` | `undefined` | Required | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

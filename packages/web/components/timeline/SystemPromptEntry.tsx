@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@/lib/fontawesome';
 import { formatTime } from '@/lib/format';

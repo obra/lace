@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { motion } from 'framer-motion';
 import { buttonTap, hoverLift, springConfig, focusRing } from '@/lib/animations';
 
