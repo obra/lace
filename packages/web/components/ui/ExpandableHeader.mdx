@@ -1,0 +1,41 @@
+# ExpandableHeader
+
+### Purpose
+A fundamental interactive atom that provides expandable section headers with clear visual state feedback. Uses chevron icons to indicate expanded/collapsed states with consistent styling and optional badge/action support.
+### When to Use
+
+## Usage
+
+```tsx
+import ExpandableHeader from '@/components/ui/ExpandableHeader';
+
+// Basic usage
+<ExpandableHeader />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `title` | `ReactNode` | Required | - |
+| `isExpanded` | `boolean` | Required | - |
+| `onToggle` | `() => void` | Required | - |
+| `badge` | `string | number` | Optional | - |
+| `actions` | `ReactNode` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

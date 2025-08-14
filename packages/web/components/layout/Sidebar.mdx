@@ -1,0 +1,39 @@
+# Sidebar
+
+### Purpose
+A complex, self-contained component that forms the primary navigation interface. Composes multiple molecules and atoms to create a standalone section that handles project navigation, timeline management, task tracking, and user settings.
+### When to Use
+
+## Usage
+
+```tsx
+import Sidebar from '@/components/ui/Sidebar';
+
+// Basic usage
+<Sidebar />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `isOpen` | `boolean` | Required | - |
+| `onToggle` | `() => void` | Required | - |
+| `onSettingsClick` | `() => void` | Optional | - |
+| `children` | `React.ReactNode` | Required | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate
