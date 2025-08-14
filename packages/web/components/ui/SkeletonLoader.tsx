@@ -9,6 +9,7 @@ interface SkeletonLoaderProps {
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
 }
 
+/** @public */
 export default function SkeletonLoader({
   className = '',
   width = 'w-full',

@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-export interface AdvancedSettingsCollapseProps {
+interface AdvancedSettingsCollapseProps {
   title?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;

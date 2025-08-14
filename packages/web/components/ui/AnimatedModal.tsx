@@ -26,6 +26,7 @@ interface AnimatedModalProps {
   className?: string;
 }
 
+/** @public */
 export function AnimatedModal({
   isOpen,
   onClose,
@@ -203,6 +204,7 @@ interface AnimatedConfirmModalProps {
   variant?: 'danger' | 'warning' | 'info';
 }
 
+/** @public */
 export function AnimatedConfirmModal({
   isOpen,
   onClose,

@@ -156,6 +156,7 @@ export function AnimatedButton({
 }
 
 // Specialized button components
+/** @public */
 export function AnimatedIconButton({
   icon,
   onClick,
@@ -235,6 +236,7 @@ interface AnimatedInputProps {
   icon?: React.ReactNode;
 }
 
+/** @public */
 export function AnimatedInput({
   label,
   type = 'text',
