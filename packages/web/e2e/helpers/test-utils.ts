@@ -34,7 +34,13 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
 
   delete process.env.ANTHROPIC_KEY;
 
-  if (env.tempDir && await fs.promises.stat(env.tempDir).then(() => true).catch(() => false)) {
+  if (
+    env.tempDir &&
+    (await fs.promises
+      .stat(env.tempDir)
+      .then(() => true)
+      .catch(() => false))
+  ) {
     await fs.promises.rm(env.tempDir, { recursive: true, force: true });
   }
 }
@@ -80,9 +86,14 @@ export async function createProject(page: Page, projectName: string, tempDir: st
 
   // Create the directory first so validation passes
   await fs.promises.mkdir(projectPath, { recursive: true });
-  
+
   // Verify project directory was created successfully
-  if (!(await fs.promises.stat(projectPath).then(() => true).catch(() => false))) {
+  if (
+    !(await fs.promises
+      .stat(projectPath)
+      .then(() => true)
+      .catch(() => false))
+  ) {
     throw new Error(`Failed to create project directory: ${projectPath}`);
   }
 
@@ -117,7 +128,7 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   });
 }
 
-export async function selectProject(page: Page, projectName: string) {
+async function selectProject(page: Page, projectName: string) {
   await page.click(`text=${projectName}`);
   // Wait for project to be selected - could add specific checks here
   await page.waitForTimeout(1000);
@@ -139,7 +150,7 @@ export async function createSession(page: Page, sessionName: string) {
   await expect(page.getByText(sessionName)).toBeVisible({ timeout: 10000 });
 }
 
-export async function selectSession(page: Page, sessionName: string) {
+async function selectSession(page: Page, sessionName: string) {
   await page.click(`text=${sessionName}`);
   await page.waitForTimeout(1000);
 }
@@ -239,12 +250,12 @@ export async function verifyNoMessage(page: Page, message: string) {
 }
 
 // Wait utilities
-export async function waitForTimeout(ms: number) {
+async function waitForTimeout(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Create project with specific provider for tool approval tests
-export async function createProjectWithProvider(
+async function createProjectWithProvider(
   page: Page,
   projectName: string,
   tempDir: string,
@@ -279,9 +290,14 @@ export async function createProjectWithProvider(
   // Create the project directory
   const projectPath = path.join(tempDir, projectName.replace(/\s+/g, '-').toLowerCase());
   await fs.promises.mkdir(projectPath, { recursive: true });
-  
+
   // Verify project directory was created successfully
-  if (!(await fs.promises.stat(projectPath).then(() => true).catch(() => false))) {
+  if (
+    !(await fs.promises
+      .stat(projectPath)
+      .then(() => true)
+      .catch(() => false))
+  ) {
     throw new Error(`Failed to create project directory: ${projectPath}`);
   }
 

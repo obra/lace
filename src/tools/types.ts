@@ -71,7 +71,7 @@ export interface ToolResult {
 }
 
 // Helper to check if a result indicates an error
-export function isToolError(result: ToolResult): boolean {
+function _isToolError(result: ToolResult): boolean {
   return result.status !== 'completed';
 }
 
