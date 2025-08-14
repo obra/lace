@@ -13,7 +13,7 @@ import {
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
-export interface OllamaProviderConfig extends ProviderConfig {
+interface OllamaProviderConfig extends ProviderConfig {
   host?: string;
   verbose?: boolean;
   [key: string]: unknown; // Allow for additional properties

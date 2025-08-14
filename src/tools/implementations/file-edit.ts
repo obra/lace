@@ -20,9 +20,7 @@ const fileEditArgsSchema = z.object({
   dry_run: z.boolean().optional(),
 });
 
-// Export types for use in tests and other files
-export type EditOperation = z.infer<typeof editOperationSchema>;
-export type FileEditArgs = z.infer<typeof fileEditArgsSchema>;
+type FileEditArgs = z.infer<typeof fileEditArgsSchema>;
 
 export interface FileEditDiffContext {
   beforeContext: string;

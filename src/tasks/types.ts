@@ -7,7 +7,6 @@ export type {
   TaskNote,
   TaskStatus,
   TaskPriority,
-  TaskActor,
 } from '~/tools/implementations/task-manager/types';
 
 import type { TaskActor } from '~/tools/implementations/task-manager/types';

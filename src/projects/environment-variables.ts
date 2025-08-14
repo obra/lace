@@ -1,7 +1,7 @@
 // ABOUTME: Project-level environment variables with encryption and inheritance
 // ABOUTME: Secure handling of environment variables with project-specific scoping
 
-export interface EnvironmentOptions {
+interface EnvironmentOptions {
   encrypt?: string[];
   inheritFrom?: string;
 }

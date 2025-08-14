@@ -13,7 +13,7 @@ import {
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { logger } from '~/utils/logger';
 
-export interface CustomCatalogTemplate {
+interface CustomCatalogTemplate {
   id: string;
   name: string;
   description: string;
@@ -21,13 +21,13 @@ export interface CustomCatalogTemplate {
   template: Partial<CatalogProvider>;
 }
 
-export interface CatalogValidationResult {
+interface CatalogValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
 }
 
-export interface CatalogImportResult {
+interface CatalogImportResult {
   success: boolean;
   catalogId: string;
   errors: string[];

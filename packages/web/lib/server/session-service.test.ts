@@ -7,7 +7,7 @@ import { asThreadId } from '@/types/core';
 import { Agent, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { TestProvider } from '@/lib/server/lace-imports';
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent, ProviderResponse } from '@/types/core';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -194,7 +194,7 @@ describe('SessionService approval event forwarding', () => {
   class MockApprovalProvider extends TestProvider {
     private callCount = 0;
 
-    createResponse(): Promise<import('@/types/core').ProviderResponse> {
+    createResponse(): Promise<ProviderResponse> {
       this.callCount++;
 
       // Only return tool calls on first call to avoid loops

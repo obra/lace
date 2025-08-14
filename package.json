@@ -28,7 +28,6 @@
     "@lmstudio/sdk": "^1.2.1",
     "@modelcontextprotocol/sdk": "^1.13.2",
     "better-sqlite3": "^11.10.0",
-    "marked": "^15.0.12",
     "mustache": "^4.2.0",
     "ollama": "^0.5.16",
     "openai": "^4.77.0",

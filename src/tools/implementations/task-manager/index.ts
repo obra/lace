@@ -9,6 +9,3 @@ export {
   TaskAddNoteTool,
   TaskViewTool,
 } from './tools';
-export type { Task, TaskNote } from './types';
-
-// Factory function no longer needed - tools get TaskManager from context

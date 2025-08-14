@@ -16,7 +16,7 @@ import { logger } from '~/utils/logger';
 import { convertToOpenAIFormat } from '~/providers/format-converters';
 import { getEnvVar } from '~/config/env-loader';
 
-export interface OpenAIProviderConfig extends ProviderConfig {
+interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;
   [key: string]: unknown; // Allow for additional properties
 }

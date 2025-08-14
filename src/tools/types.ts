@@ -46,7 +46,7 @@ export interface ToolInputSchema {
   [k: string]: unknown;
 }
 
-export interface ToolProperty {
+interface ToolProperty {
   type: string;
   description?: string;
   enum?: string[];

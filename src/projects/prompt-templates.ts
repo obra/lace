@@ -1,7 +1,7 @@
 // ABOUTME: Custom prompt templates with variable substitution and inheritance
 // ABOUTME: Allows projects to define reusable prompt templates with dynamic content
 
-export interface PromptTemplateConfig {
+interface PromptTemplateConfig {
   id: string;
   name: string;
   description: string;
