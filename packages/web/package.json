@@ -29,8 +29,6 @@
     "@fortawesome/react-fontawesome": "0.2.2",
     "@heroicons/react": "2.2.0",
     "@tailwindcss/typography": "^0.5.15",
-    "@types/highlight.js": "^9.12.4",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "daisyui": "^5.0.46",
     "dompurify": "^3.2.6",
