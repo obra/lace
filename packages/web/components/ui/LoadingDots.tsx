@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface LoadingDotsProps {
   size?: 'xs' | 'sm' | 'md' | 'lg';
 }

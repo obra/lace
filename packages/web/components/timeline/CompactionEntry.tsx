@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { useState } from 'react';
 import { MessageHeader } from '@/components/ui';
 import type { CompactionData } from '@/types/core';

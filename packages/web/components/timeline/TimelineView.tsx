@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { useEffect, useRef } from 'react';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
