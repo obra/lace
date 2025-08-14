@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperclip, faTimes, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';

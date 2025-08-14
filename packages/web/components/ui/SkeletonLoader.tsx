@@ -1,3 +1,5 @@
+import React from 'react';
+
 // ABOUTME: Skeleton loader component for showing loading states
 
 interface SkeletonLoaderProps {

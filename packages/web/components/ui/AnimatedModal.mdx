@@ -1,0 +1,44 @@
+# AnimatedModal
+
+### Purpose
+A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of modal dialogs. Handles overlay display, backdrop interaction, content presentation, and animated transitions in a single, accessible component.
+### When to Use
+
+## Usage
+
+```tsx
+import AnimatedModal from '@/components/ui/AnimatedModal';
+
+// Basic usage
+<AnimatedModal />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `isOpen` | `boolean` | Required | - |
+| `onClose` | `() => void` | Required | - |
+| `title` | `string` | Optional | - |
+| `children` | `React.ReactNode` | Required | - |
+| `size` | `'sm' | 'md' | 'lg' | 'xl' | 'full'` | Optional | - |
+| `showCloseButton` | `boolean` | Optional | - |
+| `closeOnBackdropClick` | `boolean` | Optional | - |
+| `closeOnEscape` | `boolean` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

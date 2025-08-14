@@ -1,13 +1,12 @@
 // ABOUTME: Extracted sidebar component for LaceApp to improve performance
 // ABOUTME: Memoized component to prevent unnecessary re-renders
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faComments, faRobot, faCog, faTasks } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
-import type { ProviderInfo } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 

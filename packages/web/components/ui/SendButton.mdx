@@ -1,0 +1,42 @@
+# SendButton
+
+### Purpose
+A fundamental building block that handles form submission and streaming interruption with consistent visual feedback. The smallest functional unit for send/stop actions.
+### When to Use
+
+## Usage
+
+```tsx
+import SendButton from '@/components/ui/SendButton';
+
+// Basic usage
+<SendButton />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `onSubmit` | `() => void` | Optional | - |
+| `onStop` | `() => void` | Optional | - |
+| `disabled` | `boolean` | Optional | - |
+| `isStreaming` | `boolean` | Optional | - |
+| `hasContent` | `boolean` | Optional | - |
+| `size` | `'sm' | 'md' | 'lg'` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

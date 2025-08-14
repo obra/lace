@@ -1,0 +1,43 @@
+# FileAttachment
+
+### Purpose
+A sophisticated input molecule that combines drag-and-drop functionality, file validation, preview capabilities, and management features to create a complete file attachment experience. Perfect for forms, chat interfaces, and document management systems.
+### When to Use
+
+## Usage
+
+```tsx
+import FileAttachment from '@/components/ui/FileAttachment';
+
+// Basic usage
+<FileAttachment />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `attachedFiles` | `AttachedFile[]` | Required | - |
+| `onFilesAttached` | `(files` | Required | - |
+| `onFileRemoved` | `(fileId` | Required | - |
+| `onFileCleared` | `() => void` | Required | - |
+| `maxFiles` | `number` | Optional | - |
+| `maxSizeBytes` | `number` | Optional | - |
+| `acceptedTypes` | `string[]` | Optional | - |
+| `disabled` | `boolean` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

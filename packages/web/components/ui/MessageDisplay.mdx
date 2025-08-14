@@ -1,0 +1,44 @@
+# MessageDisplay
+
+### Purpose
+A flexible molecule that renders different types of messages (human, AI, admin, tool) with appropriate styling and layout. Provides the core structure for conversation interfaces with consistent visual hierarchy.
+### When to Use
+
+## Usage
+
+```tsx
+import MessageDisplay from '@/components/ui/MessageDisplay';
+
+// Basic usage
+<MessageDisplay />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `type` | `'human' | 'ai' | 'admin' | 'tool'` | Required | - |
+| `content` | `string` | Required | - |
+| `timestamp` | `Date | string` | Required | - |
+| `agent` | `string` | Optional | - |
+| `name` | `string` | Optional | - |
+| `role` | `'user' | 'assistant'` | Optional | - |
+| `tool` | `string` | Optional | - |
+| `result` | `string` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate
