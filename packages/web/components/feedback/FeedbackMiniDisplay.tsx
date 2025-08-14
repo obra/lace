@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import { useState } from 'react';
 import { FeedbackEvent } from '@/feedback/types';
 import { FeedbackEventCard } from './FeedbackEventCard';

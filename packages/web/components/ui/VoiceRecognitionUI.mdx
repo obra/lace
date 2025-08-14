@@ -1,0 +1,43 @@
+# VoiceRecognitionUI
+
+### Purpose
+A cohesive molecule that combines 4-5 atoms to solve the specific UI pattern of voice input recognition. Handles microphone control, audio visualization, transcript display, and error states in a single, interactive component.
+### When to Use
+
+## Usage
+
+```tsx
+import VoiceRecognitionUI from '@/components/ui/VoiceRecognitionUI';
+
+// Basic usage
+<VoiceRecognitionUI />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `isListening` | `boolean` | Required | - |
+| `onStartListening` | `() => void` | Required | - |
+| `onStopListening` | `() => void` | Required | - |
+| `transcript` | `string` | Optional | - |
+| `interimTranscript` | `string` | Optional | - |
+| `confidence` | `number` | Optional | - |
+| `error` | `string` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

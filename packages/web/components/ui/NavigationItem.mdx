@@ -1,0 +1,45 @@
+# NavigationItem
+
+### Purpose
+A cohesive molecule that combines 3-4 atoms to solve the specific UI pattern of navigation items. Handles icon display, content hierarchy, status indication, and action buttons in a single, reusable component.
+### When to Use
+
+## Usage
+
+```tsx
+import NavigationItem from '@/components/ui/NavigationItem';
+
+// Basic usage
+<NavigationItem />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `icon` | `IconDefinition` | Optional | - |
+| `title` | `string` | Required | - |
+| `subtitle` | `string` | Optional | - |
+| `badge` | `string | number` | Optional | - |
+| `status` | `'online' | 'offline' | 'busy' | 'away' | 'error' | 'success'` | Optional | - |
+| `isActive` | `boolean` | Optional | - |
+| `isDisabled` | `boolean` | Optional | - |
+| `actions` | `ReactNode` | Optional | - |
+| `onClick` | `() => void` | Optional | - |
+| `className` | `string` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

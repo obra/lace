@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { motion } from 'framer-motion';
 import { shimmer, springConfig, staggerContainer, staggerItem } from '@/lib/animations';
 

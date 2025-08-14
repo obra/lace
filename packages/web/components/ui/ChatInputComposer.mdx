@@ -1,0 +1,51 @@
+# ChatInputComposer
+
+### Purpose
+A cohesive unit that combines 2-5 atoms to solve the specific UI pattern of chat message composition. Handles text input, voice recording, file attachments, and submission in a single, reusable component.
+### When to Use
+
+## Usage
+
+```tsx
+import ChatInputComposer from '@/components/ui/ChatInputComposer';
+
+// Basic usage
+<ChatInputComposer />
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `value` | `string` | Required | - |
+| `onChange` | `(value` | Required | - |
+| `onSubmit` | `() => void` | Required | - |
+| `disabled` | `boolean` | Optional | - |
+| `isListening` | `boolean` | Optional | - |
+| `onStartVoice` | `() => void` | Optional | - |
+| `onStopVoice` | `() => void` | Optional | - |
+| `onInterrupt` | `() => void` | Optional | - |
+| `isStreaming` | `boolean` | Optional | - |
+| `placeholder` | `string` | Optional | - |
+| `attachedFiles` | `AttachedFile[]` | Optional | - |
+| `onFilesAttached` | `(files` | Optional | - |
+| `onFileRemoved` | `(fileId` | Optional | - |
+| `onFileCleared` | `() => void` | Optional | - |
+| `showVoiceButton` | `boolean` | Optional | - |
+| `showFileAttachment` | `boolean` | Optional | - |
+
+## Examples
+
+See the [Playground](/play) for interactive examples.
+
+## When to Use
+
+- Component-specific use cases
+- Integration scenarios
+- UI patterns
+
+## Accessibility
+
+- Keyboard navigation support
+- Screen reader compatibility
+- ARIA labels where appropriate

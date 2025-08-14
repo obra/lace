@@ -1,3 +1,4 @@
+import React from 'react';
 import { ReactNode } from 'react';
 import { SectionHeader } from '@/components/ui';
 
