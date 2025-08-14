@@ -17,6 +17,9 @@ interface ContentPart {
 }
 
 export default function MessageText({ content, className = '' }: MessageTextProps) {
+  // Normalize content first to keep hooks at top-level (no early returns before hooks)
+  const safeContent = typeof content === 'string' ? content : '';
+
   const processInlineCode = useCallback((text: string): ContentPart[] => {
     const parts: ContentPart[] = [];
     let currentIndex = 0;
@@ -62,7 +65,7 @@ export default function MessageText({ content, className = '' }: MessageTextProp
     }> = [];
 
     let match;
-    while ((match = codeBlockRegex.exec(content)) !== null) {
+    while ((match = codeBlockRegex.exec(safeContent)) !== null) {
       codeBlockMatches.push({
         match,
         language: match[1] || 'text',
@@ -77,7 +80,7 @@ export default function MessageText({ content, className = '' }: MessageTextProp
     for (const { match, language, code } of codeBlockMatches) {
       // Add text before code block
       if (match.index > currentIndex) {
-        const textContent = content.slice(currentIndex, match.index);
+        const textContent = safeContent.slice(currentIndex, match.index);
         if (textContent) {
           parts.push({ type: 'text', content: textContent });
         }
@@ -89,8 +92,8 @@ export default function MessageText({ content, className = '' }: MessageTextProp
     }
 
     // Add remaining text
-    if (currentIndex < content.length) {
-      const remainingText = content.slice(currentIndex);
+    if (currentIndex < safeContent.length) {
+      const remainingText = safeContent.slice(currentIndex);
       if (remainingText) {
         parts.push({ type: 'text', content: remainingText });
       }
@@ -109,46 +112,54 @@ export default function MessageText({ content, className = '' }: MessageTextProp
     }
 
     return processedParts;
-  }, [content, processInlineCode]);
+  }, [safeContent, processInlineCode]);
 
   const formatTextContent = (text: string) => {
     // Convert newlines to <br> tags and sanitize HTML
     const withBreaks = text.replace(/\n/g, '<br>');
-    return DOMPurify.sanitize(withBreaks);
+    // Only sanitize on client side (DOMPurify doesn't work on server)
+    if (typeof window !== 'undefined' && DOMPurify?.sanitize) {
+      return DOMPurify.sanitize(withBreaks);
+    }
+    return withBreaks;
   };
 
   return (
     <div className={`text-sm leading-relaxed text-base-content ${className}`}>
-      {parsedContent.map((part, index) => {
-        switch (part.type) {
-          case 'code-block':
-            return (
-              <div key={index} className="my-2">
-                <CodeBlock
-                  code={part.content}
-                  language={part.language}
-                  showLineNumbers={false}
-                  showHeader={true}
-                  maxHeight="400px"
+      {!safeContent ? (
+        <div className="text-base-content/50">No content</div>
+      ) : (
+        parsedContent.map((part, index) => {
+          switch (part.type) {
+            case 'code-block':
+              return (
+                <div key={index} className="my-2">
+                  <CodeBlock
+                    code={part.content}
+                    language={part.language}
+                    showLineNumbers={false}
+                    showHeader={true}
+                    maxHeight="400px"
+                  />
+                </div>
+              );
+
+            case 'inline-code':
+              return <InlineCode key={index} code={part.content} enableHighlighting={false} />;
+
+            case 'text':
+            default:
+              return (
+                <span
+                  key={index}
+                  dangerouslySetInnerHTML={{
+                    __html: formatTextContent(part.content),
+                  }}
                 />
-              </div>
-            );
-
-          case 'inline-code':
-            return <InlineCode key={index} code={part.content} enableHighlighting={false} />;
-
-          case 'text':
-          default:
-            return (
-              <span
-                key={index}
-                dangerouslySetInnerHTML={{
-                  __html: formatTextContent(part.content),
-                }}
-              />
-            );
-        }
-      })}
+              );
+          }
+        })
+      )}
     </div>
   );
 }
