@@ -1,9 +1,16 @@
 // ABOUTME: Integration tests for project API endpoints using real Project class and database
-// ABOUTME: Tests actual behavior without mocking the Project class - uses real database operations
+// ABOUTME: Tests actual behavior without mocking the Project class - uses real database operations with auth bypassed
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+
+// Mock auth for business logic testing
+vi.mock('@/lib/server/api-auth', () => ({
+  requireAuth: vi.fn().mockReturnValue(null), // null = authenticated
+  extractTokenFromRequest: vi.fn().mockReturnValue('mock-token'),
+  createAuthErrorResponse: vi.fn()
+}));
 
 // CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
 const _tempLaceDir = setupWebTest();
@@ -15,9 +22,6 @@ import {
 import { parseResponse } from '@/lib/serialization';
 import { Session } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/core';
-
-// Mock server-only before importing API routes
-vi.mock('server-only', () => ({}));
 
 import { GET, POST } from '@/app/api/projects/route';
 
@@ -78,7 +82,8 @@ describe('Projects API Integration Tests', () => {
         projectId: project1.getId(),
       });
 
-      const response = await GET();
+      const mockRequest = new Request('http://localhost:3000/api/projects') as NextRequest;
+      const response = await GET(mockRequest);
       const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
@@ -102,7 +107,8 @@ describe('Projects API Integration Tests', () => {
     });
 
     it('should return empty projects array when no projects exist', async () => {
-      const response = await GET();
+      const mockRequest = new Request('http://localhost:3000/api/projects') as NextRequest;
+      const response = await GET(mockRequest);
       const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
@@ -276,7 +282,8 @@ describe('Projects API Integration Tests', () => {
       expect(response2.status).toBe(201);
 
       // Verify both projects exist
-      const getResponse = await GET();
+      const mockGetRequest = new Request('http://localhost:3000/api/projects') as NextRequest;
+      const getResponse = await GET(mockGetRequest);
       const data = await parseResponse<ProjectInfo[]>(getResponse);
       const duplicateProjects = data.filter((p) => p.name === 'Duplicate Project');
       expect(duplicateProjects).toHaveLength(2);

@@ -7,6 +7,13 @@ import { GET, PATCH } from '@/app/api/sessions/[sessionId]/route';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+
+// Mock auth for business logic testing
+vi.mock('@/lib/server/api-auth', () => ({
+  requireAuth: vi.fn().mockReturnValue(null), // null = authenticated
+  extractTokenFromRequest: vi.fn().mockReturnValue('mock-token'),
+  createAuthErrorResponse: vi.fn()
+}));
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,

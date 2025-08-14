@@ -4,7 +4,7 @@
 import { useTempLaceDir, type TempLaceDirContext } from '~/test-utils/temp-lace-dir';
 import { resetPersistence } from '~/persistence/database';
 import { ProviderRegistry } from '~/providers/registry';
-import { beforeEach, afterEach } from 'vitest';
+import { beforeEach, afterEach, vi } from 'vitest';
 
 /**
  * Complete test setup for web tests - handles temp LACE_DIR isolation and persistence reset
