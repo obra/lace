@@ -11,8 +11,7 @@ import {
   login,
   isAuthenticated,
   generateOneTimeLoginURL,
-  exchangeOneTimeToken,
-  type LoginResult
+  exchangeOneTimeToken
 } from '@/lib/server/auth-service';
 import { clearJWTSecretCache } from '@/lib/server/auth-config';
 

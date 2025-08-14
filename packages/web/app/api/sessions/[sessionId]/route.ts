@@ -7,6 +7,7 @@ import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { requireAuth } from '@/lib/server/api-auth';
 import { z } from 'zod';
 
 // Type guard for ThreadId using client-safe validation
@@ -20,9 +21,13 @@ function isError(error: unknown): error is Error {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ): Promise<NextResponse> {
+  // Check authentication
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;
@@ -68,6 +73,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ): Promise<NextResponse> {
+  // Check authentication
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const sessionService = getSessionService();
     const { sessionId: sessionIdParam } = await params;

@@ -23,10 +23,10 @@ const oneTimeTokens = new Map<string, { expiry: number }>();
 export function generateJWT(payload: TokenPayload, expiry: string = DEFAULT_EXPIRY): string {
   const secret = getOrGenerateJWTSecret();
   
-  return jwt.sign(payload, secret, {
+  return jwt.sign(payload, secret as string, {
     expiresIn: expiry,
     algorithm: 'HS256'
-  });
+  } as jwt.SignOptions);
 }
 
 /**
@@ -35,9 +35,9 @@ export function generateJWT(payload: TokenPayload, expiry: string = DEFAULT_EXPI
 export function verifyJWT(token: string): TokenPayload | null {
   try {
     const secret = getOrGenerateJWTSecret();
-    const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as TokenPayload;
+    const decoded = jwt.verify(token, secret as string, { algorithms: ['HS256'] } as jwt.VerifyOptions) as TokenPayload;
     return decoded;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -91,4 +91,36 @@ function cleanupExpiredTokens(): void {
       oneTimeTokens.delete(token);
     }
   }
+}
+
+/**
+ * Invalidate all sessions by regenerating the JWT secret
+ * This will make all existing JWT tokens invalid
+ */
+export async function invalidateAllSessions(): Promise<void> {
+  const { loadAuthConfig, saveAuthConfig, clearJWTSecretCache } = await import('./auth-config');
+  
+  // Generate new JWT secret
+  const newJWTSecret = crypto.randomBytes(32).toString('hex');
+  
+  // Load existing config
+  const config = await loadAuthConfig();
+  if (!config) {
+    throw new Error('No authentication configuration found');
+  }
+  
+  // Update config with new JWT secret
+  const updatedConfig = {
+    ...config,
+    jwtSecret: newJWTSecret,
+  };
+  
+  // Save updated config
+  await saveAuthConfig(updatedConfig);
+  
+  // Clear cached secret so new one gets loaded
+  clearJWTSecretCache();
+  
+  // Clear one-time tokens
+  oneTimeTokens.clear();
 }

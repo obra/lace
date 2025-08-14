@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { requireAuth } from '@/lib/server/api-auth';
 import { z } from 'zod';
 
 const CreateProjectSchema = z.object({
@@ -14,7 +15,11 @@ const CreateProjectSchema = z.object({
   configuration: z.record(z.unknown()).optional(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Check authentication
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const projects = Project.getAll();
 
@@ -29,6 +34,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Check authentication
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = CreateProjectSchema.parse(body);

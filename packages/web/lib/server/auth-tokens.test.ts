@@ -6,8 +6,7 @@ import {
   generateJWT,
   verifyJWT,
   generateOneTimeToken,
-  consumeOneTimeToken,
-  type TokenPayload
+  consumeOneTimeToken
 } from '@/lib/server/auth-tokens';
 
 // Mock jsonwebtoken to control time

@@ -46,7 +46,7 @@ export async function login(password: string, expiry?: string): Promise<LoginRes
       success: true,
       jwt
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       success: false,
       error: 'Authentication failed'
