@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { TimelineEntry } from '@/types/web-events';

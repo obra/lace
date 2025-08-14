@@ -3,6 +3,7 @@
 
 'use client';
 
+import React from 'react';
 import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
 import type { AgentInfo } from '@/types/core';
 import { TimelineMessage } from './TimelineMessage';

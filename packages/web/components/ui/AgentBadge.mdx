@@ -1,0 +1,56 @@
+# AgentBadge
+
+**Identity Atom** - Display agent identification with consistent styling
+
+## Purpose
+A foundational atom that provides visual identification for AI agents in conversation interfaces. Uses agent-specific colors and typography to maintain consistent branding across different contexts.
+
+## Usage
+
+```tsx
+import AgentBadge from '@/components/ui/AgentBadge';
+
+// Basic usage
+<AgentBadge agent="Claude" />
+
+// With custom size
+<AgentBadge agent="GPT-4" size="md" />
+
+// All agents
+<AgentBadge agent="Claude" size="md" />
+<AgentBadge agent="GPT-4" size="md" />
+<AgentBadge agent="Gemini" size="md" />
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `agent` | `string` | - | The agent name to display |
+| `size` | `'xs' \| 'sm' \| 'md'` | `'xs'` | The size of the badge |
+| `className` | `string` | `''` | Additional CSS classes |
+
+## Sizes
+
+- **xs**: 10px text - Minimal contexts
+- **sm**: 12px text - Compact interfaces  
+- **md**: 14px text - Standard usage
+
+## Agent Colors
+
+- **Claude**: Orange theme
+- **GPT-4**: Green theme  
+- **Gemini**: Blue theme
+
+## When to Use
+
+- Message headers to identify the AI agent
+- Conversation lists to show agent type
+- Settings to display current agent selection
+- Timeline entries for agent identification
+
+## Accessibility
+
+- Proper ARIA labels for screen readers
+- Sufficient color contrast ratios
+- High contrast mode compatibility

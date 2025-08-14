@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFileCode, faPlus, faMinus } from '@/lib/fontawesome';
 
