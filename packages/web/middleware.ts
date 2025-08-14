@@ -47,10 +47,8 @@ function shouldBypass(request: NextRequest): boolean {
     return true;
   }
   
-  // Allow root path (client-side routing will handle auth)
-  if (url.pathname === '/') {
-    return true;
-  }
+  // Don't bypass root path - it should require authentication
+  // (client-side routing will be handled after auth check)
   
   // Allow localhost bypass if configured
   if (process.env.LACE_ALLOW_LOCALHOST === 'true' && url.hostname === 'localhost') {
@@ -82,20 +80,38 @@ export async function middleware(request: NextRequest): Promise<NextResponse | u
     return undefined; // Continue to next middleware or route handler
   }
   
+  const isAPIRequest = request.nextUrl.pathname.startsWith('/api/');
+  
   // Extract JWT token from request
   const token = extractToken(request);
   
   if (!token) {
-    // No token found, redirect to login
-    return NextResponse.redirect(new URL('/login', request.url));
+    if (isAPIRequest) {
+      // API requests should get 401, not redirects
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    } else {
+      // Web requests get redirected to login
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
   }
   
   // Verify the JWT token
   const isValid = await verifyToken(token);
   
   if (!isValid) {
-    // Invalid token, redirect to login
-    return NextResponse.redirect(new URL('/login', request.url));
+    if (isAPIRequest) {
+      // API requests should get 401, not redirects
+      return NextResponse.json(
+        { error: 'Invalid authentication token' },
+        { status: 401 }
+      );
+    } else {
+      // Web requests get redirected to login
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
   }
   
   // Token is valid, continue to route handler
