@@ -118,6 +118,7 @@ export default function LoginPage() {
               className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Enter your password"
               disabled={isLoading}
+              data-testid="password-input"
             />
           </div>
         </div>
@@ -131,6 +132,7 @@ export default function LoginPage() {
             onChange={(e) => setRememberMe(e.target.checked)}
             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             disabled={isLoading}
+            data-testid="remember-me"
           />
           <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
             Remember me for 30 days
@@ -138,7 +140,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-50 p-4">
+          <div className="rounded-md bg-red-50 p-4" data-testid="error-message">
             <div className="text-sm text-red-800">
               {error}
             </div>
@@ -150,12 +152,13 @@ export default function LoginPage() {
             type="submit"
             disabled={!password.trim() || isLoading}
             className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="login-button"
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center" data-testid="reset-password-info">
           <p className="text-sm text-gray-500">
             Password reset is only available via command line.
             <br />

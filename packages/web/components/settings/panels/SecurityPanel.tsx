@@ -151,6 +151,7 @@ export function SecurityPanel({ onPasswordChanged, onSessionsCleared }: Security
     <SettingsPanel
       title="Security Settings"
       description="Manage your authentication and security preferences"
+      data-testid="security-panel"
     >
       <div className="space-y-8">
         {/* Success/Error Messages */}
@@ -258,6 +259,7 @@ export function SecurityPanel({ onPasswordChanged, onSessionsCleared }: Security
               onClick={handleLogoutAll}
               disabled={isLoggingOut}
               className="btn btn-outline btn-warning vapor-button ring-hover"
+              data-testid="logout-button"
             >
               {isLoggingOut ? 'Logging out...' : 'Logout from All Devices'}
             </button>

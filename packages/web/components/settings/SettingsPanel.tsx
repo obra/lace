@@ -11,6 +11,7 @@ interface SettingsPanelProps {
   icon?: string;
   className?: string;
   children: React.ReactNode;
+  'data-testid'?: string;
 }
 
 export function SettingsPanel({
@@ -19,9 +20,10 @@ export function SettingsPanel({
   icon,
   className = '',
   children,
+  'data-testid': dataTestId,
 }: SettingsPanelProps) {
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`space-y-4 ${className}`} data-testid={dataTestId}>
       {/* Panel header */}
       {title && (
         <div className="space-y-1">
