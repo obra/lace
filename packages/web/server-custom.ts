@@ -5,7 +5,9 @@ import { parseArgs } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import module from 'module';
-import { isInteractive } from './lib/server-utils';
+import { isInteractive, displayAutoLoginInfo } from './lib/server-utils';
+import { resetPassword } from './lib/server/password-reset';
+import { getOrGenerateJWTSecret } from './lib/server/auth-config';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -20,6 +22,10 @@ const { values } = parseArgs({
       default: 'localhost',
     },
     help: {
+      type: 'boolean',
+      default: false,
+    },
+    'reset-password': {
       type: 'boolean',
       default: false,
     },
@@ -38,15 +44,28 @@ Options:
   -p, --port <port>    Port to listen on (default: 31337, auto-finds available)
   -h, --host <host>    Host to bind to (default: localhost)
                        Use '0.0.0.0' to allow external connections
+  --reset-password     Generate a new authentication password and exit
   --help               Show this help message
 
 Examples:
   npm start                        # Start on localhost:31337 (or next available)
   npm start -- --port 8080         # Start on localhost:8080 (exact port required)
   npm start -- --host 0.0.0.0      # Allow external connections
+  npm start -- --reset-password    # Reset authentication password
   npm run dev -- --port 3001       # Development mode on port 3001 (exact port)
 `);
   process.exit(0);
+}
+
+// Handle password reset option
+if (values['reset-password']) {
+  try {
+    await resetPassword();
+    process.exit(0);
+  } catch (error) {
+    console.error('Error resetting password:', error instanceof Error ? error.message : 'Unknown error');
+    process.exit(1);
+  }
 }
 
 const userSpecifiedPort = !!values.port; // Track if user manually specified port
@@ -327,6 +346,9 @@ if (isStandalone) {
 
 // Our enhanced server that replaces the standalone server
 async function startLaceServer() {
+  // Initialize JWT secret for authentication
+  process.env.LACE_JWT_SECRET = getOrGenerateJWTSecret();
+  
   // Do our port detection first
   const port = await findAvailablePort(requestedPort, userSpecifiedPort, hostname);
   const url = `http://${hostname}:${port}`;
@@ -353,7 +375,12 @@ async function startLaceServer() {
    🌐 URL: ${url}
    🔧 Mode: ${isDev ? 'development' : 'production (standalone)'}
    🔒 Process: Single-process mode (PID: ${process.pid})
-   
+`);
+
+    // Display auto-login URL for CLI integration
+    await displayAutoLoginInfo(url);
+
+    console.log(`   
    Press Ctrl+C to stop
 `);
 

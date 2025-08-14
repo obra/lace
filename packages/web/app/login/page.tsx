@@ -17,36 +17,36 @@ export default function LoginPage() {
 
   // Handle one-time token from URL on component mount
   useEffect(() => {
+    const handleTokenExchange = async (token: string) => {
+      setIsLoading(true);
+      setError('');
+
+      try {
+        const response = await fetch('/api/auth/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+
+        if (response.ok) {
+          // Token exchange successful, redirect to home
+          router.push('/');
+        } else {
+          const data = await response.json() as { error?: string };
+          setError(data.error || 'Invalid or expired token');
+        }
+      } catch (_err) {
+        setError('Network error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     const token = searchParams.get('token');
     if (token) {
-      handleTokenExchange(token);
+      void handleTokenExchange(token);
     }
-  }, [searchParams]);
-
-  const handleTokenExchange = async (token: string) => {
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/auth/exchange', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-
-      if (response.ok) {
-        // Token exchange successful, redirect to home
-        router.push('/');
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Invalid or expired token');
-      }
-    } catch (err) {
-      setError('Network error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,10 +72,10 @@ export default function LoginPage() {
         // Login successful, redirect to home
         router.push('/');
       } else {
-        const data = await response.json();
+        const data = await response.json() as { error?: string };
         setError(data.error || 'Login failed');
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Network error occurred');
     } finally {
       setIsLoading(false);
