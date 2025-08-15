@@ -66,13 +66,13 @@ export default function SendButton({
       disabled={isDisabled}
       data-testid={isStreaming ? 'stop-button' : 'send-button'}
       className={`
-        ${getSizeClasses()} rounded-xl transition-colors
+        ${getSizeClasses()} rounded-xl transition-all duration-200 shadow-sm hover:shadow-md
         ${
           isStreaming
-            ? 'bg-red-600 text-white hover:bg-red-700'
-            : 'bg-teal-600 text-white hover:bg-teal-700'
+            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 hover:scale-105'
+            : 'bg-gradient-to-r from-primary to-primary/90 text-primary-content hover:from-primary/90 hover:to-primary hover:scale-105'
         }
-        ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
+        ${isDisabled ? 'opacity-50 cursor-not-allowed hover:scale-100 hover:shadow-sm' : ''}
         ${className}
       `}
       title={

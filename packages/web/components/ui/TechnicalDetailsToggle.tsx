@@ -6,7 +6,7 @@
 import React from 'react';
 import { useState, ReactNode } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck } from '@/lib/fontawesome';
+import { faCopy, faCheck, faChevronDown, faChevronUp } from '@/lib/fontawesome';
 import { safeStringify } from '@/lib/utils/safeStringify';
 
 interface TechnicalDetailsToggleProps {
@@ -44,21 +44,26 @@ export function TechnicalDetailsToggle({
   };
 
   return (
-    <div className={`relative ${className || ''}`}>
-      {children}
+    <div className={`relative group ${className || ''}`}>
+      <div className="relative">
+        {children}
 
-      <button
-        onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-        className={
-          buttonClassName ||
-          'text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200'
-        }
-      >
-        {showTechnicalDetails ? 'Hide' : 'Show'} Details
-      </button>
+        <button
+          onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+          className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+            buttonClassName ||
+            'absolute top-1/2 -translate-y-1/2 right-2 text-base-content/30 hover:text-base-content/70 p-1 rounded hover:bg-base-200/50 w-6 h-6 flex items-center justify-center z-10'
+          }`}
+        >
+          <FontAwesomeIcon
+            icon={showTechnicalDetails ? faChevronUp : faChevronDown}
+            className="text-xs w-3 h-3"
+          />
+        </button>
+      </div>
 
       {showTechnicalDetails && (
-        <div className="mt-2 px-3 py-2 bg-base-50 border border-base-200 rounded-lg">
+        <div className="mt-2 ml-11 px-3 py-2 bg-base-50 border border-base-200 rounded-lg">
           <div className="flex items-center justify-between mb-1">
             <div className="text-xs text-base-content/70 font-medium">{label}:</div>
             <button

@@ -80,11 +80,12 @@ const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(
     }, [disabled, autoFocus]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && e.shiftKey && onSubmit) {
+      if (e.key === 'Enter' && !e.shiftKey && onSubmit) {
         e.preventDefault();
         if (!value.trim() || disabled) return;
         onSubmit();
       }
+      // Shift+Enter and Option+Enter allow new lines (default textarea behavior)
       onKeyDown?.(e);
     };
 

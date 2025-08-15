@@ -46,7 +46,7 @@ export const fileWriteRenderer: ToolRenderer = {
 
     if (isError) {
       return (
-        <div className="bg-error/5 border border-error/20 rounded-lg">
+        <div className="bg-error/5 border border-error/20 rounded-xl shadow-sm">
           <div className="px-3 py-2 border-b border-error/20 bg-error/10">
             <div className="flex items-center gap-2">
               <FontAwesomeIcon

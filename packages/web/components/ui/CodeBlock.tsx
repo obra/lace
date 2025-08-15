@@ -41,6 +41,16 @@ export default function CodeBlock({
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!collapsed);
 
+  // Safe sanitizer function that works in both client and server environments
+  const safeSanitize = (html: string): string => {
+    if (typeof window !== 'undefined' && DOMPurify?.sanitize) {
+      return DOMPurify.sanitize(html);
+    }
+    // Fallback for server-side rendering - just return the html without sanitization
+    // This is safe for syntax highlighting since hljs output is controlled
+    return html;
+  };
+
   // Simple syntax highlighting
   const highlightCode = (code: string, lang?: string) => {
     // Try to detect language from filename if no language provided
@@ -197,7 +207,7 @@ export default function CodeBlock({
                 ) : (
                   <code
                     className="hljs"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightResult.value) }}
+                    dangerouslySetInnerHTML={{ __html: safeSanitize(highlightResult.value) }}
                   />
                 )}
               </div>

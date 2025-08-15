@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { ChatTextarea, VoiceButton, SendButton, FileAttachButton } from '@/components/ui';
+import { ChatTextarea, SendButton, FileAttachButton } from '@/components/ui';
+import { CompactVoiceButton } from '@/components/ui/VoiceRecognitionUI';
 import type { ChatTextareaRef } from './ChatTextarea';
 import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
 
@@ -158,16 +159,15 @@ export default function ChatInputComposer({
         }}
         className="relative"
       >
-        <div className="flex gap-3 items-end">
+        <div className="flex gap-4 items-end">
           {/* Voice Input (Mobile Only) */}
           {isMobile && showVoiceButton && onStartVoice && (
             <div className="lg:hidden">
-              <VoiceButton
+              <CompactVoiceButton
                 isListening={isListening}
                 onToggle={handleVoiceToggle}
                 size="md"
                 variant="ghost"
-                disabled={disabled}
               />
             </div>
           )}
@@ -187,13 +187,31 @@ export default function ChatInputComposer({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className="pr-20"
+              className={`${
+                showVoiceButton && !isMobile && showFileAttachment
+                  ? 'pr-36'
+                  : showVoiceButton && !isMobile
+                    ? 'pr-28'
+                    : showFileAttachment
+                      ? 'pr-20'
+                      : 'pr-12'
+              }`}
               autoFocus={!disabled}
               data-testid="message-input"
             />
 
             {/* Right Side Controls */}
-            <div className="absolute right-2 bottom-2 flex gap-1">
+            <div className="absolute right-3 bottom-3 flex gap-2">
+              {/* Voice Button (Desktop) */}
+              {!isMobile && showVoiceButton && onStartVoice && (
+                <CompactVoiceButton
+                  isListening={isListening}
+                  onToggle={handleVoiceToggle}
+                  size="md"
+                  variant="ghost"
+                />
+              )}
+
               {/* File Attachment Button */}
               {showFileAttachment && onFilesAttached && (
                 <FileAttachButton
