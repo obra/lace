@@ -57,6 +57,7 @@ jobs:
     
     - name: Test executable
       run: |
+        chmod +x build/${{ matrix.name }}
         ./build/${{ matrix.name }} --help
     
     - name: Upload executable
