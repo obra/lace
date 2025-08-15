@@ -182,17 +182,13 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   const execSize = parseInt(execStats.split(' ')[0]);
   console.log(`✅ Executable created: ${(execSize / 1024 / 1024).toFixed(1)}MB\n`);
 
-  // Step 5: Test executable
-  console.log('5️⃣ Testing executable...');
-  try {
-    const helpOutput = execSync(`${outputPath} --help`, { encoding: 'utf8', timeout: 5000 });
-    if (helpOutput.includes('Lace - Single-File AI Coding Assistant')) {
-      console.log('✅ Executable test passed\n');
-    } else {
-      console.warn('⚠️ Help output unexpected\n');
-    }
-  } catch (error) {
-    console.warn('⚠️ Executable test failed:', error);
+  // Step 5: Validate executable exists
+  console.log('5️⃣ Validating executable...');
+  if (existsSync(outputPath)) {
+    console.log('✅ Executable created successfully');
+    console.log('ℹ️  Note: Cross-platform testing skipped (may not be compatible with build host)');
+  } else {
+    throw new Error('Executable was not created');
   }
 
   // Summary

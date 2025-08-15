@@ -16,9 +16,6 @@ jobs:
           - os: ubuntu-latest
             target: bun-linux-x64
             name: lace-linux-x64
-          - os: ubuntu-latest  
-            target: bun-linux-arm64
-            name: lace-linux-arm64
           - os: macos-latest
             target: bun-darwin-arm64
             name: lace-macos-arm64
@@ -116,7 +113,6 @@ jobs:
           - **lace-macos-arm64.tar.gz** - macOS Apple Silicon (M1/M2/M3)
           - **lace-macos-x64.tar.gz** - macOS Intel
           - **lace-linux-x64.tar.gz** - Linux x86_64
-          - **lace-linux-arm64.tar.gz** - Linux ARM64
           
           ### Usage
           
