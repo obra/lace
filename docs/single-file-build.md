@@ -1,448 +1,247 @@
 # Single-File Executable Build System
 
-This document describes the complete build pipeline for creating standalone Lace executables with embedded VFS (Virtual File System).
+This document describes Lace's single-file executable build system that packages the entire Next.js web interface into a self-contained binary for easy distribution and deployment.
 
 ## Overview
 
-The single-file executable system allows Lace to run as a completely standalone binary with:
+The single-file build creates a Bun-compiled executable that contains:
+- Complete Next.js standalone build (optimized for production)
+- All runtime dependencies (including native modules)
+- Custom server with enhanced UX features
+- Automatic port detection and browser opening
+- Self-extracting ZIP archive with proper module resolution
 
-- **Embedded Next.js framework** (4,774+ files)
-- **React and React DOM libraries** (348 files combined)
-- **All Lace configuration and prompts** (11+ files)
-- **Complete web application assets** (2,256+ files)
-- **Zero external dependencies** at runtime
+## Architecture
 
-Total embedded files: **~7,148 files** creating a true single-file distribution.
-
-## Build Pipeline Architecture
-
+### Build Process Flow
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   TypeScript    │    │   Web Assets    │    │  Lace Config    │
-│     Build       │───▶│     Build       │───▶│    Assets       │
-│                 │    │                 │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    VFS Generation                               │
-│  • next-complete.ts (81MB)   • react.ts (340KB)               │
-│  • web-assets.ts (44MB)      • react-dom.ts (5.5MB)           │
-│  • lace-assets.ts (24KB)     • next-deps.ts (164KB)           │
-└─────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 Production Server Integration                   │
-│  • VFS Module Resolver      • Next.js VFS Loader              │
-│  • Filesystem Patcher       • Production Server              │
-└─────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Bun Executable Compilation                   │
-│  Target: bun-linux-x64 | bun-darwin-arm64 | etc.              │
-│  Output: Single executable file (~50-100MB)                    │
-└─────────────────────────────────────────────────────────────────┘
+1. NFT Dependency Tracing → scripts/trace-server-dependencies.mjs
+2. Next.js Standalone Build → packages/web/.next/standalone/
+3. ZIP Creation → lace-standalone.zip
+4. Bun Compilation → lace-standalone (executable)
 ```
 
-## Build Scripts
+### Key Components
 
-### Core Build Scripts
+**NFT Dependency Tracing** (`scripts/trace-server-dependencies.mjs`)
+- Uses `@vercel/nft` to trace server dependencies
+- Forces tracing of dynamic imports through temporary static import files
+- Transforms paths from `packages/web/node_modules/...` to `node_modules/...`
+- Generates dependency list for Next.js `outputFileTracingIncludes`
 
-1. **`scripts/build-vfs.ts`** - VFS Generation Pipeline
-   - Validates build environment
-   - Generates all VFS files using make-vfs
-   - Validates VFS integrity
-   - Provides comprehensive build reporting
+**Next.js Configuration** (`packages/web/next.config.ts`)
+- Reads NFT trace results from `server-dependencies.json`
+- Configures `outputFileTracingIncludes` with traced dependencies
+- Sets `outputFileTracingRoot` to project root for proper path resolution
 
-2. **`scripts/build-executable.ts`** - Executable Compilation
-   - Creates executable entry point
-   - Compiles with Bun for target platform
-   - Tests executable functionality
-   - Generates compilation reports
+**Custom Server** (`packages/web/server-custom.ts`)
+- Enhanced wrapper around Next.js `startServer`
+- Automatic port detection (finds available port starting from 31337)
+- Browser opening functionality using properly traced `open` package
+- Working directory management for standalone builds
 
-### Package.json Scripts
+**Build Scripts**
+- `build:standalone:clean`: Full clean build with cache clearing
+- `build:standalone`: Standard build without cache clearing
+- `scripts/build-simple.ts`: ZIP creation and Bun compilation orchestration
+
+## Usage
+
+### Building the Executable
 
 ```bash
-# VFS Generation
-npm run build:vfs              # Generate VFS files
-npm run build:vfs:clean        # Clean build VFS files  
-npm run build:vfs:verbose      # Verbose VFS generation
+# Full clean build (recommended)
+bun run build:standalone:clean
 
-# Executable Compilation
-npm run build:executable       # Build executable (default platform)
-npm run build:executable:linux # Build for Linux x64
-npm run build:executable:verbose # Verbose executable build
+# Quick build (reuses caches)
+bun run build:standalone
 ```
 
-### Makefile Targets
+### Running the Executable
 
 ```bash
-# Quick Development
-make install                   # Install all dependencies
-make build-deps               # Build TypeScript + Web only
-make build-vfs                # Generate VFS files only
-make quick                    # Fast dev build (no executable)
+# Run with default settings (port 31337, auto-detect available)
+./lace-standalone
 
-# Full Build Pipeline  
-make build                    # Complete build pipeline
-make build TARGET=bun-linux-x64 # Platform-specific build
-make test-executable          # Test compiled executable
+# Run with specific port
+./lace-standalone --port 8080
 
-# Multi-Platform Distribution
-make dist                     # Build for all platforms
-make release                  # Create release packages
-make linux                   # Linux-specific build
-make macos                   # macOS ARM build
-make macos-intel             # macOS Intel build
+# Run with custom host (allow external connections)
+./lace-standalone --host 0.0.0.0 --port 3000
 
-# Maintenance
-make clean                   # Clean all build artifacts
-make validate                # Validate build environment
-make benchmark              # Benchmark executable performance
+# Show help
+./lace-standalone --help
 ```
 
-## Build Environment Requirements
+### Runtime Behavior
 
-### Prerequisites
-- **Node.js 20+** - Runtime and build tools
-- **Bun latest** - Executable compilation (install from https://bun.sh)
-- **npm** - Package management
-- **make** - Build orchestration (optional but recommended)
+1. **Extraction**: Executable extracts standalone build to temporary directory
+2. **Setup**: Changes working directory to standalone root for proper module resolution
+3. **Port Detection**: Finds available port starting from requested port
+4. **Server Start**: Launches Next.js server with enhanced features
+5. **Browser Opening**: Automatically opens browser if running interactively
 
-### Platform Support
-- **macOS ARM64** (Apple Silicon) - `bun-darwin-arm64`
-- **macOS x64** (Intel) - `bun-darwin-x64`  
-- **Linux x64** - `bun-linux-x64`
-- **Linux ARM64** - `bun-linux-arm64`
-- **Windows x64** - `bun-windows-x64` (experimental)
+## Dependency Tracing Deep Dive
 
-## VFS System Architecture
+### The Problem
 
-### Generated VFS Files (Not Committed)
+Next.js standalone builds use Node File Trace (NFT) to determine which files to include, but:
+- Dynamic imports (like `await import('open')`) aren't automatically traced
+- `outputFileTracingIncludes` only copies specified files without dependency analysis
+- Complex packages like `open` have many transitive dependencies
 
-These files are generated during build and should not be committed to git:
+### The Solution
 
-```bash
-src/vfs/next-complete.ts    # 81MB  - Complete Next.js framework
-src/vfs/web-assets.ts      # 44MB  - Web application assets  
-src/vfs/react-dom.ts       # 5.5MB - React DOM library
-src/vfs/react.ts           # 340KB - React library
-src/vfs/next-deps.ts       # 164KB - Next.js dependencies
-src/vfs/lace-assets.ts     # 24KB  - Lace configuration files
+**Step 1: Force NFT to Trace Dynamic Imports**
+```javascript
+// Create temporary file with static imports
+const tempContent = `
+import 'open';
+import 'default-browser';
+import 'bundle-name';
+// ... all packages used dynamically
+`;
 ```
 
-### Source Code Files (Committed)
-
-```bash
-src/vfs/generator.ts          # VFS generation orchestration
-src/vfs/module-resolver.ts    # CommonJS module resolution
-src/vfs/fs-patcher.ts        # Filesystem interception
-src/vfs/next-loader.ts       # Next.js VFS integration
-src/vfs/production-server.ts # Unified production server
+**Step 2: Run NFT with Same Config as Next.js**
+```javascript
+const result = await nodeFileTrace([serverFile, tempFile], {
+  base: projectRoot,
+  processCwd: webDir,
+  mixedModules: true,
+  // ... filesystem operations
+});
 ```
 
-## Build Process Details
-
-### Phase 1: Environment Validation
-- Check Node.js version (≥20)
-- Verify TypeScript build exists
-- Confirm web build exists
-- Validate dependencies installed
-- Test make-vfs tool availability
-
-### Phase 2: Dependency Building
-- Compile TypeScript to `dist/`
-- Copy configuration files
-- Build Next.js web application
-- Generate optimized production assets
-
-### Phase 3: VFS Generation
-- Extract Next.js framework files using make-vfs
-- Embed React and React DOM libraries
-- Include Lace configuration and prompts
-- Package web application assets
-- Create VFS module registry (4,881 modules)
-- Build asset registry (2,267 files)
-
-### Phase 4: Production Server Integration
-- Initialize VFS module resolver
-- Setup filesystem patching for assets  
-- Configure Next.js VFS loader
-- Create unified production server
-
-### Phase 5: Executable Compilation
-- Generate standalone entry point
-- Compile with Bun for target platform
-- Minify and optimize executable
-- Test executable functionality
-
-## Usage Examples
-
-### Development Workflow
-
-```bash
-# Initial setup
-make install
-make validate
-
-# Development build (fast)
-make quick
-
-# Full build and test
-make build
-make test-executable
-
-# Clean rebuild
-make clean build
+**Step 3: Transform Paths for Standalone Build**
+```javascript
+// Transform packages/web/node_modules/... to node_modules/...
+const includePatterns = tracedFiles
+  .filter(file => file.includes('/node_modules/'))
+  .map(file => file.replace('packages/web/node_modules/', 'node_modules/'));
 ```
 
-### Multi-Platform Release
-
-```bash
-# Build for all platforms
-make dist
-
-# Results in build/dist/:
-# lace-macos-arm64.tar.gz
-# lace-macos-x64.tar.gz  
-# lace-linux-x64.tar.gz
-# lace-linux-arm64.tar.gz
+**Step 4: Integration with Next.js Build**
+```typescript
+// next.config.ts
+outputFileTracingIncludes: {
+  '/': [
+    'packages/web/server-custom.ts',
+    ...getServerDependencies() // Reads NFT trace results
+  ]
+}
 ```
 
-### CI/CD Integration
+## Build Artifacts
 
-The build system includes GitHub Actions workflow (`.github/workflows/build-executable.yml`) that:
+### Generated Files
 
-1. **Tests VFS system** on Ubuntu
-2. **Builds executables** for all platforms in parallel
-3. **Tests executables** with startup and help commands
-4. **Creates release artifacts** for tagged commits
-5. **Uploads release assets** automatically
+- `lace-standalone`: Final executable (self-contained binary)
+- `lace-standalone.zip`: Source archive embedded in executable
+- `packages/web/server-dependencies.json`: NFT trace results
+- `packages/web/.next/`: Next.js build artifacts
 
-### Custom Builds
-
-```bash
-# Custom name and output directory
-make build NAME=my-lace OUTDIR=custom/dir
-
-# Verbose build with debugging
-make build VERBOSE=1
-
-# Development build without minification
-npx tsx scripts/build-executable.ts --no-minify --sourcemap
+### ZIP Structure
 ```
-
-## Performance Characteristics
-
-### Build Times
-- **VFS Generation**: ~30-60 seconds
-- **Executable Compilation**: ~15-30 seconds  
-- **Total Build Time**: ~1-2 minutes
-
-### Executable Size
-- **Typical size**: 50-100MB
-- **Contains**: 7,148+ embedded files
-- **Startup time**: ~1-3 seconds
-- **Memory usage**: ~50-100MB initial
-
-### VFS Performance
-- **Module resolution**: <1ms per module
-- **Asset serving**: <1ms per asset
-- **Filesystem patching**: Transparent overhead
-- **Next.js startup**: ~2-5 seconds
+standalone/
+├── packages/web/           # Next.js app
+│   ├── .next/             # Build artifacts
+│   ├── server.ts          # Custom server
+│   └── node_modules/      # App-specific dependencies
+├── node_modules/          # Traced dependencies (open, is-docker, etc.)
+├── package.json           # Root package.json
+└── ...                    # Other project files
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"make-vfs not found"**
-   ```bash
-   # Install Bun first
-   curl -fsSL https://bun.sh/install | bash
-   ```
+**Missing Dependencies**
+- Check `server-dependencies.json` for traced files
+- Verify NFT found all required packages (`hasOpen: true`, `hasIsDocker: true`)
+- Look for path transformation errors in build logs
 
-2. **"Environment validation failed"**
-   ```bash
-   # Run validation to see specific issues
-   make validate
-   ```
+**Module Resolution Failures**
+- Ensure server changes working directory to standalone root
+- Check that dependencies are at `node_modules/...` not `packages/web/node_modules/...`
+- Verify `outputFileTracingRoot` is set correctly
 
-3. **"VFS generation failed"**
-   ```bash
-   # Clean and rebuild dependencies
-   make clean build-deps build-vfs
-   ```
+**Browser Opening Not Working**
+- Check if running interactively (`stdin.isTTY && stdout.isTTY`)
+- Look for `open` package in ZIP: `unzip -l lace-standalone.zip | grep open`
+- Debug with console logs in server-custom.ts
 
-4. **"Executable too large"**
-   ```bash
-   # Build without minification to debug
-   npx tsx scripts/build-executable.ts --no-minify
-   ```
+**Build Failures**
+- Clear all caches: `rm -rf build packages/web/.next packages/web/server.js`
+- Check TypeScript compilation errors
+- Verify Bun is properly installed and updated
 
-### Debug Options
+### Debug Commands
 
 ```bash
-# Verbose VFS generation
-npm run build:vfs:verbose
+# Check NFT trace results
+cat packages/web/server-dependencies.json
 
-# Verbose executable compilation  
-npm run build:executable:verbose
+# Verify ZIP contents
+unzip -l lace-standalone.zip | grep node_modules/open
 
-# Test individual components
-make test-vfs
-npx tsx scripts/test-production-server.ts
+# Test dependency tracing
+bun scripts/trace-server-dependencies.mjs
+
+# Clean build from scratch
+rm -rf build packages/web/.next packages/web/server.js && bun run build:standalone:clean
 ```
 
-## Architecture Benefits
+## Performance Considerations
 
-### Complete Isolation
-- **No external dependencies** at runtime
-- **No installation required** - just download and run  
-- **No Node.js required** on target machine
-- **Self-contained web server** with embedded assets
+- **Build Time**: NFT tracing adds ~2-5 seconds to build process
+- **ZIP Size**: Traced dependencies add ~500KB to final executable
+- **Startup Time**: Extraction to temp directory adds ~100ms
+- **Memory**: Temporary extraction requires disk space (typically ~50MB)
 
-### Distribution Advantages
-- **Single file distribution** - easy deployment
-- **Cross-platform support** - build once, run anywhere
-- **Version consistency** - no dependency conflicts
-- **Offline operation** - all assets embedded
+## Future Improvements
 
-### Development Benefits  
-- **Fast builds** with intelligent caching
-- **Comprehensive testing** throughout pipeline
-- **Multi-platform CI/CD** with automatic releases
-- **Detailed reporting** and error diagnostics
+- **Caching**: Cache NFT results to speed up incremental builds
+- **Optimization**: Minimize traced dependency set
+- **Platforms**: Support for additional Bun target platforms
+- **Compression**: Better compression for embedded ZIP archive
 
-This build system represents a complete solution for creating truly standalone, self-contained Lace executables that can run anywhere without external dependencies.
+## Implementation Notes
 
-## Bun-Native Simple Bundle Approach (2025-08-14)
+### Database Compatibility
 
-After encountering circular dependency issues and stack overflow problems with the complex VFS system, we developed a simpler, more reliable approach using Bun's native capabilities.
-
-### Problem with VFS Approach
-
-The original VFS system created several issues:
-
-1. **Stack Overflow**: The 278MB VFS files (`lace-app.ts`) contained circular dependencies that caused infinite recursion in Bun's module loader
-2. **Complex Patching**: Filesystem patching with `Module.prototype.require` manipulation was brittle and caused recursion loops
-3. **Memory Issues**: Converting large files to base64 strings hit JavaScript's string length limits (>536MB strings)
-4. **Build Complexity**: The VFS generation was slow and error-prone with multiple interdependent steps
-
-### Bun-Native Solution
-
-The new approach leverages Bun's strengths directly:
-
-#### Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Production    │    │   ZIP Entire    │    │  Bun Bundle     │
-│   Next.js       │───▶│   packages/web  │───▶│  with Native    │
-│   Build         │    │   Directory     │    │  File Import    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Runtime Process                              │
-│  1. Extract ZIP to temp directory                              │
-│  2. Run packages/web/server.ts with Bun                       │
-│  3. Use Bun's native SQLite + HTTP server                     │
-│  4. Cleanup temp directory on exit                            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### Implementation Files
-
-**Build Scripts:**
-- `scripts/simple-bundle.ts` - Server executable that extracts and runs
-- `scripts/build-simple.ts` - Build orchestration using Bun's file bundling
-
-#### Key Technical Decisions
-
-1. **No Base64 Encoding**: Use Bun's `import ... with { type: 'file' }` to bundle ZIP as binary data
-2. **Full Project Packaging**: Include entire `packages/web` directory with node_modules (no artificial trimming)
-3. **Bun File API**: Use `Bun.file().arrayBuffer()` to access bundled ZIP data
-4. **Native Server**: Run the actual `packages/web/server.ts` instead of custom server
-5. **Production Build**: Ensure `BUILD_ID` and proper Next.js production files exist
-
-#### Build Process
-
-```bash
-# 1. Create production Next.js build
-cd packages/web && bun run build
-
-# 2. ZIP complete project (no trimming for testing phase)
-zip -r build/lace-project.zip packages/web -q
-
-# 3. Bundle with Bun's native file import
-bun build scripts/simple-bundle.ts --compile --outfile=build/lace-standalone
-
-# Result: ~500MB executable (includes full node_modules)
-```
-
-#### Runtime Process
+The build system includes fixes for Bun SQLite compatibility:
 
 ```typescript
-// Extract bundled ZIP
-const zipFile = Bun.file(zipData);
-const zipBuffer = await zipFile.arrayBuffer();
-require('fs').writeFileSync(zipPath, new Uint8Array(zipBuffer));
-
-// Extract to temp directory
-execSync(`cd "${tempDir}" && unzip -q lace-project.zip`);
-
-// Run actual Lace server
-process.chdir(join(tempDir, 'packages', 'web'));
-await import(join(tempDir, 'packages', 'web', 'server.js'));
+// Fixed: Bun SQLite API differs from better-sqlite3
+this.db.exec('PRAGMA journal_mode = WAL');  // ✅ Works in both
+// this.db.pragma('journal_mode = WAL');    // ❌ better-sqlite3 only
 ```
 
-### Advantages of Bun-Native Approach
+### Path Resolution
 
-1. **Simplicity**: No complex VFS system or filesystem patching
-2. **Reliability**: Uses standard extraction + execution, no circular dependencies
-3. **Bun Compatibility**: Leverages Bun's Node.js compatibility without fighting it
-4. **Self-Contained**: True single-file executable with zero runtime dependencies
-5. **Production Ready**: Uses actual production builds with proper BUILD_ID files
-6. **Debugging**: Easy to debug since it's just extraction + server start
+Critical for proper module resolution in standalone builds:
 
-### Performance Characteristics
-
-- **Executable Size**: ~500MB (full project with dependencies)
-- **Startup Time**: 3-5 seconds (mainly extraction time)
-- **Memory Usage**: Standard Next.js + Bun memory footprint
-- **First Run**: Slower due to extraction, subsequent runs could be optimized with caching
-
-### Future Optimizations
-
-1. **Dependency Trimming**: Remove dev dependencies and test files from ZIP
-2. **Extraction Caching**: Cache extracted files between runs
-3. **Compression**: Use better compression for the embedded ZIP
-4. **Selective Bundling**: Only include production-necessary files
-
-### Build Commands
-
-```bash
-# Build the simple executable
-bun run scripts/build-simple.ts
-
-# Run the executable
-./build/lace-standalone --port 3001
-
-# The executable includes:
-# - Complete packages/web directory
-# - All node_modules dependencies  
-# - Proper Next.js production build
-# - BUILD_ID and manifest files
+```typescript
+// Change to standalone root (like Next.js does)
+const standaloneRoot = path.resolve(__dirname, '../..');
+process.chdir(standaloneRoot);
 ```
 
-### Lessons Learned
+### Dynamic Import Handling
 
-1. **Bun's Strengths**: File bundling and Node.js compatibility work great together
-2. **Avoid Over-Engineering**: Simple ZIP extraction is more reliable than complex VFS
-3. **String Length Limits**: Large base64 strings hit JavaScript limits (>536MB)
-4. **Production Builds**: Always use `bun run build` for proper Next.js production files
-5. **Module Resolution**: Let Bun handle module resolution instead of custom patching
+The system handles dynamic imports by pre-tracing them:
 
-This Bun-native approach provides a working foundation for single-file Lace distribution that's simpler, more reliable, and leverages Bun's native capabilities effectively.
+```typescript
+// Runtime: This works because dependencies were pre-traced
+const { default: open } = await import('open');
+await open(url);
+```
+
+## Security Considerations
+
+- Temporary extraction directory is created with secure permissions
+- Extracted files are cleaned up on process exit
+- No network dependencies required for runtime execution
+- Self-contained execution prevents dependency confusion attacks
