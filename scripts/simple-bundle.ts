@@ -15,7 +15,7 @@ interface ServerOptions {
 }
 
 // Import the ZIP file as binary data using Bun's bundler
-import zipData from '../build/lace-project.zip' with { type: 'file' };
+import zipData from '../build/lace-standalone.zip' with { type: 'file' };
 
 class SimpleLaceServer {
   private extractedPath: string = '';
@@ -43,7 +43,7 @@ class SimpleLaceServer {
     console.log(`📁 Extracting to: ${tempDir}`);
 
     // Use the imported ZIP file directly with Bun's API
-    const zipPath = join(tempDir, 'lace-project.zip');
+    const zipPath = join(tempDir, 'lace-standalone.zip');
 
     // Use Bun's file API to read the bundled ZIP and write it out
     const zipFile = Bun.file(zipData);
@@ -51,9 +51,9 @@ class SimpleLaceServer {
     require('fs').writeFileSync(zipPath, new Uint8Array(zipBuffer));
 
     // Extract ZIP
-    execSync(`cd "${tempDir}" && unzip -q lace-project.zip`, { stdio: 'pipe' });
+    execSync(`cd "${tempDir}" && unzip -q lace-standalone.zip`, { stdio: 'pipe' });
 
-    console.log('📁 Lace project extracted (includes all dependencies)');
+    console.log('📁 Standalone build extracted (optimized production build)');
 
     console.log('✅ Standalone build extracted');
     return tempDir;
@@ -62,24 +62,31 @@ class SimpleLaceServer {
   private async startLaceServer(): Promise<void> {
     console.log('🌐 Starting Lace server...');
 
-    // Set up Next.js to use the extracted build
-    const nextDir = join(this.extractedPath, 'packages', 'web');
-    if (!existsSync(join(nextDir, 'server.ts'))) {
-      throw new Error(`Server file not found in: ${nextDir}`);
+    // Use our custom server wrapper with the standalone build
+    const standaloneDir = join(this.extractedPath, 'standalone');
+    const webDir = join(standaloneDir, 'packages/web');
+    const serverFile = join(webDir, 'server.ts');
+
+    if (!existsSync(serverFile)) {
+      throw new Error(`Custom server not found at: ${serverFile}`);
+    }
+
+    if (!existsSync(webDir)) {
+      throw new Error(`Web directory not found at: ${webDir}`);
     }
 
     // Set environment variables for production mode
     process.env.NODE_ENV = 'production';
 
-    // Change to the extracted Next.js directory
+    // Change to the packages/web directory where Next.js and dependencies are
     const originalCwd = process.cwd();
-    process.chdir(nextDir);
+    process.chdir(webDir);
 
-    // Set CLI args for our server
+    // Set CLI args for our custom server (it uses parseArgs, not env vars)
     const originalArgv = process.argv;
     process.argv = [
-      process.argv[0], // bun/node executable
-      'server.ts', // script name
+      process.argv[0], // bun executable
+      'server.ts', // script name (we're in the web directory now)
       '--port',
       String(this.options.port || 3000),
       '--host',
@@ -87,10 +94,11 @@ class SimpleLaceServer {
     ];
 
     try {
-      // Import and run the Lace server from the extracted directory
-      console.log(`📁 Running from: ${nextDir}`);
-      const serverPath = join(nextDir, 'server.js');
-      await import(serverPath);
+      // Our custom server replaced the standalone server, so just run it from packages/web
+      console.log(`📁 Running from: ${webDir}`);
+      console.log(`📁 Using custom server: ${serverFile}`);
+      // Bun can run TypeScript directly - use relative path since we changed to webDir
+      await import('./server.ts');
     } catch (error) {
       // Restore original state on error
       process.chdir(originalCwd);
