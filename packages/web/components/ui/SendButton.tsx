@@ -1,6 +1,7 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faStop } from '@/lib/fontawesome';
+import * as Sentry from '@sentry/nextjs';
 
 interface SendButtonProps {
   onSubmit?: () => void;
@@ -48,11 +49,23 @@ export default function SendButton({
   };
 
   const handleClick = () => {
-    if (isStreaming && onStop) {
-      onStop();
-    } else if (onSubmit) {
-      onSubmit();
-    }
+    Sentry.startSpan(
+      {
+        op: 'ui.click',
+        name: isStreaming ? 'Stop Message Stream' : 'Send Message',
+      },
+      (span) => {
+        span.setAttribute('isStreaming', isStreaming);
+        span.setAttribute('hasContent', hasContent);
+        span.setAttribute('buttonSize', size);
+
+        if (isStreaming && onStop) {
+          onStop();
+        } else if (onSubmit) {
+          onSubmit();
+        }
+      }
+    );
   };
 
   // Button should be enabled when streaming (for stop) or when has content (for send)
