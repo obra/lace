@@ -47,17 +47,6 @@ interface SpeechRecognition extends EventTarget {
   abort(): void;
 }
 
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
-
 interface UseVoiceRecognitionOptions {
   onResult?: (transcript: string) => void;
   onError?: (error: string) => void;
@@ -157,7 +146,7 @@ export function useVoiceRecognition({
       setInterimTranscript('');
     };
 
-    recognitionRef.current = recognition;
+    recognitionRef.current = recognition as SpeechRecognition;
     recognition.start();
   }, [isListening, isSupported, lang, onResult, onError, stopListening]);
 

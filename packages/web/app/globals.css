@@ -1,10 +1,22 @@
 @import 'tailwindcss';
 @import '@fortawesome/fontawesome-svg-core/styles.css';
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap');
 @plugin "daisyui";
 
 /* Typography: utilities bound to Next Fonts variables (set on <body>) */
 :root {
-  /* Next Fonts inject CSS variables via class names; ensure fallbacks exist */
+  /* Google Sans Code loaded via CSS import */
+  --font-google-sans-code: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+/* Force Google Sans Code to be available when the class is applied */
+.google-sans-code-loaded {
+  --font-google-sans-code: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+/* Also ensure it's always available globally */
+* {
+  --font-google-sans-code: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 /* Use DM Sans for UI text where desired */
@@ -26,10 +38,10 @@
     'Segoe UI Symbol';
 }
 
-/* Use JetBrains Mono for code and technical content */
+/* Use Google Sans Code for code and technical content */
 .font-code {
   font-family:
-    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    var(--font-google-sans-code), 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
 }
 
@@ -145,6 +157,7 @@ select {
 
 /* Monospace font utilities for code, terminal, and technical content */
 .font-mono {
+  font-family: 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
   font-variant-ligatures: common-ligatures;
   font-feature-settings:
     'liga' 1,
@@ -406,21 +419,19 @@ select {
   opacity: 0.15;
 }
 
+/* Temporarily disabled due to URL scheme error */
+/*
 .vapor-bg .noise::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,\
-    <svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>\
-      <filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/>\
-      <feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .06 0'/></filter>\
-      <rect width='100%' height='100%' filter='url(%23n)'/>\
-    </svg>");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 220px 220px;
   mix-blend-mode: overlay;
   opacity: 0.35;
 }
+*/
 
 /* High-contrast glass card for dim theme */
 .glass {
@@ -488,4 +499,16 @@ select {
 }
 .card-sub {
   color: hsl(0 0% 92% / 0.8);
+}
+
+/* Pulse animation for voice input */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
 }

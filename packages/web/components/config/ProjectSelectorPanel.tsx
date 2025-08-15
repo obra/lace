@@ -20,6 +20,7 @@ import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
 import { parseResponse, parseTyped } from '@/lib/serialization';
 import { DirectoryField } from '@/components/ui';
+import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 
 interface ProjectSelectorPanelProps {
   projects: ProjectInfo[];
@@ -127,6 +128,10 @@ export function ProjectSelectorPanel({
   const [showDirHelp, setShowDirHelp] = useState(false);
   const [showProviderHelp, setShowProviderHelp] = useState(false);
 
+  // Provider setup state
+  const [showAddProvider, setShowAddProvider] = useState(false);
+  const [refreshProviders, setRefreshProviders] = useState(0);
+
   // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
     return (providers || []).filter((p): p is ProviderInfo & { instanceId: string } =>
@@ -144,7 +149,7 @@ export function ProjectSelectorPanel({
         modelId: firstProvider.models[0]?.id || '',
       }));
     }
-  }, [availableProviders, createConfig.providerInstanceId]);
+  }, [availableProviders, createConfig.providerInstanceId, refreshProviders]);
 
   // External trigger: open modal when parent requests (e.g., empty-state button)
   // Only open once per toggle of autoOpenCreate to avoid reopening after user closes
@@ -170,6 +175,13 @@ export function ProjectSelectorPanel({
     }
   }, [showCreateProject]);
 
+  // Handle provider instance creation success
+  const handleProviderAdded = useCallback(() => {
+    // Trigger a refresh of providers data
+    setRefreshProviders((prev) => prev + 1);
+    setShowAddProvider(false);
+  }, []);
+
   // Cancel project creation
   const handleCancelCreateProject = useCallback(() => {
     setShowCreateProject(false);
@@ -180,6 +192,7 @@ export function ProjectSelectorPanel({
     setCreateNewEnvKey('');
     setCreateNewEnvValue('');
     setShowAdvancedOptions(false); // Reset simplified mode state
+    setShowAddProvider(false); // Reset provider modal state
     // Notify parent so CTA can be toggled again cleanly
     onAutoCreateHandled?.();
   }, [onAutoCreateHandled]);
@@ -356,10 +369,13 @@ export function ProjectSelectorPanel({
         handleCancelEdit();
       } else {
         const errorData = await parseResponse<{ error: string }>(res);
-        console.error('Failed to update project:', errorData.error);
+        console.error('Project update failed:', {
+          projectId: editingProject.id,
+          error: errorData.error,
+        });
       }
     } catch (error) {
-      console.error('Error updating project:', error);
+      console.error('Project update error:', { projectId: editingProject?.id, error });
     }
   };
 
@@ -429,7 +445,7 @@ export function ProjectSelectorPanel({
         }
         setEditConfig(config);
       } else {
-        console.error('Failed to load project configuration');
+        console.error('Project config load failed:', { projectId });
         // Fallback to default configuration with first available provider
         const config = { ...DEFAULT_PROJECT_CONFIG };
         if (availableProviders.length > 0) {
@@ -439,7 +455,7 @@ export function ProjectSelectorPanel({
         setEditConfig(config);
       }
     } catch (error) {
-      console.error('Error loading project configuration:', error);
+      console.error('Project config load error:', { projectId, error });
       // Fallback to default configuration with first available provider
       const config = { ...DEFAULT_PROJECT_CONFIG };
       if (availableProviders.length > 0) {
@@ -470,7 +486,7 @@ export function ProjectSelectorPanel({
 
       if (!projectRes.ok) {
         const errorData = await parseResponse<{ error: string }>(projectRes);
-        console.error('Failed to create project:', errorData.error);
+        console.error('Project create failed:', { error: errorData.error });
         return;
       }
 
@@ -498,21 +514,28 @@ export function ProjectSelectorPanel({
               );
               sessionId = sessionsData.sessions[0]?.id;
               if (sessionId) break;
-              console.warn(
-                `[create-project] Attempt ${attempt + 1}/${maxAttempts}: No session yet for project ${projectId}`
-              );
+              console.warn('Create project session missing, retrying:', {
+                attempt: attempt + 1,
+                maxAttempts,
+                projectId,
+              });
             } else {
               const bodyText = await sessionsRes.text();
               // Common transient: {"json":{"error":"Project not found","code":"RESOURCE_NOT_FOUND"}}
-              console.warn(
-                `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Failed to fetch sessions: ${bodyText}`
-              );
+              console.warn('Create project session fetch failed:', {
+                attempt: attempt + 1,
+                maxAttempts,
+                projectId,
+                status: sessionsRes.status,
+              });
             }
           } catch (err) {
-            console.warn(
-              `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Error fetching sessions:`,
-              err
-            );
+            console.warn('Create project session fetch error:', {
+              attempt: attempt + 1,
+              maxAttempts,
+              projectId,
+              error: err,
+            });
           }
           attempt += 1;
           if (!sessionId) {
@@ -526,9 +549,10 @@ export function ProjectSelectorPanel({
           const coordinatorAgentId = sessionId; // coordinator has same threadId
           await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
         } else {
-          console.warn(
-            `[create-project] Could not obtain session for project ${projectId} after ${maxAttempts} attempts; falling back to project selection.`
-          );
+          console.warn('Create project session fallback:', {
+            projectId,
+            maxAttempts,
+          });
           // Fallback to regular project selection if session fetch failed
           onProjectSelect(projectData);
         }
@@ -539,7 +563,7 @@ export function ProjectSelectorPanel({
 
       handleCancelCreateProject();
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error('Project create error:', { error });
     }
   };
 
@@ -1160,47 +1184,92 @@ export function ProjectSelectorPanel({
                             i
                           </button>
                         </div>
-                        <div className="grid md:grid-cols-2 gap-4">
+
+                        {availableProviders.length === 0 ? (
+                          // No providers available - show model selection prompt
                           <div>
-                            <label className="label">
-                              <span className="label-text font-medium">Provider</span>
-                            </label>
-                            <select
-                              className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                              value={createConfig.providerInstanceId || ''}
-                              onChange={(e) =>
-                                setCreateConfig((prev) => ({
-                                  ...prev,
-                                  providerInstanceId: e.target.value,
-                                }))
-                              }
-                            >
-                              {availableProviders.map((p) => (
-                                <option key={p.instanceId} value={p.instanceId}>
-                                  {p.displayName}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="mb-4">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddProvider(true)}
+                                className="w-full p-4 border-2 border-dashed border-base-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-left"
+                              >
+                                <div className="text-base font-medium text-base-content">
+                                  Select an AI model
+                                </div>
+                                <div className="text-sm text-base-content/60 mt-1">
+                                  Choose from OpenAI, Anthropic, local models, and more
+                                </div>
+                              </button>
+                            </div>
                           </div>
-                          <div>
-                            <label className="label">
-                              <span className="label-text font-medium">Model</span>
-                            </label>
-                            <select
-                              className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                              value={createConfig.modelId || ''}
-                              onChange={(e) =>
-                                setCreateConfig((prev) => ({ ...prev, modelId: e.target.value }))
-                              }
-                            >
-                              {availableCreateModels.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  {m.displayName || m.id}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
+                        ) : (
+                          // Providers available - show selection dropdowns
+                          <>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="label">
+                                  <span className="label-text font-medium">Provider</span>
+                                </label>
+                                <select
+                                  className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                                  value={createConfig.providerInstanceId || ''}
+                                  onChange={(e) => {
+                                    const newInstanceId = e.target.value;
+                                    const provider = providers.find(
+                                      (p) => p.instanceId === newInstanceId
+                                    );
+                                    const providerModels = provider?.models || [];
+                                    setCreateConfig((prev) => ({
+                                      ...prev,
+                                      providerInstanceId: newInstanceId,
+                                      modelId: providerModels[0]?.id || prev.modelId,
+                                    }));
+                                  }}
+                                >
+                                  {availableProviders.map((p) => (
+                                    <option key={p.instanceId} value={p.instanceId}>
+                                      {p.displayName}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="label">
+                                  <span className="label-text font-medium">Model</span>
+                                </label>
+                                <select
+                                  className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                                  value={createConfig.modelId || ''}
+                                  onChange={(e) =>
+                                    setCreateConfig((prev) => ({
+                                      ...prev,
+                                      modelId: e.target.value,
+                                    }))
+                                  }
+                                >
+                                  {availableCreateModels.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                      {m.displayName || m.id}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddProvider(true)}
+                                className="btn btn-link text-sm text-base-content/70 no-underline p-0 h-auto min-h-0"
+                              >
+                                <FontAwesomeIcon icon={faPlus} className="w-3 h-3 mr-2" />
+                                Add more providers
+                              </button>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Help section - shown for both states */}
                         {showProviderHelp && (
                           <div className="mt-4 text-sm text-base-content/70 space-y-2">
                             <p className="font-medium">What this does</p>
@@ -1208,14 +1277,27 @@ export function ProjectSelectorPanel({
                               Sets the default AI for this project. You can override per session or
                               task later.
                             </p>
-                            <p className="font-medium">Choosing a model</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>Pick a balanced model (good quality + speed) to start</li>
-                              <li>
-                                Use larger models for complex refactors; smaller models for quick
-                                edits
-                              </li>
-                            </ul>
+                            {availableProviders.length > 0 ? (
+                              <>
+                                <p className="font-medium">Choosing a model</p>
+                                <ul className="list-disc pl-5 space-y-1">
+                                  <li>Pick a balanced model (good quality + speed) to start</li>
+                                  <li>
+                                    Use larger models for complex refactors; smaller models for
+                                    quick edits
+                                  </li>
+                                </ul>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium">Getting started</p>
+                                <p>
+                                  Click &quot;Select an AI model&quot; to add a provider and choose
+                                  your preferred model. You can add multiple providers and switch
+                                  between them later.
+                                </p>
+                              </>
+                            )}
                           </div>
                         )}
                       </GlassCard>
@@ -1291,14 +1373,20 @@ export function ProjectSelectorPanel({
                                     createWorkingDirectory.trim().length > 1
                                   )) ||
                                 (createStep === 3 &&
-                                  (!createConfig.providerInstanceId || !createConfig.modelId))
+                                  (availableProviders.length === 0 ||
+                                    !createConfig.providerInstanceId ||
+                                    !createConfig.modelId))
                               }
                             >
                               Continue
                             </AccentButton>
                           )}
                           {createStep === 4 && (
-                            <AccentButton type="submit" disabled={!createWorkingDirectory.trim()} data-testid="create-project-submit">
+                            <AccentButton
+                              type="submit"
+                              disabled={!createWorkingDirectory.trim()}
+                              data-testid="create-project-submit"
+                            >
                               {loading ? (
                                 <>
                                   <div className="loading loading-spinner loading-sm"></div>
@@ -1539,6 +1627,13 @@ export function ProjectSelectorPanel({
           </div>
         </div>
       )}
+
+      {/* Add Provider Modal */}
+      <AddInstanceModal
+        isOpen={showAddProvider}
+        onClose={() => setShowAddProvider(false)}
+        onSuccess={handleProviderAdded}
+      />
     </div>
   );
 }

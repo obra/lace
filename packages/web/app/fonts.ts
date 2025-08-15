@@ -1,4 +1,4 @@
-import { Lato, DM_Sans, JetBrains_Mono } from 'next/font/google';
+import { Lato, DM_Sans } from 'next/font/google';
 
 // Configure Lato via Next Fonts for optimal loading and automatic CSS class
 // Adjust weights/styles as needed by the design system
@@ -18,11 +18,9 @@ export const dmSans = DM_Sans({
   variable: '--font-dm-sans',
 });
 
-// JetBrains Mono for code elements
-export const jetBrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  style: ['normal', 'italic'],
-  display: 'swap',
-  variable: '--font-jetbrains-mono',
-});
+// Google Sans Code font - using CSS import since it's not yet available in next/font
+// The CSS import is added in globals.css
+export const googleSansCode = {
+  className: '',
+  variable: 'google-sans-code-loaded',
+};

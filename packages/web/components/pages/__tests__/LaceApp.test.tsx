@@ -154,6 +154,6 @@ describe('LaceApp', () => {
     // Should have base theme classes
     const mainContainer = container.firstChild as HTMLElement | null;
     expect(mainContainer).toBeTruthy();
-    expect(mainContainer!).toHaveClass('bg-base-200', 'text-base-content');
+    expect(mainContainer!).toHaveClass('bg-gradient-to-br', 'from-base-100', 'text-base-content');
   });
 });

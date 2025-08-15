@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-export interface OnboardingActionsProps {
+interface OnboardingActionsProps {
   primaryLabel: string;
   onPrimary: () => void;
   secondaryLabel?: string;

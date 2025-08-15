@@ -2,7 +2,7 @@
 import React from 'react';
 import { InfoIconButton } from './InfoIconButton';
 
-export interface InfoSectionProps {
+interface InfoSectionProps {
   title: string;
   defaultOpen?: boolean;
   children: React.ReactNode;

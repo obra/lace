@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-export interface OnboardingHeroProps {
+interface OnboardingHeroProps {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   primaryLabel: string;
