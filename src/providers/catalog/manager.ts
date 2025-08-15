@@ -3,17 +3,22 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { getLaceDir } from '~/config/lace-dir';
 import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
+import { resolveDataDirectory } from '~/utils/resource-resolver';
+import { logger } from '~/utils/logger';
+
+// Helper function to read and validate provider catalog JSON
+async function readProviderCatalog(filePath: string): Promise<CatalogProvider> {
+  const content = await fs.promises.readFile(filePath, 'utf-8');
+  return CatalogProviderSchema.parse(JSON.parse(content));
+}
 
 // Load builtin provider catalogs from filesystem (server-side)
 async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
 
-  // Use the same pattern as prompt templates - get current module directory + data
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const catalogDir = path.join(currentDir, 'data');
+  const catalogDir = resolveDataDirectory(import.meta.url);
 
   try {
     const files = await fs.promises.readdir(catalogDir);
@@ -21,27 +26,24 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
     for (const file of files.filter((f) => f.endsWith('.json'))) {
       try {
         const filePath = path.join(catalogDir, file);
-        const content = await fs.promises.readFile(filePath, 'utf-8');
-        const provider = CatalogProviderSchema.parse(JSON.parse(content));
+        const provider = await readProviderCatalog(filePath);
         catalogs.push(provider);
       } catch (error) {
-        console.warn(`Failed to load catalog file ${file}:`, error);
+        logger.warn('catalog.load.builtin_failed', { file, error: String(error) });
       }
     }
   } catch (error) {
-    console.warn('Failed to read catalog directory:', error);
+    logger.warn('catalog.load.read_dir_failed', { dir: catalogDir, error: String(error) });
   }
 
   return catalogs;
 }
 
 export class ProviderCatalogManager {
-  private shippedCatalogDir: string;
   private userCatalogDir: string;
   private catalogCache: Map<string, CatalogProvider> = new Map();
 
   constructor() {
-    this.shippedCatalogDir = path.resolve(__dirname, 'data');
     this.userCatalogDir = path.join(getLaceDir(), 'user-catalog');
   }
 
@@ -68,11 +70,10 @@ export class ProviderCatalogManager {
         if (file.endsWith('.json')) {
           try {
             const filePath = path.join(dirPath, file);
-            const content = await fs.promises.readFile(filePath, 'utf-8');
-            const provider = CatalogProviderSchema.parse(JSON.parse(content));
+            const provider = await readProviderCatalog(filePath);
             this.catalogCache.set(provider.id, provider);
           } catch (_error) {
-            console.warn(`Failed to load catalog file ${file}:`, _error);
+            logger.warn('catalog.load.user_failed', { dir: dirPath, file, error: String(_error) });
           }
         }
       }

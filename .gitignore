@@ -81,3 +81,30 @@ storybook-static/
 
 # Knip output
 knip-report.json
+storybook-static/
+# Generated VFS files - these are created by make-vfs and can be large
+src/vfs/next-complete.ts
+src/vfs/web-assets.ts
+src/vfs/react-dom.ts
+src/vfs/react.ts
+src/vfs/next-deps.ts
+src/vfs/lace-assets.ts
+
+# Bun build artifacts
+.*.bun-build
+
+# Debug/test scripts  
+debug-*.js
+test-vfs-*.js
+
+# Executables
+lace
+lace-*
+
+# Private journal
+.private-journal/
+
+# Temp VFS stubs
+src/vfs/*-stub.ts
+src/vfs/lace-config.ts
+src/vfs/lace-database.ts

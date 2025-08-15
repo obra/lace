@@ -1,7 +1,52 @@
 import type { NextConfig } from 'next';
 import path from 'path';
+import { readFileSync, existsSync } from 'fs';
+
+// Load nft-traced dependencies - only required for production builds
+function getServerDependencies(): string[] {
+  const traceFile = path.resolve('./server-dependencies.json');
+
+  // In development mode, tracing is optional
+  if (process.env.NODE_ENV !== 'production') {
+    if (!existsSync(traceFile)) {
+      return ['packages/web/server-custom.ts'];
+    }
+    // If trace file exists in dev, use it but don't require validation
+  }
+
+  if (!existsSync(traceFile)) {
+    throw new Error(
+      `❌ NFT trace file not found at ${traceFile}. Run 'bun ../../scripts/trace-server-dependencies.mjs' first.`
+    );
+  }
+
+  try {
+    const traceData = JSON.parse(readFileSync(traceFile, 'utf8'));
+
+    if (!traceData.summary.hasIsDocker || !traceData.summary.hasOpen) {
+      throw new Error(
+        `❌ NFT trace is incomplete. Missing: ${!traceData.summary.hasOpen ? 'open package ' : ''}${!traceData.summary.hasIsDocker ? 'is-docker package' : ''}`
+      );
+    }
+
+    console.log(
+      `📦 Using ${traceData.tracedFiles.length} nft-traced dependencies (includes is-docker ✅)`
+    );
+    return ['packages/web/server-custom.ts', ...traceData.tracedFiles];
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`❌ NFT trace file is corrupted: ${error.message}`);
+    }
+    throw error;
+  }
+}
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+  outputFileTracingRoot: path.resolve('../../'),
+  outputFileTracingIncludes: {
+    '/': getServerDependencies(),
+  },
   typescript: {
     ignoreBuildErrors: false,
   },

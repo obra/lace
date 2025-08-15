@@ -3,8 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { TemplateEngine } from '~/config/template-engine';
+import { resolveResourcePath } from '~/utils/resource-resolver';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -98,8 +98,7 @@ export class PromptManager {
    * Get the embedded template directory path
    */
   private getEmbeddedTemplateDir(): string {
-    const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    return path.join(currentDir, 'prompts');
+    return resolveResourcePath(import.meta.url, 'prompts');
   }
 
   /**

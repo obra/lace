@@ -1,0 +1,143 @@
+name: Build Single-File Executable
+
+on:
+  push:
+    branches: [ main, f/single-file-install ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-executable:
+    name: Build Executable
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            name: lace-linux-x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            name: lace-macos-arm64
+          - os: macos-13
+            target: bun-darwin-x64
+            name: lace-macos-x64
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+    
+    - name: Install dependencies
+      run: |
+        npm install
+        cd packages/web && npm install
+    
+    - name: Build Next.js app
+      run: |
+        cd packages/web && npm run build
+    
+    - name: Build executable
+      run: |
+        npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
+    
+    - name: Test executable
+      run: |
+        chmod +x build/${{ matrix.name }}
+        ./build/${{ matrix.name }} --help
+    
+    - name: Upload executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}
+        path: build/${{ matrix.name }}
+        retention-days: 7
+    
+    - name: Create archive
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        cd build
+        tar -czf ${{ matrix.name }}.tar.gz ${{ matrix.name }}
+    
+    - name: Upload release asset
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}.tar.gz
+        path: build/${{ matrix.name }}.tar.gz
+        retention-days: 90
+
+  create-release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-executable
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-assets
+    
+    - name: Display structure of downloaded files
+      run: ls -la release-assets
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Lace Single-File Executable ${{ github.ref_name }}
+        body: |
+          ## Lace Single-File Executable ${{ github.ref_name }}
+          
+          Standalone Lace executables with embedded Next.js, React, and all assets.
+          No external dependencies required.
+          
+          ### Downloads
+          
+          - **lace-macos-arm64.tar.gz** - macOS Apple Silicon (M1/M2/M3)
+          - **lace-macos-x64.tar.gz** - macOS Intel
+          - **lace-linux-x64.tar.gz** - Linux x86_64
+          
+          ### Usage
+          
+          ```bash
+          # Extract archive
+          tar -xzf lace-[platform].tar.gz
+          
+          # Run Lace
+          ./lace-[platform] --help
+          ./lace-[platform] --port 3000
+          ```
+          
+          ### Features
+          
+          - Complete Lace environment in a single executable
+          - Embedded Next.js web interface with React components
+          - ZIP-based asset bundling with all dependencies
+          - No installation required - just download and run
+          - Self-contained with no external dependencies
+          
+          Built from commit ${{ github.sha }}
+        files: release-assets/**/*.tar.gz
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+    
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

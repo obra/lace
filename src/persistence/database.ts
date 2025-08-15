@@ -9,7 +9,6 @@ interface SQLiteDatabase {
     all(...params: unknown[]): unknown[];
   };
   exec(sql: string): void;
-  pragma(sql: string): unknown;
   transaction<T>(fn: () => T): () => T;
   close(): void;
 }
@@ -167,9 +166,9 @@ export class DatabasePersistence {
     try {
       if (typeof dbPath === 'string') {
         this.db = new Database(dbPath);
-        // Enable WAL mode for better concurrency
-        this.db.pragma('journal_mode = WAL');
-        this.db.pragma('busy_timeout = 5000');
+        // Enable WAL mode for better concurrency (use exec for compatibility with both Bun and better-sqlite3)
+        this.db.exec('PRAGMA journal_mode = WAL');
+        this.db.exec('PRAGMA busy_timeout = 5000');
       } else {
         this.db = dbPath;
       }
