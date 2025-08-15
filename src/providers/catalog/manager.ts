@@ -3,17 +3,15 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { getLaceDir } from '~/config/lace-dir';
 import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
+import { resolveDataDirectory } from '~/utils/resource-resolver';
 
 // Load builtin provider catalogs from filesystem (server-side)
 async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
 
-  // Use the same pattern as prompt templates - get current module directory + data
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const catalogDir = path.join(currentDir, 'data');
+  const catalogDir = resolveDataDirectory(import.meta.url);
 
   try {
     const files = await fs.promises.readdir(catalogDir);
@@ -36,12 +34,10 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
 }
 
 export class ProviderCatalogManager {
-  private shippedCatalogDir: string;
   private userCatalogDir: string;
   private catalogCache: Map<string, CatalogProvider> = new Map();
 
   constructor() {
-    this.shippedCatalogDir = path.resolve(__dirname, 'data');
     this.userCatalogDir = path.join(getLaceDir(), 'user-catalog');
   }
 
