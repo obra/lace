@@ -39,6 +39,9 @@ async function startTestServer(): Promise<TestServerInstance> {
   
   await app.prepare();
   
+  // Initialize test providers in the server process
+  await initializeTestProviders();
+  
   const server = createServer((req, res) => {
     try {
       handle(req, res);
@@ -183,4 +186,48 @@ export async function authenticateInTest(page: any): Promise<void> {
   
   // Wait for redirect to main app
   await page.waitForURL('/', { timeout: 10000 });
+}
+
+/**
+ * Initialize test providers for E2E testing
+ */
+async function initializeTestProviders(): Promise<void> {
+  try {
+    // Set up in-memory database for test isolation
+    process.env.LACE_DB_PATH = ':memory:';
+    
+    // Fix __dirname for ES modules
+    global.__dirname = path.dirname(new URL(import.meta.url).pathname);
+    
+    // Import test provider utilities - test infra can import from ~/
+    const { createTestProviderInstance } = await import('~/test-utils/provider-instances');
+    
+    console.log('🔧 Initializing test providers...');
+    
+    // Create test provider instances matching the Vitest pattern
+    const anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic',
+      apiKey: 'test-anthropic-key',
+    });
+
+    const openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      displayName: 'Test OpenAI',
+      apiKey: 'test-openai-key',
+    });
+    
+    console.log(`✅ Test providers initialized successfully:
+      - Anthropic: ${anthropicInstanceId}
+      - OpenAI: ${openaiInstanceId}`);
+      
+    // Store instance IDs for potential cleanup (could add this later if needed)
+    (global as any).__E2E_PROVIDER_INSTANCE_IDS = [anthropicInstanceId, openaiInstanceId];
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize test providers:', error);
+    // Don't throw - let tests continue, but this should be visible
+  }
 }

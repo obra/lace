@@ -1364,6 +1364,7 @@ export function ProjectSelectorPanel({
                             <AccentButton
                               type="button"
                               onClick={() => setCreateStep(createStep + 1)}
+                              data-testid="create-project-continue"
                               disabled={
                                 (createStep === 2 &&
                                   !(

@@ -59,9 +59,9 @@ export class ChatInterface {
     return this.page.getByText(messageText);
   }
 
-  // Wait for interface to be ready
+  // Wait for interface to be ready (session creation may take a moment)
   async waitForChatReady(): Promise<void> {
-    await this.messageInput.waitFor({ state: 'visible' });
+    await this.messageInput.waitFor({ state: 'visible', timeout: 15000 });
   }
 
   // Wait for send button to be available (not disabled)

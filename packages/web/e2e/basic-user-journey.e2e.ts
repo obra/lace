@@ -27,18 +27,29 @@ test.describe('Basic User Journey', () => {
     
     // Step 4: Create a new project
     const projectPath = path.join(tempDir, 'test-project');
+    console.log('TEST: Using project path:', projectPath);
     
-      // Create the directory so validation passes
-      await fs.promises.mkdir(projectPath, { recursive: true });
+    // Create the directory so validation passes
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    
+    // Use page object to create project
+    await projectSelector.createProject(projectName, projectPath);
       
-      // Use page object to create project
-      await projectSelector.createProject(projectName, projectPath);
+      // Step 5: Navigate through the project UI flow: project → session → agents
+      console.log('TEST: Navigating to chat interface...');
       
-      // Step 5: Verify we're now in the chat interface
+      // Create a new session to enter the chat interface
+      // Click on the "New Session" button
+      const newSessionButton = page.locator('text="New Session"').or(page.locator('[data-testid="new-session-button"]'));
+      
+      console.log('TEST: Clicking New Session button to enter chat interface...');
+      await newSessionButton.click();
+      
+      // Step 6: Verify we're now in the chat interface
       await chatInterface.waitForChatReady();
       await expect(chatInterface.messageInput).toBeVisible();
       
-      // Step 6: Send a message to the LLM
+      // Step 7: Send a message to the LLM
       const testMessage = 'Hello, this is my first message!';
       await chatInterface.sendMessage(testMessage);
       
