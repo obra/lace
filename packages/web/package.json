@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server.ts",
-    "build": "next build",
+    "build": "bun ../../scripts/trace-server-dependencies.mjs && next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint; npx tsc --noEmit",
     "lint:fix": "next lint --fix",
@@ -73,5 +73,10 @@
     "tsx": "^4.20.3",
     "typescript": "^5.6.0",
     "vitest": "^3.2.4"
-  }
+  },
+  "trustedDependencies": [
+    "@swc/core",
+    "@tailwindcss/oxide",
+    "unrs-resolver"
+  ]
 }
