@@ -3,7 +3,7 @@
 
 import { ThreadId, AssigneeId } from '~/threads/types';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'archived';
 export type TaskPriority = 'high' | 'medium' | 'low';
 
 // Task actors can be either a ThreadId or 'human' (or any string that represents a valid thread ID)

@@ -226,6 +226,7 @@ export class TaskManager extends EventEmitter {
       in_progress: tasks.filter((t) => t.status === 'in_progress').length,
       completed: tasks.filter((t) => t.status === 'completed').length,
       blocked: tasks.filter((t) => t.status === 'blocked').length,
+      archived: tasks.filter((t) => t.status === 'archived').length,
     };
 
     return summary;

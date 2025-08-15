@@ -68,7 +68,9 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
                     ? 'bg-secondary'
                     : task.status === 'completed'
                       ? 'bg-success'
-                      : 'bg-base-content/40'
+                      : task.status === 'archived'
+                        ? 'bg-base-300'
+                        : 'bg-base-content/40'
             }`}
             role="presentation"
             aria-label={`Status: ${task.status.replace('_', ' ')}`}
