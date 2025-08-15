@@ -1115,6 +1115,7 @@ export const LaceApp = memo(function LaceApp() {
                       <div className="flex items-center justify-center gap-3">
                         <button
                           className="btn btn-accent ring-hover focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+                          data-testid="new-project-button"
                           onClick={() => setAutoOpenCreateProject(true)}
                         >
                           Create your first project
