@@ -70,13 +70,10 @@ export default function LoginPage() {
 
       if (response.ok) {
         // Login successful - use Next.js router for better WebKit compatibility
-        console.log('Login successful, using router.push for redirect...');
-        
         // Add delay to ensure cookie is processed
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Use Next.js router instead of window.location for WebKit compatibility
-        console.log('Calling router.push("/")');
         router.push('/');
       } else {
         const data = await response.json() as { error?: string };

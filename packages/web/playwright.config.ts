@@ -38,12 +38,8 @@ export default defineConfig({
     }]),
   ],
 
-  webServer: {
-    command: 'node scripts/start-test-server.js',
-    port: 23457,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60 * 1000,
-  },
+  // No global webServer - each test file manages its own server instance
+  // This ensures complete isolation including LACE_DIR and auth state per worker
 
   // Global setup for worker isolation
   globalSetup: './e2e/global-setup.ts',

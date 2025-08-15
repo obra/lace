@@ -56,8 +56,19 @@ describe('Authentication Middleware', () => {
       expect(response).toBeUndefined();
     });
 
-    it('should redirect unauthenticated requests to /login', async () => {
+    it('should return 401 for unauthenticated API requests', async () => {
       const request = new NextRequest('http://localhost:3000/api/projects');
+      
+      const response = await middleware(request);
+      
+      expect(response).toBeDefined();
+      expect(response!.status).toBe(401);
+      const data = await response!.json();
+      expect(data.error).toBe('Authentication required');
+    });
+    
+    it('should redirect unauthenticated web requests to /login', async () => {
+      const request = new NextRequest('http://localhost:3000/');
       
       const response = await middleware(request);
       
@@ -114,13 +125,33 @@ describe('Authentication Middleware', () => {
       );
     });
 
-    it('should redirect when JWT verification fails', async () => {
+    it('should return 401 when JWT verification fails for API requests', async () => {
       process.env.LACE_JWT_SECRET = 'test-secret';
       
       const { jwtVerify } = await import('jose');
       vi.mocked(jwtVerify).mockRejectedValue(new Error('Invalid token'));
       
       const request = new NextRequest('http://localhost:3000/api/projects', {
+        headers: {
+          cookie: 'auth-token=invalid-jwt-token'
+        }
+      });
+      
+      const response = await middleware(request);
+      
+      expect(response).toBeDefined();
+      expect(response!.status).toBe(401);
+      const data = await response!.json();
+      expect(data.error).toBe('Invalid authentication token');
+    });
+    
+    it('should redirect when JWT verification fails for web requests', async () => {
+      process.env.LACE_JWT_SECRET = 'test-secret';
+      
+      const { jwtVerify } = await import('jose');
+      vi.mocked(jwtVerify).mockRejectedValue(new Error('Invalid token'));
+      
+      const request = new NextRequest('http://localhost:3000/', {
         headers: {
           cookie: 'auth-token=invalid-jwt-token'
         }
@@ -157,23 +188,26 @@ describe('Authentication Middleware', () => {
       );
     });
 
-    it('should handle requests without any auth tokens', async () => {
+    it('should return 401 for API requests without auth tokens', async () => {
       const request = new NextRequest('http://localhost:3000/api/projects');
       
       const response = await middleware(request);
       
       expect(response).toBeDefined();
-      expect(response!.status).toBe(307);
-      expect(response!.headers.get('location')).toBe('http://localhost:3000/login');
+      expect(response!.status).toBe(401);
+      const data = await response!.json();
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should allow root path requests', async () => {
+    it('should redirect unauthenticated root path requests to login', async () => {
       const request = new NextRequest('http://localhost:3000/');
       
       const response = await middleware(request);
       
-      // Root path should be accessible (might redirect to login via client-side logic)
-      expect(response).toBeUndefined();
+      // Root path requires auth and should redirect to login
+      expect(response).toBeDefined();
+      expect(response!.status).toBe(307);
+      expect(response!.headers.get('location')).toBe('http://localhost:3000/login');
     });
   });
 
@@ -188,10 +222,23 @@ describe('Authentication Middleware', () => {
       expect(response).toBeUndefined();
     });
 
-    it('should still require auth for non-localhost when bypass is enabled', async () => {
+    it('should return 401 for non-localhost API requests when bypass is enabled', async () => {
       process.env.LACE_ALLOW_LOCALHOST = 'true';
       
       const request = new NextRequest('http://example.com:3000/api/projects');
+      
+      const response = await middleware(request);
+      
+      expect(response).toBeDefined();
+      expect(response!.status).toBe(401);
+      const data = await response!.json();
+      expect(data.error).toBe('Authentication required');
+    });
+    
+    it('should redirect non-localhost web requests when bypass is enabled', async () => {
+      process.env.LACE_ALLOW_LOCALHOST = 'true';
+      
+      const request = new NextRequest('http://example.com:3000/');
       
       const response = await middleware(request);
       

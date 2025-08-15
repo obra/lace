@@ -128,6 +128,25 @@ export async function initializeAuth(): Promise<string> {
 }
 
 /**
+ * Initialize authentication with a specific password - for testing
+ */
+export async function initializeAuthWithPassword(password: string): Promise<void> {
+  const { hash, salt } = await hashPassword(password);
+  const jwtSecret = crypto.randomBytes(32).toString('hex');
+  
+  const config: AuthConfig = {
+    passwordHash: hash,
+    salt,
+    iterations: ITERATIONS,
+    createdAt: new Date().toISOString(),
+    algorithm: 'scrypt',
+    jwtSecret
+  };
+  
+  saveAuthConfig(config);
+}
+
+/**
  * Reset password - generate new password and update config
  */
 export async function resetPassword(): Promise<string> {

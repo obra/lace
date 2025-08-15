@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SecurityPanel } from '@/components/settings/panels/SecurityPanel';
 
@@ -244,20 +244,25 @@ describe('SecurityPanel', () => {
       const confirmPasswordInput = screen.getByLabelText('Confirm New Password');
       const changePasswordButton = screen.getByRole('button', { name: /change password/i });
       
-      fireEvent.change(currentPasswordInput, { target: { value: 'current123' } });
-      fireEvent.change(newPasswordInput, { target: { value: 'newpass123' } });
-      fireEvent.change(confirmPasswordInput, { target: { value: 'newpass123' } });
-      fireEvent.click(changePasswordButton);
+      // Wrap all state-changing events in act()
+      await act(async () => {
+        fireEvent.change(currentPasswordInput, { target: { value: 'current123' } });
+        fireEvent.change(newPasswordInput, { target: { value: 'newpass123' } });
+        fireEvent.change(confirmPasswordInput, { target: { value: 'newpass123' } });
+        fireEvent.click(changePasswordButton);
+      });
       
       await waitFor(() => {
         expect(changePasswordButton).toBeDisabled();
         expect(screen.getByText('Changing...')).toBeInTheDocument();
       });
       
-      // Resolve the promise
-      resolvePromise!({
-        ok: true,
-        json: async () => ({ success: true }),
+      // Resolve the promise in act()
+      await act(async () => {
+        resolvePromise!({
+          ok: true,
+          json: async () => ({ success: true }),
+        });
       });
     });
   });

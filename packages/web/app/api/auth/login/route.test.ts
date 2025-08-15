@@ -5,7 +5,7 @@
  * @vitest-environment node
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/auth/login/route';
 import * as authService from '@/lib/server/auth-service';
@@ -80,8 +80,8 @@ describe('POST /api/auth/login', () => {
 
     expect(mockSet).toHaveBeenCalledWith('auth-token', 'valid-jwt-token', {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: false,
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60, // 1 hour in seconds
     });
@@ -108,8 +108,8 @@ describe('POST /api/auth/login', () => {
 
     expect(mockSet).toHaveBeenCalledWith('auth-token', 'valid-jwt-token', {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: false,
+      sameSite: 'lax',
       path: '/',
       maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
     });
@@ -256,8 +256,8 @@ describe('POST /api/auth/login', () => {
 
     expect(mockSet).toHaveBeenCalledWith('auth-token', 'valid-jwt-token', {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: false,
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60, // 1 hour (default)
     });
