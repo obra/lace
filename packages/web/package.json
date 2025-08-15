@@ -7,8 +7,8 @@
     "node": ">=20.18.3"
   },
   "scripts": {
-    "dev": "tsx server.ts",
-    "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server.ts",
+    "dev": "tsx server-custom.ts",
+    "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server-custom.ts",
     "build": "bun ../../scripts/trace-server-dependencies.mjs && next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "next lint; npx tsc --noEmit",

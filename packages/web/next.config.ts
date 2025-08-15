@@ -2,9 +2,15 @@ import type { NextConfig } from 'next';
 import path from 'path';
 import { readFileSync, existsSync } from 'fs';
 
-// Load nft-traced dependencies - fail fast if not available
+// Load nft-traced dependencies - only required for production builds
 function getServerDependencies(): string[] {
   const traceFile = path.resolve('./server-dependencies.json');
+
+  // In development mode, tracing is not required
+  if (process.env.NODE_ENV !== 'production' && !existsSync(traceFile)) {
+    return ['packages/web/server-custom.ts'];
+  }
+
   if (!existsSync(traceFile)) {
     throw new Error(
       `❌ NFT trace file not found at ${traceFile}. Run 'bun ../../scripts/trace-server-dependencies.mjs' first.`
