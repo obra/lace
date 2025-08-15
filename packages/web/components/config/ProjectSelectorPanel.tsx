@@ -4,6 +4,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -455,92 +456,115 @@ export function ProjectSelectorPanel({
     e.preventDefault();
     if (!createName.trim() || !createWorkingDirectory.trim()) return;
 
-    try {
-      // Step 1: Create project
-      const projectRes = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: createName.trim(),
-          description: createDescription.trim() || undefined,
-          workingDirectory: createWorkingDirectory.trim(),
-          configuration: createConfig,
-        }),
-      });
+    return Sentry.startSpan(
+      {
+        op: 'ui.action',
+        name: 'Create Project',
+      },
+      async (span) => {
+        span.setAttribute('project.name', createName.trim());
+        span.setAttribute('project.workingDirectory', createWorkingDirectory.trim());
+        span.setAttribute('project.providerInstanceId', createConfig.providerInstanceId || '');
 
-      if (!projectRes.ok) {
-        const errorData = await parseResponse<{ error: string }>(projectRes);
-        console.error('Failed to create project:', errorData.error);
-        return;
-      }
-
-      const projectData = await parseResponse<ProjectInfo>(projectRes);
-      const projectId = projectData.id;
-
-      // Call the callback to refresh projects list if available
-      if (onProjectCreate) {
-        onProjectCreate();
-      }
-
-      // For any project creation, navigate directly to the coordinator agent
-      if (onOnboardingComplete) {
-        // Step 2: Get sessions (project creation should have created a default session)
-        // Add retry to mitigate transient eventual-consistency: project not found
-        const maxAttempts = 5;
-        let attempt = 0;
-        let sessionId: string | undefined;
-        while (attempt < maxAttempts && !sessionId) {
-          try {
-            const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
-            if (sessionsRes.ok) {
-              const sessionsData = await parseResponse<{ sessions: Array<{ id: string }> }>(
-                sessionsRes
-              );
-              sessionId = sessionsData.sessions[0]?.id;
-              if (sessionId) break;
-              console.warn(
-                `[create-project] Attempt ${attempt + 1}/${maxAttempts}: No session yet for project ${projectId}`
-              );
-            } else {
-              const bodyText = await sessionsRes.text();
-              // Common transient: {"json":{"error":"Project not found","code":"RESOURCE_NOT_FOUND"}}
-              console.warn(
-                `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Failed to fetch sessions: ${bodyText}`
-              );
+        try {
+          // Step 1: Create project
+          const projectRes = await Sentry.startSpan(
+            {
+              op: 'http.client',
+              name: 'POST /api/projects',
+            },
+            async () => {
+              return fetch('/api/projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: createName.trim(),
+                  description: createDescription.trim() || undefined,
+                  workingDirectory: createWorkingDirectory.trim(),
+                  configuration: createConfig,
+                }),
+              });
             }
-          } catch (err) {
-            console.warn(
-              `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Error fetching sessions:`,
-              err
-            );
-          }
-          attempt += 1;
-          if (!sessionId) {
-            // Exponential backoff: 200ms, 400ms, 800ms, 1200ms, 1600ms (cap at 1600)
-            const delay = Math.min(200 * 2 ** attempt, 1600);
-            await new Promise((r) => setTimeout(r, delay));
-          }
-        }
-
-        if (sessionId) {
-          const coordinatorAgentId = sessionId; // coordinator has same threadId
-          await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-        } else {
-          console.warn(
-            `[create-project] Could not obtain session for project ${projectId} after ${maxAttempts} attempts; falling back to project selection.`
           );
-          // Fallback to regular project selection if session fetch failed
-          onProjectSelect(projectData);
-        }
-      } else {
-        // Fallback to regular project creation - just select the project
-        onProjectSelect(projectData);
-      }
 
-      handleCancelCreateProject();
-    } catch (error) {
-      console.error('Error creating project:', error);
-    }
+          if (!projectRes.ok) {
+            const errorData = await parseResponse<{ error: string }>(projectRes);
+            const error = new Error(`Failed to create project: ${errorData.error}`);
+            Sentry.captureException(error);
+            console.error('Failed to create project:', errorData.error);
+            return;
+          }
+
+          const projectData = await parseResponse<ProjectInfo>(projectRes);
+          const projectId = projectData.id;
+
+          // Call the callback to refresh projects list if available
+          if (onProjectCreate) {
+            onProjectCreate();
+          }
+
+          // For any project creation, navigate directly to the coordinator agent
+          if (onOnboardingComplete) {
+            // Step 2: Get sessions (project creation should have created a default session)
+            // Add retry to mitigate transient eventual-consistency: project not found
+            const maxAttempts = 5;
+            let attempt = 0;
+            let sessionId: string | undefined;
+            while (attempt < maxAttempts && !sessionId) {
+              try {
+                const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
+                if (sessionsRes.ok) {
+                  const sessionsData = await parseResponse<{ sessions: Array<{ id: string }> }>(
+                    sessionsRes
+                  );
+                  sessionId = sessionsData.sessions[0]?.id;
+                  if (sessionId) break;
+                  console.warn(
+                    `[create-project] Attempt ${attempt + 1}/${maxAttempts}: No session yet for project ${projectId}`
+                  );
+                } else {
+                  const bodyText = await sessionsRes.text();
+                  // Common transient: {"json":{"error":"Project not found","code":"RESOURCE_NOT_FOUND"}}
+                  console.warn(
+                    `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Failed to fetch sessions: ${bodyText}`
+                  );
+                }
+              } catch (err) {
+                console.warn(
+                  `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Error fetching sessions:`,
+                  err
+                );
+              }
+              attempt += 1;
+              if (!sessionId) {
+                // Exponential backoff: 200ms, 400ms, 800ms, 1200ms, 1600ms (cap at 1600)
+                const delay = Math.min(200 * 2 ** attempt, 1600);
+                await new Promise((r) => setTimeout(r, delay));
+              }
+            }
+
+            if (sessionId) {
+              const coordinatorAgentId = sessionId; // coordinator has same threadId
+              await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+            } else {
+              console.warn(
+                `[create-project] Could not obtain session for project ${projectId} after ${maxAttempts} attempts; falling back to project selection.`
+              );
+              // Fallback to regular project selection if session fetch failed
+              onProjectSelect(projectData);
+            }
+          } else {
+            // Fallback to regular project creation - just select the project
+            onProjectSelect(projectData);
+          }
+
+          handleCancelCreateProject();
+        } catch (error) {
+          Sentry.captureException(error);
+          console.error('Error creating project:', error);
+        }
+      }
+    );
   };
 
   // Handle create project environment variables
@@ -1298,7 +1322,11 @@ export function ProjectSelectorPanel({
                             </AccentButton>
                           )}
                           {createStep === 4 && (
-                            <AccentButton type="submit" disabled={!createWorkingDirectory.trim()} data-testid="create-project-submit">
+                            <AccentButton
+                              type="submit"
+                              disabled={!createWorkingDirectory.trim()}
+                              data-testid="create-project-submit"
+                            >
                               {loading ? (
                                 <>
                                   <div className="loading loading-spinner loading-sm"></div>

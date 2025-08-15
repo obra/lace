@@ -6,6 +6,7 @@ import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import * as Sentry from '@sentry/nextjs';
 
 const CreateProjectSchema = z.object({
   name: z.string().optional(), // Made optional for auto-generation
@@ -15,46 +16,73 @@ const CreateProjectSchema = z.object({
 });
 
 export async function GET() {
-  try {
-    const projects = Project.getAll();
+  return Sentry.startSpan(
+    {
+      op: 'http.server',
+      name: 'GET /api/projects',
+    },
+    async (span) => {
+      try {
+        const projects = Project.getAll();
+        span.setAttribute('project.count', projects.length);
 
-    return createSuperjsonResponse(projects);
-  } catch (error) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch projects',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
-  }
+        return createSuperjsonResponse(projects);
+      } catch (error) {
+        Sentry.captureException(error);
+        return createErrorResponse(
+          error instanceof Error ? error.message : 'Failed to fetch projects',
+          500,
+          { code: 'INTERNAL_SERVER_ERROR' }
+        );
+      }
+    }
+  );
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = (await request.json()) as Record<string, unknown>;
-    const validatedData = CreateProjectSchema.parse(body);
+  return Sentry.startSpan(
+    {
+      op: 'http.server',
+      name: 'POST /api/projects',
+    },
+    async (span) => {
+      try {
+        const body = (await request.json()) as Record<string, unknown>;
+        const validatedData = CreateProjectSchema.parse(body);
 
-    const project = Project.create(
-      validatedData.name || '', // Pass empty string to trigger auto-generation
-      validatedData.workingDirectory,
-      validatedData.description || '',
-      validatedData.configuration || {}
-    );
+        span.setAttribute('project.workingDirectory', validatedData.workingDirectory);
+        span.setAttribute('project.hasName', Boolean(validatedData.name));
+        span.setAttribute('project.hasDescription', Boolean(validatedData.description));
 
-    const projectInfo = project.getInfo();
+        const project = Project.create(
+          validatedData.name || '', // Pass empty string to trigger auto-generation
+          validatedData.workingDirectory,
+          validatedData.description || '',
+          validatedData.configuration || {}
+        );
 
-    return createSuperjsonResponse(projectInfo, { status: 201 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
-        code: 'VALIDATION_FAILED',
-        details: error.errors,
-      });
+        const projectInfo = project.getInfo();
+        if (projectInfo) {
+          span.setAttribute('project.createdId', projectInfo.id);
+        }
+
+        return createSuperjsonResponse(projectInfo, { status: 201 });
+      } catch (error) {
+        Sentry.captureException(error);
+
+        if (error instanceof z.ZodError) {
+          return createErrorResponse('Invalid request data', 400, {
+            code: 'VALIDATION_FAILED',
+            details: error.errors,
+          });
+        }
+
+        return createErrorResponse(
+          error instanceof Error ? error.message : 'Failed to create project',
+          500,
+          { code: 'INTERNAL_SERVER_ERROR' }
+        );
+      }
     }
-
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to create project',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR' }
-    );
-  }
+  );
 }
