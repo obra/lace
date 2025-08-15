@@ -1,3 +1,5 @@
+// ABOUTME: Enhanced chat input component with integrated speech recognition and file upload capabilities.
+
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';

@@ -1,3 +1,5 @@
+// ABOUTME: Multiline chat textarea with Enter-to-send and Shift+Enter for newline; handles drag/drop and autofocus.
+
 import React from 'react';
 import {
   forwardRef,
@@ -80,6 +82,8 @@ const ChatTextarea = forwardRef<ChatTextareaRef, ChatTextareaProps>(
     }, [disabled, autoFocus]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Check for IME composition to prevent sending during CJK input
+      if ('isComposing' in e && e.isComposing) return;
       if (e.key === 'Enter' && !e.shiftKey && onSubmit) {
         e.preventDefault();
         if (!value.trim() || disabled) return;

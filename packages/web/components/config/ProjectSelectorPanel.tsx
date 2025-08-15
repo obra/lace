@@ -369,10 +369,13 @@ export function ProjectSelectorPanel({
         handleCancelEdit();
       } else {
         const errorData = await parseResponse<{ error: string }>(res);
-        console.error('Failed to update project:', errorData.error);
+        console.error('Project update failed:', {
+          projectId: editingProject.id,
+          error: errorData.error,
+        });
       }
     } catch (error) {
-      console.error('Error updating project:', error);
+      console.error('Project update error:', { projectId: editingProject?.id, error });
     }
   };
 
@@ -442,7 +445,7 @@ export function ProjectSelectorPanel({
         }
         setEditConfig(config);
       } else {
-        console.error('Failed to load project configuration');
+        console.error('Project config load failed:', { projectId });
         // Fallback to default configuration with first available provider
         const config = { ...DEFAULT_PROJECT_CONFIG };
         if (availableProviders.length > 0) {
@@ -452,7 +455,7 @@ export function ProjectSelectorPanel({
         setEditConfig(config);
       }
     } catch (error) {
-      console.error('Error loading project configuration:', error);
+      console.error('Project config load error:', { projectId, error });
       // Fallback to default configuration with first available provider
       const config = { ...DEFAULT_PROJECT_CONFIG };
       if (availableProviders.length > 0) {
@@ -483,7 +486,7 @@ export function ProjectSelectorPanel({
 
       if (!projectRes.ok) {
         const errorData = await parseResponse<{ error: string }>(projectRes);
-        console.error('Failed to create project:', errorData.error);
+        console.error('Project create failed:', { error: errorData.error });
         return;
       }
 
@@ -511,21 +514,28 @@ export function ProjectSelectorPanel({
               );
               sessionId = sessionsData.sessions[0]?.id;
               if (sessionId) break;
-              console.warn(
-                `[create-project] Attempt ${attempt + 1}/${maxAttempts}: No session yet for project ${projectId}`
-              );
+              console.warn('Create project session missing, retrying:', {
+                attempt: attempt + 1,
+                maxAttempts,
+                projectId,
+              });
             } else {
               const bodyText = await sessionsRes.text();
               // Common transient: {"json":{"error":"Project not found","code":"RESOURCE_NOT_FOUND"}}
-              console.warn(
-                `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Failed to fetch sessions: ${bodyText}`
-              );
+              console.warn('Create project session fetch failed:', {
+                attempt: attempt + 1,
+                maxAttempts,
+                projectId,
+                status: sessionsRes.status,
+              });
             }
           } catch (err) {
-            console.warn(
-              `[create-project] Attempt ${attempt + 1}/${maxAttempts}: Error fetching sessions:`,
-              err
-            );
+            console.warn('Create project session fetch error:', {
+              attempt: attempt + 1,
+              maxAttempts,
+              projectId,
+              error: err,
+            });
           }
           attempt += 1;
           if (!sessionId) {
@@ -539,9 +549,10 @@ export function ProjectSelectorPanel({
           const coordinatorAgentId = sessionId; // coordinator has same threadId
           await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
         } else {
-          console.warn(
-            `[create-project] Could not obtain session for project ${projectId} after ${maxAttempts} attempts; falling back to project selection.`
-          );
+          console.warn('Create project session fallback:', {
+            projectId,
+            maxAttempts,
+          });
           // Fallback to regular project selection if session fetch failed
           onProjectSelect(projectData);
         }
@@ -552,7 +563,7 @@ export function ProjectSelectorPanel({
 
       handleCancelCreateProject();
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error('Project create error:', { error });
     }
   };
 

@@ -1,3 +1,5 @@
+// ABOUTME: Native browser speech recognition component with visual feedback and error handling.
+
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';

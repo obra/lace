@@ -1,3 +1,5 @@
+// ABOUTME: Visual waveform icon that reflects audio level/activity state for speech input UI.
+
 import React from 'react';
 
 interface WaveformIconProps {
@@ -21,6 +23,8 @@ export function WaveformIcon({
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 640 640"
       className={className}
+      aria-hidden="true"
+      role="presentation"
       style={{
         opacity: finalOpacity,
         transition: isActive ? 'opacity 0.1s ease-out' : 'fill 0.2s ease-out',

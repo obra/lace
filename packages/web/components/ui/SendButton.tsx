@@ -1,3 +1,5 @@
+// ABOUTME: Icon-only send/stop button for chat input with streaming-aware states and gradient styling.
+
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faStop } from '@/lib/fontawesome';
@@ -65,6 +67,7 @@ export default function SendButton({
       onClick={handleClick}
       disabled={isDisabled}
       data-testid={isStreaming ? 'stop-button' : 'send-button'}
+      aria-label={isStreaming ? 'Stop response' : hasContent ? 'Send message' : 'Send (disabled)'}
       className={`
         ${getSizeClasses()} rounded-xl transition-all duration-200 shadow-sm hover:shadow-md
         ${
