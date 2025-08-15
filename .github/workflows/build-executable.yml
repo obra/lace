@@ -8,36 +8,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test-vfs:
-    name: Test VFS System
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-    
-    - name: Setup Bun
-      uses: oven-sh/setup-bun@v1
-      with:
-        bun-version: latest
-    
-    - name: Install dependencies
-      run: make install
-    
-    - name: Build project dependencies
-      run: make build-deps
-    
-    - name: Test VFS functionality
-      run: make test-vfs
-
   build-executable:
     name: Build Executable
-    needs: test-vfs
     strategy:
       matrix:
         include:
@@ -71,25 +43,33 @@ jobs:
         bun-version: latest
     
     - name: Install dependencies
-      run: make install
+      run: |
+        npm install
+        cd packages/web && npm install
+    
+    - name: Build Next.js app
+      run: |
+        cd packages/web && npm run build
     
     - name: Build executable
-      run: make build TARGET=${{ matrix.target }} NAME=${{ matrix.name }}
+      run: |
+        npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
     
     - name: Test executable
-      run: make test-executable TARGET=${{ matrix.target }} NAME=${{ matrix.name }}
+      run: |
+        ./build/${{ matrix.name }} --help
     
     - name: Upload executable
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}
-        path: build/executables/${{ matrix.name }}
+        path: build/${{ matrix.name }}
         retention-days: 7
     
     - name: Create archive
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        cd build/executables
+        cd build
         tar -czf ${{ matrix.name }}.tar.gz ${{ matrix.name }}
     
     - name: Upload release asset
@@ -97,7 +77,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}.tar.gz
-        path: build/executables/${{ matrix.name }}.tar.gz
+        path: build/${{ matrix.name }}.tar.gz
         retention-days: 90
 
   create-release:
@@ -152,7 +132,7 @@ jobs:
           
           - Complete Lace environment in a single executable
           - Embedded Next.js web interface with React components
-          - Virtual filesystem with all dependencies (7,000+ files)
+          - ZIP-based asset bundling with all dependencies
           - No installation required - just download and run
           - Self-contained with no external dependencies
           

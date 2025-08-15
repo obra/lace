@@ -2,7 +2,7 @@
 // ABOUTME: Uses Bun's native capabilities instead of complex VFS system
 
 import { execSync } from 'child_process';
-import { createReadStream, createWriteStream, mkdirSync, existsSync } from 'fs';
+import { createReadStream, createWriteStream, mkdirSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { createHash } from 'crypto';
@@ -19,7 +19,6 @@ import zipData from '../build/lace-standalone.zip' with { type: 'file' };
 
 class SimpleLaceServer {
   private extractedPath: string = '';
-  private server: any = null;
 
   constructor(private options: ServerOptions = {}) {}
 
@@ -38,7 +37,7 @@ class SimpleLaceServer {
 
     // Create temp directory
     const tempDir = join(tmpdir(), `lace-${Date.now()}-${process.pid}`);
-    mkdirSync(tempDir, { recursive: true });
+    mkdirSync(tempDir, { recursive: true, mode: 0o700 });
 
     console.log(`📁 Extracting to: ${tempDir}`);
 
@@ -48,7 +47,7 @@ class SimpleLaceServer {
     // Use Bun's file API to read the bundled ZIP and write it out
     const zipFile = Bun.file(zipData);
     const zipBuffer = await zipFile.arrayBuffer();
-    require('fs').writeFileSync(zipPath, new Uint8Array(zipBuffer));
+    writeFileSync(zipPath, new Uint8Array(zipBuffer));
 
     // Extract ZIP
     execSync(`cd "${tempDir}" && unzip -q lace-standalone.zip`, { stdio: 'pipe' });
@@ -119,14 +118,51 @@ class SimpleLaceServer {
       }
     };
 
+    // Standard termination signals
     process.on('SIGINT', () => {
+      console.log('\n📡 Received SIGINT (Ctrl+C)');
       cleanup();
       process.exit(0);
     });
 
     process.on('SIGTERM', () => {
+      console.log('\n📡 Received SIGTERM (terminate)');
       cleanup();
       process.exit(0);
+    });
+
+    // Additional process signals for comprehensive shutdown
+    process.on('SIGHUP', () => {
+      console.log('\n📡 Received SIGHUP (hangup)');
+      cleanup();
+      process.exit(0);
+    });
+
+    process.on('SIGQUIT', () => {
+      console.log('\n📡 Received SIGQUIT (quit)');
+      cleanup();
+      process.exit(0);
+    });
+
+    // Uncaught exception handler
+    process.on('uncaughtException', (error) => {
+      console.error('\n💥 Uncaught exception:', error);
+      cleanup();
+      process.exit(1);
+    });
+
+    // Unhandled promise rejection handler
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('\n💥 Unhandled promise rejection:', reason);
+      cleanup();
+      process.exit(1);
+    });
+
+    // Process exit handler (final cleanup)
+    process.on('exit', (code) => {
+      if (code !== 0) {
+        console.log(`\n🚪 Process exiting with code ${code}`);
+      }
     });
   }
 }
@@ -140,7 +176,7 @@ function parseArgs(args: string[]): ServerOptions {
 
     switch (arg) {
       case '--port':
-      case '-p':
+      case '-p': {
         const portValue = args[++i];
         const port = parseInt(portValue);
         if (isNaN(port) || port < 1 || port > 65535) {
@@ -148,21 +184,25 @@ function parseArgs(args: string[]): ServerOptions {
         }
         options.port = port;
         break;
+      }
 
       case '--host':
-      case '-h':
+      case '-h': {
         options.host = args[++i];
         break;
+      }
 
       case '--verbose':
-      case '-v':
+      case '-v': {
         options.verbose = true;
         break;
+      }
 
-      case '--help':
+      case '--help': {
         printHelp();
         process.exit(0);
         break;
+      }
     }
   }
 

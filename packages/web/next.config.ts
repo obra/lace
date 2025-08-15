@@ -6,9 +6,12 @@ import { readFileSync, existsSync } from 'fs';
 function getServerDependencies(): string[] {
   const traceFile = path.resolve('./server-dependencies.json');
 
-  // In development mode, tracing is not required
-  if (process.env.NODE_ENV !== 'production' && !existsSync(traceFile)) {
-    return ['packages/web/server-custom.ts'];
+  // In development mode, tracing is optional
+  if (process.env.NODE_ENV !== 'production') {
+    if (!existsSync(traceFile)) {
+      return ['packages/web/server-custom.ts'];
+    }
+    // If trace file exists in dev, use it but don't require validation
   }
 
   if (!existsSync(traceFile)) {

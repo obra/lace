@@ -163,7 +163,7 @@ if (isStandalone) {
       '@mui/icons-material': { transform: '@mui/icons-material/{{member}}' },
       lodash: { transform: 'lodash/{{member}}' },
     },
-    outputFileTracingRoot: '/Users/jesse/Documents/GitHub/lace/.worktrees/f-single-file-install',
+    outputFileTracingRoot: process.cwd(),
     experimental: {
       nodeMiddleware: false,
       cacheLife: {
@@ -318,11 +318,11 @@ if (isStandalone) {
     outputFileTracingIncludes: { '/': ['packages/web/server-custom.ts', 'node_modules/open/**/*'] },
     turbopack: {
       resolveAlias: {
-        '~/': '/Users/jesse/Documents/GitHub/lace/.worktrees/f-single-file-install/src/',
-        '@/': '/Users/jesse/Documents/GitHub/lace/.worktrees/f-single-file-install/packages/web/',
+        '~/': path.join(process.cwd(), 'src/'),
+        '@/': path.join(process.cwd(), 'packages/web/'),
       },
       resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
-      root: '/Users/jesse/Documents/GitHub/lace/.worktrees/f-single-file-install',
+      root: process.cwd(),
     },
   };
 

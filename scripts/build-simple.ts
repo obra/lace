@@ -5,8 +5,57 @@ import { execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 
-async function buildSimpleExecutable() {
-  console.log('🔨 Building simple single-file executable...\n');
+interface BuildOptions {
+  target?: string;
+  name?: string;
+  outdir?: string;
+}
+
+function parseArgs(): BuildOptions {
+  const args = process.argv.slice(2);
+  const options: BuildOptions = {};
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--target':
+        options.target = args[++i];
+        break;
+      case '--name':
+        options.name = args[++i];
+        break;
+      case '--outdir':
+        options.outdir = args[++i];
+        break;
+      case '--help':
+        console.log(`
+Usage: npx tsx build-simple.ts [options]
+
+Options:
+  --target <target>    Bun target (default: bun-darwin-arm64)
+  --name <name>        Output executable name (default: lace-standalone)  
+  --outdir <outdir>    Output directory (default: build)
+  --help               Show this help
+
+Examples:
+  npx tsx build-simple.ts
+  npx tsx build-simple.ts --target bun-linux-x64 --name lace-linux
+`);
+        process.exit(0);
+    }
+  }
+
+  return options;
+}
+
+async function buildSimpleExecutable(options: BuildOptions = {}) {
+  const target = options.target || 'bun-darwin-arm64';
+  const name = options.name || 'lace-standalone';
+  const outdir = options.outdir || 'build';
+
+  console.log('🔨 Building simple single-file executable...');
+  console.log(`   🎯 Target: ${target}`);
+  console.log(`   📝 Name: ${name}`);
+  console.log(`   📁 Output: ${outdir}\n`);
 
   // Step 1: Check Next.js build exists
   console.log('1️⃣ Checking Next.js build...');
@@ -106,21 +155,26 @@ async function buildSimpleExecutable() {
 
   // Step 4: Compile with Bun
   console.log('4️⃣ Compiling with Bun...');
-  const outputPath = 'build/lace-standalone';
+  mkdirSync(outdir, { recursive: true });
+  const outputPath = join(outdir, name);
 
-  const compileCmd = `bun build ${execSourcePath} --compile --outfile=${outputPath} --target=bun-darwin-arm64 --minify --sourcemap=none`;
+  const compileCmd = `bun build ${execSourcePath} --compile --outfile=${outputPath} --target=${target} --minify --sourcemap=none`;
   console.log(`🔧 Running: ${compileCmd}`);
 
   execSync(compileCmd, { stdio: 'inherit' });
 
-  // Re-sign the executable to ensure proper code signing
-  console.log('🔏 Re-signing executable...');
-  try {
-    execSync(`codesign --remove-signature ${outputPath}`, { stdio: 'pipe' });
-    execSync(`codesign -s - --deep --force ${outputPath}`, { stdio: 'pipe' });
-    console.log('✅ Executable signed successfully');
-  } catch (error) {
-    console.warn('⚠️  Warning: Code signing failed, but executable may still work');
+  // Re-sign the executable to ensure proper code signing (macOS only)
+  if (process.platform === 'darwin') {
+    console.log('🔏 Re-signing executable (macOS)...');
+    try {
+      execSync(`codesign --remove-signature ${outputPath}`, { stdio: 'pipe' });
+      execSync(`codesign -s - --deep --force ${outputPath}`, { stdio: 'pipe' });
+      console.log('✅ Executable signed successfully');
+    } catch (error) {
+      console.warn('⚠️  Warning: Code signing failed, but executable may still work');
+    }
+  } else {
+    console.log('ℹ️  Skipping code signing (non-macOS platform)');
   }
 
   // Check file size
@@ -151,7 +205,8 @@ async function buildSimpleExecutable() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  buildSimpleExecutable().catch((error) => {
+  const options = parseArgs();
+  buildSimpleExecutable(options).catch((error) => {
     console.error('❌ Build failed:', error);
     process.exit(1);
   });

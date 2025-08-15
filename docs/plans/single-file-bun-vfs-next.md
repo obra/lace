@@ -164,10 +164,11 @@ const nextApp = this.nextModule({
 // Override Next.js internal filesystem expectations
 const nextConfig = {
   ...userConfig,
-  experimental: {
-    useVirtualFileSystem: true, // If available
-  },
-  // Override internal paths to use VFS
+  // Note: useVirtualFileSystem is a hypothetical flag (not supported as of Aug 2025)
+  // Use Options A/B instead: standalone output with file-tracing includes/excludes
+  // or custom asset pipeline approaches
+  
+  // Override internal paths to use VFS (theoretical)
   distDir: 'vfs://web-assets/.next',
   // etc.
 };
