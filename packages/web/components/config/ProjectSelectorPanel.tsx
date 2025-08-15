@@ -509,10 +509,8 @@ export function ProjectSelectorPanel({
           try {
             const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
             if (sessionsRes.ok) {
-              const sessionsData = await parseResponse<{ sessions: Array<{ id: string }> }>(
-                sessionsRes
-              );
-              sessionId = sessionsData.sessions[0]?.id;
+              const sessionsData = await parseResponse<Array<{ id: string }>>(sessionsRes);
+              sessionId = sessionsData[0]?.id;
               if (sessionId) break;
               console.warn('Create project session missing, retrying:', {
                 attempt: attempt + 1,

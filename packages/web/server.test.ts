@@ -27,7 +27,7 @@ const mockOpen = vi.mocked(open.default);
 const { logger } = await import('../../src/utils/logger');
 const mockLogger = vi.mocked(logger);
 
-const { isInteractive } = await import('./server');
+const { isInteractive } = await import('./lib/server-utils');
 
 // Helper to create a test server
 function createTestServer(): Server {

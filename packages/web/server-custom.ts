@@ -5,6 +5,7 @@ import { parseArgs } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import module from 'module';
+import { isInteractive } from './lib/server-utils';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -52,13 +53,7 @@ const userSpecifiedPort = !!values.port; // Track if user manually specified por
 const requestedPort = parseInt(values.port || '31337', 10);
 const hostname = values.host || 'localhost';
 
-// Detect if running interactively (both stdin and stdout are TTYs)
-export function isInteractive(
-  stdin: { isTTY?: boolean } = process.stdin,
-  stdout: { isTTY?: boolean } = process.stdout
-): boolean {
-  return !!(stdin.isTTY && stdout.isTTY);
-}
+// Interactive detection is now handled by imported isInteractive function
 
 const shouldOpenBrowser = isInteractive();
 
