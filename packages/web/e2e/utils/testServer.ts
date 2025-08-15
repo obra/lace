@@ -126,8 +126,19 @@ async function initializeAuthInTempDir(laceDir: string, password: string): Promi
   const originalLaceDir = process.env.LACE_DIR;
   process.env.LACE_DIR = laceDir;
   
+  console.log(`[AUTH-INIT] Setting up auth in ${laceDir} with password: ${password.substring(0, 4)}...`);
+  
   try {
     await initializeAuthWithPassword(password);
+    console.log(`[AUTH-INIT] Auth initialization completed for ${laceDir}`);
+    
+    // Verify the auth config was created
+    const authConfigPath = path.join(laceDir, 'auth.json');
+    const exists = await fs.access(authConfigPath).then(() => true).catch(() => false);
+    console.log(`[AUTH-INIT] Auth config exists at ${authConfigPath}: ${exists}`);
+  } catch (error) {
+    console.error(`[AUTH-INIT] Failed to initialize auth in ${laceDir}:`, error);
+    throw error;
   } finally {
     // Restore original LACE_DIR
     if (originalLaceDir) {

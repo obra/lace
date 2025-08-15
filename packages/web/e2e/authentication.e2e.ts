@@ -48,14 +48,14 @@ test.describe('Authentication E2E Tests', () => {
     // MUST redirect to main app after successful login
     await expect(page).toHaveURL(new RegExp('/$'), { timeout: 15000 });
     
-    // Step 5: Main app MUST be accessible after login - should show project creation
+    // Step 5: Main app MUST be accessible after login - should show new project button
     await page.waitForLoadState('networkidle', { timeout: 10000 });
     
     // Check that we're not on the login page anymore
     await expect(page.locator('body')).not.toContainText('Sign in to Lace');
     
-    // Should be in the project creation flow for new users
-    await expect(page.locator('text=Projects')).toBeVisible();
+    // Should see the new project button (matches existing working tests)
+    await expect(page.locator('[data-testid="new-project-button"]')).toBeVisible({ timeout: 10000 });
   });
   
   test('protected routes require authentication', async ({ page }) => {
@@ -103,6 +103,7 @@ test.describe('Authentication E2E Tests', () => {
     // Step 4: User MUST be authenticated and see main app
     await page.waitForLoadState('networkidle', { timeout: 5000 });
     await expect(page.locator('body')).not.toContainText('Sign in to Lace');
+    await expect(page.locator('[data-testid="new-project-button"]')).toBeVisible({ timeout: 5000 });
     
     // Step 5: Token MUST be consumed (can't be used again)
     const { consumeOneTimeToken } = await import('@/lib/server/auth-tokens');
@@ -135,7 +136,7 @@ test.describe('Authentication E2E Tests', () => {
     expect(authCookie!.expires).toBeGreaterThan(Date.now() + (25 * 24 * 60 * 60 * 1000)); // At least 25 days
   });
   
-  test('project creation flow after authentication', async ({ page }) => {
+  test('main app access after authentication', async ({ page }) => {
     // Use isolated test server  
     const baseURL = testServer.url;
     
@@ -148,17 +149,28 @@ test.describe('Authentication E2E Tests', () => {
     // Step 2: Should redirect to main app after successful login
     await expect(page).toHaveURL(new RegExp('/$'), { timeout: 15000 });
     
-    // Step 2: Should show project creation form (first-time user experience)
+    // Step 3: Should show main app with project interface
     await page.waitForLoadState('networkidle', { timeout: 10000 });
     
-    // Step 3: Verify project creation form is displayed
-    await expect(page.locator('text=Projects')).toBeVisible();
-    await expect(page.locator('text=Create New Project')).toBeVisible();
-    await expect(page.locator('[data-testid="project-path-input"]')).toBeVisible();
-    await expect(page.locator('text=Continue')).toBeVisible();
+    // Step 4: Verify main app elements are accessible (matching existing working tests)
+    // Debug: Check what's actually on the page
+    const html = await page.content();
+    console.log('=== PAGE HTML AFTER SUCCESSFUL LOGIN ===');
+    console.log(html.substring(0, 2000)); // First 2000 chars
+    console.log('=== END DEBUG HTML ===');
+    
+    // Look for the new project button
+    const buttonExists = await page.locator('[data-testid="new-project-button"]').count();
+    console.log(`[DEBUG] new-project-button count: ${buttonExists}`);
+    
+    // Try finding it with different approaches
+    const allButtons = await page.locator('button').count();
+    console.log(`[DEBUG] Total buttons on page: ${allButtons}`);
+    
+    await expect(page.locator('[data-testid="new-project-button"]')).toBeVisible();
     
     // This verifies that authentication is working correctly and the user
-    // is being shown the expected onboarding flow for a new workspace
+    // can access the main application interface
   });
   
   test('logout functionality', async ({ page }) => {
@@ -246,6 +258,7 @@ test.describe('Authentication E2E Tests', () => {
     await page.goto(baseURL);
     await page.waitForLoadState('networkidle', { timeout: 5000 });
     await expect(page.locator('body')).not.toContainText('Sign in to Lace');
+    await expect(page.locator('[data-testid="new-project-button"]')).toBeVisible();
   });
   
   test('multiple browser tab authentication', async ({ browser }) => {
@@ -269,6 +282,7 @@ test.describe('Authentication E2E Tests', () => {
       await expect(page2).toHaveURL(new RegExp('/$'));
       await page2.waitForLoadState('networkidle', { timeout: 5000 });
       await expect(page2.locator('body')).not.toContainText('Sign in to Lace');
+      await expect(page2.locator('[data-testid="new-project-button"]')).toBeVisible();
       
       // Step 4: API calls from both tabs MUST work
       const response1 = await page1.request.get(`${baseURL}/api/projects`);

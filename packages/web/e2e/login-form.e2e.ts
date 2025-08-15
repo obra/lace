@@ -52,9 +52,9 @@ test.describe('Login Form JavaScript Tests', () => {
   
   test('should handle successful login response and redirect', async ({ page }) => {
     await withTempLaceDir('login-success-', async (tempDir) => {
-      // Use the password that was set when we reset it earlier
-      // This avoids auth config mismatch between test and server
-      const password = 'ZMAb3TNMSFRXw68UaTYb5WH2';
+      // Initialize auth system to ensure we have a known password for this test
+      const { setupTestAuth } = await import('./utils/testAuth');
+      const password = await setupTestAuth();
       
       // Navigate to login page
       await page.goto('/login');
