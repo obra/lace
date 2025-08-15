@@ -539,9 +539,6 @@ export function AnimatedLaceApp({
             onChange={setPrompt}
             onSubmit={() => void handleSendMessage()}
             disabled={isTyping || isToolRunning}
-            isListening={isListening}
-            onStartVoice={startListening}
-            onStopVoice={stopListening}
           />
         </motion.div>
       </motion.div>

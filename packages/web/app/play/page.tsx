@@ -35,7 +35,8 @@ import { DragDropOverlay } from '@/components/ui/DragDropOverlay';
 import { FileAttachment } from '@/components/ui/FileAttachment';
 import { AnimatedCarousel } from '@/components/ui/AnimatedCarousel';
 import MessageDisplay from '@/components/ui/MessageDisplay';
-import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
+import { VoiceRecognitionUI, CompactVoiceButton } from '@/components/ui/VoiceRecognitionUI';
+import { NativeSpeechInput, EnhancedChatInputWithSpeech } from '@/components/ui';
 import { AccountDropdown } from '@/components/ui/AccountDropdown';
 import SidebarSection from '@/components/ui/SidebarSection';
 import NavigationItem from '@/components/ui/NavigationItem';
@@ -50,6 +51,23 @@ import { InfoIconButton } from '@/components/ui/InfoIconButton';
 import { OnboardingHero } from '@/components/ui/OnboardingHero';
 import MessageBubble from '@/components/ui/MessageBubble';
 import { OnboardingActions } from '@/components/ui/OnboardingActions';
+
+// ADDITIONAL MISSING COMPONENTS
+import { AccentButton } from '@/components/ui/AccentButton';
+import IconButton from '@/components/ui/IconButton';
+import LoadingDots from '@/components/ui/LoadingDots';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import SkeletonLoader from '@/components/ui/SkeletonLoader';
+import InlineCode from '@/components/ui/InlineCode';
+import { Modal } from '@/components/ui/Modal';
+import { Carousel } from '@/components/ui/Carousel';
+import CodeBlock from '@/components/ui/CodeBlock';
+// import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
+// import FileRenderer from '@/components/ui/FileRenderer';
+import LLMModelBadge from '@/components/ui/LLMModelBadge';
+import { TechnicalDetailsToggle } from '@/components/ui/TechnicalDetailsToggle';
+import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
+import { TextAreaField } from '@/components/ui/TextAreaField';
 
 // MOLECULES - Composed UI patterns
 import ChatInputComposer from '@/components/ui/ChatInputComposer';
@@ -85,7 +103,8 @@ const AtomItem: React.FC<{
  */
 export default function PlaygroundPage() {
   const [activeCategory, setActiveCategory] = useState<ComponentCategory>('atoms');
-  const [showModal, setShowModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showBasicModal, setShowBasicModal] = useState(false);
   const [showAnimatedModal, setShowAnimatedModal] = useState(false);
 
   const renderAtoms = () => (
@@ -152,6 +171,23 @@ export default function PlaygroundPage() {
             <AtomItem n={10} tip="Atom #10: NavigationButton">
               <NavigationButton icon={faUser} onClick={() => {}} title="Navigate" />
             </AtomItem>
+            <AtomItem n={39} tip="Atom #39: AccentButton">
+              <AccentButton>Accent</AccentButton>
+            </AtomItem>
+            <AtomItem n={40} tip="Atom #40: IconButton">
+              <IconButton icon={faUser} onClick={() => {}} />
+            </AtomItem>
+            <AtomItem n={41} tip="Atom #41: CompactVoiceButton">
+              <CompactVoiceButton isListening={false} onToggle={() => {}} />
+            </AtomItem>
+            <AtomItem n={55} tip="Atom #55: NativeSpeechInput">
+              <NativeSpeechInput
+                onTranscript={(text) => void text}
+                onError={(error) => void error}
+                size="md"
+                variant="ghost"
+              />
+            </AtomItem>
           </div>
         </div>
       </div>
@@ -181,6 +217,14 @@ export default function PlaygroundPage() {
             </AtomItem>
             <AtomItem n={11} tip="Atom #11: ChatTextarea">
               <ChatTextarea value="" onChange={() => {}} placeholder="Type your message..." />
+            </AtomItem>
+            <AtomItem n={42} tip="Atom #42: TextAreaField">
+              <TextAreaField
+                label="Text Area"
+                value=""
+                onChange={() => {}}
+                placeholder="Enter text here..."
+              />
             </AtomItem>
           </div>
         </div>
@@ -217,6 +261,21 @@ export default function PlaygroundPage() {
             </AtomItem>
             <AtomItem n={22} tip="Atom #22: MessageDisplay">
               <MessageDisplay type="ai" content="Sample message content" timestamp={new Date()} />
+            </AtomItem>
+            <AtomItem n={43} tip="Atom #43: LoadingDots">
+              <LoadingDots />
+            </AtomItem>
+            <AtomItem n={44} tip="Atom #44: LoadingSkeleton">
+              <LoadingSkeleton />
+            </AtomItem>
+            <AtomItem n={45} tip="Atom #45: SkeletonLoader">
+              <SkeletonLoader />
+            </AtomItem>
+            <AtomItem n={46} tip="Atom #46: InlineCode">
+              <InlineCode code='console.log("Hello")' />
+            </AtomItem>
+            <AtomItem n={47} tip="Atom #47: LLMModelBadge">
+              <LLMModelBadge model="Claude 3.5 Sonnet" />
             </AtomItem>
           </div>
         </div>
@@ -342,7 +401,7 @@ export default function PlaygroundPage() {
       {/* File Components */}
       <div className="card bg-base-100 shadow">
         <div className="card-body">
-          <h3 className="card-title text-base-content">📁 File Components</h3>
+          <h3 className="card-title text-base-content">📁 File & Content Components</h3>
           <div className="space-y-4">
             <AtomItem n={36} tip="Atom #36: FileAttachment">
               <FileAttachment
@@ -351,6 +410,53 @@ export default function PlaygroundPage() {
                 onFileRemoved={() => {}}
                 onFileCleared={() => {}}
               />
+            </AtomItem>
+            <AtomItem n={48} tip="Atom #48: CodeBlock">
+              <CodeBlock language="javascript" code="const hello = 'world';" />
+            </AtomItem>
+            {/* <AtomItem n={49} tip="Atom #49: MarkdownRenderer">
+              <MarkdownRenderer content="**Bold** text with *italics*" />
+            </AtomItem>
+            <AtomItem n={50} tip="Atom #50: FileRenderer">
+              <FileRenderer fileName="example.txt" content="File content here" />
+            </AtomItem> */}
+            <AtomItem n={51} tip="Atom #51: TechnicalDetailsToggle">
+              <TechnicalDetailsToggle details={{ example: 'data' }}>
+                <div className="p-2">Component content</div>
+              </TechnicalDetailsToggle>
+            </AtomItem>
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Components */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-base-content">🛠️ Advanced Components</h3>
+          <div className="space-y-4">
+            <AtomItem n={52} tip="Atom #52: ToolCallDisplay">
+              <ToolCallDisplay
+                tool="example_tool"
+                content="Tool execution content"
+                timestamp={new Date()}
+              />
+            </AtomItem>
+            <AtomItem n={53} tip="Atom #53: Modal">
+              <div>
+                <button className="btn btn-outline" onClick={() => setShowBasicModal(true)}>
+                  Modal Example (click to open modal)
+                </button>
+                <p className="text-xs text-base-content/60 mt-1">
+                  Modal component for overlay dialogs
+                </p>
+              </div>
+            </AtomItem>
+            <AtomItem n={54} tip="Atom #54: Carousel">
+              <Carousel>
+                <div className="p-4 bg-primary text-primary-content rounded">Slide 1</div>
+                <div className="p-4 bg-secondary text-secondary-content rounded">Slide 2</div>
+                <div className="p-4 bg-accent text-accent-content rounded">Slide 3</div>
+              </Carousel>
             </AtomItem>
           </div>
         </div>
@@ -403,17 +509,38 @@ export default function PlaygroundPage() {
             <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M3</span>
-                <span className="text-sm font-medium">EnhancedChatInput</span>
+                <span className="text-sm font-medium">EnhancedChatInput (Production)</span>
                 <div className="text-xs text-base-content/60">
-                  Built on: <span className="text-secondary">ChatInputComposer(M2)</span> +
-                  additional features
+                  Uses: <span className="text-primary">NativeSpeechInput(55)</span> + circular
+                  emerald send button
                 </div>
               </div>
               <EnhancedChatInput
                 value=""
                 onChange={() => {}}
                 onSubmit={() => {}}
-                placeholder="Enhanced chat input with features"
+                placeholder="Production chat input with native speech..."
+                showVoiceButton={true}
+                showFileAttachment={true}
+              />
+            </div>
+
+            <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M7</span>
+                <span className="text-sm font-medium">EnhancedChatInputWithSpeech</span>
+                <div className="text-xs text-base-content/60">
+                  Uses: <span className="text-primary">NativeSpeechInput(55)</span> +
+                  <span className="text-secondary"> ChatInputComposer(M2)</span>
+                </div>
+              </div>
+              <EnhancedChatInputWithSpeech
+                value=""
+                onChange={() => {}}
+                onSubmit={() => {}}
+                placeholder="Chat with native speech recognition..."
+                speechLanguage="en-US"
+                showVoiceButton={true}
               />
             </div>
           </div>
@@ -513,7 +640,7 @@ export default function PlaygroundPage() {
                 🔬 <span className="text-primary">Atoms:</span> Badge(4), AnimatedButton(6),
                 StatusDot(2), Avatar(3), NavigationButton(10)
               </div>
-              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <button className="btn btn-primary" onClick={() => setShowTaskModal(true)}>
                 Open Task Board
               </button>
             </div>
@@ -556,7 +683,7 @@ export default function PlaygroundPage() {
       <div>
         <h2 className="text-3xl font-bold mb-6 text-base-content flex items-center gap-2">
           🔬 Atoms
-          <span className="badge badge-primary">38 components</span>
+          <span className="badge badge-primary">55 components</span>
         </h2>
         <p className="text-base-content/70 mb-6">
           Single-purpose UI building blocks - buttons, inputs, icons, labels, and other fundamental
@@ -568,7 +695,7 @@ export default function PlaygroundPage() {
       <div>
         <h2 className="text-3xl font-bold mb-6 text-base-content flex items-center gap-2">
           🧪 Molecules
-          <span className="badge badge-secondary">11 components</span>
+          <span className="badge badge-secondary">12 components</span>
         </h2>
         <p className="text-base-content/70 mb-6">
           Composed UI patterns - combinations of atoms that solve specific interface problems
@@ -636,9 +763,9 @@ export default function PlaygroundPage() {
         </div>
         <div className="stats shadow">
           <div className="stat">
-            <div className="stat-title">Total Migrated</div>
-            <div className="stat-value text-primary">51</div>
-            <div className="stat-desc">Components from Storybook</div>
+            <div className="stat-title">Total Components</div>
+            <div className="stat-value text-primary">69</div>
+            <div className="stat-desc">UI Components Available</div>
           </div>
           <div className="stat">
             <div className="stat-title">Categories</div>
@@ -648,7 +775,7 @@ export default function PlaygroundPage() {
           <div className="stat">
             <div className="stat-title">Coverage</div>
             <div className="stat-value text-accent">100%</div>
-            <div className="stat-desc">All CONVERT stories migrated</div>
+            <div className="stat-desc">Including Native Speech</div>
           </div>
         </div>
       </div>
@@ -662,7 +789,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">🔬 Atoms</span>
             <span className="sm:hidden">Atoms</span>
-            <span className="ml-1">(38)</span>
+            <span className="ml-1">(55)</span>
           </button>
           <button
             className={`btn ${activeCategory === 'molecules' ? 'btn-primary' : 'btn-outline'} btn-sm md:btn-md`}
@@ -670,7 +797,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">🧪 Molecules</span>
             <span className="sm:hidden">Molecules</span>
-            <span className="ml-1">(11)</span>
+            <span className="ml-1">(12)</span>
           </button>
           <button
             className={`btn ${activeCategory === 'organisms' ? 'btn-primary' : 'btn-outline'} btn-sm md:btn-md`}
@@ -686,7 +813,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">📚 View All</span>
             <span className="sm:hidden">All</span>
-            <span className="ml-1">(51)</span>
+            <span className="ml-1">(69)</span>
           </button>
         </div>
       </div>
@@ -694,7 +821,20 @@ export default function PlaygroundPage() {
       <div className="min-h-96">{renderContent()}</div>
 
       {/* Modals */}
-      <TaskBoardModal isOpen={showModal} onClose={() => setShowModal(false)} tasks={[]} />
+      <TaskBoardModal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} tasks={[]} />
+
+      <Modal
+        isOpen={showBasicModal}
+        onClose={() => setShowBasicModal(false)}
+        title="Basic Modal Example"
+      >
+        <p>This is a basic modal component with a title and content area.</p>
+        <div className="mt-4">
+          <button className="btn btn-primary" onClick={() => setShowBasicModal(false)}>
+            Close Modal
+          </button>
+        </div>
+      </Modal>
 
       <AnimatedModal
         isOpen={showAnimatedModal}
@@ -708,10 +848,10 @@ export default function PlaygroundPage() {
         <div>
           <h4 className="font-bold">📖 Migration Complete!</h4>
           <p className="text-sm mt-1">
-            All 51 CONVERT stories have been successfully migrated from Storybook to this
-            playground. Each component has detailed MDX documentation with usage examples and
-            implementation notes. Check the generated{' '}
-            <code className="bg-base-300 px-1 rounded">*.mdx</code> files in component directories.
+            All 69 UI components from /components/ui/ are now showcased in this playground,
+            including native OS-level speech recognition. Each component includes usage examples and
+            interactive demonstrations. Components are organized by Atomic Design principles for
+            better understanding of the design system.
           </p>
         </div>
       </div>

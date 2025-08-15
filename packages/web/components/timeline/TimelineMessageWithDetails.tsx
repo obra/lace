@@ -12,16 +12,27 @@ import { TechnicalDetailsToggle } from '@/components/ui/TechnicalDetailsToggle';
 interface TimelineMessageWithDetailsProps {
   event: ProcessedEvent;
   agents?: AgentInfo[];
+  isGrouped?: boolean;
+  isFirstInGroup?: boolean;
+  isLastInGroup?: boolean;
 }
 
-export function TimelineMessageWithDetails({ event, agents }: TimelineMessageWithDetailsProps) {
+export function TimelineMessageWithDetails({
+  event,
+  agents,
+  isGrouped,
+  isFirstInGroup,
+  isLastInGroup,
+}: TimelineMessageWithDetailsProps) {
   return (
-    <TechnicalDetailsToggle
-      details={event}
-      label="Event Details"
-      buttonClassName="absolute top-2 right-2 text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200"
-    >
-      <TimelineMessage event={event} agents={agents} />
+    <TechnicalDetailsToggle details={event} label="Event Details">
+      <TimelineMessage
+        event={event}
+        agents={agents}
+        isGrouped={isGrouped}
+        isFirstInGroup={isFirstInGroup}
+        isLastInGroup={isLastInGroup}
+      />
     </TechnicalDetailsToggle>
   );
 }

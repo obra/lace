@@ -11,10 +11,14 @@ import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
 import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
 import { CompactionEntry } from '@/components/timeline/CompactionEntry';
+import { formatTime } from '@/lib/format';
 
 interface TimelineMessageProps {
   event: ProcessedEvent;
   agents?: AgentInfo[];
+  isGrouped?: boolean;
+  isFirstInGroup?: boolean;
+  isLastInGroup?: boolean;
 }
 
 function getAgentName(threadId: string, agents?: AgentInfo[]): string {
@@ -22,47 +26,77 @@ function getAgentName(threadId: string, agents?: AgentInfo[]): string {
   return agent?.name || 'Assistant';
 }
 
-export function TimelineMessage({ event, agents }: TimelineMessageProps) {
+export function TimelineMessage({
+  event,
+  agents,
+  isGrouped = false,
+  isFirstInGroup = true,
+  isLastInGroup = true,
+}: TimelineMessageProps) {
   const timestamp = event.timestamp || new Date();
   const agentName = getAgentName(event.threadId, agents);
 
   switch (event.type) {
     case 'USER_MESSAGE':
       return (
-        <div className="flex gap-3">
-          <div className="flex-1 min-w-0">
-            <MessageHeader name="You" timestamp={timestamp} role="user" />
-            <MessageText content={event.data} />
-          </div>
+        <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
+          {/* Only show header for first message in group */}
+          {isFirstInGroup && (
+            <div className="flex gap-3 items-start">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-md bg-teal-500 text-white flex items-center justify-center">
+                  <span className="text-xs font-semibold">Me</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="bg-neutral-700/20 rounded-lg px-3 py-2">
+                  <MessageText content={event.data} className="!leading-normal" />
+                </div>
+              </div>
+            </div>
+          )}
+          {!isFirstInGroup && (
+            <div
+              className={`ml-11 bg-neutral-700/20 rounded-lg px-3 py-2 ${isLastInGroup ? 'mb-1' : ''}`}
+            >
+              <MessageText content={event.data} className="!leading-normal" />
+            </div>
+          )}
         </div>
       );
 
     case 'AGENT_MESSAGE':
       return (
-        <div className="flex gap-3">
-          <div className="flex-1 min-w-0">
+        <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
+          {/* Only show header for first message in group */}
+          {isFirstInGroup && (
             <MessageHeader
               name={agentName}
               timestamp={timestamp}
               role="assistant"
               badge={{ text: agentName, variant: 'primary' }}
             />
-            <MessageText content={event.data.content} />
+          )}
+          <div className={`ml-11 ${isLastInGroup ? 'mb-1' : ''}`}>
+            <MessageText content={event.data.content} className="!leading-normal" />
           </div>
         </div>
       );
 
     case 'AGENT_STREAMING':
       return (
-        <div className="flex gap-3">
-          <div className="flex-1 min-w-0">
+        <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
+          {/* Only show header for first message in group */}
+          {isFirstInGroup && (
             <MessageHeader
               name={agentName}
               timestamp={timestamp}
               role="assistant"
               badge={{ text: agentName, variant: 'primary' }}
             />
-            <MessageText content={event.data.content} />
+          )}
+          <div className={`ml-11 ${isLastInGroup ? 'mb-1' : ''}`}>
+            <MessageText content={event.data.content} className="!leading-normal" />
           </div>
         </div>
       );

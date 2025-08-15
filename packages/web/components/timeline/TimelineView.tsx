@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
@@ -40,49 +41,122 @@ export function TimelineView({
     selectedAgent ? asThreadId(selectedAgent) : undefined
   );
 
+  // Smooth scroll to bottom when new messages arrive
   useEffect(() => {
     if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      // Delay scroll slightly to account for entry animations
+      const timeoutId = setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTo({
+            top: containerRef.current.scrollHeight,
+            behavior: 'smooth',
+          });
+        }
+      }, 50); // Reduced delay for faster feel
+
+      return () => clearTimeout(timeoutId);
     }
   }, [processedEvents, isTyping, streamingContent]);
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto overscroll-contain">
-      <div className="p-4 space-y-4 pb-32">
-        {processedEvents.length === 0 && (
-          <div className="text-gray-400 text-center py-8">
-            No conversation data loaded. {processedEvents.length} events.
-          </div>
-        )}
+    <div ref={containerRef} className="h-full overflow-y-auto overscroll-contain scroll-smooth">
+      <div className="min-h-full flex flex-col justify-end">
+        <div className="p-4 space-y-4 pb-32">
+          {processedEvents.length === 0 && (
+            <div className="text-gray-400 text-center py-8">
+              No conversation data loaded. {processedEvents.length} events.
+            </div>
+          )}
 
-        {processedEvents.map((event, index) => (
-          <TimelineEntryErrorBoundary
-            key={event.id || `${event.threadId}-${event.timestamp}-${index}`}
-            event={event}
-          >
-            <TimelineMessageWithDetails event={event} agents={agents} />
-          </TimelineEntryErrorBoundary>
-        ))}
+          <AnimatePresence mode="popLayout">
+            {processedEvents.map((event, index) => {
+              // Determine if this message should be grouped with previous message
+              const prevEvent = index > 0 ? processedEvents[index - 1] : null;
+              const nextEvent =
+                index < processedEvents.length - 1 ? processedEvents[index + 1] : null;
 
-        {streamingContent &&
-          (() => {
-            const streamingEvent = {
-              id: 'streaming',
-              type: 'AGENT_STREAMING' as const,
-              threadId: currentAgent ? asThreadId(currentAgent) : STREAMING_THREAD_ID,
-              timestamp: new Date(),
-              data: { content: streamingContent },
-              transient: true,
-            };
+              // Group messages from same sender that are close in time and type
+              const shouldGroupWithPrevious =
+                prevEvent &&
+                prevEvent.type === event.type &&
+                prevEvent.threadId === event.threadId &&
+                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
+                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(prevEvent.type);
 
-            return (
-              <TimelineEntryErrorBoundary event={streamingEvent}>
-                <TimelineMessageWithDetails event={streamingEvent} agents={agents} />
-              </TimelineEntryErrorBoundary>
-            );
-          })()}
+              const shouldGroupWithNext =
+                nextEvent &&
+                nextEvent.type === event.type &&
+                nextEvent.threadId === event.threadId &&
+                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
+                ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
-        {isTyping && !streamingContent && <TypingIndicator agent={currentAgent} />}
+              return (
+                <motion.div
+                  key={event.id || `${event.threadId}-${event.timestamp}-${index}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{
+                    duration: 0.15,
+                    ease: 'easeOut',
+                    layout: { duration: 0.1 },
+                  }}
+                  layout
+                >
+                  <TimelineEntryErrorBoundary event={event}>
+                    <TimelineMessageWithDetails
+                      event={event}
+                      agents={agents}
+                      isGrouped={!!shouldGroupWithPrevious}
+                      isLastInGroup={!shouldGroupWithNext}
+                      isFirstInGroup={!shouldGroupWithPrevious}
+                    />
+                  </TimelineEntryErrorBoundary>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {streamingContent &&
+              (() => {
+                const streamingEvent = {
+                  id: 'streaming',
+                  type: 'AGENT_STREAMING' as const,
+                  threadId: currentAgent ? asThreadId(currentAgent) : STREAMING_THREAD_ID,
+                  timestamp: new Date(),
+                  data: { content: streamingContent },
+                  transient: true,
+                };
+
+                return (
+                  <motion.div
+                    key="streaming"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.1, ease: 'easeOut' }}
+                  >
+                    <TimelineEntryErrorBoundary event={streamingEvent}>
+                      <TimelineMessageWithDetails event={streamingEvent} agents={agents} />
+                    </TimelineEntryErrorBoundary>
+                  </motion.div>
+                );
+              })()}
+
+            {isTyping && !streamingContent && (
+              <motion.div
+                key="typing"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -2 }}
+                transition={{ duration: 0.1, ease: 'easeOut' }}
+              >
+                <TypingIndicator agent={currentAgent} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

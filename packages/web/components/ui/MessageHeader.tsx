@@ -72,14 +72,9 @@ export default function MessageHeader({
 
       {/* Header content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 mb-1">
-          <div className="flex items-center gap-2">
-            {icon && <span className="text-sm">{icon}</span>}
-            <span className="font-medium text-sm text-base-content">{name}</span>
-          </div>
-          <span className="text-xs text-base-content/50">
-            {typeof timestamp === 'string' ? timestamp : formatTime(timestamp)}
-          </span>
+        <div className="flex items-center gap-2 mb-1">
+          {icon && <span className="text-sm">{icon}</span>}
+          <span className="font-medium text-sm text-base-content">{name}</span>
           {badge &&
             (isLLMModel(badge.text) ? (
               <LLMModelBadge model={badge.text} className={badge.className} />

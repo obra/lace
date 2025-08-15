@@ -46,47 +46,60 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
   // Collapsed state
   if (!isOpen) {
     return (
-      <div className="bg-base-100 border-r border-base-300 flex flex-col items-center py-4 transition-all duration-300 w-16 relative">
-        <div className="flex flex-col gap-2">
+      <div className="bg-base-100 border-r border-base-300/50 flex flex-col items-center py-6 transition-all duration-300 w-16 relative shadow-sm h-full">
+        <div className="flex flex-col gap-3">
           <button
             onClick={onSettingsClick}
-            className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+            className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
             title="Settings"
           >
             <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
           </button>
         </div>
 
+        {/* Clickable border area for toggle */}
+        <div
+          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40"
+          onClick={onToggle}
+          title="Click to expand sidebar"
+        />
+
         <button
           onClick={onToggle}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group"
+          className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[200] group"
         >
-          <ChevronRightIcon className="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors" />
+          <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="bg-base-100 border-r border-base-300 flex flex-col relative transition-all duration-300 w-[350px] h-full">
+    <div className="bg-base-100/95 backdrop-blur-sm border-r border-base-300/50 flex flex-col relative transition-all duration-300 w-[350px] h-full shadow-lg">
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="p-4 border-b border-base-300">
+        <div className="p-6 border-b border-base-300/30">
           <div className="flex items-center justify-between">
             <div className="flex-1 gap-3">
-              <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-800 text-xs text-neutral-200">
+              <Link
+                href="/"
+                className="flex items-center gap-3 font-semibold tracking-tight hover:opacity-80 transition-opacity"
+              >
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-cyan-600 text-xs text-white shadow-md">
                   ✦
                 </span>
-                <span className="text-lg">Lace</span>
+                <span className="text-xl font-ui font-medium">Lace</span>
               </Link>
             </div>
             <button
               onClick={onSettingsClick}
-              className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+              className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
               title="Settings"
             >
-              <FontAwesomeIcon icon={faCog} className="w-4 h-4 text-base-content/60" />
+              <FontAwesomeIcon
+                icon={faCog}
+                className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
+              />
             </button>
           </div>
         </div>
@@ -94,12 +107,19 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto">{children}</div>
 
+        {/* Clickable border area for toggle */}
+        <div
+          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40 group"
+          onClick={onToggle}
+          title="Click to collapse sidebar"
+        />
+
         {/* Toggle Button */}
         <button
           onClick={onToggle}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-md z-10 group"
+          className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[200] group"
         >
-          <ChevronRightIcon className="w-3 h-3 text-base-content/60 group-hover:text-base-content transition-colors rotate-180" />
+          <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors rotate-180" />
         </button>
       </div>
     </div>
@@ -121,16 +141,16 @@ export function SidebarSection({
   }, [defaultCollapsed]);
 
   return (
-    <div className="px-4 py-3">
+    <div className="px-6 py-4">
       <button
         onClick={() => collapsible && setCollapsed(!collapsed)}
-        className={`w-full flex items-center justify-between text-sm font-medium text-base-content/70 mb-2 hover:text-base-content transition-colors ${
+        className={`w-full flex items-center justify-between text-sm font-medium text-base-content/60 mb-3 hover:text-base-content/80 transition-all duration-200 ${
           collapsible ? 'cursor-pointer' : 'cursor-default'
         }`}
       >
         <div className="flex items-center gap-2">
           {icon && <FontAwesomeIcon icon={icon} className="w-4 h-4" />}
-          <span className="uppercase tracking-wide">{title}</span>
+          <span className="uppercase tracking-wider text-xs font-semibold">{title}</span>
         </div>
         {collapsible && (
           <ChevronRightIcon
@@ -139,7 +159,7 @@ export function SidebarSection({
         )}
       </button>
 
-      {!collapsed && <div className="space-y-1">{children}</div>}
+      {!collapsed && <div className="space-y-2 ml-1">{children}</div>}
     </div>
   );
 }
@@ -151,12 +171,13 @@ export function SidebarItem({
   disabled = false,
   className = '',
 }: SidebarItemProps) {
-  const baseClasses = 'w-full text-left p-3 rounded-lg text-sm transition-colors';
+  const baseClasses =
+    'w-full text-left py-3 px-4 rounded-xl text-sm transition-all duration-200 font-ui';
   const stateClasses = disabled
     ? 'text-base-content/40 cursor-not-allowed'
     : active
-      ? 'bg-primary text-primary-content'
-      : 'text-base-content/80 hover:bg-base-200 hover:text-base-content';
+      ? 'bg-primary/90 text-primary-content shadow-sm ring-1 ring-primary/20 font-medium'
+      : 'text-base-content/70 hover:bg-base-200/80 hover:text-base-content hover:scale-[1.02] hover:shadow-sm';
 
   return (
     <button
@@ -179,12 +200,15 @@ export function SidebarButton({
   className = '',
 }: SidebarButtonProps) {
   const baseClasses =
-    'w-full border rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2';
+    'w-full border rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md';
 
   const variantClasses = {
-    primary: 'border-primary bg-primary text-primary-content hover:bg-primary/90',
-    secondary: 'border-base-300 bg-base-200 text-base-content hover:bg-base-300',
-    ghost: 'border-transparent bg-transparent text-base-content hover:bg-base-200',
+    primary:
+      'border-primary/80 bg-gradient-to-r from-primary to-primary/90 text-primary-content hover:from-primary/90 hover:to-primary hover:scale-[1.02]',
+    secondary:
+      'border-base-300/50 bg-base-200/80 text-base-content hover:bg-base-300/80 hover:border-base-300 hover:scale-[1.02]',
+    ghost:
+      'border-transparent bg-transparent text-base-content hover:bg-base-200/60 hover:scale-[1.02]',
   };
 
   const sizeClasses = {

@@ -65,28 +65,20 @@ export default function TokenUsageDisplay({
 
   return (
     <div
-      className={`flex items-center justify-between text-xs text-base-content/70 py-2 px-1 ${className}`}
+      className={`flex items-center justify-end text-xs text-base-content/70 py-1 px-1 ${className}`}
     >
-      {/* Left side: Token usage */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <StatusDot status={usageStatus.status} size="xs" pulse={tokenUsage.nearLimit} />
-          <span className="font-medium">{formatTokenCount(tokenUsage.totalTokens)} tokens</span>
-          <Badge variant={usageStatus.status} size="xs">
-            {(tokenUsage.percentUsed * 100).toFixed(0)}%
-          </Badge>
-        </div>
-
-        {/* Context limit indicator */}
-        <span className="text-base-content/50">of {formatTokenCount(tokenUsage.contextLimit)}</span>
-      </div>
-
-      {/* Right side: Compaction status */}
+      {/* Compact right-aligned display */}
       <div className="flex items-center gap-2">
-        <span
-          className={`text-base-content/60 ${tokenUsage.percentUsed >= 80 ? 'text-warning' : ''}`}
-        >
-          {compactionDistance}
+        <span className="text-base-content/50">
+          {formatTokenCount(tokenUsage.totalTokens)} of {formatTokenCount(tokenUsage.contextLimit)}
+        </span>
+        <StatusDot status={usageStatus.status} size="xs" pulse={tokenUsage.nearLimit} />
+        <Badge variant={usageStatus.status === 'error' ? 'success' : usageStatus.status} size="xs">
+          {(tokenUsage.percentUsed * 100).toFixed(0)}%
+        </Badge>
+        <span className="text-base-content/50">•</span>
+        <span className="text-base-content/60">
+          {compactionDistance === 'Auto-compaction ready' ? 'Ready' : compactionDistance}
         </span>
       </div>
     </div>

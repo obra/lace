@@ -227,7 +227,7 @@ export class EventStreamManager {
       timestamp: new Date(),
       threadId: 'system',
       type: 'LOCAL_SYSTEM_MESSAGE',
-      data: 'Connected to unified event stream',
+      data: 'Ready!',
       transient: true,
     });
 

@@ -138,6 +138,20 @@ Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, S
 - **Vitest and Playwright** for testing
 - **ESLint + Prettier** for code quality
 
+## Styling and CSS
+
+**⚠️ CRITICAL: DaisyUI Plugin in globals.css**
+- The line `@plugin "daisyui";` in `packages/web/app/globals.css` is **ESSENTIAL** and must **NEVER** be removed
+- Removing this line will break the entire app's CSS styling system
+- DaisyUI components and utilities depend on this plugin declaration
+- This is in addition to the DaisyUI plugin in `tailwind.config.js` - both are required
+
+**CSS Architecture:**
+- **Tailwind CSS** for utility-first styling
+- **DaisyUI** for component library and themes  
+- **CSS Variables** for dynamic theming and font management
+- **Google Fonts** loaded via Next.js font optimization + CSS imports
+
 ## Tool Development
 
 ### Schema-Based Tool Architecture
