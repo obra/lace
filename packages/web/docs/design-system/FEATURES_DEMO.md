@@ -13,8 +13,9 @@ This guide shows you how to explore all the implemented features in the Lace web
 ## 📱 Main Features Tour
 
 ### 1. **Syntax Highlighting Demo**
+
 - **Location**: Default "Main Dev" timeline
-- **Features**: 
+- **Features**:
   - TypeScript code with full syntax highlighting
   - Inline code highlighting (e.g., `const result = await api.getData()`)
   - Monospace font for all code contexts
@@ -22,14 +23,16 @@ This guide shows you how to explore all the implemented features in the Lace web
   - 30+ programming languages supported
 
 ### 2. **Tennis Commentary System** 🎾
+
 - **Access**: Click on **"Tennis Commentary Demo"** in the sidebar
 - **What You'll See**:
   - Engaging sports-style commentary on development activities
-  - Sample messages like *"And here we see the agent entering deep thought mode!"*
+  - Sample messages like _"And here we see the agent entering deep thought mode!"_
   - Performance insights and tool execution commentary
   - Turn-based commentary for conversation flow
 
 ### 3. **Design System Showcase** 🎨
+
 - **Access**: Click on **"Design System Demo"** in the sidebar
 - **Features**:
   - Overview of atomic design components (atoms, molecules, organisms)
@@ -38,6 +41,7 @@ This guide shows you how to explore all the implemented features in the Lace web
   - Complete component documentation
 
 ### 4. **Admin Design System Interface**
+
 - **Direct URL**: `http://localhost:3001/admin/design`
 - **Features**:
   - Interactive component showcase
@@ -46,6 +50,7 @@ This guide shows you how to explore all the implemented features in the Lace web
   - Component analysis and mapping
 
 ### 5. **File Diff Viewer Examples**
+
 - **Location**: Available in the "Tennis Commentary Demo" timeline
 - **Features**:
   - Side-by-side code comparison
@@ -54,6 +59,7 @@ This guide shows you how to explore all the implemented features in the Lace web
   - Responsive layout
 
 ### 6. **Instructions Editor**
+
 - **Access**: Through the admin interface at `/admin/design`
 - **Features**:
   - Rich text editing capabilities
@@ -65,25 +71,28 @@ This guide shows you how to explore all the implemented features in the Lace web
 
 When you visit the **"Tennis Commentary Demo"** timeline, you'll see:
 
-- **Tool Execution**: *"A powerful file-read execution is underway - precision is key here!"*
-- **Success Messages**: *"Excellent execution! The bash tool delivered exactly what was needed."*
-- **Turn Commentary**: *"What a magnificent turn! The agent has delivered exceptional results."*
-- **Performance Insights**: *"Beautiful work! The FileDiffViewer operation was executed with precision."*
+- **Tool Execution**: _"A powerful file-read execution is underway - precision is key here!"_
+- **Success Messages**: _"Excellent execution! The bash tool delivered exactly what was needed."_
+- **Turn Commentary**: _"What a magnificent turn! The agent has delivered exceptional results."_
+- **Performance Insights**: _"Beautiful work! The FileDiffViewer operation was executed with precision."_
 
 ## 🔧 Technical Features
 
 ### Syntax Highlighting
+
 - **30+ Languages**: JavaScript, TypeScript, Python, Java, C++, Rust, Go, PHP, Ruby, Swift, Kotlin, HTML, CSS, SCSS, JSON, YAML, XML, Bash, PowerShell, SQL, Dockerfile, Markdown, and more
 - **Automatic Detection**: Language detection based on file extensions and content patterns
 - **Theme Support**: GitHub Light/Dark, Visual Studio, Monokai themes
 - **Performance Optimized**: Caching, lazy loading, and chunked processing for large files
 
 ### Monospace Typography
-- **Font Stack**: ui-monospace, JetBrains Mono, Fira Code, SF Mono, SFMono-Regular, Monaco, Consolas, Liberation Mono, Menlo, Courier New
+
+- **Font Stack**: ui-monospace, Google Code Sans, JetBrains Mono, Fira Code, SF Mono, SFMono-Regular, Monaco, Consolas, Liberation Mono, Menlo, Courier New
 - **Ligature Support**: Enhanced readability with programming ligatures
 - **Contexts**: Code blocks, inline code, terminal interfaces, file paths
 
 ### Responsive Design
+
 - **Mobile-First**: Optimized for mobile devices
 - **Adaptive Layouts**: Responsive design that works on all screen sizes
 - **Touch-Friendly**: Mobile-optimized interactions
@@ -107,6 +116,7 @@ When you visit the **"Tennis Commentary Demo"** timeline, you'll see:
 ## 🛠️ Behind the Scenes
 
 ### Technologies Used
+
 - **React 18** with TypeScript
 - **Next.js 15** with App Router
 - **Tailwind CSS 4.x** for styling
@@ -115,6 +125,7 @@ When you visit the **"Tennis Commentary Demo"** timeline, you'll see:
 - **FontAwesome** for icons
 
 ### Architecture
+
 - **Atomic Design**: Components organized as atoms, molecules, organisms
 - **Event-Driven**: Real-time updates and streaming
 - **Performance Optimized**: Caching, lazy loading, and efficient rendering
