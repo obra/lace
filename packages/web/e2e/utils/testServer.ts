@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { createServer } from 'http';
+import { initializeAuthWithPassword } from '@/lib/server/auth-config';
 
 let testServerProcess: ChildProcess | null = null;
 let testServerUrl: string | null = null;
@@ -28,6 +29,9 @@ export async function startTestServer(testName: string): Promise<{
   // Generate auth password for this test server
   const password = generateTestPassword();
   
+  // Initialize auth config in the temp directory
+  await initializeAuthInTempDir(tempLaceDir, password);
+  
   // Find available port starting from 23457
   const port = await findAvailablePort(23457);
   
@@ -46,8 +50,6 @@ export async function startTestServer(testName: string): Promise<{
         LACE_DB_PATH: ':memory:',
         NODE_ENV: 'test',
         VITEST_RUNNING: 'true',
-        // Auth setup
-        E2E_TEST_PASSWORD: password,
         // API keys for testing
         ANTHROPIC_KEY: 'test-anthropic-key-for-e2e-tests',
         ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e-tests',
@@ -113,6 +115,26 @@ export async function stopTestServer(): Promise<void> {
       console.warn('Failed to clean up temp directory:', error);
     }
     tempLaceDir = null;
+  }
+}
+
+/**
+ * Initialize auth config in the temp directory for E2E testing
+ */
+async function initializeAuthInTempDir(laceDir: string, password: string): Promise<void> {
+  // Temporarily set LACE_DIR so the auth config functions use the test directory
+  const originalLaceDir = process.env.LACE_DIR;
+  process.env.LACE_DIR = laceDir;
+  
+  try {
+    await initializeAuthWithPassword(password);
+  } finally {
+    // Restore original LACE_DIR
+    if (originalLaceDir) {
+      process.env.LACE_DIR = originalLaceDir;
+    } else {
+      delete process.env.LACE_DIR;
+    }
   }
 }
 
