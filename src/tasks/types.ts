@@ -25,7 +25,7 @@ export interface CreateTaskRequest {
 }
 
 export interface TaskFilters {
-  status?: 'pending' | 'in_progress' | 'completed' | 'blocked';
+  status?: 'pending' | 'in_progress' | 'completed' | 'blocked' | 'archived';
   priority?: 'high' | 'medium' | 'low';
   assignedTo?: string;
   createdBy?: string;
@@ -37,4 +37,5 @@ export interface TaskSummary {
   in_progress: number;
   completed: number;
   blocked: number;
+  archived: number;
 }

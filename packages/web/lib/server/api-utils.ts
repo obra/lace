@@ -24,7 +24,7 @@ export const CreateTaskSchema = z.object({
 export const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  status: z.enum(['pending', 'in_progress', 'completed', 'blocked']).optional(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'blocked', 'archived']).optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   assignedTo: z.string().optional(),
 });

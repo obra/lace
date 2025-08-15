@@ -39,6 +39,7 @@ export function TaskListSidebar({
       in_progress: tasks.filter((t) => t.status === 'in_progress'),
       blocked: tasks.filter((t) => t.status === 'blocked'),
       completed: tasks.filter((t) => t.status === 'completed'),
+      archived: tasks.filter((t) => t.status === 'archived'),
     }),
     [tasks]
   );

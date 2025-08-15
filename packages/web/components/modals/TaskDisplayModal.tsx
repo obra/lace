@@ -154,6 +154,8 @@ export function TaskDisplayModal({
         return 'badge-success';
       case 'blocked':
         return 'badge-error';
+      case 'archived':
+        return 'badge-neutral';
       default:
         return 'badge-neutral';
     }
@@ -259,6 +261,7 @@ export function TaskDisplayModal({
                 <option value="in_progress">⚡ In Progress</option>
                 <option value="blocked">🚫 Blocked</option>
                 <option value="completed">✅ Completed</option>
+                <option value="archived">📁 Archived</option>
               </select>
             ) : (
               <div className="mt-1">
