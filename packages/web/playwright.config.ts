@@ -20,7 +20,10 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'http://localhost:23457',
+    // Dynamic baseURL per worker to avoid port conflicts
+    baseURL: process.env.TEST_WORKER_INDEX 
+      ? `http://localhost:${23457 + parseInt(process.env.TEST_WORKER_INDEX)}` 
+      : 'http://localhost:23457',
     trace: 'retain-on-failure', // More comprehensive than 'on-first-retry'
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

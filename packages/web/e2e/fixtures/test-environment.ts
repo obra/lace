@@ -9,6 +9,7 @@ import * as os from 'os';
 interface TestEnvironmentContext {
   tempDir: string;
   originalLaceDir: string | undefined;
+  originalWorkerIndex: string | undefined;
   projectName: string;
 }
 
@@ -22,28 +23,38 @@ export const test = baseTest.extend<{}, { testEnv: TestEnvironmentContext }>({
         path.join(os.tmpdir(), `lace-e2e-worker-${workerIndex}-`)
       );
 
-      // Save original LACE_DIR and set to our temp directory
+      // Save original environment and set to our worker-specific values
       const originalLaceDir = process.env.LACE_DIR;
+      const originalWorkerIndex = process.env.TEST_WORKER_INDEX;
+      
       process.env.LACE_DIR = tempDir;
+      process.env.TEST_WORKER_INDEX = workerIndex.toString();
 
       // Create unique project name for this worker
       const projectName = `E2E Test Project Worker ${workerIndex}`;
 
-      console.log(`Worker ${workerIndex}: Using LACE_DIR=${tempDir}`);
+      console.log(`Worker ${workerIndex}: Using LACE_DIR=${tempDir}, port=${23457 + workerIndex}`);
 
       const context: TestEnvironmentContext = {
         tempDir,
         originalLaceDir,
+        originalWorkerIndex,
         projectName,
       };
 
       await use(context);
 
-      // Cleanup: restore original LACE_DIR
+      // Cleanup: restore original environment
       if (originalLaceDir !== undefined) {
         process.env.LACE_DIR = originalLaceDir;
       } else {
         delete process.env.LACE_DIR;
+      }
+      
+      if (originalWorkerIndex !== undefined) {
+        process.env.TEST_WORKER_INDEX = originalWorkerIndex;
+      } else {
+        delete process.env.TEST_WORKER_INDEX;
       }
 
       // Cleanup: remove temp directory

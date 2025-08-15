@@ -3,7 +3,7 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
-import { withTempLaceDir } from './utils/withTempLaceDir';
+import { withTempLaceDir, authenticateInTest } from './utils/withTempLaceDir';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,13 +16,16 @@ test.describe('Basic User Journey', () => {
       const projectName = 'E2E Test Project Basic Journey';
       const { projectSelector, chatInterface } = createPageObjects(page);
 
-    // Step 1: User lands on the application
+    // Step 1: Navigate to app (will redirect to login due to middleware)
     await page.goto('/');
     
-    // Step 2: Verify we see project selection interface
+    // Step 2: Authenticate using the test helper
+    await authenticateInTest(page);
+    
+    // Step 3: Verify we're redirected to main app and see project selection interface
     await expect(projectSelector.newProjectButton).toBeVisible();
     
-    // Step 3: Create a new project
+    // Step 4: Create a new project
     const projectPath = path.join(tempDir, 'test-project');
     
       // Create the directory so validation passes
@@ -31,18 +34,18 @@ test.describe('Basic User Journey', () => {
       // Use page object to create project
       await projectSelector.createProject(projectName, projectPath);
       
-      // Step 4: Verify we're now in the chat interface
+      // Step 5: Verify we're now in the chat interface
       await chatInterface.waitForChatReady();
       await expect(chatInterface.messageInput).toBeVisible();
       
-      // Step 5: Send a message to the LLM
+      // Step 6: Send a message to the LLM
       const testMessage = 'Hello, this is my first message!';
       await chatInterface.sendMessage(testMessage);
       
-      // Step 6: Verify our message appears in the conversation
+      // Step 7: Verify our message appears in the conversation
       await expect(chatInterface.getMessage(testMessage)).toBeVisible();
       
-      // Step 7: Verify chat interface is ready for next message
+      // Step 8: Verify chat interface is ready for next message
       // The message was sent successfully (202 status) so the interface should be ready
       await chatInterface.waitForSendAvailable();
       await expect(chatInterface.sendButton).toBeVisible();

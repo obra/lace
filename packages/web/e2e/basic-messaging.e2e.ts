@@ -3,7 +3,7 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
-import { withTempLaceDir } from './utils/withTempLaceDir';
+import { withTempLaceDir, authenticateInTest } from './utils/withTempLaceDir';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -12,9 +12,12 @@ test.describe('Basic Messaging', () => {
     await withTempLaceDir('lace-e2e-basic-messaging-', async (tempDir) => {
       const projectName = 'E2E Basic Messaging Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
       
+      // Navigate and authenticate
+      await page.goto('/');
+      await authenticateInTest(page);
+      
+      // Create project
       const projectPath = join(tempDir, 'basic-messaging-project');
       await fs.mkdir(projectPath, { recursive: true });
       
@@ -40,9 +43,12 @@ test.describe('Basic Messaging', () => {
     await withTempLaceDir('lace-e2e-processing-state-', async (tempDir) => {
       const projectName = 'E2E Processing State Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
       
+      // Navigate and authenticate
+      await page.goto('/');
+      await authenticateInTest(page);
+      
+      // Create project
       const projectPath = join(tempDir, 'processing-state-project');
       await fs.mkdir(projectPath, { recursive: true });
       
@@ -80,9 +86,12 @@ test.describe('Basic Messaging', () => {
     await withTempLaceDir('lace-e2e-streaming-behavior-', async (tempDir) => {
       const projectName = 'E2E Streaming Behavior Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
       
+      // Navigate and authenticate
+      await page.goto('/');
+      await authenticateInTest(page);
+      
+      // Create project
       const projectPath = join(tempDir, 'streaming-behavior-project');
       await fs.mkdir(projectPath, { recursive: true });
       
