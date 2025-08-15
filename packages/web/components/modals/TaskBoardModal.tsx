@@ -48,6 +48,12 @@ const DEFAULT_TASK_COLUMNS: TaskColumn[] = [
     status: 'completed',
     color: 'bg-success/10 border-success/20',
   },
+  {
+    id: 'archived',
+    title: 'Archived',
+    status: 'archived',
+    color: 'bg-base-300/10 border-base-300/20',
+  },
 ];
 
 export function TaskBoardModal({

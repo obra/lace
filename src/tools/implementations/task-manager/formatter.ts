@@ -174,6 +174,8 @@ export class TaskFormatter {
         return '✓';
       case 'blocked':
         return '⊗';
+      case 'archived':
+        return '📁';
     }
   }
 
