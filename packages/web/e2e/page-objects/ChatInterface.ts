@@ -12,7 +12,12 @@ export class ChatInterface {
 
   // Locators
   get messageInput(): Locator {
-    return this.page.getByTestId('message-input');
+    return this.page
+      .locator('textarea[placeholder*="Message"]')
+      .or(this.page.locator('input[placeholder*="message"]'))
+      .or(this.page.locator('[data-testid="message-input"]'))
+      .or(this.page.locator('[data-testid="enhanced-message-input"]'))
+      .first();
   }
 
   get sendButton(): Locator {

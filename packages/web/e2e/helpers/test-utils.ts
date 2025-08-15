@@ -191,14 +191,20 @@ export async function selectAgent(page: Page, agentName: string) {
   await page.waitForTimeout(1000);
 }
 
-// Messaging utilities
-export async function sendMessage(page: Page, message: string) {
-  // Look for message input field with various possible selectors
-  const messageInput = page
+// Helper to get message input with fallback selectors
+export function getMessageInput(page: Page) {
+  return page
     .locator('textarea[placeholder*="Message"]')
     .or(page.locator('input[placeholder*="message"]'))
     .or(page.locator('[data-testid="message-input"]'))
+    .or(page.locator('[data-testid="enhanced-message-input"]'))
     .first();
+}
+
+// Messaging utilities
+export async function sendMessage(page: Page, message: string) {
+  // Use the shared message input helper
+  const messageInput = getMessageInput(page);
 
   await messageInput.waitFor({ timeout: 10000 });
   await messageInput.fill(message);

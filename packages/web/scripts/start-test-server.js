@@ -11,7 +11,7 @@ const PORT_FILE = join(process.cwd(), '.playwright-server-url');
 function startServer() {
   // Use E2E test server for tool approval tests, regular server otherwise
   const serverFile =
-    process.env.E2E_TOOL_APPROVAL_MOCK === 'true' ? 'e2e-test-server.ts' : 'server.ts';
+    process.env.E2E_TOOL_APPROVAL_MOCK === 'true' ? 'e2e-test-server.ts' : 'server-custom.ts';
 
   // Start the server with our test port
   const serverProcess = spawn('npx', ['tsx', serverFile, '--port', TEST_PORT_START.toString()], {
