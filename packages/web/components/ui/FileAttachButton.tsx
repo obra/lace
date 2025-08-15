@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip } from '@/lib/fontawesome';
+import { faPlus } from '@/lib/fontawesome';
 
 interface FileAttachButtonProps {
   onFilesSelected: (files: FileList) => void;
@@ -130,7 +130,7 @@ export default function FileAttachButton({
         `}
         title={title}
       >
-        <FontAwesomeIcon icon={faPaperclip} className={getIconSize()} />
+        <FontAwesomeIcon icon={faPlus} className={getIconSize()} />
       </button>
     </>
   );

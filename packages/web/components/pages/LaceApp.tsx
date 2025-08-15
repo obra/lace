@@ -48,30 +48,39 @@ const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId
 
   if (usageResult.loading) {
     return (
-      <div className="flex justify-center p-4 border-t border-base-300">
-        <div className="text-xs text-base-content/60">Loading token usage...</div>
+      <div className="flex justify-center p-2 border-t border-base-300/50 bg-base-100/50 backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-xs text-base-content/60">
+          <div className="loading loading-spinner loading-xs"></div>
+          <span className="animate-pulse-soft">Loading usage data...</span>
+        </div>
       </div>
     );
   }
 
   if (usageResult.error) {
     return (
-      <div className="flex justify-center p-4 border-t border-base-300">
-        <div className="text-xs text-error">Error loading token usage: {usageResult.error}</div>
+      <div className="flex justify-center p-2 border-t border-base-300/50 bg-base-100/50 backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-xs text-error/80">
+          <span>⚠️</span>
+          <span>Could not load usage data</span>
+        </div>
       </div>
     );
   }
 
   if (!usageResult.tokenUsage) {
     return (
-      <div className="flex justify-center p-4 border-t border-base-300">
-        <div className="text-xs text-base-content/60">No token usage data available</div>
+      <div className="flex justify-center p-2 border-t border-base-300/50 bg-base-100/50 backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-xs text-base-content/50">
+          <span>📊</span>
+          <span>No usage data yet</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center p-4 border-t border-base-300">
+    <div className="flex justify-center p-2 border-t border-base-300/50 bg-base-100/50 backdrop-blur-sm">
       <TokenUsageDisplay tokenUsage={usageResult.tokenUsage} loading={usageResult.loading} />
     </div>
   );
@@ -143,7 +152,9 @@ export const LaceApp = memo(function LaceApp() {
   }, []);
 
   // Get current agent's status from the updated session details
-  const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent);
+  const currentAgent =
+    selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent) ||
+    selectedSessionDetails?.agents?.[0];
   const agentBusy =
     currentAgent?.status === 'thinking' ||
     currentAgent?.status === 'streaming' ||
@@ -674,9 +685,10 @@ export const LaceApp = memo(function LaceApp() {
 
   return (
     <motion.div
-      className="flex h-screen bg-base-200 text-base-content font-ui overflow-hidden"
+      className="flex h-screen bg-gradient-to-br from-base-100 via-base-200/50 to-base-200 text-base-content font-ui overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
       {/* Mobile Sidebar - copy structure from AnimatedLaceApp */}
       <AnimatePresence>
@@ -702,12 +714,14 @@ export const LaceApp = memo(function LaceApp() {
                       defaultCollapsed={false}
                       collapsible={false}
                     >
-                      <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
+                      <div className="px-4 py-3 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300/30 shadow-sm">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="p-1.5 bg-primary/10 rounded-lg">
+                            <FontAwesomeIcon icon={faFolder} className="w-3.5 h-3.5 text-primary" />
+                          </div>
                           <span
                             data-testid="current-project-name"
-                            className="font-medium text-base-content truncate"
+                            className="font-semibold text-base-content truncate text-sm"
                           >
                             {currentProject.name}
                           </span>
@@ -743,7 +757,7 @@ export const LaceApp = memo(function LaceApp() {
                       collapsible={false}
                     >
                       {/* Session Info */}
-                      <div className="px-3 py-2 bg-base-50 rounded border border-base-200 mb-2">
+                      <div className="px-4 py-3 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300/30 shadow-sm mb-3">
                         <div className="text-sm font-medium text-base-content truncate">
                           {selectedSessionDetails.name}
                         </div>
@@ -854,12 +868,14 @@ export const LaceApp = memo(function LaceApp() {
                   defaultCollapsed={false}
                   collapsible={false}
                 >
-                  <div className="px-3 py-2 bg-base-50 rounded border border-base-200">
-                    <div className="flex items-center gap-2 mb-1">
-                      <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
+                  <div className="px-4 py-3 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300/30 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-1.5 bg-primary/10 rounded-lg">
+                        <FontAwesomeIcon icon={faFolder} className="w-3.5 h-3.5 text-primary" />
+                      </div>
                       <span
                         data-testid="current-project-name-desktop"
-                        className="font-medium text-base-content truncate"
+                        className="font-semibold text-base-content truncate text-sm"
                       >
                         {currentProject.name}
                       </span>
@@ -975,14 +991,14 @@ export const LaceApp = memo(function LaceApp() {
       </div>
 
       {/* Main Content - copy structure from AnimatedLaceApp */}
-      <motion.div className="flex-1 flex flex-col min-w-0">
+      <motion.div className="flex-1 flex flex-col min-w-0 h-screen">
         {/* Dim/Glass vapor background */}
         <div className="vapor-bg" aria-hidden>
           <div className="sunlines"></div>
           <div className="noise"></div>
         </div>
-        {/* Top Bar */}
-        <motion.div className="bg-transparent sticky top-0 z-30">
+        {/* Top Bar - Fixed Header */}
+        <motion.div className="bg-base-100/90 backdrop-blur-md border-b border-base-300/50 flex-shrink-0 z-30">
           <motion.div className="flex items-center justify-between p-4 lg:px-6">
             <motion.div className="flex items-center gap-3">
               <motion.button
@@ -1014,48 +1030,52 @@ export const LaceApp = memo(function LaceApp() {
         </motion.div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col min-h-0 text-base-content">
+        <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
           {loadingProjects || loadingProviders ? (
             <div className="flex-1 flex items-center justify-center p-6">
-              <div className="flex items-center gap-2">
-                <div className="loading loading-spinner loading-md"></div>
-                <span>Loading...</span>
+              <div className="flex flex-col items-center gap-4 animate-fade-in">
+                <div className="loading loading-spinner loading-lg text-primary"></div>
+                <div className="text-center">
+                  <div className="text-lg font-medium text-base-content">Setting things up</div>
+                  <div className="text-sm text-base-content/60 animate-pulse-soft">
+                    Loading your workspace...
+                  </div>
+                </div>
               </div>
             </div>
           ) : selectedProject && foundProject ? (
-            selectedAgent ? (
-              <div className="flex-1 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-                {/* Conversation Display */}
-                <div className="flex-1 min-h-0">
-                  <TimelineView
-                    events={events}
-                    agents={selectedSessionDetails?.agents}
-                    isTyping={agentBusy}
-                    currentAgent={
-                      selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)
-                        ?.name || 'Agent'
-                    }
-                    selectedAgent={selectedAgent}
-                  />
+            selectedAgent ||
+            (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
+              <div className="flex-1 flex flex-col h-full">
+                {/* Conversation Display - scrollable area with max width */}
+                <div className="flex-1 overflow-y-auto">
+                  <div className="max-w-3xl mx-auto px-4">
+                    <TimelineView
+                      events={events}
+                      agents={selectedSessionDetails?.agents}
+                      isTyping={agentBusy}
+                      currentAgent={
+                        selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)
+                          ?.name || 'Agent'
+                      }
+                      selectedAgent={selectedAgent || selectedSessionDetails?.agents?.[0]?.threadId}
+                    />
+                  </div>
                 </div>
 
-                {/* Token Usage Display */}
-                {selectedAgent ? (
-                  <TokenUsageSection agentId={selectedAgent} />
-                ) : (
-                  <div className="p-2 text-xs text-base-content/60 text-center">
-                    No agent selected (selectedAgent: {selectedAgent || 'null'})
+                {/* Chat Input - Fixed at bottom with max width */}
+                <div className="flex-shrink-0 pb-6 pt-2 min-h-[80px]">
+                  <div className="max-w-3xl mx-auto px-4">
+                    <MemoizedChatInput
+                      onSubmit={sendMessage}
+                      onInterrupt={stopGeneration}
+                      disabled={agentBusy}
+                      isStreaming={agentBusy}
+                      placeholder={`Message ${selectedAgent ? selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)?.name || 'agent' : selectedSessionDetails?.agents?.[0]?.name || 'agent'}...`}
+                      agentId={selectedAgent || selectedSessionDetails?.agents?.[0]?.threadId}
+                    />
                   </div>
-                )}
-
-                {/* Chat Input */}
-                <MemoizedChatInput
-                  onSubmit={sendMessage}
-                  onInterrupt={stopGeneration}
-                  disabled={agentBusy}
-                  isStreaming={agentBusy}
-                  placeholder={`Message ${selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)?.name || 'agent'}...`}
-                />
+                </div>
               </div>
             ) : (
               /* Session Configuration Panel - Main UI for session/agent management */
@@ -1186,12 +1206,14 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
   disabled,
   isStreaming,
   placeholder,
+  agentId,
 }: {
   onSubmit: (message: string) => Promise<boolean | void>;
   onInterrupt?: () => Promise<boolean | void>;
   disabled: boolean;
   isStreaming?: boolean;
   placeholder: string;
+  agentId?: ThreadId;
 }) {
   const [message, setMessage] = useState('');
 
@@ -1204,22 +1226,115 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
 
   return (
     <motion.div
-      initial={{ y: 100, opacity: 0 }}
+      initial={{ y: 10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="flex-shrink-0 bg-base-200 border-t border-base-300 p-4"
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className="flex-shrink-0 bg-base-100/50 backdrop-blur-sm border-t border-base-300/30 p-2"
     >
-      <EnhancedChatInput
+      <CustomEnhancedChatInput
         value={message}
         onChange={setMessage}
         onSubmit={handleSubmit}
         onInterrupt={onInterrupt}
         disabled={disabled}
-        isListening={false}
         isStreaming={isStreaming}
-        onStartVoice={() => {}}
-        onStopVoice={() => {}}
         placeholder={placeholder}
+        agentId={agentId}
       />
     </motion.div>
+  );
+});
+
+// Custom chat input with status below - includes speech status monitoring
+const CustomEnhancedChatInput = memo(function CustomEnhancedChatInput({
+  value,
+  onChange,
+  onSubmit,
+  onInterrupt,
+  disabled,
+  isStreaming,
+  placeholder,
+  agentId,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onInterrupt?: () => void;
+  disabled: boolean;
+  isStreaming?: boolean;
+  placeholder: string;
+  agentId?: ThreadId;
+}) {
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-2">
+      {/* Chat Input */}
+      <EnhancedChatInput
+        value={value}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        onInterrupt={onInterrupt}
+        disabled={disabled}
+        isStreaming={isStreaming}
+        placeholder={placeholder}
+      />
+
+      {/* Bottom Status Area */}
+      <div className="flex justify-between items-center text-xs text-base-content/40 min-h-[16px]">
+        {/* Left side - Status messages */}
+        <div className="flex-1">
+          {speechError ? (
+            <div className="flex items-center gap-2 text-red-600">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <span>Speech error</span>
+            </div>
+          ) : isListening ? (
+            <div className="flex items-center gap-2 text-emerald-600">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span>Listening...</span>
+            </div>
+          ) : isStreaming ? (
+            <div className="flex items-center gap-2 text-amber-600">
+              <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+              <span>Agent is responding...</span>
+            </div>
+          ) : disabled ? (
+            <div className="flex items-center gap-2 text-emerald-600">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span>Tool running...</span>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Right side - Token usage */}
+        <div>{agentId && <CompactTokenUsage agentId={agentId} />}</div>
+      </div>
+    </div>
+  );
+});
+
+// Compact token usage component for bottom-right display
+const CompactTokenUsage = memo(function CompactTokenUsage({ agentId }: { agentId: ThreadId }) {
+  const usageResult: UseAgentTokenUsageResult = useAgentTokenUsage(agentId);
+
+  if (usageResult.loading) {
+    return (
+      <div className="text-xs text-base-content/40 flex items-center gap-1">
+        <div className="loading loading-spinner loading-xs"></div>
+        <span>Loading usage...</span>
+      </div>
+    );
+  }
+
+  if (usageResult.error || !usageResult.tokenUsage) {
+    return null; // Don't show errors in compact view
+  }
+
+  return (
+    <div className="text-xs text-base-content/40">
+      <TokenUsageDisplay tokenUsage={usageResult.tokenUsage} loading={false} />
+    </div>
   );
 });

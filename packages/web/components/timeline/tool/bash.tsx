@@ -54,11 +54,11 @@ export const bashRenderer: ToolRenderer = {
       // Fallback to raw output if not structured
       return (
         <div
-          className={`font-mono text-sm whitespace-pre-wrap ${
+          className={`font-mono text-sm whitespace-pre-wrap leading-relaxed ${
             result.status !== 'completed'
               ? 'text-error bg-error/10 border border-error/20'
-              : 'text-base-content/80 bg-base-200 border border-base-300'
-          } rounded-lg p-3`}
+              : 'text-base-content/80 bg-base-100/80 backdrop-blur-sm border border-base-300/50'
+          } rounded-xl p-4 shadow-sm terminal-syntax`}
         >
           {rawOutput}
         </div>
@@ -74,14 +74,14 @@ export const bashRenderer: ToolRenderer = {
       <div className="space-y-2">
         {/* Stdout output */}
         {hasStdout && (
-          <div className="font-mono text-sm whitespace-pre-wrap text-base-content/80 bg-base-200 border border-base-300 rounded-lg p-3">
+          <div className="font-mono text-sm whitespace-pre-wrap leading-relaxed text-base-content/80 bg-base-100/80 backdrop-blur-sm border border-base-300/50 rounded-xl p-4 shadow-sm terminal-syntax">
             {stdout}
           </div>
         )}
 
         {/* Stderr output */}
         {hasStderr && (
-          <div className="font-mono text-sm whitespace-pre-wrap text-error bg-error/10 border border-error/20 rounded-lg p-3">
+          <div className="font-mono text-sm whitespace-pre-wrap leading-relaxed text-error bg-error/10 border border-error/30 rounded-xl p-4 shadow-sm">
             <div className="text-error/70 text-xs font-bold mb-1">STDERR:</div>
             {stderr}
           </div>

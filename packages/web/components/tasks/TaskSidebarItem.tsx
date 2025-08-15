@@ -26,7 +26,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
 
   return (
     <div
-      className="px-2 py-1 hover:bg-base-200 rounded cursor-pointer group transition-colors"
+      className="px-3 py-2.5 hover:bg-base-200/80 hover:shadow-sm rounded-xl cursor-pointer group transition-all duration-200 hover:scale-[1.02] border border-transparent hover:border-base-300/40"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -37,37 +37,43 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
         }
       }}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-3">
         {/* Priority Indicator */}
-        <div
-          className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${priorityColor}`}
-          role="presentation"
-          aria-label={`${task.priority} priority`}
-        />
+        <div className="flex items-center justify-center">
+          <div
+            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm ${priorityColor} group-hover:scale-110 transition-transform duration-200`}
+            role="presentation"
+            aria-label={`${task.priority} priority`}
+          />
+        </div>
 
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium text-base-content truncate">{task.title}</div>
-          <div className="text-xs text-base-content/60 truncate">
+          <div className="text-sm font-medium text-base-content truncate group-hover:text-base-content/90 transition-colors">
+            {task.title}
+          </div>
+          <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
             {getAssignmentText(task.assignedTo)}
           </div>
         </div>
 
         {/* Status Indicator */}
-        <div
-          className={`w-2 h-2 rounded-full flex-shrink-0 ${
-            task.status === 'pending'
-              ? 'bg-blue-500'
-              : task.status === 'in_progress'
-                ? 'bg-yellow-500'
-                : task.status === 'blocked'
-                  ? 'bg-purple-500'
-                  : task.status === 'completed'
-                    ? 'bg-green-500'
-                    : 'bg-gray-400'
-          }`}
-          role="presentation"
-          aria-label={`Status: ${task.status.replace('_', ' ')}`}
-        />
+        <div className="flex items-center justify-center">
+          <div
+            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200 ${
+              task.status === 'pending'
+                ? 'bg-info'
+                : task.status === 'in_progress'
+                  ? 'bg-warning'
+                  : task.status === 'blocked'
+                    ? 'bg-secondary'
+                    : task.status === 'completed'
+                      ? 'bg-success'
+                      : 'bg-base-content/40'
+            }`}
+            role="presentation"
+            aria-label={`Status: ${task.status.replace('_', ' ')}`}
+          />
+        </div>
       </div>
     </div>
   );
