@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/Badge';
 import StatusDot from '@/components/ui/StatusDot';
-import { parseResponse } from '@/lib/serialization';
+import { useProviderInstances } from './ProviderInstanceProvider';
 
 interface Model {
   id: string;
@@ -43,45 +43,43 @@ export function ModelSelectionForm({
   selectedModelId = '',
   className = '',
 }: ModelSelectionFormProps) {
-  const [instances, setInstances] = useState<ProviderInstance[]>([]);
-  const [availableModels, setAvailableModels] = useState<Model[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modelsLoading, setModelsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    instances: allInstances,
+    instancesLoading: loading,
+    instancesError: error,
+    catalogProviders,
+    loadCatalog,
+  } = useProviderInstances();
 
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+
+  // Filter to only show instances with credentials
+  const instances = allInstances.filter((instance) => instance.hasCredentials);
+
+  // Load catalog data when component mounts
   useEffect(() => {
-    loadInstances();
-  }, []);
+    if (catalogProviders.length === 0) {
+      void loadCatalog();
+    }
+  }, [catalogProviders.length, loadCatalog]);
 
   const loadModelsForInstance = useCallback(
-    async (instanceId: string) => {
-      try {
-        setModelsLoading(true);
-        setError(null);
-        const response = await fetch(`/api/provider/catalog`);
+    (instanceId: string) => {
+      setModelsLoading(true);
 
-        if (!response.ok) {
-          throw new Error(`Failed to load models: ${response.status}`);
-        }
-
-        const data = await parseResponse<{ providers: Array<{ id: string; models: Model[] }> }>(
-          response
-        );
-
-        // Find the instance and get its catalog provider
-        const instance = instances.find((inst) => inst.id === instanceId);
-        if (instance) {
-          const catalogProvider = data.providers.find((p) => p.id === instance.catalogProviderId);
-          setAvailableModels(catalogProvider?.models || []);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load models');
+      // Find the instance and get its catalog provider
+      const instance = instances.find((inst) => inst.id === instanceId);
+      if (instance) {
+        const catalogProvider = catalogProviders.find((p) => p.id === instance.catalogProviderId);
+        setAvailableModels(catalogProvider?.models || []);
+      } else {
         setAvailableModels([]);
-      } finally {
-        setModelsLoading(false);
       }
+
+      setModelsLoading(false);
     },
-    [instances]
+    [instances, catalogProviders]
   );
 
   useEffect(() => {
@@ -91,27 +89,6 @@ export function ModelSelectionForm({
       setAvailableModels([]);
     }
   }, [selectedInstanceId, instances, loadModelsForInstance]);
-
-  const loadInstances = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch('/api/provider/instances');
-
-      if (!response.ok) {
-        throw new Error(`Failed to load instances: ${response.status}`);
-      }
-
-      const data = await parseResponse<{ instances: ProviderInstance[] }>(response);
-      // Only show instances with credentials
-      const configuredInstances = data.instances.filter((instance) => instance.hasCredentials);
-      setInstances(configuredInstances);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load instances');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleInstanceChange = (instanceId: string) => {
     setAvailableModels([]);
@@ -170,9 +147,6 @@ export function ModelSelectionForm({
     return (
       <div className={`alert alert-error ${className}`}>
         <span>Error: {error}</span>
-        <button className="btn btn-sm btn-ghost" onClick={loadInstances}>
-          Retry
-        </button>
       </div>
     );
   }

@@ -87,6 +87,7 @@ interface ProviderInstanceContextValue {
   // Instance Operations
   loadInstances: () => Promise<void>;
   createInstance: (catalogProviderId: string, formData: InstanceFormData) => Promise<void>;
+  updateInstance: (instanceId: string, updateData: Partial<InstanceFormData>) => Promise<void>;
   deleteInstance: (instanceId: string) => Promise<void>;
   testInstance: (instanceId: string) => Promise<void>;
 
@@ -206,6 +207,46 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to create instance';
         console.error('Error creating instance:', errorMessage);
+        throw err; // Re-throw so the modal can handle the error
+      }
+    },
+    [loadInstances]
+  );
+
+  // Update provider instance
+  const updateInstance = useCallback(
+    async (instanceId: string, updateData: Partial<InstanceFormData>) => {
+      try {
+        const payload: Record<string, unknown> = {
+          displayName: updateData.displayName,
+          endpoint: updateData.endpoint || undefined,
+          timeout: updateData.timeout,
+        };
+
+        // Only include credential if API key was provided
+        if (updateData.apiKey && updateData.apiKey.trim()) {
+          payload.credential = { apiKey: updateData.apiKey };
+        }
+
+        const response = await fetch(`/api/provider/instances/${instanceId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorData = await parseResponse<unknown>(response);
+          if (isApiError(errorData)) {
+            throw new Error(errorData.error);
+          }
+          throw new Error(`Failed to update instance: ${response.status}`);
+        }
+
+        // Reload instances to get the updated data
+        await loadInstances();
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to update instance';
+        console.error('Error updating instance:', errorMessage);
         throw err; // Re-throw so the modal can handle the error
       }
     },
@@ -359,6 +400,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       // Instance Operations
       loadInstances,
       createInstance,
+      updateInstance,
       deleteInstance,
       testInstance,
 
@@ -385,6 +427,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       selectedCatalogProvider,
       loadInstances,
       createInstance,
+      updateInstance,
       deleteInstance,
       testInstance,
       loadCatalog,
