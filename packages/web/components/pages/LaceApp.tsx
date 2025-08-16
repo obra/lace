@@ -13,6 +13,7 @@ import { TimelineView } from '@/components/timeline/TimelineView';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { TokenUsageDisplay } from '@/components/ui';
 import { TokenUsageSection } from '@/components/ui/TokenUsageSection';
+import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
 import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
@@ -1364,30 +1365,6 @@ const CustomChatInput = memo(function CustomChatInput({
         {/* Right side - Token usage */}
         <div>{agentId && <CompactTokenUsage agentId={agentId} />}</div>
       </div>
-    </div>
-  );
-});
-
-// Compact token usage component for bottom-right display
-const CompactTokenUsage = memo(function CompactTokenUsage({ agentId }: { agentId: ThreadId }) {
-  const usageResult: UseAgentTokenUsageResult = useAgentTokenUsage(agentId);
-
-  if (usageResult.loading) {
-    return (
-      <div className="text-xs text-base-content/40 flex items-center gap-1">
-        <div className="loading loading-spinner loading-xs"></div>
-        <span>Loading usage...</span>
-      </div>
-    );
-  }
-
-  if (usageResult.error || !usageResult.tokenUsage) {
-    return null; // Don't show errors in compact view
-  }
-
-  return (
-    <div className="text-xs text-base-content/40">
-      <TokenUsageDisplay tokenUsage={usageResult.tokenUsage} loading={false} />
     </div>
   );
 });
