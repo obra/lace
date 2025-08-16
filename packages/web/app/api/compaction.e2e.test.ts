@@ -45,6 +45,10 @@ import {
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
+import {
+  createAnthropicStreamResponse,
+  anthropicStreamingEventPatterns,
+} from '@/test-utils/msw-streaming-helpers';
 import type { ThreadId } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
@@ -56,36 +60,6 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   let providerInstanceId: string;
   let streamedEvents: unknown[] = [];
   let originalBroadcast: EventStreamManager['broadcast'] | undefined;
-
-  // Helper function to create proper SSE stream for Anthropic streaming responses
-  // Define it at the describe level so all tests can use it
-  const createAnthropicStreamResponse = (events: unknown[]) => {
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        // Send each event as proper SSE with event type and data
-        for (const event of events) {
-          // Anthropic SDK expects events with event: and data: fields
-          if ((event as { type?: string }).type) {
-            controller.enqueue(encoder.encode(`event: ${(event as { type: string }).type}\n`));
-          }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-        }
-        // Send final event
-        controller.enqueue(encoder.encode('event: done\n'));
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        'content-type': 'text/event-stream',
-        'cache-control': 'no-cache',
-        connection: 'keep-alive',
-      },
-    });
-  };
 
   beforeEach(async () => {
     // Suppress console output during tests
