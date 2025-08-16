@@ -35,14 +35,14 @@ describe('LMStudio Provider Timeout Handling', () => {
 
     process.stderr.write = vi.fn((chunk: unknown) => {
       if (suppressWebSocketOutput(chunk)) {
-        return originalStderrWrite.call(process.stderr, chunk);
+        return originalStderrWrite.call(process.stderr, chunk as string);
       }
       return true; // Swallow WebSocket-related output
     });
 
     process.stdout.write = vi.fn((chunk: unknown) => {
       if (suppressWebSocketOutput(chunk)) {
-        return originalStdoutWrite.call(process.stdout, chunk);
+        return originalStdoutWrite.call(process.stdout, chunk as string);
       }
       return true; // Swallow WebSocket-related output
     });

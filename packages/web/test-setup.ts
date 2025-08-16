@@ -148,7 +148,7 @@ vi.spyOn(console, 'warn').mockImplementation(() => {});
 vi.spyOn(console, 'info').mockImplementation(() => {});
 
 // Helper to restore console for debugging if needed
-globalThis.restoreConsole = () => {
+(globalThis as unknown as { restoreConsole: () => void }).restoreConsole = () => {
   console.log = originalConsole.log;
   console.error = originalConsole.error;
   console.warn = originalConsole.warn;
