@@ -1,26 +1,31 @@
-import { Lato, DM_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 
-// Configure Lato via Next Fonts for optimal loading and automatic CSS class
-// Adjust weights/styles as needed by the design system
-export const lato = Lato({
-  subsets: ['latin'],
-  weight: ['300', '400', '700', '900'],
-  display: 'swap',
+// Configure local fonts using @fontsource packages (CSS-only, no Next.js font objects needed)
+// Fonts are loaded via CSS imports in globals.css
+export const lato = {
   variable: '--font-lato',
-});
-
-// DM Sans for UI text
-export const dmSans = DM_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
-  style: ['normal', 'italic'],
-  display: 'swap',
-  variable: '--font-dm-sans',
-});
-
-// Google Sans Code font - using CSS import since it's not yet available in next/font
-// The CSS import is added in globals.css
-export const googleSansCode = {
-  className: '',
-  variable: 'google-sans-code-loaded',
+  className: '', // CSS-only, no specific className needed
 };
+
+export const dmSans = {
+  variable: '--font-dm-sans',
+  className: '', // CSS-only, no specific className needed
+};
+
+// Configure local Google Sans Code font with variable font file
+export const googleSansCode = localFont({
+  src: [
+    {
+      path: '../public/fonts/variable/GoogleSansCode[wght].ttf',
+      weight: '200 700',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/variable/GoogleSansCode-Italic[wght].ttf',
+      weight: '200 700',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-google-sans-code',
+  display: 'swap',
+});

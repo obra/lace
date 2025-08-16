@@ -24,6 +24,8 @@
     "chromatic": "chromatic --exit-zero-on-changes"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.2.6",
+    "@fontsource/lato": "^5.2.6",
     "@fortawesome/fontawesome-svg-core": "6.7.0",
     "@fortawesome/free-solid-svg-icons": "6.7.0",
     "@fortawesome/react-fontawesome": "0.2.2",
