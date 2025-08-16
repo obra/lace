@@ -13,8 +13,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1, // Add retry for local development
   workers: process.env.CI ? 2 : 1, // Reduce workers to prevent memory issues
 
-  // Enhanced reporting and debugging
-  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
+  // Enhanced reporting and debugging - use dot reporter to reduce output volume
+  reporter: [['html', { outputFolder: 'playwright-report' }], ['dot']],
 
   use: {
     baseURL: 'http://localhost:23457',

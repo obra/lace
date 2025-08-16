@@ -41,7 +41,14 @@ function startServer() {
   // Parse stdout to find the actual URL
   serverProcess.stdout.on('data', (data) => {
     const output = data.toString();
-    process.stdout.write(output); // Forward output for logging
+    try {
+      process.stdout.write(output); // Forward output for logging
+    } catch (error) {
+      // Ignore EPIPE errors when forwarding output
+      if (error.code !== 'EPIPE') {
+        console.error('Error forwarding stdout:', error);
+      }
+    }
 
     // Look for the URL line: "🌐 URL: http://localhost:PORT"
     const urlMatch = output.match(/🌐 URL: (http:\/\/[^:\s]+:\d+)/);
@@ -55,9 +62,16 @@ function startServer() {
     }
   });
 
-  // Forward stderr
+  // Forward stderr with error handling
   serverProcess.stderr.on('data', (data) => {
-    process.stderr.write(data);
+    try {
+      process.stderr.write(data);
+    } catch (error) {
+      // Ignore EPIPE errors when forwarding error output
+      if (error.code !== 'EPIPE') {
+        console.error('Error forwarding stderr:', error);
+      }
+    }
   });
 
   // Handle server exit
