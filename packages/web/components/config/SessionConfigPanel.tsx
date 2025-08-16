@@ -6,12 +6,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
-import { ModelSelectionForm } from './ModelSelectionForm';
-import { ModelDropdown } from '@/components/config/ModelDropdown';
 import { SessionHeader } from './SessionHeader';
 import { SessionsList } from './SessionsList';
 import { SessionCreateModal } from './SessionCreateModal';
 import { SessionEditModal } from './SessionEditModal';
+import { AgentCreateModal } from './AgentCreateModal';
+import { AgentEditModal } from './AgentEditModal';
 import type { ProviderInfo, ModelInfo, CreateAgentRequest } from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
@@ -427,6 +427,21 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
     setShowEditConfig(false);
   }, []);
 
+  // Agent creation modal handlers
+  const handleAgentNameChange = useCallback((name: string) => {
+    setNewAgentName(name);
+  }, []);
+
+  const handleCloseCreateAgent = useCallback(() => {
+    setShowCreateAgent(false);
+  }, []);
+
+  // Agent edit modal handlers
+  const handleCloseEditAgent = useCallback(() => {
+    setShowEditAgent(false);
+    setEditingAgent(null);
+  }, []);
+
   return (
     <div className="bg-base-100 rounded-lg border border-base-300 p-6">
       <SessionHeader project={currentProject} />
@@ -458,72 +473,20 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
         onSessionConfigChange={handleSessionConfigChange}
       />
 
-      {/* Create Agent Modal */}
-      {showCreateAgent && selectedSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Launch Agent in {selectedSession.name}</h3>
-              <button onClick={() => setShowCreateAgent(false)} className="btn btn-ghost btn-sm">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateAgent} className="space-y-4">
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Agent Name *</span>
-                </label>
-                <input
-                  type="text"
-                  value={newAgentName}
-                  onChange={(e) => setNewAgentName(e.target.value)}
-                  className="input input-bordered w-full"
-                  placeholder="e.g., Code Reviewer"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              {/* Provider Instance Selection Toggle */}
-              <ModelSelectionForm
-                providers={providers}
-                providerInstanceId={selectedInstanceId}
-                modelId={selectedModelId}
-                onProviderChange={setSelectedInstanceId}
-                onModelChange={setSelectedModelId}
-                className="mb-4"
-              />
-
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateAgent(false)}
-                  className="btn btn-ghost"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={
-                    !newAgentName.trim() || loading || !selectedInstanceId || !selectedModelId
-                  }
-                >
-                  {loading ? (
-                    <>
-                      <div className="loading loading-spinner loading-sm"></div>
-                      Launching...
-                    </>
-                  ) : (
-                    'Launch Agent'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AgentCreateModal
+        isOpen={showCreateAgent}
+        selectedSession={selectedSession}
+        providers={providers}
+        agentName={newAgentName}
+        selectedInstanceId={selectedInstanceId}
+        selectedModelId={selectedModelId}
+        loading={loading}
+        onClose={handleCloseCreateAgent}
+        onSubmit={handleCreateAgent}
+        onAgentNameChange={handleAgentNameChange}
+        onProviderChange={setSelectedInstanceId}
+        onModelChange={setSelectedModelId}
+      />
 
       <SessionEditModal
         isOpen={showEditConfig}
@@ -541,113 +504,15 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
         onSessionConfigChange={handleEditSessionConfigChange}
       />
 
-      {/* Edit Agent Modal */}
-      {showEditAgent && editingAgent && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Edit Agent: {editingAgent.name}</h3>
-              <button onClick={() => setShowEditAgent(false)} className="btn btn-ghost btn-sm">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleEditAgentSubmit} className="space-y-4">
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Agent Name *</span>
-                </label>
-                <input
-                  type="text"
-                  value={editingAgent.name}
-                  onChange={(e) =>
-                    setEditingAgent((prev) => (prev ? { ...prev, name: e.target.value } : null))
-                  }
-                  className="input input-bordered w-full"
-                  placeholder="e.g., Code Reviewer"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Provider</span>
-                </label>
-                <select
-                  value={editingAgent.providerInstanceId}
-                  onChange={(e) => {
-                    const newInstanceId = e.target.value;
-                    const provider = providers.find((p) => p.instanceId === newInstanceId);
-                    const providerModels = provider?.models || [];
-                    setEditingAgent((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            providerInstanceId: newInstanceId,
-                            modelId: providerModels[0]?.id || prev.modelId,
-                          }
-                        : null
-                    );
-                  }}
-                  className="select select-bordered w-full"
-                >
-                  {availableProviders.map((provider) => (
-                    <option key={provider.instanceId} value={provider.instanceId}>
-                      {provider.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Model</span>
-                </label>
-                <select
-                  value={editingAgent.modelId}
-                  onChange={(e) =>
-                    setEditingAgent((prev) => (prev ? { ...prev, modelId: e.target.value } : null))
-                  }
-                  className="select select-bordered w-full"
-                >
-                  {providers
-                    .find((p) => p.instanceId === editingAgent.providerInstanceId)
-                    ?.models.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.displayName}
-                      </option>
-                    )) || []}
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowEditAgent(false)}
-                  className="btn btn-ghost"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={!editingAgent.name.trim() || loading}
-                >
-                  {loading ? (
-                    <>
-                      <div className="loading loading-spinner loading-sm"></div>
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Agent'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AgentEditModal
+        isOpen={showEditAgent}
+        editingAgent={editingAgent}
+        providers={providers}
+        loading={loading}
+        onClose={handleCloseEditAgent}
+        onSubmit={handleEditAgentSubmit}
+        onAgentChange={setEditingAgent}
+      />
     </div>
   );
 }
