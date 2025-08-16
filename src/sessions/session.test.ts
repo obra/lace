@@ -146,7 +146,7 @@ describe('Session', () => {
   });
 
   describe('spawnAgent default naming', () => {
-    it('should use "Lace" as default agent name', () => {
+    it('should use thread-based default name for delegate agents', () => {
       const session = Session.create({
         projectId: testProject.getId(),
         configuration: {},
@@ -156,7 +156,8 @@ describe('Session', () => {
 
       const agents = session.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Delegates should get thread-based names like "Agent-1", not "Lace"
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should use provided name when given', () => {
@@ -182,7 +183,8 @@ describe('Session', () => {
 
       const agents = session.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Whitespace-only should also trigger thread-based naming
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
   });
 

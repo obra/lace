@@ -153,7 +153,7 @@ export class Agent extends EventEmitter {
   private _initialized = false;
   private _promptConfig?: PromptConfig; // Cache loaded prompt config
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
-  private _progressTimer: number | null = null;
+  private _progressTimer: ReturnType<typeof setInterval> | null = null;
   private _abortController: AbortController | null = null;
   private _toolAbortController: AbortController | null = null;
   private _activeToolCalls: Map<string, ToolCall> = new Map();
@@ -1646,7 +1646,7 @@ export class Agent extends EventEmitter {
           });
         }
       }
-    }, 1000) as unknown as number; // Every second
+    }, 1000); // Every second
   }
 
   private _clearProgressTimer(): void {

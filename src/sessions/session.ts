@@ -58,7 +58,6 @@ export class Session {
   private _threadManager: ThreadManager;
   private _destroyed = false;
   private _projectId?: string;
-  private _providerCache?: unknown; // Cached provider instance
 
   constructor(sessionId: ThreadId, sessionData: SessionData, threadManager: ThreadManager) {
     this._sessionId = sessionId;
@@ -696,7 +695,12 @@ export class Session {
     providerInstanceId?: string;
     modelId?: string;
   }): Agent {
-    const agentName = config.name?.trim() || 'Lace';
+    // Generate thread ID first to create proper agent name
+    const targetThreadId =
+      config.threadId || this._threadManager.createDelegateThreadFor(this._sessionId).id;
+
+    // Generate agent name - use provided name or thread-based name for delegates (not 'Lace')
+    const agentName = config.name?.trim() || `Agent-${targetThreadId.split('.').pop()}`;
 
     // If no provider instance specified, inherit from session
     let targetProviderInstanceId = config.providerInstanceId;
@@ -738,9 +742,7 @@ export class Session {
     const delegateTool = new DelegateTool();
     agentToolExecutor.registerTool('delegate', delegateTool);
 
-    // If no threadId provided, create a delegate thread
-    const targetThreadId =
-      config.threadId || this._threadManager.createDelegateThreadFor(this._sessionId).id;
+    // Thread ID already generated above for agent naming
 
     // Create agent with metadata
     const agent = new Agent({
