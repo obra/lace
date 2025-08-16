@@ -47,6 +47,7 @@ import {
   useToolApprovals,
 } from '@/components/providers/EventStreamProvider';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
+import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import Link from 'next/link';
 
 // Inner component that uses app state context
@@ -679,86 +680,15 @@ const LaceAppInner = memo(function LaceAppInner() {
                   )}
 
                   {/* TASK MANAGEMENT */}
-                  {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
-                    <SidebarSection
-                      title="Tasks"
-                      icon={faTasks}
-                      defaultCollapsed={false}
-                      collapsible={true}
-                    >
-                      {/* Task Overview */}
-                      <div className="bg-base-300/20 backdrop-blur-sm border border-base-300/15 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <button
-                            onClick={() => {
-                              setShowTaskBoard(true);
-                              setShowMobileNav(false);
-                            }}
-                            className="text-sm font-medium text-base-content hover:text-base-content/80 transition-colors"
-                            disabled={taskManager.tasks.length === 0}
-                          >
-                            Task Board ({taskManager.tasks.length})
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowTaskCreation(true);
-                              setShowMobileNav(false);
-                            }}
-                            className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
-                            title="Add task"
-                            data-testid="add-task-button"
-                          >
-                            <FontAwesomeIcon
-                              icon={faPlus}
-                              className="w-3 h-3 text-base-content/60"
-                            />
-                          </button>
-                        </div>
-
-                        {taskManager.tasks.length > 0 && (
-                          <div className="flex items-center gap-3 text-xs text-base-content/60">
-                            <div className="flex items-center gap-1">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                              <span>
-                                {taskManager.tasks.filter((t) => t.status === 'completed').length}{' '}
-                                done
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                              <span>
-                                {taskManager.tasks.filter((t) => t.status === 'in_progress').length}{' '}
-                                active
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                              <span>
-                                {taskManager.tasks.filter((t) => t.status === 'pending').length}{' '}
-                                pending
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Task List */}
-                      <TaskListSidebar
-                        taskManager={taskManager}
-                        onTaskClick={(taskId) => {
-                          setShowMobileNav(false);
-                        }}
-                        onOpenTaskBoard={() => {
-                          setShowTaskBoard(true);
-                          setShowMobileNav(false);
-                        }}
-                        onCreateTask={() => {
-                          setShowTaskCreation(true);
-                          setShowMobileNav(false);
-                        }}
-                      />
-                    </SidebarSection>
-                  )}
+                  <TaskSidebarSection
+                    taskManager={taskManager}
+                    selectedProject={selectedProject}
+                    selectedSession={selectedSession as ThreadId | null}
+                    selectedSessionDetails={selectedSessionDetails}
+                    onShowTaskBoard={() => setShowTaskBoard(true)}
+                    onShowTaskCreation={() => setShowTaskCreation(true)}
+                    onCloseMobileNav={() => setShowMobileNav(false)}
+                  />
                 </MobileSidebar>
               )}
             </SettingsContainer>
@@ -974,69 +904,14 @@ const LaceAppInner = memo(function LaceAppInner() {
               )}
 
               {/* TASK MANAGEMENT */}
-              {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
-                <SidebarSection
-                  title="Tasks"
-                  icon={faTasks}
-                  defaultCollapsed={false}
-                  collapsible={true}
-                >
-                  {/* Task Overview */}
-                  <div className="bg-base-300/20 backdrop-blur-sm border border-base-300/15 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <button
-                        onClick={() => setShowTaskBoard(true)}
-                        className="text-sm font-medium text-base-content hover:text-base-content/80 transition-colors"
-                        disabled={taskManager.tasks.length === 0}
-                      >
-                        Task Board ({taskManager.tasks.length})
-                      </button>
-                      <button
-                        onClick={() => setShowTaskCreation(true)}
-                        className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
-                        title="Add task"
-                        data-testid="add-task-button"
-                      >
-                        <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-base-content/60" />
-                      </button>
-                    </div>
-
-                    {taskManager.tasks.length > 0 && (
-                      <div className="flex items-center gap-3 text-xs text-base-content/60">
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                          <span>
-                            {taskManager.tasks.filter((t) => t.status === 'completed').length} done
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                          <span>
-                            {taskManager.tasks.filter((t) => t.status === 'in_progress').length}{' '}
-                            active
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                          <span>
-                            {taskManager.tasks.filter((t) => t.status === 'pending').length} pending
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Task List */}
-                  <TaskListSidebar
-                    taskManager={taskManager}
-                    onTaskClick={(taskId) => {
-                      // For now, just ignore - could open task detail modal in future
-                    }}
-                    onOpenTaskBoard={() => setShowTaskBoard(true)}
-                    onCreateTask={() => setShowTaskCreation(true)}
-                  />
-                </SidebarSection>
-              )}
+              <TaskSidebarSection
+                taskManager={taskManager}
+                selectedProject={selectedProject}
+                selectedSession={selectedSession as ThreadId | null}
+                selectedSessionDetails={selectedSessionDetails}
+                onShowTaskBoard={() => setShowTaskBoard(true)}
+                onShowTaskCreation={() => setShowTaskCreation(true)}
+              />
             </Sidebar>
           )}
         </SettingsContainer>
