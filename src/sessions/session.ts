@@ -210,7 +210,7 @@ export class Session {
     // Agent will auto-initialize token budget based on model
 
     // Create coordinator agent (not initialized yet - will be lazy initialized)
-    const coordinatorAgent = Session.createAgentSync({
+    const sessionAgent = Session.createAgentSync({
       sessionData,
       providerInstance,
       toolExecutor,
@@ -222,13 +222,13 @@ export class Session {
     });
 
     // Mark the agent's thread as a session thread
-    coordinatorAgent.updateThreadMetadata({
+    sessionAgent.updateThreadMetadata({
       isSession: true,
     });
 
     // Create session instance and add coordinator
     const session = new Session(asThreadId(threadId), sessionData, threadManager);
-    session._agents.set(asThreadId(threadId), coordinatorAgent);
+    session._agents.set(asThreadId(threadId), sessionAgent);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -373,7 +373,7 @@ export class Session {
     Session.initializeTools(toolExecutor);
 
     logger.debug(`Creating session for ${sessionId}`);
-    
+
     // Create session instance
     const session = new Session(sessionId, sessionData, threadManager);
 
@@ -390,7 +390,7 @@ export class Session {
     });
 
     logger.debug(`Coordinator agent created and initialized for ${sessionId}`);
-    
+
     // Add coordinator to agents map
     session._agents.set(sessionId, coordinatorAgent);
 
@@ -452,7 +452,9 @@ export class Session {
           isCoordinator: false,
         });
 
-        logger.debug(`Delegate agent created and initialized, state: ${delegateAgent.getCurrentState()}`);
+        logger.debug(
+          `Delegate agent created and initialized, state: ${delegateAgent.getCurrentState()}`
+        );
 
         // Add to session's agents map
         session._agents.set(asThreadId(delegateThreadId), delegateAgent);
@@ -1154,11 +1156,19 @@ Use your task_add_note tool to record important notes as you work and your task_
     providerInstanceId: string;
     modelId: string;
   }): Agent {
-    const { sessionData, providerInstance, toolExecutor, threadManager, threadId, providerInstanceId, modelId } = params;
-    
+    const {
+      sessionData,
+      providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      providerInstanceId,
+      modelId,
+    } = params;
+
     // Use session name if available, otherwise default to "Lace"
     const agentName = sessionData.name || 'Lace';
-    
+
     return new Agent({
       provider: providerInstance,
       toolExecutor,
@@ -1171,6 +1181,69 @@ Use your task_add_note tool to record important notes as you work and your task_
         modelId,
       },
     });
+  }
+
+  /**
+   * Create an agent with consistent configuration (synchronous, lazy initialization)
+   */
+  private static createAgentSync(params: {
+    sessionData: SessionData;
+    providerInstance: AIProvider;
+    toolExecutor: ToolExecutor;
+    threadManager: ThreadManager;
+    threadId: string;
+    providerInstanceId: string;
+    modelId: string;
+    isCoordinator?: boolean;
+  }): Agent {
+    const {
+      sessionData,
+      providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      providerInstanceId,
+      modelId,
+      isCoordinator = false,
+    } = params;
+
+    // Use appropriate name - session name for coordinator, or thread-based name for delegates
+    const agentName = isCoordinator
+      ? sessionData.name || 'Lace'
+      : `Agent-${threadId.split('.').pop()}`;
+
+    return new Agent({
+      provider: providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: agentName,
+        providerInstanceId,
+        modelId,
+      },
+    });
+  }
+
+  /**
+   * Create and initialize an agent with consistent configuration (async version for getById)
+   */
+  private async createAgent(params: {
+    sessionData: SessionData;
+    providerInstance: AIProvider;
+    toolExecutor: ToolExecutor;
+    threadManager: ThreadManager;
+    threadId: string;
+    providerInstanceId: string;
+    modelId: string;
+    isCoordinator?: boolean;
+  }): Promise<Agent> {
+    const agent = Session.createAgentSync(params);
+    // Initialize the agent (loads prompts, records events)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    await (agent as any)._initialize();
+    return agent;
   }
 
   /**

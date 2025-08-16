@@ -20,6 +20,7 @@ import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
+import type { PromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
 import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { Project } from '~/projects/project';
@@ -145,11 +146,12 @@ export class Agent extends EventEmitter {
   }
 
   get isRunning(): boolean {
-    return this._isRunning;
+    return this._initialized;
   }
   private readonly _stopReasonHandler: StopReasonHandler;
   private _state: AgentState = 'idle';
-  private _isRunning = false;
+  private _initialized = false;
+  private _promptConfig?: PromptConfig; // Cache loaded prompt config
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
   private _progressTimer: number | null = null;
   private _abortController: AbortController | null = null;
@@ -316,13 +318,11 @@ export class Agent extends EventEmitter {
   // Check if initial events already exist
   private _hasInitialEvents(): boolean {
     const events = this._threadManager.getEvents(this._threadId);
-    return events.some(
-      (e) => e.type === 'SYSTEM_PROMPT' || e.type === 'USER_SYSTEM_PROMPT'
-    );
+    return events.some((e) => e.type === 'SYSTEM_PROMPT' || e.type === 'USER_SYSTEM_PROMPT');
   }
 
   // Add initial events to thread
-  private _addInitialEvents(promptConfig: any): void {
+  private _addInitialEvents(promptConfig: PromptConfig): void {
     this._addEventAndEmit({
       type: 'SYSTEM_PROMPT',
       threadId: this._threadId,
@@ -339,7 +339,7 @@ export class Agent extends EventEmitter {
   async start(): Promise<void> {
     // Ensure agent is initialized
     await this._initialize();
-    
+
     // Provider might be fresh, so always set system prompt
     if (this._promptConfig) {
       this.providerInstance.setSystemPrompt(this._promptConfig.systemPrompt);
