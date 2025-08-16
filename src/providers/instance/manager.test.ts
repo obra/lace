@@ -1,7 +1,7 @@
 // ABOUTME: Tests for provider instance manager
 // ABOUTME: Validates instance configuration and credential storage
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -14,6 +14,10 @@ describe('ProviderInstanceManager', () => {
   let manager: ProviderInstanceManager;
 
   beforeEach(() => {
+    // Suppress console output during tests that intentionally trigger validation errors
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     // Create temp directory for testing
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
     originalLaceDir = process.env.LACE_DIR;
@@ -22,6 +26,9 @@ describe('ProviderInstanceManager', () => {
   });
 
   afterEach(() => {
+    // Restore console mocks
+    vi.restoreAllMocks();
+
     // Cleanup
     if (originalLaceDir) {
       process.env.LACE_DIR = originalLaceDir;

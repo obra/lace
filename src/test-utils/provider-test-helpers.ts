@@ -21,12 +21,14 @@ export async function checkProviderAvailability(
 
     const diagnostics = await Promise.race([provider.diagnose(), timeoutPromise]);
     if (!diagnostics.connected || diagnostics.models.length === 0) {
-      console.warn(`Skipping ${providerName} tests - ${diagnostics.error || 'not available'}`);
+      // Silently skip unavailable providers to reduce test noise
+      // Original message: `Skipping ${providerName} tests - ${diagnostics.error || 'not available'}`
       return false;
     }
     return true;
-  } catch (error) {
-    console.warn(`Skipping ${providerName} tests - ${String(error)}`);
+  } catch (_error) {
+    // Silently skip unavailable providers to reduce test noise
+    // Original message: `Skipping ${providerName} tests - ${String(_error)}`
     return false;
   }
 }
