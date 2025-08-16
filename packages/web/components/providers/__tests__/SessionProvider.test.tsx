@@ -55,6 +55,7 @@ function ContextConsumer() {
     createSession,
     loadProjectConfig,
     reloadSessions,
+    enableAgentAutoSelection,
   } = useSessionContext();
 
   return (
@@ -79,6 +80,9 @@ function ContextConsumer() {
       </button>
       <button onClick={() => void reloadSessions()} data-testid="reload-sessions">
         Reload Sessions
+      </button>
+      <button onClick={() => enableAgentAutoSelection()} data-testid="enable-auto-selection">
+        Enable Auto Selection
       </button>
     </div>
   );
@@ -430,5 +434,33 @@ describe('SessionProvider', () => {
       expect(screen.getByTestId('session-count')).toHaveTextContent('1');
       expect(screen.getByTestId('found-session')).toHaveTextContent('Incomplete Session');
     });
+  });
+
+  describe('Agent Auto-Selection', () => {
+    it('provides enableAgentAutoSelection function', () => {
+      render(
+        <SessionProvider projectId="test-project">
+          <ContextConsumer />
+        </SessionProvider>
+      );
+
+      expect(screen.getByTestId('enable-auto-selection')).toBeInTheDocument();
+    });
+
+    it('calls enableAgentAutoSelection without errors', () => {
+      render(
+        <SessionProvider projectId="test-project">
+          <ContextConsumer />
+        </SessionProvider>
+      );
+
+      expect(() => {
+        fireEvent.click(screen.getByTestId('enable-auto-selection'));
+      }).not.toThrow();
+    });
+
+    // Note: Full auto-selection behavior testing would require integration with
+    // hash router and session details with agents, which is better tested at the
+    // integration level since it involves multiple providers working together
   });
 });

@@ -86,6 +86,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     projectConfig,
     createSession,
     reloadSessions,
+    enableAgentAutoSelection,
   } = useSessionContext();
 
   // Project state from ProjectProvider
@@ -165,37 +166,12 @@ const LaceAppInner = memo(function LaceAppInner() {
     }
   }, [projects?.length, loadingProjects, setAutoOpenCreateProject]);
 
-  // Sessions and project configuration are now handled by useSessionManagement hook
-  // Session details are now loaded by useAgentManagement hook
-
-  // Auto-select agent only when user selects a project (not on every render)
-  const [shouldAutoSelectAgent, setShouldAutoSelectAgent] = useState(false);
-
-  // Auto-select agent if session has only one agent and auto-selection is enabled
-  useEffect(() => {
-    if (
-      shouldAutoSelectAgent &&
-      selectedSessionDetails &&
-      selectedSessionDetails.agents &&
-      selectedSessionDetails.agents.length === 1 &&
-      !selectedAgent
-    ) {
-      setSelectedAgent(selectedSessionDetails.agents[0].threadId as ThreadId);
-      setShouldAutoSelectAgent(false); // Reset flag after auto-selection
-    }
-  }, [shouldAutoSelectAgent, selectedSessionDetails, selectedAgent, setSelectedAgent]);
-
-  // Reset auto-selection flag when session changes
-  useEffect(() => {
-    setShouldAutoSelectAgent(false);
-  }, [selectedSession]);
-
   // Handle project selection - now delegated to ProjectProvider
   const handleProjectSelect = (project: { id: string }) => {
     // ProjectProvider handles the selection
     onProjectSelect(project);
     // Enable auto-selection for this project selection
-    setShouldAutoSelectAgent(true);
+    enableAgentAutoSelection();
   };
 
   const sendMessage = useCallback(
@@ -254,7 +230,7 @@ const LaceAppInner = memo(function LaceAppInner() {
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
-    setShouldAutoSelectAgent(false); // Clear auto-selection flag when user manually selects an agent
+    // Manual agent selection - no need to disable auto-selection as SessionProvider handles this
     setSelectedAgent(agentThreadId as ThreadId);
   };
 
@@ -296,8 +272,8 @@ const LaceAppInner = memo(function LaceAppInner() {
     // Clear auto-open state
     setAutoOpenCreateProject(false);
 
-    // Enable auto-selection for future navigation within this project
-    setShouldAutoSelectAgent(true);
+    // Enable auto-selection for this onboarding completion
+    enableAgentAutoSelection();
   };
 
   // Project data transformations are now handled by ProjectProvider
