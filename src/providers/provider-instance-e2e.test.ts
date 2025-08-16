@@ -170,11 +170,12 @@ describe('Provider Instance E2E Tests', () => {
     lmstudioServer = createMockLMStudioServer('ws://mock-lmstudio.test:1234');
     ollamaServer = createMockOllamaServer('http://mock-ollama.test:11434');
 
-    openaiServer1.listen();
-    openaiServer2.listen();
-    anthropicServer.listen();
-    lmstudioServer.listen();
-    ollamaServer.listen();
+    // Configure servers to be quiet during tests
+    openaiServer1.listen({ onUnhandledRequest: 'bypass' });
+    openaiServer2.listen({ onUnhandledRequest: 'bypass' });
+    anthropicServer.listen({ onUnhandledRequest: 'bypass' });
+    lmstudioServer.listen({ onUnhandledRequest: 'bypass' });
+    ollamaServer.listen({ onUnhandledRequest: 'bypass' });
 
     // Setup provider catalog with test data
     _catalogManager = new ProviderCatalogManager();

@@ -1,24 +1,57 @@
 // ABOUTME: Test for LMStudio connection timeout handling
 // ABOUTME: Ensures LMStudio provider doesn't hang indefinitely when server is unavailable
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];
 let originalConsoleError: typeof console.error;
+let originalStderrWrite: typeof process.stderr.write;
+let originalStdoutWrite: typeof process.stdout.write;
 
 describe('LMStudio Provider Timeout Handling', () => {
   beforeEach(() => {
     consoleLogs = [];
     originalConsoleError = console.error;
+    originalStderrWrite = process.stderr.write;
+    originalStdoutWrite = process.stdout.write;
+
+    // Mock console.error to capture logs for test verification
     console.error = (...args: unknown[]) => {
       consoleLogs.push(args.map((arg) => String(arg)).join(' '));
     };
+
+    // Mock both stderr and stdout to suppress underlying library error output during tests
+    const suppressWebSocketOutput = (chunk: unknown) => {
+      const str = String(chunk);
+      return !(
+        str.includes('WebSocket') ||
+        str.includes('LMStudioClient') ||
+        str.includes('ECONNREFUSED') ||
+        str.includes('connect ECONNREFUSED')
+      );
+    };
+
+    process.stderr.write = vi.fn((chunk: unknown) => {
+      if (suppressWebSocketOutput(chunk)) {
+        return originalStderrWrite.call(process.stderr, chunk as string);
+      }
+      return true; // Swallow WebSocket-related output
+    });
+
+    process.stdout.write = vi.fn((chunk: unknown) => {
+      if (suppressWebSocketOutput(chunk)) {
+        return originalStdoutWrite.call(process.stdout, chunk as string);
+      }
+      return true; // Swallow WebSocket-related output
+    });
   });
 
   afterEach(() => {
     console.error = originalConsoleError;
+    process.stderr.write = originalStderrWrite;
+    process.stdout.write = originalStdoutWrite;
   });
 
   it('should timeout quickly when LMStudio server is unavailable', async () => {

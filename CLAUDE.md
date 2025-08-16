@@ -120,7 +120,6 @@ TOOL_RESULT events → Agent continues or responds
 **Interface System (`src/interfaces/`)**
 - **TerminalInterface**: Rich Ink/React-based UI with real-time updates and tool approval modals
 - **ThreadProcessor**: Cached processing of persisted events + real-time streaming content processing
-- **NonInteractiveInterface**: Single-prompt execution mode
 
 
 ## Event Model
