@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import type { SessionContextType } from '@/components/providers/SessionProvider';
 import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectContextType } from '@/components/providers/ProjectProvider';
+import type { ThreadId } from '@/types/core';
 
 /**
  * Creates a mock SessionContextType with all required methods
@@ -34,6 +35,7 @@ export function createMockSessionContext(
     loadSessionConfiguration: vi.fn(),
     updateSessionConfiguration: vi.fn(),
     updateSession: vi.fn(),
+    loadSessionsForProject: vi.fn(),
 
     // Agent auto-selection control
     enableAgentAutoSelection: vi.fn(),
@@ -129,30 +131,32 @@ export function createTestScenarios() {
     sessionWithAgents: createMockSessionContext({
       sessions: [
         {
-          id: 'session-1',
+          id: 'lace_20250801_test01' as ThreadId,
           name: 'Test Session',
           createdAt: new Date(),
           agents: [
             {
-              threadId: 'agent-1',
+              threadId: 'lace_20250801_test01.1' as ThreadId,
               name: 'Test Agent',
+              providerInstanceId: 'test-provider',
+              modelId: 'test-model',
               status: 'idle',
-              createdAt: new Date(),
             },
           ],
         },
       ],
-      selectedSession: 'session-1',
+      selectedSession: 'lace_20250801_test01',
       foundSession: {
-        id: 'session-1',
+        id: 'lace_20250801_test01' as ThreadId,
         name: 'Test Session',
         createdAt: new Date(),
         agents: [
           {
-            threadId: 'agent-1',
+            threadId: 'lace_20250801_test01.1' as ThreadId,
             name: 'Test Agent',
+            providerInstanceId: 'test-provider',
+            modelId: 'test-model',
             status: 'idle',
-            createdAt: new Date(),
           },
         ],
       },
@@ -161,24 +165,26 @@ export function createTestScenarios() {
     // Agent with session details
     agentWithSession: createMockAgentContext({
       sessionDetails: {
-        id: 'session-1',
+        id: 'lace_20250801_test01' as ThreadId,
         name: 'Test Session',
         createdAt: new Date(),
         agents: [
           {
-            threadId: 'agent-1',
+            threadId: 'lace_20250801_test01.1' as ThreadId,
             name: 'Test Agent',
+            providerInstanceId: 'test-provider',
+            modelId: 'test-model',
             status: 'idle',
-            createdAt: new Date(),
           },
         ],
       },
-      selectedAgent: 'agent-1',
+      selectedAgent: 'lace_20250801_test01.1',
       currentAgent: {
-        threadId: 'agent-1',
+        threadId: 'lace_20250801_test01.1' as ThreadId,
         name: 'Test Agent',
+        providerInstanceId: 'test-provider',
+        modelId: 'test-model',
         status: 'idle',
-        createdAt: new Date(),
       },
     }),
 
