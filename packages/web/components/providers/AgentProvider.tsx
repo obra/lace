@@ -19,6 +19,10 @@ interface AgentContextType {
   selectedAgent: string | null;
   foundAgent: AgentInfo | null;
 
+  // Computed agent state
+  currentAgent: AgentInfo | null;
+  agentBusy: boolean;
+
   // Selection actions
   selectAgent: (agentId: string | null) => void;
   onAgentSelect: (agent: { id: string }) => void;
@@ -52,6 +56,24 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
       : null;
   }, [selectedAgent, sessionDetails]);
 
+  // Get current agent (selected agent or first available agent)
+  const currentAgent = useMemo(() => {
+    return (
+      (selectedAgent && sessionDetails?.agents?.find((a) => a.threadId === selectedAgent)) ||
+      sessionDetails?.agents?.[0] ||
+      null
+    );
+  }, [selectedAgent, sessionDetails]);
+
+  // Determine if agent is busy (thinking, streaming, or executing tools)
+  const agentBusy = useMemo(() => {
+    return (
+      currentAgent?.status === 'thinking' ||
+      currentAgent?.status === 'streaming' ||
+      currentAgent?.status === 'tool_execution'
+    );
+  }, [currentAgent]);
+
   // Selection actions
   const selectAgent = useCallback(
     (agentId: string | null) => {
@@ -80,6 +102,10 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
     // Selection state (managed here)
     selectedAgent,
     foundAgent,
+
+    // Computed agent state
+    currentAgent,
+    agentBusy,
 
     // Selection actions
     selectAgent,

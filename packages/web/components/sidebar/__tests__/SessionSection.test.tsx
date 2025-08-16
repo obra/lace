@@ -41,6 +41,22 @@ const createMockSessionDetails = (agents: AgentInfo[]): SessionInfo => ({
   agents,
 });
 
+// Helper to create a complete agent context mock
+const createMockAgentContext = (overrides = {}) => ({
+  sessionDetails: null,
+  loading: false,
+  selectedAgent: null,
+  foundAgent: null,
+  currentAgent: null,
+  agentBusy: false,
+  selectAgent: vi.fn(),
+  onAgentSelect: vi.fn(),
+  createAgent: vi.fn(),
+  updateAgentState: vi.fn(),
+  reloadSessionDetails: vi.fn(),
+  ...overrides,
+});
+
 describe('SessionSection', () => {
   const mockOnAgentSelect = vi.fn();
   const mockOnClearAgent = vi.fn();
@@ -69,6 +85,8 @@ describe('SessionSection', () => {
       updateAgentState: vi.fn(),
       onAgentSelect: vi.fn(),
       reloadSessionDetails: vi.fn(),
+      currentAgent: null,
+      agentBusy: false,
     });
   });
 
@@ -97,6 +115,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -115,6 +135,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       const { container } = render(<SessionSection {...defaultProps} />);
@@ -146,6 +168,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -168,6 +192,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -186,6 +212,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -206,6 +234,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -229,6 +259,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -249,6 +281,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -282,6 +316,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -335,6 +371,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -353,6 +391,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SessionSection {...defaultProps} />);
@@ -385,6 +425,8 @@ describe('SessionSection', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       const { container } = render(<SessionSection {...defaultProps} />);

@@ -175,6 +175,16 @@ describe('SidebarContent', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       reloadProjects: vi.fn(),
+      currentProject: {
+        id: '',
+        name: 'No project selected',
+        description: '',
+        workingDirectory: '/',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+        sessionCount: 0,
+      },
     });
 
     mockUseSessionContext.mockReturnValue({
@@ -201,6 +211,8 @@ describe('SidebarContent', () => {
       updateAgentState: vi.fn(),
       onAgentSelect: vi.fn(),
       reloadSessionDetails: vi.fn(),
+      currentAgent: null,
+      agentBusy: false,
     });
 
     mockUseAppSelections.mockReturnValue({
@@ -232,6 +244,16 @@ describe('SidebarContent', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: {
+          id: '',
+          name: 'No project selected',
+          description: '',
+          workingDirectory: '/',
+          isArchived: false,
+          createdAt: new Date(),
+          lastUsedAt: new Date(),
+          sessionCount: 0,
+        },
       });
 
       mockUseAgentContext.mockReturnValue({
@@ -244,6 +266,8 @@ describe('SidebarContent', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SidebarContent {...defaultProps} />);
@@ -264,6 +288,8 @@ describe('SidebarContent', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SidebarContent {...defaultProps} />);
@@ -402,6 +428,16 @@ describe('SidebarContent', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: {
+          id: '',
+          name: 'No project selected',
+          description: '',
+          workingDirectory: '/',
+          isArchived: false,
+          createdAt: new Date(),
+          lastUsedAt: new Date(),
+          sessionCount: 0,
+        },
       });
 
       render(<SidebarContent {...defaultProps} />);
@@ -421,6 +457,8 @@ describe('SidebarContent', () => {
         updateAgentState: vi.fn(),
         onAgentSelect: vi.fn(),
         reloadSessionDetails: vi.fn(),
+        currentAgent: null,
+        agentBusy: false,
       });
 
       render(<SidebarContent {...defaultProps} />);

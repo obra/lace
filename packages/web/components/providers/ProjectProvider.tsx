@@ -20,6 +20,7 @@ interface ProjectContextType {
   foundProject: ProjectInfo | null;
 
   // Computed values based on data + selection
+  currentProject: ProjectInfo;
   projectsForSidebar: ProjectInfo[];
 
   // Selection actions
@@ -58,6 +59,22 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
   const foundProject = useMemo(() => {
     return selectedProject ? (projects || []).find((p) => p.id === selectedProject) || null : null;
   }, [selectedProject, projects]);
+
+  // Create fallback current project for UI needs
+  const currentProject = useMemo(
+    () =>
+      foundProject || {
+        id: '',
+        name: 'No project selected',
+        description: 'Select a project to get started',
+        workingDirectory: '/',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+        sessionCount: 0,
+      },
+    [foundProject]
+  );
 
   // Transform projects for sidebar display
   const projectsForSidebar = useMemo(
@@ -106,6 +123,7 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     foundProject,
 
     // Computed values
+    currentProject,
     projectsForSidebar,
 
     // Selection actions

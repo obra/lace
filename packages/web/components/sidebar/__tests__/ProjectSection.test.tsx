@@ -38,6 +38,7 @@ const mockUseAgentContext = vi.mocked(useAgentContext);
 const createMockProjectContext = (overrides = {}) => ({
   selectedProject: 'test-project',
   foundProject: createMockProject(),
+  currentProject: createMockProject(),
   projects: [createMockProject()],
   loading: false,
   error: null,
@@ -73,6 +74,8 @@ const createMockAgentContext = (overrides = {}) => ({
   loading: false,
   selectedAgent: 'agent-1',
   foundAgent: createMockAgent('agent-1', 'Agent 1'),
+  currentAgent: createMockAgent('agent-1', 'Agent 1'),
+  agentBusy: false,
   selectAgent: vi.fn(),
   onAgentSelect: vi.fn(),
   createAgent: vi.fn(),
@@ -157,6 +160,7 @@ describe('ProjectSection', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: createMockProject(),
       });
 
       render(<ProjectSection {...defaultProps} />);
@@ -348,6 +352,7 @@ describe('ProjectSection', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: createMockProject(),
       });
 
       render(<ProjectSection {...defaultProps} />);
@@ -374,6 +379,7 @@ describe('ProjectSection', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: createMockProject(),
       });
 
       render(<ProjectSection {...defaultProps} />);
@@ -396,6 +402,7 @@ describe('ProjectSection', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: createMockProject(),
       });
 
       render(<ProjectSection {...defaultProps} />);
@@ -418,6 +425,7 @@ describe('ProjectSection', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: createMockProject(),
       });
 
       const { container } = render(<ProjectSection {...defaultProps} />);
@@ -438,6 +446,7 @@ describe('ProjectSection', () => {
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
         reloadProjects: vi.fn(),
+        currentProject: createMockProject(),
       });
 
       const { container } = render(<ProjectSection {...defaultProps} />);
