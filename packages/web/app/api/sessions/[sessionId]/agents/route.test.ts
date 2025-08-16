@@ -169,7 +169,8 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
-      expect(data.name).toBe('Lace'); // Default name
+      // Delegates should get thread-based names, not 'Lace'
+      expect(data.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should auto-generate agent name when empty', async () => {
@@ -187,7 +188,8 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
-      expect(data.name).toBe('Lace'); // Default name for empty string
+      // Delegates should get thread-based names, not 'Lace'
+      expect(data.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should increment agent threadIds sequentially', async () => {

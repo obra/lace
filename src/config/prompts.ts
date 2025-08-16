@@ -7,7 +7,7 @@ import { getLaceDir, ensureLaceDir } from '~/config/lace-dir';
 import { PromptManager } from '~/config/prompt-manager';
 import { logger } from '~/utils/logger';
 
-interface PromptConfig {
+export interface PromptConfig {
   systemPrompt: string;
   userInstructions: string;
   filesCreated: string[];

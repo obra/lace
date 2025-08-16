@@ -223,28 +223,31 @@ describe('Session.spawnAgent() with Provider Instances', () => {
   });
 
   describe('Agent naming and defaults', () => {
-    it('should use "Lace" as default name when no name provided', () => {
+    it('should use thread-based default name when no name provided', () => {
       const agent = testSession.spawnAgent({});
 
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Delegates should get thread-based names, not 'Lace'
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
 
-    it('should use "Lace" as default name for empty string', () => {
+    it('should use thread-based default name for empty string', () => {
       const agent = testSession.spawnAgent({ name: '' });
 
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Delegates should get thread-based names, not 'Lace'
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
 
-    it('should use "Lace" as default name for whitespace-only string', () => {
+    it('should use thread-based default name for whitespace-only string', () => {
       const agent = testSession.spawnAgent({ name: '   ' });
 
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Delegates should get thread-based names, not 'Lace'
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should preserve custom agent names', () => {

@@ -146,7 +146,7 @@ describe('Session', () => {
   });
 
   describe('spawnAgent default naming', () => {
-    it('should use "Lace" as default agent name', () => {
+    it('should use thread-based default name for delegate agents', () => {
       const session = Session.create({
         projectId: testProject.getId(),
         configuration: {},
@@ -156,7 +156,8 @@ describe('Session', () => {
 
       const agents = session.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Delegates should get thread-based names like "Agent-1", not "Lace"
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should use provided name when given', () => {
@@ -182,7 +183,8 @@ describe('Session', () => {
 
       const agents = session.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Lace');
+      // Whitespace-only should also trigger thread-based naming
+      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
     });
   });
 
@@ -364,7 +366,7 @@ describe('Session', () => {
       expect(agents[0]).toEqual(
         expect.objectContaining({
           threadId: session.getId(),
-          name: 'Lace', // Coordinator agent is always named "Lace"
+          name: 'Lace', // Coordinator agent defaults to "Lace" when no session name provided
           providerInstanceId: expect.any(String) as string,
           modelId: 'claude-3-5-haiku-20241022',
           status: expect.any(String) as string,
@@ -535,11 +537,11 @@ describe('Session', () => {
 
       session.destroy();
 
-      // After destroy, spawned agents should be removed but coordinator remains
+      // After destroy, all agents should be removed (including coordinator)
       const agentsAfter = session.getAgents();
       expect(agentsAfter.some((a) => a.threadId === asThreadId(agent1.threadId))).toBe(false);
       expect(agentsAfter.some((a) => a.threadId === asThreadId(agent2.threadId))).toBe(false);
-      expect(agentsAfter.some((a) => a.threadId === session.getId())).toBe(true); // Coordinator remains
+      expect(agentsAfter.some((a) => a.threadId === session.getId())).toBe(false); // Coordinator also removed
     });
   });
 

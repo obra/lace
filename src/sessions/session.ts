@@ -49,25 +49,22 @@ export interface SessionInfo {
 
 export class Session {
   private static _sessionRegistry = new Map<ThreadId, Session>();
+  private static _providerCreationInProgress = new Set<string>();
 
-  private _sessionAgent: Agent;
   private _sessionId: ThreadId;
-  private _sessionData: SessionData; // 👈 NEW: Cache the session data
-  private _agents: Map<ThreadId, Agent> = new Map();
+  private _sessionData: SessionData;
+  private _agents: Map<ThreadId, Agent> = new Map(); // All agents, including coordinator
   private _taskManager: TaskManager;
   private _threadManager: ThreadManager;
   private _destroyed = false;
   private _projectId?: string;
-  private _providerCache?: unknown; // Cached provider instance
 
-  constructor(sessionAgent: Agent, sessionData: SessionData, threadManager?: ThreadManager) {
-    this._sessionAgent = sessionAgent;
-    this._sessionId = asThreadId(sessionAgent.threadId);
-    this._sessionData = sessionData; // 👈 NEW: Store the data
+  constructor(sessionId: ThreadId, sessionData: SessionData, threadManager: ThreadManager) {
+    this._sessionId = sessionId;
+    this._sessionData = sessionData;
     this._projectId = sessionData.projectId;
 
-    // Use provided ThreadManager or get it from the sessionAgent
-    this._threadManager = threadManager || sessionAgent.threadManager;
+    this._threadManager = threadManager;
 
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
@@ -212,18 +209,16 @@ export class Session {
 
     // Agent will auto-initialize token budget based on model
 
-    // Create agent with token budget for auto-compaction
-    const sessionAgent = new Agent({
-      provider: providerInstance,
+    // Create coordinator agent (not initialized yet - will be lazy initialized)
+    const sessionAgent = Session.createAgentSync({
+      sessionData,
+      providerInstance,
       toolExecutor,
       threadManager,
       threadId,
-      tools: toolExecutor.getAllTools(),
-      metadata: {
-        name: 'Lace', // Always name the coordinator agent "Lace"
-        providerInstanceId: providerInstanceId,
-        modelId: modelId,
-      },
+      providerInstanceId,
+      modelId,
+      isCoordinator: true,
     });
 
     // Mark the agent's thread as a session thread
@@ -231,7 +226,9 @@ export class Session {
       isSession: true,
     });
 
-    const session = new Session(sessionAgent, sessionData, threadManager);
+    // Create session instance and add coordinator
+    const session = new Session(asThreadId(threadId), sessionData, threadManager);
+    session._agents.set(asThreadId(threadId), sessionAgent);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
@@ -243,7 +240,7 @@ export class Session {
     toolExecutor.registerTool('delegate', delegateTool);
 
     // Set up coordinator agent with approval callback if provided
-    const coordinatorAgent = session.getAgent(session.getId());
+    const coordinatorAgent = session.getCoordinatorAgent();
     if (coordinatorAgent && options.approvalCallback) {
       coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
     }
@@ -375,26 +372,27 @@ export class Session {
     const toolExecutor = new ToolExecutor();
     Session.initializeTools(toolExecutor);
 
-    // Create agent with existing thread - it will auto-initialize token budget based on model
-    const sessionAgent = new Agent({
-      provider: providerInstance,
+    logger.debug(`Creating session for ${sessionId}`);
+
+    // Create session instance
+    const session = new Session(sessionId, sessionData, threadManager);
+
+    // Create and initialize coordinator agent
+    const coordinatorAgent = await session.createAgent({
+      sessionData,
+      providerInstance,
       toolExecutor,
       threadManager,
       threadId: sessionId,
-      tools: toolExecutor.getAllTools(),
-      metadata: {
-        name: sessionData.name || 'Session Coordinator',
-        providerInstanceId: providerInstanceId,
-        modelId: modelId,
-      },
+      providerInstanceId,
+      modelId,
+      isCoordinator: true,
     });
 
-    logger.debug(`Starting session agent for ${sessionId}`);
-    // Start the session agent
-    await sessionAgent.start();
-    logger.debug(`Session agent started, state: ${sessionAgent.getCurrentState()}`);
+    logger.debug(`Coordinator agent created and initialized for ${sessionId}`);
 
-    const session = new Session(sessionAgent, sessionData, threadManager);
+    // Add coordinator to agents map
+    session._agents.set(sessionId, coordinatorAgent);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -442,24 +440,21 @@ export class Session {
           delegateProviderInstanceId
         );
 
-        // Create agent for this delegate thread with its own provider
-        // Agent will auto-initialize token budget based on its model
-        const delegateAgent = new Agent({
-          provider: delegateProviderInstance,
+        // Create and initialize delegate agent
+        const delegateAgent = await session.createAgent({
+          sessionData,
+          providerInstance: delegateProviderInstance,
           toolExecutor,
           threadManager,
           threadId: delegateThreadId,
-          tools: toolExecutor.getAllTools(),
-          metadata: {
-            name: (delegateThread.metadata?.name as string) || 'Delegate Agent',
-            providerInstanceId: delegateProviderInstanceId,
-            modelId: delegateModelId,
-          },
+          providerInstanceId: delegateProviderInstanceId,
+          modelId: delegateModelId,
+          isCoordinator: false,
         });
 
-        // Start the delegate agent
-        await delegateAgent.start();
-        logger.debug(`Delegate agent started, state: ${delegateAgent.getCurrentState()}`);
+        logger.debug(
+          `Delegate agent created and initialized, state: ${delegateAgent.getCurrentState()}`
+        );
 
         // Add to session's agents map
         session._agents.set(asThreadId(delegateThreadId), delegateAgent);
@@ -689,7 +684,7 @@ export class Session {
     return {
       id: this._sessionId,
       name: sessionData?.name || 'Session ' + this._sessionId,
-      createdAt: this._sessionAgent.getThreadCreatedAt() || new Date(),
+      createdAt: this.getCoordinatorAgent()?.getThreadCreatedAt() || new Date(),
       agents,
     };
   }
@@ -700,7 +695,12 @@ export class Session {
     providerInstanceId?: string;
     modelId?: string;
   }): Agent {
-    const agentName = config.name?.trim() || 'Lace';
+    // Generate thread ID first to create proper agent name
+    const targetThreadId =
+      config.threadId || this._threadManager.createDelegateThreadFor(this._sessionId).id;
+
+    // Generate agent name - use provided name or thread-based name for delegates (not 'Lace')
+    const agentName = config.name?.trim() || `Agent-${targetThreadId.split('.').pop()}`;
 
     // If no provider instance specified, inherit from session
     let targetProviderInstanceId = config.providerInstanceId;
@@ -742,9 +742,7 @@ export class Session {
     const delegateTool = new DelegateTool();
     agentToolExecutor.registerTool('delegate', delegateTool);
 
-    // If no threadId provided, create a delegate thread
-    const targetThreadId =
-      config.threadId || this._threadManager.createDelegateThreadFor(this._sessionId).id;
+    // Thread ID already generated above for agent naming
 
     // Create agent with metadata
     const agent = new Agent({
@@ -761,10 +759,11 @@ export class Session {
       },
     });
 
-    // Set up approval callback for spawned agent (inherit from session agent)
-    const sessionApprovalCallback = this._sessionAgent.toolExecutor.getApprovalCallback();
-    if (sessionApprovalCallback) {
-      agent.toolExecutor.setApprovalCallback(sessionApprovalCallback);
+    // Set up approval callback for spawned agent (inherit from coordinator)
+    const coordinatorAgent = this.getCoordinatorAgent();
+    const coordinatorApprovalCallback = coordinatorAgent?.toolExecutor.getApprovalCallback();
+    if (coordinatorApprovalCallback) {
+      agent.toolExecutor.setApprovalCallback(coordinatorApprovalCallback);
     }
 
     this._agents.set(agent.threadId, agent);
@@ -774,26 +773,29 @@ export class Session {
   getAgents(): AgentInfo[] {
     const agents = [];
 
-    // Add the coordinator agent first
-    agents.push(this._sessionAgent.getInfo());
+    // Add the coordinator agent first (if it exists)
+    const coordinator = this.getCoordinatorAgent();
+    if (coordinator) {
+      agents.push(coordinator.getInfo());
+    }
 
-    // Add delegate agents
-    Array.from(this._agents.values()).forEach((agent) => {
-      agents.push(agent.getInfo());
+    // Add all other agents
+    Array.from(this._agents.entries()).forEach(([threadId, agent]) => {
+      if (threadId !== this._sessionId) {
+        agents.push(agent.getInfo());
+      }
     });
 
     return agents;
   }
 
-  getAgent(threadId: ThreadId): Agent | null {
-    // Check if it's the coordinator agent
-    if (threadId === this._sessionId) {
-      return this._sessionAgent;
-    }
+  // Get coordinator agent (agent with session ID as thread ID)
+  getCoordinatorAgent(): Agent | null {
+    return this._agents.get(this._sessionId) || null;
+  }
 
-    // Check delegate agents
-    const delegateAgent = this._agents.get(threadId);
-    return delegateAgent || null;
+  getAgent(threadId: ThreadId): Agent | null {
+    return this._agents.get(threadId) || null;
   }
 
   async startAgent(threadId: ThreadId): Promise<void> {
@@ -850,11 +852,7 @@ export class Session {
     // Remove from registry
     Session._sessionRegistry.delete(this._sessionId);
 
-    // Stop and cleanup the coordinator agent
-    this._sessionAgent.stop();
-    this._sessionAgent.removeAllListeners();
-
-    // Stop and cleanup all delegate agents
+    // Stop and cleanup all agents (including coordinator)
     for (const agent of this._agents.values()) {
       agent.stop();
       agent.removeAllListeners();
@@ -1008,6 +1006,43 @@ Use your task_add_note tool to record important notes as you work and your task_
       Session._providerCache.delete(cacheKey);
     }
 
+    // Check if another thread is currently creating this provider
+    if (Session._providerCreationInProgress.has(cacheKey)) {
+      // Wait briefly and check cache again - the other thread might have completed
+      // This is a simple spin-wait for the synchronous context
+      let attempts = 0;
+      const maxAttempts = 100; // ~100ms max wait
+      while (Session._providerCreationInProgress.has(cacheKey) && attempts < maxAttempts) {
+        const nowCached = Session._providerCache.get(cacheKey);
+        if (nowCached && nowCached.isConfigured()) {
+          logger.info('✅ Using provider created by another thread', {
+            providerInstanceId,
+            cacheKey,
+            attempts,
+          });
+          return nowCached;
+        }
+        attempts++;
+        // Simple synchronous delay
+        const start = Date.now();
+        while (Date.now() - start < 1) {
+          // 1ms busy wait
+        }
+      }
+
+      // If still in progress after waiting, proceed anyway to avoid deadlock
+      if (Session._providerCreationInProgress.has(cacheKey)) {
+        logger.warn('⚠️ Provider creation taking too long, proceeding anyway', {
+          providerInstanceId,
+          cacheKey,
+          attempts,
+        });
+      }
+    }
+
+    // Mark as creation in progress
+    Session._providerCreationInProgress.add(cacheKey);
+
     logger.debug('Creating new provider instance (not cached)', {
       providerInstanceId,
       cacheKey,
@@ -1117,8 +1152,14 @@ Use your task_add_note tool to record important notes as you work and your task_
       // Cache the result
       Session._providerCache.set(cacheKey, providerInstance);
 
+      // Clear the creation lock
+      Session._providerCreationInProgress.delete(cacheKey);
+
       return providerInstance;
     } catch (error) {
+      // Clear the creation lock on error too
+      Session._providerCreationInProgress.delete(cacheKey);
+
       throw new Error(
         `Failed to resolve provider instance ${providerInstanceId}: ${
           error instanceof Error ? error.message : String(error)
@@ -1133,6 +1174,7 @@ Use your task_add_note tool to record important notes as you work and your task_
 
   static clearProviderCache(): void {
     Session._providerCache.clear();
+    Session._providerCreationInProgress.clear();
   }
 
   /**
@@ -1147,6 +1189,104 @@ Use your task_add_note tool to record important notes as you work and your task_
     const sessionTempPath = join(projectTempDir, `session-${this._sessionId}`);
     mkdirSync(sessionTempPath, { recursive: true });
     return sessionTempPath;
+  }
+
+  /**
+   * Create session agent with consistent configuration
+   */
+  private static createSessionAgent(params: {
+    sessionData: SessionData;
+    providerInstance: AIProvider;
+    toolExecutor: ToolExecutor;
+    threadManager: ThreadManager;
+    threadId: string;
+    providerInstanceId: string;
+    modelId: string;
+  }): Agent {
+    const {
+      sessionData,
+      providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      providerInstanceId,
+      modelId,
+    } = params;
+
+    // Use session name if available, otherwise default to "Lace"
+    const agentName = sessionData.name || 'Lace';
+
+    return new Agent({
+      provider: providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: agentName,
+        providerInstanceId,
+        modelId,
+      },
+    });
+  }
+
+  /**
+   * Create an agent with consistent configuration (synchronous, lazy initialization)
+   */
+  private static createAgentSync(params: {
+    sessionData: SessionData;
+    providerInstance: AIProvider;
+    toolExecutor: ToolExecutor;
+    threadManager: ThreadManager;
+    threadId: string;
+    providerInstanceId: string;
+    modelId: string;
+    isCoordinator?: boolean;
+  }): Agent {
+    const {
+      providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      providerInstanceId,
+      modelId,
+      isCoordinator = false,
+    } = params;
+
+    // Use appropriate name - always "Lace" for coordinator, or thread-based name for delegates
+    const agentName = isCoordinator ? 'Lace' : `Agent-${threadId.split('.').pop()}`;
+
+    return new Agent({
+      provider: providerInstance,
+      toolExecutor,
+      threadManager,
+      threadId,
+      tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: agentName,
+        providerInstanceId,
+        modelId,
+      },
+    });
+  }
+
+  /**
+   * Create and initialize an agent with consistent configuration (async version for getById)
+   */
+  private async createAgent(params: {
+    sessionData: SessionData;
+    providerInstance: AIProvider;
+    toolExecutor: ToolExecutor;
+    threadManager: ThreadManager;
+    threadId: string;
+    providerInstanceId: string;
+    modelId: string;
+    isCoordinator?: boolean;
+  }): Promise<Agent> {
+    const agent = Session.createAgentSync(params);
+    // Initialize the agent (loads prompts, records events)
+    await agent.initialize();
+    return agent;
   }
 
   /**
