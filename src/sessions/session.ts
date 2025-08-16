@@ -49,6 +49,7 @@ export interface SessionInfo {
 
 export class Session {
   private static _sessionRegistry = new Map<ThreadId, Session>();
+  private static _providerCreationInProgress = new Set<string>();
 
   private _sessionId: ThreadId;
   private _sessionData: SessionData;
@@ -1003,6 +1004,43 @@ Use your task_add_note tool to record important notes as you work and your task_
       Session._providerCache.delete(cacheKey);
     }
 
+    // Check if another thread is currently creating this provider
+    if (Session._providerCreationInProgress.has(cacheKey)) {
+      // Wait briefly and check cache again - the other thread might have completed
+      // This is a simple spin-wait for the synchronous context
+      let attempts = 0;
+      const maxAttempts = 100; // ~100ms max wait
+      while (Session._providerCreationInProgress.has(cacheKey) && attempts < maxAttempts) {
+        const nowCached = Session._providerCache.get(cacheKey);
+        if (nowCached && nowCached.isConfigured()) {
+          logger.info('✅ Using provider created by another thread', {
+            providerInstanceId,
+            cacheKey,
+            attempts,
+          });
+          return nowCached;
+        }
+        attempts++;
+        // Simple synchronous delay
+        const start = Date.now();
+        while (Date.now() - start < 1) {
+          // 1ms busy wait
+        }
+      }
+
+      // If still in progress after waiting, proceed anyway to avoid deadlock
+      if (Session._providerCreationInProgress.has(cacheKey)) {
+        logger.warn('⚠️ Provider creation taking too long, proceeding anyway', {
+          providerInstanceId,
+          cacheKey,
+          attempts,
+        });
+      }
+    }
+
+    // Mark as creation in progress
+    Session._providerCreationInProgress.add(cacheKey);
+
     logger.debug('Creating new provider instance (not cached)', {
       providerInstanceId,
       cacheKey,
@@ -1112,8 +1150,14 @@ Use your task_add_note tool to record important notes as you work and your task_
       // Cache the result
       Session._providerCache.set(cacheKey, providerInstance);
 
+      // Clear the creation lock
+      Session._providerCreationInProgress.delete(cacheKey);
+
       return providerInstance;
     } catch (error) {
+      // Clear the creation lock on error too
+      Session._providerCreationInProgress.delete(cacheKey);
+
       throw new Error(
         `Failed to resolve provider instance ${providerInstanceId}: ${
           error instanceof Error ? error.message : String(error)
@@ -1128,6 +1172,7 @@ Use your task_add_note tool to record important notes as you work and your task_
 
   static clearProviderCache(): void {
     Session._providerCache.clear();
+    Session._providerCreationInProgress.clear();
   }
 
   /**
@@ -1238,8 +1283,7 @@ Use your task_add_note tool to record important notes as you work and your task_
   }): Promise<Agent> {
     const agent = Session.createAgentSync(params);
     // Initialize the agent (loads prompts, records events)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    await (agent as any)._initialize();
+    await agent.initialize();
     return agent;
   }
 

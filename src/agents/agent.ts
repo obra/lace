@@ -207,7 +207,7 @@ export class Agent extends EventEmitter {
     }
   ): Promise<void> {
     if (!this._initialized) {
-      await this._initialize();
+      await this.initialize();
     }
 
     if (this._state === 'idle') {
@@ -268,14 +268,14 @@ export class Agent extends EventEmitter {
 
   async continueConversation(): Promise<void> {
     if (!this._initialized) {
-      await this._initialize();
+      await this.initialize();
     }
 
     await this._processConversation();
   }
 
-  // Private initialization method - happens once per agent
-  private async _initialize(): Promise<void> {
+  // Public initialization method - happens once per agent
+  async initialize(): Promise<void> {
     if (this._initialized) return; // idempotent
 
     // Load prompts (expensive, happens once)
@@ -344,7 +344,7 @@ export class Agent extends EventEmitter {
   // Control methods
   async start(): Promise<void> {
     // Ensure agent is initialized
-    await this._initialize();
+    await this.initialize();
 
     // Provider might be fresh, so always set system prompt
     if (this._promptConfig) {
