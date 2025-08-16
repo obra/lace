@@ -44,6 +44,6 @@
     "node_modules",
     ".next",
     "stories_parked",
-    "../../scripts/**"
+    "scripts/**"
   ]
 }
