@@ -26,7 +26,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
 
   return (
     <div
-      className="px-3 py-2.5 hover:bg-base-200/80 hover:shadow-sm rounded-xl cursor-pointer group transition-all duration-200 hover:scale-[1.02] border border-transparent hover:border-base-300/40"
+      className="pr-2 py-2.5 hover:bg-base-200/80 hover:shadow-sm rounded-xl cursor-pointer group transition-all duration-200 hover:scale-[1.02] border border-transparent hover:border-base-300/40"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -37,7 +37,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
         }
       }}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-y-2">
         {/* Priority Indicator */}
         <div className="flex items-center justify-center">
           <div
