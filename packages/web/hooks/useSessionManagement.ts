@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from 'react';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
-import { stringify } from '@/lib/serialization';
 
 interface UseSessionManagementResult {
   sessions: SessionInfo[];
@@ -24,6 +23,7 @@ interface UseSessionManagementResult {
     sessionId: string,
     updates: { name: string; description?: string }
   ) => Promise<void>;
+  loadSessionsForProject: (projectId: string) => Promise<SessionInfo[]>;
 }
 
 export function useSessionManagement(projectId: string | null): UseSessionManagementResult {
@@ -91,7 +91,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
         const res = await fetch(`/api/projects/${projectId}/sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: stringify(sessionData),
+          body: JSON.stringify(sessionData),
         });
 
         if (res.ok) {
@@ -137,7 +137,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
         const res = await fetch(`/api/sessions/${sessionId}/configuration`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: stringify(config),
+          body: JSON.stringify(config),
         });
 
         if (!res.ok) {
@@ -160,7 +160,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
         const res = await fetch(`/api/sessions/${sessionId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: stringify(updates),
+          body: JSON.stringify(updates),
         });
 
         if (!res.ok) {
@@ -176,6 +176,27 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
       }
     },
     [loadSessions]
+  );
+
+  const loadSessionsForProject = useCallback(
+    async (targetProjectId: string): Promise<SessionInfo[]> => {
+      try {
+        const res = await fetch(`/api/projects/${targetProjectId}/sessions`);
+        const data: unknown = await parseResponse<unknown>(res);
+
+        if (isApiError(data)) {
+          console.error('Failed to load sessions for project:', data.error);
+          return [];
+        }
+
+        const sessionsData = data as SessionInfo[];
+        return sessionsData || [];
+      } catch (error) {
+        console.error('Failed to load sessions for project:', error);
+        return [];
+      }
+    },
+    []
   );
 
   // Load sessions when project changes
@@ -206,5 +227,6 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     loadSessionConfiguration,
     updateSessionConfiguration,
     updateSession,
+    loadSessionsForProject,
   };
 }

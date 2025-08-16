@@ -10,7 +10,7 @@ import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 
 // Types for agent context
-interface AgentContextType {
+export interface AgentContextType {
   // Agent data (from useAgentManagement hook)
   sessionDetails: SessionInfo | null;
   loading: boolean;

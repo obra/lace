@@ -6,7 +6,6 @@ import type { SessionInfo, ThreadId, AgentState } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
-import { stringify } from '@/lib/serialization';
 
 interface UseAgentManagementResult {
   sessionDetails: SessionInfo | null;
@@ -55,7 +54,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
         const res = await fetch(`/api/sessions/${sessionId}/agents`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: stringify(agentData),
+          body: JSON.stringify(agentData),
         });
 
         if (res.ok) {
@@ -124,7 +123,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
         const res = await fetch(`/api/agents/${agentId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: stringify(config),
+          body: JSON.stringify(config),
         });
 
         if (!res.ok) {

@@ -17,7 +17,7 @@ import { useHashRouter } from '@/hooks/useHashRouter';
 import type { SessionInfo, ThreadId } from '@/types/core';
 
 // Types for session context
-interface SessionContextType {
+export interface SessionContextType {
   // Session data (from useSessionManagement hook)
   sessions: SessionInfo[];
   loading: boolean;
@@ -45,6 +45,7 @@ interface SessionContextType {
     sessionId: string,
     updates: { name: string; description?: string }
   ) => Promise<void>;
+  loadSessionsForProject: (projectId: string) => Promise<SessionInfo[]>;
 
   // Agent auto-selection control
   enableAgentAutoSelection: () => void;
@@ -101,6 +102,7 @@ export function SessionProvider({ children, projectId, onSessionChange }: Sessio
     loadSessionConfiguration,
     updateSessionConfiguration,
     updateSession,
+    loadSessionsForProject,
   } = useSessionManagement(projectId);
 
   // Get selection state from hash router
@@ -160,6 +162,7 @@ export function SessionProvider({ children, projectId, onSessionChange }: Sessio
     loadSessionConfiguration,
     updateSessionConfiguration,
     updateSession,
+    loadSessionsForProject,
 
     // Agent auto-selection control
     enableAgentAutoSelection,
