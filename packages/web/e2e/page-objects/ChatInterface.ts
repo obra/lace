@@ -59,9 +59,26 @@ export class ChatInterface {
     return this.page.getByText(messageText);
   }
 
+  // Wait for a specific message to appear (more robust than getMessage + toBeVisible)
+  async waitForMessage(messageText: string, timeout: number = 10000): Promise<void> {
+    // Look for the message in the chat timeline, not in the input field
+    await this.page
+      .locator('[data-testid="chat-timeline"]')
+      .getByText(messageText)
+      .first()
+      .waitFor({ state: 'visible', timeout });
+  }
+
+  // Send message and wait for it to appear in the conversation
+  async sendMessageAndWait(message: string, timeout: number = 10000): Promise<void> {
+    await this.sendMessage(message);
+    await this.waitForMessage(message, timeout);
+  }
+
   // Wait for interface to be ready
   async waitForChatReady(): Promise<void> {
     await this.messageInput.waitFor({ state: 'visible' });
+    // Simple approach - just wait for the input to be ready
   }
 
   // Wait for send button to be available (not disabled)

@@ -59,7 +59,7 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   // Look for the New Project button with various selectors
   const newProjectButton = page
     .locator('button:has-text("New Project")')
-    .or(page.locator('[data-testid="new-project-button"]'))
+    .or(page.locator('[data-testid="create-project-button"]'))
     .or(page.locator('button').filter({ hasText: 'New Project' }))
     .first();
 
@@ -105,7 +105,7 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   await page.waitForTimeout(1000);
 
   // Click the Create Project button - it should be enabled now
-  const createButton = page.locator('button:has-text("Create Project")');
+  const createButton = page.getByTestId('create-project-button');
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
 
   // Wait for button to be enabled (form validation should pass with valid directory)
@@ -144,7 +144,7 @@ export async function createSession(page: Page, sessionName: string) {
   await sessionInput.waitFor({ timeout: 10000 });
 
   await sessionInput.fill(sessionName);
-  await page.click('button:has-text("Create")');
+  await page.getByTestId('create-project-button').click();
 
   // Wait for session to appear
   await expect(page.getByText(sessionName)).toBeVisible({ timeout: 10000 });
@@ -277,7 +277,7 @@ async function createProjectWithProvider(
   // Click "New Project" button
   const newProjectButton = page
     .locator('button:has-text("New Project")')
-    .or(page.locator('[data-testid="new-project-button"]'))
+    .or(page.locator('[data-testid="create-project-button"]'))
     .or(page.locator('button').filter({ hasText: 'New Project' }))
     .first();
 
@@ -342,7 +342,7 @@ async function createProjectWithProvider(
   await modelSelect.selectOption(modelId);
 
   // Click Create Project button
-  const createButton = page.locator('button:has-text("Create Project")');
+  const createButton = page.getByTestId('create-project-button');
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
 
   // Ensure the button is enabled
