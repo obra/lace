@@ -40,6 +40,7 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
 import { useProjectManagement } from '@/hooks/useProjectManagement';
+import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
@@ -119,14 +120,17 @@ export const LaceApp = memo(function LaceApp() {
     updateProject,
     reloadProjects,
   } = useProjectManagement();
+  const {
+    sessions,
+    loading: sessionLoading,
+    projectConfig,
+    createSession,
+    reloadSessions,
+  } = useSessionManagement(selectedProject);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionInfo | null>(null);
-  const [sessionName, setSessionName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [creatingSession, setCreatingSession] = useState(false);
-  const [projectConfig, setProjectConfig] = useState<Record<string, unknown> | null>(null);
 
   // Use session events hook for event management (without event stream)
   const {
@@ -226,33 +230,6 @@ export const LaceApp = memo(function LaceApp() {
     setLoadingProviders(false);
   }, []);
 
-  const loadSessions = useCallback(async () => {
-    if (!selectedProject) {
-      setSessions([]);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/projects/${selectedProject}/sessions`);
-      const data: unknown = await parseResponse<unknown>(res);
-
-      if (isApiError(data)) {
-        console.error('Failed to load sessions:', data.error);
-        if (data.error === 'Project not found') {
-          // Clear the stale selection to stop repeated errors and let FTUX flow proceed
-          setSelectedProject(null);
-          setSessions([]);
-        }
-        return;
-      }
-
-      const sessionsData = data as SessionInfo[];
-      setSessions(sessionsData || []);
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-    }
-  }, [selectedProject, setSelectedProject]);
-
   // Load providers on mount (projects are loaded by the hook)
   useEffect(() => {
     void loadProviders();
@@ -293,29 +270,7 @@ export const LaceApp = memo(function LaceApp() {
     [setSelectedSession]
   );
 
-  // Load sessions and project configuration when project is selected
-  useEffect(() => {
-    void loadSessions();
-
-    // Load project configuration
-    if (selectedProject) {
-      fetch(`/api/projects/${selectedProject}/configuration`)
-        .then((res) => parseResponse<{ configuration?: Record<string, unknown> }>(res))
-        .then((data) => {
-          if (data.configuration) {
-            setProjectConfig(data.configuration);
-          } else {
-            setProjectConfig({});
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to load project configuration:', error);
-          setProjectConfig(null);
-        });
-    } else {
-      setProjectConfig(null);
-    }
-  }, [selectedProject, loadSessions]);
+  // Sessions and project configuration are now handled by useSessionManagement hook
 
   // Load session details when session is selected
   useEffect(() => {
@@ -396,27 +351,7 @@ export const LaceApp = memo(function LaceApp() {
     description?: string;
     configuration?: Record<string, unknown>;
   }) => {
-    if (!selectedProject) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/projects/${selectedProject}/sessions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionData),
-      });
-
-      if (res.ok) {
-        // Reload sessions to show the new one
-        void loadSessions();
-      } else {
-        const errorData = await parseResponse<{ error?: string }>(res);
-        console.error('Failed to create session:', errorData.error);
-      }
-    } catch (error) {
-      console.error('Failed to create session:', error);
-    }
-    setLoading(false);
+    await createSession(sessionData);
   };
 
   // Agent creation function
@@ -440,20 +375,6 @@ export const LaceApp = memo(function LaceApp() {
       console.error('Failed to create agent:', error);
     }
     setLoading(false);
-  };
-
-  // Legacy session creation (for backward compatibility)
-  const createSession = async () => {
-    if (!selectedProject || !sessionName.trim()) return;
-
-    await handleSessionCreate({ name: sessionName.trim() });
-    setSessionName('');
-    setCreatingSession(false);
-  };
-
-  const cancelSessionCreation = () => {
-    setCreatingSession(false);
-    setSessionName('');
   };
 
   // Handle session selection - load session details but don't auto-select agent
