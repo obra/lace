@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ProjectInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
+import { stringify } from '@/lib/serialization';
 
 interface UseProjectManagementResult {
   projects: ProjectInfo[];
@@ -68,7 +69,7 @@ export function useProjectManagement(): UseProjectManagementResult {
         const res = await fetch(`/api/projects/${projectId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
+          body: stringify(updates),
         });
 
         if (res.ok) {
@@ -99,7 +100,7 @@ export function useProjectManagement(): UseProjectManagementResult {
         const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(projectData),
+          body: stringify(projectData),
         });
 
         if (res.ok) {

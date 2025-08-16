@@ -3,6 +3,7 @@
 
 import type { Task, TaskStatus, TaskPriority, TaskFilters } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
+import { stringify } from '@/lib/serialization';
 
 export interface CreateTaskRequest {
   title: string;
@@ -58,7 +59,7 @@ export class TaskAPIClient {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
+        body: stringify(task),
       }
     );
 
@@ -94,7 +95,7 @@ export class TaskAPIClient {
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
+        body: stringify(updates),
       }
     );
 
@@ -136,7 +137,7 @@ export class TaskAPIClient {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: stringify(requestBody),
       }
     );
 

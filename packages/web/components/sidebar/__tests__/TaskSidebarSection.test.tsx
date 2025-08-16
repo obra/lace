@@ -12,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import type { SessionInfo, ThreadId, Task, AgentInfo } from '@/types/core';
+import { createMockSessionContext, createMockAgentContext } from '@/__tests__/utils/provider-mocks';
 
 // Mock TaskProvider context to control behavior
 const mockTaskContext = vi.hoisted(() => ({

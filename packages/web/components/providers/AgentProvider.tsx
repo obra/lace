@@ -31,6 +31,13 @@ interface AgentContextType {
   createAgent: (sessionId: string, request: CreateAgentRequest) => Promise<void>;
   updateAgentState: (agentId: string, fromState: string, toState: string) => void;
   reloadSessionDetails: () => Promise<void>;
+  loadAgentConfiguration: (
+    agentId: string
+  ) => Promise<{ name: string; providerInstanceId: string; modelId: string }>;
+  updateAgent: (
+    agentId: string,
+    config: { name: string; providerInstanceId: string; modelId: string }
+  ) => Promise<void>;
 }
 
 const AgentContext = createContext<AgentContextType | null>(null);
@@ -43,8 +50,15 @@ interface AgentProviderProps {
 
 export function AgentProvider({ children, sessionId, onAgentChange }: AgentProviderProps) {
   // Get agent data from pure data hook
-  const { sessionDetails, loading, createAgent, updateAgentState, reloadSessionDetails } =
-    useAgentManagement(sessionId);
+  const {
+    sessionDetails,
+    loading,
+    createAgent,
+    updateAgentState,
+    reloadSessionDetails,
+    loadAgentConfiguration,
+    updateAgent,
+  } = useAgentManagement(sessionId);
 
   // Get selection state from hash router
   const { agent: selectedAgent, setAgent: setSelectedAgent } = useHashRouter();
@@ -115,6 +129,8 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
     createAgent,
     updateAgentState,
     reloadSessionDetails,
+    loadAgentConfiguration,
+    updateAgent,
   };
 
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;

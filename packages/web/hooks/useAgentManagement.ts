@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 import type { SessionInfo, ThreadId, AgentState } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 import { parseResponse } from '@/lib/serialization';
+import { isApiError } from '@/types/api';
+import { stringify } from '@/lib/serialization';
 
 interface UseAgentManagementResult {
   sessionDetails: SessionInfo | null;
@@ -12,6 +14,13 @@ interface UseAgentManagementResult {
   createAgent: (sessionId: string, agentData: CreateAgentRequest) => Promise<void>;
   updateAgentState: (agentId: string, from: string, to: string) => void;
   reloadSessionDetails: () => Promise<void>;
+  loadAgentConfiguration: (
+    agentId: string
+  ) => Promise<{ name: string; providerInstanceId: string; modelId: string }>;
+  updateAgent: (
+    agentId: string,
+    config: { name: string; providerInstanceId: string; modelId: string }
+  ) => Promise<void>;
 }
 
 export function useAgentManagement(sessionId: string | null): UseAgentManagementResult {
@@ -46,7 +55,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
         const res = await fetch(`/api/sessions/${sessionId}/agents`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(agentData),
+          body: stringify(agentData),
         });
 
         if (res.ok) {
@@ -77,6 +86,62 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
     });
   }, []);
 
+  const loadAgentConfiguration = useCallback(
+    async (
+      agentId: string
+    ): Promise<{ name: string; providerInstanceId: string; modelId: string }> => {
+      try {
+        const res = await fetch(`/api/agents/${agentId}`);
+
+        if (!res.ok) {
+          throw new Error(`Failed to load agent configuration: ${res.status}`);
+        }
+
+        const data = await parseResponse<{
+          name: string;
+          providerInstanceId: string;
+          modelId: string;
+        }>(res);
+        if (isApiError(data)) {
+          throw new Error(data.error);
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Error loading agent configuration:', error);
+        throw error;
+      }
+    },
+    []
+  );
+
+  const updateAgent = useCallback(
+    async (
+      agentId: string,
+      config: { name: string; providerInstanceId: string; modelId: string }
+    ): Promise<void> => {
+      try {
+        const res = await fetch(`/api/agents/${agentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: stringify(config),
+        });
+
+        if (!res.ok) {
+          const errorData = await parseResponse<{ error: string }>(res);
+          throw new Error(errorData.error || `Failed to update agent: ${res.status}`);
+        }
+
+        // Reload session details to reflect the changes
+        await loadSessionDetails();
+      } catch (error) {
+        console.error('Error updating agent:', error);
+        throw error;
+      }
+    },
+    [loadSessionDetails]
+  );
+
   // Load session details when session changes
   useEffect(() => {
     void loadSessionDetails();
@@ -95,5 +160,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
     createAgent,
     updateAgentState,
     reloadSessionDetails: loadSessionDetails,
+    loadAgentConfiguration,
+    updateAgent,
   };
 }

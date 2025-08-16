@@ -14,7 +14,6 @@ import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
 import type { ProviderInfo, ModelInfo, CreateAgentRequest } from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
@@ -66,12 +65,22 @@ const DEFAULT_CONFIG: SessionConfiguration = {
 export function SessionConfigPanel({}: SessionConfigPanelProps) {
   // Get data from providers instead of props
   const { currentProject } = useProjectContext();
-  const { sessions, projectConfig, createSession, loading: sessionLoading } = useSessionContext();
+  const {
+    sessions,
+    projectConfig,
+    createSession,
+    loading: sessionLoading,
+    loadSessionConfiguration,
+    updateSessionConfiguration,
+    updateSession,
+  } = useSessionContext();
   const {
     sessionDetails: selectedSession,
     createAgent,
     reloadSessionDetails,
     loading: agentLoading,
+    loadAgentConfiguration,
+    updateAgent,
   } = useAgentContext();
   const {
     actions: { updateHashState },
@@ -214,40 +223,26 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
     if (!selectedSession) return;
 
     try {
-      // Load session configuration from API
-      const res = await fetch(`/api/sessions/${selectedSession.id}/configuration`);
+      // Load session configuration from provider
+      const configuration = await loadSessionConfiguration(selectedSession.id);
 
-      if (res.ok) {
-        const data = await parseResponse<{ configuration: SessionConfiguration }>(res);
-        setEditSessionName(selectedSession.name);
-        setEditSessionDescription(''); // Session descriptions not currently stored
+      setEditSessionName(selectedSession.name);
+      setEditSessionDescription(''); // Session descriptions not currently stored
 
-        // Merge with defaults and ensure provider instance is set
-        const config = {
-          ...DEFAULT_CONFIG,
-          ...data.configuration,
-        };
+      // Merge with defaults and ensure provider instance is set
+      const config = {
+        ...DEFAULT_CONFIG,
+        ...configuration,
+      };
 
-        // If no provider instance configured, use first available
-        if (!config.providerInstanceId && availableProviders.length > 0) {
-          config.providerInstanceId = availableProviders[0].instanceId;
-          config.modelId = availableProviders[0].models[0]?.id || '';
-        }
-
-        setEditSessionConfig(config);
-        setShowEditConfig(true);
-      } else {
-        // Fallback to default configuration with first available provider
-        const config = { ...DEFAULT_CONFIG };
-        if (availableProviders.length > 0) {
-          config.providerInstanceId = availableProviders[0].instanceId;
-          config.modelId = availableProviders[0].models[0]?.id || '';
-        }
-        setEditSessionName(selectedSession.name);
-        setEditSessionDescription('');
-        setEditSessionConfig(config);
-        setShowEditConfig(true);
+      // If no provider instance configured, use first available
+      if (!config.providerInstanceId && availableProviders.length > 0) {
+        config.providerInstanceId = availableProviders[0].instanceId;
+        config.modelId = availableProviders[0].models[0]?.id || '';
       }
+
+      setEditSessionConfig(config);
+      setShowEditConfig(true);
     } catch (error) {
       console.error('Error loading session configuration:', error);
       // Fallback to default configuration with first available provider
@@ -268,43 +263,25 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
     if (!selectedSession || !editSessionName.trim()) return;
 
     try {
-      // Update session configuration via API
-      const configRes = await fetch(`/api/sessions/${selectedSession.id}/configuration`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editSessionConfig),
-      });
+      // Update session configuration via provider
+      await updateSessionConfiguration(selectedSession.id, editSessionConfig);
 
-      // Update session name/description if changed via PATCH endpoint
+      // Update session name/description if changed via provider
       const nameChanged = editSessionName.trim() !== selectedSession.name;
       const descChanged = (editSessionDescription.trim() || undefined) !== undefined;
 
       if (nameChanged || descChanged) {
-        const sessionRes = await fetch(`/api/sessions/${selectedSession.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: editSessionName.trim(),
-            description: editSessionDescription.trim() || undefined,
-          }),
+        await updateSession(selectedSession.id, {
+          name: editSessionName.trim(),
+          description: editSessionDescription.trim() || undefined,
         });
-
-        if (!sessionRes.ok) {
-          const errorData = await parseResponse<{ error: string }>(sessionRes);
-          console.error('Failed to update session name/description:', errorData.error);
-        }
       }
 
-      if (configRes.ok) {
-        // Trigger local state update by reloading session details
-        await reloadSessionDetails();
+      // Trigger local state update by reloading session details
+      await reloadSessionDetails();
 
-        setShowEditConfig(false);
-        resetEditSessionForm();
-      } else {
-        const errorData = await parseResponse<{ error: string }>(configRes);
-        console.error('Failed to update session configuration:', errorData.error);
-      }
+      setShowEditConfig(false);
+      resetEditSessionForm();
     } catch (error) {
       console.error('Error updating session:', error);
     }
@@ -315,25 +292,14 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
     if (!editingAgent || !editingAgent.name.trim()) return;
 
     try {
-      const res = await fetch(`/api/agents/${editingAgent.threadId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editingAgent.name.trim(),
-          providerInstanceId: editingAgent.providerInstanceId,
-          modelId: editingAgent.modelId,
-        }),
+      await updateAgent(editingAgent.threadId, {
+        name: editingAgent.name.trim(),
+        providerInstanceId: editingAgent.providerInstanceId,
+        modelId: editingAgent.modelId,
       });
 
-      if (res.ok) {
-        // Trigger a refresh by reloading session details
-        await reloadSessionDetails();
-        setShowEditAgent(false);
-        setEditingAgent(null);
-      } else {
-        const errorData = await parseResponse<{ error: string }>(res);
-        console.error('Failed to update agent:', errorData.error);
-      }
+      setShowEditAgent(false);
+      setEditingAgent(null);
     } catch (error) {
       console.error('Failed to update agent:', error);
     }
@@ -366,18 +332,8 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
   const handleEditAgentClick = useCallback(
     async (agent: { threadId: string; name: string; status: string }) => {
       try {
-        // Fetch agent's actual configuration
-        const res = await fetch(`/api/agents/${agent.threadId}`);
-        if (!res.ok) {
-          console.error('Failed to fetch agent configuration');
-          return;
-        }
-
-        const agentDetails = await parseResponse<{
-          name: string;
-          providerInstanceId: string;
-          modelId: string;
-        }>(res);
+        // Load agent configuration from provider
+        const agentDetails = await loadAgentConfiguration(agent.threadId);
 
         setEditingAgent({
           threadId: agent.threadId,
@@ -390,7 +346,7 @@ export function SessionConfigPanel({}: SessionConfigPanelProps) {
         console.error('Failed to load agent for editing:', error);
       }
     },
-    []
+    [loadAgentConfiguration]
   );
 
   // Session creation modal handlers

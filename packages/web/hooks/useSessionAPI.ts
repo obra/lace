@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { CreateSessionRequest, CreateAgentRequest, isApiError, isApiSuccess } from '@/types/api';
 import type { ThreadId, SessionInfo, AgentInfo } from '@/types/core';
 import { parse } from '@/lib/serialization';
+import { stringify } from '@/lib/serialization';
 
 interface APIState {
   error: string | null;
@@ -27,7 +28,7 @@ export function useSessionAPI() {
         const response = await fetch('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
+          body: stringify(request),
         });
 
         if (!response.ok) {
@@ -78,7 +79,7 @@ export function useSessionAPI() {
         const response = await fetch(`/api/sessions/${sessionId}/agents`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
+          body: stringify(request),
         });
 
         if (!response.ok) {
@@ -126,7 +127,7 @@ export function useSessionAPI() {
 
     try {
       const url = `/api/threads/${threadId}/message`;
-      const body = JSON.stringify({ message });
+      const body = stringify({ message });
 
       const response = await fetch(url, {
         method: 'POST',

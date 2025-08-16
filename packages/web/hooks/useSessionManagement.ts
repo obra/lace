@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
+import { stringify } from '@/lib/serialization';
 
 interface UseSessionManagementResult {
   sessions: SessionInfo[];
@@ -17,6 +18,12 @@ interface UseSessionManagementResult {
   }) => Promise<void>;
   loadProjectConfig: () => Promise<void>;
   reloadSessions: () => Promise<void>;
+  loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
+  updateSessionConfiguration: (sessionId: string, config: Record<string, unknown>) => Promise<void>;
+  updateSession: (
+    sessionId: string,
+    updates: { name: string; description?: string }
+  ) => Promise<void>;
 }
 
 export function useSessionManagement(projectId: string | null): UseSessionManagementResult {
@@ -84,7 +91,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
         const res = await fetch(`/api/projects/${projectId}/sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sessionData),
+          body: stringify(sessionData),
         });
 
         if (res.ok) {
@@ -99,6 +106,76 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
       }
     },
     [projectId, loadSessions]
+  );
+
+  const loadSessionConfiguration = useCallback(
+    async (sessionId: string): Promise<Record<string, unknown>> => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/configuration`);
+
+        if (!res.ok) {
+          throw new Error(`Failed to load session configuration: ${res.status}`);
+        }
+
+        const data = await parseResponse<{ configuration: Record<string, unknown> }>(res);
+        if (isApiError(data)) {
+          throw new Error(data.error);
+        }
+
+        return data.configuration || {};
+      } catch (error) {
+        console.error('Error loading session configuration:', error);
+        throw error;
+      }
+    },
+    []
+  );
+
+  const updateSessionConfiguration = useCallback(
+    async (sessionId: string, config: Record<string, unknown>): Promise<void> => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/configuration`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: stringify(config),
+        });
+
+        if (!res.ok) {
+          const errorData = await parseResponse<{ error: string }>(res);
+          throw new Error(
+            errorData.error || `Failed to update session configuration: ${res.status}`
+          );
+        }
+      } catch (error) {
+        console.error('Error updating session configuration:', error);
+        throw error;
+      }
+    },
+    []
+  );
+
+  const updateSession = useCallback(
+    async (sessionId: string, updates: { name: string; description?: string }): Promise<void> => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: stringify(updates),
+        });
+
+        if (!res.ok) {
+          const errorData = await parseResponse<{ error: string }>(res);
+          throw new Error(errorData.error || `Failed to update session: ${res.status}`);
+        }
+
+        // Reload sessions to reflect the changes
+        await loadSessions();
+      } catch (error) {
+        console.error('Error updating session:', error);
+        throw error;
+      }
+    },
+    [loadSessions]
   );
 
   // Load sessions when project changes
@@ -126,5 +203,8 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     createSession,
     loadProjectConfig,
     reloadSessions: loadSessions,
+    loadSessionConfiguration,
+    updateSessionConfiguration,
+    updateSession,
   };
 }

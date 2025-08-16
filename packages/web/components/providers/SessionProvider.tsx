@@ -39,6 +39,12 @@ interface SessionContextType {
   }) => Promise<void>;
   loadProjectConfig: () => Promise<void>;
   reloadSessions: () => Promise<void>;
+  loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
+  updateSessionConfiguration: (sessionId: string, config: Record<string, unknown>) => Promise<void>;
+  updateSession: (
+    sessionId: string,
+    updates: { name: string; description?: string }
+  ) => Promise<void>;
 
   // Agent auto-selection control
   enableAgentAutoSelection: () => void;
@@ -85,8 +91,17 @@ function useAgentAutoSelection(
 
 export function SessionProvider({ children, projectId, onSessionChange }: SessionProviderProps) {
   // Get session data from pure data hook
-  const { sessions, loading, projectConfig, createSession, loadProjectConfig, reloadSessions } =
-    useSessionManagement(projectId);
+  const {
+    sessions,
+    loading,
+    projectConfig,
+    createSession,
+    loadProjectConfig,
+    reloadSessions,
+    loadSessionConfiguration,
+    updateSessionConfiguration,
+    updateSession,
+  } = useSessionManagement(projectId);
 
   // Get selection state from hash router
   const {
@@ -142,6 +157,9 @@ export function SessionProvider({ children, projectId, onSessionChange }: Sessio
     createSession,
     loadProjectConfig,
     reloadSessions,
+    loadSessionConfiguration,
+    updateSessionConfiguration,
+    updateSession,
 
     // Agent auto-selection control
     enableAgentAutoSelection,
