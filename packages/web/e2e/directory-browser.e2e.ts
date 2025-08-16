@@ -57,11 +57,10 @@ test.describe('Directory Browser E2E Tests', () => {
   });
 
   test('should handle directory input validation', async ({ page }) => {
+    await page.goto('/');
+
     // Navigate to project creation
-    const newProjectButton = page
-      .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="create-project-button"]'))
-      .first();
+    const newProjectButton = page.getByTestId('create-project-button');
 
     await newProjectButton.waitFor({ timeout: 10000 });
     await newProjectButton.click();
@@ -79,7 +78,7 @@ test.describe('Directory Browser E2E Tests', () => {
     await directoryInput.fill('/invalid/path/that/does/not/exist');
 
     // Try to proceed (button should be disabled or show error)
-    const createButton = page.locator('button:has-text("Create Project")');
+    const createButton = page.getByTestId('create-project-submit');
 
     // The button might be disabled for invalid paths
     // Or there might be validation errors displayed
@@ -96,14 +95,13 @@ test.describe('Directory Browser E2E Tests', () => {
   });
 
   test('should work with valid directory paths', async ({ page }) => {
-    // Navigate to project creation
-    const newProjectButton = page
-      .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="create-project-button"]'))
-      .first();
+    await page.goto('/');
 
-    await newProjectButton.waitFor({ timeout: 10000 });
-    await newProjectButton.click();
+    // Use ProjectSelector page object for proper wizard navigation
+    const { createPageObjects } = await import('./page-objects');
+    const { projectSelector } = createPageObjects(page);
+
+    await projectSelector.clickNewProject();
 
     // Wait for modal
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
@@ -122,8 +120,11 @@ test.describe('Directory Browser E2E Tests', () => {
     await directoryInput.blur();
     await page.waitForTimeout(1000);
 
+    // Navigate through wizard steps to reach submit button
+    await projectSelector.navigateWizardSteps();
+
     // Check if Create Project button becomes enabled
-    const createButton = page.locator('button:has-text("Create Project")');
+    const createButton = page.getByTestId('create-project-submit');
 
     // With a valid directory, the button should eventually become enabled
     // (may take some time for validation to run)
@@ -175,11 +176,10 @@ test.describe('Directory Browser E2E Tests', () => {
   });
 
   test('should handle keyboard navigation in directory field', async ({ page }) => {
+    await page.goto('/');
+
     // Navigate to project creation
-    const newProjectButton = page
-      .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="create-project-button"]'))
-      .first();
+    const newProjectButton = page.getByTestId('create-project-button');
 
     await newProjectButton.waitFor({ timeout: 10000 });
     await newProjectButton.click();
@@ -218,10 +218,11 @@ test.describe('Directory Browser E2E Tests', () => {
     // Verify field is focused (this tests that keyboard navigation worked)
     await expect(directoryInput).toBeFocused();
 
-    // Type using keyboard
-    await page.keyboard.type(`${homedir()}/test`);
+    // Clear any existing value and use fill instead of keyboard typing to avoid duplication
+    await directoryInput.fill('');
+    await directoryInput.fill(`${homedir()}/test`);
 
-    // Verify input was typed
+    // Verify input was filled
     await expect(directoryInput).toHaveValue(`${homedir()}/test`);
 
     // Press Escape to potentially close any dropdown
@@ -245,61 +246,70 @@ test.describe('Directory Browser E2E Tests', () => {
   });
 
   test('should integrate with project creation workflow', async ({ page }) => {
-    // This test creates a full project using the DirectoryField
-    const newProjectButton = page
-      .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="create-project-button"]'))
-      .first();
+    // Set up test environment
+    const testEnv = await setupTestEnvironment();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
-    await newProjectButton.click();
+    try {
+      await page.goto('/');
 
-    // Wait for modal
-    await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
-    });
+      // This test creates a full project using the DirectoryField
+      const newProjectButton = page.getByTestId('create-project-button');
 
-    // Fill directory field using DirectoryField component
-    const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+      await newProjectButton.waitFor({ timeout: 10000 });
+      await newProjectButton.click();
 
-    // Use testEnv temp directory for valid project creation
-    const projectPath = `${testEnv.tempDir}/e2e-directory-test`;
-    await directoryInput.fill(projectPath);
+      // Wait for modal
+      await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
+        timeout: 10000,
+      });
 
-    // Blur to trigger validation
-    await directoryInput.blur();
-    await page.waitForTimeout(1000);
+      // Fill directory field using DirectoryField component
+      const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
+      await directoryInput.waitFor({ timeout: 5000 });
 
-    // Create Project button should become enabled
-    const createButton = page.locator('button:has-text("Create Project")');
-    await expect(createButton).toBeEnabled({ timeout: 5000 });
+      // Use testEnv temp directory for valid project creation
+      const projectPath = `${testEnv.tempDir}/e2e-directory-test`;
+      await directoryInput.fill(projectPath);
 
-    // Click create project
-    await createButton.click();
+      // Blur to trigger validation
+      await directoryInput.blur();
+      await page.waitForTimeout(1000);
 
-    // Project should be created successfully
-    // Wait for project interface to appear
-    await expect(
-      page
-        .locator(
-          '[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]'
-        )
-        .first()
-    ).toBeVisible({ timeout: 15000 });
+      // Create Project button should become enabled
+      const createButton = page.getByTestId('create-project-submit');
+      await expect(createButton).toBeEnabled({ timeout: 5000 });
 
-    // Should reach the chat interface
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-      timeout: 10000,
-    });
+      // Click create project
+      await createButton.click();
 
-    await test.step('Project creation with DirectoryField completed', async () => {
-      // Verify we have successfully reached the chat interface
-      expect(
-        await page
-          .locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
-          .count()
-      ).toBeGreaterThan(0);
-    });
+      // Project should be created successfully
+      // Wait for project interface to appear
+      await expect(
+        page
+          .locator(
+            '[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]'
+          )
+          .first()
+      ).toBeVisible({ timeout: 15000 });
+
+      // Should reach the chat interface
+      await page.waitForSelector(
+        'input[placeholder*="Message"], textarea[placeholder*="Message"]',
+        {
+          timeout: 10000,
+        }
+      );
+
+      await test.step('Project creation with DirectoryField completed', async () => {
+        // Verify we have successfully reached the chat interface
+        expect(
+          await page
+            .locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
+            .count()
+        ).toBeGreaterThan(0);
+      });
+    } finally {
+      await cleanupTestEnvironment(testEnv);
+    }
   });
 });
