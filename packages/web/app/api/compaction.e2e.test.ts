@@ -45,10 +45,7 @@ import {
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
-import {
-  createAnthropicStreamResponse,
-  anthropicStreamingEventPatterns,
-} from '@/test-utils/msw-streaming-helpers';
+import { createAnthropicStreamResponse } from '@/test-utils/msw-streaming-helpers';
 import type { ThreadId } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
