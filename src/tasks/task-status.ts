@@ -99,14 +99,8 @@ export const TASK_STATUS_ORDERED = TASK_STATUS_VALUES.sort(
   (a, b) => getStatusOrder(a) - getStatusOrder(b)
 );
 
-// Zod schema helper - create a simpler schema to avoid deep type instantiation
-export const TaskStatusSchema = z.enum([
-  'pending',
-  'in_progress',
-  'blocked',
-  'completed',
-  'archived',
-]);
+// Zod schema helper - use centralized values for true single source of truth
+export const TaskStatusSchema = z.enum(TASK_STATUS_VALUES as [TaskStatus, ...TaskStatus[]]);
 
 // Database constraint helper
 export const getTaskStatusDBConstraint = () =>
