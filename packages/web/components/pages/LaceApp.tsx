@@ -33,6 +33,7 @@ import type { LaceEvent } from '~/threads/types';
 import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 import { useModalState } from '@/hooks/useModalState';
+import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import {
   EventStreamProvider,
@@ -84,8 +85,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     autoOpenCreateProject,
     setAutoOpenCreateProject,
   } = useModalState();
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [loadingProviders, setLoadingProviders] = useState(true);
+  const { providers, loading: loadingProviders } = useProviders();
   const [loading, setLoading] = useState(false);
 
   // Use session events from EventStreamProvider context
@@ -114,33 +114,7 @@ const LaceAppInner = memo(function LaceAppInner() {
   // Events are now LaceEvent[] directly
   // No conversion needed - components handle LaceEvent natively
 
-  // Provider loading function
-  const loadProviders = useCallback(async () => {
-    setLoadingProviders(true);
-    try {
-      const res = await fetch('/api/providers');
-      const data: unknown = await parseResponse<unknown>(res);
-
-      if (isApiError(data)) {
-        console.error('Failed to load providers:', data.error);
-        return;
-      }
-
-      const providersData = data as ProviderInfo[];
-      setProviders(providersData || []);
-    } catch (error) {
-      console.error('Failed to load providers:', error);
-      setProviders([]);
-      setLoadingProviders(false);
-      return;
-    }
-    setLoadingProviders(false);
-  }, []);
-
-  // Load providers on mount (projects are loaded by the hook)
-  useEffect(() => {
-    void loadProviders();
-  }, [loadProviders]);
+  // Providers are now loaded by useProviders hook
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
