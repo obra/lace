@@ -41,7 +41,7 @@ export async function startTestServer(testName: string): Promise<{
     }, 60000);
 
     // Start server with isolated environment
-    testServerProcess = spawn('npx', ['tsx', 'server.ts', '--port', port.toString()], {
+    testServerProcess = spawn('npx', ['tsx', 'server-custom.ts', '--port', port.toString()], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
