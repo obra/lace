@@ -15,6 +15,7 @@ import React, {
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 import { parse } from '@/lib/serialization';
+import type { ApprovalDecision } from '@/types/core';
 
 // Types for tool approval context
 interface ToolApprovalContextType {
@@ -25,6 +26,7 @@ interface ToolApprovalContextType {
   // Approval actions
   handleApprovalRequest: (approval: PendingApproval) => void;
   handleApprovalResponse: (toolCallId: string) => void;
+  handleApprovalDecision: (toolCallId: string, decision: ApprovalDecision) => Promise<void>;
   clearApprovalRequest: () => void;
   refreshPendingApprovals: () => Promise<void>;
 }
@@ -87,6 +89,32 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
     setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
   }, []);
 
+  // Handle approval decision and submit to API
+  const handleApprovalDecision = useCallback(
+    async (toolCallId: string, decision: ApprovalDecision) => {
+      if (!agentId) return;
+
+      try {
+        const res = await fetch(`/api/threads/${agentId}/approvals/${toolCallId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        });
+
+        if (!res.ok) {
+          console.error('[TOOL_APPROVAL] Failed to submit approval decision');
+          return;
+        }
+
+        // Remove the approval from pending list after successful submission
+        handleApprovalResponse(toolCallId);
+      } catch (error) {
+        console.error('[TOOL_APPROVAL] Failed to submit approval decision:', error);
+      }
+    },
+    [agentId, handleApprovalResponse]
+  );
+
   // Clear all approval requests
   const clearApprovalRequest = useCallback(() => {
     setPendingApprovals([]);
@@ -110,6 +138,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
     // Approval actions
     handleApprovalRequest,
     handleApprovalResponse,
+    handleApprovalDecision,
     clearApprovalRequest,
     refreshPendingApprovals,
   };

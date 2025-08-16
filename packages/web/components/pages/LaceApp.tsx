@@ -139,7 +139,7 @@ const LaceAppInner = memo(function LaceAppInner() {
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
 
   // Use tool approvals from ToolApprovalProvider context
-  const { pendingApprovals } = useToolApprovalContext();
+  const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
 
   // Use event stream connection from EventStreamProvider context
   const { connection } = useEventStream();
@@ -191,24 +191,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     return await stopAgentAPI(selectedAgent as ThreadId);
   }, [selectedAgent, stopAgentAPI]);
 
-  // Handle tool approval decision
-  const handleApprovalDecision = async (toolCallId: string, decision: ApprovalDecision) => {
-    if (!selectedAgent) return;
-
-    try {
-      const res = await fetch(`/api/threads/${selectedAgent}/approvals/${toolCallId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision }),
-      });
-
-      if (!res.ok) {
-        console.error('Failed to submit approval decision');
-      }
-    } catch (error) {
-      console.error('Failed to submit approval decision:', error);
-    }
-  };
+  // Tool approval decisions are now handled by ToolApprovalProvider
 
   // Session creation function with configuration
   const handleSessionCreate = async (sessionData: {
@@ -318,12 +301,6 @@ const LaceAppInner = memo(function LaceAppInner() {
                   onSettingsClick={onOpenSettings}
                 >
                   <SidebarContent
-                    selectedProject={selectedProject}
-                    currentProject={currentProject}
-                    sessionsCount={sessions.length}
-                    selectedSession={selectedSession as ThreadId | null}
-                    selectedSessionDetails={selectedSessionDetails}
-                    selectedAgent={selectedAgent as ThreadId | null}
                     isMobile={true}
                     onCloseMobileNav={() => setShowMobileNav(false)}
                     onSwitchProject={handleSwitchProject}
@@ -347,12 +324,6 @@ const LaceAppInner = memo(function LaceAppInner() {
               onSettingsClick={onOpenSettings}
             >
               <SidebarContent
-                selectedProject={selectedProject}
-                currentProject={currentProject}
-                sessionsCount={sessions.length}
-                selectedSession={selectedSession as ThreadId | null}
-                selectedSessionDetails={selectedSessionDetails}
-                selectedAgent={selectedAgent as ThreadId | null}
                 isMobile={false}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
