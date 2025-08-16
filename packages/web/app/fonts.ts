@@ -1,20 +1,8 @@
-// ABOUTME: Font configuration using @fontsource packages for consistent loading
-// ABOUTME: All fonts use CSS imports in globals.css for reliable self-hosting
+// ABOUTME: Font configuration using @fontsource packages for local self-hosting
 
-// Configure local fonts using @fontsource packages (CSS-only, no Next.js font objects needed)
-// Fonts are loaded via CSS imports in globals.css
-export const lato = {
-  variable: '--font-lato',
-  className: '', // CSS-only, no specific className needed
-};
+// All fonts are loaded via CSS imports in globals.css
+// CSS variables are defined in globals.css for consistent font family access:
+// --font-lato, --font-dm-sans, --font-google-sans-code
 
-export const dmSans = {
-  variable: '--font-dm-sans',
-  className: '', // CSS-only, no specific className needed
-};
-
-// Configure Google Sans Code using @fontsource package for consistency
-export const googleSansCode = {
-  variable: '--font-google-sans-code',
-  className: '', // CSS-only, no specific className needed
-};
+// No font objects needed since we use pure CSS loading approach
+// Fonts are available via CSS variables in root element

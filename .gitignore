@@ -108,3 +108,6 @@ lace-*
 src/vfs/*-stub.ts
 src/vfs/lace-config.ts
 src/vfs/lace-database.ts
+
+# Build artifacts that get regenerated
+packages/web/server-dependencies.json

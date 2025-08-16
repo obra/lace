@@ -6,7 +6,7 @@ import '@/app/globals.css';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { ConsoleForwardScript } from '@/lib/console-forward/script';
-import { lato, dmSans, googleSansCode } from '@/app/fonts';
+// Fonts are loaded via CSS imports in globals.css
 
 export const metadata: Metadata = {
   title: 'Lace Web Terminal',
@@ -17,9 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head></head>
-      <body
-        className={`${dmSans.variable} ${lato.variable} ${googleSansCode.variable} antialiased`}
-      >
+      <body className="antialiased">
         <ConsoleForwardScript />
         <ErrorBoundary>
           <ThemeProvider>{children}</ThemeProvider>

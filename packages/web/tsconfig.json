@@ -43,6 +43,7 @@
   "exclude": [
     "node_modules",
     ".next",
-    "stories_parked"
+    "stories_parked",
+    "scripts/**"
   ]
 }
