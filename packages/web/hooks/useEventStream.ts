@@ -117,7 +117,7 @@ interface UseEventStreamOptions extends EventHandlers {
   reconnectInterval?: number;
 }
 
-interface UseEventStreamResult {
+export interface UseEventStreamResult {
   connection: StreamConnection;
   lastEvent?: LaceEvent;
   sendCount: number;

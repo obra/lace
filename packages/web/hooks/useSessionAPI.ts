@@ -188,3 +188,5 @@ export function useSessionAPI() {
     stopAgent,
   };
 }
+
+export type UseSessionAPIReturn = ReturnType<typeof useSessionAPI>;

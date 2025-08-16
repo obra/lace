@@ -34,12 +34,16 @@ import { ApprovalDecision } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
 import type { ToolApprovalRequestData } from '@/types/web-events';
-import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
-import { useSessionAPI } from '@/hooks/useSessionAPI';
-import { useEventStream } from '@/hooks/useEventStream';
 import { useModalState } from '@/hooks/useModalState';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
+import {
+  EventStreamProvider,
+  useSessionEvents,
+  useEventStream,
+  useSessionAPI,
+  useToolApprovals,
+} from '@/components/providers/EventStreamProvider';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
@@ -134,27 +138,19 @@ const LaceAppInner = memo(function LaceAppInner() {
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // Use session events hook for event management (without event stream)
-  const {
-    filteredEvents: events,
-    pendingApprovals,
-    loadingHistory,
-    clearApprovalRequest,
-    addSessionEvent,
-    handleApprovalRequest,
-    handleApprovalResponse,
-  } = useSessionEvents(selectedSession as ThreadId | null, selectedAgent as ThreadId | null, false); // Connection state will be passed to component that needs it
+  // Use session events from EventStreamProvider context
+  const { events, loadingHistory } = useSessionEvents();
 
-  // Use session API hook for all API calls (HTTP requests only, not streaming state)
+  // Use session API from EventStreamProvider context
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
 
-  // Handle agent state changes from event stream
-  const handleAgentStateChange = useCallback(
-    (agentId: string, from: string, to: string) => {
-      updateAgentState(agentId, from, to);
-    },
-    [updateAgentState]
-  );
+  // Use tool approvals from EventStreamProvider context
+  const { pendingApprovals, clearApprovalRequest, handleApprovalRequest, handleApprovalResponse } =
+    useToolApprovals();
+
+  // Use event stream connection from EventStreamProvider context
+  const { connection } = useEventStream();
+  const connected = connection.connected;
 
   // Get current agent's status from the updated session details
   const currentAgent =
@@ -168,37 +164,9 @@ const LaceAppInner = memo(function LaceAppInner() {
   // Task manager - only create when we have a project and session
   const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
 
-  // Single unified event stream connection with all event handlers
-  const { connection } = useEventStream({
-    projectId: selectedProject || undefined,
-    sessionId: selectedSession || undefined,
-    threadIds: selectedAgent ? [selectedAgent] : undefined,
-    onConnect: () => {
-      // Event stream connected - no logging needed for production
-    },
-    onError: (error) => {
-      console.error('Event stream error:', error);
-    },
-    // Session event handlers - wire to useSessionEvents
-    onUserMessage: addSessionEvent,
-    onAgentMessage: addSessionEvent,
-    onAgentToken: addSessionEvent,
-    onToolCall: addSessionEvent,
-    onToolResult: addSessionEvent,
-    onSystemMessage: addSessionEvent,
-    // Agent state change handler
-    onAgentStateChange: handleAgentStateChange,
-    // Approval handlers
-    onApprovalRequest: handleApprovalRequest,
-    onApprovalResponse: handleApprovalResponse,
-    // Task event handlers - wire to useTaskManager (only if available)
-    onTaskCreated: taskManager?.handleTaskCreated,
-    onTaskUpdated: taskManager?.handleTaskUpdated,
-    onTaskDeleted: taskManager?.handleTaskDeleted,
-    onTaskNoteAdded: taskManager?.handleTaskNoteAdded,
-  });
-
-  const connected = connection.connected;
+  // Task event handlers - wire to useTaskManager (only if available)
+  // Note: Task events are not handled by EventStreamProvider, so we keep the task manager integration separate
+  // TODO: Consider adding task event handling to EventStreamProvider if needed
 
   // Events are now LaceEvent[] directly
   // No conversion needed - components handle LaceEvent natively
@@ -1467,11 +1435,37 @@ const CompactTokenUsage = memo(function CompactTokenUsage({ agentId }: { agentId
   );
 });
 
-// Main LaceApp component that wraps LaceAppInner with AppStateProvider
+// Component that needs event stream context
+const LaceAppWithEventStream = memo(function LaceAppWithEventStream() {
+  const {
+    selections: { selectedProject, selectedSession, selectedAgent },
+    actions: { updateAgentState },
+  } = useAppState();
+
+  const handleAgentStateChange = useCallback(
+    (agentId: string, from: string, to: string) => {
+      updateAgentState(agentId, from, to);
+    },
+    [updateAgentState]
+  );
+
+  return (
+    <EventStreamProvider
+      projectId={selectedProject}
+      sessionId={selectedSession as ThreadId | null}
+      agentId={selectedAgent as ThreadId | null}
+      onAgentStateChange={handleAgentStateChange}
+    >
+      <LaceAppInner />
+    </EventStreamProvider>
+  );
+});
+
+// Main LaceApp component that wraps with both providers
 export default function LaceApp() {
   return (
     <AppStateProvider>
-      <LaceAppInner />
+      <LaceAppWithEventStream />
     </AppStateProvider>
   );
 }

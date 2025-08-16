@@ -1,0 +1,349 @@
+// ABOUTME: Integration tests for EventStreamProvider with real component usage
+// ABOUTME: Tests actual integration behavior and event flow coordination
+
+import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import {
+  EventStreamProvider,
+  useEventStream,
+  useSessionEvents,
+  useSessionAPI,
+  useToolApprovals,
+} from './EventStreamProvider';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import type { ThreadId } from '@/types/core';
+import type { LaceEvent } from '~/threads/types';
+
+// Mock all the hooks that EventStreamProvider depends on
+vi.mock('@/hooks/useSessionEvents');
+vi.mock('@/hooks/useEventStream');
+vi.mock('@/hooks/useSessionAPI');
+
+import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
+import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
+import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
+import type { PendingApproval } from '@/types/api';
+import type { StreamConnection } from '@/types/stream-events';
+
+// Test component that consumes event stream state without receiving it through props
+function TestEventStreamConsumer() {
+  const { connection } = useEventStream();
+  const { events, loadingHistory } = useSessionEvents();
+  const { sendMessage, stopAgent } = useSessionAPI();
+  const { pendingApprovals } = useToolApprovals();
+
+  return (
+    <div>
+      <div data-testid="is-connected">{connection.connected.toString()}</div>
+      <div data-testid="connection-id">{connection.lastEventId || 'none'}</div>
+      <div data-testid="events-count">{events.length}</div>
+      <div data-testid="loading-history">{loadingHistory.toString()}</div>
+      <div data-testid="approvals-count">{pendingApprovals.length}</div>
+      <button
+        data-testid="send-message-button"
+        onClick={() => sendMessage('test-agent' as ThreadId, 'Hello')}
+      >
+        Send Message
+      </button>
+      <button data-testid="stop-agent-button" onClick={() => stopAgent('test-agent' as ThreadId)}>
+        Stop Agent
+      </button>
+    </div>
+  );
+}
+
+// Test component that should fail without provider
+function TestComponentWithoutProvider() {
+  const { connection } = useEventStream();
+  return <div data-testid="connected">{connection.connected}</div>;
+}
+
+describe('EventStreamProvider Integration', () => {
+  const mockSendMessage = vi.fn();
+  const mockStopAgent = vi.fn();
+  const mockAddSessionEvent = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Setup default mock implementations
+    vi.mocked(useSessionEventsHook).mockReturnValue({
+      allEvents: [],
+      filteredEvents: [],
+      pendingApprovals: [],
+      loadingHistory: false,
+      connected: false,
+      clearApprovalRequest: vi.fn(),
+      addSessionEvent: mockAddSessionEvent,
+      handleApprovalRequest: vi.fn(),
+      handleApprovalResponse: vi.fn(),
+    });
+
+    vi.mocked(useEventStreamHook).mockReturnValue({
+      connection: {
+        connected: false,
+        reconnectAttempts: 0,
+        maxReconnectAttempts: 5,
+      } as StreamConnection,
+      lastEvent: undefined,
+      sendCount: 0,
+      close: vi.fn(),
+      reconnect: vi.fn(),
+    });
+
+    vi.mocked(useSessionAPIHook).mockReturnValue({
+      error: null,
+      createSession: vi.fn(),
+      getSession: vi.fn(),
+      spawnAgent: vi.fn(),
+      listAgents: vi.fn(),
+      sendMessage: mockSendMessage,
+      stopAgent: mockStopAgent,
+    });
+  });
+
+  it('provides event stream state to deeply nested components without prop drilling', () => {
+    const mockEvents: LaceEvent[] = [
+      {
+        id: 'event-1',
+        type: 'USER_MESSAGE',
+        timestamp: new Date(),
+        threadId: 'test-agent' as ThreadId,
+        data: 'Hello',
+      },
+      {
+        id: 'event-2',
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date(),
+        threadId: 'test-agent' as ThreadId,
+        data: { content: 'Hi there!' },
+      },
+    ];
+
+    const mockApprovals: PendingApproval[] = [
+      {
+        toolCallId: 'approval-1',
+        toolCall: {
+          name: 'test_tool',
+          arguments: {},
+        },
+        requestedAt: new Date(),
+        requestData: {
+          requestId: 'approval-1',
+          toolName: 'test_tool',
+          isReadOnly: false,
+          riskLevel: 'safe',
+          input: {},
+        },
+      },
+    ];
+
+    // Setup test data
+    vi.mocked(useEventStreamHook).mockReturnValue({
+      connection: {
+        connected: true,
+        lastEventId: 'conn-123',
+        reconnectAttempts: 0,
+        maxReconnectAttempts: 5,
+      } as StreamConnection,
+      lastEvent: undefined,
+      sendCount: 0,
+      close: vi.fn(),
+      reconnect: vi.fn(),
+    });
+
+    vi.mocked(useSessionEventsHook).mockReturnValue({
+      allEvents: mockEvents,
+      filteredEvents: mockEvents,
+      pendingApprovals: mockApprovals,
+      loadingHistory: true,
+      connected: true,
+      clearApprovalRequest: vi.fn(),
+      addSessionEvent: mockAddSessionEvent,
+      handleApprovalRequest: vi.fn(),
+      handleApprovalResponse: vi.fn(),
+    });
+
+    render(
+      <ThemeProvider>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'test-session' as ThreadId}
+          agentId={'test-agent' as ThreadId}
+        >
+          <div>
+            <div>
+              <div>
+                <TestEventStreamConsumer />
+              </div>
+            </div>
+          </div>
+        </EventStreamProvider>
+      </ThemeProvider>
+    );
+
+    // Verify state is accessible without prop drilling
+    expect(screen.getByTestId('is-connected')).toHaveTextContent('true');
+    expect(screen.getByTestId('connection-id')).toHaveTextContent('conn-123');
+    expect(screen.getByTestId('events-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('loading-history')).toHaveTextContent('true');
+    expect(screen.getByTestId('approvals-count')).toHaveTextContent('1');
+  });
+
+  it('allows API calls to be made from deeply nested components', async () => {
+    const userEvent = await import('@testing-library/user-event');
+    const user = userEvent.default.setup();
+
+    render(
+      <ThemeProvider>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'test-session' as ThreadId}
+          agentId={'test-agent' as ThreadId}
+        >
+          <div>
+            <div>
+              <div>
+                <TestEventStreamConsumer />
+              </div>
+            </div>
+          </div>
+        </EventStreamProvider>
+      </ThemeProvider>
+    );
+
+    // Test API calls work without prop drilling
+    await user.click(screen.getByTestId('send-message-button'));
+    expect(mockSendMessage).toHaveBeenCalledWith('test-agent', 'Hello');
+
+    await user.click(screen.getByTestId('stop-agent-button'));
+    expect(mockStopAgent).toHaveBeenCalledWith('test-agent');
+  });
+
+  it('throws error when used outside provider', () => {
+    // Suppress console.error for this test
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => {
+      render(
+        <ThemeProvider>
+          <TestComponentWithoutProvider />
+        </ThemeProvider>
+      );
+    }).toThrow('useEventStream must be used within EventStreamProvider');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('updates state when underlying hooks change', () => {
+    const { rerender } = render(
+      <ThemeProvider>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'test-session' as ThreadId}
+          agentId={'test-agent' as ThreadId}
+        >
+          <TestEventStreamConsumer />
+        </EventStreamProvider>
+      </ThemeProvider>
+    );
+
+    // Initially not connected
+    expect(screen.getByTestId('is-connected')).toHaveTextContent('false');
+
+    // Mock hook returns different value
+    vi.mocked(useEventStreamHook).mockReturnValue({
+      connection: {
+        connected: true,
+        lastEventId: 'new-conn',
+        reconnectAttempts: 0,
+        maxReconnectAttempts: 5,
+      } as StreamConnection,
+      lastEvent: undefined,
+      sendCount: 0,
+      close: vi.fn(),
+      reconnect: vi.fn(),
+    });
+
+    // Force re-render with new mock data
+    rerender(
+      <ThemeProvider>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'test-session' as ThreadId}
+          agentId={'test-agent' as ThreadId}
+        >
+          <TestEventStreamConsumer />
+        </EventStreamProvider>
+      </ThemeProvider>
+    );
+
+    // Should reflect updated state
+    expect(screen.getByTestId('is-connected')).toHaveTextContent('true');
+    expect(screen.getByTestId('connection-id')).toHaveTextContent('new-conn');
+  });
+
+  it('passes correct parameters to underlying hooks based on props', () => {
+    render(
+      <ThemeProvider>
+        <EventStreamProvider
+          projectId="my-project"
+          sessionId={'my-session' as ThreadId}
+          agentId={'my-agent' as ThreadId}
+        >
+          <TestEventStreamConsumer />
+        </EventStreamProvider>
+      </ThemeProvider>
+    );
+
+    // Verify hooks are called with correct parameters
+    expect(useSessionEventsHook).toHaveBeenCalledWith('my-session', 'my-agent', false);
+    expect(useEventStreamHook).toHaveBeenCalledWith({
+      projectId: 'my-project',
+      sessionId: 'my-session',
+      threadIds: ['my-agent'],
+      onConnect: expect.any(Function),
+      onError: expect.any(Function),
+      onUserMessage: expect.any(Function),
+      onAgentMessage: expect.any(Function),
+      onToolCall: expect.any(Function),
+      onToolResult: expect.any(Function),
+      onAgentStateChange: expect.any(Function),
+      onApprovalRequest: expect.any(Function),
+    });
+  });
+
+  it('handles null agentId gracefully', () => {
+    render(
+      <ThemeProvider>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'test-session' as ThreadId}
+          agentId={null}
+        >
+          <TestEventStreamConsumer />
+        </EventStreamProvider>
+      </ThemeProvider>
+    );
+
+    // Should still work with null agentId
+    expect(screen.getByTestId('is-connected')).toHaveTextContent('false');
+    expect(screen.getByTestId('events-count')).toHaveTextContent('0');
+
+    // Verify correct parameters passed
+    expect(useEventStreamHook).toHaveBeenCalledWith({
+      projectId: 'test-project',
+      sessionId: 'test-session',
+      threadIds: undefined,
+      onConnect: expect.any(Function),
+      onError: expect.any(Function),
+      onUserMessage: expect.any(Function),
+      onAgentMessage: expect.any(Function),
+      onToolCall: expect.any(Function),
+      onToolResult: expect.any(Function),
+      onAgentStateChange: expect.any(Function),
+      onApprovalRequest: expect.any(Function),
+    });
+  });
+});

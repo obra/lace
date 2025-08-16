@@ -8,7 +8,7 @@ import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
-interface UseSessionEventsReturn {
+export interface UseSessionEventsReturn {
   allEvents: LaceEvent[];
   filteredEvents: LaceEvent[];
   pendingApprovals: PendingApproval[];
