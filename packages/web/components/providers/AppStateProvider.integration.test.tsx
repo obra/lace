@@ -10,24 +10,19 @@ import type { ThreadId } from '@/types/core';
 
 // Mock all the hooks that AppStateProvider depends on
 vi.mock('@/hooks/useHashRouter');
-vi.mock('@/hooks/useSessionManagement');
 vi.mock('@/hooks/useAgentManagement');
 
 import { useHashRouter } from '@/hooks/useHashRouter';
-import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 
 // Test component that consumes app state without receiving it through props
 function TestConsumerComponent() {
-  const { selections, sessions, agents, actions } = useAppState();
+  const { selections, agents, actions } = useAppState();
 
   return (
     <div>
       <div data-testid="selected-project">{selections.selectedProject || 'none'}</div>
-      <div data-testid="selected-session">{selections.selectedSession || 'none'}</div>
       <div data-testid="selected-agent">{selections.selectedAgent || 'none'}</div>
-      <div data-testid="sessions-count">{sessions.sessions.length}</div>
-      <div data-testid="sessions-loading">{sessions.loading.toString()}</div>
       <div data-testid="agents-loading">{agents.loading.toString()}</div>
       <button
         data-testid="set-project-button"
@@ -65,15 +60,6 @@ describe('AppStateProvider Integration', () => {
       isHydrated: true,
     });
 
-    vi.mocked(useSessionManagement).mockReturnValue({
-      sessions: [],
-      loading: false,
-      projectConfig: null,
-      createSession: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
-    });
-
     vi.mocked(useAgentManagement).mockReturnValue({
       sessionDetails: null,
       loading: false,
@@ -96,22 +82,6 @@ describe('AppStateProvider Integration', () => {
       clearAll: vi.fn(),
       state: { project: 'test-project', session: 'test-session', agent: 'test-agent' },
       isHydrated: true,
-    });
-
-    vi.mocked(useSessionManagement).mockReturnValue({
-      sessions: [
-        {
-          id: 's1' as ThreadId,
-          name: 'Session 1',
-          createdAt: new Date(),
-          agents: [],
-        },
-      ],
-      loading: false,
-      projectConfig: null,
-      createSession: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
     });
 
     vi.mocked(useAgentManagement).mockReturnValue({
@@ -138,10 +108,7 @@ describe('AppStateProvider Integration', () => {
 
     // Verify state is accessible without prop drilling
     expect(screen.getByTestId('selected-project')).toHaveTextContent('test-project');
-    expect(screen.getByTestId('selected-session')).toHaveTextContent('test-session');
     expect(screen.getByTestId('selected-agent')).toHaveTextContent('test-agent');
-    expect(screen.getByTestId('sessions-count')).toHaveTextContent('1');
-    expect(screen.getByTestId('sessions-loading')).toHaveTextContent('false');
     expect(screen.getByTestId('agents-loading')).toHaveTextContent('true');
   });
 
@@ -169,7 +136,6 @@ describe('AppStateProvider Integration', () => {
   });
 
   it('throws error when useAppState is used outside provider', () => {
-    // Suppress console.error for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(() => {
@@ -179,6 +145,18 @@ describe('AppStateProvider Integration', () => {
         </ThemeProvider>
       );
     }).toThrow('useAppState must be used within AppStateProvider');
+
+    // Verify that React logged the error (error boundary behavior)
+    expect(consoleSpy).toHaveBeenCalled();
+    // Check that at least one call contains our error message
+    const calls = consoleSpy.mock.calls.flat();
+    expect(
+      calls.some(
+        (call) =>
+          typeof call === 'string' &&
+          call.includes('useAppState must be used within AppStateProvider')
+      )
+    ).toBe(true);
 
     consoleSpy.mockRestore();
   });
@@ -245,7 +223,6 @@ describe('AppStateProvider Integration', () => {
     );
 
     // Verify hooks are called with correct parameters
-    expect(useSessionManagement).toHaveBeenCalledWith('test-project');
     expect(useAgentManagement).toHaveBeenCalledWith('test-session');
   });
 });

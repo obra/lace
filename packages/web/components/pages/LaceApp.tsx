@@ -36,6 +36,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import {
   EventStreamProvider,
   useSessionEvents,
@@ -50,6 +51,7 @@ import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
+import { SessionProvider } from '@/components/providers/SessionProvider';
 import Link from 'next/link';
 
 // Inner component that uses app state context
@@ -60,19 +62,25 @@ const LaceAppInner = memo(function LaceAppInner() {
   // App state from context (replaces individual hook calls)
   const {
     selections: { selectedSession, selectedAgent, urlStateHydrated },
-    sessions: { sessions, loading: sessionLoading, projectConfig },
     agents: { sessionDetails: selectedSessionDetails, loading: agentLoading },
     actions: {
       setSelectedSession,
       setSelectedAgent,
       updateHashState,
-      createSession,
-      reloadSessions,
       createAgent,
       updateAgentState,
       reloadSessionDetails,
     },
   } = useAppState();
+
+  // Session state from SessionProvider
+  const {
+    sessions,
+    loading: sessionLoading,
+    projectConfig,
+    createSession,
+    reloadSessions,
+  } = useSessionContext();
 
   // Project state from ProjectProvider
   const {
@@ -550,20 +558,22 @@ const LaceAppContent = memo(function LaceAppContent() {
 
   return (
     <ProjectProvider onProjectChange={handleProjectChange}>
-      <EventStreamProvider
-        projectId={selectedProject}
-        sessionId={selectedSession as ThreadId | null}
-        agentId={selectedAgent as ThreadId | null}
-        onAgentStateChange={handleAgentStateChange}
-      >
-        <TaskProvider
+      <SessionProvider projectId={selectedProject}>
+        <EventStreamProvider
           projectId={selectedProject}
           sessionId={selectedSession as ThreadId | null}
-          agents={selectedSessionDetails?.agents}
+          agentId={selectedAgent as ThreadId | null}
+          onAgentStateChange={handleAgentStateChange}
         >
-          <LaceAppInner />
-        </TaskProvider>
-      </EventStreamProvider>
+          <TaskProvider
+            projectId={selectedProject}
+            sessionId={selectedSession as ThreadId | null}
+            agents={selectedSessionDetails?.agents}
+          >
+            <LaceAppInner />
+          </TaskProvider>
+        </EventStreamProvider>
+      </SessionProvider>
     </ProjectProvider>
   );
 });

@@ -8,7 +8,6 @@ import {
   AppStateProvider,
   useAppState,
   useAppSelections,
-  useAppSessions,
   useAppAgents,
   useAppActions,
 } from './AppStateProvider';
@@ -17,18 +16,13 @@ import type { ThreadId } from '@/types/core';
 
 // Mock all dependencies
 vi.mock('@/hooks/useHashRouter');
-vi.mock('@/hooks/useSessionManagement');
 vi.mock('@/hooks/useAgentManagement');
 
 // Import and type the mocked hooks
 import { useHashRouter } from '@/hooks/useHashRouter';
-import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 
 const mockUseHashRouter = useHashRouter as MockedFunction<typeof useHashRouter>;
-const mockUseSessionManagement = useSessionManagement as MockedFunction<
-  typeof useSessionManagement
->;
 const mockUseAgentManagement = useAgentManagement as MockedFunction<typeof useAgentManagement>;
 
 describe('AppStateProvider', () => {
@@ -51,15 +45,6 @@ describe('AppStateProvider', () => {
       isHydrated: true,
     });
 
-    mockUseSessionManagement.mockReturnValue({
-      sessions: [],
-      loading: false,
-      projectConfig: null,
-      createSession: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
-    });
-
     mockUseAgentManagement.mockReturnValue({
       sessionDetails: null,
       loading: false,
@@ -74,7 +59,6 @@ describe('AppStateProvider', () => {
 
     expect(result.current).toBeDefined();
     expect(result.current.selections).toBeDefined();
-    expect(result.current.sessions).toBeDefined();
     expect(result.current.agents).toBeDefined();
     expect(result.current.actions).toBeDefined();
   });
@@ -101,41 +85,6 @@ describe('AppStateProvider', () => {
     expect(result.current.selections.selectedSession).toBe('session-1');
     expect(result.current.selections.selectedAgent).toBe('agent-1');
     expect(result.current.selections.urlStateHydrated).toBe(true);
-  });
-
-  it('exposes session management state and actions', () => {
-    const mockSessionManagement = {
-      sessions: [
-        {
-          id: 's1' as ThreadId,
-          name: 'Session 1',
-          createdAt: new Date(),
-          agents: [],
-        },
-      ],
-      loading: false,
-      projectConfig: { theme: 'dark' },
-      createSession: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
-    };
-
-    mockUseSessionManagement.mockReturnValue(mockSessionManagement);
-
-    const { result } = renderHook(() => useAppState(), { wrapper });
-
-    expect(result.current.sessions.sessions).toEqual([
-      {
-        id: 's1',
-        name: 'Session 1',
-        createdAt: expect.any(Date),
-        agents: [],
-      },
-    ]);
-    expect(result.current.sessions.loading).toBe(false);
-    expect(result.current.sessions.projectConfig).toEqual({ theme: 'dark' });
-    expect(result.current.actions.createSession).toBe(mockSessionManagement.createSession);
-    expect(result.current.actions.reloadSessions).toBe(mockSessionManagement.reloadSessions);
   });
 
   it('exposes agent management state and actions', () => {
@@ -195,30 +144,25 @@ describe('AppStateProvider', () => {
   });
 
   it('throws error when useAppState is used outside provider', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     expect(() => {
       renderHook(() => useAppState());
     }).toThrow('useAppState must be used within AppStateProvider');
-  });
 
-  it('passes selected project to session management hook', () => {
-    const mockHashRouter = {
-      project: 'test-project',
-      session: null,
-      agent: null,
-      setProject: vi.fn(),
-      setSession: vi.fn(),
-      setAgent: vi.fn(),
-      updateState: vi.fn(),
-      clearAll: vi.fn(),
-      state: { project: 'test-project' },
-      isHydrated: true,
-    };
+    // Verify that React logged the error (error boundary behavior)
+    expect(consoleSpy).toHaveBeenCalled();
+    // Check that at least one call contains our error message
+    const calls = consoleSpy.mock.calls.flat();
+    expect(
+      calls.some(
+        (call) =>
+          typeof call === 'string' &&
+          call.includes('useAppState must be used within AppStateProvider')
+      )
+    ).toBe(true);
 
-    mockUseHashRouter.mockReturnValue(mockHashRouter);
-
-    renderHook(() => useAppState(), { wrapper });
-
-    expect(mockUseSessionManagement).toHaveBeenCalledWith('test-project');
+    consoleSpy.mockRestore();
   });
 
   it('passes selected session to agent management hook', () => {
@@ -267,32 +211,6 @@ describe('AppStateProvider', () => {
       expect(result.current.urlStateHydrated).toBe(true);
     });
 
-    it('useAppSessions returns only sessions', () => {
-      const mockSessions = [
-        {
-          id: 's1' as ThreadId,
-          name: 'Session 1',
-          createdAt: new Date(),
-          agents: [],
-        },
-      ];
-      const mockConfig = { theme: 'dark' };
-      mockUseSessionManagement.mockReturnValue({
-        sessions: mockSessions,
-        loading: false,
-        projectConfig: mockConfig,
-        createSession: vi.fn(),
-        loadProjectConfig: vi.fn(),
-        reloadSessions: vi.fn(),
-      });
-
-      const { result } = renderHook(() => useAppSessions(), { wrapper });
-
-      expect(result.current.sessions).toEqual(mockSessions);
-      expect(result.current.loading).toBe(false);
-      expect(result.current.projectConfig).toEqual(mockConfig);
-    });
-
     it('useAppAgents returns only agents', () => {
       const mockSessionDetails = {
         id: 'a1' as ThreadId,
@@ -328,11 +246,6 @@ describe('AppStateProvider', () => {
         isHydrated: true,
       };
 
-      const mockSessionActions = {
-        createSession: vi.fn(),
-        reloadSessions: vi.fn(),
-      };
-
       const mockAgentActions = {
         createAgent: vi.fn(),
         updateAgentState: vi.fn(),
@@ -340,13 +253,6 @@ describe('AppStateProvider', () => {
       };
 
       mockUseHashRouter.mockReturnValue(mockHashRouter);
-      mockUseSessionManagement.mockReturnValue({
-        sessions: [],
-        loading: false,
-        projectConfig: null,
-        loadProjectConfig: vi.fn(),
-        ...mockSessionActions,
-      });
       mockUseAgentManagement.mockReturnValue({
         sessionDetails: null,
         loading: false,
@@ -360,10 +266,6 @@ describe('AppStateProvider', () => {
       expect(result.current.setSelectedSession).toBe(mockHashRouter.setSession);
       expect(result.current.setSelectedAgent).toBe(mockHashRouter.setAgent);
       expect(result.current.updateHashState).toBe(mockHashRouter.updateState);
-
-      // Session actions
-      expect(result.current.createSession).toBe(mockSessionActions.createSession);
-      expect(result.current.reloadSessions).toBe(mockSessionActions.reloadSessions);
 
       // Agent actions
       expect(result.current.createAgent).toBe(mockAgentActions.createAgent);
