@@ -61,10 +61,11 @@ describe('TaskBoardModal', () => {
     );
 
     // Should render default column titles
-    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
     expect(screen.getByText('In Progress')).toBeInTheDocument();
     expect(screen.getByText('Blocked')).toBeInTheDocument();
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.getByText('Archived')).toBeInTheDocument();
   });
 
   it('should handle task status updates via drag and drop', async () => {
