@@ -22,31 +22,33 @@ describe('useProviders', () => {
   const mockProviders: ProviderInfo[] = [
     {
       instanceId: 'anthropic-1',
-      name: 'Anthropic Claude',
-      type: 'anthropic',
-      status: 'available',
+      name: 'anthropic',
+      displayName: 'Anthropic Claude',
+      requiresApiKey: true,
       models: [
         {
           id: 'claude-3-5-sonnet-20241022',
-          name: 'Claude 3.5 Sonnet',
-          contextLength: 200000,
-          pricing: { input: 0.003, output: 0.015 },
+          displayName: 'Claude 3.5 Sonnet',
+          contextWindow: 200000,
+          maxOutputTokens: 4096,
         },
       ],
+      configured: true,
     },
     {
       instanceId: 'openai-1',
-      name: 'OpenAI GPT',
-      type: 'openai',
-      status: 'available',
+      name: 'openai',
+      displayName: 'OpenAI GPT',
+      requiresApiKey: true,
       models: [
         {
           id: 'gpt-4',
-          name: 'GPT-4',
-          contextLength: 128000,
-          pricing: { input: 0.03, output: 0.06 },
+          displayName: 'GPT-4',
+          contextWindow: 128000,
+          maxOutputTokens: 4096,
         },
       ],
+      configured: true,
     },
   ];
 

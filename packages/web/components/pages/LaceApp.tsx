@@ -35,6 +35,7 @@ import type { ToolApprovalRequestData } from '@/types/web-events';
 import { useModalState } from '@/hooks/useModalState';
 import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 import {
   EventStreamProvider,
   useSessionEvents,
@@ -48,6 +49,7 @@ import { SessionSection } from '@/components/sidebar/SessionSection';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { TaskProvider } from '@/components/providers/TaskProvider';
+import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import Link from 'next/link';
 
 // Inner component that uses app state context
@@ -57,17 +59,13 @@ const LaceAppInner = memo(function LaceAppInner() {
 
   // App state from context (replaces individual hook calls)
   const {
-    selections: { selectedProject, selectedSession, selectedAgent, urlStateHydrated },
-    projects: { projects, loading: loadingProjects },
+    selections: { selectedSession, selectedAgent, urlStateHydrated },
     sessions: { sessions, loading: sessionLoading, projectConfig },
     agents: { sessionDetails: selectedSessionDetails, loading: agentLoading },
     actions: {
-      setSelectedProject,
       setSelectedSession,
       setSelectedAgent,
       updateHashState,
-      updateProject,
-      reloadProjects,
       createSession,
       reloadSessions,
       createAgent,
@@ -75,6 +73,19 @@ const LaceAppInner = memo(function LaceAppInner() {
       reloadSessionDetails,
     },
   } = useAppState();
+
+  // Project state from ProjectProvider
+  const {
+    projects,
+    loading: loadingProjects,
+    selectedProject,
+    currentProject,
+    projectsForSidebar,
+    onProjectSelect,
+    updateProject: updateProjectFromProvider,
+    reloadProjects,
+    foundProject,
+  } = useProjectContext();
 
   // UI State (from AnimatedLaceApp but remove demo data)
   const {
@@ -150,10 +161,10 @@ const LaceAppInner = memo(function LaceAppInner() {
     setShouldAutoSelectAgent(false);
   }, [selectedSession]);
 
-  // Handle project selection
+  // Handle project selection - now delegated to ProjectProvider
   const handleProjectSelect = (project: { id: string }) => {
-    // Hash router automatically clears session/agent when project changes
-    setSelectedProject(project.id);
+    // ProjectProvider handles the selection
+    onProjectSelect(project);
     // Enable auto-selection for this project selection
     setShouldAutoSelectAgent(true);
   };
@@ -223,7 +234,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     await reloadSessionDetails();
   };
 
-  // Handle project updates (archive/unarchive/edit)
+  // Handle project updates (archive/unarchive/edit) - now delegated to ProjectProvider
   const handleProjectUpdate = async (
     projectId: string,
     updates: {
@@ -234,7 +245,7 @@ const LaceAppInner = memo(function LaceAppInner() {
       configuration?: Record<string, unknown>;
     }
   ) => {
-    await updateProject(projectId, updates);
+    await updateProjectFromProvider(projectId, updates);
   };
 
   // Handle onboarding completion - navigate directly to chat
@@ -260,52 +271,12 @@ const LaceAppInner = memo(function LaceAppInner() {
     setShouldAutoSelectAgent(true);
   };
 
-  // Convert projects to format expected by Sidebar
-  // If selectedProject ID doesn't match any actual project, clear the selection
-  const foundProject = selectedProject
-    ? (projects || []).find((p) => p.id === selectedProject)
-    : null;
-  const currentProject = useMemo(
-    () =>
-      foundProject || {
-        id: '',
-        name: 'No project selected',
-        description: 'Select a project to get started',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-      },
-    [foundProject]
-  );
+  // Project data transformations are now handled by ProjectProvider
 
-  // Clear invalid project selection from URL
-  // useEffect(() => {
-  //   // Clear any project ID that doesn't match loaded projects after loading is complete
-  //   // This handles invalid URLs gracefully by falling back to project selection
-  //   if (selectedProject &&
-  //       !loadingProjects &&
-  //       projects.length > 0 &&
-  //       !foundProject) {
-  //     console.log('Clearing invalid project ID from URL:', selectedProject);
-  //     setSelectedProject(null, true); // Use replaceState to avoid polluting history
-  //   }
-  // }, [selectedProject, projects, foundProject, setSelectedProject, loadingProjects]);
-
-  const projectsForSidebar = useMemo(
-    () =>
-      projects.map((p) => ({
-        id: p.id,
-        name: p.name,
-        workingDirectory: p.workingDirectory,
-        description: p.description,
-        isArchived: p.isArchived || false,
-        createdAt: new Date(p.createdAt),
-        lastUsedAt: new Date(p.lastUsedAt),
-        sessionCount: p.sessionCount || 0,
-      })),
-    [projects]
-  );
+  // Handle switching projects (clear current selection)
+  const handleSwitchProject = useCallback(() => {
+    onProjectSelect({ id: '' }); // Empty string will be handled as null by ProjectProvider
+  }, [onProjectSelect]);
 
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
@@ -348,7 +319,7 @@ const LaceAppInner = memo(function LaceAppInner() {
                     selectedAgent={selectedAgent as ThreadId | null}
                     isMobile={true}
                     onCloseMobileNav={() => setShowMobileNav(false)}
-                    onSwitchProject={() => setSelectedProject(null)}
+                    onSwitchProject={handleSwitchProject}
                     onAgentSelect={handleAgentSelect}
                     onClearAgent={() => setSelectedAgent(null)}
                   />
@@ -376,7 +347,7 @@ const LaceAppInner = memo(function LaceAppInner() {
                 selectedSessionDetails={selectedSessionDetails}
                 selectedAgent={selectedAgent as ThreadId | null}
                 isMobile={false}
-                onSwitchProject={() => setSelectedProject(null)}
+                onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
                 onClearAgent={() => setSelectedAgent(null)}
               />
@@ -532,10 +503,17 @@ const LaceAppInner = memo(function LaceAppInner() {
   );
 });
 
-// Memoized chat input component to prevent parent re-renders
+// Main LaceApp component with integrated provider hierarchy
+export default function LaceApp() {
+  return (
+    <AppStateProvider>
+      <LaceAppContent />
+    </AppStateProvider>
+  );
+}
 
-// Component that needs event stream context
-const LaceAppWithEventStream = memo(function LaceAppWithEventStream() {
+// Main app content with all providers integrated
+const LaceAppContent = memo(function LaceAppContent() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
     agents: { sessionDetails: selectedSessionDetails },
@@ -549,29 +527,28 @@ const LaceAppWithEventStream = memo(function LaceAppWithEventStream() {
     [updateAgentState]
   );
 
+  const handleProjectChange = useCallback((projectId: string | null) => {
+    // Enable auto-selection for project changes
+    // This matches the current LaceApp behavior
+    // TODO: Move this logic to AgentProvider when we create it
+  }, []);
+
   return (
-    <EventStreamProvider
-      projectId={selectedProject}
-      sessionId={selectedSession as ThreadId | null}
-      agentId={selectedAgent as ThreadId | null}
-      onAgentStateChange={handleAgentStateChange}
-    >
-      <TaskProvider
+    <ProjectProvider onProjectChange={handleProjectChange}>
+      <EventStreamProvider
         projectId={selectedProject}
         sessionId={selectedSession as ThreadId | null}
-        agents={selectedSessionDetails?.agents}
+        agentId={selectedAgent as ThreadId | null}
+        onAgentStateChange={handleAgentStateChange}
       >
-        <LaceAppInner />
-      </TaskProvider>
-    </EventStreamProvider>
+        <TaskProvider
+          projectId={selectedProject}
+          sessionId={selectedSession as ThreadId | null}
+          agents={selectedSessionDetails?.agents}
+        >
+          <LaceAppInner />
+        </TaskProvider>
+      </EventStreamProvider>
+    </ProjectProvider>
   );
 });
-
-// Main LaceApp component that wraps with both providers
-export default function LaceApp() {
-  return (
-    <AppStateProvider>
-      <LaceAppWithEventStream />
-    </AppStateProvider>
-  );
-}
