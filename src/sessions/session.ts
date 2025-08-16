@@ -1197,7 +1197,6 @@ Use your task_add_note tool to record important notes as you work and your task_
     isCoordinator?: boolean;
   }): Agent {
     const {
-      sessionData,
       providerInstance,
       toolExecutor,
       threadManager,
@@ -1207,10 +1206,8 @@ Use your task_add_note tool to record important notes as you work and your task_
       isCoordinator = false,
     } = params;
 
-    // Use appropriate name - session name for coordinator, or thread-based name for delegates
-    const agentName = isCoordinator
-      ? sessionData.name || 'Lace'
-      : `Agent-${threadId.split('.').pop()}`;
+    // Use appropriate name - always "Lace" for coordinator, or thread-based name for delegates
+    const agentName = isCoordinator ? 'Lace' : `Agent-${threadId.split('.').pop()}`;
 
     return new Agent({
       provider: providerInstance,

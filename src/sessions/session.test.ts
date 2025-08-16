@@ -364,7 +364,7 @@ describe('Session', () => {
       expect(agents[0]).toEqual(
         expect.objectContaining({
           threadId: session.getId(),
-          name: 'Lace', // Coordinator agent is always named "Lace"
+          name: 'Lace', // Coordinator agent defaults to "Lace" when no session name provided
           providerInstanceId: expect.any(String) as string,
           modelId: 'claude-3-5-haiku-20241022',
           status: expect.any(String) as string,
@@ -535,11 +535,11 @@ describe('Session', () => {
 
       session.destroy();
 
-      // After destroy, spawned agents should be removed but coordinator remains
+      // After destroy, all agents should be removed (including coordinator)
       const agentsAfter = session.getAgents();
       expect(agentsAfter.some((a) => a.threadId === asThreadId(agent1.threadId))).toBe(false);
       expect(agentsAfter.some((a) => a.threadId === asThreadId(agent2.threadId))).toBe(false);
-      expect(agentsAfter.some((a) => a.threadId === session.getId())).toBe(true); // Coordinator remains
+      expect(agentsAfter.some((a) => a.threadId === session.getId())).toBe(false); // Coordinator also removed
     });
   });
 
