@@ -132,6 +132,29 @@ afterAll(() => {
   }
 });
 
+// Mock console methods to prevent test noise
+// Save original console methods
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn,
+  info: console.info,
+};
+
+// Set up global console mocking
+vi.spyOn(console, 'log').mockImplementation(() => {});
+vi.spyOn(console, 'error').mockImplementation(() => {});
+vi.spyOn(console, 'warn').mockImplementation(() => {});
+vi.spyOn(console, 'info').mockImplementation(() => {});
+
+// Helper to restore console for debugging if needed
+globalThis.restoreConsole = () => {
+  console.log = originalConsole.log;
+  console.error = originalConsole.error;
+  console.warn = originalConsole.warn;
+  console.info = originalConsole.info;
+};
+
 // Cleanup after each individual test
 afterEach(() => {
   // Reset all vitest mocks and timers

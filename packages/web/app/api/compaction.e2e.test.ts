@@ -88,6 +88,11 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   };
 
   beforeEach(async () => {
+    // Suppress console output during tests
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     // Reset MSW handlers
     server.resetHandlers();
     streamedEvents = [];
@@ -157,6 +162,9 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   });
 
   afterEach(async () => {
+    // Restore console and other mocks
+    vi.restoreAllMocks();
+
     // Restore original broadcast
     if (originalBroadcast) {
       EventStreamManager.getInstance().broadcast = originalBroadcast;
@@ -228,12 +236,12 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
         let outputTokens = 50;
 
         if (messageCount <= 3) {
-          responseText = `Response ${messageCount}: This is a test response that simulates conversation.`;
+          responseText = `Test response ${messageCount}`;
           inputTokens = 30000 * messageCount; // Build up token usage
           outputTokens = 5000;
         } else if (messageCount === 4 && !shouldTriggerCompaction) {
           shouldTriggerCompaction = true;
-          responseText = 'This response pushes us close to the token limit.';
+          responseText = 'High token response.';
           inputTokens = 160000; // Trigger compaction at 80% of 200000 (claude-3-5-sonnet context window)
           outputTokens = 5000;
         } else if (
@@ -252,7 +260,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
           inputTokens = 500;
           outputTokens = 100;
         } else {
-          responseText = 'Continuing after compaction with reduced context.';
+          responseText = 'Post-compaction response.';
           inputTokens = 1000;
           outputTokens = 50;
         }
@@ -505,7 +513,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
         }
 
         // Regular response
-        const text = 'Regular response to build some context.';
+        const text = 'Test context response.';
         if (isStreaming) {
           return createTestStreamResponse(text, 500, 50);
         } else {
@@ -633,7 +641,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
         const usage = tokenUsages[requestIndex] || { input: 100, output: 50 };
         requestIndex++;
 
-        const text = `Response ${requestIndex} with tracked tokens.`;
+        const text = `Token test ${requestIndex}.`;
 
         if (isStreaming) {
           return createTokenTrackingStreamResponse(text, usage);
