@@ -8,56 +8,50 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTasks } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import { useTaskManager } from '@/hooks/useTaskManager';
+import { useTaskContext } from '@/components/providers/TaskProvider';
 import type { SessionInfo, ThreadId, Task } from '@/types/core';
 
-type TaskManager = ReturnType<typeof useTaskManager>;
-
 interface TaskSidebarSectionProps {
-  taskManager: TaskManager | null;
   selectedProject: string | null;
   selectedSession: ThreadId | null;
   selectedSessionDetails: SessionInfo | null;
-  onShowTaskBoard: () => void;
-  onShowTaskCreation: () => void;
   onCloseMobileNav?: () => void;
 }
 
 export const TaskSidebarSection = memo(function TaskSidebarSection({
-  taskManager,
   selectedProject,
   selectedSession,
   selectedSessionDetails,
-  onShowTaskBoard,
-  onShowTaskCreation,
   onCloseMobileNav,
 }: TaskSidebarSectionProps) {
+  const { taskManager, showTaskBoard, showTaskCreation, handleTaskDisplay } = useTaskContext();
+
   if (!selectedSessionDetails || !selectedProject || !selectedSession || !taskManager) {
     return null;
   }
 
   const handleTaskBoardClick = () => {
-    onShowTaskBoard();
+    showTaskBoard();
     onCloseMobileNav?.();
   };
 
   const handleTaskCreationClick = () => {
-    onShowTaskCreation();
+    showTaskCreation();
     onCloseMobileNav?.();
   };
 
-  const handleTaskClick = (taskId: string) => {
-    // For now, just close mobile nav - could open task detail modal in future
+  const handleTaskClick = (task: Task) => {
+    handleTaskDisplay(task);
     onCloseMobileNav?.();
   };
 
   const handleOpenTaskBoard = () => {
-    onShowTaskBoard();
+    showTaskBoard();
     onCloseMobileNav?.();
   };
 
   const handleCreateTask = () => {
-    onShowTaskCreation();
+    showTaskCreation();
     onCloseMobileNav?.();
   };
 
@@ -108,7 +102,6 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
       {/* Task List */}
       <TaskListSidebar
         taskManager={taskManager}
-        onTaskClick={handleTaskClick}
         onOpenTaskBoard={handleOpenTaskBoard}
         onCreateTask={handleCreateTask}
       />

@@ -73,25 +73,11 @@ vi.mock('@/components/sidebar/SessionSection', () => ({
 }));
 
 vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
-  TaskSidebarSection: ({
-    taskManager,
-    onShowTaskBoard,
-    onShowTaskCreation,
-    onCloseMobileNav,
-  }: {
-    taskManager: { tasks: unknown[] } | null;
-    onShowTaskBoard: () => void;
-    onShowTaskCreation: () => void;
-    onCloseMobileNav?: () => void;
-  }) => (
+  TaskSidebarSection: ({ onCloseMobileNav }: { onCloseMobileNav?: () => void }) => (
     <div data-testid="task-section">
-      <div data-testid="task-count">{taskManager?.tasks?.length || 0}</div>
-      <button onClick={onShowTaskBoard} data-testid="show-task-board">
-        Show Board
-      </button>
-      <button onClick={onShowTaskCreation} data-testid="show-task-creation">
-        Create Task
-      </button>
+      <div data-testid="task-count">0</div>
+      <button data-testid="show-task-board">Show Board</button>
+      <button data-testid="show-task-creation">Create Task</button>
       {onCloseMobileNav && (
         <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-task">
           Close
@@ -130,6 +116,7 @@ const createMockTask = (id: string): Task => ({
   id,
   title: `Task ${id}`,
   description: 'Test task description',
+  prompt: 'Test task prompt',
   status: 'pending',
   priority: 'medium',
   threadId: 'test-session' as ThreadId,
@@ -156,8 +143,6 @@ describe('SidebarContent', () => {
     onSwitchProject: vi.fn(),
     onAgentSelect: vi.fn(),
     onClearAgent: vi.fn(),
-    onShowTaskBoard: vi.fn(),
-    onShowTaskCreation: vi.fn(),
     onCloseMobileNav: vi.fn(),
   };
 
@@ -168,7 +153,6 @@ describe('SidebarContent', () => {
     selectedSession: 'test-session' as ThreadId,
     selectedSessionDetails: createMockSessionDetails(),
     selectedAgent: 'agent-1' as ThreadId,
-    taskManager: createMockTaskManager(),
     ...mockHandlers,
   };
 
@@ -300,22 +284,6 @@ describe('SidebarContent', () => {
       expect(mockHandlers.onClearAgent).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onShowTaskBoard when TaskSidebarSection triggers it', () => {
-      render(<SidebarContent {...defaultProps} />);
-
-      screen.getByTestId('show-task-board').click();
-
-      expect(mockHandlers.onShowTaskBoard).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onShowTaskCreation when TaskSidebarSection triggers it', () => {
-      render(<SidebarContent {...defaultProps} />);
-
-      screen.getByTestId('show-task-creation').click();
-
-      expect(mockHandlers.onShowTaskCreation).toHaveBeenCalledTimes(1);
-    });
-
     it('calls onCloseMobileNav from all sections in mobile mode', () => {
       render(<SidebarContent {...defaultProps} isMobile={true} />);
 
@@ -358,12 +326,9 @@ describe('SidebarContent', () => {
         selectedSession: null,
         selectedSessionDetails: null,
         selectedAgent: null,
-        taskManager: null,
         onSwitchProject: vi.fn(),
         onAgentSelect: vi.fn(),
         onClearAgent: vi.fn(),
-        onShowTaskBoard: vi.fn(),
-        onShowTaskCreation: vi.fn(),
       };
 
       render(<SidebarContent {...minimalProps} />);

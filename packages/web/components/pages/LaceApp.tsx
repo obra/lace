@@ -15,9 +15,6 @@ import { TokenUsageSection } from '@/components/ui/TokenUsageSection';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
 import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
-import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
-import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -35,7 +32,6 @@ import { ApprovalDecision } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
 import type { ToolApprovalRequestData } from '@/types/web-events';
-import { useTaskManager } from '@/hooks/useTaskManager';
 import { useModalState } from '@/hooks/useModalState';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import {
@@ -50,7 +46,7 @@ import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { useTaskHandlers } from '@/hooks/useTaskHandlers';
+import { TaskProvider } from '@/components/providers/TaskProvider';
 import Link from 'next/link';
 
 // Inner component that uses app state context
@@ -85,14 +81,6 @@ const LaceAppInner = memo(function LaceAppInner() {
     setShowMobileNav,
     showDesktopSidebar,
     setShowDesktopSidebar,
-    showTaskBoard,
-    setShowTaskBoard,
-    showTaskCreation,
-    setShowTaskCreation,
-    showTaskDisplay,
-    setShowTaskDisplay,
-    selectedTaskForDisplay,
-    setSelectedTaskForDisplay,
     autoOpenCreateProject,
     setAutoOpenCreateProject,
   } = useModalState();
@@ -122,13 +110,6 @@ const LaceAppInner = memo(function LaceAppInner() {
     currentAgent?.status === 'thinking' ||
     currentAgent?.status === 'streaming' ||
     currentAgent?.status === 'tool_execution';
-
-  // Task manager - only create when we have a project and session
-  const taskManager = useTaskManager(selectedProject || '', selectedSession || '');
-
-  // Task event handlers - wire to useTaskManager (only if available)
-  // Note: Task events are not handled by EventStreamProvider, so we keep the task manager integration separate
-  // TODO: Consider adding task event handling to EventStreamProvider if needed
 
   // Events are now LaceEvent[] directly
   // No conversion needed - components handle LaceEvent natively
@@ -305,21 +286,6 @@ const LaceAppInner = memo(function LaceAppInner() {
     setShouldAutoSelectAgent(true);
   };
 
-  // Task handlers from custom hook
-  const {
-    handleTaskUpdate,
-    handleTaskCreate,
-    handleTaskCreateFromModal,
-    handleTaskDisplay,
-    handleTaskUpdateFromModal,
-    handleTaskAddNote,
-  } = useTaskHandlers({
-    taskManager,
-    onSetShowTaskCreation: setShowTaskCreation,
-    onSetShowTaskDisplay: setShowTaskDisplay,
-    onSetSelectedTaskForDisplay: setSelectedTaskForDisplay,
-  });
-
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
   const foundProject = selectedProject
@@ -406,14 +372,11 @@ const LaceAppInner = memo(function LaceAppInner() {
                     selectedSession={selectedSession as ThreadId | null}
                     selectedSessionDetails={selectedSessionDetails}
                     selectedAgent={selectedAgent as ThreadId | null}
-                    taskManager={taskManager}
                     isMobile={true}
                     onCloseMobileNav={() => setShowMobileNav(false)}
                     onSwitchProject={() => setSelectedProject(null)}
                     onAgentSelect={handleAgentSelect}
                     onClearAgent={() => setSelectedAgent(null)}
-                    onShowTaskBoard={() => setShowTaskBoard(true)}
-                    onShowTaskCreation={() => setShowTaskCreation(true)}
                   />
                 </MobileSidebar>
               )}
@@ -438,13 +401,10 @@ const LaceAppInner = memo(function LaceAppInner() {
                 selectedSession={selectedSession as ThreadId | null}
                 selectedSessionDetails={selectedSessionDetails}
                 selectedAgent={selectedAgent as ThreadId | null}
-                taskManager={taskManager}
                 isMobile={false}
                 onSwitchProject={() => setSelectedProject(null)}
                 onAgentSelect={handleAgentSelect}
                 onClearAgent={() => setSelectedAgent(null)}
-                onShowTaskBoard={() => setShowTaskBoard(true)}
-                onShowTaskCreation={() => setShowTaskCreation(true)}
               />
             </Sidebar>
           )}
@@ -594,45 +554,6 @@ const LaceAppInner = memo(function LaceAppInner() {
       {pendingApprovals && pendingApprovals.length > 0 && (
         <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
       )}
-
-      {/* Task Board Modal */}
-      {showTaskBoard && selectedProject && selectedSession && taskManager && (
-        <TaskBoardModal
-          isOpen={showTaskBoard}
-          onClose={() => setShowTaskBoard(false)}
-          tasks={taskManager.tasks}
-          onTaskUpdate={handleTaskUpdate}
-          onTaskCreate={handleTaskCreate}
-          onTaskClick={handleTaskDisplay}
-        />
-      )}
-
-      {/* Task Creation Modal */}
-      {showTaskCreation && selectedProject && selectedSession && (
-        <TaskCreationModal
-          isOpen={showTaskCreation}
-          onClose={() => setShowTaskCreation(false)}
-          onCreateTask={handleTaskCreateFromModal}
-          agents={selectedSessionDetails?.agents || []}
-          loading={taskManager?.isCreating || false}
-        />
-      )}
-
-      {/* Task Display Modal */}
-      {showTaskDisplay && selectedTaskForDisplay && (
-        <TaskDisplayModal
-          isOpen={showTaskDisplay}
-          onClose={() => {
-            setShowTaskDisplay(false);
-            setSelectedTaskForDisplay(null);
-          }}
-          task={selectedTaskForDisplay}
-          onUpdateTask={handleTaskUpdateFromModal}
-          onAddNote={handleTaskAddNote}
-          agents={selectedSessionDetails?.agents || []}
-          loading={taskManager?.isUpdating || false}
-        />
-      )}
     </motion.div>
   );
 });
@@ -643,6 +564,7 @@ const LaceAppInner = memo(function LaceAppInner() {
 const LaceAppWithEventStream = memo(function LaceAppWithEventStream() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
+    agents: { sessionDetails: selectedSessionDetails },
     actions: { updateAgentState },
   } = useAppState();
 
@@ -660,7 +582,13 @@ const LaceAppWithEventStream = memo(function LaceAppWithEventStream() {
       agentId={selectedAgent as ThreadId | null}
       onAgentStateChange={handleAgentStateChange}
     >
-      <LaceAppInner />
+      <TaskProvider
+        projectId={selectedProject}
+        sessionId={selectedSession as ThreadId | null}
+        agents={selectedSessionDetails?.agents}
+      >
+        <LaceAppInner />
+      </TaskProvider>
     </EventStreamProvider>
   );
 });

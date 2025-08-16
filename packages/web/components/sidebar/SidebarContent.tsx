@@ -8,9 +8,6 @@ import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import type { SessionInfo, ThreadId } from '@/types/core';
-import { useTaskManager } from '@/hooks/useTaskManager';
-
-type TaskManager = ReturnType<typeof useTaskManager>;
 
 interface Project {
   id: string;
@@ -29,9 +26,6 @@ interface SidebarContentProps {
   selectedSessionDetails: SessionInfo | null;
   selectedAgent: ThreadId | null;
 
-  // Task management
-  taskManager: TaskManager | null;
-
   // Mobile behavior
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
@@ -40,8 +34,6 @@ interface SidebarContentProps {
   onSwitchProject: () => void;
   onAgentSelect: (agentId: string) => void;
   onClearAgent: () => void;
-  onShowTaskBoard: () => void;
-  onShowTaskCreation: () => void;
 }
 
 export const SidebarContent = memo(function SidebarContent({
@@ -51,14 +43,11 @@ export const SidebarContent = memo(function SidebarContent({
   selectedSession,
   selectedSessionDetails,
   selectedAgent,
-  taskManager,
   isMobile = false,
   onCloseMobileNav,
   onSwitchProject,
   onAgentSelect,
   onClearAgent,
-  onShowTaskBoard,
-  onShowTaskCreation,
 }: SidebarContentProps) {
   return (
     <>
@@ -88,12 +77,9 @@ export const SidebarContent = memo(function SidebarContent({
 
       {/* TASK MANAGEMENT */}
       <TaskSidebarSection
-        taskManager={taskManager}
         selectedProject={selectedProject}
         selectedSession={selectedSession}
         selectedSessionDetails={selectedSessionDetails}
-        onShowTaskBoard={onShowTaskBoard}
-        onShowTaskCreation={onShowTaskCreation}
         onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
       />
     </>
