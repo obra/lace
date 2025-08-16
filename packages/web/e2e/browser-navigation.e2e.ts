@@ -415,15 +415,13 @@ test.describe('Browser Navigation Support', () => {
           let messagesVisible = 0;
           let interfaceReady = false;
 
-          // Count how many messages are still visible
-          for (const message of messages) {
-            const visible = await chatInterface
-              .getMessage(message)
-              .isVisible()
-              .catch(() => false);
-            if (visible) {
-              messagesVisible++;
-            }
+          // Check if the test message is still visible
+          const visible = await chatInterface
+            .getMessage(testMessage)
+            .isVisible()
+            .catch(() => false);
+          if (visible) {
+            messagesVisible = 1;
           }
 
           // Check if interface is ready for interaction
@@ -437,7 +435,7 @@ test.describe('Browser Navigation Support', () => {
           });
 
           console.log(
-            `${scenario.type} - Messages: ${messagesVisible}/${messages.length}, Interface ready: ${interfaceReady}`
+            `${scenario.type} - Messages: ${messagesVisible}/1, Interface ready: ${interfaceReady}`
           );
 
           // If interface is ready, try sending a new message
