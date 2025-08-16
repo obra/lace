@@ -9,22 +9,22 @@ import { faPlus, faTasks } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { useTaskContext } from '@/components/providers/TaskProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
 import type { SessionInfo, ThreadId, Task } from '@/types/core';
 
 interface TaskSidebarSectionProps {
-  selectedProject: string | null;
-  selectedSession: ThreadId | null;
-  selectedSessionDetails: SessionInfo | null;
   onCloseMobileNav?: () => void;
 }
 
 export const TaskSidebarSection = memo(function TaskSidebarSection({
-  selectedProject,
-  selectedSession,
-  selectedSessionDetails,
   onCloseMobileNav,
 }: TaskSidebarSectionProps) {
   const { taskManager, showTaskBoard, showTaskCreation, handleTaskDisplay } = useTaskContext();
+  const { selectedProject } = useProjectContext();
+  const { selectedSession } = useSessionContext();
+  const { sessionDetails: selectedSessionDetails } = useAgentContext();
 
   if (!selectedSessionDetails || !selectedProject || !selectedSession || !taskManager) {
     return null;

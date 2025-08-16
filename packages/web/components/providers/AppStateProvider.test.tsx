@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { AppStateProvider, useAppState, useAppSelections, useAppActions } from './AppStateProvider';
+import { AppStateProvider, useAppState, useAppActions } from './AppStateProvider';
 import type { ReactNode } from 'react';
 import type { ThreadId } from '@/types/core';
 
@@ -117,30 +117,6 @@ describe('AppStateProvider', () => {
   });
 
   describe('convenience hooks', () => {
-    it('useAppSelections returns only selections', () => {
-      const mockHashRouter = {
-        project: 'project-1',
-        session: 'session-1' as ThreadId,
-        agent: 'agent-1' as ThreadId,
-        setProject: vi.fn(),
-        setSession: vi.fn(),
-        setAgent: vi.fn(),
-        updateState: vi.fn(),
-        clearAll: vi.fn(),
-        state: { project: 'project-1', session: 'session-1', agent: 'agent-1' },
-        isHydrated: true,
-      };
-
-      mockUseHashRouter.mockReturnValue(mockHashRouter);
-
-      const { result } = renderHook(() => useAppSelections(), { wrapper });
-
-      expect(result.current.selectedProject).toBe('project-1');
-      expect(result.current.selectedSession).toBe('session-1');
-      expect(result.current.selectedAgent).toBe('agent-1');
-      expect(result.current.urlStateHydrated).toBe(true);
-    });
-
     it('useAppActions returns only actions', () => {
       const mockHashRouter = {
         project: null,

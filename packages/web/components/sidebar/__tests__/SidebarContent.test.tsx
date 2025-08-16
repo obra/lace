@@ -25,10 +25,6 @@ vi.mock('@/components/providers/AgentProvider', () => ({
   useAgentContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/AppStateProvider', () => ({
-  useAppSelections: vi.fn(),
-}));
-
 // Mock the child components to verify they receive correct props
 vi.mock('@/components/sidebar/ProjectSection', () => ({
   ProjectSection: ({
@@ -84,23 +80,11 @@ vi.mock('@/components/sidebar/SessionSection', () => ({
 }));
 
 vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
-  TaskSidebarSection: ({
-    selectedProject,
-    selectedSession,
-    selectedSessionDetails,
-    onCloseMobileNav,
-  }: {
-    selectedProject: string | null;
-    selectedSession: ThreadId | null;
-    selectedSessionDetails: SessionInfo | null;
-    onCloseMobileNav?: () => void;
-  }) => (
+  TaskSidebarSection: ({ onCloseMobileNav }: { onCloseMobileNav?: () => void }) => (
     <div data-testid="task-section">
-      <div data-testid="task-project">{selectedProject || 'no-project'}</div>
-      <div data-testid="task-session">{selectedSession || 'no-session'}</div>
-      <div data-testid="task-session-name">
-        {selectedSessionDetails?.name || 'no-session-details'}
-      </div>
+      <div data-testid="task-project">test-project</div>
+      <div data-testid="task-session">test-session</div>
+      <div data-testid="task-session-name">Test Session</div>
       {onCloseMobileNav && (
         <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-task">
           Close
@@ -114,12 +98,10 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import { useAppSelections } from '@/components/providers/AppStateProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
-const mockUseAppSelections = vi.mocked(useAppSelections);
 
 // Test data factories
 const createMockProject = (): ProjectInfo => ({
@@ -194,7 +176,7 @@ describe('SidebarContent', () => {
       loading: false,
       projectConfig: null,
       createSession: vi.fn(),
-      selectedSession: null,
+      selectedSession: 'test-session',
       foundSession: null,
       selectSession: vi.fn(),
       onSessionSelect: vi.fn(),
@@ -215,13 +197,6 @@ describe('SidebarContent', () => {
       reloadSessionDetails: vi.fn(),
       currentAgent: null,
       agentBusy: false,
-    });
-
-    mockUseAppSelections.mockReturnValue({
-      selectedProject: 'test-project',
-      selectedSession: 'test-session',
-      selectedAgent: 'agent-1',
-      urlStateHydrated: true,
     });
   });
 
@@ -409,13 +384,6 @@ describe('SidebarContent', () => {
 
       expect(mockUseAgentContext).toHaveBeenCalled();
       expect(screen.getByTestId('session-section')).toBeInTheDocument();
-    });
-
-    it('uses AppSelections for URL state', () => {
-      render(<SidebarContent {...defaultProps} />);
-
-      expect(mockUseAppSelections).toHaveBeenCalled();
-      expect(screen.getByTestId('task-session')).toHaveTextContent('test-session');
     });
   });
 

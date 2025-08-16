@@ -10,7 +10,6 @@ import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import { useAppSelections } from '@/components/providers/AppStateProvider';
 import type { ThreadId } from '@/types/core';
 
 interface SidebarContentProps {
@@ -33,7 +32,6 @@ export const SidebarContent = memo(function SidebarContent({
 }: SidebarContentProps) {
   // Get state from providers
   const { selectedProject } = useProjectContext();
-  const { selectedSession } = useAppSelections();
   const { sessionDetails } = useAgentContext();
   return (
     <>
@@ -57,12 +55,7 @@ export const SidebarContent = memo(function SidebarContent({
       )}
 
       {/* TASK MANAGEMENT */}
-      <TaskSidebarSection
-        selectedProject={selectedProject}
-        selectedSession={selectedSession as ThreadId | null}
-        selectedSessionDetails={sessionDetails}
-        onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
-      />
+      <TaskSidebarSection onCloseMobileNav={isMobile ? onCloseMobileNav : undefined} />
     </>
   );
 });

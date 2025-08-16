@@ -75,11 +75,6 @@ export function useAppState(): AppStateContextType {
 }
 
 // Convenience hooks for specific parts of the state
-export function useAppSelections() {
-  const { selections } = useAppState();
-  return selections;
-}
-
 export function useAppActions() {
   const { actions } = useAppState();
   return actions;

@@ -77,6 +77,24 @@ vi.mock('@/components/chat/MemoizedChatInput', () => ({
   MemoizedChatInput: mockMemoizedChatInput,
 }));
 
+// Mock providers
+vi.mock('@/components/providers/EventStreamProvider', () => ({
+  useSessionEvents: vi.fn(),
+  useSessionAPI: vi.fn(),
+}));
+
+vi.mock('@/components/providers/AgentProvider', () => ({
+  useAgentContext: vi.fn(),
+}));
+
+// Import mocked hooks
+import { useSessionEvents, useSessionAPI } from '@/components/providers/EventStreamProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
+
+const mockUseSessionEvents = vi.mocked(useSessionEvents);
+const mockUseSessionAPI = vi.mocked(useSessionAPI);
+const mockUseAgentContext = vi.mocked(useAgentContext);
+
 // Test data factories
 const createMockAgent = (id: string, name: string): AgentInfo => ({
   threadId: id as ThreadId,
@@ -95,32 +113,54 @@ const createMockEvent = (id: string): LaceEvent => ({
 });
 
 describe('Chat', () => {
-  const mockOnSendMessage = vi.fn();
-  const mockOnStopGeneration = vi.fn();
-
-  const defaultProps = {
-    events: [createMockEvent('event-1'), createMockEvent('event-2')],
-    agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
-    selectedAgent: 'agent-1' as ThreadId,
-    agentBusy: false,
-    onSendMessage: mockOnSendMessage,
-    onStopGeneration: mockOnStopGeneration,
-  };
+  const mockSendMessage = vi.fn();
+  const mockStopAgent = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Set up default provider mocks
+    mockUseSessionEvents.mockReturnValue({
+      events: [createMockEvent('event-1'), createMockEvent('event-2')],
+      loadingHistory: false,
+      addSessionEvent: vi.fn(),
+    });
+
+    mockUseSessionAPI.mockReturnValue({
+      sendMessage: mockSendMessage,
+      stopAgent: mockStopAgent,
+    });
+
+    mockUseAgentContext.mockReturnValue({
+      sessionDetails: {
+        id: 'session-1' as ThreadId,
+        name: 'Test Session',
+        createdAt: new Date(),
+        agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
+      },
+      selectedAgent: 'agent-1',
+      agentBusy: false,
+      loading: false,
+      foundAgent: null,
+      currentAgent: null,
+      selectAgent: vi.fn(),
+      onAgentSelect: vi.fn(),
+      createAgent: vi.fn(),
+      updateAgentState: vi.fn(),
+      reloadSessionDetails: vi.fn(),
+    });
   });
 
   describe('Layout Structure', () => {
     it('renders with correct layout classes', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       const container = screen.getByTestId('timeline-view').closest('.flex-1.flex.flex-col.h-full');
       expect(container).toBeInTheDocument();
     });
 
     it('renders timeline view in scrollable container', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       const timelineContainer = screen
         .getByTestId('timeline-view')
@@ -132,7 +172,7 @@ describe('Chat', () => {
     });
 
     it('renders chat input in fixed bottom container', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       const inputContainer = screen
         .getByTestId('memoized-chat-input')
@@ -144,95 +184,266 @@ describe('Chat', () => {
     });
   });
 
-  describe('Props Passing to TimelineView', () => {
-    it('passes events correctly', () => {
-      render(<Chat {...defaultProps} />);
+  describe('Provider Integration', () => {
+    it('uses events from SessionEvents provider', () => {
+      render(<Chat />);
 
       expect(screen.getByTestId('events-count')).toHaveTextContent('2');
     });
 
     it('passes agents correctly', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('2');
     });
 
-    it('passes isTyping based on agentBusy', () => {
-      render(<Chat {...defaultProps} agentBusy={true} />);
+    it('passes isTyping based on agentBusy from provider', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
+        },
+        selectedAgent: 'agent-1',
+        agentBusy: true,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('is-typing')).toHaveTextContent('true');
     });
 
     it('passes current agent name when selected agent exists', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       expect(screen.getByTestId('current-agent')).toHaveTextContent('Alice');
     });
 
     it('passes default Agent name when selected agent not found', () => {
-      render(<Chat {...defaultProps} selectedAgent={'nonexistent' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
+        },
+        selectedAgent: 'nonexistent',
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('current-agent')).toHaveTextContent('Agent');
     });
 
     it('passes selectedAgent for timeline', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       expect(screen.getByTestId('selected-agent')).toHaveTextContent('agent-1');
     });
 
     it('falls back to first agent when no agent selected', () => {
-      render(<Chat {...defaultProps} selectedAgent={null} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
+        },
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('selected-agent')).toHaveTextContent('agent-1');
     });
   });
 
-  describe('Props Passing to MemoizedChatInput', () => {
-    it('passes disabled state based on agentBusy', () => {
-      render(<Chat {...defaultProps} agentBusy={true} />);
+  describe('Data Passing to MemoizedChatInput', () => {
+    it('passes disabled state based on agentBusy from provider', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice')],
+        },
+        selectedAgent: 'agent-1',
+        agentBusy: true,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('disabled')).toHaveTextContent('true');
     });
 
-    it('passes streaming state based on agentBusy', () => {
-      render(<Chat {...defaultProps} agentBusy={true} />);
+    it('passes streaming state based on agentBusy from provider', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice')],
+        },
+        selectedAgent: 'agent-1',
+        agentBusy: true,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('is-streaming')).toHaveTextContent('true');
     });
 
     it('generates correct placeholder with selected agent', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message Alice...');
     });
 
     it('generates placeholder with first agent when none selected', () => {
-      render(<Chat {...defaultProps} selectedAgent={null} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice')],
+        },
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message Alice...');
     });
 
     it('uses fallback placeholder when no agents', () => {
-      render(<Chat {...defaultProps} agents={[]} selectedAgent={null} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [],
+        },
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message agent...');
     });
 
     it('passes correct agent ID for selected agent', () => {
-      render(<Chat {...defaultProps} />);
+      render(<Chat />);
 
       expect(screen.getByTestId('agent-id')).toHaveTextContent('agent-1');
     });
 
     it('passes first agent ID when none selected', () => {
-      render(<Chat {...defaultProps} selectedAgent={null} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice')],
+        },
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('agent-id')).toHaveTextContent('agent-1');
     });
 
     it('passes none when no agents available', () => {
-      render(<Chat {...defaultProps} agents={[]} selectedAgent={null} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [],
+        },
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('agent-id')).toHaveTextContent('none');
     });
@@ -240,15 +451,48 @@ describe('Chat', () => {
 
   describe('Agent Selection Logic', () => {
     it('prefers selected agent over first agent', () => {
-      render(<Chat {...defaultProps} selectedAgent={'agent-2' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
+        },
+        selectedAgent: 'agent-2',
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('current-agent')).toHaveTextContent('Bob');
       expect(screen.getByTestId('agent-id')).toHaveTextContent('agent-2');
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message Bob...');
     });
 
-    it('handles undefined agents gracefully', () => {
-      render(<Chat {...defaultProps} agents={undefined} selectedAgent={null} />);
+    it('handles no session details gracefully', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: null,
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('0');
       expect(screen.getByTestId('current-agent')).toHaveTextContent('Agent');
@@ -257,7 +501,26 @@ describe('Chat', () => {
     });
 
     it('handles empty agents array', () => {
-      render(<Chat {...defaultProps} agents={[]} selectedAgent={null} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [],
+        },
+        selectedAgent: null,
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('0');
       expect(screen.getByTestId('current-agent')).toHaveTextContent('Agent');
@@ -266,41 +529,66 @@ describe('Chat', () => {
   });
 
   describe('Event Handlers', () => {
-    it('passes onSendMessage to chat input', () => {
-      render(<Chat {...defaultProps} />);
+    it('calls sendMessage from provider when chat input sends', () => {
+      render(<Chat />);
 
       const sendButton = screen.getByText('Send');
       sendButton.click();
 
-      expect(mockOnSendMessage).toHaveBeenCalledWith('test message');
+      expect(mockSendMessage).toHaveBeenCalledWith('agent-1', 'test message');
     });
 
-    it('passes onStopGeneration when provided', () => {
-      render(<Chat {...defaultProps} />);
+    it('calls stopAgent from provider when stop button clicked', () => {
+      render(<Chat />);
+
+      const stopButton = screen.getByText('Stop');
+      stopButton.click();
+
+      expect(mockStopAgent).toHaveBeenCalledWith('agent-1');
+    });
+
+    it('renders stop button when onStopGeneration callback exists', () => {
+      render(<Chat />);
 
       const stopButton = screen.getByText('Stop');
       expect(stopButton).toBeInTheDocument();
     });
-
-    it('does not render stop button when onStopGeneration not provided', () => {
-      render(<Chat {...defaultProps} onStopGeneration={undefined} />);
-
-      expect(screen.queryByText('Stop')).not.toBeInTheDocument();
-    });
   });
 
   describe('Edge Cases', () => {
-    it('handles empty events array', () => {
-      render(<Chat {...defaultProps} events={[]} />);
+    it('handles empty events array from provider', () => {
+      mockUseSessionEvents.mockReturnValue({
+        events: [],
+        loadingHistory: false,
+        addSessionEvent: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('events-count')).toHaveTextContent('0');
     });
 
-    it('handles single agent', () => {
-      const singleAgent = [createMockAgent('solo-agent', 'Solo')];
-      render(
-        <Chat {...defaultProps} agents={singleAgent} selectedAgent={'solo-agent' as ThreadId} />
-      );
+    it('handles single agent from provider', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: {
+          id: 'session-1' as ThreadId,
+          name: 'Test Session',
+          createdAt: new Date(),
+          agents: [createMockAgent('solo-agent', 'Solo')],
+        },
+        selectedAgent: 'solo-agent',
+        agentBusy: false,
+        loading: false,
+        foundAgent: null,
+        currentAgent: null,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('1');
       expect(screen.getByTestId('current-agent')).toHaveTextContent('Solo');

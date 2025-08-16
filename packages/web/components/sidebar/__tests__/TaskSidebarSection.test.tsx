@@ -31,6 +31,27 @@ vi.mock('@/components/providers/TaskProvider', () => ({
   useTaskContext: () => mockTaskContext,
 }));
 
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: vi.fn(),
+}));
+
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: vi.fn(),
+}));
+
+vi.mock('@/components/providers/AgentProvider', () => ({
+  useAgentContext: vi.fn(),
+}));
+
+// Import mocked hooks
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
+
+const mockUseProjectContext = vi.mocked(useProjectContext);
+const mockUseSessionContext = vi.mocked(useSessionContext);
+const mockUseAgentContext = vi.mocked(useAgentContext);
+
 // Mock child components
 vi.mock('@/components/layout/Sidebar', () => ({
   SidebarSection: ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -125,15 +146,71 @@ const createMockTaskManager = (tasks: Task[] = []) => ({
 
 describe('TaskSidebarSection', () => {
   const defaultProps = {
-    selectedProject: 'test-project',
-    selectedSession: 'test-session' as ThreadId,
-    selectedSessionDetails: createMockSessionDetails(),
     onCloseMobileNav: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Set up provider mocks with default values
+    mockUseProjectContext.mockReturnValue({
+      selectedProject: 'test-project',
+      projects: [],
+      currentProject: createMockProject(),
+      loading: false,
+      error: null,
+      projectsForSidebar: [],
+      foundProject: createMockProject(),
+      selectProject: vi.fn(),
+      onProjectSelect: vi.fn(),
+      updateProject: vi.fn(),
+      createProject: vi.fn(),
+      loadProjectConfiguration: vi.fn(),
+      reloadProjects: vi.fn(),
+    });
+
+    mockUseSessionContext.mockReturnValue({
+      selectedSession: 'test-session' as ThreadId,
+      sessions: [],
+      loading: false,
+      projectConfig: null,
+      foundSession: null,
+      selectSession: vi.fn(),
+      onSessionSelect: vi.fn(),
+      createSession: vi.fn(),
+      loadProjectConfig: vi.fn(),
+      reloadSessions: vi.fn(),
+      enableAgentAutoSelection: vi.fn(),
+    });
+
+    mockUseAgentContext.mockReturnValue({
+      sessionDetails: createMockSessionDetails(),
+      loading: false,
+      selectedAgent: 'test-agent',
+      foundAgent: null,
+      currentAgent: null,
+      agentBusy: false,
+      selectAgent: vi.fn(),
+      onAgentSelect: vi.fn(),
+      createAgent: vi.fn(),
+      updateAgentState: vi.fn(),
+      reloadSessionDetails: vi.fn(),
+    });
   });
+
+  // Helper function to create mock project
+  function createMockProject() {
+    return {
+      id: 'test-project',
+      name: 'Test Project',
+      description: 'Test Description',
+      workingDirectory: '/test',
+      isArchived: false,
+      createdAt: new Date(),
+      lastUsedAt: new Date(),
+      sessionCount: 1,
+    };
+  }
 
   describe('Conditional Rendering', () => {
     it('returns null when taskManager is null', () => {
@@ -145,24 +222,63 @@ describe('TaskSidebarSection', () => {
 
     it('returns null when selectedProject is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
+      mockUseProjectContext.mockReturnValue({
+        selectedProject: null,
+        projects: [],
+        currentProject: createMockProject(),
+        loading: false,
+        error: null,
+        projectsForSidebar: [],
+        foundProject: null,
+        selectProject: vi.fn(),
+        onProjectSelect: vi.fn(),
+        updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
+        reloadProjects: vi.fn(),
+      });
 
-      const { container } = render(<TaskSidebarSection {...defaultProps} selectedProject={null} />);
+      const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();
     });
 
     it('returns null when selectedSession is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
+      mockUseSessionContext.mockReturnValue({
+        selectedSession: null,
+        sessions: [],
+        loading: false,
+        projectConfig: null,
+        foundSession: null,
+        selectSession: vi.fn(),
+        onSessionSelect: vi.fn(),
+        createSession: vi.fn(),
+        loadProjectConfig: vi.fn(),
+        reloadSessions: vi.fn(),
+        enableAgentAutoSelection: vi.fn(),
+      });
 
-      const { container } = render(<TaskSidebarSection {...defaultProps} selectedSession={null} />);
+      const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();
     });
 
     it('returns null when selectedSessionDetails is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: null,
+        loading: false,
+        selectedAgent: 'test-agent',
+        foundAgent: null,
+        currentAgent: null,
+        agentBusy: false,
+        selectAgent: vi.fn(),
+        onAgentSelect: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
 
-      const { container } = render(
-        <TaskSidebarSection {...defaultProps} selectedSessionDetails={null} />
-      );
+      const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();
     });
 

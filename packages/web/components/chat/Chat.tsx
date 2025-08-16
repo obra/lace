@@ -3,34 +3,44 @@
 
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
+import { useSessionEvents, useSessionAPI } from '@/components/providers/EventStreamProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
-interface ChatProps {
-  events: LaceEvent[];
-  agents: AgentInfo[] | undefined;
-  selectedAgent: ThreadId | null;
-  agentBusy: boolean;
-  onSendMessage: (message: string) => Promise<boolean | void>;
-  onStopGeneration?: () => Promise<boolean | void>;
-}
+interface ChatProps {}
 
-export const Chat = memo(function Chat({
-  events,
-  agents,
-  selectedAgent,
-  agentBusy,
-  onSendMessage,
-  onStopGeneration,
-}: ChatProps) {
+export const Chat = memo(function Chat({}: ChatProps) {
+  // Get data from providers
+  const { events } = useSessionEvents();
+  const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
+  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
+
+  const agents = sessionDetails?.agents;
+
+  // Event handlers using provider methods
+  const onSendMessage = useCallback(
+    async (message: string) => {
+      if (!selectedAgent || !message.trim()) {
+        return false;
+      }
+      return await sendMessageAPI(selectedAgent as ThreadId, message);
+    },
+    [selectedAgent, sendMessageAPI]
+  );
+
+  const onStopGeneration = useCallback(async () => {
+    if (!selectedAgent) return false;
+    return await stopAgentAPI(selectedAgent as ThreadId);
+  }, [selectedAgent, stopAgentAPI]);
   // Find current agent for display
   const currentAgent = agents?.find((a) => a.threadId === selectedAgent);
   const currentAgentName = currentAgent?.name || 'Agent';
 
   // Get agent for input (selected or first available)
-  const inputAgentId = selectedAgent || agents?.[0]?.threadId;
+  const inputAgentId = (selectedAgent as ThreadId) || agents?.[0]?.threadId;
   const inputAgentName = selectedAgent ? currentAgentName : agents?.[0]?.name || 'agent';
 
   return (

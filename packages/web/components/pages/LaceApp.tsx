@@ -45,7 +45,6 @@ import {
   EventStreamProvider,
   useSessionEvents,
   useEventStream,
-  useSessionAPI,
 } from '@/components/providers/EventStreamProvider';
 import {
   ToolApprovalProvider,
@@ -136,7 +135,6 @@ const LaceAppInner = memo(function LaceAppInner() {
   const { events, loadingHistory } = useSessionEvents();
 
   // Use session API from EventStreamProvider context
-  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
 
   // Use tool approvals from ToolApprovalProvider context
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
@@ -159,49 +157,12 @@ const LaceAppInner = memo(function LaceAppInner() {
     }
   }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
 
-  // Handle project selection - now delegated to ProjectProvider
-  const handleProjectSelect = (project: { id: string }) => {
-    // ProjectProvider handles the selection
-    onProjectSelect(project);
-    // Enable auto-selection for this project selection
-    enableAgentAutoSelection();
-  };
-
-  const sendMessage = useCallback(
-    async (message: string) => {
-      if (!selectedAgent || !message.trim()) {
-        return false;
-      }
-      return await sendMessageAPI(selectedAgent as ThreadId, message);
-    },
-    [selectedAgent, sendMessageAPI]
-  );
-
-  const stopGeneration = useCallback(async () => {
-    if (!selectedAgent) return false;
-    return await stopAgentAPI(selectedAgent as ThreadId);
-  }, [selectedAgent, stopAgentAPI]);
-
   // Tool approval decisions are now handled by ToolApprovalProvider
 
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
     // Manual agent selection - no need to disable auto-selection as SessionProvider handles this
     setSelectedAgent(agentThreadId as ThreadId);
-  };
-
-  // Handle project updates (archive/unarchive/edit) - now delegated to ProjectProvider
-  const handleProjectUpdate = async (
-    projectId: string,
-    updates: {
-      isArchived?: boolean;
-      name?: string;
-      description?: string;
-      workingDirectory?: string;
-      configuration?: Record<string, unknown>;
-    }
-  ) => {
-    await updateProjectFromProvider(projectId, updates);
   };
 
   // Onboarding completion is now handled by useOnboarding hook
@@ -325,14 +286,7 @@ const LaceAppInner = memo(function LaceAppInner() {
           ) : selectedProject && foundProject ? (
             selectedAgent ||
             (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
-              <Chat
-                events={events}
-                agents={selectedSessionDetails?.agents}
-                selectedAgent={selectedAgent as ThreadId | null}
-                agentBusy={agentBusy}
-                onSendMessage={sendMessage}
-                onStopGeneration={stopGeneration}
-              />
+              <Chat />
             ) : (
               <div className="flex-1 p-6">
                 <SessionConfigPanel />
