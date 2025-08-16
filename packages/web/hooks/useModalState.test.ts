@@ -4,6 +4,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { useModalState } from './useModalState';
+import { asThreadId } from '@/types/core';
 
 describe('useModalState', () => {
   it('initializes all modal states to false', () => {
@@ -89,13 +90,14 @@ describe('useModalState', () => {
       id: 'task-1',
       title: 'Test Task',
       description: 'A test task',
+      prompt: 'Test task prompt',
       status: 'pending' as const,
       priority: 'medium' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
       notes: [],
-      createdBy: 'user-1',
-      threadId: 'thread-1',
+      createdBy: asThreadId('lace_20240101_agent1'),
+      threadId: asThreadId('lace_20240101_sess01'),
     };
 
     act(() => {

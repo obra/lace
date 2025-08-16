@@ -3,7 +3,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionInfo, AgentInfo } from '@/types/core';
+import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
 // Mock fetch globally
@@ -19,23 +19,23 @@ vi.mock('@/lib/serialization', () => ({
 }));
 
 const mockSessionWithAgents: SessionInfo = {
-  id: 'session-1',
+  id: 'session-1' as ThreadId,
   name: 'Test Session',
-  description: 'A test session',
   createdAt: new Date('2024-01-01'),
-  lastUsedAt: new Date('2024-01-01'),
   agents: [
     {
-      threadId: 'agent-1',
+      threadId: 'agent-1' as ThreadId,
       name: 'Agent 1',
       modelId: 'claude-3-5-haiku',
       status: 'idle',
+      providerInstanceId: 'provider-1',
     },
     {
-      threadId: 'agent-2',
+      threadId: 'agent-2' as ThreadId,
       name: 'Agent 2',
       modelId: 'claude-3-5-sonnet',
       status: 'thinking',
+      providerInstanceId: 'provider-2',
     },
   ],
 };
@@ -63,9 +63,12 @@ describe('useAgentManagement', () => {
   });
 
   it('clears session details when session is deselected', () => {
-    const { result, rerender } = renderHook(({ sessionId }) => useAgentManagement(sessionId), {
-      initialProps: { sessionId: 'session-1' },
-    });
+    const { result, rerender } = renderHook(
+      (props: { sessionId: string | null }) => useAgentManagement(props.sessionId),
+      {
+        initialProps: { sessionId: 'session-1' as string | null },
+      }
+    );
 
     // Clear session
     rerender({ sessionId: null });
@@ -105,7 +108,7 @@ describe('useAgentManagement', () => {
       await result.current.createAgent('session-1', {
         name: 'New Agent',
         modelId: 'gpt-4',
-        providerId: 'openai',
+        providerInstanceId: 'openai',
       });
     });
 
@@ -115,7 +118,7 @@ describe('useAgentManagement', () => {
       body: JSON.stringify({
         name: 'New Agent',
         modelId: 'gpt-4',
-        providerId: 'openai',
+        providerInstanceId: 'openai',
       }),
     });
 

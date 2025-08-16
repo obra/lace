@@ -3,7 +3,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionInfo } from '@/types/core';
+import type { SessionInfo, ThreadId } from '@/types/core';
 import { useSessionManagement } from './useSessionManagement';
 
 // Mock fetch globally
@@ -20,26 +20,23 @@ vi.mock('@/lib/serialization', () => ({
 
 const mockSessions: SessionInfo[] = [
   {
-    id: 'session-1',
+    id: 'session-1' as ThreadId,
     name: 'Test Session 1',
-    description: 'A test session',
     createdAt: new Date('2024-01-01'),
-    lastUsedAt: new Date('2024-01-01'),
     agents: [
       {
-        threadId: 'agent-1',
+        threadId: 'agent-1' as ThreadId,
         name: 'Agent 1',
         modelId: 'claude-3-5-haiku',
         status: 'idle',
+        providerInstanceId: 'provider-1',
       },
     ],
   },
   {
-    id: 'session-2',
+    id: 'session-2' as ThreadId,
     name: 'Test Session 2',
-    description: 'Another test session',
     createdAt: new Date('2024-01-02'),
-    lastUsedAt: new Date('2024-01-02'),
     agents: [],
   },
 ];
@@ -60,9 +57,12 @@ describe('useSessionManagement', () => {
         json: () => Promise.resolve({ configuration: {} }),
       });
 
-    const { result, rerender } = renderHook(({ projectId }) => useSessionManagement(projectId), {
-      initialProps: { projectId: null },
-    });
+    const { result, rerender } = renderHook(
+      (props: { projectId: string | null }) => useSessionManagement(props.projectId),
+      {
+        initialProps: { projectId: null as string | null },
+      }
+    );
 
     // Initially no sessions when no project
     expect(result.current.sessions).toEqual([]);
@@ -81,9 +81,12 @@ describe('useSessionManagement', () => {
   });
 
   it('clears sessions when project is deselected', () => {
-    const { result, rerender } = renderHook(({ projectId }) => useSessionManagement(projectId), {
-      initialProps: { projectId: 'project-1' },
-    });
+    const { result, rerender } = renderHook(
+      (props: { projectId: string | null }) => useSessionManagement(props.projectId),
+      {
+        initialProps: { projectId: 'project-1' as string | null },
+      }
+    );
 
     // Deselect project
     rerender({ projectId: null });
