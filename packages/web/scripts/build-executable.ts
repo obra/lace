@@ -2,7 +2,7 @@
 // ABOUTME: Embeds Next.js standalone build as ZIP and creates Bun executable
 
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, cpSync } from 'fs';
 import { join, resolve } from 'path';
 
 interface BuildOptions {
@@ -57,6 +57,16 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   console.log(`   📝 Name: ${name}`);
   console.log(`   📁 Output: ${outdir}\n`);
 
+  // Validate Bun CLI is available
+  try {
+    execSync('bun --version', { stdio: 'ignore' });
+    console.log('✅ Bun CLI found');
+  } catch {
+    console.error('❌ Bun CLI not found. Please install Bun first.');
+    console.error('   Visit: https://bun.sh/docs/installation');
+    process.exit(1);
+  }
+
   // Step 1: Check Next.js build exists
   console.log('1️⃣ Checking Next.js build...');
   const nextBuildPath = '.next';
@@ -88,26 +98,24 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
 
   // Create temp directory to organize files for ZIP
   const tempBuildDir = '../../build/temp-standalone';
-  execSync(`rm -rf ${tempBuildDir}`, { stdio: 'pipe' });
+  if (existsSync(tempBuildDir)) {
+    rmSync(tempBuildDir, { recursive: true, force: true });
+  }
   mkdirSync(tempBuildDir, { recursive: true });
 
   // Copy standalone build
-  execSync(`cp -r .next/standalone ${tempBuildDir}/standalone`, {
-    stdio: 'pipe',
-  });
+  cpSync('.next/standalone', `${tempBuildDir}/standalone`, { recursive: true });
 
   // Copy src directory (needed for provider catalog data and other runtime files)
-  execSync(`cp -r ../../src ${tempBuildDir}/standalone/src`, {
-    stdio: 'pipe',
-  });
+  cpSync('../../src', `${tempBuildDir}/standalone/src`, { recursive: true });
   console.log('📁 Source directory copied to standalone/src/');
 
   // Copy static files to the correct location where Next.js server expects them
   // The server runs from packages/web, so static files must be at packages/web/.next/static
   if (existsSync('.next/static')) {
     mkdirSync(`${tempBuildDir}/standalone/packages/web/.next`, { recursive: true });
-    execSync(`cp -r .next/static ${tempBuildDir}/standalone/packages/web/.next/static`, {
-      stdio: 'pipe',
+    cpSync('.next/static', `${tempBuildDir}/standalone/packages/web/.next/static`, {
+      recursive: true,
     });
     console.log('📁 Static assets copied to packages/web/.next/static/');
   } else {
@@ -116,13 +124,12 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
 
   // Replace the standalone server with our custom enhanced server (TypeScript)
   // First remove the original server.js from packages/web
-  execSync(`rm -f ${tempBuildDir}/standalone/packages/web/server.js`, {
-    stdio: 'pipe',
-  });
+  const serverJsPath = `${tempBuildDir}/standalone/packages/web/server.js`;
+  if (existsSync(serverJsPath)) {
+    rmSync(serverJsPath, { force: true });
+  }
   // Then copy our TypeScript server to the packages/web directory where Next.js dependencies are
-  execSync(`cp server-custom.ts ${tempBuildDir}/standalone/packages/web/server.ts`, {
-    stdio: 'pipe',
-  });
+  cpSync('server-custom.ts', `${tempBuildDir}/standalone/packages/web/server.ts`);
 
   // Create ZIP with just the standalone build + our server
   execSync(`cd ${tempBuildDir} && zip -r ../lace-standalone.zip . -q`, {
@@ -130,7 +137,7 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   });
 
   // Clean up temp directory
-  execSync(`rm -rf ${tempBuildDir}`, { stdio: 'pipe' });
+  rmSync(tempBuildDir, { recursive: true, force: true });
 
   // The standalone directory already contains its own .next with build files,
   // but we need to ensure static assets are properly linked

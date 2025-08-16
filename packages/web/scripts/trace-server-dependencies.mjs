@@ -153,10 +153,12 @@ import 'wsl-utils';
   }
 }
 
-// Run if called directly
-traceServerDependencies().catch(error => {
-  console.error('Script failed:', error);
-  process.exit(1);
-});
+// Only run when executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  traceServerDependencies().catch(error => {
+    console.error('Script failed:', error);
+    process.exit(1);
+  });
+}
 
 export { traceServerDependencies };
