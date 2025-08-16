@@ -79,13 +79,28 @@ const LaceAppInner = memo(function LaceAppInner() {
     projects,
     loading: loadingProjects,
     selectedProject,
-    currentProject,
+    foundProject,
     projectsForSidebar,
     onProjectSelect,
     updateProject: updateProjectFromProvider,
     reloadProjects,
-    foundProject,
   } = useProjectContext();
+
+  // Create fallback current project for this component's UI needs
+  const currentProject = useMemo(
+    () =>
+      foundProject || {
+        id: '',
+        name: 'No project selected',
+        description: 'Select a project to get started',
+        workingDirectory: '/',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+        sessionCount: 0,
+      },
+    [foundProject]
+  );
 
   // UI State (from AnimatedLaceApp but remove demo data)
   const {

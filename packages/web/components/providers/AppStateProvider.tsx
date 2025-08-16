@@ -5,10 +5,9 @@
 
 import React, { createContext, useContext, type ReactNode } from 'react';
 import { useHashRouter } from '@/hooks/useHashRouter';
-import { useProjectManagement } from '@/hooks/useProjectManagement';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
-import type { ProjectInfo, SessionInfo, AgentInfo, ThreadId } from '@/types/core';
+import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 
 // Types for the context
@@ -17,11 +16,6 @@ interface AppSelections {
   selectedSession: string | null;
   selectedAgent: string | null;
   urlStateHydrated: boolean;
-}
-
-interface AppProjects {
-  projects: ProjectInfo[];
-  loading: boolean;
 }
 
 interface AppSessions {
@@ -46,19 +40,6 @@ interface AppActions {
   ) => void;
   clearAll: (replace?: boolean) => void;
 
-  // Project actions (match useProjectManagement return type)
-  updateProject: (
-    projectId: string,
-    updates: {
-      isArchived?: boolean;
-      name?: string;
-      description?: string;
-      workingDirectory?: string;
-      configuration?: Record<string, unknown>;
-    }
-  ) => Promise<void>;
-  reloadProjects: () => Promise<ProjectInfo[]>;
-
   // Session actions (match useSessionManagement return type)
   createSession: (sessionData: {
     name: string;
@@ -76,7 +57,6 @@ interface AppActions {
 
 interface AppStateContextType {
   selections: AppSelections;
-  projects: AppProjects;
   sessions: AppSessions;
   agents: AppAgents;
   actions: AppActions;
@@ -93,7 +73,6 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   const hashRouter = useHashRouter();
 
   // Business logic hooks
-  const projectManagement = useProjectManagement();
   const sessionManagement = useSessionManagement(hashRouter.project);
   const agentManagement = useAgentManagement(hashRouter.session);
 
@@ -104,11 +83,6 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       selectedSession: hashRouter.session,
       selectedAgent: hashRouter.agent,
       urlStateHydrated: hashRouter.isHydrated,
-    },
-
-    projects: {
-      projects: projectManagement.projects,
-      loading: projectManagement.loading,
     },
 
     sessions: {
@@ -129,10 +103,6 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       setSelectedAgent: hashRouter.setAgent,
       updateHashState: hashRouter.updateState,
       clearAll: hashRouter.clearAll,
-
-      // Project actions
-      updateProject: projectManagement.updateProject,
-      reloadProjects: projectManagement.reloadProjects,
 
       // Session actions
       createSession: sessionManagement.createSession,
@@ -163,11 +133,6 @@ export function useAppState(): AppStateContextType {
 export function useAppSelections() {
   const { selections } = useAppState();
   return selections;
-}
-
-export function useAppProjects() {
-  const { projects } = useAppState();
-  return projects;
 }
 
 export function useAppSessions() {

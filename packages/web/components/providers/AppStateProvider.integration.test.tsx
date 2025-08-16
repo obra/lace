@@ -10,27 +10,23 @@ import type { ThreadId } from '@/types/core';
 
 // Mock all the hooks that AppStateProvider depends on
 vi.mock('@/hooks/useHashRouter');
-vi.mock('@/hooks/useProjectManagement');
 vi.mock('@/hooks/useSessionManagement');
 vi.mock('@/hooks/useAgentManagement');
 
 import { useHashRouter } from '@/hooks/useHashRouter';
-import { useProjectManagement } from '@/hooks/useProjectManagement';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 
 // Test component that consumes app state without receiving it through props
 function TestConsumerComponent() {
-  const { selections, projects, sessions, agents, actions } = useAppState();
+  const { selections, sessions, agents, actions } = useAppState();
 
   return (
     <div>
       <div data-testid="selected-project">{selections.selectedProject || 'none'}</div>
       <div data-testid="selected-session">{selections.selectedSession || 'none'}</div>
       <div data-testid="selected-agent">{selections.selectedAgent || 'none'}</div>
-      <div data-testid="projects-count">{projects.projects.length}</div>
       <div data-testid="sessions-count">{sessions.sessions.length}</div>
-      <div data-testid="projects-loading">{projects.loading.toString()}</div>
       <div data-testid="sessions-loading">{sessions.loading.toString()}</div>
       <div data-testid="agents-loading">{agents.loading.toString()}</div>
       <button
@@ -38,9 +34,6 @@ function TestConsumerComponent() {
         onClick={() => actions.setSelectedProject('new-project')}
       >
         Set Project
-      </button>
-      <button data-testid="reload-projects-button" onClick={() => actions.reloadProjects()}>
-        Reload Projects
       </button>
     </div>
   );
@@ -54,7 +47,6 @@ function TestComponentWithoutProvider() {
 
 describe('AppStateProvider Integration', () => {
   const mockSetProject = vi.fn();
-  const mockReloadProjects = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,13 +63,6 @@ describe('AppStateProvider Integration', () => {
       clearAll: vi.fn(),
       state: {},
       isHydrated: true,
-    });
-
-    vi.mocked(useProjectManagement).mockReturnValue({
-      projects: [],
-      loading: false,
-      updateProject: vi.fn(),
-      reloadProjects: mockReloadProjects,
     });
 
     vi.mocked(useSessionManagement).mockReturnValue({
@@ -111,32 +96,6 @@ describe('AppStateProvider Integration', () => {
       clearAll: vi.fn(),
       state: { project: 'test-project', session: 'test-session', agent: 'test-agent' },
       isHydrated: true,
-    });
-
-    vi.mocked(useProjectManagement).mockReturnValue({
-      projects: [
-        {
-          id: 'p1',
-          name: 'Project 1',
-          description: 'Test project 1',
-          workingDirectory: '/test1',
-          isArchived: false,
-          createdAt: new Date(),
-          lastUsedAt: new Date(),
-        },
-        {
-          id: 'p2',
-          name: 'Project 2',
-          description: 'Test project 2',
-          workingDirectory: '/test2',
-          isArchived: false,
-          createdAt: new Date(),
-          lastUsedAt: new Date(),
-        },
-      ],
-      loading: true,
-      updateProject: vi.fn(),
-      reloadProjects: mockReloadProjects,
     });
 
     vi.mocked(useSessionManagement).mockReturnValue({
@@ -181,9 +140,7 @@ describe('AppStateProvider Integration', () => {
     expect(screen.getByTestId('selected-project')).toHaveTextContent('test-project');
     expect(screen.getByTestId('selected-session')).toHaveTextContent('test-session');
     expect(screen.getByTestId('selected-agent')).toHaveTextContent('test-agent');
-    expect(screen.getByTestId('projects-count')).toHaveTextContent('2');
     expect(screen.getByTestId('sessions-count')).toHaveTextContent('1');
-    expect(screen.getByTestId('projects-loading')).toHaveTextContent('true');
     expect(screen.getByTestId('sessions-loading')).toHaveTextContent('false');
     expect(screen.getByTestId('agents-loading')).toHaveTextContent('true');
   });
@@ -209,9 +166,6 @@ describe('AppStateProvider Integration', () => {
     // Test action calls work without prop drilling
     await user.click(screen.getByTestId('set-project-button'));
     expect(mockSetProject).toHaveBeenCalledWith('new-project');
-
-    await user.click(screen.getByTestId('reload-projects-button'));
-    expect(mockReloadProjects).toHaveBeenCalled();
   });
 
   it('throws error when useAppState is used outside provider', () => {

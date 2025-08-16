@@ -51,8 +51,8 @@ function ContextConsumer() {
   const {
     projects,
     loading,
+    error,
     selectedProject,
-    currentProject,
     projectsForSidebar,
     selectProject,
     onProjectSelect,
@@ -65,8 +65,8 @@ function ContextConsumer() {
     <div>
       <div data-testid="project-count">{projects.length}</div>
       <div data-testid="loading">{loading.toString()}</div>
+      <div data-testid="error">{error || 'none'}</div>
       <div data-testid="selected-project">{selectedProject || 'none'}</div>
-      <div data-testid="current-project-name">{currentProject.name}</div>
       <div data-testid="sidebar-project-count">{projectsForSidebar.length}</div>
       <div data-testid="found-project">{foundProject?.name || 'none'}</div>
 
@@ -98,6 +98,7 @@ describe('ProjectProvider', () => {
   const defaultProjectManagement = {
     projects: mockProjects,
     loading: false,
+    error: null,
     updateProject: mockUpdateProject,
     reloadProjects: mockReloadProjects,
   };
@@ -132,8 +133,8 @@ describe('ProjectProvider', () => {
 
       expect(screen.getByTestId('project-count')).toHaveTextContent('3');
       expect(screen.getByTestId('loading')).toHaveTextContent('false');
+      expect(screen.getByTestId('error')).toHaveTextContent('none');
       expect(screen.getByTestId('selected-project')).toHaveTextContent('project-1');
-      expect(screen.getByTestId('current-project-name')).toHaveTextContent('Project One');
       expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('3');
       expect(screen.getByTestId('found-project')).toHaveTextContent('Project One');
     });
@@ -150,18 +151,17 @@ describe('ProjectProvider', () => {
   });
 
   describe('Project Data Management', () => {
-    it('provides current project data when project is selected', () => {
+    it('provides found project data when project is selected', () => {
       render(
         <ProjectProvider>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('current-project-name')).toHaveTextContent('Project One');
       expect(screen.getByTestId('found-project')).toHaveTextContent('Project One');
     });
 
-    it('provides fallback current project when no project is selected', () => {
+    it('provides null found project when no project is selected', () => {
       mockUseHashRouter.mockReturnValue({
         ...defaultHashRouter,
         project: null,
@@ -174,11 +174,10 @@ describe('ProjectProvider', () => {
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('current-project-name')).toHaveTextContent('No project selected');
       expect(screen.getByTestId('found-project')).toHaveTextContent('none');
     });
 
-    it('provides fallback current project when selected project not found', () => {
+    it('provides null found project when selected project not found', () => {
       mockUseHashRouter.mockReturnValue({
         ...defaultHashRouter,
         project: 'nonexistent-project',
@@ -191,7 +190,6 @@ describe('ProjectProvider', () => {
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('current-project-name')).toHaveTextContent('No project selected');
       expect(screen.getByTestId('found-project')).toHaveTextContent('none');
     });
 
@@ -247,7 +245,7 @@ describe('ProjectProvider', () => {
     it('handles empty string project selection as null', () => {
       // Create a component that calls onProjectSelect with empty string
       function TestComponent() {
-        const { onProjectSelect, onProjectChange } = useProjectContext();
+        const { onProjectSelect } = useProjectContext();
         return (
           <button onClick={() => onProjectSelect({ id: '' })} data-testid="clear-selection">
             Clear Selection
@@ -350,7 +348,21 @@ describe('ProjectProvider', () => {
 
       expect(screen.getByTestId('project-count')).toHaveTextContent('0');
       expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('0');
-      expect(screen.getByTestId('current-project-name')).toHaveTextContent('No project selected');
+    });
+
+    it('displays error state from useProjectManagement', () => {
+      mockUseProjectManagement.mockReturnValue({
+        ...defaultProjectManagement,
+        error: 'Failed to load projects',
+      });
+
+      render(
+        <ProjectProvider>
+          <ContextConsumer />
+        </ProjectProvider>
+      );
+
+      expect(screen.getByTestId('error')).toHaveTextContent('Failed to load projects');
     });
   });
 

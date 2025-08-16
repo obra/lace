@@ -1,5 +1,5 @@
-// ABOUTME: Context provider for project-related state management and operations
-// ABOUTME: Centralizes project selection, CRUD operations, and data transformations
+// ABOUTME: Context provider for shared project selection state across the app
+// ABOUTME: Manages which project is selected and provides computed values based on selection
 
 'use client';
 
@@ -10,18 +10,23 @@ import type { ProjectInfo } from '@/types/core';
 
 // Types for project context
 interface ProjectContextType {
-  // Project data
+  // Project data (from useProjectManagement hook)
   projects: ProjectInfo[];
   loading: boolean;
+  error: string | null;
+
+  // Selection state (managed by this provider)
   selectedProject: string | null;
-  currentProject: ProjectInfo;
+  foundProject: ProjectInfo | null;
+
+  // Computed values based on data + selection
   projectsForSidebar: ProjectInfo[];
 
-  // Project selection
+  // Selection actions
   selectProject: (projectId: string | null) => void;
   onProjectSelect: (project: { id: string }) => void;
 
-  // Project CRUD operations
+  // Data operations (passed through from hook)
   updateProject: (
     projectId: string,
     updates: {
@@ -33,9 +38,6 @@ interface ProjectContextType {
     }
   ) => Promise<void>;
   reloadProjects: () => Promise<ProjectInfo[]>;
-
-  // Project validation and utilities
-  foundProject: ProjectInfo | null;
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
@@ -46,31 +48,16 @@ interface ProjectProviderProps {
 }
 
 export function ProjectProvider({ children, onProjectChange }: ProjectProviderProps) {
-  // Use existing project management hook
-  const { projects, loading, updateProject, reloadProjects } = useProjectManagement();
+  // Get project data from pure data hook
+  const { projects, loading, error, updateProject, reloadProjects } = useProjectManagement();
 
-  // Use hash router for project selection state
+  // Get selection state from hash router
   const { project: selectedProject, setProject: setSelectedProject } = useHashRouter();
 
-  // Find the currently selected project
-  const foundProject = selectedProject
-    ? (projects || []).find((p) => p.id === selectedProject) || null
-    : null;
-
-  // Create a fallback current project for UI consistency
-  const currentProject = useMemo(
-    () =>
-      foundProject || {
-        id: '',
-        name: 'No project selected',
-        description: 'Select a project to get started',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-      },
-    [foundProject]
-  );
+  // Compute derived state based on data + selection
+  const foundProject = useMemo(() => {
+    return selectedProject ? (projects || []).find((p) => p.id === selectedProject) || null : null;
+  }, [selectedProject, projects]);
 
   // Transform projects for sidebar display
   const projectsForSidebar = useMemo(
@@ -88,7 +75,7 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     [projects]
   );
 
-  // Project selection handler
+  // Selection actions
   const selectProject = useCallback(
     (projectId: string | null) => {
       setSelectedProject(projectId);
@@ -99,7 +86,6 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     [setSelectedProject, onProjectChange]
   );
 
-  // Handle project selection from components (matches current LaceApp interface)
   const onProjectSelect = useCallback(
     (project: { id: string }) => {
       // Handle empty string as null (for clearing selection)
@@ -110,23 +96,25 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
   );
 
   const value: ProjectContextType = {
-    // Project data
+    // Project data (from hook)
     projects,
     loading,
+    error,
+
+    // Selection state (managed here)
     selectedProject,
-    currentProject,
+    foundProject,
+
+    // Computed values
     projectsForSidebar,
 
-    // Project selection
+    // Selection actions
     selectProject,
     onProjectSelect,
 
-    // Project CRUD operations
+    // Data operations (passed through)
     updateProject,
     reloadProjects,
-
-    // Project validation and utilities
-    foundProject,
   };
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
