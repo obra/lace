@@ -39,6 +39,7 @@ import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
+import { useProjectManagement } from '@/hooks/useProjectManagement';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
@@ -112,8 +113,12 @@ export const LaceApp = memo(function LaceApp() {
   const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
 
   // Business Logic State (from current app/page.tsx)
-  const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
+  const {
+    projects,
+    loading: loadingProjects,
+    updateProject,
+    reloadProjects,
+  } = useProjectManagement();
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -198,22 +203,6 @@ export const LaceApp = memo(function LaceApp() {
   // Events are now LaceEvent[] directly
   // No conversion needed - components handle LaceEvent natively
 
-  // Project loading function
-  const loadProjects = useCallback(async (): Promise<ProjectInfo[]> => {
-    setLoadingProjects(true);
-    try {
-      const res = await fetch('/api/projects');
-      const data = await parseResponse<ProjectInfo[]>(res);
-      setProjects(data);
-      setLoadingProjects(false);
-      return data;
-    } catch (error) {
-      console.error('Failed to load projects:', error);
-    }
-    setLoadingProjects(false);
-    return [];
-  }, []);
-
   // Provider loading function
   const loadProviders = useCallback(async () => {
     setLoadingProviders(true);
@@ -264,11 +253,10 @@ export const LaceApp = memo(function LaceApp() {
     }
   }, [selectedProject, setSelectedProject]);
 
-  // Load projects and providers on mount
+  // Load providers on mount (projects are loaded by the hook)
   useEffect(() => {
-    void loadProjects();
     void loadProviders();
-  }, [loadProjects, loadProviders]);
+  }, [loadProviders]);
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
@@ -498,23 +486,7 @@ export const LaceApp = memo(function LaceApp() {
       configuration?: Record<string, unknown>;
     }
   ) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-
-      if (res.ok) {
-        // Reload projects to reflect the changes
-        void loadProjects();
-      } else {
-        console.error('Failed to update project');
-        return;
-      }
-    } catch (error) {
-      console.error('Failed to update project:', error);
-    }
+    await updateProject(projectId, updates);
   };
 
   // Handle onboarding completion - navigate directly to chat
@@ -524,7 +496,7 @@ export const LaceApp = memo(function LaceApp() {
     agentId: string
   ) => {
     // Reload projects first to ensure the newly created project is in the array
-    await loadProjects();
+    await reloadProjects();
 
     // Set all three selections atomically to navigate directly to chat
     updateHashState({
@@ -1429,7 +1401,7 @@ export const LaceApp = memo(function LaceApp() {
                   selectedProject={currentProject.id ? currentProject : null}
                   providers={providers}
                   onProjectSelect={handleProjectSelect}
-                  onProjectCreate={() => void loadProjects()}
+                  onProjectCreate={() => void reloadProjects()}
                   onProjectUpdate={handleProjectUpdate}
                   loading={loadingProjects}
                   autoOpenCreate={autoOpenCreateProject}

@@ -2,7 +2,8 @@
 // ABOUTME: Handles agent creation, selection, and state updates
 
 import { useState, useEffect, useCallback } from 'react';
-import type { SessionInfo, ThreadId, CreateAgentRequest, AgentState } from '@/types/core';
+import type { SessionInfo, ThreadId, AgentState } from '@/types/core';
+import type { CreateAgentRequest } from '@/types/api';
 import { parseResponse } from '@/lib/serialization';
 
 interface UseAgentManagementResult {
