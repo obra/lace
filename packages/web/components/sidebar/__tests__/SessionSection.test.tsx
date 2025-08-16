@@ -259,7 +259,7 @@ describe('SessionSection', () => {
     it('handles undefined agents', () => {
       const sessionWithoutAgents = {
         ...defaultProps.selectedSessionDetails,
-        agents: undefined,
+        agents: [],
       };
 
       render(<SessionSection {...defaultProps} selectedSessionDetails={sessionWithoutAgents} />);

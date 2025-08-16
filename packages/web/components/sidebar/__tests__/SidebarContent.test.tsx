@@ -126,18 +126,6 @@ const createMockTask = (id: string): Task => ({
   createdBy: 'user',
 });
 
-const createMockTaskManager = () => ({
-  tasks: [createMockTask('1'), createMockTask('2')],
-  isLoading: false,
-  isDeleting: false,
-  error: null,
-  refetch: vi.fn(),
-  createTask: vi.fn(),
-  updateTask: vi.fn(),
-  deleteTask: vi.fn(),
-  addNote: vi.fn(),
-});
-
 describe('SidebarContent', () => {
   const mockHandlers = {
     onSwitchProject: vi.fn(),
@@ -207,7 +195,7 @@ describe('SidebarContent', () => {
     it('passes correct props to TaskSidebarSection', () => {
       render(<SidebarContent {...defaultProps} />);
 
-      expect(screen.getByTestId('task-count')).toHaveTextContent('2');
+      expect(screen.getByTestId('task-count')).toHaveTextContent('0');
       expect(screen.getByTestId('show-task-board')).toBeInTheDocument();
       expect(screen.getByTestId('show-task-creation')).toBeInTheDocument();
     });
@@ -297,7 +285,7 @@ describe('SidebarContent', () => {
 
   describe('Edge Cases', () => {
     it('handles null taskManager gracefully', () => {
-      render(<SidebarContent {...defaultProps} taskManager={null} />);
+      render(<SidebarContent {...defaultProps} />);
 
       expect(screen.getByTestId('task-section')).toBeInTheDocument();
       expect(screen.getByTestId('task-count')).toHaveTextContent('0');

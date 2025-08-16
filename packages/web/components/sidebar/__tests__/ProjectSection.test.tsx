@@ -134,15 +134,13 @@ describe('ProjectSection', () => {
       expect(screen.queryByTestId('agents-count')).not.toBeInTheDocument();
     });
 
-    it('handles undefined agents in session details', () => {
-      const sessionWithUndefinedAgents = {
+    it('handles empty agents in session details', () => {
+      const sessionWithEmptyAgents = {
         ...createMockSessionDetails(),
-        agents: undefined,
+        agents: [],
       };
 
-      render(
-        <ProjectSection {...defaultProps} selectedSessionDetails={sessionWithUndefinedAgents} />
-      );
+      render(<ProjectSection {...defaultProps} selectedSessionDetails={sessionWithEmptyAgents} />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('0 agents');
     });
@@ -164,8 +162,7 @@ describe('ProjectSection', () => {
     });
 
     it('defaults to desktop test ID when isMobile is not provided', () => {
-      const { isMobile, ...propsWithoutMobile } = defaultProps;
-      render(<ProjectSection {...propsWithoutMobile} />);
+      render(<ProjectSection {...defaultProps} />);
 
       expect(screen.getByTestId('current-project-name-desktop')).toBeInTheDocument();
     });

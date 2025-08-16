@@ -10,6 +10,8 @@ import type { Task } from '@/types/core';
 const createMockTaskManager = () => ({
   tasks: [],
   isLoading: false,
+  isCreating: false,
+  isUpdating: false,
   isDeleting: false,
   error: null,
   refetch: vi.fn(),
@@ -17,6 +19,10 @@ const createMockTaskManager = () => ({
   updateTask: vi.fn().mockResolvedValue(undefined),
   deleteTask: vi.fn().mockResolvedValue(undefined),
   addNote: vi.fn().mockResolvedValue(undefined),
+  handleTaskCreated: vi.fn(),
+  handleTaskUpdated: vi.fn(),
+  handleTaskDeleted: vi.fn(),
+  handleTaskNoteAdded: vi.fn(),
 });
 
 // Mock task data
@@ -24,6 +30,7 @@ const createMockTask = (overrides?: Partial<Task>): Task => ({
   id: 'task-1',
   title: 'Test Task',
   description: 'Test task description',
+  prompt: 'Test task prompt',
   status: 'pending',
   priority: 'medium',
   threadId: 'thread-1' as any,
@@ -111,9 +118,10 @@ describe('useTaskHandlers', () => {
       const taskData = {
         title: 'New Task',
         description: 'New task description',
+        prompt: 'New task prompt',
         status: 'pending' as const,
         priority: 'high' as const,
-        assignedTo: 'user-1',
+        assignedTo: 'user-1' as any,
         threadId: 'thread-1' as any,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -128,7 +136,7 @@ describe('useTaskHandlers', () => {
       expect(mockTaskManager.createTask).toHaveBeenCalledWith({
         title: 'New Task',
         description: 'New task description',
-        prompt: 'New task description',
+        prompt: 'New task prompt', // Uses taskData.prompt since it exists
         priority: 'high',
         assignedTo: 'user-1',
       });
@@ -136,7 +144,19 @@ describe('useTaskHandlers', () => {
 
     it('uses title as prompt when description is empty', async () => {
       const { result } = renderHook(() => useTaskHandlers(getDefaultProps()));
-      const taskData = createMockTask({ description: '', title: 'Title Only' });
+      // Create task data with empty prompt field to test fallback logic
+      const taskData = {
+        title: 'Title Only',
+        description: '',
+        prompt: '', // Empty prompt - should fall back to title
+        status: 'pending' as const,
+        priority: 'medium' as const,
+        threadId: 'thread-1' as any,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+        createdBy: 'user-1',
+      };
 
       await act(async () => {
         await result.current.handleTaskCreate(taskData);
@@ -172,7 +192,7 @@ describe('useTaskHandlers', () => {
         description: 'From modal',
         status: 'pending' as const,
         priority: 'low' as const,
-        assignedTo: 'user-2',
+        assignedTo: 'user-2' as any,
         prompt: 'Custom prompt',
       };
 
@@ -196,6 +216,7 @@ describe('useTaskHandlers', () => {
       const taskData = {
         title: 'Modal Task',
         description: 'From modal',
+        prompt: 'Modal task prompt',
         status: 'pending' as const,
         priority: 'low' as const,
       };
@@ -293,6 +314,7 @@ describe('useTaskHandlers', () => {
         await result.current.handleTaskCreateFromModal({
           title: 'Test',
           description: 'Test',
+          prompt: 'Test prompt',
           status: 'pending',
           priority: 'medium',
         });
