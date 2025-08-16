@@ -37,6 +37,7 @@ import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
 import {
   EventStreamProvider,
   useSessionEvents,
@@ -52,6 +53,7 @@ import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
+import { AgentProvider } from '@/components/providers/AgentProvider';
 import Link from 'next/link';
 
 // Inner component that uses app state context
@@ -59,19 +61,23 @@ const LaceAppInner = memo(function LaceAppInner() {
   // Theme state
   const { theme, setTheme } = useTheme();
 
-  // App state from context (replaces individual hook calls)
+  // App state from context (now only hash router selections)
   const {
-    selections: { selectedSession, selectedAgent, urlStateHydrated },
-    agents: { sessionDetails: selectedSessionDetails, loading: agentLoading },
-    actions: {
-      setSelectedSession,
-      setSelectedAgent,
-      updateHashState,
-      createAgent,
-      updateAgentState,
-      reloadSessionDetails,
-    },
+    selections: { selectedSession, urlStateHydrated },
+    actions: { setSelectedSession, updateHashState },
   } = useAppState();
+
+  // Agent state from AgentProvider
+  const {
+    sessionDetails: selectedSessionDetails,
+    loading: agentLoading,
+    selectedAgent,
+    foundAgent,
+    selectAgent: setSelectedAgent,
+    createAgent,
+    updateAgentState,
+    reloadSessionDetails,
+  } = useAgentContext();
 
   // Session state from SessionProvider
   const {
@@ -539,9 +545,37 @@ export default function LaceApp() {
 const LaceAppContent = memo(function LaceAppContent() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
-    agents: { sessionDetails: selectedSessionDetails },
-    actions: { updateAgentState },
   } = useAppState();
+
+  const handleProjectChange = useCallback((projectId: string | null) => {
+    // Enable auto-selection for project changes
+    // This matches the current LaceApp behavior
+    // TODO: Move this logic to AgentProvider when we create it
+  }, []);
+
+  const handleAgentChange = useCallback((agentId: string | null) => {
+    // Agent selection change handling
+    // This will be called when agent selection changes
+  }, []);
+
+  return (
+    <ProjectProvider onProjectChange={handleProjectChange}>
+      <SessionProvider projectId={selectedProject}>
+        <AgentProvider sessionId={selectedSession} onAgentChange={handleAgentChange}>
+          <AgentProviderConsumer />
+        </AgentProvider>
+      </SessionProvider>
+    </ProjectProvider>
+  );
+});
+
+// Consumer component that has access to AgentProvider context
+const AgentProviderConsumer = memo(function AgentProviderConsumer() {
+  const {
+    selections: { selectedProject, selectedSession, selectedAgent },
+  } = useAppState();
+
+  const { sessionDetails: selectedSessionDetails, updateAgentState } = useAgentContext();
 
   const handleAgentStateChange = useCallback(
     (agentId: string, from: string, to: string) => {
@@ -550,30 +584,20 @@ const LaceAppContent = memo(function LaceAppContent() {
     [updateAgentState]
   );
 
-  const handleProjectChange = useCallback((projectId: string | null) => {
-    // Enable auto-selection for project changes
-    // This matches the current LaceApp behavior
-    // TODO: Move this logic to AgentProvider when we create it
-  }, []);
-
   return (
-    <ProjectProvider onProjectChange={handleProjectChange}>
-      <SessionProvider projectId={selectedProject}>
-        <EventStreamProvider
-          projectId={selectedProject}
-          sessionId={selectedSession as ThreadId | null}
-          agentId={selectedAgent as ThreadId | null}
-          onAgentStateChange={handleAgentStateChange}
-        >
-          <TaskProvider
-            projectId={selectedProject}
-            sessionId={selectedSession as ThreadId | null}
-            agents={selectedSessionDetails?.agents}
-          >
-            <LaceAppInner />
-          </TaskProvider>
-        </EventStreamProvider>
-      </SessionProvider>
-    </ProjectProvider>
+    <EventStreamProvider
+      projectId={selectedProject}
+      sessionId={selectedSession as ThreadId | null}
+      agentId={selectedAgent as ThreadId | null}
+      onAgentStateChange={handleAgentStateChange}
+    >
+      <TaskProvider
+        projectId={selectedProject}
+        sessionId={selectedSession as ThreadId | null}
+        agents={selectedSessionDetails?.agents}
+      >
+        <LaceAppInner />
+      </TaskProvider>
+    </EventStreamProvider>
   );
 });

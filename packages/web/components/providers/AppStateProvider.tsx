@@ -5,9 +5,7 @@
 
 import React, { createContext, useContext, type ReactNode } from 'react';
 import { useHashRouter } from '@/hooks/useHashRouter';
-import { useAgentManagement } from '@/hooks/useAgentManagement';
-import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
-import type { CreateAgentRequest } from '@/types/api';
+import type { ThreadId } from '@/types/core';
 
 // Types for the context
 interface AppSelections {
@@ -15,11 +13,6 @@ interface AppSelections {
   selectedSession: string | null;
   selectedAgent: string | null;
   urlStateHydrated: boolean;
-}
-
-interface AppAgents {
-  sessionDetails: SessionInfo | null;
-  loading: boolean;
 }
 
 interface AppActions {
@@ -32,16 +25,10 @@ interface AppActions {
     replace?: boolean
   ) => void;
   clearAll: (replace?: boolean) => void;
-
-  // Agent actions
-  createAgent: (sessionId: string, request: CreateAgentRequest) => Promise<void>;
-  updateAgentState: (agentId: string, fromState: string, toState: string) => void;
-  reloadSessionDetails: () => Promise<void>;
 }
 
 interface AppStateContextType {
   selections: AppSelections;
-  agents: AppAgents;
   actions: AppActions;
 }
 
@@ -55,9 +42,6 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   // Hash-based routing state
   const hashRouter = useHashRouter();
 
-  // Business logic hooks
-  const agentManagement = useAgentManagement(hashRouter.session);
-
   // Create context value
   const contextValue: AppStateContextType = {
     selections: {
@@ -67,11 +51,6 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       urlStateHydrated: hashRouter.isHydrated,
     },
 
-    agents: {
-      sessionDetails: agentManagement.sessionDetails,
-      loading: agentManagement.loading,
-    },
-
     actions: {
       // Selection actions
       setSelectedProject: hashRouter.setProject,
@@ -79,11 +58,6 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       setSelectedAgent: hashRouter.setAgent,
       updateHashState: hashRouter.updateState,
       clearAll: hashRouter.clearAll,
-
-      // Agent actions
-      createAgent: agentManagement.createAgent,
-      updateAgentState: agentManagement.updateAgentState,
-      reloadSessionDetails: agentManagement.reloadSessionDetails,
     },
   };
 
@@ -104,11 +78,6 @@ export function useAppState(): AppStateContextType {
 export function useAppSelections() {
   const { selections } = useAppState();
   return selections;
-}
-
-export function useAppAgents() {
-  const { agents } = useAppState();
-  return agents;
 }
 
 export function useAppActions() {

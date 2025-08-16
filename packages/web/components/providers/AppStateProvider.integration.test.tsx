@@ -1,5 +1,5 @@
-// ABOUTME: Integration tests for AppStateProvider with LaceApp component
-// ABOUTME: Tests actual integration behavior and prop drilling elimination
+// ABOUTME: Integration tests for AppStateProvider with hash router selections
+// ABOUTME: Tests actual integration behavior and prop drilling elimination for URL state
 
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -10,20 +10,19 @@ import type { ThreadId } from '@/types/core';
 
 // Mock all the hooks that AppStateProvider depends on
 vi.mock('@/hooks/useHashRouter');
-vi.mock('@/hooks/useAgentManagement');
 
 import { useHashRouter } from '@/hooks/useHashRouter';
-import { useAgentManagement } from '@/hooks/useAgentManagement';
 
 // Test component that consumes app state without receiving it through props
 function TestConsumerComponent() {
-  const { selections, agents, actions } = useAppState();
+  const { selections, actions } = useAppState();
 
   return (
     <div>
       <div data-testid="selected-project">{selections.selectedProject || 'none'}</div>
+      <div data-testid="selected-session">{selections.selectedSession || 'none'}</div>
       <div data-testid="selected-agent">{selections.selectedAgent || 'none'}</div>
-      <div data-testid="agents-loading">{agents.loading.toString()}</div>
+      <div data-testid="url-hydrated">{selections.urlStateHydrated.toString()}</div>
       <button
         data-testid="set-project-button"
         onClick={() => actions.setSelectedProject('new-project')}
@@ -59,14 +58,6 @@ describe('AppStateProvider Integration', () => {
       state: {},
       isHydrated: true,
     });
-
-    vi.mocked(useAgentManagement).mockReturnValue({
-      sessionDetails: null,
-      loading: false,
-      createAgent: vi.fn(),
-      updateAgentState: vi.fn(),
-      reloadSessionDetails: vi.fn(),
-    });
   });
 
   it('provides app state to deeply nested components without prop drilling', () => {
@@ -82,14 +73,6 @@ describe('AppStateProvider Integration', () => {
       clearAll: vi.fn(),
       state: { project: 'test-project', session: 'test-session', agent: 'test-agent' },
       isHydrated: true,
-    });
-
-    vi.mocked(useAgentManagement).mockReturnValue({
-      sessionDetails: null,
-      loading: true,
-      createAgent: vi.fn(),
-      updateAgentState: vi.fn(),
-      reloadSessionDetails: vi.fn(),
     });
 
     render(
@@ -108,8 +91,9 @@ describe('AppStateProvider Integration', () => {
 
     // Verify state is accessible without prop drilling
     expect(screen.getByTestId('selected-project')).toHaveTextContent('test-project');
+    expect(screen.getByTestId('selected-session')).toHaveTextContent('test-session');
     expect(screen.getByTestId('selected-agent')).toHaveTextContent('test-agent');
-    expect(screen.getByTestId('agents-loading')).toHaveTextContent('true');
+    expect(screen.getByTestId('url-hydrated')).toHaveTextContent('true');
   });
 
   it('allows actions to be called from deeply nested components', async () => {
@@ -200,21 +184,8 @@ describe('AppStateProvider Integration', () => {
     expect(screen.getByTestId('selected-project')).toHaveTextContent('updated-project');
   });
 
-  it('passes correct parameters to underlying hooks based on selections', () => {
-    vi.mocked(useHashRouter).mockReturnValue({
-      project: 'test-project',
-      session: 'test-session' as ThreadId,
-      agent: null,
-      setProject: vi.fn(),
-      setSession: vi.fn(),
-      setAgent: vi.fn(),
-      updateState: vi.fn(),
-      clearAll: vi.fn(),
-      state: { project: 'test-project', session: 'test-session' },
-      isHydrated: true,
-    });
-
-    render(
+  it('reflects changes when hash router state changes', () => {
+    const { rerender } = render(
       <ThemeProvider>
         <AppStateProvider>
           <TestConsumerComponent />
@@ -222,7 +193,35 @@ describe('AppStateProvider Integration', () => {
       </ThemeProvider>
     );
 
-    // Verify hooks are called with correct parameters
-    expect(useAgentManagement).toHaveBeenCalledWith('test-session');
+    // Initially shows no selections
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('none');
+    expect(screen.getByTestId('selected-session')).toHaveTextContent('none');
+
+    // Mock hash router returns different values
+    vi.mocked(useHashRouter).mockReturnValue({
+      project: 'updated-project',
+      session: 'updated-session' as ThreadId,
+      agent: null,
+      setProject: mockSetProject,
+      setSession: vi.fn(),
+      setAgent: vi.fn(),
+      updateState: vi.fn(),
+      clearAll: vi.fn(),
+      state: { project: 'updated-project', session: 'updated-session' },
+      isHydrated: true,
+    });
+
+    // Force re-render with new mock data
+    rerender(
+      <ThemeProvider>
+        <AppStateProvider>
+          <TestConsumerComponent />
+        </AppStateProvider>
+      </ThemeProvider>
+    );
+
+    // Should reflect updated state
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('updated-project');
+    expect(screen.getByTestId('selected-session')).toHaveTextContent('updated-session');
   });
 });
