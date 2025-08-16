@@ -704,6 +704,15 @@ export function ProjectSelectorPanel({
             <div
               onClick={() => setShowCreateProject(true)}
               className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
+              data-testid="create-new-project-button"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setShowCreateProject(true);
+                }
+              }}
             >
               <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
               <div className="text-left">
