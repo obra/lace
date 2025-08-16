@@ -9,7 +9,7 @@ import { useHashRouter } from '@/hooks/useHashRouter';
 import type { ProjectInfo } from '@/types/core';
 
 // Types for project context
-interface ProjectContextType {
+export interface ProjectContextType {
   // Project data (from useProjectManagement hook)
   projects: ProjectInfo[];
   loading: boolean;

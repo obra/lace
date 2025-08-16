@@ -18,7 +18,7 @@ import {
 } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
-import { parseResponse, parseTyped } from '@/lib/serialization';
+import { parseTyped } from '@/lib/serialization';
 import { DirectoryField } from '@/components/ui';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
@@ -86,7 +86,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectContext();
-  const { enableAgentAutoSelection, sessions } = useSessionContext();
+  const { enableAgentAutoSelection, sessions, loadSessionsForProject } = useSessionContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIState();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,
@@ -451,16 +451,11 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
       // If onboarding is available, get the session for this project
       if (handleOnboardingComplete) {
         try {
-          // TODO: This should use SessionProvider method to get sessions by projectId instead of direct API call
-          // SessionProvider currently only loads sessions for selected project, need method for any projectId
-          const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
-          if (sessionsRes.ok) {
-            const sessionsData = await parseResponse<Array<{ id: string }>>(sessionsRes);
-            const sessionId = sessionsData[0]?.id;
-            if (sessionId) {
-              const coordinatorAgentId = sessionId; // coordinator has same threadId
-              await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-            }
+          const sessionsData = await loadSessionsForProject(projectId);
+          const sessionId = sessionsData[0]?.id;
+          if (sessionId) {
+            const coordinatorAgentId = sessionId; // coordinator has same threadId
+            await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
           }
         } catch (error) {
           console.error('Failed to get project sessions for onboarding:', error);
