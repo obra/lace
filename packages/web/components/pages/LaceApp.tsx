@@ -47,6 +47,10 @@ import {
 } from '@/components/providers/EventStreamProvider';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
+import { SessionSection } from '@/components/sidebar/SessionSection';
+import { ProjectSection } from '@/components/sidebar/ProjectSection';
+import { SidebarContent } from '@/components/sidebar/SidebarContent';
+import { useTaskHandlers } from '@/hooks/useTaskHandlers';
 import Link from 'next/link';
 
 // Inner component that uses app state context
@@ -301,92 +305,20 @@ const LaceAppInner = memo(function LaceAppInner() {
     setShouldAutoSelectAgent(true);
   };
 
-  // Handle task updates
-  const handleTaskUpdate = async (task: Task) => {
-    if (!taskManager) return;
-
-    try {
-      await taskManager.updateTask(task.id, {
-        status: task.status,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        assignedTo: task.assignedTo,
-      });
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    }
-  };
-
-  const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
-    if (!taskManager) return;
-
-    try {
-      await taskManager.createTask({
-        title: taskData.title,
-        description: taskData.description,
-        prompt: taskData.prompt || taskData.description || taskData.title,
-        priority: taskData.priority,
-        assignedTo: taskData.assignedTo,
-      });
-    } catch (error) {
-      console.error('Failed to create task:', error);
-    }
-  };
-
-  // Handle task creation from modal
-  const handleTaskCreateFromModal = async (
-    taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>
-  ) => {
-    if (!taskManager) return;
-
-    try {
-      await taskManager.createTask({
-        title: taskData.title,
-        description: taskData.description,
-        prompt: taskData.prompt,
-        priority: taskData.priority,
-        assignedTo: taskData.assignedTo,
-      });
-      setShowTaskCreation(false);
-    } catch (error) {
-      console.error('Failed to create task:', error);
-    }
-  };
-
-  // Handle opening task display modal
-  const handleTaskDisplay = (task: Task) => {
-    setSelectedTaskForDisplay(task);
-    setShowTaskDisplay(true);
-  };
-
-  // Handle updating task from display modal
-  const handleTaskUpdateFromModal = async (taskId: string, updates: Partial<Task>) => {
-    if (!taskManager) return;
-
-    try {
-      await taskManager.updateTask(taskId, {
-        title: updates.title,
-        description: updates.description,
-        status: updates.status,
-        priority: updates.priority,
-        assignedTo: updates.assignedTo,
-      });
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    }
-  };
-
-  // Handle adding task note
-  const handleTaskAddNote = async (taskId: string, content: string) => {
-    if (!taskManager) return;
-
-    try {
-      await taskManager.addNote(taskId, content);
-    } catch (error) {
-      console.error('Failed to add task note:', error);
-    }
-  };
+  // Task handlers from custom hook
+  const {
+    handleTaskUpdate,
+    handleTaskCreate,
+    handleTaskCreateFromModal,
+    handleTaskDisplay,
+    handleTaskUpdateFromModal,
+    handleTaskAddNote,
+  } = useTaskHandlers({
+    taskManager,
+    onSetShowTaskCreation: setShowTaskCreation,
+    onSetShowTaskDisplay: setShowTaskDisplay,
+    onSetSelectedTaskForDisplay: setSelectedTaskForDisplay,
+  });
 
   // Convert projects to format expected by Sidebar
   // If selectedProject ID doesn't match any actual project, clear the selection
@@ -467,226 +399,21 @@ const LaceAppInner = memo(function LaceAppInner() {
                   onClose={() => setShowMobileNav(false)}
                   onSettingsClick={onOpenSettings}
                 >
-                  {/* WORKSPACE CONTEXT */}
-                  {selectedProject && (
-                    <SidebarSection
-                      title="Workspace"
-                      icon={faFolder}
-                      defaultCollapsed={false}
-                      collapsible={false}
-                    >
-                      {/* Project Overview Card */}
-                      <div className="bg-base-100/80 backdrop-blur-sm border border-base-300/30 rounded-xl p-4 mb-3 shadow-sm -ml-1">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="min-w-0 flex-1">
-                            <h3
-                              data-testid="current-project-name"
-                              className="font-semibold text-base-content text-sm truncate leading-tight"
-                            >
-                              {currentProject.name}
-                            </h3>
-                            {currentProject.description && (
-                              <p className="text-xs text-base-content/60 truncate mt-0.5">
-                                {currentProject.description}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSelectedProject(null);
-                              setShowMobileNav(false);
-                            }}
-                            className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 flex-shrink-0 border border-transparent hover:border-base-300/30"
-                            title="Switch project"
-                          >
-                            <svg
-                              className="w-3.5 h-3.5 text-base-content/50 hover:text-base-content/70 transition-colors"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-
-                        {/* Project Stats */}
-                        <div className="flex items-center gap-4 text-xs text-base-content/60">
-                          <div className="flex items-center gap-1.5">
-                            <FontAwesomeIcon icon={faComments} className="w-3 h-3" />
-                            <span>
-                              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          {selectedSessionDetails && (
-                            <div className="flex items-center gap-1.5">
-                              <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
-                              <span>
-                                {selectedSessionDetails.agents?.length || 0} agent
-                                {selectedSessionDetails.agents?.length !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </SidebarSection>
-                  )}
-
-                  {/* ACTIVE SESSION */}
-                  {selectedSessionDetails && (
-                    <SidebarSection
-                      title="Active Session"
-                      icon={faComments}
-                      defaultCollapsed={false}
-                      collapsible={false}
-                    >
-                      {/* Session Header */}
-                      <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm text-base-content truncate">
-                            {selectedSessionDetails.name}
-                          </h4>
-                          {!selectedAgent && (
-                            <span className="text-xs text-warning font-medium">Setup needed</span>
-                          )}
-                        </div>
-
-                        {/* Agent Status or Selection */}
-                        {selectedAgent ? (
-                          (() => {
-                            const currentAgent = selectedSessionDetails.agents?.find(
-                              (a) => a.threadId === selectedAgent
-                            );
-                            return currentAgent ? (
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <FontAwesomeIcon
-                                    icon={faRobot}
-                                    className="w-3.5 h-3.5 text-base-content/60 flex-shrink-0"
-                                  />
-                                  <span className="text-xs text-base-content/80 truncate">
-                                    {currentAgent.name}
-                                  </span>
-                                </div>
-                                <span
-                                  className={`text-xs badge badge-xs ${
-                                    currentAgent.status === 'idle'
-                                      ? 'badge-success'
-                                      : currentAgent.status === 'thinking' ||
-                                          currentAgent.status === 'tool_execution' ||
-                                          currentAgent.status === 'streaming'
-                                        ? 'badge-warning'
-                                        : 'badge-neutral'
-                                  }`}
-                                >
-                                  {currentAgent.status}
-                                </span>
-                              </div>
-                            ) : null;
-                          })()
-                        ) : (
-                          <div className="text-xs text-base-content/60">
-                            {selectedSessionDetails.agents?.length || 0} agents available
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Primary Actions */}
-                      {selectedAgent ? (
-                        <div className="space-y-2">
-                          <SidebarButton
-                            onClick={() => {
-                              setShowMobileNav(false);
-                            }}
-                            variant="secondary"
-                            className="font-medium"
-                          >
-                            Continue Session
-                          </SidebarButton>
-
-                          {selectedSessionDetails.agents &&
-                            selectedSessionDetails.agents.length > 1 && (
-                              <SidebarButton
-                                onClick={() => {
-                                  setSelectedAgent(null);
-                                  setShowMobileNav(false);
-                                }}
-                                variant="ghost"
-                                size="sm"
-                              >
-                                <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />
-                                Switch Agent
-                              </SidebarButton>
-                            )}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Agent Selection */}
-                          {selectedSessionDetails.agents?.map((agent) => (
-                            <SidebarItem
-                              key={agent.threadId}
-                              active={selectedAgent === agent.threadId}
-                              onClick={() => {
-                                handleAgentSelect(agent.threadId);
-                                setShowMobileNav(false);
-                              }}
-                              className="text-sm"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <FontAwesomeIcon
-                                    icon={faRobot}
-                                    className="w-3.5 h-3.5 text-base-content/60"
-                                  />
-                                  <span className="font-medium truncate">{agent.name}</span>
-                                </div>
-                                <span
-                                  className={`text-xs badge badge-xs ${
-                                    agent.status === 'idle'
-                                      ? 'badge-success'
-                                      : agent.status === 'thinking' ||
-                                          agent.status === 'tool_execution' ||
-                                          agent.status === 'streaming'
-                                        ? 'badge-warning'
-                                        : 'badge-neutral'
-                                  }`}
-                                >
-                                  {agent.status}
-                                </span>
-                              </div>
-                            </SidebarItem>
-                          )) || []}
-
-                          <SidebarButton
-                            onClick={() => {
-                              setSelectedAgent(null);
-                              setShowMobileNav(false);
-                            }}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            <FontAwesomeIcon icon={faCog} className="w-3.5 h-3.5" />
-                            Configure Session
-                          </SidebarButton>
-                        </div>
-                      )}
-                    </SidebarSection>
-                  )}
-
-                  {/* TASK MANAGEMENT */}
-                  <TaskSidebarSection
-                    taskManager={taskManager}
+                  <SidebarContent
                     selectedProject={selectedProject}
+                    currentProject={currentProject}
+                    sessionsCount={sessions.length}
                     selectedSession={selectedSession as ThreadId | null}
                     selectedSessionDetails={selectedSessionDetails}
+                    selectedAgent={selectedAgent as ThreadId | null}
+                    taskManager={taskManager}
+                    isMobile={true}
+                    onCloseMobileNav={() => setShowMobileNav(false)}
+                    onSwitchProject={() => setSelectedProject(null)}
+                    onAgentSelect={handleAgentSelect}
+                    onClearAgent={() => setSelectedAgent(null)}
                     onShowTaskBoard={() => setShowTaskBoard(true)}
                     onShowTaskCreation={() => setShowTaskCreation(true)}
-                    onCloseMobileNav={() => setShowMobileNav(false)}
                   />
                 </MobileSidebar>
               )}
@@ -704,210 +431,18 @@ const LaceAppInner = memo(function LaceAppInner() {
               onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
               onSettingsClick={onOpenSettings}
             >
-              {/* WORKSPACE CONTEXT */}
-              {selectedProject && (
-                <SidebarSection
-                  title="Workspace"
-                  icon={faFolder}
-                  defaultCollapsed={false}
-                  collapsible={false}
-                >
-                  {/* Project Overview Card */}
-                  <div className="bg-base-100/80 backdrop-blur-sm border border-base-300/30 rounded-xl p-4 mb-3 shadow-sm -ml-1">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="min-w-0 flex-1">
-                        <h3
-                          data-testid="current-project-name-desktop"
-                          className="font-semibold text-base-content text-sm truncate leading-tight"
-                        >
-                          {currentProject.name}
-                        </h3>
-                        {currentProject.description && (
-                          <p className="text-xs text-base-content/60 truncate mt-0.5">
-                            {currentProject.description}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => setSelectedProject(null)}
-                        className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 flex-shrink-0 border border-transparent hover:border-base-300/30"
-                        title="Switch project"
-                      >
-                        <svg
-                          className="w-3.5 h-3.5 text-base-content/50 hover:text-base-content/70 transition-colors"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Project Stats */}
-                    <div className="flex items-center gap-4 text-xs text-base-content/60">
-                      <div className="flex items-center gap-1.5">
-                        <FontAwesomeIcon icon={faComments} className="w-3 h-3" />
-                        <span>
-                          {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      {selectedSessionDetails && (
-                        <div className="flex items-center gap-1.5">
-                          <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
-                          <span>
-                            {selectedSessionDetails.agents?.length || 0} agent
-                            {selectedSessionDetails.agents?.length !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </SidebarSection>
-              )}
-
-              {/* ACTIVE SESSION */}
-              {selectedSessionDetails && (
-                <SidebarSection
-                  title="Active Session"
-                  icon={faComments}
-                  defaultCollapsed={false}
-                  collapsible={false}
-                >
-                  {/* Session Header */}
-                  <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-sm text-base-content truncate">
-                        {selectedSessionDetails.name}
-                      </h4>
-                      {!selectedAgent && (
-                        <span className="text-xs text-warning font-medium">Setup needed</span>
-                      )}
-                    </div>
-
-                    {/* Agent Status or Selection */}
-                    {selectedAgent ? (
-                      (() => {
-                        const currentAgent = selectedSessionDetails.agents?.find(
-                          (a) => a.threadId === selectedAgent
-                        );
-                        return currentAgent ? (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <FontAwesomeIcon
-                                icon={faRobot}
-                                className="w-3.5 h-3.5 text-base-content/60 flex-shrink-0"
-                              />
-                              <span className="text-xs text-base-content/80 truncate">
-                                {currentAgent.name}
-                              </span>
-                            </div>
-                            <span
-                              className={`text-xs badge badge-xs ${
-                                currentAgent.status === 'idle'
-                                  ? 'badge-success'
-                                  : currentAgent.status === 'thinking' ||
-                                      currentAgent.status === 'tool_execution' ||
-                                      currentAgent.status === 'streaming'
-                                    ? 'badge-warning'
-                                    : 'badge-neutral'
-                              }`}
-                            >
-                              {currentAgent.status}
-                            </span>
-                          </div>
-                        ) : null;
-                      })()
-                    ) : (
-                      <div className="text-xs text-base-content/60">
-                        {selectedSessionDetails.agents?.length || 0} agents available
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Primary Actions */}
-                  {selectedAgent ? (
-                    <div className="space-y-2">
-                      <SidebarButton
-                        onClick={() => {
-                          // Could scroll to chat input or focus it
-                        }}
-                        variant="secondary"
-                        className="font-medium"
-                      >
-                        Continue Session
-                      </SidebarButton>
-
-                      {selectedSessionDetails.agents &&
-                        selectedSessionDetails.agents.length > 1 && (
-                          <SidebarButton
-                            onClick={() => setSelectedAgent(null)}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />
-                            Switch Agent
-                          </SidebarButton>
-                        )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {/* Agent Selection */}
-                      {selectedSessionDetails.agents?.map((agent) => (
-                        <SidebarItem
-                          key={agent.threadId}
-                          onClick={() => handleAgentSelect(agent.threadId)}
-                          className="text-sm"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <FontAwesomeIcon
-                                icon={faRobot}
-                                className="w-3.5 h-3.5 text-base-content/60"
-                              />
-                              <span className="font-medium truncate">{agent.name}</span>
-                            </div>
-                            <span
-                              className={`text-xs badge badge-xs ${
-                                agent.status === 'idle'
-                                  ? 'badge-success'
-                                  : agent.status === 'thinking' ||
-                                      agent.status === 'tool_execution' ||
-                                      agent.status === 'streaming'
-                                    ? 'badge-warning'
-                                    : 'badge-neutral'
-                              }`}
-                            >
-                              {agent.status}
-                            </span>
-                          </div>
-                        </SidebarItem>
-                      )) || []}
-
-                      <SidebarButton
-                        onClick={() => setSelectedAgent(null)}
-                        variant="ghost"
-                        size="sm"
-                      >
-                        <FontAwesomeIcon icon={faCog} className="w-3.5 h-3.5" />
-                        Configure Session
-                      </SidebarButton>
-                    </div>
-                  )}
-                </SidebarSection>
-              )}
-
-              {/* TASK MANAGEMENT */}
-              <TaskSidebarSection
-                taskManager={taskManager}
+              <SidebarContent
                 selectedProject={selectedProject}
+                currentProject={currentProject}
+                sessionsCount={sessions.length}
                 selectedSession={selectedSession as ThreadId | null}
                 selectedSessionDetails={selectedSessionDetails}
+                selectedAgent={selectedAgent as ThreadId | null}
+                taskManager={taskManager}
+                isMobile={false}
+                onSwitchProject={() => setSelectedProject(null)}
+                onAgentSelect={handleAgentSelect}
+                onClearAgent={() => setSelectedAgent(null)}
                 onShowTaskBoard={() => setShowTaskBoard(true)}
                 onShowTaskCreation={() => setShowTaskCreation(true)}
               />
