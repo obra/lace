@@ -7,25 +7,29 @@ import React, { memo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faRobot, faCog } from '@/lib/fontawesome';
 import { SidebarSection, SidebarButton, SidebarItem } from '@/components/layout/Sidebar';
-import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
+import { useAgentContext } from '@/components/providers/AgentProvider';
+import type { ThreadId, AgentInfo } from '@/types/core';
 
 interface SessionSectionProps {
-  selectedSessionDetails: SessionInfo;
-  selectedAgent: ThreadId | null;
   isMobile?: boolean;
+  onCloseMobileNav?: () => void;
   onAgentSelect: (agentId: string) => void;
   onClearAgent: () => void;
-  onCloseMobileNav?: () => void;
 }
 
 export const SessionSection = memo(function SessionSection({
-  selectedSessionDetails,
-  selectedAgent,
   isMobile = false,
+  onCloseMobileNav,
   onAgentSelect,
   onClearAgent,
-  onCloseMobileNav,
 }: SessionSectionProps) {
+  // Get agent data from AgentProvider
+  const { sessionDetails, selectedAgent } = useAgentContext();
+
+  // Don't render if no session is selected
+  if (!sessionDetails) {
+    return null;
+  }
   const handleContinueSession = () => {
     if (isMobile) {
       onCloseMobileNav?.();
@@ -69,7 +73,7 @@ export const SessionSection = memo(function SessionSection({
 
   // Find current agent for display
   const currentAgent = selectedAgent
-    ? selectedSessionDetails.agents?.find((a) => a.threadId === selectedAgent)
+    ? sessionDetails.agents?.find((a) => a.threadId === selectedAgent)
     : null;
 
   return (
@@ -82,9 +86,7 @@ export const SessionSection = memo(function SessionSection({
       {/* Session Header */}
       <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-medium text-sm text-base-content truncate">
-            {selectedSessionDetails.name}
-          </h4>
+          <h4 className="font-medium text-sm text-base-content truncate">{sessionDetails.name}</h4>
           {!selectedAgent && <span className="text-xs text-warning font-medium">Setup needed</span>}
         </div>
 
@@ -106,7 +108,7 @@ export const SessionSection = memo(function SessionSection({
           </div>
         ) : (
           <div className="text-xs text-base-content/60">
-            {selectedSessionDetails.agents?.length || 0} agents available
+            {sessionDetails.agents?.length || 0} agents available
           </div>
         )}
       </div>
@@ -122,7 +124,7 @@ export const SessionSection = memo(function SessionSection({
             Continue Session
           </SidebarButton>
 
-          {selectedSessionDetails.agents && selectedSessionDetails.agents.length > 1 && (
+          {sessionDetails.agents && sessionDetails.agents.length > 1 && (
             <SidebarButton onClick={handleSwitchAgent} variant="ghost" size="sm">
               <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />
               Switch Agent
@@ -132,7 +134,7 @@ export const SessionSection = memo(function SessionSection({
       ) : (
         <div className="space-y-2">
           {/* Agent Selection */}
-          {selectedSessionDetails.agents?.map((agent) => (
+          {sessionDetails.agents?.map((agent) => (
             <SidebarItem
               key={agent.threadId}
               active={selectedAgent === agent.threadId}

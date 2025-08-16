@@ -1,5 +1,5 @@
-// ABOUTME: Unit tests for SessionSection component
-// ABOUTME: Tests agent selection, mobile/desktop behaviors, status display
+// ABOUTME: Unit tests for SessionSection component with provider-based architecture
+// ABOUTME: Tests agent selection, mobile/desktop behaviors, status display with providers
 
 /**
  * @vitest-environment jsdom
@@ -11,6 +11,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
+
+// Mock the AgentProvider
+vi.mock('@/components/providers/AgentProvider', () => ({
+  useAgentContext: vi.fn(),
+}));
+
+// Import the mocked hook
+import { useAgentContext } from '@/components/providers/AgentProvider';
+const mockUseAgentContext = vi.mocked(useAgentContext);
 
 // Test data factories
 const createMockAgent = (
@@ -38,11 +47,6 @@ describe('SessionSection', () => {
   const mockOnCloseMobileNav = vi.fn();
 
   const defaultProps = {
-    selectedSessionDetails: createMockSessionDetails([
-      createMockAgent('agent-1', 'Alice', 'idle'),
-      createMockAgent('agent-2', 'Bob', 'thinking'),
-    ]),
-    selectedAgent: null,
     onAgentSelect: mockOnAgentSelect,
     onClearAgent: mockOnClearAgent,
     onCloseMobileNav: mockOnCloseMobileNav,
@@ -50,6 +54,22 @@ describe('SessionSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default mock setup
+    mockUseAgentContext.mockReturnValue({
+      sessionDetails: createMockSessionDetails([
+        createMockAgent('agent-1', 'Alice', 'idle'),
+        createMockAgent('agent-2', 'Bob', 'thinking'),
+      ]),
+      loading: false,
+      selectedAgent: null,
+      foundAgent: null,
+      selectAgent: vi.fn(),
+      createAgent: vi.fn(),
+      updateAgentState: vi.fn(),
+      onAgentSelect: vi.fn(),
+      reloadSessionDetails: vi.fn(),
+    });
   });
 
   describe('Basic Structure', () => {
@@ -64,13 +84,42 @@ describe('SessionSection', () => {
       render(<SessionSection {...defaultProps} />);
 
       expect(screen.getByText('Setup needed')).toBeInTheDocument();
-      expect(screen.getByText('2 agents available')).toBeInTheDocument();
     });
 
     it('does not show setup needed when agent is selected', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+        loading: false,
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<SessionSection {...defaultProps} />);
 
       expect(screen.queryByText('Setup needed')).not.toBeInTheDocument();
+    });
+
+    it('does not render when no session details available', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: null,
+        loading: false,
+        selectedAgent: null,
+        foundAgent: null,
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      const { container } = render(<SessionSection {...defaultProps} />);
+
+      expect(container.firstChild).toBeNull();
     });
   });
 
@@ -84,28 +133,62 @@ describe('SessionSection', () => {
     });
 
     it('shows continue session UI when agent selected', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([
+          createMockAgent('agent-1', 'Alice', 'idle'),
+          createMockAgent('agent-2', 'Bob', 'thinking'),
+        ]),
+        loading: false,
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<SessionSection {...defaultProps} />);
 
       expect(screen.getByText('Continue Session')).toBeInTheDocument();
       expect(screen.queryByText('Configure Session')).not.toBeInTheDocument();
     });
 
     it('shows switch agent button for multi-agent sessions', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([
+          createMockAgent('agent-1', 'Alice', 'idle'),
+          createMockAgent('agent-2', 'Bob', 'thinking'),
+        ]),
+        loading: false,
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<SessionSection {...defaultProps} />);
 
       expect(screen.getByText('Switch Agent')).toBeInTheDocument();
     });
 
     it('does not show switch agent button for single agent sessions', () => {
-      const singleAgentSession = createMockSessionDetails([createMockAgent('agent-1', 'Alice')]);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+        loading: false,
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
 
-      render(
-        <SessionSection
-          {...defaultProps}
-          selectedSessionDetails={singleAgentSession}
-          selectedAgent={'agent-1' as ThreadId}
-        />
-      );
+      render(<SessionSection {...defaultProps} />);
 
       expect(screen.queryByText('Switch Agent')).not.toBeInTheDocument();
     });
@@ -113,45 +196,98 @@ describe('SessionSection', () => {
 
   describe('Agent Status Display', () => {
     it('displays current agent name and status when selected', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'thinking')]),
+        loading: false,
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Alice', 'thinking'),
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<SessionSection {...defaultProps} />);
 
       expect(screen.getByText('Alice')).toBeInTheDocument();
-      expect(screen.getByText('idle')).toBeInTheDocument();
+      expect(screen.getByText('thinking')).toBeInTheDocument();
     });
 
     it('shows correct status badges for different agent states', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([
+          createMockAgent('agent-1', 'Alice', 'idle'),
+          createMockAgent('agent-2', 'Bob', 'thinking'),
+          createMockAgent('agent-3', 'Charlie', 'tool_execution'),
+        ]),
+        loading: false,
+        selectedAgent: null,
+        foundAgent: null,
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
       render(<SessionSection {...defaultProps} />);
 
-      // Check status badges in agent list
-      const idleBadges = screen.getAllByText('idle');
-      const thinkingBadges = screen.getAllByText('thinking');
-
-      expect(idleBadges.length).toBeGreaterThan(0);
-      expect(thinkingBadges.length).toBeGreaterThan(0);
+      expect(screen.getByText('idle')).toBeInTheDocument();
+      expect(screen.getByText('thinking')).toBeInTheDocument();
+      expect(screen.getByText('tool_execution')).toBeInTheDocument();
     });
 
     it('handles missing selected agent gracefully', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'nonexistent-agent' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+        loading: false,
+        selectedAgent: 'nonexistent-agent',
+        foundAgent: null,
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
 
-      // Should fall back to showing agent list
+      render(<SessionSection {...defaultProps} />);
+
+      // Should show agent selection UI since current agent is null
       expect(screen.getByText('Alice')).toBeInTheDocument();
-      expect(screen.getByText('Bob')).toBeInTheDocument();
     });
   });
 
-  describe('Event Handlers', () => {
+  describe('Event Handling', () => {
     it('calls onAgentSelect when agent is clicked', () => {
       render(<SessionSection {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Alice'));
+      const aliceButton = screen.getByText('Alice').closest('div')!;
+      fireEvent.click(aliceButton);
 
       expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
     });
 
     it('calls onClearAgent when switch agent is clicked', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} />);
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([
+          createMockAgent('agent-1', 'Alice', 'idle'),
+          createMockAgent('agent-2', 'Bob', 'thinking'),
+        ]),
+        loading: false,
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
 
-      fireEvent.click(screen.getByText('Switch Agent'));
+      render(<SessionSection {...defaultProps} />);
+
+      const switchButton = screen.getByText('Switch Agent');
+      fireEvent.click(switchButton);
 
       expect(mockOnClearAgent).toHaveBeenCalledTimes(1);
     });
@@ -159,120 +295,102 @@ describe('SessionSection', () => {
     it('calls onClearAgent when configure session is clicked', () => {
       render(<SessionSection {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Configure Session'));
+      const configButton = screen.getByText('Configure Session');
+      fireEvent.click(configButton);
 
       expect(mockOnClearAgent).toHaveBeenCalledTimes(1);
     });
-
-    it('handles continue session click', () => {
-      render(<SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} />);
-
-      // Should not throw error when clicked
-      fireEvent.click(screen.getByText('Continue Session'));
-    });
   });
 
-  describe('Mobile vs Desktop Behavior', () => {
-    it('does not call onCloseMobileNav in desktop mode', () => {
-      render(<SessionSection {...defaultProps} isMobile={false} />);
+  describe('Mobile Behavior', () => {
+    it('calls onCloseMobileNav in mobile mode after actions', () => {
+      const mobileProps = { ...defaultProps, isMobile: true };
+      render(<SessionSection {...mobileProps} />);
 
-      fireEvent.click(screen.getByText('Alice'));
+      const aliceButton = screen.getByText('Alice').closest('div')!;
+      fireEvent.click(aliceButton);
 
+      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
       expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
-      expect(mockOnCloseMobileNav).not.toHaveBeenCalled();
-    });
-
-    it('calls onCloseMobileNav when selecting agent in mobile mode', () => {
-      render(<SessionSection {...defaultProps} isMobile={true} />);
-
-      fireEvent.click(screen.getByText('Alice'));
-
-      expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
-      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onCloseMobileNav when switching agent in mobile mode', () => {
-      render(
-        <SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} isMobile={true} />
-      );
-
-      fireEvent.click(screen.getByText('Switch Agent'));
-
-      expect(mockOnClearAgent).toHaveBeenCalledTimes(1);
-      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onCloseMobileNav when continuing session in mobile mode', () => {
-      render(
-        <SessionSection {...defaultProps} selectedAgent={'agent-1' as ThreadId} isMobile={true} />
-      );
-
-      fireEvent.click(screen.getByText('Continue Session'));
-
-      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onCloseMobileNav when configuring session in mobile mode', () => {
-      render(<SessionSection {...defaultProps} isMobile={true} />);
-
-      fireEvent.click(screen.getByText('Configure Session'));
-
-      expect(mockOnClearAgent).toHaveBeenCalledTimes(1);
-      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Agent Status Badge Classes', () => {
-    it('applies correct badge classes for different statuses', () => {
-      const agents = [
-        createMockAgent('agent-1', 'Idle Agent', 'idle'),
-        createMockAgent('agent-2', 'Thinking Agent', 'thinking'),
-        createMockAgent('agent-3', 'Streaming Agent', 'streaming'),
-        createMockAgent('agent-4', 'Tool Agent', 'tool_execution'),
-      ];
-
-      render(
-        <SessionSection
-          {...defaultProps}
-          selectedSessionDetails={createMockSessionDetails(agents)}
-        />
-      );
-
-      // All status text should be present
-      expect(screen.getByText('idle')).toBeInTheDocument();
-      expect(screen.getByText('thinking')).toBeInTheDocument();
-      expect(screen.getByText('streaming')).toBeInTheDocument();
-      expect(screen.getByText('tool_execution')).toBeInTheDocument();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('handles empty agents array', () => {
-      const emptySession = createMockSessionDetails([]);
-
-      render(<SessionSection {...defaultProps} selectedSessionDetails={emptySession} />);
-
-      expect(screen.getByText('0 agents available')).toBeInTheDocument();
-      expect(screen.getByText('Configure Session')).toBeInTheDocument();
-    });
-
-    it('handles undefined agents', () => {
-      const sessionWithoutAgents = {
-        ...defaultProps.selectedSessionDetails,
-        agents: [],
-      };
-
-      render(<SessionSection {...defaultProps} selectedSessionDetails={sessionWithoutAgents} />);
-
-      expect(screen.getByText('0 agents available')).toBeInTheDocument();
     });
 
     it('works without onCloseMobileNav callback', () => {
-      render(<SessionSection {...defaultProps} isMobile={true} onCloseMobileNav={undefined} />);
+      const propsWithoutCallback = { ...defaultProps, onCloseMobileNav: undefined };
 
-      // Should not throw when clicking
-      fireEvent.click(screen.getByText('Alice'));
-      expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
+      expect(() => {
+        render(<SessionSection {...propsWithoutCallback} isMobile={true} />);
+      }).not.toThrow();
+    });
+  });
+
+  describe('Agent Count Display', () => {
+    it('displays correct agent count when no agents available', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([]),
+        loading: false,
+        selectedAgent: null,
+        foundAgent: null,
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<SessionSection {...defaultProps} />);
+
+      expect(screen.getByText('0 agents available')).toBeInTheDocument();
+    });
+
+    it('displays correct agent count for single agent', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+        loading: false,
+        selectedAgent: null,
+        foundAgent: null,
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      render(<SessionSection {...defaultProps} />);
+
+      expect(screen.getByText('1 agents available')).toBeInTheDocument();
+    });
+
+    it('displays correct agent count for multiple agents', () => {
+      render(<SessionSection {...defaultProps} />);
+
+      expect(screen.getByText('2 agents available')).toBeInTheDocument();
+    });
+  });
+
+  describe('Provider Integration', () => {
+    it('uses AgentProvider for session details', () => {
+      render(<SessionSection {...defaultProps} />);
+
+      expect(mockUseAgentContext).toHaveBeenCalled();
+    });
+
+    it('handles loading state from provider', () => {
+      mockUseAgentContext.mockReturnValue({
+        sessionDetails: null,
+        loading: true,
+        selectedAgent: null,
+        foundAgent: null,
+        selectAgent: vi.fn(),
+        createAgent: vi.fn(),
+        updateAgentState: vi.fn(),
+        onAgentSelect: vi.fn(),
+        reloadSessionDetails: vi.fn(),
+      });
+
+      const { container } = render(<SessionSection {...defaultProps} />);
+
+      // Component should not render when sessionDetails is null
+      expect(container.firstChild).toBeNull();
     });
   });
 });

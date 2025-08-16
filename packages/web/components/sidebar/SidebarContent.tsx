@@ -7,79 +7,60 @@ import React, { memo } from 'react';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
-import type { SessionInfo, ThreadId } from '@/types/core';
-
-interface Project {
-  id: string;
-  name: string;
-  description?: string;
-}
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useAppSelections } from '@/components/providers/AppStateProvider';
+import type { ThreadId } from '@/types/core';
 
 interface SidebarContentProps {
-  // Project context
-  selectedProject: string | null;
-  currentProject: Project;
-  sessionsCount: number;
-
-  // Session context
-  selectedSession: ThreadId | null;
-  selectedSessionDetails: SessionInfo | null;
-  selectedAgent: ThreadId | null;
-
   // Mobile behavior
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
 
-  // Event handlers
+  // Event handlers (still needed for parent coordination)
   onSwitchProject: () => void;
   onAgentSelect: (agentId: string) => void;
   onClearAgent: () => void;
 }
 
 export const SidebarContent = memo(function SidebarContent({
-  selectedProject,
-  currentProject,
-  sessionsCount,
-  selectedSession,
-  selectedSessionDetails,
-  selectedAgent,
   isMobile = false,
   onCloseMobileNav,
   onSwitchProject,
   onAgentSelect,
   onClearAgent,
 }: SidebarContentProps) {
+  // Get state from providers
+  const { selectedProject } = useProjectContext();
+  const { selectedSession } = useAppSelections();
+  const { sessionDetails } = useAgentContext();
   return (
     <>
       {/* WORKSPACE CONTEXT */}
       {selectedProject && (
         <ProjectSection
-          currentProject={currentProject}
-          sessionsCount={sessionsCount}
-          selectedSessionDetails={selectedSessionDetails}
           isMobile={isMobile}
-          onSwitchProject={onSwitchProject}
           onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
+          onSwitchProject={onSwitchProject}
         />
       )}
 
       {/* ACTIVE SESSION */}
-      {selectedSessionDetails && (
+      {sessionDetails && (
         <SessionSection
-          selectedSessionDetails={selectedSessionDetails}
-          selectedAgent={selectedAgent}
           isMobile={isMobile}
+          onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
           onAgentSelect={onAgentSelect}
           onClearAgent={onClearAgent}
-          onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
         />
       )}
 
       {/* TASK MANAGEMENT */}
       <TaskSidebarSection
         selectedProject={selectedProject}
-        selectedSession={selectedSession}
-        selectedSessionDetails={selectedSessionDetails}
+        selectedSession={selectedSession as ThreadId | null}
+        selectedSessionDetails={sessionDetails}
         onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
       />
     </>

@@ -7,31 +7,36 @@ import React, { memo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faComments, faRobot } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
-import type { SessionInfo } from '@/types/core';
-
-interface Project {
-  id: string;
-  name: string;
-  description?: string;
-}
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
 
 interface ProjectSectionProps {
-  currentProject: Project;
-  sessionsCount: number;
-  selectedSessionDetails?: SessionInfo | null;
   isMobile?: boolean;
-  onSwitchProject: () => void;
   onCloseMobileNav?: () => void;
+  onSwitchProject: () => void;
 }
 
 export const ProjectSection = memo(function ProjectSection({
-  currentProject,
-  sessionsCount,
-  selectedSessionDetails,
   isMobile = false,
-  onSwitchProject,
   onCloseMobileNav,
+  onSwitchProject,
 }: ProjectSectionProps) {
+  // Get project data from ProjectProvider
+  const { selectedProject, foundProject } = useProjectContext();
+
+  // Get session data from SessionProvider
+  const { sessions } = useSessionContext();
+
+  // Get agent data from AgentProvider
+  const { sessionDetails } = useAgentContext();
+
+  // Don't render if no project is selected
+  if (!selectedProject || !foundProject) {
+    return null;
+  }
+
+  const sessionsCount = sessions?.length || 0;
   const handleSwitchProject = () => {
     onSwitchProject();
     if (isMobile) {
@@ -51,11 +56,11 @@ export const ProjectSection = memo(function ProjectSection({
               data-testid={testId}
               className="font-semibold text-base-content text-sm truncate leading-tight"
             >
-              {currentProject.name}
+              {foundProject.name}
             </h3>
-            {currentProject.description && (
+            {foundProject.description && (
               <p className="text-xs text-base-content/60 truncate mt-0.5">
-                {currentProject.description}
+                {foundProject.description}
               </p>
             )}
           </div>
@@ -89,12 +94,12 @@ export const ProjectSection = memo(function ProjectSection({
               {sessionsCount} session{sessionsCount !== 1 ? 's' : ''}
             </span>
           </div>
-          {selectedSessionDetails && (
+          {sessionDetails && (
             <div className="flex items-center gap-1.5">
               <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
               <span data-testid="agents-count">
-                {selectedSessionDetails.agents?.length || 0} agent
-                {selectedSessionDetails.agents?.length !== 1 ? 's' : ''}
+                {sessionDetails.agents?.length || 0} agent
+                {sessionDetails.agents?.length !== 1 ? 's' : ''}
               </span>
             </div>
           )}
