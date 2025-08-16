@@ -451,6 +451,46 @@ describe('Enhanced Task Manager Tools', () => {
       taskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
     });
 
+    it('should update task status to archived', async () => {
+      // This test should fail initially since 'archived' is not in the schema
+      const result = await taskUpdateTool.execute(
+        {
+          taskId,
+          status: 'archived',
+        },
+        context
+      );
+
+      expect(result.status).toBe('completed');
+      expect(result.content?.[0]?.text).toContain('status to archived');
+    });
+
+    it('should require adding a note when archiving tasks (LLM instruction test)', async () => {
+      // First, archive without a note to show the expected pattern
+      const archiveResult = await taskUpdateTool.execute(
+        {
+          taskId,
+          status: 'archived',
+        },
+        context
+      );
+      expect(archiveResult.status).toBe('completed');
+
+      // Then verify a note should be added separately (this tests that the LLM should be instructed to do this)
+      const addNoteResult = await taskAddNoteTool.execute(
+        {
+          taskId,
+          note: 'Archived: Requirements changed, feature no longer needed',
+        },
+        context
+      );
+      expect(addNoteResult.status).toBe('completed');
+
+      // Verify the task has the note
+      const viewResult = await taskViewTool.execute({ taskId }, context);
+      expect(viewResult.content?.[0]?.text).toContain('Archived: Requirements changed');
+    });
+
     it('should update task status', async () => {
       const result = await taskUpdateTool.execute(
         {

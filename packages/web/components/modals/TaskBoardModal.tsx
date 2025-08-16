@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTasks, faUser } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { Task } from '@/types/core';
+import { getKanbanColumns } from '@/lib/task-status-ui';
 
 interface TaskBoardModalProps {
   isOpen: boolean;
@@ -23,32 +24,7 @@ interface TaskColumn {
   color: string;
 }
 
-const DEFAULT_TASK_COLUMNS: TaskColumn[] = [
-  {
-    id: 'todo',
-    title: 'To Do',
-    status: 'pending',
-    color: 'bg-info/10 border-info/20',
-  },
-  {
-    id: 'progress',
-    title: 'In Progress',
-    status: 'in_progress',
-    color: 'bg-warning/10 border-warning/20',
-  },
-  {
-    id: 'blocked',
-    title: 'Blocked',
-    status: 'blocked',
-    color: 'bg-secondary/10 border-secondary/20',
-  },
-  {
-    id: 'done',
-    title: 'Done',
-    status: 'completed',
-    color: 'bg-success/10 border-success/20',
-  },
-];
+const DEFAULT_TASK_COLUMNS: TaskColumn[] = getKanbanColumns();
 
 export function TaskBoardModal({
   isOpen,
