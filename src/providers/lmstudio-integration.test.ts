@@ -6,6 +6,7 @@ import { LMStudioProvider } from '~/providers/lmstudio-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { checkProviderAvailability } from '~/test-utils/provider-test-helpers';
+import { withSuppressedStdio } from '~/test-utils/stdio-suppressor';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects
@@ -47,7 +48,10 @@ const provider = new LMStudioProvider({
   systemPrompt: 'You are a helpful assistant. Use tools when asked.',
 });
 
-const isLMStudioAvailable = await checkProviderAvailability('LMStudio', provider);
+// Suppress all output during provider availability check to prevent WebSocket connection errors
+const isLMStudioAvailable = await withSuppressedStdio(async () => {
+  return await checkProviderAvailability('LMStudio', provider);
+});
 
 const conditionalDescribe = isLMStudioAvailable ? describe.sequential : describe.skip;
 
