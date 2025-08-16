@@ -299,8 +299,8 @@ export class Agent extends EventEmitter {
     // Cache the prompt config
     this._promptConfig = promptConfig;
 
-    // Record initial events (happens once)
-    if (!this._hasInitialEvents()) {
+    // Record initial events (happens once) - only for new conversations
+    if (!this._hasInitialEvents() && !this._hasConversationStarted()) {
       this._addInitialEvents(promptConfig);
     }
 
@@ -319,6 +319,12 @@ export class Agent extends EventEmitter {
   private _hasInitialEvents(): boolean {
     const events = this._threadManager.getEvents(this._threadId);
     return events.some((e) => e.type === 'SYSTEM_PROMPT' || e.type === 'USER_SYSTEM_PROMPT');
+  }
+
+  // Check if conversation has already started
+  private _hasConversationStarted(): boolean {
+    const events = this._threadManager.getEvents(this._threadId);
+    return events.some((e) => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE');
   }
 
   // Add initial events to thread
