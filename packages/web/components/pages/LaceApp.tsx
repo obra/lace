@@ -10,7 +10,7 @@ import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
-import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { ChatInput } from '@/components/chat/ChatInput';
 import { TokenUsageDisplay } from '@/components/ui';
 import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
@@ -1231,7 +1231,7 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className="flex-shrink-0 bg-base-100/50 backdrop-blur-sm border-t border-base-300/30 p-2"
     >
-      <CustomEnhancedChatInput
+      <CustomChatInput
         value={message}
         onChange={setMessage}
         onSubmit={handleSubmit}
@@ -1246,7 +1246,7 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
 });
 
 // Custom chat input with status below - includes speech status monitoring
-const CustomEnhancedChatInput = memo(function CustomEnhancedChatInput({
+const CustomChatInput = memo(function CustomChatInput({
   value,
   onChange,
   onSubmit,
@@ -1271,7 +1271,7 @@ const CustomEnhancedChatInput = memo(function CustomEnhancedChatInput({
   return (
     <div className="space-y-2">
       {/* Chat Input */}
-      <EnhancedChatInput
+      <ChatInput
         value={value}
         onChange={onChange}
         onSubmit={onSubmit}

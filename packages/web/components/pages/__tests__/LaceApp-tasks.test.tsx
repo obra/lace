@@ -55,8 +55,8 @@ vi.mock('@/components/timeline/TimelineView', () => ({
   TimelineView: () => <div data-testid="timeline-view">Timeline</div>,
 }));
 
-vi.mock('@/components/chat/EnhancedChatInput', () => ({
-  EnhancedChatInput: () => <div data-testid="chat-input">Chat Input</div>,
+vi.mock('@/components/chat/ChatInput', () => ({
+  ChatInput: () => <div data-testid="chat-input">Chat Input</div>,
 }));
 
 vi.mock('@/components/modals/ToolApprovalModal', () => ({
