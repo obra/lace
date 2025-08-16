@@ -174,6 +174,8 @@ describe('SidebarContent', () => {
       selectProject: vi.fn(),
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
+      createProject: vi.fn(),
+      loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
       currentProject: {
         id: '',
@@ -243,6 +245,8 @@ describe('SidebarContent', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: {
           id: '',
@@ -427,6 +431,8 @@ describe('SidebarContent', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: {
           id: '',

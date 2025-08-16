@@ -46,6 +46,8 @@ const createMockProjectContext = (overrides = {}) => ({
   selectProject: vi.fn(),
   onProjectSelect: vi.fn(),
   updateProject: vi.fn(),
+  createProject: vi.fn(),
+  loadProjectConfiguration: vi.fn(),
   reloadProjects: vi.fn(),
   ...overrides,
 });
@@ -159,6 +161,8 @@ describe('ProjectSection', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: createMockProject(),
       });
@@ -351,6 +355,8 @@ describe('ProjectSection', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: createMockProject(),
       });
@@ -378,6 +384,8 @@ describe('ProjectSection', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: createMockProject(),
       });
@@ -401,6 +409,8 @@ describe('ProjectSection', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: createMockProject(),
       });
@@ -424,6 +434,8 @@ describe('ProjectSection', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: createMockProject(),
       });
@@ -445,6 +457,8 @@ describe('ProjectSection', () => {
         selectProject: vi.fn(),
         onProjectSelect: vi.fn(),
         updateProject: vi.fn(),
+        createProject: vi.fn(),
+        loadProjectConfiguration: vi.fn(),
         reloadProjects: vi.fn(),
         currentProject: createMockProject(),
       });

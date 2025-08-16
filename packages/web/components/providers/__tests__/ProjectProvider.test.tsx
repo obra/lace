@@ -100,6 +100,8 @@ describe('ProjectProvider', () => {
     loading: false,
     error: null,
     updateProject: mockUpdateProject,
+    createProject: vi.fn(),
+    loadProjectConfiguration: vi.fn(),
     reloadProjects: mockReloadProjects,
   };
 

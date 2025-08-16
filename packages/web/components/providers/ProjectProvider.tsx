@@ -38,6 +38,13 @@ interface ProjectContextType {
       configuration?: Record<string, unknown>;
     }
   ) => Promise<void>;
+  createProject: (projectData: {
+    name: string;
+    description?: string;
+    workingDirectory: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<ProjectInfo>;
+  loadProjectConfiguration: (projectId: string) => Promise<Record<string, unknown>>;
   reloadProjects: () => Promise<ProjectInfo[]>;
 }
 
@@ -50,7 +57,15 @@ interface ProjectProviderProps {
 
 export function ProjectProvider({ children, onProjectChange }: ProjectProviderProps) {
   // Get project data from pure data hook
-  const { projects, loading, error, updateProject, reloadProjects } = useProjectManagement();
+  const {
+    projects,
+    loading,
+    error,
+    updateProject,
+    createProject,
+    loadProjectConfiguration,
+    reloadProjects,
+  } = useProjectManagement();
 
   // Get selection state from hash router
   const { project: selectedProject, setProject: setSelectedProject } = useHashRouter();
@@ -132,6 +147,8 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
 
     // Data operations (passed through)
     updateProject,
+    createProject,
+    loadProjectConfiguration,
     reloadProjects,
   };
 

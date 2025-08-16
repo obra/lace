@@ -81,9 +81,11 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     loading: projectLoading,
     onProjectSelect,
     updateProject,
+    createProject,
+    loadProjectConfiguration,
     reloadProjects,
   } = useProjectContext();
-  const { enableAgentAutoSelection } = useSessionContext();
+  const { enableAgentAutoSelection, sessions } = useSessionContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIState();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,
@@ -324,8 +326,8 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         setEditName(project.name);
         setEditDescription(project.description || '');
         setEditWorkingDirectory(project.workingDirectory);
-        // Load actual project configuration from API
-        void loadProjectConfiguration(project.id);
+        // Load actual project configuration using provider
+        void loadProjectConfig(project.id);
         break;
     }
 
@@ -338,35 +340,15 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     if (!editingProject || !editName.trim()) return;
 
     try {
-      // Update project via API
-      const res = await fetch(`/api/projects/${editingProject.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editName.trim(),
-          description: editDescription.trim() || undefined,
-          workingDirectory: editWorkingDirectory.trim(),
-          configuration: editConfig,
-        }),
+      // Use provider method instead of direct API call
+      await updateProject(editingProject.id, {
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+        workingDirectory: editWorkingDirectory.trim(),
+        configuration: editConfig,
       });
 
-      if (res.ok) {
-        // Update local state via provider
-        updateProject(editingProject.id, {
-          name: editName.trim(),
-          description: editDescription.trim() || undefined,
-          workingDirectory: editWorkingDirectory.trim(),
-          configuration: editConfig,
-        });
-
-        handleCancelEdit();
-      } else {
-        const errorData = await parseResponse<{ error: string }>(res);
-        console.error('Project update failed:', {
-          projectId: editingProject.id,
-          error: errorData.error,
-        });
-      }
+      handleCancelEdit();
     } catch (error) {
       console.error('Project update error:', { projectId: editingProject?.id, error });
     }
@@ -420,33 +402,20 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     }));
   };
 
-  // Load project configuration from API
-  const loadProjectConfiguration = async (projectId: string) => {
+  // Load project configuration using provider method
+  const loadProjectConfig = async (projectId: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/configuration`);
-
-      if (res.ok) {
-        const data = await parseResponse<{ configuration: ProjectConfiguration }>(res);
-        // If no provider instance configured, use first available
-        const config = {
-          ...DEFAULT_PROJECT_CONFIG,
-          ...data.configuration,
-        };
-        if (!config.providerInstanceId && availableProviders.length > 0) {
-          config.providerInstanceId = availableProviders[0].instanceId;
-          config.modelId = availableProviders[0].models[0]?.id || '';
-        }
-        setEditConfig(config);
-      } else {
-        console.error('Project config load failed:', { projectId });
-        // Fallback to default configuration with first available provider
-        const config = { ...DEFAULT_PROJECT_CONFIG };
-        if (availableProviders.length > 0) {
-          config.providerInstanceId = availableProviders[0].instanceId;
-          config.modelId = availableProviders[0].models[0]?.id || '';
-        }
-        setEditConfig(config);
+      const configData = await loadProjectConfiguration(projectId);
+      // If no provider instance configured, use first available
+      const config = {
+        ...DEFAULT_PROJECT_CONFIG,
+        ...configData,
+      };
+      if (!config.providerInstanceId && availableProviders.length > 0) {
+        config.providerInstanceId = availableProviders[0].instanceId;
+        config.modelId = availableProviders[0].models[0]?.id || '';
       }
+      setEditConfig(config);
     } catch (error) {
       console.error('Project config load error:', { projectId, error });
       // Fallback to default configuration with first available provider
@@ -465,89 +434,36 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     if (!createName.trim() || !createWorkingDirectory.trim()) return;
 
     try {
-      // Step 1: Create project
-      const projectRes = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: createName.trim(),
-          description: createDescription.trim() || undefined,
-          workingDirectory: createWorkingDirectory.trim(),
-          configuration: createConfig,
-        }),
+      // Step 1: Create project using provider method
+      const projectData = await createProject({
+        name: createName.trim(),
+        description: createDescription.trim() || undefined,
+        workingDirectory: createWorkingDirectory.trim(),
+        configuration: createConfig,
       });
 
-      if (!projectRes.ok) {
-        const errorData = await parseResponse<{ error: string }>(projectRes);
-        console.error('Project create failed:', { error: errorData.error });
-        return;
-      }
-
-      const projectData = await parseResponse<ProjectInfo>(projectRes);
       const projectId = projectData.id;
 
-      // Refresh projects list
-      await reloadProjects();
+      // Select the newly created project
+      onProjectSelect(projectData);
 
-      // For any project creation, navigate directly to the coordinator agent
+      // If onboarding is available, get the session for this project
       if (handleOnboardingComplete) {
-        // Step 2: Get sessions (project creation should have created a default session)
-        // Add retry to mitigate transient eventual-consistency: project not found
-        const maxAttempts = 5;
-        let attempt = 0;
-        let sessionId: string | undefined;
-        while (attempt < maxAttempts && !sessionId) {
-          try {
-            const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
-            if (sessionsRes.ok) {
-              const sessionsData = await parseResponse<Array<{ id: string }>>(sessionsRes);
-              sessionId = sessionsData[0]?.id;
-              if (sessionId) break;
-              console.warn('Create project session missing, retrying:', {
-                attempt: attempt + 1,
-                maxAttempts,
-                projectId,
-              });
-            } else {
-              const bodyText = await sessionsRes.text();
-              // Common transient: {"json":{"error":"Project not found","code":"RESOURCE_NOT_FOUND"}}
-              console.warn('Create project session fetch failed:', {
-                attempt: attempt + 1,
-                maxAttempts,
-                projectId,
-                status: sessionsRes.status,
-              });
+        try {
+          // TODO: This should use SessionProvider method to get sessions by projectId instead of direct API call
+          // SessionProvider currently only loads sessions for selected project, need method for any projectId
+          const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
+          if (sessionsRes.ok) {
+            const sessionsData = await parseResponse<Array<{ id: string }>>(sessionsRes);
+            const sessionId = sessionsData[0]?.id;
+            if (sessionId) {
+              const coordinatorAgentId = sessionId; // coordinator has same threadId
+              await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
             }
-          } catch (err) {
-            console.warn('Create project session fetch error:', {
-              attempt: attempt + 1,
-              maxAttempts,
-              projectId,
-              error: err,
-            });
           }
-          attempt += 1;
-          if (!sessionId) {
-            // Exponential backoff: 200ms, 400ms, 800ms, 1200ms, 1600ms (cap at 1600)
-            const delay = Math.min(200 * 2 ** attempt, 1600);
-            await new Promise((r) => setTimeout(r, delay));
-          }
+        } catch (error) {
+          console.error('Failed to get project sessions for onboarding:', error);
         }
-
-        if (sessionId) {
-          const coordinatorAgentId = sessionId; // coordinator has same threadId
-          await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-        } else {
-          console.warn('Create project session fallback:', {
-            projectId,
-            maxAttempts,
-          });
-          // Fallback to regular project selection if session fetch failed
-          onProjectSelect(projectData);
-        }
-      } else {
-        // Fallback to regular project creation - just select the project
-        onProjectSelect(projectData);
       }
 
       handleCancelCreateProject();

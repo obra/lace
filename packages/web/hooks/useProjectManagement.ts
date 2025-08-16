@@ -19,6 +19,13 @@ interface UseProjectManagementResult {
       configuration?: Record<string, unknown>;
     }
   ) => Promise<void>;
+  createProject: (projectData: {
+    name: string;
+    description?: string;
+    workingDirectory: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<ProjectInfo>;
+  loadProjectConfiguration: (projectId: string) => Promise<Record<string, unknown>>;
   reloadProjects: () => Promise<ProjectInfo[]>;
 }
 
@@ -81,6 +88,67 @@ export function useProjectManagement(): UseProjectManagementResult {
     [loadProjects]
   );
 
+  const createProject = useCallback(
+    async (projectData: {
+      name: string;
+      description?: string;
+      workingDirectory: string;
+      configuration?: Record<string, unknown>;
+    }): Promise<ProjectInfo> => {
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(projectData),
+        });
+
+        if (res.ok) {
+          const newProject = await parseResponse<ProjectInfo>(res);
+          // Reload projects to include the new project
+          await loadProjects();
+          return newProject;
+        } else {
+          const errorData = await parseResponse<{ error: string }>(res);
+          const errorMessage = `Failed to create project: ${errorData.error}`;
+          setError(errorMessage);
+          console.error(errorMessage);
+          throw new Error(errorMessage);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create project';
+        setError(errorMessage);
+        console.error('Failed to create project:', error);
+        throw error;
+      }
+    },
+    [loadProjects]
+  );
+
+  const loadProjectConfiguration = useCallback(
+    async (projectId: string): Promise<Record<string, unknown>> => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/configuration`);
+
+        if (res.ok) {
+          const data = await parseResponse<{ configuration: Record<string, unknown> }>(res);
+          return data.configuration || {};
+        } else {
+          const errorMessage = `Failed to load project configuration: ${res.status}`;
+          setError(errorMessage);
+          console.error(errorMessage);
+          return {};
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to load project configuration';
+        setError(errorMessage);
+        console.error('Failed to load project configuration:', error);
+        return {};
+      }
+    },
+    []
+  );
+
   // Load projects on mount
   useEffect(() => {
     void loadProjects();
@@ -91,6 +159,8 @@ export function useProjectManagement(): UseProjectManagementResult {
     loading,
     error,
     updateProject,
+    createProject,
+    loadProjectConfiguration,
     reloadProjects: loadProjects,
   };
 }

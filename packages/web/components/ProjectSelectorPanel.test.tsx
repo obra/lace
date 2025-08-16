@@ -101,6 +101,8 @@ describe('ProjectSelectorPanel', () => {
       selectProject: vi.fn(),
       onProjectSelect: mockHandlers.onProjectSelect,
       updateProject: mockHandlers.updateProject,
+      createProject: vi.fn(),
+      loadProjectConfiguration: vi.fn(),
       reloadProjects: mockHandlers.reloadProjects,
     });
 
@@ -176,6 +178,8 @@ describe('ProjectSelectorPanel', () => {
       selectProject: vi.fn(),
       onProjectSelect: mockHandlers.onProjectSelect,
       updateProject: mockHandlers.updateProject,
+      createProject: vi.fn(),
+      loadProjectConfiguration: vi.fn(),
       reloadProjects: mockHandlers.reloadProjects,
     });
 
@@ -222,6 +226,8 @@ describe('ProjectSelectorPanel', () => {
       selectProject: vi.fn(),
       onProjectSelect: mockHandlers.onProjectSelect,
       updateProject: mockHandlers.updateProject,
+      createProject: vi.fn(),
+      loadProjectConfiguration: vi.fn(),
       reloadProjects: mockHandlers.reloadProjects,
     });
 
@@ -252,6 +258,8 @@ describe('ProjectSelectorPanel', () => {
       selectProject: vi.fn(),
       onProjectSelect: mockHandlers.onProjectSelect,
       updateProject: mockHandlers.updateProject,
+      createProject: vi.fn(),
+      loadProjectConfiguration: vi.fn(),
       reloadProjects: mockHandlers.reloadProjects,
     });
 
