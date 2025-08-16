@@ -9,8 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@/lib/fontawesome';
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
-import { TimelineView } from '@/components/timeline/TimelineView';
-import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
+import { Chat } from '@/components/chat/Chat';
 import { TokenUsageDisplay } from '@/components/ui';
 import { TokenUsageSection } from '@/components/ui/TokenUsageSection';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
@@ -973,39 +972,14 @@ const LaceAppInner = memo(function LaceAppInner() {
           ) : selectedProject && foundProject ? (
             selectedAgent ||
             (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
-              <div className="flex-1 flex flex-col h-full">
-                {/* Conversation Display - scrollable area with max width */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="max-w-3xl mx-auto px-4">
-                    <TimelineView
-                      events={events}
-                      agents={selectedSessionDetails?.agents}
-                      isTyping={agentBusy}
-                      currentAgent={
-                        selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)
-                          ?.name || 'Agent'
-                      }
-                      selectedAgent={selectedAgent || selectedSessionDetails?.agents?.[0]?.threadId}
-                    />
-                  </div>
-                </div>
-
-                {/* Chat Input - Fixed at bottom with max width */}
-                <div className="flex-shrink-0 pb-6 pt-2 min-h-[80px]">
-                  <div className="max-w-3xl mx-auto px-4">
-                    <MemoizedChatInput
-                      onSubmit={sendMessage}
-                      onInterrupt={stopGeneration}
-                      disabled={agentBusy}
-                      isStreaming={agentBusy}
-                      placeholder={`Message ${selectedAgent ? selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)?.name || 'agent' : selectedSessionDetails?.agents?.[0]?.name || 'agent'}...`}
-                      agentId={
-                        (selectedAgent as ThreadId) || selectedSessionDetails?.agents?.[0]?.threadId
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
+              <Chat
+                events={events}
+                agents={selectedSessionDetails?.agents}
+                selectedAgent={selectedAgent as ThreadId | null}
+                agentBusy={agentBusy}
+                onSendMessage={sendMessage}
+                onStopGeneration={stopGeneration}
+              />
             ) : (
               /* Session Configuration Panel - Main UI for session/agent management */
               <div className="flex-1 p-6">
