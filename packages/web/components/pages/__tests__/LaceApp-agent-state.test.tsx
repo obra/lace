@@ -60,9 +60,9 @@ vi.mock('@/components/timeline/TimelineView', () => ({
   TimelineView: () => <div data-testid="timeline-view">Timeline</div>,
 }));
 
-// Mock EnhancedChatInput with stop button simulation
-vi.mock('@/components/chat/EnhancedChatInput', () => ({
-  EnhancedChatInput: (props: { showStopButton?: boolean }) => {
+// Mock ChatInput with stop button simulation
+vi.mock('@/components/chat/ChatInput', () => ({
+  ChatInput: (props: { showStopButton?: boolean }) => {
     mockChatInput(props);
     return (
       <div data-testid="chat-input">

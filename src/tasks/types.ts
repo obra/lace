@@ -9,7 +9,7 @@ export type {
   TaskPriority,
 } from '~/tools/implementations/task-manager/types';
 
-import type { TaskActor } from '~/tools/implementations/task-manager/types';
+import type { TaskActor, TaskStatus } from '~/tools/implementations/task-manager/types';
 
 export interface TaskContext {
   actor: TaskActor; // Who is performing the action (ThreadId or 'human')
@@ -25,7 +25,7 @@ export interface CreateTaskRequest {
 }
 
 export interface TaskFilters {
-  status?: 'pending' | 'in_progress' | 'completed' | 'blocked';
+  status?: TaskStatus;
   priority?: 'high' | 'medium' | 'low';
   assignedTo?: string;
   createdBy?: string;
@@ -37,4 +37,5 @@ export interface TaskSummary {
   in_progress: number;
   completed: number;
   blocked: number;
+  archived: number;
 }

@@ -18,6 +18,7 @@ import {
 import { Modal } from '@/components/ui/Modal';
 import type { AgentInfo } from '@/types/core';
 import type { Task, AssigneeId, TaskPriority, TaskNote } from '@/types/core';
+import { getStatusBadgeColor, getStatusOptions } from '@/lib/task-status-ui';
 
 interface TaskDisplayModalProps {
   isOpen: boolean;
@@ -144,21 +145,6 @@ export function TaskDisplayModal({
     setShowAddNote(false);
   };
 
-  const getStatusColor = (status: Task['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'badge-info';
-      case 'in_progress':
-        return 'badge-warning';
-      case 'completed':
-        return 'badge-success';
-      case 'blocked':
-        return 'badge-error';
-      default:
-        return 'badge-neutral';
-    }
-  };
-
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
       case 'high':
@@ -255,14 +241,15 @@ export function TaskDisplayModal({
                 className="select select-bordered select-sm w-full mt-1"
                 disabled={loading}
               >
-                <option value="pending">📋 Pending</option>
-                <option value="in_progress">⚡ In Progress</option>
-                <option value="blocked">🚫 Blocked</option>
-                <option value="completed">✅ Completed</option>
+                {getStatusOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             ) : (
               <div className="mt-1">
-                <span className={`badge ${getStatusColor(task.status)}`}>
+                <span className={`badge ${getStatusBadgeColor(task.status)}`}>
                   {task.status.replace('_', ' ')}
                 </span>
               </div>

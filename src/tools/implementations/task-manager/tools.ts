@@ -8,6 +8,7 @@ import type { ToolResult, ToolContext } from '~/tools/types';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 import { logger } from '~/utils/logger';
+import { TaskStatusSchema } from '~/tasks/task-status';
 
 // Simple schema that always takes an array of tasks
 const createTaskSchema = z.object({
@@ -370,7 +371,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
 const updateTaskSchema = z
   .object({
     taskId: NonEmptyString,
-    status: z.enum(['pending', 'in_progress', 'completed', 'blocked'] as const).optional(),
+    status: TaskStatusSchema.optional(),
     assignTo: z.string().describe('Thread ID or "new:provider/model"').optional(),
     priority: z.enum(['high', 'medium', 'low'] as const).optional(),
     title: z.string().max(200).optional(),
@@ -392,10 +393,18 @@ Use for:
 - Reassigning work: task_update({ taskId: "task_123", assignTo: "new:anthropic/claude-3-5-haiku-20241022" })
 - Updating requirements: task_update({ taskId: "task_123", prompt: "Updated requirements..." })
 
-Status options: pending, in_progress, completed, blocked
+Status options: pending, in_progress, completed, blocked, archived
 Priority options: high, medium, low
 
-Example: task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked on API access - need credentials" })`;
+IMPORTANT: When marking a task as "archived", you MUST also add a note explaining why using task_add_note.
+Archived status is for tasks that won't be completed (requirements changed, deprioritized, superseded, etc.).
+
+Example workflow for archiving:
+1. task_update({ taskId: "task_123", status: "archived" })
+2. task_add_note({ taskId: "task_123", note: "Archived: Requirements changed, feature no longer needed per stakeholder feedback" })
+
+Other examples: 
+- task_update({ taskId: "task_123", status: "blocked", prompt: "Blocked on API access - need credentials" })`;
   schema = updateTaskSchema;
   annotations = {
     safeInternal: true,

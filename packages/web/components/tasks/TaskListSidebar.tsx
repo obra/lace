@@ -39,6 +39,7 @@ export function TaskListSidebar({
       in_progress: tasks.filter((t) => t.status === 'in_progress'),
       blocked: tasks.filter((t) => t.status === 'blocked'),
       completed: tasks.filter((t) => t.status === 'completed'),
+      archived: tasks.filter((t) => t.status === 'archived'),
     }),
     [tasks]
   );
@@ -62,26 +63,10 @@ export function TaskListSidebar({
 
   return (
     <div className="space-y-2">
-      {/* Add Task Button */}
-      <SidebarButton
-        onClick={() => onCreateTask?.()}
-        variant="ghost"
-        size="sm"
-        className="w-full text-left justify-start"
-      >
-        <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
-        Add task
-      </SidebarButton>
-
-      {/* Task Summary */}
-      <div className="text-xs text-base-content/60 px-2">
-        {tasks.length} tasks • {tasksByStatus.in_progress.length} in progress
-      </div>
-
       {/* Active Tasks - In Progress */}
       {tasksByStatus.in_progress.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs font-medium text-base-content/80 px-2">In Progress</div>
+          <div className="text-xs font-medium text-base-content/80 pr-2">In Progress</div>
           {tasksByStatus.in_progress.slice(0, TASK_DISPLAY_LIMITS.in_progress).map((task) => (
             <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
           ))}
@@ -91,7 +76,7 @@ export function TaskListSidebar({
       {/* Pending Tasks */}
       {tasksByStatus.pending.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs font-medium text-base-content/80 px-2">Pending</div>
+          <div className="text-xs font-medium text-base-content/80 pr-2">Pending</div>
           {tasksByStatus.pending.slice(0, TASK_DISPLAY_LIMITS.pending).map((task) => (
             <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
           ))}
@@ -101,17 +86,10 @@ export function TaskListSidebar({
       {/* Blocked Tasks */}
       {tasksByStatus.blocked.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs font-medium text-base-content/80 px-2">Blocked</div>
+          <div className="text-xs font-medium text-base-content/80 pr-2">Blocked</div>
           {tasksByStatus.blocked.slice(0, TASK_DISPLAY_LIMITS.blocked).map((task) => (
             <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
           ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {tasks.length === 0 && (
-        <div className="text-center py-4">
-          <div className="text-xs text-base-content/40">No tasks yet</div>
         </div>
       )}
     </div>

@@ -10,7 +10,7 @@ import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@
 import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { TimelineView } from '@/components/timeline/TimelineView';
-import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { ChatInput } from '@/components/chat/ChatInput';
 import { TokenUsageDisplay } from '@/components/ui';
 import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
@@ -706,140 +706,293 @@ export const LaceApp = memo(function LaceApp() {
                   onClose={() => setShowMobileNav(false)}
                   onSettingsClick={onOpenSettings}
                 >
-                  {/* Current Project - Show only when project selected */}
+                  {/* WORKSPACE CONTEXT */}
                   {selectedProject && (
                     <SidebarSection
-                      title="Current Project"
+                      title="Workspace"
                       icon={faFolder}
                       defaultCollapsed={false}
                       collapsible={false}
                     >
-                      <div className="px-4 py-3 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300/30 shadow-sm">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="p-1.5 bg-primary/10 rounded-lg">
-                            <FontAwesomeIcon icon={faFolder} className="w-3.5 h-3.5 text-primary" />
+                      {/* Project Overview Card */}
+                      <div className="bg-base-100/80 backdrop-blur-sm border border-base-300/30 rounded-xl p-4 mb-3 shadow-sm -ml-1">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="min-w-0 flex-1">
+                            <h3
+                              data-testid="current-project-name"
+                              className="font-semibold text-base-content text-sm truncate leading-tight"
+                            >
+                              {currentProject.name}
+                            </h3>
+                            {currentProject.description && (
+                              <p className="text-xs text-base-content/60 truncate mt-0.5">
+                                {currentProject.description}
+                              </p>
+                            )}
                           </div>
-                          <span
-                            data-testid="current-project-name"
-                            className="font-semibold text-base-content truncate text-sm"
+                          <button
+                            onClick={() => {
+                              setSelectedProject(null);
+                              setShowMobileNav(false);
+                            }}
+                            className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 flex-shrink-0 border border-transparent hover:border-base-300/30"
+                            title="Switch project"
                           >
-                            {currentProject.name}
-                          </span>
+                            <svg
+                              className="w-3.5 h-3.5 text-base-content/50 hover:text-base-content/70 transition-colors"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                              />
+                            </svg>
+                          </button>
                         </div>
-                        <div className="text-xs text-base-content/60 truncate">
-                          {currentProject.description}
-                        </div>
-                        <div className="text-xs text-base-content/50 mt-1">
-                          {sessions.length} sessions
+
+                        {/* Project Stats */}
+                        <div className="flex items-center gap-4 text-xs text-base-content/60">
+                          <div className="flex items-center gap-1.5">
+                            <FontAwesomeIcon icon={faComments} className="w-3 h-3" />
+                            <span>
+                              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {selectedSessionDetails && (
+                            <div className="flex items-center gap-1.5">
+                              <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
+                              <span>
+                                {selectedSessionDetails.agents?.length || 0} agent
+                                {selectedSessionDetails.agents?.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      {/* Switch Project Button */}
-                      <SidebarButton
-                        onClick={() => {
-                          setSelectedProject(null);
-                          setShowMobileNav(false);
-                        }}
-                        variant="ghost"
-                      >
-                        <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
-                        Switch Project
-                      </SidebarButton>
                     </SidebarSection>
                   )}
 
-                  {/* Session Management - Show session context and agent selection */}
+                  {/* ACTIVE SESSION */}
                   {selectedSessionDetails && (
                     <SidebarSection
-                      title="Current Session"
+                      title="Active Session"
                       icon={faComments}
                       defaultCollapsed={false}
                       collapsible={false}
                     >
-                      {/* Session Info */}
-                      <div className="px-4 py-3 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300/30 shadow-sm mb-3">
-                        <div className="text-sm font-medium text-base-content truncate">
-                          {selectedSessionDetails.name}
+                      {/* Session Header */}
+                      <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm text-base-content truncate">
+                            {selectedSessionDetails.name}
+                          </h4>
+                          {!selectedAgent && (
+                            <span className="text-xs text-warning font-medium">Setup needed</span>
+                          )}
                         </div>
-                        <div className="text-xs text-base-content/60">
-                          {selectedSessionDetails.agents?.length || 0} agents available
-                        </div>
+
+                        {/* Agent Status or Selection */}
+                        {selectedAgent ? (
+                          (() => {
+                            const currentAgent = selectedSessionDetails.agents?.find(
+                              (a) => a.threadId === selectedAgent
+                            );
+                            return currentAgent ? (
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <FontAwesomeIcon
+                                    icon={faRobot}
+                                    className="w-3.5 h-3.5 text-base-content/60 flex-shrink-0"
+                                  />
+                                  <span className="text-xs text-base-content/80 truncate">
+                                    {currentAgent.name}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`text-xs badge badge-xs ${
+                                    currentAgent.status === 'idle'
+                                      ? 'badge-success'
+                                      : currentAgent.status === 'thinking' ||
+                                          currentAgent.status === 'tool_execution' ||
+                                          currentAgent.status === 'streaming'
+                                        ? 'badge-warning'
+                                        : 'badge-neutral'
+                                  }`}
+                                >
+                                  {currentAgent.status}
+                                </span>
+                              </div>
+                            ) : null;
+                          })()
+                        ) : (
+                          <div className="text-xs text-base-content/60">
+                            {selectedSessionDetails.agents?.length || 0} agents available
+                          </div>
+                        )}
                       </div>
 
-                      {/* Back to Session Config */}
-                      <SidebarButton
-                        onClick={() => {
-                          setSelectedAgent(null);
-                          setShowMobileNav(false);
-                        }}
-                        variant="ghost"
-                      >
-                        <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
-                        Configure Session
-                      </SidebarButton>
+                      {/* Primary Actions */}
+                      {selectedAgent ? (
+                        <div className="space-y-2">
+                          <SidebarButton
+                            onClick={() => {
+                              setShowMobileNav(false);
+                            }}
+                            variant="secondary"
+                            className="font-medium"
+                          >
+                            Continue Session
+                          </SidebarButton>
 
-                      {/* Agent Selection */}
-                      {selectedSessionDetails.agents?.map((agent) => (
-                        <SidebarItem
-                          key={agent.threadId}
-                          active={selectedAgent === agent.threadId}
-                          onClick={() => {
-                            handleAgentSelect(agent.threadId);
-                            setShowMobileNav(false);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <FontAwesomeIcon
-                                icon={faRobot}
-                                className={`w-4 h-4 ${
-                                  selectedAgent === agent.threadId
-                                    ? 'text-primary'
-                                    : 'text-base-content/60'
-                                }`}
-                              />
-                              <span className="font-medium">{agent.name}</span>
-                            </div>
-                            <span
-                              className={`text-xs badge badge-xs ${
-                                agent.status === 'idle'
-                                  ? 'badge-success'
-                                  : agent.status === 'thinking' ||
-                                      agent.status === 'tool_execution' ||
-                                      agent.status === 'streaming'
-                                    ? 'badge-warning'
-                                    : 'badge-neutral'
-                              }`}
+                          {selectedSessionDetails.agents &&
+                            selectedSessionDetails.agents.length > 1 && (
+                              <SidebarButton
+                                onClick={() => {
+                                  setSelectedAgent(null);
+                                  setShowMobileNav(false);
+                                }}
+                                variant="ghost"
+                                size="sm"
+                              >
+                                <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />
+                                Switch Agent
+                              </SidebarButton>
+                            )}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {/* Agent Selection */}
+                          {selectedSessionDetails.agents?.map((agent) => (
+                            <SidebarItem
+                              key={agent.threadId}
+                              active={selectedAgent === agent.threadId}
+                              onClick={() => {
+                                handleAgentSelect(agent.threadId);
+                                setShowMobileNav(false);
+                              }}
+                              className="text-sm"
                             >
-                              {agent.status}
-                            </span>
-                          </div>
-                        </SidebarItem>
-                      )) || []}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <FontAwesomeIcon
+                                    icon={faRobot}
+                                    className="w-3.5 h-3.5 text-base-content/60"
+                                  />
+                                  <span className="font-medium truncate">{agent.name}</span>
+                                </div>
+                                <span
+                                  className={`text-xs badge badge-xs ${
+                                    agent.status === 'idle'
+                                      ? 'badge-success'
+                                      : agent.status === 'thinking' ||
+                                          agent.status === 'tool_execution' ||
+                                          agent.status === 'streaming'
+                                        ? 'badge-warning'
+                                        : 'badge-neutral'
+                                  }`}
+                                >
+                                  {agent.status}
+                                </span>
+                              </div>
+                            </SidebarItem>
+                          )) || []}
+
+                          <SidebarButton
+                            onClick={() => {
+                              setSelectedAgent(null);
+                              setShowMobileNav(false);
+                            }}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <FontAwesomeIcon icon={faCog} className="w-3.5 h-3.5" />
+                            Configure Session
+                          </SidebarButton>
+                        </div>
+                      )}
                     </SidebarSection>
                   )}
 
-                  {/* Tasks Section - Show when session is selected */}
+                  {/* TASK MANAGEMENT */}
                   {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
                     <SidebarSection
-                      title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+                      title="Tasks"
                       icon={faTasks}
                       defaultCollapsed={false}
-                      collapsible={false}
+                      collapsible={true}
                     >
+                      {/* Task Overview */}
+                      <div className="bg-base-300/20 backdrop-blur-sm border border-base-300/15 rounded-xl p-3 mb-3 shadow-sm -ml-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <button
+                            onClick={() => {
+                              setShowTaskBoard(true);
+                              setShowMobileNav(false);
+                            }}
+                            className="text-sm font-medium text-base-content hover:text-base-content/80 transition-colors"
+                            disabled={taskManager.tasks.length === 0}
+                          >
+                            Task Board ({taskManager.tasks.length})
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowTaskCreation(true);
+                              setShowMobileNav(false);
+                            }}
+                            className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
+                            title="Add task"
+                          >
+                            <FontAwesomeIcon
+                              icon={faPlus}
+                              className="w-3 h-3 text-base-content/60"
+                            />
+                          </button>
+                        </div>
+
+                        {taskManager.tasks.length > 0 && (
+                          <div className="flex items-center gap-3 text-xs text-base-content/60">
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                              <span>
+                                {taskManager.tasks.filter((t) => t.status === 'completed').length}{' '}
+                                done
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                              <span>
+                                {taskManager.tasks.filter((t) => t.status === 'in_progress').length}{' '}
+                                active
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                              <span>
+                                {taskManager.tasks.filter((t) => t.status === 'pending').length}{' '}
+                                pending
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Task List */}
                       <TaskListSidebar
                         taskManager={taskManager}
                         onTaskClick={(taskId) => {
-                          // For now, just close mobile nav - could open task detail modal in future
-                          setShowMobileNav(false); // Close mobile nav when task is clicked
+                          setShowMobileNav(false);
                         }}
                         onOpenTaskBoard={() => {
                           setShowTaskBoard(true);
-                          setShowMobileNav(false); // Close mobile nav when opening task board
+                          setShowMobileNav(false);
                         }}
                         onCreateTask={() => {
                           setShowTaskCreation(true);
-                          setShowMobileNav(false); // Close mobile nav when creating task
+                          setShowMobileNav(false);
                         }}
                       />
                     </SidebarSection>
@@ -860,121 +1013,257 @@ export const LaceApp = memo(function LaceApp() {
               onToggle={() => setShowDesktopSidebar(!showDesktopSidebar)}
               onSettingsClick={onOpenSettings}
             >
-              {/* Current Project - Show only when project selected */}
+              {/* WORKSPACE CONTEXT */}
               {selectedProject && (
                 <SidebarSection
-                  title="Current Project"
+                  title="Workspace"
                   icon={faFolder}
                   defaultCollapsed={false}
                   collapsible={false}
                 >
-                  <div className="px-4 py-3 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300/30 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-1.5 bg-primary/10 rounded-lg">
-                        <FontAwesomeIcon icon={faFolder} className="w-3.5 h-3.5 text-primary" />
+                  {/* Project Overview Card */}
+                  <div className="bg-base-100/80 backdrop-blur-sm border border-base-300/30 rounded-xl p-4 mb-3 shadow-sm -ml-1">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="min-w-0 flex-1">
+                        <h3
+                          data-testid="current-project-name-desktop"
+                          className="font-semibold text-base-content text-sm truncate leading-tight"
+                        >
+                          {currentProject.name}
+                        </h3>
+                        {currentProject.description && (
+                          <p className="text-xs text-base-content/60 truncate mt-0.5">
+                            {currentProject.description}
+                          </p>
+                        )}
                       </div>
-                      <span
-                        data-testid="current-project-name-desktop"
-                        className="font-semibold text-base-content truncate text-sm"
+                      <button
+                        onClick={() => setSelectedProject(null)}
+                        className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 flex-shrink-0 border border-transparent hover:border-base-300/30"
+                        title="Switch project"
                       >
-                        {currentProject.name}
-                      </span>
+                        <svg
+                          className="w-3.5 h-3.5 text-base-content/50 hover:text-base-content/70 transition-colors"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                    <div className="text-xs text-base-content/60 truncate">
-                      {currentProject.description}
-                    </div>
-                    <div className="text-xs text-base-content/50 mt-1">
-                      {sessions.length} sessions
+
+                    {/* Project Stats */}
+                    <div className="flex items-center gap-4 text-xs text-base-content/60">
+                      <div className="flex items-center gap-1.5">
+                        <FontAwesomeIcon icon={faComments} className="w-3 h-3" />
+                        <span>
+                          {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      {selectedSessionDetails && (
+                        <div className="flex items-center gap-1.5">
+                          <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
+                          <span>
+                            {selectedSessionDetails.agents?.length || 0} agent
+                            {selectedSessionDetails.agents?.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Switch Project Button */}
-                  <SidebarButton
-                    onClick={() => {
-                      setSelectedProject(null);
-                    }}
-                    variant="ghost"
-                  >
-                    <FontAwesomeIcon icon={faFolder} className="w-4 h-4" />
-                    Switch Project
-                  </SidebarButton>
                 </SidebarSection>
               )}
 
-              {/* Session Management - Show session context and agent selection */}
+              {/* ACTIVE SESSION */}
               {selectedSessionDetails && (
                 <SidebarSection
-                  title="Current Session"
+                  title="Active Session"
                   icon={faComments}
                   defaultCollapsed={false}
                   collapsible={false}
                 >
-                  {/* Session Info */}
-                  <div className="px-3 py-2 bg-base-50 rounded border border-base-200 mb-2">
-                    <div className="text-sm font-medium text-base-content truncate">
-                      {selectedSessionDetails.name}
+                  {/* Session Header */}
+                  <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-sm text-base-content truncate">
+                        {selectedSessionDetails.name}
+                      </h4>
+                      {!selectedAgent && (
+                        <span className="text-xs text-warning font-medium">Setup needed</span>
+                      )}
                     </div>
-                    <div className="text-xs text-base-content/60">
-                      {selectedSessionDetails.agents?.length || 0} agents available
-                    </div>
+
+                    {/* Agent Status or Selection */}
+                    {selectedAgent ? (
+                      (() => {
+                        const currentAgent = selectedSessionDetails.agents?.find(
+                          (a) => a.threadId === selectedAgent
+                        );
+                        return currentAgent ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FontAwesomeIcon
+                                icon={faRobot}
+                                className="w-3.5 h-3.5 text-base-content/60 flex-shrink-0"
+                              />
+                              <span className="text-xs text-base-content/80 truncate">
+                                {currentAgent.name}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-xs badge badge-xs ${
+                                currentAgent.status === 'idle'
+                                  ? 'badge-success'
+                                  : currentAgent.status === 'thinking' ||
+                                      currentAgent.status === 'tool_execution' ||
+                                      currentAgent.status === 'streaming'
+                                    ? 'badge-warning'
+                                    : 'badge-neutral'
+                              }`}
+                            >
+                              {currentAgent.status}
+                            </span>
+                          </div>
+                        ) : null;
+                      })()
+                    ) : (
+                      <div className="text-xs text-base-content/60">
+                        {selectedSessionDetails.agents?.length || 0} agents available
+                      </div>
+                    )}
                   </div>
 
-                  {/* Back to Session Config */}
-                  <SidebarButton
-                    onClick={() => {
-                      setSelectedAgent(null);
-                    }}
-                    variant="ghost"
-                  >
-                    <FontAwesomeIcon icon={faCog} className="w-4 h-4" />
-                    Configure Session
-                  </SidebarButton>
+                  {/* Primary Actions */}
+                  {selectedAgent ? (
+                    <div className="space-y-2">
+                      <SidebarButton
+                        onClick={() => {
+                          // Could scroll to chat input or focus it
+                        }}
+                        variant="secondary"
+                        className="font-medium"
+                      >
+                        Continue Session
+                      </SidebarButton>
 
-                  {/* Agent Selection */}
-                  {selectedSessionDetails.agents?.map((agent) => (
-                    <SidebarItem
-                      key={agent.threadId}
-                      active={selectedAgent === agent.threadId}
-                      onClick={() => handleAgentSelect(agent.threadId)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FontAwesomeIcon
-                            icon={faRobot}
-                            className={`w-4 h-4 ${
-                              selectedAgent === agent.threadId
-                                ? 'text-primary'
-                                : 'text-base-content/60'
-                            }`}
-                          />
-                          <span className="font-medium">{agent.name}</span>
-                        </div>
-                        <span
-                          className={`text-xs badge badge-xs ${
-                            agent.status === 'idle'
-                              ? 'badge-success'
-                              : agent.status === 'thinking' ||
-                                  agent.status === 'tool_execution' ||
-                                  agent.status === 'streaming'
-                                ? 'badge-warning'
-                                : 'badge-neutral'
-                          }`}
+                      {selectedSessionDetails.agents &&
+                        selectedSessionDetails.agents.length > 1 && (
+                          <SidebarButton
+                            onClick={() => setSelectedAgent(null)}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />
+                            Switch Agent
+                          </SidebarButton>
+                        )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {/* Agent Selection */}
+                      {selectedSessionDetails.agents?.map((agent) => (
+                        <SidebarItem
+                          key={agent.threadId}
+                          onClick={() => handleAgentSelect(agent.threadId)}
+                          className="text-sm"
                         >
-                          {agent.status}
-                        </span>
-                      </div>
-                    </SidebarItem>
-                  )) || []}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FontAwesomeIcon
+                                icon={faRobot}
+                                className="w-3.5 h-3.5 text-base-content/60"
+                              />
+                              <span className="font-medium truncate">{agent.name}</span>
+                            </div>
+                            <span
+                              className={`text-xs badge badge-xs ${
+                                agent.status === 'idle'
+                                  ? 'badge-success'
+                                  : agent.status === 'thinking' ||
+                                      agent.status === 'tool_execution' ||
+                                      agent.status === 'streaming'
+                                    ? 'badge-warning'
+                                    : 'badge-neutral'
+                              }`}
+                            >
+                              {agent.status}
+                            </span>
+                          </div>
+                        </SidebarItem>
+                      )) || []}
+
+                      <SidebarButton
+                        onClick={() => setSelectedAgent(null)}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        <FontAwesomeIcon icon={faCog} className="w-3.5 h-3.5" />
+                        Configure Session
+                      </SidebarButton>
+                    </div>
+                  )}
                 </SidebarSection>
               )}
 
-              {/* Tasks Section - Show when session is selected */}
+              {/* TASK MANAGEMENT */}
               {selectedSessionDetails && selectedProject && selectedSession && taskManager && (
                 <SidebarSection
-                  title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
+                  title="Tasks"
                   icon={faTasks}
                   defaultCollapsed={false}
+                  collapsible={true}
                 >
+                  {/* Task Overview */}
+                  <div className="bg-base-300/20 backdrop-blur-sm border border-base-300/15 rounded-xl p-3 mb-3 shadow-sm -ml-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <button
+                        onClick={() => setShowTaskBoard(true)}
+                        className="text-sm font-medium text-base-content hover:text-base-content/80 transition-colors"
+                        disabled={taskManager.tasks.length === 0}
+                      >
+                        Task Board ({taskManager.tasks.length})
+                      </button>
+                      <button
+                        onClick={() => setShowTaskCreation(true)}
+                        className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
+                        title="Add task"
+                      >
+                        <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-base-content/60" />
+                      </button>
+                    </div>
+
+                    {taskManager.tasks.length > 0 && (
+                      <div className="flex items-center gap-3 text-xs text-base-content/60">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                          <span>
+                            {taskManager.tasks.filter((t) => t.status === 'completed').length} done
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                          <span>
+                            {taskManager.tasks.filter((t) => t.status === 'in_progress').length}{' '}
+                            active
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                          <span>
+                            {taskManager.tasks.filter((t) => t.status === 'pending').length} pending
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Task List */}
                   <TaskListSidebar
                     taskManager={taskManager}
                     onTaskClick={(taskId) => {
@@ -1034,7 +1323,7 @@ export const LaceApp = memo(function LaceApp() {
           {loadingProjects || loadingProviders ? (
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="flex flex-col items-center gap-4 animate-fade-in">
-                <div className="loading loading-spinner loading-lg text-primary"></div>
+                <div className="loading loading-spinner loading-lg text-base-content/60"></div>
                 <div className="text-center">
                   <div className="text-lg font-medium text-base-content">Setting things up</div>
                   <div className="text-sm text-base-content/60 animate-pulse-soft">
@@ -1231,7 +1520,7 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className="flex-shrink-0 bg-base-100/50 backdrop-blur-sm border-t border-base-300/30 p-2"
     >
-      <CustomEnhancedChatInput
+      <CustomChatInput
         value={message}
         onChange={setMessage}
         onSubmit={handleSubmit}
@@ -1246,7 +1535,7 @@ const MemoizedChatInput = memo(function MemoizedChatInput({
 });
 
 // Custom chat input with status below - includes speech status monitoring
-const CustomEnhancedChatInput = memo(function CustomEnhancedChatInput({
+const CustomChatInput = memo(function CustomChatInput({
   value,
   onChange,
   onSubmit,
@@ -1271,7 +1560,7 @@ const CustomEnhancedChatInput = memo(function CustomEnhancedChatInput({
   return (
     <div className="space-y-2">
       {/* Chat Input */}
-      <EnhancedChatInput
+      <ChatInput
         value={value}
         onChange={onChange}
         onSubmit={onSubmit}

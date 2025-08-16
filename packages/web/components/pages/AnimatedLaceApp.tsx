@@ -8,7 +8,7 @@ import { faBars, faSearch, faTerminal, faTasks, faFolder, faMicrophone } from '@
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { AnimatedTimelineView } from '@/components/timeline/AnimatedTimelineView';
-import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { ChatInput } from '@/components/chat/ChatInput';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { VoiceRecognitionUI } from '@/components/ui/VoiceRecognitionUI';
@@ -534,7 +534,7 @@ export function AnimatedLaceApp({
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2, ...springConfig.gentle }}
         >
-          <EnhancedChatInput
+          <ChatInput
             value={prompt}
             onChange={setPrompt}
             onSubmit={() => void handleSendMessage()}

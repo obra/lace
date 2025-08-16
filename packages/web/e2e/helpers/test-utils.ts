@@ -197,7 +197,7 @@ export function getMessageInput(page: Page) {
     .locator('textarea[placeholder*="Message"]')
     .or(page.locator('input[placeholder*="message"]'))
     .or(page.locator('[data-testid="message-input"]'))
-    .or(page.locator('[data-testid="enhanced-message-input"]'))
+    .or(page.locator('[data-testid="message-input"]'))
     .first();
 }
 

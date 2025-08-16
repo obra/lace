@@ -6,7 +6,7 @@ import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faStop, faPlus } from '@/lib/fontawesome';
 
-interface EnhancedChatInputProps {
+interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
@@ -24,7 +24,7 @@ interface EnhancedChatInputProps {
   autoSubmitOnSpeech?: boolean;
 }
 
-export function EnhancedChatInput({
+export function ChatInput({
   value,
   onChange,
   onSubmit,
@@ -40,7 +40,7 @@ export function EnhancedChatInput({
   showFileAttachment = true,
   speechLanguage = 'en-US',
   autoSubmitOnSpeech = false,
-}: EnhancedChatInputProps) {
+}: ChatInputProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [forceStopSpeech, setForceStopSpeech] = useState(false);
   const [shouldSendAfterStop, setShouldSendAfterStop] = useState(false);
@@ -334,7 +334,7 @@ export function EnhancedChatInput({
             }}
             rows={2}
             autoFocus={!disabled && !isListening}
-            data-testid="enhanced-message-input"
+            data-testid="message-input"
             onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
               const target = e.target as HTMLTextAreaElement;
               // Reset height to auto to get accurate scrollHeight

@@ -520,7 +520,7 @@ export function SessionConfigPanel({
             <p className="text-sm">Create your first session to get started</p>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="space-y-3">
             {sessions
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .map((session) => (

@@ -113,10 +113,11 @@ describe('TaskBoardModal', () => {
     );
 
     // Check that columns exist
-    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
     expect(screen.getByText('In Progress')).toBeInTheDocument();
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('Blocked')).toBeInTheDocument();
+    expect(screen.getByText('Archived')).toBeInTheDocument();
   });
 
   it('should handle empty task list', () => {
@@ -132,7 +133,7 @@ describe('TaskBoardModal', () => {
 
     expect(screen.getByText(/project tasks/i)).toBeInTheDocument();
     // Should still show columns even with no tasks
-    expect(screen.getByText('To Do')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
     expect(screen.getByText('In Progress')).toBeInTheDocument();
   });
 

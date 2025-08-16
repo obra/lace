@@ -1,16 +1,14 @@
-# ChatInputComposer
+# ChatInput
 
-### Purpose
-A cohesive unit that combines 2-5 atoms to solve the specific UI pattern of chat message composition. Handles text input, voice recording, file attachments, and submission in a single, reusable component.
-### When to Use
+ChatInput component
 
 ## Usage
 
 ```tsx
-import ChatInputComposer from '@/components/ui/ChatInputComposer';
+import { ChatInput } from '@/components/chat/ChatInput';
 
 // Basic usage
-<ChatInputComposer />
+<ChatInput />
 ```
 
 ## Props
@@ -31,8 +29,6 @@ import ChatInputComposer from '@/components/ui/ChatInputComposer';
 | `onFilesAttached` | `(files` | Optional | - |
 | `onFileRemoved` | `(fileId` | Optional | - |
 | `onFileCleared` | `() => void` | Optional | - |
-| `showVoiceButton` | `boolean` | Optional | - |
-| `showFileAttachment` | `boolean` | Optional | - |
 
 ## Examples
 

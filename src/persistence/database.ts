@@ -1,6 +1,8 @@
 // ABOUTME: Consolidated SQLite persistence layer for threads, events, and tasks
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
+import { getTaskStatusDBConstraint } from '~/tasks/task-status';
+
 // Common SQLite interface that both better-sqlite3 and bun:sqlite implement
 interface SQLiteDatabase {
   prepare(sql: string): {
@@ -209,6 +211,9 @@ export class DatabasePersistence {
     if (currentVersion < 11) {
       this.migrateToV11();
     }
+    if (currentVersion < 12) {
+      this.migrateToV12();
+    }
   }
 
   private getSchemaVersion(): number {
@@ -262,7 +267,7 @@ export class DatabasePersistence {
         title TEXT NOT NULL,
         description TEXT,
         prompt TEXT NOT NULL,
-        status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'blocked')) DEFAULT 'pending',
+        status TEXT CHECK(${getTaskStatusDBConstraint()}) DEFAULT 'pending',
         priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
         assigned_to TEXT,
         created_by TEXT NOT NULL,
@@ -337,6 +342,43 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(11);
+  }
+
+  private migrateToV12(): void {
+    if (!this.db) return;
+
+    // Add 'archived' to task status CHECK constraint
+    // SQLite doesn't support altering CHECK constraints, so we need to recreate the table
+    this.db.exec(`
+      -- Create new tasks table with updated status constraint
+      CREATE TABLE tasks_new (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        prompt TEXT NOT NULL,
+        status TEXT CHECK(${getTaskStatusDBConstraint()}) DEFAULT 'pending',
+        priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+        assigned_to TEXT,
+        created_by TEXT NOT NULL,
+        thread_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      -- Copy data from old table
+      INSERT INTO tasks_new SELECT * FROM tasks;
+      
+      -- Drop old table and rename new one
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      
+      -- Recreate indexes
+      CREATE INDEX IF NOT EXISTS idx_tasks_thread_id ON tasks(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+    `);
+
+    this.setSchemaVersion(12);
   }
 
   transaction<T>(fn: () => T): T {

@@ -5,6 +5,7 @@
 
 import React from 'react';
 import type { Task } from '@/types/core';
+import { getStatusBgColor } from '@/lib/task-status-ui';
 
 interface TaskSidebarItemProps {
   task: Task;
@@ -26,7 +27,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
 
   return (
     <div
-      className="px-3 py-2.5 hover:bg-base-200/80 hover:shadow-sm rounded-xl cursor-pointer group transition-all duration-200 hover:scale-[1.02] border border-transparent hover:border-base-300/40"
+      className="pr-2 py-2.5 hover:bg-base-200/80 hover:shadow-sm rounded-xl cursor-pointer group transition-all duration-200 hover:scale-[1.02] border border-transparent hover:border-base-300/40"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -37,7 +38,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
         }
       }}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-y-2">
         {/* Priority Indicator */}
         <div className="flex items-center justify-center">
           <div
@@ -59,17 +60,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
         {/* Status Indicator */}
         <div className="flex items-center justify-center">
           <div
-            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200 ${
-              task.status === 'pending'
-                ? 'bg-info'
-                : task.status === 'in_progress'
-                  ? 'bg-warning'
-                  : task.status === 'blocked'
-                    ? 'bg-secondary'
-                    : task.status === 'completed'
-                      ? 'bg-success'
-                      : 'bg-base-content/40'
-            }`}
+            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200 ${getStatusBgColor(task.status)}`}
             role="presentation"
             aria-label={`Status: ${task.status.replace('_', ' ')}`}
           />

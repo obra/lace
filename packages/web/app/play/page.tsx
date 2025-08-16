@@ -36,7 +36,7 @@ import { FileAttachment } from '@/components/ui/FileAttachment';
 import { AnimatedCarousel } from '@/components/ui/AnimatedCarousel';
 import MessageDisplay from '@/components/ui/MessageDisplay';
 import { VoiceRecognitionUI, CompactVoiceButton } from '@/components/ui/VoiceRecognitionUI';
-import { NativeSpeechInput, EnhancedChatInputWithSpeech } from '@/components/ui';
+import { NativeSpeechInput } from '@/components/ui';
 import { AccountDropdown } from '@/components/ui/AccountDropdown';
 import SidebarSection from '@/components/ui/SidebarSection';
 import NavigationItem from '@/components/ui/NavigationItem';
@@ -70,9 +70,8 @@ import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
 import { TextAreaField } from '@/components/ui/TextAreaField';
 
 // MOLECULES - Composed UI patterns
-import ChatInputComposer from '@/components/ui/ChatInputComposer';
 import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
-import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { ChatInput } from '@/components/chat/ChatInput';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
 // Removed unused feedback and files imports to satisfy lints
@@ -471,7 +470,7 @@ export default function PlaygroundPage() {
         <div className="card-body">
           <h3 className="card-title text-base-content">
             💬 Chat Components
-            <span className="badge badge-secondary ml-2">Molecules 1-3</span>
+            <span className="badge badge-secondary ml-2">Molecules 1-2</span>
           </h3>
           <div className="space-y-4 max-w-lg">
             <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
@@ -490,57 +489,19 @@ export default function PlaygroundPage() {
             <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M2</span>
-                <span className="text-sm font-medium">ChatInputComposer</span>
-                <div className="text-xs text-base-content/60">
-                  Uses: <span className="text-primary">SendButton(5)</span> +{' '}
-                  <span className="text-primary">VoiceButton(7)</span> +{' '}
-                  <span className="text-primary">FileAttachButton(8)</span> +{' '}
-                  <span className="text-primary">ChatTextarea(11)</span>
-                </div>
-              </div>
-              <ChatInputComposer
-                value=""
-                onChange={() => {}}
-                onSubmit={() => {}}
-                placeholder="Enhanced chat input composer"
-              />
-            </div>
-
-            <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M3</span>
-                <span className="text-sm font-medium">EnhancedChatInput (Production)</span>
+                <span className="text-sm font-medium">ChatInput (Production)</span>
                 <div className="text-xs text-base-content/60">
                   Uses: <span className="text-primary">NativeSpeechInput(55)</span> + circular
-                  emerald send button
+                  emerald send button + file attachment
                 </div>
               </div>
-              <EnhancedChatInput
+              <ChatInput
                 value=""
                 onChange={() => {}}
                 onSubmit={() => {}}
                 placeholder="Production chat input with native speech..."
                 showVoiceButton={true}
                 showFileAttachment={true}
-              />
-            </div>
-
-            <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M7</span>
-                <span className="text-sm font-medium">EnhancedChatInputWithSpeech</span>
-                <div className="text-xs text-base-content/60">
-                  Uses: <span className="text-primary">NativeSpeechInput(55)</span> +
-                  <span className="text-secondary"> ChatInputComposer(M2)</span>
-                </div>
-              </div>
-              <EnhancedChatInputWithSpeech
-                value=""
-                onChange={() => {}}
-                onSubmit={() => {}}
-                placeholder="Chat with native speech recognition..."
-                speechLanguage="en-US"
-                showVoiceButton={true}
               />
             </div>
           </div>
@@ -552,12 +513,12 @@ export default function PlaygroundPage() {
         <div className="card-body">
           <h3 className="card-title text-base-content">
             🏗️ Layout Components
-            <span className="badge badge-secondary ml-2">Molecules 4-5</span>
+            <span className="badge badge-secondary ml-2">Molecules 3-4</span>
           </h3>
           <div className="grid gap-4">
             <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M4</span>
+                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M3</span>
                 <span className="text-sm font-medium">Sidebar</span>
                 <div className="text-xs text-base-content/60">
                   Uses: <span className="text-primary">NavigationItem(16)</span> +{' '}
@@ -573,7 +534,7 @@ export default function PlaygroundPage() {
 
             <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M5</span>
+                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M4</span>
                 <span className="text-sm font-medium">MobileSidebar</span>
                 <div className="text-xs text-base-content/60">
                   Uses: <span className="text-primary">NavigationItem(16)</span> + responsive
@@ -595,11 +556,11 @@ export default function PlaygroundPage() {
         <div className="card-body">
           <h3 className="card-title text-base-content">
             ⚙️ Settings Panels
-            <span className="badge badge-secondary ml-2">Molecule 6</span>
+            <span className="badge badge-secondary ml-2">Molecule 5</span>
           </h3>
           <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M6</span>
+              <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M5</span>
               <span className="text-sm font-medium">UISettingsPanel</span>
               <div className="text-xs text-base-content/60">
                 Uses: <span className="text-primary">ThemeSelector(18)</span> +{' '}
@@ -635,7 +596,7 @@ export default function PlaygroundPage() {
                 <strong>Built from:</strong>
                 <br />
                 🧪 <span className="text-secondary">Molecules:</span> MessageHeader(M1),
-                ChatInputComposer(M2)
+                ChatInput(M2)
                 <br />
                 🔬 <span className="text-primary">Atoms:</span> Badge(4), AnimatedButton(6),
                 StatusDot(2), Avatar(3), NavigationButton(10)
@@ -695,7 +656,7 @@ export default function PlaygroundPage() {
       <div>
         <h2 className="text-3xl font-bold mb-6 text-base-content flex items-center gap-2">
           🧪 Molecules
-          <span className="badge badge-secondary">12 components</span>
+          <span className="badge badge-secondary">5 components</span>
         </h2>
         <p className="text-base-content/70 mb-6">
           Composed UI patterns - combinations of atoms that solve specific interface problems
@@ -764,7 +725,7 @@ export default function PlaygroundPage() {
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Total Components</div>
-            <div className="stat-value text-primary">69</div>
+            <div className="stat-value text-primary">62</div>
             <div className="stat-desc">UI Components Available</div>
           </div>
           <div className="stat">
@@ -797,7 +758,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">🧪 Molecules</span>
             <span className="sm:hidden">Molecules</span>
-            <span className="ml-1">(12)</span>
+            <span className="ml-1">(5)</span>
           </button>
           <button
             className={`btn ${activeCategory === 'organisms' ? 'btn-primary' : 'btn-outline'} btn-sm md:btn-md`}
@@ -813,7 +774,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">📚 View All</span>
             <span className="sm:hidden">All</span>
-            <span className="ml-1">(69)</span>
+            <span className="ml-1">(62)</span>
           </button>
         </div>
       </div>
@@ -848,10 +809,10 @@ export default function PlaygroundPage() {
         <div>
           <h4 className="font-bold">📖 Migration Complete!</h4>
           <p className="text-sm mt-1">
-            All 69 UI components from /components/ui/ are now showcased in this playground,
-            including native OS-level speech recognition. Each component includes usage examples and
-            interactive demonstrations. Components are organized by Atomic Design principles for
-            better understanding of the design system.
+            All 62 UI components are now showcased in this playground, including native OS-level
+            speech recognition. Each component includes usage examples and interactive
+            demonstrations. Components are organized by Atomic Design principles for better
+            understanding of the design system.
           </p>
         </div>
       </div>

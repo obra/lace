@@ -1,19 +1,19 @@
 /** PARKED STORY — not in active use, see STORYBOOK_MIGRATION_GUIDE.md */
-// ABOUTME: Storybook story for EnhancedChatInput.stories.tsx
+// ABOUTME: Storybook story for ChatInput.stories.tsx
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
-import { EnhancedChatInput } from './EnhancedChatInput';
+import { ChatInput } from '@/components/chat/ChatInput';
 import { AttachedFile } from '@/components/ui/FileAttachment';
 
-const meta: Meta<typeof EnhancedChatInput> = {
-  title: 'Organisms/EnhancedChatInput',
-  component: EnhancedChatInput,
+const meta: Meta<typeof ChatInput> = {
+  title: 'Organisms/ChatInput',
+  component: ChatInput,
   parameters: {
     layout: 'padded',
     docs: {
       description: {
         component:
-          'Enhanced chat input component that provides a complete chat interface with advanced features like voice input, file attachments, and streaming support. This is a wrapper around ChatInputComposer with additional functionality for the main chat interface.',
+          'Production chat input component that provides a complete chat interface with advanced features like voice input, file attachments, and streaming support.',
       },
     },
   },
@@ -79,7 +79,7 @@ const meta: Meta<typeof EnhancedChatInput> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof EnhancedChatInput>;
+type Story = StoryObj<typeof ChatInput>;
 
 // Sample attached files for testing
 const sampleFiles: AttachedFile[] = [
@@ -149,7 +149,7 @@ export const Default: Story = {
             </div>
           </div>
         </div>
-        <EnhancedChatInput
+        <ChatInput
           {...args}
           value={value}
           onChange={setValue}
@@ -203,7 +203,7 @@ export const WithVoiceInput: Story = {
             <div className="badge badge-outline">Voice: {isListening ? 'Listening' : 'Ready'}</div>
           </div>
         </div>
-        <EnhancedChatInput
+        <ChatInput
           {...args}
           value={value}
           onChange={setValue}
@@ -262,7 +262,7 @@ export const WithFileAttachments: Story = {
             <div className="badge badge-outline">Files: {files.length}</div>
           </div>
         </div>
-        <EnhancedChatInput
+        <ChatInput
           {...args}
           value={value}
           onChange={setValue}
@@ -319,7 +319,7 @@ export const StreamingState: Story = {
             </div>
           </div>
         </div>
-        <EnhancedChatInput
+        <ChatInput
           {...args}
           value={value}
           onChange={setValue}
@@ -360,7 +360,7 @@ export const DisabledState: Story = {
             <div className="badge badge-neutral">Status: Disabled</div>
           </div>
         </div>
-        <EnhancedChatInput {...args} value={value} onChange={setValue} />
+        <ChatInput {...args} value={value} onChange={setValue} />
       </div>
     );
   },
@@ -445,7 +445,7 @@ export const FullFeatured: Story = {
             <div className="badge badge-outline">Files: {files.length}</div>
           </div>
         </div>
-        <EnhancedChatInput
+        <ChatInput
           {...args}
           value={value}
           onChange={setValue}
@@ -489,7 +489,7 @@ export const CustomPlaceholder: Story = {
             The placeholder text can be customized for different contexts
           </p>
         </div>
-        <EnhancedChatInput {...args} value={value} onChange={setValue} />
+        <ChatInput {...args} value={value} onChange={setValue} />
       </div>
     );
   },
@@ -523,13 +523,13 @@ export const ResponsiveDesign: Story = {
           <div className="border-2 border-dashed border-base-300 p-4 rounded-lg">
             <h4 className="text-sm font-medium mb-2">Mobile View</h4>
             <div className="w-full max-w-sm">
-              <EnhancedChatInput {...args} value={value} onChange={setValue} />
+              <ChatInput {...args} value={value} onChange={setValue} />
             </div>
           </div>
           <div className="border-2 border-dashed border-base-300 p-4 rounded-lg">
             <h4 className="text-sm font-medium mb-2">Desktop View</h4>
             <div className="w-full">
-              <EnhancedChatInput {...args} value={value} onChange={setValue} />
+              <ChatInput {...args} value={value} onChange={setValue} />
             </div>
           </div>
         </div>

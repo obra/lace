@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { logger } from '~/utils/logger';
 import { createSuperjsonResponse } from '@/lib/serialization';
+import { TASK_STATUS_VALUES } from '~/tasks/task-status';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');
@@ -24,7 +25,7 @@ export const CreateTaskSchema = z.object({
 export const UpdateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  status: z.enum(['pending', 'in_progress', 'completed', 'blocked']).optional(),
+  status: z.enum(TASK_STATUS_VALUES as [string, ...string[]]).optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   assignedTo: z.string().optional(),
 });
