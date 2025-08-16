@@ -1,21 +1,10 @@
 @import 'tailwindcss';
 @import '@fortawesome/fontawesome-svg-core/styles.css';
-@import '@fontsource/lato/300.css';
-@import '@fontsource/lato/400.css'; 
-@import '@fontsource/lato/700.css';
-@import '@fontsource/lato/900.css';
-@import '@fontsource/dm-sans/300.css';
-@import '@fontsource/dm-sans/400.css';
-@import '@fontsource/dm-sans/500.css';
-@import '@fontsource/dm-sans/700.css';
-@import '@fontsource/dm-sans/300-italic.css';
-@import '@fontsource/dm-sans/400-italic.css';
-@import '@fontsource/dm-sans/500-italic.css';
-@import '@fontsource/dm-sans/700-italic.css';
-@import '@fontsource/google-sans-code/400.css';
-@import '@fontsource/google-sans-code/500.css';
-@import '@fontsource/google-sans-code/600.css';
-@import '@fontsource/google-sans-code/700.css';
+/* Optimized font loading with variable fonts and selective weights */
+@import '@fontsource/lato/400.css';  /* Regular weight only for Lato */
+@import '@fontsource/lato/700.css';  /* Bold weight for Lato */
+@import '@fontsource-variable/dm-sans/index.css';  /* DM Sans variable font */
+@import '@fontsource/google-sans-code/latin.css';  /* Google Sans Code Latin subset only */
 @plugin "daisyui";
 
 /* Typography: utilities bound to local fonts */
