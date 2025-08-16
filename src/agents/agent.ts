@@ -204,8 +204,8 @@ export class Agent extends EventEmitter {
       metadata?: QueuedMessage['metadata'];
     }
   ): Promise<void> {
-    if (!this._isRunning) {
-      await this.start();
+    if (!this._initialized) {
+      await this._initialize();
     }
 
     if (this._state === 'idle') {
@@ -265,20 +265,22 @@ export class Agent extends EventEmitter {
   }
 
   async continueConversation(): Promise<void> {
-    if (!this._isRunning) {
-      await this.start();
+    if (!this._initialized) {
+      await this._initialize();
     }
 
     await this._processConversation();
   }
 
-  // Control methods
-  async start(): Promise<void> {
-    // Load prompts when starting
+  // Private initialization method - happens once per agent
+  private async _initialize(): Promise<void> {
+    if (this._initialized) return; // idempotent
+
+    // Load prompts (expensive, happens once)
     const session = this._getSession();
     const project = this._getProject();
 
-    logger.debug('Agent.start() - loading prompt config with session/project context', {
+    logger.debug('Agent._initialize() - loading prompt config with session/project context', {
       threadId: this._threadId,
       hasSession: !!session,
       hasProject: !!project,
@@ -292,34 +294,56 @@ export class Agent extends EventEmitter {
       project: project,
     });
 
-    // Configure provider with loaded system prompt
-    this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+    // Cache the prompt config
+    this._promptConfig = promptConfig;
 
-    // Record events for new conversations only - check for existing prompts too
-    const events = this._threadManager.getEvents(this._threadId);
-    const hasConversationStarted = events.some(
-      (e) => e.type === 'USER_MESSAGE' || e.type === 'AGENT_MESSAGE'
-    );
-    const hasSystemPrompts = events.some(
-      (e) => e.type === 'SYSTEM_PROMPT' || e.type === 'USER_SYSTEM_PROMPT'
-    );
-
-    if (!hasConversationStarted && !hasSystemPrompts) {
-      this._addEventAndEmit({
-        type: 'SYSTEM_PROMPT',
-        threadId: this._threadId,
-        data: promptConfig.systemPrompt,
-      });
-      this._addEventAndEmit({
-        type: 'USER_SYSTEM_PROMPT',
-        threadId: this._threadId,
-        data: promptConfig.userInstructions,
-      });
+    // Record initial events (happens once)
+    if (!this._hasInitialEvents()) {
+      this._addInitialEvents(promptConfig);
     }
 
-    this._isRunning = true;
+    // Configure provider with loaded system prompt (happens every time)
+    this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
 
-    // Token budget initialization removed - using direct token tracking
+    this._initialized = true;
+
+    logger.info('AGENT: Initialized', {
+      threadId: this._threadId,
+      provider: this._provider.providerName,
+    });
+  }
+
+  // Check if initial events already exist
+  private _hasInitialEvents(): boolean {
+    const events = this._threadManager.getEvents(this._threadId);
+    return events.some(
+      (e) => e.type === 'SYSTEM_PROMPT' || e.type === 'USER_SYSTEM_PROMPT'
+    );
+  }
+
+  // Add initial events to thread
+  private _addInitialEvents(promptConfig: any): void {
+    this._addEventAndEmit({
+      type: 'SYSTEM_PROMPT',
+      threadId: this._threadId,
+      data: promptConfig.systemPrompt,
+    });
+    this._addEventAndEmit({
+      type: 'USER_SYSTEM_PROMPT',
+      threadId: this._threadId,
+      data: promptConfig.userInstructions,
+    });
+  }
+
+  // Control methods
+  async start(): Promise<void> {
+    // Ensure agent is initialized
+    await this._initialize();
+    
+    // Provider might be fresh, so always set system prompt
+    if (this._promptConfig) {
+      this.providerInstance.setSystemPrompt(this._promptConfig.systemPrompt);
+    }
 
     logger.info('AGENT: Started', {
       threadId: this._threadId,
@@ -328,7 +352,7 @@ export class Agent extends EventEmitter {
   }
 
   stop(): void {
-    this._isRunning = false;
+    this._initialized = false;
     this._clearProgressTimer();
 
     // Abort any in-progress processing
@@ -1343,7 +1367,7 @@ export class Agent extends EventEmitter {
       this.emit('conversation_complete');
 
       // Only continue conversation if agent is still running and thread exists
-      if (this._isRunning && this._threadManager.getThread(this._threadId)) {
+      if (this._initialized && this._threadManager.getThread(this._threadId)) {
         void this._processConversation();
       }
     }
