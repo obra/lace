@@ -5,76 +5,91 @@ import React from 'react';
 export default function FontTest() {
   const testCSSVariables = () => {
     const style = getComputedStyle(document.documentElement);
+    const lato = style.getPropertyValue('--font-lato');
+    const dmSans = style.getPropertyValue('--font-dm-sans');
     const googleSansCode = style.getPropertyValue('--font-google-sans-code');
-    const sourceCodePro = style.getPropertyValue('--font-source-code-pro');
 
     // eslint-disable-next-line no-console
-    console.log('CSS Variables:', { googleSansCode, sourceCodePro });
+    console.log('CSS Variables:', { lato, dmSans, googleSansCode });
 
-    return { googleSansCode, sourceCodePro };
+    return { lato, dmSans, googleSansCode };
   };
 
   const checkFontFace = async () => {
     if (typeof window !== 'undefined' && 'fonts' in document) {
       await document.fonts.ready;
       const fonts = Array.from(document.fonts).map((font) => font.family);
+      const hasLato = fonts.some((font) => font.includes('Lato'));
+      const hasDMSans = fonts.some((font) => font.includes('DM Sans'));
       const hasGoogleSansCode = fonts.some((font) => font.includes('Google Sans Code'));
-      const hasSourceCodePro = fonts.some((font) => font.includes('Source Code Pro'));
 
-      // Test if Google Sans Code can load
+      // Test if fonts can load
+      const latoTest = document.fonts.check('16px "Lato"');
+      const dmSansTest = document.fonts.check('16px "DM Sans"');
       const googleSansCodeTest = document.fonts.check('16px "Google Sans Code"');
 
       // eslint-disable-next-line no-console
       console.log('Font status:', {
+        hasLato,
+        hasDMSans,
         hasGoogleSansCode,
-        hasSourceCodePro,
         totalFonts: fonts.length,
+        latoAvailable: latoTest,
+        dmSansAvailable: dmSansTest,
         googleSansCodeAvailable: googleSansCodeTest,
         allFonts: fonts,
       });
 
       return {
+        hasLato,
+        hasDMSans,
         hasGoogleSansCode,
-        hasSourceCodePro,
         allFonts: fonts,
+        latoAvailable: latoTest,
+        dmSansAvailable: dmSansTest,
         googleSansCodeAvailable: googleSansCodeTest,
       };
     }
   };
 
-  const testNetworkFetch = async () => {
-    // Test removed: No longer fetching from Google Fonts CDN
-    // All fonts are now self-hosted via @fontsource packages
+  const testLocalFonts = async () => {
+    // Test local @fontsource fonts and CSS variables
     try {
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK (local fonts)',
-        headers: { 'content-type': 'text/css' },
-        css: '/* Local @fontsource fonts loaded via CSS imports */',
+      const rootStyles = getComputedStyle(document.documentElement);
+      const fontVariables = {
+        lato: rootStyles.getPropertyValue('--font-lato').trim(),
+        dmSans: rootStyles.getPropertyValue('--font-dm-sans').trim(),
+        googleSansCode: rootStyles.getPropertyValue('--font-google-sans-code').trim(),
+      };
+
+      // Check if CSS variables are defined
+      const variablesDefined = Object.values(fontVariables).every((v) => v.length > 0);
+
+      const result = {
+        fontVariables,
+        variablesDefined,
+        message: variablesDefined
+          ? 'All fonts loaded locally via @fontsource'
+          : 'Font CSS variables not properly defined',
       };
 
       // eslint-disable-next-line no-console
-      console.log('Font loading status (local @fontsource):', {
-        status: mockResponse.status,
-        ok: true,
-        cssLength: mockResponse.css.length,
-        preview: mockResponse.css,
-      });
+      console.log('Local font verification:', result);
 
-      return { status: mockResponse.status, ok: true, css: mockResponse.css };
+      return result;
     } catch (error) {
-      console.error('Local font loading error:', error);
+      console.error('Font verification error:', error);
       return { error: error instanceof Error ? error.message : String(error) };
     }
   };
 
   const [variables, setVariables] = React.useState<{
+    lato?: string;
+    dmSans?: string;
     googleSansCode?: string;
-    sourceCodePro?: string;
   }>({});
-  const [networkStatus, setNetworkStatus] = React.useState<{
-    status?: number;
-    ok?: boolean;
+  const [localStatus, setLocalStatus] = React.useState<{
+    variablesDefined?: boolean;
     error?: string;
   }>({});
 
@@ -82,7 +97,7 @@ export default function FontTest() {
     const vars = testCSSVariables();
     setVariables(vars);
     void checkFontFace();
-    void testNetworkFetch().then(setNetworkStatus);
+    void testLocalFonts().then(setLocalStatus);
   }, []);
 
   return (
@@ -92,24 +107,23 @@ export default function FontTest() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">CSS Variables</h2>
         <div className="bg-base-200 p-4 rounded font-mono text-sm">
+          <div>--font-lato: {variables.lato || 'NOT SET'}</div>
+          <div>--font-dm-sans: {variables.dmSans || 'NOT SET'}</div>
           <div>--font-google-sans-code: {variables.googleSansCode || 'NOT SET'}</div>
-          <div>--font-source-code-pro: {variables.sourceCodePro || 'NOT SET'}</div>
         </div>
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Network Status</h2>
+        <h2 className="text-xl font-semibold">Local Font Status</h2>
         <div className="bg-base-200 p-4 rounded font-mono text-sm">
-          {networkStatus.ok ? (
-            <div className="text-green-600">
-              ✅ Google Fonts CSS loaded successfully (Status: {networkStatus.status})
-            </div>
-          ) : networkStatus.error ? (
-            <div className="text-red-600">❌ Network error: {networkStatus.error}</div>
-          ) : networkStatus.status ? (
-            <div className="text-yellow-600">⚠️ HTTP {networkStatus.status} response</div>
+          {localStatus.variablesDefined ? (
+            <div className="text-green-600">✅ All fonts loaded locally via @fontsource</div>
+          ) : localStatus.error ? (
+            <div className="text-red-600">❌ Font verification error: {localStatus.error}</div>
+          ) : localStatus.variablesDefined === false ? (
+            <div className="text-yellow-600">⚠️ Font CSS variables not properly defined</div>
           ) : (
-            <div className="text-gray-500">⏳ Testing network access...</div>
+            <div className="text-gray-500">⏳ Testing local fonts...</div>
           )}
         </div>
       </div>
@@ -152,9 +166,9 @@ export default function FontTest() {
         </div>
 
         <div className="space-y-2">
-          <h3 className="font-semibold">Direct Source Code Pro (CSS variable):</h3>
+          <h3 className="font-semibold">Direct Lato (CSS variable):</h3>
           <div
-            style={{ fontFamily: 'var(--font-source-code-pro)' }}
+            style={{ fontFamily: 'var(--font-lato)' }}
             className="p-4 bg-base-100 border rounded text-lg"
           >
             The quick brown fox jumps over the lazy dog 123456789
@@ -162,9 +176,9 @@ export default function FontTest() {
         </div>
 
         <div className="space-y-2">
-          <h3 className="font-semibold">Direct Source Code Pro (font name):</h3>
+          <h3 className="font-semibold">Direct DM Sans (CSS variable):</h3>
           <div
-            style={{ fontFamily: 'Source Code Pro, monospace' }}
+            style={{ fontFamily: 'var(--font-dm-sans)' }}
             className="p-4 bg-base-100 border rounded text-lg"
           >
             The quick brown fox jumps over the lazy dog 123456789
@@ -189,19 +203,20 @@ export default function FontTest() {
             <strong>1. Open DevTools → Network tab</strong>
           </p>
           <p>
-            <strong>2. Refresh page and look for:</strong>
+            <strong>2. Refresh page and verify:</strong>
           </p>
           <ul className="list-disc ml-4 space-y-1">
-            <li>Local @fontsource font files (no external requests)</li>
-            <li>Source Code Pro font files (if any)</li>
+            <li>Only local @fontsource font files are loaded (no external requests)</li>
+            <li>No requests to fonts.googleapis.com or fonts.gstatic.com</li>
+            <li>Font files should come from your domain or bundled assets</li>
           </ul>
           <p>
             <strong>3. Open DevTools → Elements → Computed styles</strong>
           </p>
           <ul className="list-disc ml-4 space-y-1">
-            <li>Inspect any .font-mono element above</li>
+            <li>Inspect any font element above</li>
             <li>Look at the font-family computed value</li>
-            <li>See which font is actually being used</li>
+            <li>Verify CSS variables are properly resolved</li>
           </ul>
           <p>
             <strong>4. Check Console for logged font information</strong>
@@ -214,7 +229,7 @@ export default function FontTest() {
           const vars = testCSSVariables();
           setVariables(vars);
           void checkFontFace();
-          void testNetworkFetch().then(setNetworkStatus);
+          void testLocalFonts().then(setLocalStatus);
         }}
         className="btn btn-primary"
       >
