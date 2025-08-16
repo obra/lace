@@ -1,8 +1,6 @@
 // ABOUTME: Utility for extracting Open Graph and meta tags from web pages
 // ABOUTME: Provides client-side interface to meta data scraping API
 
-import { stringify } from '@/lib/serialization';
-
 interface MetaData {
   /**
    * The title of the webpage.
@@ -41,7 +39,7 @@ export async function scrapeMetaData(url: string): Promise<MetaScrapingResult> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: stringify({ url }),
+      body: JSON.stringify({ url }),
     });
 
     if (!response.ok) {
