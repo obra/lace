@@ -101,7 +101,7 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: /new project/i })).toBeInTheDocument();
+    expect(screen.getByTestId('create-new-project-button')).toBeInTheDocument();
   });
 
   it('should open create project modal when create button is clicked', async () => {
@@ -114,7 +114,7 @@ describe('ProjectSelectorPanel', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /new project/i }));
+    await user.click(screen.getByTestId('create-new-project-button'));
     // Wizard now opens directly on Directory step
     expect(await screen.findByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
   });

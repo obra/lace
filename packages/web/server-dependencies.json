@@ -15,6 +15,8 @@
     "node_modules/bundle-name/index.js",
     "node_modules/define-lazy-prop/index.js",
     "node_modules/is-inside-container/index.js",
+    "node_modules/bundle-name/index.js",
+    "node_modules/define-lazy-prop/index.js",
     "node_modules/is-docker/index.js",
     "node_modules/is-wsl/index.js",
     "node_modules/wsl-utils/index.js",

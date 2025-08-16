@@ -171,7 +171,7 @@ describe('LaceApp Task Sidebar Integration', () => {
     // Check if the task section elements are there
     await waitFor(
       () => {
-        expect(screen.getByText('Add task')).toBeInTheDocument(); // Add task button
+        expect(screen.getByTestId('add-task-button')).toBeInTheDocument(); // Add task button
       },
       { timeout: 3000 }
     );
@@ -195,7 +195,7 @@ describe('LaceApp Task Sidebar Integration', () => {
     renderWithProviders(<LaceApp />);
 
     await waitFor(() => {
-      expect(screen.queryByText('Add task')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('add-task-button')).not.toBeInTheDocument();
     });
   });
 
@@ -239,10 +239,10 @@ describe('LaceApp Task Sidebar Integration', () => {
     renderWithProviders(<LaceApp />);
 
     await waitFor(() => {
-      // Check that the Tasks section exists with task count and shows the task itself
-      expect(screen.getByText('Tasks (1)')).toBeInTheDocument(); // Section header with count
-      expect(screen.getByText('Test Task')).toBeInTheDocument(); // Task item
-      expect(screen.getByText('1 tasks • 0 in progress')).toBeInTheDocument(); // Task summary
+      // Check that the Tasks section exists and shows task board with count
+      expect(screen.getByText('Task Board (1)')).toBeInTheDocument(); // Task Board button with count
+      expect(screen.getByText('Test Task')).toBeInTheDocument(); // Task item in sidebar
+      expect(screen.getByText(/1 done|1 active|1 pending/)).toBeInTheDocument(); // Task status summary
     });
   });
 });

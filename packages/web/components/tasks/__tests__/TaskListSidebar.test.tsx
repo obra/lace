@@ -129,11 +129,12 @@ describe('TaskListSidebar', () => {
     });
   });
 
-  it('should render task summary', () => {
+  it('should not render task summary (feature removed)', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} />);
 
-    expect(screen.getByText('3 tasks • 1 in progress')).toBeInTheDocument();
+    // Task summary was removed in UI refactor
+    expect(screen.queryByText('3 tasks • 1 in progress')).not.toBeInTheDocument();
   });
 
   it('should show in progress tasks first', () => {
@@ -175,16 +176,15 @@ describe('TaskListSidebar', () => {
     expect(mockOnOpenTaskBoard).toHaveBeenCalled();
   });
 
-  it('should call onCreateTask when create task button is clicked', async () => {
+  it('should not render create task button (functionality moved to section header)', () => {
     const mockOnCreateTask = vi.fn();
-    const user = userEvent.setup();
 
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} onCreateTask={mockOnCreateTask} />);
 
-    // Look for the "Add task" button
-    await user.click(screen.getByText('Add task'));
-    expect(mockOnCreateTask).toHaveBeenCalled();
+    // The "Add task" button is now in the parent component's section header, not in this component
+    expect(screen.queryByText('Add task')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('add-task-button')).not.toBeInTheDocument();
   });
 
   it('should show loading state', () => {
@@ -212,7 +212,7 @@ describe('TaskListSidebar', () => {
     expect(screen.getByRole('status')).toBeInTheDocument(); // loading spinner
   });
 
-  it('should show empty state when no tasks', () => {
+  it('should render empty when no tasks (no empty state message)', () => {
     mockUseTaskManager.mockReturnValue({
       tasks: [],
       isLoading: false,
@@ -234,7 +234,11 @@ describe('TaskListSidebar', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} />);
 
-    expect(screen.getByText('No tasks yet')).toBeInTheDocument();
+    // Verify that no tasks are shown and no "No tasks yet" message is displayed
+    expect(screen.queryByText('No tasks yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('In Progress')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pending')).not.toBeInTheDocument();
+    expect(screen.queryByText('Blocked')).not.toBeInTheDocument();
   });
 
   it('should limit tasks shown per section', () => {

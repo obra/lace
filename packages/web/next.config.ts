@@ -29,9 +29,6 @@ function getServerDependencies(): string[] {
       );
     }
 
-    console.log(
-      `📦 Using ${traceData.tracedFiles.length} nft-traced dependencies (includes is-docker ✅)`
-    );
     return ['packages/web/server-custom.ts', ...traceData.tracedFiles];
   } catch (error) {
     if (error instanceof SyntaxError) {

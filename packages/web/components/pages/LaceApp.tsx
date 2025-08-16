@@ -945,6 +945,7 @@ export const LaceApp = memo(function LaceApp() {
                             }}
                             className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
                             title="Add task"
+                            data-testid="add-task-button"
                           >
                             <FontAwesomeIcon
                               icon={faPlus}
@@ -1233,6 +1234,7 @@ export const LaceApp = memo(function LaceApp() {
                         onClick={() => setShowTaskCreation(true)}
                         className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
                         title="Add task"
+                        data-testid="add-task-button"
                       >
                         <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-base-content/60" />
                       </button>
