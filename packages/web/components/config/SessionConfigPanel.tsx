@@ -11,6 +11,11 @@ import { ModelDropdown } from '@/components/config/ModelDropdown';
 import type { ProviderInfo, ModelInfo, CreateAgentRequest } from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useAppState } from '@/components/providers/AppStateProvider';
+import { useProviders } from '@/hooks/useProviders';
 
 interface SessionConfiguration {
   providerInstanceId?: string;
@@ -24,27 +29,7 @@ interface SessionConfiguration {
 }
 
 interface SessionConfigPanelProps {
-  selectedProject: ProjectInfo;
-  projectConfiguration?: Record<string, unknown> | null;
-  sessions: SessionInfo[];
-  selectedSession: SessionInfo | null;
-  providers: ProviderInfo[];
-  onSessionCreate: (sessionData: {
-    name: string;
-    description?: string;
-    providerInstanceId?: string;
-    modelId?: string;
-    configuration?: Record<string, unknown>;
-  }) => void;
-  onSessionSelect: (session: SessionInfo) => void;
-  onAgentCreate: (sessionId: string, agentData: CreateAgentRequest) => void;
-  onAgentSelect?: (agentId: string) => void;
-  onAgentUpdate?: () => void | Promise<void>;
-  onSessionUpdate?: (
-    sessionId: string,
-    updates: Partial<SessionInfo & { configuration?: SessionConfiguration }>
-  ) => void;
-  loading?: boolean;
+  // No props needed - all data comes from providers
 }
 
 const AVAILABLE_TOOLS = [
@@ -74,20 +59,22 @@ const DEFAULT_CONFIG: SessionConfiguration = {
   environmentVariables: {},
 };
 
-export function SessionConfigPanel({
-  selectedProject,
-  projectConfiguration,
-  sessions,
-  selectedSession,
-  providers,
-  onSessionCreate,
-  onSessionSelect,
-  onAgentCreate,
-  onAgentSelect,
-  onAgentUpdate,
-  onSessionUpdate,
-  loading = false,
-}: SessionConfigPanelProps) {
+export function SessionConfigPanel({}: SessionConfigPanelProps) {
+  // Get data from providers instead of props
+  const { currentProject } = useProjectContext();
+  const { sessions, projectConfig, createSession, loading: sessionLoading } = useSessionContext();
+  const {
+    sessionDetails: selectedSession,
+    createAgent,
+    reloadSessionDetails,
+    loading: agentLoading,
+  } = useAgentContext();
+  const {
+    actions: { updateHashState },
+  } = useAppState();
+  const { providers, loading: providersLoading } = useProviders();
+
+  const loading = sessionLoading || agentLoading || providersLoading;
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
@@ -128,7 +115,7 @@ export function SessionConfigPanel({
   }, [providers]);
 
   // Reset form when project or project configuration changes
-  const projectId = (selectedProject as { id: string }).id;
+  const projectId = currentProject.id;
   useEffect(() => {
     setShowCreateSession(false);
     setShowCreateAgent(false);
@@ -139,31 +126,31 @@ export function SessionConfigPanel({
     resetAgentForm();
     resetEditSessionForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, projectConfiguration]);
+  }, [projectId, projectConfig]);
 
   const resetSessionForm = () => {
     setNewSessionName('');
     setNewSessionDescription('');
     // Use project configuration as defaults if available
     const defaultConfig = { ...DEFAULT_CONFIG };
-    if (projectConfiguration) {
-      if (projectConfiguration.providerInstanceId) {
-        defaultConfig.providerInstanceId = projectConfiguration.providerInstanceId as string;
+    if (projectConfig) {
+      if (projectConfig.providerInstanceId) {
+        defaultConfig.providerInstanceId = projectConfig.providerInstanceId as string;
       }
-      if (projectConfiguration.modelId) {
-        defaultConfig.modelId = projectConfiguration.modelId as string;
+      if (projectConfig.modelId) {
+        defaultConfig.modelId = projectConfig.modelId as string;
       }
-      if (projectConfiguration.workingDirectory) {
-        defaultConfig.workingDirectory = projectConfiguration.workingDirectory as string;
+      if (projectConfig.workingDirectory) {
+        defaultConfig.workingDirectory = projectConfig.workingDirectory as string;
       }
-      if (projectConfiguration.environmentVariables) {
-        defaultConfig.environmentVariables = projectConfiguration.environmentVariables as Record<
+      if (projectConfig.environmentVariables) {
+        defaultConfig.environmentVariables = projectConfig.environmentVariables as Record<
           string,
           string
         >;
       }
-      if (projectConfiguration.toolPolicies) {
-        defaultConfig.toolPolicies = projectConfiguration.toolPolicies as Record<
+      if (projectConfig.toolPolicies) {
+        defaultConfig.toolPolicies = projectConfig.toolPolicies as Record<
           string,
           'allow' | 'require-approval' | 'deny'
         >;
@@ -197,15 +184,10 @@ export function SessionConfigPanel({
     e.preventDefault();
     if (!newSessionName.trim()) return;
 
-    // Extract provider and model from sessionConfig to send at top level
-    const { providerInstanceId, modelId, ...restConfig } = sessionConfig;
-
-    onSessionCreate({
+    createSession({
       name: newSessionName.trim(),
       description: newSessionDescription.trim() || undefined,
-      providerInstanceId: providerInstanceId || '',
-      modelId: modelId || '',
-      configuration: restConfig,
+      configuration: sessionConfig,
     });
 
     resetSessionForm();
@@ -223,7 +205,7 @@ export function SessionConfigPanel({
       return;
     }
 
-    onAgentCreate(selectedSession.id, {
+    createAgent(selectedSession.id, {
       name: newAgentName.trim(),
       providerInstanceId: selectedInstanceId,
       modelId: selectedModelId,
@@ -354,13 +336,8 @@ export function SessionConfigPanel({
       }
 
       if (configRes.ok) {
-        // Trigger local state update if callback is available
-        if (onSessionUpdate) {
-          onSessionUpdate(selectedSession.id, {
-            name: editSessionName.trim(),
-            configuration: editSessionConfig,
-          });
-        }
+        // Trigger local state update by reloading session details
+        await reloadSessionDetails();
 
         setShowEditConfig(false);
         resetEditSessionForm();
@@ -474,10 +451,8 @@ export function SessionConfigPanel({
       });
 
       if (res.ok) {
-        // Trigger a refresh by calling parent's agent update handler to reload session data
-        if (onAgentUpdate) {
-          await onAgentUpdate();
-        }
+        // Trigger a refresh by reloading session details
+        await reloadSessionDetails();
         setShowEditAgent(false);
         setEditingAgent(null);
       } else {
@@ -496,12 +471,8 @@ export function SessionConfigPanel({
         <div className="flex items-center gap-3">
           <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold text-base-content">
-              {(selectedProject as { name: string }).name}
-            </h2>
-            <p className="text-sm text-base-content/60">
-              {(selectedProject as { description: string }).description}
-            </p>
+            <h2 className="text-xl font-semibold text-base-content">{currentProject.name}</h2>
+            <p className="text-sm text-base-content/60">{currentProject.description}</p>
           </div>
         </div>
       </div>
@@ -531,7 +502,7 @@ export function SessionConfigPanel({
                       ? 'border-primary bg-primary/5'
                       : 'border-base-300 hover:border-primary/50'
                   }`}
-                  onClick={() => onSessionSelect(session)}
+                  onClick={() => updateHashState({ session: session.id })}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -582,7 +553,7 @@ export function SessionConfigPanel({
                               className="flex items-center justify-between p-2 bg-base-50 rounded border border-base-200 cursor-pointer hover:bg-base-100 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onAgentSelect?.(agent.threadId);
+                                updateHashState({ agent: agent.threadId });
                               }}
                             >
                               <div className="flex items-center gap-2">
@@ -703,15 +674,12 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={
-                      sessionConfig.workingDirectory ||
-                      (selectedProject as { workingDirectory: string }).workingDirectory
-                    }
+                    value={sessionConfig.workingDirectory || currentProject.workingDirectory}
                     onChange={(e) =>
                       setSessionConfig((prev) => ({ ...prev, workingDirectory: e.target.value }))
                     }
                     className="input input-bordered w-full"
-                    placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
+                    placeholder={currentProject.workingDirectory}
                   />
                 </div>
 
@@ -967,10 +935,7 @@ export function SessionConfigPanel({
                   </label>
                   <input
                     type="text"
-                    value={
-                      editSessionConfig.workingDirectory ||
-                      (selectedProject as { workingDirectory: string }).workingDirectory
-                    }
+                    value={editSessionConfig.workingDirectory || currentProject.workingDirectory}
                     onChange={(e) =>
                       setEditSessionConfig((prev) => ({
                         ...prev,
@@ -978,7 +943,7 @@ export function SessionConfigPanel({
                       }))
                     }
                     className="input input-bordered w-full"
-                    placeholder={(selectedProject as { workingDirectory: string }).workingDirectory}
+                    placeholder={currentProject.workingDirectory}
                   />
                 </div>
 

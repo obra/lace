@@ -184,35 +184,10 @@ const LaceAppInner = memo(function LaceAppInner() {
 
   // Tool approval decisions are now handled by ToolApprovalProvider
 
-  // Session creation function with configuration
-  const handleSessionCreate = async (sessionData: {
-    name: string;
-    description?: string;
-    configuration?: Record<string, unknown>;
-  }) => {
-    await createSession(sessionData);
-  };
-
-  // Agent creation function
-  const handleAgentCreate = async (sessionId: string, agentData: CreateAgentRequest) => {
-    await createAgent(sessionId, agentData);
-  };
-
-  // Handle session selection - load session details but don't auto-select agent
-  const handleSessionSelect = (sessionId: string) => {
-    // Hash router automatically clears agent when session changes
-    setSelectedSession(sessionId as ThreadId);
-  };
-
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
     // Manual agent selection - no need to disable auto-selection as SessionProvider handles this
     setSelectedAgent(agentThreadId as ThreadId);
-  };
-
-  // Handle agent updates - refresh session details to show updated agent info
-  const handleAgentUpdate = async () => {
-    await reloadSessionDetails();
   };
 
   // Handle project updates (archive/unarchive/edit) - now delegated to ProjectProvider
@@ -360,19 +335,7 @@ const LaceAppInner = memo(function LaceAppInner() {
               />
             ) : (
               <div className="flex-1 p-6">
-                <SessionConfigPanel
-                  selectedProject={currentProject}
-                  projectConfiguration={projectConfig}
-                  sessions={sessions}
-                  selectedSession={selectedSessionDetails}
-                  providers={providers}
-                  onSessionCreate={handleSessionCreate}
-                  onSessionSelect={(session: SessionInfo) => handleSessionSelect(session.id)}
-                  onAgentCreate={handleAgentCreate}
-                  onAgentSelect={handleAgentSelect}
-                  onAgentUpdate={handleAgentUpdate}
-                  loading={loading}
-                />
+                <SessionConfigPanel />
               </div>
             )
           ) : (
