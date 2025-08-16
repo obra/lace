@@ -343,20 +343,7 @@ const LaceAppInner = memo(function LaceAppInner() {
               {projects.length === 0 && (
                 <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
               )}
-              {(projects.length > 0 || autoOpenCreateProject) && (
-                <ProjectSelectorPanel
-                  projects={projectsForSidebar}
-                  selectedProject={currentProject.id ? currentProject : null}
-                  providers={providers}
-                  onProjectSelect={handleProjectSelect}
-                  onProjectCreate={() => void reloadProjects()}
-                  onProjectUpdate={handleProjectUpdate}
-                  loading={loadingProjects}
-                  autoOpenCreate={autoOpenCreateProject}
-                  onAutoCreateHandled={() => setAutoOpenCreateProject(false)}
-                  onOnboardingComplete={handleOnboardingComplete}
-                />
-              )}
+              {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
             </div>
           )}
         </div>

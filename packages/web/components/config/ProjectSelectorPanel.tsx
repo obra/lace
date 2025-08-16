@@ -21,27 +21,14 @@ import type { ProviderInfo } from '@/types/api';
 import { parseResponse, parseTyped } from '@/lib/serialization';
 import { DirectoryField } from '@/components/ui';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useUIState } from '@/hooks/useUIState';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import { useProviders } from '@/hooks/useProviders';
 
 interface ProjectSelectorPanelProps {
-  projects: ProjectInfo[];
-  selectedProject: ProjectInfo | null;
-  providers?: ProviderInfo[];
-  onProjectSelect: (project: ProjectInfo) => void;
-  onProjectCreate?: () => void;
-  onProjectUpdate?: (
-    projectId: string,
-    updates: {
-      isArchived?: boolean;
-      name?: string;
-      description?: string;
-      workingDirectory?: string;
-      configuration?: ProjectConfiguration;
-    }
-  ) => void;
-  loading?: boolean;
-  autoOpenCreate?: boolean;
-  onAutoCreateHandled?: () => void;
-  onOnboardingComplete?: (projectId: string, sessionId: string, agentId: string) => Promise<void>;
+  // No props needed - all data comes from providers
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
@@ -85,18 +72,28 @@ const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
   environmentVariables: {},
 };
 
-export function ProjectSelectorPanel({
-  projects,
-  selectedProject,
-  providers = [],
-  onProjectSelect,
-  onProjectCreate,
-  onProjectUpdate,
-  loading = false,
-  autoOpenCreate = false,
-  onAutoCreateHandled,
-  onOnboardingComplete,
-}: ProjectSelectorPanelProps) {
+export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
+  // Get data from providers instead of props
+  const {
+    projects,
+    projectsForSidebar,
+    currentProject,
+    loading: projectLoading,
+    onProjectSelect,
+    updateProject,
+    reloadProjects,
+  } = useProjectContext();
+  const { enableAgentAutoSelection } = useSessionContext();
+  const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIState();
+  const { handleOnboardingComplete } = useOnboarding(
+    setAutoOpenCreateProject,
+    enableAgentAutoSelection
+  );
+  const { providers, loading: providersLoading } = useProviders();
+
+  const loading = projectLoading || providersLoading;
+  const selectedProject = currentProject.id ? currentProject : null;
+  const autoOpenCreate = autoOpenCreateProject;
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ProjectFilter>('active');
   const [timeFrame, setTimeFrame] = useState<ProjectTimeFrame>('week');
@@ -166,7 +163,7 @@ export function ProjectSelectorPanel({
     if (!autoOpenCreate) {
       autoOpenHandledRef.current = false;
     }
-  }, [autoOpenCreate, showCreateProject, onAutoCreateHandled]);
+  }, [autoOpenCreate, showCreateProject]);
 
   // When the modal opens, start at step 2 (Directory)
   useEffect(() => {
@@ -193,9 +190,9 @@ export function ProjectSelectorPanel({
     setCreateNewEnvValue('');
     setShowAdvancedOptions(false); // Reset simplified mode state
     setShowAddProvider(false); // Reset provider modal state
-    // Notify parent so CTA can be toggled again cleanly
-    onAutoCreateHandled?.();
-  }, [onAutoCreateHandled]);
+    // Clear auto-open state so CTA can be toggled again cleanly
+    setAutoOpenCreateProject(false);
+  }, [setAutoOpenCreateProject]);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -312,17 +309,15 @@ export function ProjectSelectorPanel({
 
   // Handle context menu actions
   const handleContextMenuAction = (projectId: string, action: 'archive' | 'unarchive' | 'edit') => {
-    if (!onProjectUpdate) return;
-
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
     switch (action) {
       case 'archive':
-        onProjectUpdate(projectId, { isArchived: true });
+        updateProject(projectId, { isArchived: true });
         break;
       case 'unarchive':
-        onProjectUpdate(projectId, { isArchived: false });
+        updateProject(projectId, { isArchived: false });
         break;
       case 'edit':
         setEditingProject(project);
@@ -356,15 +351,13 @@ export function ProjectSelectorPanel({
       });
 
       if (res.ok) {
-        // Update local state via callback if available
-        if (onProjectUpdate) {
-          onProjectUpdate(editingProject.id, {
-            name: editName.trim(),
-            description: editDescription.trim() || undefined,
-            workingDirectory: editWorkingDirectory.trim(),
-            configuration: editConfig,
-          });
-        }
+        // Update local state via provider
+        updateProject(editingProject.id, {
+          name: editName.trim(),
+          description: editDescription.trim() || undefined,
+          workingDirectory: editWorkingDirectory.trim(),
+          configuration: editConfig,
+        });
 
         handleCancelEdit();
       } else {
@@ -493,13 +486,11 @@ export function ProjectSelectorPanel({
       const projectData = await parseResponse<ProjectInfo>(projectRes);
       const projectId = projectData.id;
 
-      // Call the callback to refresh projects list if available
-      if (onProjectCreate) {
-        onProjectCreate();
-      }
+      // Refresh projects list
+      await reloadProjects();
 
       // For any project creation, navigate directly to the coordinator agent
-      if (onOnboardingComplete) {
+      if (handleOnboardingComplete) {
         // Step 2: Get sessions (project creation should have created a default session)
         // Add retry to mitigate transient eventual-consistency: project not found
         const maxAttempts = 5;
@@ -545,7 +536,7 @@ export function ProjectSelectorPanel({
 
         if (sessionId) {
           const coordinatorAgentId = sessionId; // coordinator has same threadId
-          await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+          await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
         } else {
           console.warn('Create project session fallback:', {
             projectId,
@@ -704,7 +695,7 @@ export function ProjectSelectorPanel({
             <div
               onClick={() => setShowCreateProject(true)}
               className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
-              data-testid="create-new-project-button"
+              data-testid="create-project-button"
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
@@ -754,52 +745,51 @@ export function ProjectSelectorPanel({
                     )}
 
                     {/* Context Menu Button */}
-                    {onProjectUpdate && (
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowContextMenu(showContextMenu === project.id ? null : project.id);
-                          }}
-                          className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
-                        >
-                          <FontAwesomeIcon icon={faEllipsisV} className="w-3 h-3" />
-                        </button>
 
-                        {/* Context Menu Dropdown */}
-                        {showContextMenu === project.id && (
-                          <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleContextMenuAction(project.id, 'edit');
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
-                            >
-                              <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                              Edit
-                            </button>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowContextMenu(showContextMenu === project.id ? null : project.id);
+                        }}
+                        className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
+                      >
+                        <FontAwesomeIcon icon={faEllipsisV} className="w-3 h-3" />
+                      </button>
 
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleContextMenuAction(
-                                  project.id,
-                                  project.isArchived ? 'unarchive' : 'archive'
-                                );
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
-                            >
-                              <FontAwesomeIcon
-                                icon={project.isArchived ? faFolder : faTrash}
-                                className="w-3 h-3"
-                              />
-                              {project.isArchived ? 'Unarchive' : 'Archive'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      {/* Context Menu Dropdown */}
+                      {showContextMenu === project.id && (
+                        <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleContextMenuAction(project.id, 'edit');
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleContextMenuAction(
+                                project.id,
+                                project.isArchived ? 'unarchive' : 'archive'
+                              );
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon
+                              icon={project.isArchived ? faFolder : faTrash}
+                              className="w-3 h-3"
+                            />
+                            {project.isArchived ? 'Unarchive' : 'Archive'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-4 text-sm text-base-content/60">
