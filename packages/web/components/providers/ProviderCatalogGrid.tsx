@@ -3,74 +3,29 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ProviderCatalogCard } from './ProviderCatalogCard';
 import { AddInstanceModal } from './AddInstanceModal';
-import { parseResponse } from '@/lib/serialization';
-
-interface CatalogModel {
-  id: string;
-  name: string;
-  cost_per_1m_in: number;
-  cost_per_1m_out: number;
-  cost_per_1m_in_cached?: number;
-  cost_per_1m_out_cached?: number;
-  context_window: number;
-  default_max_tokens: number;
-  can_reason?: boolean;
-  has_reasoning_effort?: boolean;
-  supports_attachments?: boolean;
-}
-
-interface CatalogProvider {
-  id: string;
-  name: string;
-  type: string;
-  api_key?: string;
-  api_endpoint?: string;
-  default_large_model_id: string;
-  default_small_model_id: string;
-  models: CatalogModel[];
-}
+import { useProviderInstances, type CatalogProvider } from './ProviderInstanceProvider';
 
 export function ProviderCatalogGrid() {
-  const [providers, setProviders] = useState<CatalogProvider[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<CatalogProvider | null>(null);
+  const {
+    catalogProviders: providers,
+    catalogLoading: loading,
+    catalogError: error,
+    showAddModal,
+    selectedCatalogProvider: selectedProvider,
+    loadCatalog,
+    openAddModal,
+    closeAddModal,
+  } = useProviderInstances();
 
   useEffect(() => {
-    loadProviders();
-  }, []);
-
-  const loadProviders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch('/api/provider/catalog');
-
-      if (!response.ok) {
-        throw new Error(`Failed to load catalog: ${response.status}`);
-      }
-
-      const data = await parseResponse<{ providers: CatalogProvider[] }>(response);
-      setProviders(data.providers);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load catalog');
-    } finally {
-      setLoading(false);
-    }
-  };
+    void loadCatalog();
+  }, [loadCatalog]);
 
   const handleAddInstance = (provider: CatalogProvider) => {
-    setSelectedProvider(provider);
-    setShowAddModal(true);
-  };
-
-  const handleModalClose = () => {
-    setShowAddModal(false);
-    setSelectedProvider(null);
+    openAddModal(provider);
   };
 
   if (loading) {
@@ -102,7 +57,7 @@ export function ProviderCatalogGrid() {
     return (
       <div className="alert alert-error">
         <span>Error: {error}</span>
-        <button className="btn btn-sm btn-ghost" onClick={loadProviders}>
+        <button className="btn btn-sm btn-ghost" onClick={() => void loadCatalog()}>
           Retry
         </button>
       </div>
@@ -153,10 +108,10 @@ export function ProviderCatalogGrid() {
 
       <AddInstanceModal
         isOpen={showAddModal}
-        onClose={handleModalClose}
+        onClose={closeAddModal}
         onSuccess={() => {
           // Success handled by parent component
-          handleModalClose();
+          closeAddModal();
         }}
         preselectedProvider={selectedProvider}
       />
