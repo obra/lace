@@ -42,6 +42,7 @@ import { useEventStream } from '@/hooks/useEventStream';
 import { useProjectManagement } from '@/hooks/useProjectManagement';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
+import { useModalState } from '@/hooks/useModalState';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
@@ -106,13 +107,22 @@ export const LaceApp = memo(function LaceApp() {
   } = useHashRouter();
 
   // UI State (from AnimatedLaceApp but remove demo data)
-  const [showMobileNav, setShowMobileNav] = useState(false);
-  const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
-  const [showTaskBoard, setShowTaskBoard] = useState(false);
-  const [showTaskCreation, setShowTaskCreation] = useState(false);
-  const [showTaskDisplay, setShowTaskDisplay] = useState(false);
-  const [selectedTaskForDisplay, setSelectedTaskForDisplay] = useState<Task | null>(null);
-  const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
+  const {
+    showMobileNav,
+    setShowMobileNav,
+    showDesktopSidebar,
+    setShowDesktopSidebar,
+    showTaskBoard,
+    setShowTaskBoard,
+    showTaskCreation,
+    setShowTaskCreation,
+    showTaskDisplay,
+    setShowTaskDisplay,
+    selectedTaskForDisplay,
+    setSelectedTaskForDisplay,
+    autoOpenCreateProject,
+    setAutoOpenCreateProject,
+  } = useModalState();
 
   // Business Logic State (from current app/page.tsx)
   const {
@@ -243,7 +253,7 @@ export const LaceApp = memo(function LaceApp() {
     } else {
       setAutoOpenCreateProject(false);
     }
-  }, [projects?.length, loadingProjects]);
+  }, [projects?.length, loadingProjects, setAutoOpenCreateProject]);
 
   // Sessions and project configuration are now handled by useSessionManagement hook
   // Session details are now loaded by useAgentManagement hook
