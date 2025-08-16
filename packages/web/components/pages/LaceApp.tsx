@@ -41,6 +41,7 @@ import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
 import { useProjectManagement } from '@/hooks/useProjectManagement';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
+import { useAgentManagement } from '@/hooks/useAgentManagement';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
@@ -127,9 +128,15 @@ export const LaceApp = memo(function LaceApp() {
     createSession,
     reloadSessions,
   } = useSessionManagement(selectedProject);
+  const {
+    sessionDetails: selectedSessionDetails,
+    loading: agentLoading,
+    createAgent,
+    updateAgentState,
+    reloadSessionDetails,
+  } = useAgentManagement(selectedSession);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Use session events hook for event management (without event stream)
@@ -147,18 +154,12 @@ export const LaceApp = memo(function LaceApp() {
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
 
   // Handle agent state changes from event stream
-  const handleAgentStateChange = useCallback((agentId: string, from: string, to: string) => {
-    setSelectedSessionDetails((prevSession) => {
-      if (!prevSession?.agents) return prevSession;
-
-      return {
-        ...prevSession,
-        agents: prevSession.agents.map((agent) =>
-          agent.threadId === agentId ? { ...agent, status: to as AgentState } : agent
-        ),
-      };
-    });
-  }, []);
+  const handleAgentStateChange = useCallback(
+    (agentId: string, from: string, to: string) => {
+      updateAgentState(agentId, from, to);
+    },
+    [updateAgentState]
+  );
 
   // Get current agent's status from the updated session details
   const currentAgent =
@@ -244,42 +245,8 @@ export const LaceApp = memo(function LaceApp() {
     }
   }, [projects?.length, loadingProjects]);
 
-  const loadSessionDetails = useCallback(
-    async (sessionId: ThreadId) => {
-      try {
-        const res = await fetch(`/api/sessions/${sessionId}`);
-        const data: unknown = await parseResponse<unknown>(res);
-
-        if (isApiError(data)) {
-          console.error('Failed to load session details:', data.error);
-          // If session not found, clear it from the hash to prevent repeated errors
-          if (data.error === 'Session not found') {
-            setSelectedSession(null);
-          }
-          return;
-        }
-
-        const sessionResponse = data as SessionInfo;
-        setSelectedSessionDetails(sessionResponse);
-      } catch (error) {
-        console.error('Failed to load session details:', error);
-        // On network or other errors, also clear the invalid session
-        setSelectedSession(null);
-      }
-    },
-    [setSelectedSession]
-  );
-
   // Sessions and project configuration are now handled by useSessionManagement hook
-
-  // Load session details when session is selected
-  useEffect(() => {
-    if (!selectedSession) {
-      setSelectedSessionDetails(null);
-      return;
-    }
-    void loadSessionDetails(selectedSession);
-  }, [selectedSession, loadSessionDetails]);
+  // Session details are now loaded by useAgentManagement hook
 
   // Auto-select agent only when user selects a project (not on every render)
   const [shouldAutoSelectAgent, setShouldAutoSelectAgent] = useState(false);
@@ -356,25 +323,7 @@ export const LaceApp = memo(function LaceApp() {
 
   // Agent creation function
   const handleAgentCreate = async (sessionId: string, agentData: CreateAgentRequest) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(agentData),
-      });
-
-      if (res.ok) {
-        // Reload session details to show the new agent
-        void loadSessionDetails(sessionId as ThreadId);
-      } else {
-        console.error('Failed to create agent');
-        return;
-      }
-    } catch (error) {
-      console.error('Failed to create agent:', error);
-    }
-    setLoading(false);
+    await createAgent(sessionId, agentData);
   };
 
   // Handle session selection - load session details but don't auto-select agent
@@ -391,9 +340,7 @@ export const LaceApp = memo(function LaceApp() {
 
   // Handle agent updates - refresh session details to show updated agent info
   const handleAgentUpdate = async () => {
-    if (selectedSession) {
-      await loadSessionDetails(selectedSession);
-    }
+    await reloadSessionDetails();
   };
 
   // Handle project updates (archive/unarchive/edit)
