@@ -1,4 +1,5 @@
-import localFont from 'next/font/local';
+// ABOUTME: Font configuration using @fontsource packages for consistent loading
+// ABOUTME: All fonts use CSS imports in globals.css for reliable self-hosting
 
 // Configure local fonts using @fontsource packages (CSS-only, no Next.js font objects needed)
 // Fonts are loaded via CSS imports in globals.css
@@ -12,20 +13,8 @@ export const dmSans = {
   className: '', // CSS-only, no specific className needed
 };
 
-// Configure local Google Sans Code font with variable font file
-export const googleSansCode = localFont({
-  src: [
-    {
-      path: '../public/fonts/variable/GoogleSansCode[wght].ttf',
-      weight: '200 700',
-      style: 'normal',
-    },
-    {
-      path: '../public/fonts/variable/GoogleSansCode-Italic[wght].ttf',
-      weight: '200 700',
-      style: 'italic',
-    },
-  ],
+// Configure Google Sans Code using @fontsource package for consistency
+export const googleSansCode = {
   variable: '--font-google-sans-code',
-  display: 'swap',
-});
+  className: '', // CSS-only, no specific className needed
+};

@@ -12,6 +12,10 @@
 @import '@fontsource/dm-sans/400-italic.css';
 @import '@fontsource/dm-sans/500-italic.css';
 @import '@fontsource/dm-sans/700-italic.css';
+@import '@fontsource/google-sans-code/400.css';
+@import '@fontsource/google-sans-code/500.css';
+@import '@fontsource/google-sans-code/600.css';
+@import '@fontsource/google-sans-code/700.css';
 @plugin "daisyui";
 
 /* Typography: utilities bound to local fonts */
@@ -19,9 +23,10 @@
   /* Local fonts via @fontsource packages */
   --font-lato: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-dm-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-google-sans-code: 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
-/* Google Sans Code local font will be available via Next.js local font loading */
+/* Google Sans Code now loaded via @fontsource package for consistency */
 
 /* Use DM Sans for UI text where desired */
 .font-ui {
