@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { NativeSpeechInput, useSpeechRecognition } from '@/components/ui';
-import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
+import { ChatInput } from '@/components/chat/ChatInput';
 
 export default function SpeechDemoPage() {
   const [messages, setMessages] = useState<string[]>([]);
@@ -145,7 +145,7 @@ export default function SpeechDemoPage() {
               microphone level visualization, file attachments, and circular emerald send button.
             </p>
 
-            <EnhancedChatInput
+            <ChatInput
               value={inputValue}
               onChange={setInputValue}
               onSubmit={handleSubmit}

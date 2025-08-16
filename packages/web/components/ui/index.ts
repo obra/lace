@@ -15,8 +15,6 @@ export { DirectoryField } from './DirectoryField';
 
 // MOLECULES - Simple compositions
 export { default as MessageHeader } from './MessageHeader';
-export { default as ChatInputComposer } from './ChatInputComposer';
 
 // ENHANCED COMPONENTS - Advanced functionality
 export { NativeSpeechInput, useSpeechRecognition } from './NativeSpeechInput';
-export { default as EnhancedChatInputWithSpeech } from './EnhancedChatInputWithSpeech';
