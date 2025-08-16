@@ -33,8 +33,7 @@ test.describe('Agent Management', () => {
 
       // Verify we can interact with the agent (send a message)
       const testMessage = 'Testing default agent functionality';
-      await chatInterface.sendMessage(testMessage);
-      await expect(chatInterface.getMessage(testMessage)).toBeVisible();
+      await chatInterface.sendMessageAndWait(testMessage);
     }
   });
 
@@ -52,8 +51,7 @@ test.describe('Agent Management', () => {
 
     // Send a message to create agent activity
     const testMessage = 'Message to establish agent context';
-    await chatInterface.sendMessage(testMessage);
-    await expect(chatInterface.getMessage(testMessage)).toBeVisible({ timeout: 10000 });
+    await chatInterface.sendMessageAndWait(testMessage);
 
     // Capture the agent URL
     const agentUrl = page.url();
@@ -85,8 +83,7 @@ test.describe('Agent Management', () => {
       await chatInterface.waitForChatReady();
 
       const reloadMessage = 'Message sent after agent reload';
-      await chatInterface.sendMessage(reloadMessage);
-      await expect(chatInterface.getMessage(reloadMessage)).toBeVisible({ timeout: 10000 });
+      await chatInterface.sendMessageAndWait(reloadMessage);
     } else {
       // Agent might be in processing state - URL persistence is key
       expect(agentUrl).toMatch(/agent\/[^\/]+/);
@@ -107,8 +104,7 @@ test.describe('Agent Management', () => {
 
     // Send a unique message to establish this agent's context
     const uniqueMessage = `Agent-specific message at ${new Date().getTime()}`;
-    await chatInterface.sendMessage(uniqueMessage);
-    await expect(chatInterface.getMessage(uniqueMessage)).toBeVisible({ timeout: 10000 });
+    await chatInterface.sendMessageAndWait(uniqueMessage);
 
     // Get the agent information
     const agentUrl = page.url();
@@ -127,8 +123,7 @@ test.describe('Agent Management', () => {
     // Test if we can send another message (agent is functioning)
     try {
       const followupMessage = 'Follow-up message to verify agent isolation';
-      await chatInterface.sendMessage(followupMessage);
-      await expect(chatInterface.getMessage(followupMessage)).toBeVisible({ timeout: 10000 });
+      await chatInterface.sendMessageAndWait(followupMessage);
       agentIsolationTest.canSendNewMessage = true;
     } catch (error) {
       console.log('Agent isolation: Could not send follow-up message');

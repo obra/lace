@@ -12,13 +12,13 @@ test.describe('Error Handling and Recovery', () => {
     await withTempLaceDir('lace-e2e-invalid-path-', async (tempDir) => {
       const { projectSelector, chatInterface } = createPageObjects(page);
       await page.goto('/');
-      
+
       // Try to create project with invalid path
       const invalidPath = '/nonexistent/directory/that/cannot/be/created';
-      
+
       // Monitor for error messages or UI feedback
       const errorMessages: string[] = [];
-      page.on('console', message => {
+      page.on('console', (message) => {
         if (message.type() === 'error') {
           errorMessages.push(message.text());
         }
@@ -28,32 +28,40 @@ test.describe('Error Handling and Recovery', () => {
       try {
         await page.locator('[data-testid="project-path-input"]').fill(invalidPath);
         await page.locator('[data-testid="create-project-submit"]').click();
-        
+
         // Wait to see what happens
         await page.waitForTimeout(3000);
-        
+
         // Check if we're still on the project selection screen (good error handling)
-        const stillOnProjectSelection = await page.locator('[data-testid="new-project-button"]').isVisible();
-        
+        const stillOnProjectSelection = await page
+          .locator('[data-testid="create-project-button"]')
+          .isVisible();
+
         // Check for user-visible error messages
-        const errorText = await page.locator('text=/error|Error|failed|Failed|invalid|Invalid/').first().textContent().catch(() => null);
-        
+        const errorText = await page
+          .locator('text=/error|Error|failed|Failed|invalid|Invalid/')
+          .first()
+          .textContent()
+          .catch(() => null);
+
         const errorHandling = {
           remainedOnProjectSelection: stillOnProjectSelection,
           errorMessageVisible: !!errorText,
           errorMessageText: errorText,
           consoleErrors: errorMessages.length,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
-        
+
         console.log('Invalid path error handling:', JSON.stringify(errorHandling, null, 2));
-        
+
         // Good error handling means we either show an error or gracefully prevent the action
         expect(stillOnProjectSelection || errorHandling.errorMessageVisible).toBeTruthy();
-        
       } catch (error) {
         // If the UI prevents invalid input, that's also good error handling
-        console.log('Invalid path prevented by UI validation:', error instanceof Error ? error.message : String(error));
+        console.log(
+          'Invalid path prevented by UI validation:',
+          error instanceof Error ? error.message : String(error)
+        );
         expect(true).toBeTruthy(); // Test passes - UI validation is working
       }
     });
@@ -65,37 +73,37 @@ test.describe('Error Handling and Recovery', () => {
       const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project successfully first
       await page.goto('/');
-      
+
       const projectPath = path.join(tempDir, 'network-failure-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
-      
+
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
-      
+
       // Monitor network requests for failures
       const networkActivity = {
         requests: 0,
         failures: 0,
-        retries: 0
+        retries: 0,
       };
-      
-      page.on('request', request => {
+
+      page.on('request', (request) => {
         networkActivity.requests++;
       });
 
-      page.on('response', response => {
+      page.on('response', (response) => {
         if (response.status() >= 400) {
           networkActivity.failures++;
         }
       });
-      
+
       // Simulate network stress by sending multiple messages rapidly
       const stressMessages = [
         'First stress test message',
-        'Second stress test message', 
-        'Third stress test message'
+        'Second stress test message',
+        'Third stress test message',
       ];
-      
+
       // Try to overwhelm the system to see how it handles errors
       for (const message of stressMessages) {
         try {
@@ -103,22 +111,25 @@ test.describe('Error Handling and Recovery', () => {
           // Don't wait for each message to complete - stress test
           await page.waitForTimeout(100);
         } catch (error) {
-          console.log(`Network stress: Message "${message}" encountered error:`, error instanceof Error ? error.message : String(error));
+          console.log(
+            `Network stress: Message "${message}" encountered error:`,
+            error instanceof Error ? error.message : String(error)
+          );
         }
       }
-      
+
       // Wait for network activity to settle
       await page.waitForTimeout(5000);
-      
+
       // Check if interface recovered and is still functional
       const recoveryState = {
         interfaceResponsive: await chatInterface.messageInput.isVisible().catch(() => false),
         inputEnabled: !(await chatInterface.messageInput.isDisabled().catch(() => false)),
         canSendNewMessage: false,
         networkActivity,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-      
+
       // Try to send one more message to confirm recovery
       if (recoveryState.interfaceResponsive && recoveryState.inputEnabled) {
         try {
@@ -130,9 +141,9 @@ test.describe('Error Handling and Recovery', () => {
           console.log('Recovery test: Could not send message after stress test');
         }
       }
-      
+
       console.log('Network failure recovery analysis:', JSON.stringify(recoveryState, null, 2));
-      
+
       // Test passes if the interface remains responsive despite network issues
       expect(recoveryState.interfaceResponsive).toBeTruthy();
     });
@@ -144,47 +155,53 @@ test.describe('Error Handling and Recovery', () => {
       const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
-      
+
       const projectPath = path.join(tempDir, 'processing-errors-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
-      
+
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
-      
+
       // Monitor for error indicators in the UI
       const errorFeedback = {
         consoleErrors: [] as string[],
         uiErrorMessages: [] as string[],
         processingStates: [] as string[],
-        interfaceChanges: [] as string[]
+        interfaceChanges: [] as string[],
       };
-      
-      page.on('console', message => {
+
+      page.on('console', (message) => {
         if (message.type() === 'error') {
           errorFeedback.consoleErrors.push(message.text());
         }
       });
-      
+
       // Send a message and monitor for error feedback mechanisms
       const testMessage = 'Test message to check error feedback';
       await chatInterface.sendMessage(testMessage);
-      
+
       // Monitor UI state changes over time
       for (let i = 0; i < 5; i++) {
         await page.waitForTimeout(1000);
-        
+
         // Check for error messages in the UI
-        const errorInUI = await page.locator('text=/error|Error|failed|Failed/').first().textContent().catch(() => null);
+        const errorInUI = await page
+          .locator('text=/error|Error|failed|Failed/')
+          .first()
+          .textContent()
+          .catch(() => null);
         if (errorInUI && !errorFeedback.uiErrorMessages.includes(errorInUI)) {
           errorFeedback.uiErrorMessages.push(errorInUI);
         }
-        
+
         // Check processing state indicators
-        const placeholder = await chatInterface.messageInput.getAttribute('placeholder').catch(() => null);
+        const placeholder = await chatInterface.messageInput
+          .getAttribute('placeholder')
+          .catch(() => null);
         if (placeholder && !errorFeedback.processingStates.includes(placeholder)) {
           errorFeedback.processingStates.push(placeholder);
         }
-        
+
         // Check for interface state changes
         const disabled = await chatInterface.messageInput.isDisabled().catch(() => false);
         const stateDescription = disabled ? 'input-disabled' : 'input-enabled';
@@ -192,20 +209,20 @@ test.describe('Error Handling and Recovery', () => {
           errorFeedback.interfaceChanges.push(stateDescription);
         }
       }
-      
+
       const feedbackAnalysis = {
         errorFeedback,
         totalErrorTypes: errorFeedback.consoleErrors.length + errorFeedback.uiErrorMessages.length,
         processingStatesDetected: errorFeedback.processingStates.length,
         interfaceStateChanges: errorFeedback.interfaceChanges.length,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-      
+
       console.log('Error feedback analysis:', JSON.stringify(feedbackAnalysis, null, 2));
-      
+
       // Test succeeds if we can document the current error feedback mechanisms
       expect(testMessage.length).toBeGreaterThan(0); // We sent a test message
-      
+
       // If we detected any error feedback mechanisms, that's valuable information
       if (feedbackAnalysis.totalErrorTypes > 0 || feedbackAnalysis.processingStatesDetected > 0) {
         console.log('Found error feedback mechanisms in the UI');
@@ -225,20 +242,20 @@ test.describe('Error Handling and Recovery', () => {
         '/#/project/invalid-project-id/session/invalid-session',
         '/#/project//session//agent/',
         '/#/project/nonexistent/session/nonexistent/agent/nonexistent',
-        '/#/malformed-hash-structure'
+        '/#/malformed-hash-structure',
       ];
-      
+
       const urlErrorHandling = {
         redirectsToHome: 0,
         showsErrorPage: 0,
         gracefulFallback: 0,
-        consoleLogs: [] as string[]
+        consoleLogs: [] as string[],
       };
-      
-      page.on('console', message => {
+
+      page.on('console', (message) => {
         urlErrorHandling.consoleLogs.push(`${message.type()}: ${message.text()}`);
       });
-      
+
       for (const malformedUrl of malformedUrls) {
         try {
           // Get the base URL from page and construct malformed URL
@@ -246,10 +263,10 @@ test.describe('Error Handling and Recovery', () => {
           const baseUrl = new URL(page.url()).origin;
           await page.goto(`${baseUrl}${malformedUrl}`);
           await page.waitForTimeout(2000);
-          
+
           const currentUrl = page.url();
           console.log(`Malformed URL test: ${malformedUrl} -> ${currentUrl}`);
-          
+
           if (currentUrl.includes('/#/') && !currentUrl.includes(malformedUrl)) {
             // Redirected to a different valid URL
             urlErrorHandling.gracefulFallback++;
@@ -258,23 +275,31 @@ test.describe('Error Handling and Recovery', () => {
             urlErrorHandling.redirectsToHome++;
           } else {
             // Check if we're on an error page
-            const hasErrorContent = await page.locator('text=/error|Error|not found|Not Found/').first().isVisible().catch(() => false);
+            const hasErrorContent = await page
+              .locator('text=/error|Error|not found|Not Found/')
+              .first()
+              .isVisible()
+              .catch(() => false);
             if (hasErrorContent) {
               urlErrorHandling.showsErrorPage++;
             }
           }
         } catch (error) {
-          console.log(`URL error handling test failed for ${malformedUrl}:`, error instanceof Error ? error.message : String(error));
+          console.log(
+            `URL error handling test failed for ${malformedUrl}:`,
+            error instanceof Error ? error.message : String(error)
+          );
         }
       }
-      
+
       console.log('URL error handling analysis:', urlErrorHandling);
-      
+
       // Good error handling means we either redirect or show appropriate feedback
-      const totalHandledErrors = urlErrorHandling.redirectsToHome + 
-                               urlErrorHandling.showsErrorPage + 
-                               urlErrorHandling.gracefulFallback;
-      
+      const totalHandledErrors =
+        urlErrorHandling.redirectsToHome +
+        urlErrorHandling.showsErrorPage +
+        urlErrorHandling.gracefulFallback;
+
       expect(totalHandledErrors).toBeGreaterThanOrEqual(malformedUrls.length - 1); // Allow for one failure
     });
   });
@@ -285,24 +310,24 @@ test.describe('Error Handling and Recovery', () => {
       const { projectSelector, chatInterface } = createPageObjects(page);
       // Create project
       await page.goto('/');
-      
+
       const projectPath = path.join(tempDir, 'js-error-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
-      
+
       await projectSelector.createProject(projectName, projectPath);
       await chatInterface.waitForChatReady();
-      
+
       // Monitor JavaScript errors
       const jsErrors: string[] = [];
-      page.on('pageerror', error => {
+      page.on('pageerror', (error) => {
         jsErrors.push(error.message);
       });
-      
+
       // Send a normal message first to establish baseline
       const baselineMessage = 'Baseline message before error testing';
       await chatInterface.sendMessage(baselineMessage);
       await expect(chatInterface.getMessage(baselineMessage)).toBeVisible({ timeout: 10000 });
-      
+
       // Inject a non-critical JavaScript error to test resilience
       try {
         await page.evaluate(() => {
@@ -315,18 +340,18 @@ test.describe('Error Handling and Recovery', () => {
         // Expected to catch the error
         console.log('Intentionally triggered JS error for resilience testing');
       }
-      
+
       // Wait a moment for the error to potentially impact the interface
       await page.waitForTimeout(2000);
-      
+
       // Test if interface is still functional after the error
       const postErrorState = {
         interfaceStillVisible: await chatInterface.messageInput.isVisible().catch(() => false),
         canStillType: false,
         canSendMessage: false,
-        jsErrorsDetected: jsErrors.length
+        jsErrorsDetected: jsErrors.length,
       };
-      
+
       if (postErrorState.interfaceStillVisible) {
         // Try to interact with the interface
         try {
@@ -334,22 +359,28 @@ test.describe('Error Handling and Recovery', () => {
           await page.keyboard.type('a', { delay: 100 });
           await page.keyboard.press('Backspace');
           postErrorState.canStillType = true;
-          
+
           // Try to send a message
           const recoveryMessage = 'Message sent after JS error';
           await chatInterface.sendMessage(recoveryMessage);
           await page.waitForTimeout(2000);
-          postErrorState.canSendMessage = await chatInterface.getMessage(recoveryMessage).isVisible().catch(() => false);
+          postErrorState.canSendMessage = await chatInterface
+            .getMessage(recoveryMessage)
+            .isVisible()
+            .catch(() => false);
         } catch (error) {
-          console.log('Interface interaction failed after JS error:', error instanceof Error ? error.message : String(error));
+          console.log(
+            'Interface interaction failed after JS error:',
+            error instanceof Error ? error.message : String(error)
+          );
         }
       }
-      
+
       console.log('JavaScript error resilience analysis:', postErrorState);
-      
+
       // Test passes if the interface remains functional despite errors
       expect(postErrorState.interfaceStillVisible).toBeTruthy();
-      
+
       if (postErrorState.canSendMessage) {
         console.log('Interface fully functional after JS error - excellent resilience');
         expect(postErrorState.canSendMessage).toBeTruthy();
