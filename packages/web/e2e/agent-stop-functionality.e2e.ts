@@ -5,7 +5,6 @@ import { test, expect } from './mocks/setup';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
-  createProject,
   createSession,
   createAgent,
   selectAgent,
@@ -17,6 +16,7 @@ import {
   verifyNoMessage,
   type TestEnvironment,
 } from './helpers/test-utils';
+import { createPageObjects } from './page-objects';
 
 test.describe('Agent Stop Functionality E2E Tests', () => {
   let testEnv: TestEnvironment;
@@ -35,8 +35,12 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
       };
     }, testEnv.tempDir);
 
-    // Create project using reusable utility
-    await createProject(page, testEnv.projectName, testEnv.tempDir);
+    // Navigate to home page first
+    await page.goto('/');
+
+    // Create project using page objects (more reliable than test-utils)
+    const { projectSelector } = createPageObjects(page);
+    await projectSelector.createProject(testEnv.projectName, testEnv.tempDir);
   });
 
   test.afterEach(async () => {
