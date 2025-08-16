@@ -1,6 +1,8 @@
 // ABOUTME: Consolidated SQLite persistence layer for threads, events, and tasks
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
+import { getTaskStatusDBConstraint } from '~/tasks/task-status';
+
 // Common SQLite interface that both better-sqlite3 and bun:sqlite implement
 interface SQLiteDatabase {
   prepare(sql: string): {
@@ -265,7 +267,7 @@ export class DatabasePersistence {
         title TEXT NOT NULL,
         description TEXT,
         prompt TEXT NOT NULL,
-        status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'blocked')) DEFAULT 'pending',
+        status TEXT CHECK(${getTaskStatusDBConstraint()}) DEFAULT 'pending',
         priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
         assigned_to TEXT,
         created_by TEXT NOT NULL,
@@ -354,7 +356,7 @@ export class DatabasePersistence {
         title TEXT NOT NULL,
         description TEXT,
         prompt TEXT NOT NULL,
-        status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'blocked', 'archived')) DEFAULT 'pending',
+        status TEXT CHECK(${getTaskStatusDBConstraint()}) DEFAULT 'pending',
         priority TEXT CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
         assigned_to TEXT,
         created_by TEXT NOT NULL,

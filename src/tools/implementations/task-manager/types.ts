@@ -2,8 +2,9 @@
 // ABOUTME: Defines Task, TaskNote interfaces with thread-based assignment capabilities
 
 import { ThreadId, AssigneeId } from '~/threads/types';
+import type { TaskStatus } from '~/tasks/task-status';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'archived';
+export type { TaskStatus };
 export type TaskPriority = 'high' | 'medium' | 'low';
 
 // Task actors can be either a ThreadId or 'human' (or any string that represents a valid thread ID)

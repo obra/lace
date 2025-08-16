@@ -8,6 +8,7 @@ import type { ToolResult, ToolContext } from '~/tools/types';
 import { Task } from '~/tools/implementations/task-manager/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 import { logger } from '~/utils/logger';
+import { TaskStatusSchema } from '~/tasks/task-status';
 
 // Simple schema that always takes an array of tasks
 const createTaskSchema = z.object({
@@ -370,9 +371,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
 const updateTaskSchema = z
   .object({
     taskId: NonEmptyString,
-    status: z
-      .enum(['pending', 'in_progress', 'completed', 'blocked', 'archived'] as const)
-      .optional(),
+    status: TaskStatusSchema.optional(),
     assignTo: z.string().describe('Thread ID or "new:provider/model"').optional(),
     priority: z.enum(['high', 'medium', 'low'] as const).optional(),
     title: z.string().max(200).optional(),

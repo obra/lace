@@ -3,6 +3,7 @@
 
 import { Task } from '~/tools/implementations/task-manager/types';
 import { ThreadId, AssigneeId } from '~/threads/types';
+import { getStatusIcon, getStatusOrder } from '~/tasks/task-status';
 
 interface FormatOptions {
   showAssignee?: boolean;
@@ -73,11 +74,14 @@ export class TaskFormatter {
         return aPriority - bPriority;
       });
     } else if (options.groupBy === 'status') {
-      const statusOrder = { pending: 0, in_progress: 1, blocked: 2, completed: 3 };
       sortedGroups.sort((a, b) => {
-        const aStatus = statusOrder[a[0] as keyof typeof statusOrder] ?? 999;
-        const bStatus = statusOrder[b[0] as keyof typeof statusOrder] ?? 999;
-        return aStatus - bStatus;
+        try {
+          const aOrder = getStatusOrder(a[0] as Task['status']);
+          const bOrder = getStatusOrder(b[0] as Task['status']);
+          return aOrder - bOrder;
+        } catch {
+          return 0; // fallback for unknown statuses
+        }
       });
     } else {
       sortedGroups.sort((a, b) => a[0].localeCompare(b[0]));
@@ -110,7 +114,7 @@ export class TaskFormatter {
   }
 
   private static formatTaskLine(task: Task, options: FormatOptions): string {
-    const status = this.getStatusIcon(task.status);
+    const status = getStatusIcon(task.status);
     let line = `${status} ${task.id} [${task.priority}] ${task.title}`;
 
     if (options.showAssignee && task.assignedTo) {
@@ -134,7 +138,7 @@ export class TaskFormatter {
     // Basic info
     lines.push(`Task: ${task.id}`);
     lines.push(`Title: ${task.title}`);
-    lines.push(`Status: ${this.getStatusIcon(task.status)} ${task.status}`);
+    lines.push(`Status: ${getStatusIcon(task.status)} ${task.status}`);
     lines.push(`Priority: ${task.priority}`);
 
     if (detailed) {
@@ -162,21 +166,6 @@ export class TaskFormatter {
     }
 
     return lines.join('\n');
-  }
-
-  private static getStatusIcon(status: Task['status']): string {
-    switch (status) {
-      case 'pending':
-        return '○';
-      case 'in_progress':
-        return '◐';
-      case 'completed':
-        return '✓';
-      case 'blocked':
-        return '⊗';
-      case 'archived':
-        return '📁';
-    }
   }
 
   // Make this protected instead of private so tests can access it
