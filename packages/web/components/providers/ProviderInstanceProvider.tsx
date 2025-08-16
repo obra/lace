@@ -328,7 +328,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
         lastTested: testResult?.lastTested,
       };
     },
-    [instances, testResults, getInstanceById]
+    [testResults, getInstanceById]
   );
 
   // Load instances on mount
