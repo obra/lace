@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import {
   EventStreamProvider,
   useEventStream,
@@ -105,7 +105,7 @@ describe('EventStreamProvider Integration', () => {
     });
   });
 
-  it('provides event stream state to deeply nested components without prop drilling', () => {
+  it('provides event stream state to deeply nested components without prop drilling', async () => {
     const mockEvents: LaceEvent[] = [
       {
         id: 'event-1',
@@ -163,25 +163,27 @@ describe('EventStreamProvider Integration', () => {
       addSessionEvent: mockAddSessionEvent,
     });
 
-    render(
-      <ThemeProvider>
-        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-          <EventStreamProvider
-            projectId="test-project"
-            sessionId={'test-session' as ThreadId}
-            agentId={'test-agent' as ThreadId}
-          >
-            <div>
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+            <EventStreamProvider
+              projectId="test-project"
+              sessionId={'test-session' as ThreadId}
+              agentId={'test-agent' as ThreadId}
+            >
               <div>
                 <div>
-                  <TestEventStreamConsumer />
+                  <div>
+                    <TestEventStreamConsumer />
+                  </div>
                 </div>
               </div>
-            </div>
-          </EventStreamProvider>
-        </ToolApprovalProvider>
-      </ThemeProvider>
-    );
+            </EventStreamProvider>
+          </ToolApprovalProvider>
+        </ThemeProvider>
+      );
+    });
 
     // Verify state is accessible without prop drilling
     expect(screen.getByTestId('is-connected')).toHaveTextContent('true');
@@ -194,25 +196,27 @@ describe('EventStreamProvider Integration', () => {
     const userEvent = await import('@testing-library/user-event');
     const user = userEvent.default.setup();
 
-    render(
-      <ThemeProvider>
-        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-          <EventStreamProvider
-            projectId="test-project"
-            sessionId={'test-session' as ThreadId}
-            agentId={'test-agent' as ThreadId}
-          >
-            <div>
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+            <EventStreamProvider
+              projectId="test-project"
+              sessionId={'test-session' as ThreadId}
+              agentId={'test-agent' as ThreadId}
+            >
               <div>
                 <div>
-                  <TestEventStreamConsumer />
+                  <div>
+                    <TestEventStreamConsumer />
+                  </div>
                 </div>
               </div>
-            </div>
-          </EventStreamProvider>
-        </ToolApprovalProvider>
-      </ThemeProvider>
-    );
+            </EventStreamProvider>
+          </ToolApprovalProvider>
+        </ThemeProvider>
+      );
+    });
 
     // Test API calls work without prop drilling
     await user.click(screen.getByTestId('send-message-button'));
@@ -222,7 +226,7 @@ describe('EventStreamProvider Integration', () => {
     expect(mockStopAgent).toHaveBeenCalledWith('test-agent');
   });
 
-  it('throws error when used outside provider', () => {
+  it('throws error when used outside provider', async () => {
     // Suppress console.error for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -237,20 +241,24 @@ describe('EventStreamProvider Integration', () => {
     consoleSpy.mockRestore();
   });
 
-  it('updates state when underlying hooks change', () => {
-    const { rerender } = render(
-      <ThemeProvider>
-        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-          <EventStreamProvider
-            projectId="test-project"
-            sessionId={'test-session' as ThreadId}
-            agentId={'test-agent' as ThreadId}
-          >
-            <TestEventStreamConsumer />
-          </EventStreamProvider>
-        </ToolApprovalProvider>
-      </ThemeProvider>
-    );
+  it('updates state when underlying hooks change', async () => {
+    let rerender: ReturnType<typeof render>['rerender'];
+    await act(async () => {
+      const result = render(
+        <ThemeProvider>
+          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+            <EventStreamProvider
+              projectId="test-project"
+              sessionId={'test-session' as ThreadId}
+              agentId={'test-agent' as ThreadId}
+            >
+              <TestEventStreamConsumer />
+            </EventStreamProvider>
+          </ToolApprovalProvider>
+        </ThemeProvider>
+      );
+      rerender = result.rerender;
+    });
 
     // Initially not connected
     expect(screen.getByTestId('is-connected')).toHaveTextContent('false');
@@ -270,39 +278,43 @@ describe('EventStreamProvider Integration', () => {
     });
 
     // Force re-render with new mock data
-    rerender(
-      <ThemeProvider>
-        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-          <EventStreamProvider
-            projectId="test-project"
-            sessionId={'test-session' as ThreadId}
-            agentId={'test-agent' as ThreadId}
-          >
-            <TestEventStreamConsumer />
-          </EventStreamProvider>
-        </ToolApprovalProvider>
-      </ThemeProvider>
-    );
+    await act(async () => {
+      rerender(
+        <ThemeProvider>
+          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+            <EventStreamProvider
+              projectId="test-project"
+              sessionId={'test-session' as ThreadId}
+              agentId={'test-agent' as ThreadId}
+            >
+              <TestEventStreamConsumer />
+            </EventStreamProvider>
+          </ToolApprovalProvider>
+        </ThemeProvider>
+      );
+    });
 
     // Should reflect updated state
     expect(screen.getByTestId('is-connected')).toHaveTextContent('true');
     expect(screen.getByTestId('connection-id')).toHaveTextContent('new-conn');
   });
 
-  it('passes correct parameters to underlying hooks based on props', () => {
-    render(
-      <ThemeProvider>
-        <ToolApprovalProvider agentId={'my-agent' as ThreadId}>
-          <EventStreamProvider
-            projectId="my-project"
-            sessionId={'my-session' as ThreadId}
-            agentId={'my-agent' as ThreadId}
-          >
-            <TestEventStreamConsumer />
-          </EventStreamProvider>
-        </ToolApprovalProvider>
-      </ThemeProvider>
-    );
+  it('passes correct parameters to underlying hooks based on props', async () => {
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <ToolApprovalProvider agentId={'my-agent' as ThreadId}>
+            <EventStreamProvider
+              projectId="my-project"
+              sessionId={'my-session' as ThreadId}
+              agentId={'my-agent' as ThreadId}
+            >
+              <TestEventStreamConsumer />
+            </EventStreamProvider>
+          </ToolApprovalProvider>
+        </ThemeProvider>
+      );
+    });
 
     // Verify hooks are called with correct parameters
     expect(useSessionEventsHook).toHaveBeenCalledWith('my-session', 'my-agent', false);
@@ -321,20 +333,22 @@ describe('EventStreamProvider Integration', () => {
     });
   });
 
-  it('handles null agentId gracefully', () => {
-    render(
-      <ThemeProvider>
-        <ToolApprovalProvider agentId={null}>
-          <EventStreamProvider
-            projectId="test-project"
-            sessionId={'test-session' as ThreadId}
-            agentId={null}
-          >
-            <TestEventStreamConsumer />
-          </EventStreamProvider>
-        </ToolApprovalProvider>
-      </ThemeProvider>
-    );
+  it('handles null agentId gracefully', async () => {
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <ToolApprovalProvider agentId={null}>
+            <EventStreamProvider
+              projectId="test-project"
+              sessionId={'test-session' as ThreadId}
+              agentId={null}
+            >
+              <TestEventStreamConsumer />
+            </EventStreamProvider>
+          </ToolApprovalProvider>
+        </ThemeProvider>
+      );
+    });
 
     // Should still work with null agentId
     expect(screen.getByTestId('is-connected')).toHaveTextContent('false');

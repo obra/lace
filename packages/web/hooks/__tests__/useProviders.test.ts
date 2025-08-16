@@ -2,7 +2,7 @@
 // ABOUTME: Covers loading states, error handling, API integration, and refetch functionality
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useProviders } from '@/hooks/useProviders';
 import type { ProviderInfo } from '@/types/api';
 
@@ -149,7 +149,9 @@ describe('useProviders', () => {
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 
-      await result.current.refetch();
+      await act(async () => {
+        await result.current.refetch();
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -180,14 +182,19 @@ describe('useProviders', () => {
           })
       );
 
-      const refetchPromise = result.current.refetch();
+      let refetchPromise: Promise<void>;
+      await act(async () => {
+        refetchPromise = result.current.refetch();
+      });
 
       // Wait for loading state to update asynchronously
       await waitFor(() => {
         expect(result.current.loading).toBe(true);
       });
 
-      await refetchPromise;
+      await act(async () => {
+        await refetchPromise!;
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -242,7 +249,9 @@ describe('useProviders', () => {
       // Refetch fails
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      await result.current.refetch();
+      await act(async () => {
+        await result.current.refetch();
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -283,7 +292,9 @@ describe('useProviders', () => {
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 
-      await result.current.refetch();
+      await act(async () => {
+        await result.current.refetch();
+      });
 
       await waitFor(() => {
         expect(result.current.error).toBe(null);

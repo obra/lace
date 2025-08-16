@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
@@ -133,8 +133,12 @@ describe('ProjectSelectorPanel', () => {
     cleanup();
   });
 
-  it('should render project list', () => {
-    render(<ProjectSelectorPanel />);
+  it('should render project list', async () => {
+    await act(async () => {
+      await act(async () => {
+        render(<ProjectSelectorPanel />);
+      });
+    });
 
     expect(screen.getByText('Test Project 1')).toBeInTheDocument();
     expect(screen.getByText('Test Project 2')).toBeInTheDocument();
@@ -143,13 +147,17 @@ describe('ProjectSelectorPanel', () => {
   });
 
   it('should call onProjectSelect when project is clicked', async () => {
-    render(<ProjectSelectorPanel />);
+    await act(async () => {
+      await act(async () => {
+        render(<ProjectSelectorPanel />);
+      });
+    });
 
     await user.click(screen.getByText('Test Project 1'));
     expect(mockHandlers.onProjectSelect).toHaveBeenCalledWith(mockProjects[0]);
   });
 
-  it('should show selected project as active', () => {
+  it('should show selected project as active', async () => {
     // Override the current project to be one of the mock projects
     mockUseProjectContext.mockReturnValue(
       createMockProjectContext({
@@ -164,28 +172,34 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    render(<ProjectSelectorPanel />);
+    await act(async () => {
+      render(<ProjectSelectorPanel />);
+    });
 
     // Check that the selected project has different styling (would need to check actual implementation)
     const selectedProject = screen.getByText('Test Project 1').closest('div');
     expect(selectedProject).toBeInTheDocument();
   });
 
-  it('should show create project button', () => {
-    render(<ProjectSelectorPanel />);
+  it('should show create project button', async () => {
+    await act(async () => {
+      render(<ProjectSelectorPanel />);
+    });
 
     expect(screen.getByTestId('create-project-button')).toBeInTheDocument();
   });
 
   it('should open create project modal when create button is clicked', async () => {
-    render(<ProjectSelectorPanel />);
+    await act(async () => {
+      render(<ProjectSelectorPanel />);
+    });
 
     await user.click(screen.getByTestId('create-project-button'));
     // Wizard now opens directly on Directory step
     expect(await screen.findByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
   });
 
-  it('should handle empty project list', () => {
+  it('should handle empty project list', async () => {
     // Override to provide empty projects list
     mockUseProjectContext.mockReturnValue(
       createMockProjectContext({
@@ -199,12 +213,14 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    render(<ProjectSelectorPanel />);
+    await act(async () => {
+      render(<ProjectSelectorPanel />);
+    });
 
     expect(screen.getByText(/No Projects Yet/i)).toBeInTheDocument();
   });
 
-  it('should show loading state', () => {
+  it('should show loading state', async () => {
     // Override to provide loading state
     mockUseProjectContext.mockReturnValue(
       createMockProjectContext({
@@ -219,7 +235,9 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    render(<ProjectSelectorPanel />);
+    await act(async () => {
+      render(<ProjectSelectorPanel />);
+    });
 
     expect(screen.getByText('Loading projects...')).toBeInTheDocument();
   });

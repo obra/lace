@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ProviderInstanceProvider } from './ProviderInstanceProvider';
@@ -50,12 +50,16 @@ describe('EditInstanceModal', () => {
   };
 
   // Helper to render with provider
-  const renderWithProvider = (props = defaultProps) => {
-    return render(
-      <ProviderInstanceProvider>
-        <EditInstanceModal {...props} />
-      </ProviderInstanceProvider>
-    );
+  const renderWithProvider = async (props = defaultProps) => {
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(
+        <ProviderInstanceProvider>
+          <EditInstanceModal {...props} />
+        </ProviderInstanceProvider>
+      );
+    });
+    return result!;
   };
 
   beforeEach(() => {
@@ -84,7 +88,7 @@ describe('EditInstanceModal', () => {
   });
 
   it('should render edit form with current instance values', async () => {
-    renderWithProvider();
+    await renderWithProvider();
 
     expect(screen.getByDisplayValue('Test Instance')).toBeInTheDocument();
     expect(screen.getByDisplayValue('https://api.openai.com/v1')).toBeInTheDocument();
@@ -119,7 +123,7 @@ describe('EditInstanceModal', () => {
     });
     global.fetch = mockFetch;
 
-    renderWithProvider();
+    await renderWithProvider();
 
     // Update display name
     const nameInput = screen.getByDisplayValue('Test Instance');
@@ -171,7 +175,7 @@ describe('EditInstanceModal', () => {
       });
     });
 
-    renderWithProvider();
+    await renderWithProvider();
 
     // Update API key
     const apiKeyInput = screen.getByPlaceholderText(/leave empty to keep current/i);
@@ -198,7 +202,7 @@ describe('EditInstanceModal', () => {
   it('should validate required fields', async () => {
     const user = userEvent.setup();
 
-    renderWithProvider();
+    await renderWithProvider();
 
     // Clear required display name
     const nameInput = screen.getByDisplayValue('Test Instance');
@@ -237,7 +241,7 @@ describe('EditInstanceModal', () => {
       });
     });
 
-    renderWithProvider();
+    await renderWithProvider();
 
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
@@ -250,8 +254,8 @@ describe('EditInstanceModal', () => {
     expect(defaultProps.onClose).not.toHaveBeenCalled();
   });
 
-  it('should not render when closed', () => {
-    renderWithProvider({ ...defaultProps, isOpen: false });
+  it('should not render when closed', async () => {
+    await renderWithProvider({ ...defaultProps, isOpen: false });
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -259,7 +263,7 @@ describe('EditInstanceModal', () => {
   it('should close modal on cancel', async () => {
     const user = userEvent.setup();
 
-    renderWithProvider();
+    await renderWithProvider();
 
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
@@ -293,7 +297,7 @@ describe('EditInstanceModal', () => {
 
     mockParseResponse.mockResolvedValue({ instance: mockInstance });
 
-    renderWithProvider();
+    await renderWithProvider();
 
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
