@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { LaceApp } from '@/components/pages/LaceApp';
+import LaceApp from '@/components/pages/LaceApp';
 import type { SessionInfo, AgentInfo, AgentState } from '@/types/core';
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';

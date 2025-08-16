@@ -6,7 +6,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { LaceApp } from '@/components/pages/LaceApp';
+import LaceApp from '@/components/pages/LaceApp';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import { useTaskManager } from '@/hooks/useTaskManager';

@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { LaceApp } from './LaceApp';
+import LaceApp from './LaceApp';
 import { createFetchMock, createMockResponse } from '@/test-utils/mock-fetch';
 
 // Mock external dependencies

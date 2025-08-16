@@ -34,15 +34,12 @@ import { ApprovalDecision } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
 import type { ToolApprovalRequestData } from '@/types/web-events';
-import { useHashRouter } from '@/hooks/useHashRouter';
 import { useSessionEvents } from '@/hooks/useSessionEvents';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import { useEventStream } from '@/hooks/useEventStream';
-import { useProjectManagement } from '@/hooks/useProjectManagement';
-import { useSessionManagement } from '@/hooks/useSessionManagement';
-import { useAgentManagement } from '@/hooks/useAgentManagement';
 import { useModalState } from '@/hooks/useModalState';
+import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import Link from 'next/link';
 
@@ -90,21 +87,31 @@ const TokenUsageSection = memo(function TokenUsageSection({ agentId }: { agentId
   );
 });
 
-export const LaceApp = memo(function LaceApp() {
+// Inner component that uses app state context
+const LaceAppInner = memo(function LaceAppInner() {
   // Theme state
   const { theme, setTheme } = useTheme();
 
-  // Hash-based routing state (replaces selectedProject, selectedSession, selectedAgent)
+  // App state from context (replaces individual hook calls)
   const {
-    project: selectedProject,
-    session: selectedSession,
-    agent: selectedAgent,
-    setProject: setSelectedProject,
-    setSession: setSelectedSession,
-    setAgent: setSelectedAgent,
-    updateState: updateHashState,
-    isHydrated: urlStateHydrated,
-  } = useHashRouter();
+    selections: { selectedProject, selectedSession, selectedAgent, urlStateHydrated },
+    projects: { projects, loading: loadingProjects },
+    sessions: { sessions, loading: sessionLoading, projectConfig },
+    agents: { sessionDetails: selectedSessionDetails, loading: agentLoading },
+    actions: {
+      setSelectedProject,
+      setSelectedSession,
+      setSelectedAgent,
+      updateHashState,
+      updateProject,
+      reloadProjects,
+      createSession,
+      reloadSessions,
+      createAgent,
+      updateAgentState,
+      reloadSessionDetails,
+    },
+  } = useAppState();
 
   // UI State (from AnimatedLaceApp but remove demo data)
   const {
@@ -123,28 +130,6 @@ export const LaceApp = memo(function LaceApp() {
     autoOpenCreateProject,
     setAutoOpenCreateProject,
   } = useModalState();
-
-  // Business Logic State (from current app/page.tsx)
-  const {
-    projects,
-    loading: loadingProjects,
-    updateProject,
-    reloadProjects,
-  } = useProjectManagement();
-  const {
-    sessions,
-    loading: sessionLoading,
-    projectConfig,
-    createSession,
-    reloadSessions,
-  } = useSessionManagement(selectedProject);
-  const {
-    sessionDetails: selectedSessionDetails,
-    loading: agentLoading,
-    createAgent,
-    updateAgentState,
-    reloadSessionDetails,
-  } = useAgentManagement(selectedSession);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -158,7 +143,7 @@ export const LaceApp = memo(function LaceApp() {
     addSessionEvent,
     handleApprovalRequest,
     handleApprovalResponse,
-  } = useSessionEvents(selectedSession, selectedAgent, false); // Connection state will be passed to component that needs it
+  } = useSessionEvents(selectedSession as ThreadId | null, selectedAgent as ThreadId | null, false); // Connection state will be passed to component that needs it
 
   // Use session API hook for all API calls (HTTP requests only, not streaming state)
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
@@ -293,14 +278,14 @@ export const LaceApp = memo(function LaceApp() {
       if (!selectedAgent || !message.trim()) {
         return false;
       }
-      return await sendMessageAPI(selectedAgent, message);
+      return await sendMessageAPI(selectedAgent as ThreadId, message);
     },
     [selectedAgent, sendMessageAPI]
   );
 
   const stopGeneration = useCallback(async () => {
     if (!selectedAgent) return false;
-    return await stopAgentAPI(selectedAgent);
+    return await stopAgentAPI(selectedAgent as ThreadId);
   }, [selectedAgent, stopAgentAPI]);
 
   // Handle tool approval decision
@@ -1213,7 +1198,9 @@ export const LaceApp = memo(function LaceApp() {
                       disabled={agentBusy}
                       isStreaming={agentBusy}
                       placeholder={`Message ${selectedAgent ? selectedSessionDetails?.agents?.find((a) => a.threadId === selectedAgent)?.name || 'agent' : selectedSessionDetails?.agents?.[0]?.name || 'agent'}...`}
-                      agentId={selectedAgent || selectedSessionDetails?.agents?.[0]?.threadId}
+                      agentId={
+                        (selectedAgent as ThreadId) || selectedSessionDetails?.agents?.[0]?.threadId
+                      }
                     />
                   </div>
                 </div>
@@ -1479,3 +1466,12 @@ const CompactTokenUsage = memo(function CompactTokenUsage({ agentId }: { agentId
     </div>
   );
 });
+
+// Main LaceApp component that wraps LaceAppInner with AppStateProvider
+export default function LaceApp() {
+  return (
+    <AppStateProvider>
+      <LaceAppInner />
+    </AppStateProvider>
+  );
+}

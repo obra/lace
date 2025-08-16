@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { LaceApp } from '@/components/pages/LaceApp';
+import LaceApp from '@/components/pages/LaceApp';
 
 // Use real theme provider instead of mocking internal business logic
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
