@@ -26,8 +26,15 @@ function startServer() {
       VITEST_RUNNING: 'true',
       // Enable tool approval mock provider for E2E tests
       E2E_TOOL_APPROVAL_MOCK: process.env.E2E_TOOL_APPROVAL_MOCK || 'false',
+      // Fix memory leak by increasing max listeners
+      NODE_OPTIONS: '--max-old-space-size=2048',
     },
   });
+
+  // Increase max listeners to prevent memory leaks
+  serverProcess.stdout.setMaxListeners(20);
+  serverProcess.stderr.setMaxListeners(20);
+  serverProcess.setMaxListeners(20);
 
   let serverUrl = null;
 

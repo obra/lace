@@ -21,7 +21,26 @@ function isArgsArray(data: unknown): data is unknown[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { logs: ConsoleLogEntry[] };
+    // Handle cases where the request body might be empty or malformed
+    const text = await request.text();
+    if (!text || text.trim() === '') {
+      // Empty request body - return success without processing
+      return NextResponse.json({ success: true, processed: 0 });
+    }
+
+    let body: { logs: ConsoleLogEntry[] };
+    try {
+      body = JSON.parse(text) as { logs: ConsoleLogEntry[] };
+    } catch (parseError) {
+      console.error(
+        '[CONSOLE-FORWARD] JSON parse error:',
+        parseError,
+        'Raw text:',
+        text.substring(0, 200)
+      );
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+
     const { logs } = body;
 
     if (!Array.isArray(logs)) {
@@ -49,9 +68,15 @@ export async function POST(request: NextRequest) {
 
         if (isSuperJSONFormat(argsData)) {
           // This is superjson format - deserialize it
-          deserializedArgs = superjson.deserialize(
-            argsData as Parameters<typeof superjson.deserialize>[0]
-          );
+          try {
+            deserializedArgs = superjson.deserialize(
+              argsData as Parameters<typeof superjson.deserialize>[0]
+            );
+          } catch (deserializeError) {
+            // If superjson deserialization fails, fall back to raw data
+            console.warn('[CONSOLE-FORWARD] SuperJSON deserialization failed, using raw data');
+            deserializedArgs = [argsData];
+          }
         } else if (isArgsArray(argsData)) {
           // This is already an array
           deserializedArgs = argsData;
