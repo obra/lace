@@ -181,6 +181,25 @@ export class SessionService {
       }
     );
 
+    // Listen for thread events and broadcast USER_MESSAGE events to UI
+    agent.on('thread_event_added', ({ event }: { event: LaceEvent; threadId: string }) => {
+      if (event.type === 'USER_MESSAGE') {
+        logger.debug(`[SESSION_SERVICE] Agent ${threadId} user message, broadcasting USER_MESSAGE`);
+        sseManager.broadcast({
+          type: 'USER_MESSAGE',
+          threadId: event.threadId,
+          timestamp: event.timestamp || new Date(),
+          data: event.data,
+          context: {
+            sessionId,
+            projectId: undefined,
+            taskId: undefined,
+            agentId: undefined,
+          },
+        });
+      }
+    });
+
     // Listen for state changes and broadcast to UI
     agent.on('state_change', ({ from, to }: { from: string; to: string }) => {
       // Broadcast agent state change to UI via SSE
