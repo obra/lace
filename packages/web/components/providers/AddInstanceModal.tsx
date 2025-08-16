@@ -6,32 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
-import { parseResponse } from '@/lib/serialization';
-
-interface CatalogModel {
-  id: string;
-  name: string;
-  cost_per_1m_in: number;
-  cost_per_1m_out: number;
-  cost_per_1m_in_cached?: number;
-  cost_per_1m_out_cached?: number;
-  context_window: number;
-  default_max_tokens: number;
-  can_reason?: boolean;
-  has_reasoning_effort?: boolean;
-  supports_attachments?: boolean;
-}
-
-interface CatalogProvider {
-  id: string;
-  name: string;
-  type: string;
-  api_key?: string;
-  api_endpoint?: string;
-  default_large_model_id: string;
-  default_small_model_id: string;
-  models: CatalogModel[];
-}
+import { useProviderInstances, type CatalogProvider } from './ProviderInstanceProvider';
 
 interface AddInstanceModalProps {
   isOpen: boolean;
@@ -46,12 +21,18 @@ export function AddInstanceModal({
   onSuccess,
   preselectedProvider,
 }: AddInstanceModalProps) {
+  const {
+    catalogProviders: providers,
+    catalogLoading: loading,
+    catalogError: error,
+    createInstance,
+    loadCatalog,
+  } = useProviderInstances();
+
   const [step, setStep] = useState<'select' | 'configure'>('select');
-  const [providers, setProviders] = useState<CatalogProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<CatalogProvider | null>(null);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     displayName: '',
@@ -62,37 +43,16 @@ export function AddInstanceModal({
 
   useEffect(() => {
     if (isOpen && !preselectedProvider) {
-      loadProviders();
+      void loadCatalog();
     } else if (preselectedProvider) {
-      setProviders([]);
       setSelectedProvider(preselectedProvider);
       setFormData((prev) => ({
         ...prev,
         displayName: preselectedProvider.name,
       }));
       setStep('configure');
-      setLoading(false);
     }
-  }, [isOpen, preselectedProvider]);
-
-  const loadProviders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch('/api/provider/catalog');
-
-      if (!response.ok) {
-        throw new Error(`Failed to load providers: ${response.status}`);
-      }
-
-      const data = await parseResponse<{ providers: CatalogProvider[] }>(response);
-      setProviders(data.providers);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load providers');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isOpen, preselectedProvider, loadCatalog]);
 
   const handleProviderSelect = (provider: CatalogProvider) => {
     setSelectedProvider(provider);
@@ -124,37 +84,21 @@ export function AddInstanceModal({
 
     try {
       setSubmitting(true);
-      setError(null);
+      setSubmitError(null);
 
-      const instanceId = generateInstanceId(formData.displayName, selectedProvider.id);
-
-      const response = await fetch('/api/provider/instances', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instanceId,
-          displayName: formData.displayName,
-          catalogProviderId: selectedProvider.id,
-          endpoint: formData.endpoint || undefined,
-          timeout: formData.timeout,
-          credential: {
-            apiKey: formData.apiKey,
-          },
-        }),
+      // Create the instance using provider method
+      await createInstance(selectedProvider.id, {
+        displayName: formData.displayName,
+        endpoint: formData.endpoint || '',
+        timeout: formData.timeout,
+        apiKey: formData.apiKey,
       });
-
-      if (!response.ok) {
-        const errorData = await parseResponse<{ error?: string }>(response).catch(() => ({
-          error: undefined,
-        }));
-        throw new Error(errorData.error || `Failed to create instance: ${response.status}`);
-      }
 
       onSuccess();
       onClose();
       resetForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create instance');
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create instance');
     } finally {
       setSubmitting(false);
     }
@@ -164,7 +108,7 @@ export function AddInstanceModal({
     setStep('select');
     setSelectedProvider(null);
     setFormData({ displayName: '', endpoint: '', timeout: 30000, apiKey: '' });
-    setError(null);
+    setSubmitError(null);
   };
 
   const handleClose = () => {
@@ -181,9 +125,9 @@ export function AddInstanceModal({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={getStepTitle()} size="md">
-      {error && (
+      {(error || submitError) && (
         <div className="alert alert-error mb-4">
-          <span className="text-sm">{error}</span>
+          <span className="text-sm">{error || submitError}</span>
         </div>
       )}
 
