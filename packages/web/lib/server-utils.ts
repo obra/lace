@@ -26,7 +26,9 @@ export async function generateAutoLoginURL(baseUrl: string): Promise<string> {
 export async function displayAutoLoginInfo(baseUrl: string): Promise<void> {
   try {
     const autoLoginUrl = await generateAutoLoginURL(baseUrl);
+    // eslint-disable-next-line no-console
     console.log(`   🔐 Auto-login URL: ${autoLoginUrl}`);
+    // eslint-disable-next-line no-console
     console.log(`   ⏱️  This URL will expire in 30 seconds`);
   } catch (error) {
     console.warn(`   ⚠️  Could not generate auto-login URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
