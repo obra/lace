@@ -102,6 +102,10 @@ describe('SessionProvider', () => {
     createSession: mockCreateSession,
     loadProjectConfig: mockLoadProjectConfig,
     reloadSessions: mockReloadSessions,
+    loadSessionConfiguration: vi.fn(),
+    updateSessionConfiguration: vi.fn(),
+    updateSession: vi.fn(),
+    loadSessionsForProject: vi.fn(),
   };
 
   const defaultHashRouter = {

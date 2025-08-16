@@ -118,6 +118,8 @@ describe('AgentProvider', () => {
     createAgent: mockCreateAgent,
     updateAgentState: mockUpdateAgentState,
     reloadSessionDetails: mockReloadSessionDetails,
+    loadAgentConfiguration: vi.fn(),
+    updateAgent: vi.fn(),
   };
 
   const defaultHashRouter = {

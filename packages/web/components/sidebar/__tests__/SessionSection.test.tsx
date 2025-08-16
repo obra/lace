@@ -11,6 +11,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
+import { createMockAgentContext } from '@/__tests__/utils/provider-mocks';
 
 // Mock the AgentProvider
 vi.mock('@/components/providers/AgentProvider', () => ({
@@ -41,22 +42,6 @@ const createMockSessionDetails = (agents: AgentInfo[]): SessionInfo => ({
   agents,
 });
 
-// Helper to create a complete agent context mock
-const createMockAgentContext = (overrides = {}) => ({
-  sessionDetails: null,
-  loading: false,
-  selectedAgent: null,
-  foundAgent: null,
-  currentAgent: null,
-  agentBusy: false,
-  selectAgent: vi.fn(),
-  onAgentSelect: vi.fn(),
-  createAgent: vi.fn(),
-  updateAgentState: vi.fn(),
-  reloadSessionDetails: vi.fn(),
-  ...overrides,
-});
-
 describe('SessionSection', () => {
   const mockOnAgentSelect = vi.fn();
   const mockOnClearAgent = vi.fn();
@@ -72,22 +57,16 @@ describe('SessionSection', () => {
     vi.clearAllMocks();
 
     // Default mock setup
-    mockUseAgentContext.mockReturnValue({
-      sessionDetails: createMockSessionDetails([
-        createMockAgent('agent-1', 'Alice', 'idle'),
-        createMockAgent('agent-2', 'Bob', 'thinking'),
-      ]),
-      loading: false,
-      selectedAgent: null,
-      foundAgent: null,
-      selectAgent: vi.fn(),
-      createAgent: vi.fn(),
-      updateAgentState: vi.fn(),
-      onAgentSelect: vi.fn(),
-      reloadSessionDetails: vi.fn(),
-      currentAgent: null,
-      agentBusy: false,
-    });
+    mockUseAgentContext.mockReturnValue(
+      createMockAgentContext({
+        sessionDetails: createMockSessionDetails([
+          createMockAgent('agent-1', 'Alice', 'idle'),
+          createMockAgent('agent-2', 'Bob', 'thinking'),
+        ]),
+        selectedAgent: null,
+        foundAgent: null,
+      })
+    );
   });
 
   describe('Basic Structure', () => {
@@ -105,19 +84,13 @@ describe('SessionSection', () => {
     });
 
     it('does not show setup needed when agent is selected', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-        loading: false,
-        selectedAgent: 'agent-1',
-        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+          selectedAgent: 'agent-1',
+          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -125,19 +98,13 @@ describe('SessionSection', () => {
     });
 
     it('does not render when no session details available', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: null,
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: null,
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       const { container } = render(<SessionSection {...defaultProps} />);
 
@@ -155,22 +122,16 @@ describe('SessionSection', () => {
     });
 
     it('shows continue session UI when agent selected', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([
-          createMockAgent('agent-1', 'Alice', 'idle'),
-          createMockAgent('agent-2', 'Bob', 'thinking'),
-        ]),
-        loading: false,
-        selectedAgent: 'agent-1',
-        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([
+            createMockAgent('agent-1', 'Alice', 'idle'),
+            createMockAgent('agent-2', 'Bob', 'thinking'),
+          ]),
+          selectedAgent: 'agent-1',
+          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -179,22 +140,16 @@ describe('SessionSection', () => {
     });
 
     it('shows switch agent button for multi-agent sessions', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([
-          createMockAgent('agent-1', 'Alice', 'idle'),
-          createMockAgent('agent-2', 'Bob', 'thinking'),
-        ]),
-        loading: false,
-        selectedAgent: 'agent-1',
-        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([
+            createMockAgent('agent-1', 'Alice', 'idle'),
+            createMockAgent('agent-2', 'Bob', 'thinking'),
+          ]),
+          selectedAgent: 'agent-1',
+          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -202,19 +157,13 @@ describe('SessionSection', () => {
     });
 
     it('does not show switch agent button for single agent sessions', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-        loading: false,
-        selectedAgent: 'agent-1',
-        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+          selectedAgent: 'agent-1',
+          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -224,19 +173,15 @@ describe('SessionSection', () => {
 
   describe('Agent Status Display', () => {
     it('displays current agent name and status when selected', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'thinking')]),
-        loading: false,
-        selectedAgent: 'agent-1',
-        foundAgent: createMockAgent('agent-1', 'Alice', 'thinking'),
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([
+            createMockAgent('agent-1', 'Alice', 'thinking'),
+          ]),
+          selectedAgent: 'agent-1',
+          foundAgent: createMockAgent('agent-1', 'Alice', 'thinking'),
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -245,23 +190,17 @@ describe('SessionSection', () => {
     });
 
     it('shows correct status badges for different agent states', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([
-          createMockAgent('agent-1', 'Alice', 'idle'),
-          createMockAgent('agent-2', 'Bob', 'thinking'),
-          createMockAgent('agent-3', 'Charlie', 'tool_execution'),
-        ]),
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([
+            createMockAgent('agent-1', 'Alice', 'idle'),
+            createMockAgent('agent-2', 'Bob', 'thinking'),
+            createMockAgent('agent-3', 'Charlie', 'tool_execution'),
+          ]),
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -271,19 +210,13 @@ describe('SessionSection', () => {
     });
 
     it('handles missing selected agent gracefully', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-        loading: false,
-        selectedAgent: 'nonexistent-agent',
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+          selectedAgent: 'nonexistent-agent',
+          foundAgent: null,
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -303,22 +236,16 @@ describe('SessionSection', () => {
     });
 
     it('calls onClearAgent when switch agent is clicked', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([
-          createMockAgent('agent-1', 'Alice', 'idle'),
-          createMockAgent('agent-2', 'Bob', 'thinking'),
-        ]),
-        loading: false,
-        selectedAgent: 'agent-1',
-        foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([
+            createMockAgent('agent-1', 'Alice', 'idle'),
+            createMockAgent('agent-2', 'Bob', 'thinking'),
+          ]),
+          selectedAgent: 'agent-1',
+          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -361,19 +288,13 @@ describe('SessionSection', () => {
 
   describe('Agent Count Display', () => {
     it('displays correct agent count when no agents available', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([]),
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([]),
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -381,19 +302,13 @@ describe('SessionSection', () => {
     });
 
     it('displays correct agent count for single agent', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       render(<SessionSection {...defaultProps} />);
 
@@ -415,19 +330,14 @@ describe('SessionSection', () => {
     });
 
     it('handles loading state from provider', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: null,
-        loading: true,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: null,
+          loading: true,
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       const { container } = render(<SessionSection {...defaultProps} />);
 

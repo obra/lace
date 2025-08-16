@@ -306,24 +306,17 @@ describe('Chat', () => {
     });
 
     it('generates placeholder with first agent when none selected', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: {
-          id: 'session-1' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [createMockAgent('agent-1', 'Alice')],
-        },
-        selectedAgent: null,
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: {
+            id: 'session-1' as ThreadId,
+            name: 'Test Session',
+            createdAt: new Date(),
+            agents: [createMockAgent('agent-1', 'Alice')],
+          },
+          selectedAgent: null,
+        })
+      );
 
       render(<Chat />);
 
@@ -331,24 +324,17 @@ describe('Chat', () => {
     });
 
     it('uses fallback placeholder when no agents', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: {
-          id: 'session-1' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [],
-        },
-        selectedAgent: null,
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: {
+            id: 'session-1' as ThreadId,
+            name: 'Test Session',
+            createdAt: new Date(),
+            agents: [],
+          },
+          selectedAgent: null,
+        })
+      );
 
       render(<Chat />);
 
@@ -380,24 +366,17 @@ describe('Chat', () => {
     });
 
     it('passes none when no agents available', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: {
-          id: 'session-1' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [],
-        },
-        selectedAgent: null,
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: {
+            id: 'session-1' as ThreadId,
+            name: 'Test Session',
+            createdAt: new Date(),
+            agents: [],
+          },
+          selectedAgent: null,
+        })
+      );
 
       render(<Chat />);
 
@@ -407,24 +386,17 @@ describe('Chat', () => {
 
   describe('Agent Selection Logic', () => {
     it('prefers selected agent over first agent', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: {
-          id: 'session-1' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
-        },
-        selectedAgent: 'agent-2',
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: {
+            id: 'session-1' as ThreadId,
+            name: 'Test Session',
+            createdAt: new Date(),
+            agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
+          },
+          selectedAgent: 'agent-2',
+        })
+      );
 
       render(<Chat />);
 
@@ -434,19 +406,12 @@ describe('Chat', () => {
     });
 
     it('handles no session details gracefully', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: null,
-        selectedAgent: null,
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: null,
+          selectedAgent: null,
+        })
+      );
 
       render(<Chat />);
 
@@ -457,24 +422,17 @@ describe('Chat', () => {
     });
 
     it('handles empty agents array', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: {
-          id: 'session-1' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [],
-        },
-        selectedAgent: null,
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: {
+            id: 'session-1' as ThreadId,
+            name: 'Test Session',
+            createdAt: new Date(),
+            agents: [],
+          },
+          selectedAgent: null,
+        })
+      );
 
       render(<Chat />);
 
@@ -525,24 +483,17 @@ describe('Chat', () => {
     });
 
     it('handles single agent from provider', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: {
-          id: 'session-1' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [createMockAgent('solo-agent', 'Solo')],
-        },
-        selectedAgent: 'solo-agent',
-        agentBusy: false,
-        loading: false,
-        foundAgent: null,
-        currentAgent: null,
-        selectAgent: vi.fn(),
-        onAgentSelect: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: {
+            id: 'session-1' as ThreadId,
+            name: 'Test Session',
+            createdAt: new Date(),
+            agents: [createMockAgent('solo-agent', 'Solo')],
+          },
+          selectedAgent: 'solo-agent',
+        })
+      );
 
       render(<Chat />);
 

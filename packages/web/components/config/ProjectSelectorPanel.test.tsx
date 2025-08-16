@@ -6,6 +6,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProjectSelectorPanel } from './ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
+import {
+  createMockProjectContext,
+  createMockSessionContext,
+} from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -78,44 +82,24 @@ describe('ProjectSelectorPanel', () => {
     );
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue({
-      projects: [],
-      projectsForSidebar: [],
-      currentProject: {
-        id: '',
-        name: 'No project selected',
-        description: '',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      },
-      loading: false,
-      error: null,
-      selectedProject: null,
-      foundProject: null,
-      selectProject: vi.fn(),
-      onProjectSelect: mockHandlers.onProjectSelect,
-      updateProject: mockHandlers.updateProject,
-      createProject: vi.fn(),
-      loadProjectConfiguration: vi.fn(),
-      reloadProjects: mockHandlers.reloadProjects,
-    });
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        projects: [],
+        projectsForSidebar: [],
+        selectedProject: null,
+        foundProject: null,
+        onProjectSelect: mockHandlers.onProjectSelect,
+        updateProject: mockHandlers.updateProject,
+        reloadProjects: mockHandlers.reloadProjects,
+      })
+    );
 
-    mockUseSessionContext.mockReturnValue({
-      sessions: [],
-      loading: false,
-      projectConfig: null,
-      selectedSession: null,
-      foundSession: null,
-      selectSession: vi.fn(),
-      onSessionSelect: vi.fn(),
-      createSession: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
-      enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
-    });
+    mockUseSessionContext.mockReturnValue(
+      createMockSessionContext({
+        selectedSession: null,
+        enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
+      })
+    );
 
     mockUseUIState.mockReturnValue({
       showMobileNav: false,

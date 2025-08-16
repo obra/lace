@@ -11,6 +11,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core';
+import {
+  createMockSessionContext,
+  createMockAgentContext,
+  createMockProjectContext,
+} from '@/__tests__/utils/provider-mocks';
 
 // Mock the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -34,57 +39,12 @@ const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
 
-// Helper functions for consistent mocking
-const createMockProjectContext = (overrides = {}) => ({
-  selectedProject: 'test-project',
-  foundProject: createMockProject(),
-  currentProject: createMockProject(),
-  projects: [createMockProject()],
-  loading: false,
-  error: null,
-  projectsForSidebar: [createMockProject()],
-  selectProject: vi.fn(),
-  onProjectSelect: vi.fn(),
-  updateProject: vi.fn(),
-  createProject: vi.fn(),
-  loadProjectConfiguration: vi.fn(),
-  reloadProjects: vi.fn(),
-  ...overrides,
-});
-
-const createMockSessionContext = (overrides = {}) => ({
-  sessions: [
-    { id: 'session-1' as ThreadId, name: 'Session 1', createdAt: new Date(), agents: [] },
-    { id: 'session-2' as ThreadId, name: 'Session 2', createdAt: new Date(), agents: [] },
-    { id: 'session-3' as ThreadId, name: 'Session 3', createdAt: new Date(), agents: [] },
-  ],
-  loading: false,
-  projectConfig: null,
-  selectedSession: null,
-  foundSession: null,
-  selectSession: vi.fn(),
-  onSessionSelect: vi.fn(),
-  createSession: vi.fn(),
-  loadProjectConfig: vi.fn(),
-  reloadSessions: vi.fn(),
-  enableAgentAutoSelection: vi.fn(),
-  ...overrides,
-});
-
-const createMockAgentContext = (overrides = {}) => ({
-  sessionDetails: createMockSessionDetails(),
-  loading: false,
-  selectedAgent: 'agent-1',
-  foundAgent: createMockAgent('agent-1', 'Agent 1'),
-  currentAgent: createMockAgent('agent-1', 'Agent 1'),
-  agentBusy: false,
-  selectAgent: vi.fn(),
-  onAgentSelect: vi.fn(),
-  createAgent: vi.fn(),
-  updateAgentState: vi.fn(),
-  reloadSessionDetails: vi.fn(),
-  ...overrides,
-});
+// Helper functions for test data
+const createMockSessionsForProject = () => [
+  { id: 'session-1' as ThreadId, name: 'Session 1', createdAt: new Date(), agents: [] },
+  { id: 'session-2' as ThreadId, name: 'Session 2', createdAt: new Date(), agents: [] },
+  { id: 'session-3' as ThreadId, name: 'Session 3', createdAt: new Date(), agents: [] },
+];
 
 // Test data factories
 const createMockProject = (overrides?: Partial<ProjectInfo>): ProjectInfo => ({
@@ -129,9 +89,27 @@ describe('ProjectSection', () => {
     vi.clearAllMocks();
 
     // Set up default mock returns using helpers
-    mockUseProjectContext.mockReturnValue(createMockProjectContext());
-    mockUseSessionContext.mockReturnValue(createMockSessionContext());
-    mockUseAgentContext.mockReturnValue(createMockAgentContext());
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        selectedProject: 'test-project',
+        foundProject: createMockProject(),
+        projects: [createMockProject()],
+        projectsForSidebar: [createMockProject()],
+      })
+    );
+    mockUseSessionContext.mockReturnValue(
+      createMockSessionContext({
+        sessions: createMockSessionsForProject(),
+      })
+    );
+    mockUseAgentContext.mockReturnValue(
+      createMockAgentContext({
+        sessionDetails: createMockSessionDetails(),
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Agent 1'),
+        currentAgent: createMockAgent('agent-1', 'Agent 1'),
+      })
+    );
   });
 
   describe('Basic Structure', () => {
@@ -151,21 +129,14 @@ describe('ProjectSection', () => {
     it('displays project name without description when description is undefined', () => {
       const projectWithoutDescription = createMockProject({ description: undefined });
 
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: 'test-project',
-        foundProject: projectWithoutDescription,
-        projects: [projectWithoutDescription],
-        loading: false,
-        error: null,
-        projectsForSidebar: [projectWithoutDescription],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: createMockProject(),
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: 'test-project',
+          foundProject: projectWithoutDescription,
+          projects: [projectWithoutDescription],
+          projectsForSidebar: [projectWithoutDescription],
+        })
+      );
 
       render(<ProjectSection {...defaultProps} />);
 
@@ -345,21 +316,14 @@ describe('ProjectSection', () => {
         name: 'This is an extremely long project name that should be truncated in the UI to prevent layout issues',
       });
 
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: 'test-project',
-        foundProject: longNameProject,
-        projects: [longNameProject],
-        loading: false,
-        error: null,
-        projectsForSidebar: [longNameProject],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: createMockProject(),
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: 'test-project',
+          foundProject: longNameProject,
+          projects: [longNameProject],
+          projectsForSidebar: [longNameProject],
+        })
+      );
 
       render(<ProjectSection {...defaultProps} />);
 
@@ -374,21 +338,14 @@ describe('ProjectSection', () => {
           'This is an extremely long project description that should be truncated in the UI to prevent layout issues and maintain clean appearance',
       });
 
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: 'test-project',
-        foundProject: longDescProject,
-        projects: [longDescProject],
-        loading: false,
-        error: null,
-        projectsForSidebar: [longDescProject],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: createMockProject(),
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: 'test-project',
+          foundProject: longDescProject,
+          projects: [longDescProject],
+          projectsForSidebar: [longDescProject],
+        })
+      );
 
       render(<ProjectSection {...defaultProps} />);
 
@@ -399,21 +356,14 @@ describe('ProjectSection', () => {
     it('handles empty project name gracefully', () => {
       const emptyNameProject = createMockProject({ name: '' });
 
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: 'test-project',
-        foundProject: emptyNameProject,
-        projects: [emptyNameProject],
-        loading: false,
-        error: null,
-        projectsForSidebar: [emptyNameProject],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: createMockProject(),
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: 'test-project',
+          foundProject: emptyNameProject,
+          projects: [emptyNameProject],
+          projectsForSidebar: [emptyNameProject],
+        })
+      );
 
       render(<ProjectSection {...defaultProps} />);
 
@@ -424,21 +374,14 @@ describe('ProjectSection', () => {
     it('handles missing project id', () => {
       const projectWithoutId = createMockProject({ id: '' });
 
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: '', // Empty project ID should still render if foundProject exists
-        foundProject: projectWithoutId,
-        projects: [projectWithoutId],
-        loading: false,
-        error: null,
-        projectsForSidebar: [projectWithoutId],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: createMockProject(),
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: '', // Empty project ID should still render if foundProject exists
+          foundProject: projectWithoutId,
+          projects: [projectWithoutId],
+          projectsForSidebar: [projectWithoutId],
+        })
+      );
 
       const { container } = render(<ProjectSection {...defaultProps} />);
 
@@ -447,21 +390,14 @@ describe('ProjectSection', () => {
     });
 
     it('does not render when no project is selected', () => {
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: null,
-        foundProject: null,
-        projects: [],
-        loading: false,
-        error: null,
-        projectsForSidebar: [],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: createMockProject(),
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: null,
+          foundProject: null,
+          projects: [],
+          projectsForSidebar: [],
+        })
+      );
 
       const { container } = render(<ProjectSection {...defaultProps} />);
 

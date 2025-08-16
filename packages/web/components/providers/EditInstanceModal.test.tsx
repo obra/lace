@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditInstanceModal } from './EditInstanceModal';
+import { ProviderInstanceProvider } from './ProviderInstanceProvider';
 
 // Mock the serialization utility
 vi.mock('@/lib/serialization', () => ({
@@ -48,10 +49,34 @@ describe('EditInstanceModal', () => {
     onSuccess: vi.fn(),
   };
 
+  // Helper to render with provider
+  const renderWithProvider = (props = defaultProps) => {
+    return render(
+      <ProviderInstanceProvider>
+        <EditInstanceModal {...props} />
+      </ProviderInstanceProvider>
+    );
+  };
+
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+
+    // Setup default fetch mock for provider initialization
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
   });
 
   afterEach(() => {
@@ -59,7 +84,7 @@ describe('EditInstanceModal', () => {
   });
 
   it('should render edit form with current instance values', async () => {
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     expect(screen.getByDisplayValue('Test Instance')).toBeInTheDocument();
     expect(screen.getByDisplayValue('https://api.openai.com/v1')).toBeInTheDocument();
@@ -79,13 +104,22 @@ describe('EditInstanceModal', () => {
       instance: mockUpdatedInstance,
     });
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
+    const mockFetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+      });
     });
     global.fetch = mockFetch;
 
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     // Update display name
     const nameInput = screen.getByDisplayValue('Test Instance');
@@ -107,6 +141,7 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Updated Instance Name',
           endpoint: 'https://custom.api.com',
+          timeout: 30,
         }),
       });
     });
@@ -122,12 +157,21 @@ describe('EditInstanceModal', () => {
       instance: mockInstance,
     });
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+      });
     });
 
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     // Update API key
     const apiKeyInput = screen.getByPlaceholderText(/leave empty to keep current/i);
@@ -144,6 +188,7 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Test Instance',
           endpoint: 'https://api.openai.com/v1',
+          timeout: 30,
           credential: { apiKey: 'new-api-key' },
         }),
       });
@@ -153,7 +198,7 @@ describe('EditInstanceModal', () => {
   it('should validate required fields', async () => {
     const user = userEvent.setup();
 
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     // Clear required display name
     const nameInput = screen.getByDisplayValue('Test Instance');
@@ -163,8 +208,9 @@ describe('EditInstanceModal', () => {
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
 
-    // Should not make API call
-    expect(global.fetch).not.toHaveBeenCalled();
+    // Should not make API call to update instance (only the initial load)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('/api/provider/instances');
 
     // Form should show validation state (HTML5 validation)
     expect(nameInput).toBeInvalid();
@@ -177,12 +223,21 @@ describe('EditInstanceModal', () => {
       error: 'Instance validation failed',
     });
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+      });
     });
 
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
@@ -196,7 +251,7 @@ describe('EditInstanceModal', () => {
   });
 
   it('should not render when closed', () => {
-    render(<EditInstanceModal {...defaultProps} isOpen={false} />);
+    renderWithProvider({ ...defaultProps, isOpen: false });
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -204,7 +259,7 @@ describe('EditInstanceModal', () => {
   it('should close modal on cancel', async () => {
     const user = userEvent.setup();
 
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
@@ -216,23 +271,29 @@ describe('EditInstanceModal', () => {
     const user = userEvent.setup();
 
     // Mock delayed response
-    global.fetch = vi.fn().mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                ok: true,
-                status: 200,
-              }),
-            100
-          )
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              ok: true,
+              status: 200,
+            }),
+          100
         )
-    );
+      );
+    });
 
     mockParseResponse.mockResolvedValue({ instance: mockInstance });
 
-    render(<EditInstanceModal {...defaultProps} />);
+    renderWithProvider();
 
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);

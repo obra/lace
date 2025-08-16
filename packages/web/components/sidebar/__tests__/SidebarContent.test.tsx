@@ -11,6 +11,11 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core';
+import {
+  createMockSessionContext,
+  createMockAgentContext,
+  createMockProjectContext,
+} from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -146,58 +151,28 @@ describe('SidebarContent', () => {
     vi.clearAllMocks();
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue({
-      selectedProject: 'test-project',
-      foundProject: createMockProject(),
-      projects: [createMockProject()],
-      loading: false,
-      error: null,
-      projectsForSidebar: [createMockProject()],
-      selectProject: vi.fn(),
-      onProjectSelect: vi.fn(),
-      updateProject: vi.fn(),
-      createProject: vi.fn(),
-      loadProjectConfiguration: vi.fn(),
-      reloadProjects: vi.fn(),
-      currentProject: {
-        id: '',
-        name: 'No project selected',
-        description: '',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      },
-    });
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        selectedProject: 'test-project',
+        foundProject: createMockProject(),
+        projects: [createMockProject()],
+        projectsForSidebar: [createMockProject()],
+      })
+    );
 
-    mockUseSessionContext.mockReturnValue({
-      sessions: [],
-      loading: false,
-      projectConfig: null,
-      createSession: vi.fn(),
-      selectedSession: 'test-session',
-      foundSession: null,
-      selectSession: vi.fn(),
-      onSessionSelect: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
-      enableAgentAutoSelection: vi.fn(),
-    });
+    mockUseSessionContext.mockReturnValue(
+      createMockSessionContext({
+        selectedSession: 'test-session',
+      })
+    );
 
-    mockUseAgentContext.mockReturnValue({
-      sessionDetails: createMockSessionDetails(),
-      loading: false,
-      selectedAgent: 'agent-1',
-      foundAgent: createMockAgent('agent-1', 'Agent 1'),
-      selectAgent: vi.fn(),
-      createAgent: vi.fn(),
-      updateAgentState: vi.fn(),
-      onAgentSelect: vi.fn(),
-      reloadSessionDetails: vi.fn(),
-      currentAgent: null,
-      agentBusy: false,
-    });
+    mockUseAgentContext.mockReturnValue(
+      createMockAgentContext({
+        sessionDetails: createMockSessionDetails(),
+        selectedAgent: 'agent-1',
+        foundAgent: createMockAgent('agent-1', 'Agent 1'),
+      })
+    );
   });
 
   describe('Component Rendering', () => {
@@ -210,44 +185,22 @@ describe('SidebarContent', () => {
     });
 
     it('renders only task section when no project is selected', () => {
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: null,
-        foundProject: null,
-        projects: [],
-        loading: false,
-        error: null,
-        projectsForSidebar: [],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: {
-          id: '',
-          name: 'No project selected',
-          description: '',
-          workingDirectory: '/',
-          isArchived: false,
-          createdAt: new Date(),
-          lastUsedAt: new Date(),
-          sessionCount: 0,
-        },
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: null,
+          foundProject: null,
+          projects: [],
+          projectsForSidebar: [],
+        })
+      );
 
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: null,
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: null,
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       render(<SidebarContent {...defaultProps} />);
 
@@ -257,19 +210,13 @@ describe('SidebarContent', () => {
     });
 
     it('renders project and task sections when no session is available', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: null,
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: null,
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       render(<SidebarContent {...defaultProps} />);
 
@@ -389,30 +336,14 @@ describe('SidebarContent', () => {
 
   describe('Edge Cases', () => {
     it('handles null project gracefully', () => {
-      mockUseProjectContext.mockReturnValue({
-        selectedProject: null,
-        foundProject: null,
-        projects: [],
-        loading: false,
-        error: null,
-        projectsForSidebar: [],
-        selectProject: vi.fn(),
-        onProjectSelect: vi.fn(),
-        updateProject: vi.fn(),
-        createProject: vi.fn(),
-        loadProjectConfiguration: vi.fn(),
-        reloadProjects: vi.fn(),
-        currentProject: {
-          id: '',
-          name: 'No project selected',
-          description: '',
-          workingDirectory: '/',
-          isArchived: false,
-          createdAt: new Date(),
-          lastUsedAt: new Date(),
-          sessionCount: 0,
-        },
-      });
+      mockUseProjectContext.mockReturnValue(
+        createMockProjectContext({
+          selectedProject: null,
+          foundProject: null,
+          projects: [],
+          projectsForSidebar: [],
+        })
+      );
 
       render(<SidebarContent {...defaultProps} />);
 
@@ -421,19 +352,13 @@ describe('SidebarContent', () => {
     });
 
     it('handles null session details gracefully', () => {
-      mockUseAgentContext.mockReturnValue({
-        sessionDetails: null,
-        loading: false,
-        selectedAgent: null,
-        foundAgent: null,
-        selectAgent: vi.fn(),
-        createAgent: vi.fn(),
-        updateAgentState: vi.fn(),
-        onAgentSelect: vi.fn(),
-        reloadSessionDetails: vi.fn(),
-        currentAgent: null,
-        agentBusy: false,
-      });
+      mockUseAgentContext.mockReturnValue(
+        createMockAgentContext({
+          sessionDetails: null,
+          selectedAgent: null,
+          foundAgent: null,
+        })
+      );
 
       render(<SidebarContent {...defaultProps} />);
 

@@ -8,6 +8,10 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import type { ProjectInfo } from '@/types/core';
+import {
+  createMockProjectContext,
+  createMockSessionContext,
+} from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -81,44 +85,24 @@ describe('ProjectSelectorPanel', () => {
     vi.clearAllMocks();
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue({
-      projects: mockProjects,
-      projectsForSidebar: mockProjects,
-      currentProject: {
-        id: '',
-        name: 'No project selected',
-        description: '',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      },
-      loading: false,
-      error: null,
-      selectedProject: null,
-      foundProject: null,
-      selectProject: vi.fn(),
-      onProjectSelect: mockHandlers.onProjectSelect,
-      updateProject: mockHandlers.updateProject,
-      createProject: vi.fn(),
-      loadProjectConfiguration: vi.fn(),
-      reloadProjects: mockHandlers.reloadProjects,
-    });
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        projects: mockProjects,
+        projectsForSidebar: mockProjects,
+        selectedProject: null,
+        foundProject: null,
+        onProjectSelect: mockHandlers.onProjectSelect,
+        updateProject: mockHandlers.updateProject,
+        reloadProjects: mockHandlers.reloadProjects,
+      })
+    );
 
-    mockUseSessionContext.mockReturnValue({
-      sessions: [],
-      loading: false,
-      projectConfig: null,
-      selectedSession: null,
-      foundSession: null,
-      selectSession: vi.fn(),
-      onSessionSelect: vi.fn(),
-      createSession: vi.fn(),
-      loadProjectConfig: vi.fn(),
-      reloadSessions: vi.fn(),
-      enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
-    });
+    mockUseSessionContext.mockReturnValue(
+      createMockSessionContext({
+        selectedSession: null,
+        enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
+      })
+    );
 
     mockUseUIState.mockReturnValue({
       showMobileNav: false,
@@ -167,21 +151,18 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show selected project as active', () => {
     // Override the current project to be one of the mock projects
-    mockUseProjectContext.mockReturnValue({
-      projects: mockProjects,
-      projectsForSidebar: mockProjects,
-      currentProject: mockProjects[0], // Set as selected
-      loading: false,
-      error: null,
-      selectedProject: mockProjects[0].id,
-      foundProject: mockProjects[0],
-      selectProject: vi.fn(),
-      onProjectSelect: mockHandlers.onProjectSelect,
-      updateProject: mockHandlers.updateProject,
-      createProject: vi.fn(),
-      loadProjectConfiguration: vi.fn(),
-      reloadProjects: mockHandlers.reloadProjects,
-    });
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        projects: mockProjects,
+        projectsForSidebar: mockProjects,
+        currentProject: mockProjects[0], // Set as selected
+        selectedProject: mockProjects[0].id,
+        foundProject: mockProjects[0],
+        onProjectSelect: mockHandlers.onProjectSelect,
+        updateProject: mockHandlers.updateProject,
+        reloadProjects: mockHandlers.reloadProjects,
+      })
+    );
 
     render(<ProjectSelectorPanel />);
 
@@ -206,30 +187,17 @@ describe('ProjectSelectorPanel', () => {
 
   it('should handle empty project list', () => {
     // Override to provide empty projects list
-    mockUseProjectContext.mockReturnValue({
-      projects: [],
-      projectsForSidebar: [],
-      currentProject: {
-        id: '',
-        name: 'No project selected',
-        description: '',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      },
-      loading: false,
-      error: null,
-      selectedProject: null,
-      foundProject: null,
-      selectProject: vi.fn(),
-      onProjectSelect: mockHandlers.onProjectSelect,
-      updateProject: mockHandlers.updateProject,
-      createProject: vi.fn(),
-      loadProjectConfiguration: vi.fn(),
-      reloadProjects: mockHandlers.reloadProjects,
-    });
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        projects: [],
+        projectsForSidebar: [],
+        selectedProject: null,
+        foundProject: null,
+        onProjectSelect: mockHandlers.onProjectSelect,
+        updateProject: mockHandlers.updateProject,
+        reloadProjects: mockHandlers.reloadProjects,
+      })
+    );
 
     render(<ProjectSelectorPanel />);
 
@@ -238,30 +206,18 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show loading state', () => {
     // Override to provide loading state
-    mockUseProjectContext.mockReturnValue({
-      projects: [],
-      projectsForSidebar: [],
-      currentProject: {
-        id: '',
-        name: 'No project selected',
-        description: '',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      },
-      loading: true,
-      error: null,
-      selectedProject: null,
-      foundProject: null,
-      selectProject: vi.fn(),
-      onProjectSelect: mockHandlers.onProjectSelect,
-      updateProject: mockHandlers.updateProject,
-      createProject: vi.fn(),
-      loadProjectConfiguration: vi.fn(),
-      reloadProjects: mockHandlers.reloadProjects,
-    });
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
+        projects: [],
+        projectsForSidebar: [],
+        loading: true,
+        selectedProject: null,
+        foundProject: null,
+        onProjectSelect: mockHandlers.onProjectSelect,
+        updateProject: mockHandlers.updateProject,
+        reloadProjects: mockHandlers.reloadProjects,
+      })
+    );
 
     render(<ProjectSelectorPanel />);
 
