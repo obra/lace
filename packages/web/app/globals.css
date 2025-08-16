@@ -1,28 +1,26 @@
 @import 'tailwindcss';
 @import '@fortawesome/fontawesome-svg-core/styles.css';
-@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap');
+/* Optimized font loading with variable fonts and selective weights */
+@import '@fontsource/lato/400.css';  /* Regular weight only for Lato */
+@import '@fontsource/lato/700.css';  /* Bold weight for Lato */
+@import '@fontsource-variable/dm-sans/index.css';  /* DM Sans variable font */
+@import '@fontsource/google-sans-code/latin.css';  /* Google Sans Code Latin subset only */
 @plugin "daisyui";
 
-/* Typography: utilities bound to Next Fonts variables (set on <body>) */
+/* Typography: utilities bound to local fonts */
 :root {
-  /* Google Sans Code loaded via CSS import */
-  --font-google-sans-code: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  /* Local fonts via @fontsource packages */
+  --font-lato: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-dm-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-google-sans-code: 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
-/* Force Google Sans Code to be available when the class is applied */
-.google-sans-code-loaded {
-  --font-google-sans-code: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
-
-/* Also ensure it's always available globally */
-* {
-  --font-google-sans-code: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
+/* Google Sans Code now loaded via @fontsource package for consistency */
 
 /* Use DM Sans for UI text where desired */
 .font-ui {
   font-family:
-    var(--font-dm-sans),
+    var(--font-dm-sans, 'DM Sans'),
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -41,14 +39,14 @@
 /* Use Google Sans Code for code and technical content */
 .font-code {
   font-family:
-    var(--font-google-sans-code), 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    var(--font-google-sans-code, 'Google Sans Code'), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
 }
 
 /* Use Lato where desired */
 .font-lato {
   font-family:
-    var(--font-lato),
+    var(--font-lato, 'Lato'),
     ui-sans-serif,
     system-ui,
     -apple-system,

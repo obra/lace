@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head></head>
       <body
-        className={`${dmSans.className} ${dmSans.variable} ${lato.variable} ${googleSansCode.variable} antialiased`}
+        className={`${dmSans.variable} ${lato.variable} ${googleSansCode.variable} antialiased`}
       >
         <ConsoleForwardScript />
         <ErrorBoundary>

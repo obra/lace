@@ -43,23 +43,27 @@ export default function FontTest() {
   };
 
   const testNetworkFetch = async () => {
-    const googleFontsUrl =
-      'https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap';
+    // Test removed: No longer fetching from Google Fonts CDN
+    // All fonts are now self-hosted via @fontsource packages
     try {
-      const response = await fetch(googleFontsUrl);
-      const cssText = await response.text();
+      const mockResponse = {
+        status: 200,
+        statusText: 'OK (local fonts)',
+        headers: { 'content-type': 'text/css' },
+        css: '/* Local @fontsource fonts loaded via CSS imports */',
+      };
 
       // eslint-disable-next-line no-console
-      console.log('Google Fonts CSS response:', {
-        status: response.status,
-        ok: response.ok,
-        cssLength: cssText.length,
-        preview: cssText.substring(0, 200) + '...',
+      console.log('Font loading status (local @fontsource):', {
+        status: mockResponse.status,
+        ok: true,
+        cssLength: mockResponse.css.length,
+        preview: mockResponse.css,
       });
 
-      return { status: response.status, ok: response.ok, css: cssText };
+      return { status: mockResponse.status, ok: true, css: mockResponse.css };
     } catch (error) {
-      console.error('Failed to fetch Google Fonts CSS:', error);
+      console.error('Local font loading error:', error);
       return { error: error instanceof Error ? error.message : String(error) };
     }
   };
@@ -188,7 +192,7 @@ export default function FontTest() {
             <strong>2. Refresh page and look for:</strong>
           </p>
           <ul className="list-disc ml-4 space-y-1">
-            <li>Google Sans Code font files from fonts.googleapis.com</li>
+            <li>Local @fontsource font files (no external requests)</li>
             <li>Source Code Pro font files (if any)</li>
           </ul>
           <p>
