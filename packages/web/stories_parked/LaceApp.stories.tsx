@@ -30,7 +30,7 @@ The main application page that combines all core functionality into a complete c
 - **Sidebar**: Navigation and project management
 - **MobileSidebar**: Mobile-optimized navigation
 - **TimelineView**: Conversation history and message display
-- **EnhancedChatInput**: Advanced chat input with voice and file support
+- **ChatInput**: Advanced chat input with voice and file support
 - **StreamingIndicator**: Real-time response indicators
 - **VoiceRecognitionUI**: Voice input interface
 - **TaskBoardModal**: Task management overlay

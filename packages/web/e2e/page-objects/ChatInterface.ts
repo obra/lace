@@ -16,7 +16,7 @@ export class ChatInterface {
       .locator('textarea[placeholder*="Message"]')
       .or(this.page.locator('input[placeholder*="message"]'))
       .or(this.page.locator('[data-testid="message-input"]'))
-      .or(this.page.locator('[data-testid="enhanced-message-input"]'))
+      .or(this.page.locator('[data-testid="message-input"]'))
       .first();
   }
 

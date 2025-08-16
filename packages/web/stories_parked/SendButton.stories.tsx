@@ -14,7 +14,7 @@ const meta: Meta<typeof SendButton> = {
 ## SendButton
 
 **Atomic Classification**: Input Atom  
-**Source**: Extracted from EnhancedChatInput component  
+**Source**: Extracted from ChatInput component  
 **Single Responsibility**: Submit/stop action with loading states
 
 ### Purpose
