@@ -80,16 +80,40 @@ describe('useSessionManagement', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration');
   });
 
-  it('clears sessions when project is deselected', () => {
+  it('clears sessions when project is deselected', async () => {
     const { result, rerender } = renderHook(
       (props: { projectId: string | null }) => useSessionManagement(props.projectId),
       {
-        initialProps: { projectId: 'project-1' as string | null },
+        initialProps: { projectId: null as string | null },
       }
     );
 
+    // Initially no sessions when no project
+    expect(result.current.sessions).toEqual([]);
+    expect(result.current.loading).toBe(false);
+
+    // Select a project - set up mocks for this
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessions),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      });
+
+    await act(async () => {
+      rerender({ projectId: 'project-1' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.sessions).toEqual(mockSessions);
+
     // Deselect project
-    rerender({ projectId: null });
+    act(() => {
+      rerender({ projectId: null });
+    });
 
     expect(result.current.sessions).toEqual([]);
   });
@@ -170,7 +194,9 @@ describe('useSessionManagement', () => {
   });
 
   it('handles API errors gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    mockFetch
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(new Error('Network error'));
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
