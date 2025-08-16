@@ -1,5 +1,5 @@
-// ABOUTME: Context provider for event stream connections and tool approval workflows
-// ABOUTME: Eliminates prop drilling by centralizing event handling, streaming, and session API calls
+// ABOUTME: Context provider for event stream connections and session API
+// ABOUTME: Eliminates prop drilling by centralizing event handling and streaming (tool approvals now in ToolApprovalProvider)
 
 'use client';
 
@@ -7,6 +7,7 @@ import React, { createContext, useContext, useCallback, type ReactNode } from 'r
 import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
+import { useToolApprovalContext } from './ToolApprovalProvider';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { StreamConnection } from '@/types/stream-events';
@@ -32,13 +33,6 @@ interface SessionAPIActions {
   stopAgent: (agentId: ThreadId) => Promise<boolean>;
 }
 
-interface ToolApprovalsState {
-  pendingApprovals: PendingApproval[];
-  clearApprovalRequest: () => void;
-  handleApprovalRequest: (approval: PendingApproval) => void;
-  handleApprovalResponse: (toolCallId: string) => void;
-}
-
 interface EventStreamContextType {
   // Event stream connection
   eventStream: EventStreamConnection;
@@ -48,9 +42,6 @@ interface EventStreamContextType {
 
   // Session API
   sessionAPI: SessionAPIActions;
-
-  // Tool approvals
-  toolApprovals: ToolApprovalsState;
 
   // Agent state handling
   onAgentStateChange?: (agentId: string, fromState: string, toState: string) => void;
@@ -73,16 +64,15 @@ export function EventStreamProvider({
   agentId,
   onAgentStateChange,
 }: EventStreamProviderProps) {
-  // Session events hook
-  const {
-    filteredEvents,
-    pendingApprovals,
-    loadingHistory,
-    clearApprovalRequest,
-    addSessionEvent,
-    handleApprovalRequest,
-    handleApprovalResponse,
-  } = useSessionEventsHook(sessionId, agentId, false);
+  // Get tool approval handlers from ToolApprovalProvider
+  const { handleApprovalRequest } = useToolApprovalContext();
+
+  // Session events hook (no longer manages approvals internally)
+  const { filteredEvents, loadingHistory, addSessionEvent } = useSessionEventsHook(
+    sessionId,
+    agentId,
+    false
+  );
 
   // Session API hook
   const sessionAPI = useSessionAPIHook();
@@ -140,13 +130,6 @@ export function EventStreamProvider({
       stopAgent: sessionAPI.stopAgent,
     },
 
-    toolApprovals: {
-      pendingApprovals,
-      clearApprovalRequest,
-      handleApprovalRequest,
-      handleApprovalResponse,
-    },
-
     onAgentStateChange: handleAgentStateChangeCallback,
   };
 
@@ -201,12 +184,5 @@ export function useSessionAPI() {
   return context.sessionAPI;
 }
 
-export function useToolApprovals() {
-  const context = useContext(EventStreamContext);
-
-  if (!context) {
-    throw new Error('useToolApprovals must be used within EventStreamProvider');
-  }
-
-  return context.toolApprovals;
-}
+// Note: useToolApprovals is now provided by ToolApprovalProvider
+// Import useToolApprovalContext from ToolApprovalProvider instead

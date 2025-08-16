@@ -9,8 +9,8 @@ import {
   useEventStream,
   useSessionEvents,
   useSessionAPI,
-  useToolApprovals,
 } from './EventStreamProvider';
+import { ToolApprovalProvider } from './ToolApprovalProvider';
 import type { ReactNode } from 'react';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
@@ -36,13 +36,15 @@ const mockUseSessionAPI = useSessionAPIHook as MockedFunction<() => UseSessionAP
 
 describe('EventStreamProvider', () => {
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <EventStreamProvider
-      projectId="test-project"
-      sessionId={'test-session' as ThreadId}
-      agentId={'test-agent' as ThreadId}
-    >
-      {children}
-    </EventStreamProvider>
+    <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+      <EventStreamProvider
+        projectId="test-project"
+        sessionId={'test-session' as ThreadId}
+        agentId={'test-agent' as ThreadId}
+      >
+        {children}
+      </EventStreamProvider>
+    </ToolApprovalProvider>
   );
 
   beforeEach(() => {
@@ -52,13 +54,9 @@ describe('EventStreamProvider', () => {
     const mockSessionEventsReturn: UseSessionEventsReturn = {
       allEvents: [],
       filteredEvents: [],
-      pendingApprovals: [],
       loadingHistory: false,
       connected: false,
-      clearApprovalRequest: vi.fn(),
       addSessionEvent: vi.fn(),
-      handleApprovalRequest: vi.fn(),
-      handleApprovalResponse: vi.fn(),
     };
 
     const mockEventStreamReturn: UseEventStreamResult = {
@@ -116,15 +114,7 @@ describe('EventStreamProvider', () => {
     expect(result.current.stopAgent).toBeDefined();
   });
 
-  it('provides tool approvals context to children', () => {
-    const { result } = renderHook(() => useToolApprovals(), { wrapper });
-
-    expect(result.current).toBeDefined();
-    expect(result.current.pendingApprovals).toBeDefined();
-    expect(result.current.clearApprovalRequest).toBeDefined();
-    expect(result.current.handleApprovalRequest).toBeDefined();
-    expect(result.current.handleApprovalResponse).toBeDefined();
-  });
+  // Note: Tool approval functionality has been moved to ToolApprovalProvider
 
   it('exposes session events state', () => {
     const mockEvents: LaceEvent[] = [
@@ -140,13 +130,9 @@ describe('EventStreamProvider', () => {
     const mockSessionEventsWithData: UseSessionEventsReturn = {
       allEvents: mockEvents,
       filteredEvents: mockEvents,
-      pendingApprovals: [],
       loadingHistory: false,
       connected: false,
-      clearApprovalRequest: vi.fn(),
       addSessionEvent: vi.fn(),
-      handleApprovalRequest: vi.fn(),
-      handleApprovalResponse: vi.fn(),
     };
 
     mockUseSessionEvents.mockReturnValue(mockSessionEventsWithData);
@@ -157,43 +143,7 @@ describe('EventStreamProvider', () => {
     expect(result.current.loadingHistory).toBe(false);
   });
 
-  it('exposes tool approval state', () => {
-    const mockApprovals: PendingApproval[] = [
-      {
-        toolCallId: 'approval-1',
-        toolCall: {
-          name: 'test_tool',
-          arguments: {},
-        },
-        requestedAt: new Date(),
-        requestData: {
-          requestId: 'approval-1',
-          toolName: 'test_tool',
-          isReadOnly: false,
-          riskLevel: 'safe',
-          input: {},
-        },
-      },
-    ];
-
-    const mockSessionEventsWithApprovals: UseSessionEventsReturn = {
-      allEvents: [],
-      filteredEvents: [],
-      pendingApprovals: mockApprovals,
-      loadingHistory: false,
-      connected: false,
-      clearApprovalRequest: vi.fn(),
-      addSessionEvent: vi.fn(),
-      handleApprovalRequest: vi.fn(),
-      handleApprovalResponse: vi.fn(),
-    };
-
-    mockUseSessionEvents.mockReturnValue(mockSessionEventsWithApprovals);
-
-    const { result } = renderHook(() => useToolApprovals(), { wrapper });
-
-    expect(result.current.pendingApprovals).toEqual(mockApprovals);
-  });
+  // Note: Tool approval functionality has been moved to ToolApprovalProvider
 
   it('exposes event stream connection state', () => {
     mockUseEventStream.mockReturnValue({
@@ -270,9 +220,7 @@ describe('EventStreamProvider', () => {
       renderHook(() => useSessionAPI());
     }).toThrow('useSessionAPI must be used within EventStreamProvider');
 
-    expect(() => {
-      renderHook(() => useToolApprovals());
-    }).toThrow('useToolApprovals must be used within EventStreamProvider');
+    // Note: Tool approval functionality has been moved to ToolApprovalProvider
   });
 
   it('calls underlying hooks with correct parameters', () => {
@@ -297,13 +245,15 @@ describe('EventStreamProvider', () => {
 
   it('handles missing agentId gracefully', () => {
     const wrapperWithoutAgent = ({ children }: { children: ReactNode }) => (
-      <EventStreamProvider
-        projectId="test-project"
-        sessionId={'test-session' as ThreadId}
-        agentId={null}
-      >
-        {children}
-      </EventStreamProvider>
+      <ToolApprovalProvider agentId={null}>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'test-session' as ThreadId}
+          agentId={null}
+        >
+          {children}
+        </EventStreamProvider>
+      </ToolApprovalProvider>
     );
 
     renderHook(() => useEventStream(), { wrapper: wrapperWithoutAgent });

@@ -43,8 +43,11 @@ import {
   useSessionEvents,
   useEventStream,
   useSessionAPI,
-  useToolApprovals,
 } from '@/components/providers/EventStreamProvider';
+import {
+  ToolApprovalProvider,
+  useToolApprovalContext,
+} from '@/components/providers/ToolApprovalProvider';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
@@ -135,9 +138,8 @@ const LaceAppInner = memo(function LaceAppInner() {
   // Use session API from EventStreamProvider context
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
 
-  // Use tool approvals from EventStreamProvider context
-  const { pendingApprovals, clearApprovalRequest, handleApprovalRequest, handleApprovalResponse } =
-    useToolApprovals();
+  // Use tool approvals from ToolApprovalProvider context
+  const { pendingApprovals } = useToolApprovalContext();
 
   // Use event stream connection from EventStreamProvider context
   const { connection } = useEventStream();
@@ -538,7 +540,9 @@ const LaceAppContent = memo(function LaceAppContent() {
     <ProjectProvider onProjectChange={handleProjectChange}>
       <SessionProvider projectId={selectedProject}>
         <AgentProvider sessionId={selectedSession} onAgentChange={handleAgentChange}>
-          <AgentProviderConsumer />
+          <ToolApprovalProvider agentId={selectedAgent as ThreadId | null}>
+            <AgentProviderConsumer />
+          </ToolApprovalProvider>
         </AgentProvider>
       </SessionProvider>
     </ProjectProvider>

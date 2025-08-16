@@ -9,8 +9,8 @@ import {
   useEventStream,
   useSessionEvents,
   useSessionAPI,
-  useToolApprovals,
 } from './EventStreamProvider';
+import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
@@ -19,6 +19,14 @@ import type { LaceEvent } from '~/threads/types';
 vi.mock('@/hooks/useSessionEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
+
+// Mock global fetch for ToolApprovalProvider
+beforeEach(() => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    text: () => Promise.resolve('[]'),
+  } as Response);
+});
 
 import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
@@ -31,7 +39,6 @@ function TestEventStreamConsumer() {
   const { connection } = useEventStream();
   const { events, loadingHistory } = useSessionEvents();
   const { sendMessage, stopAgent } = useSessionAPI();
-  const { pendingApprovals } = useToolApprovals();
 
   return (
     <div>
@@ -39,7 +46,6 @@ function TestEventStreamConsumer() {
       <div data-testid="connection-id">{connection.lastEventId || 'none'}</div>
       <div data-testid="events-count">{events.length}</div>
       <div data-testid="loading-history">{loadingHistory.toString()}</div>
-      <div data-testid="approvals-count">{pendingApprovals.length}</div>
       <button
         data-testid="send-message-button"
         onClick={() => sendMessage('test-agent' as ThreadId, 'Hello')}
@@ -71,13 +77,9 @@ describe('EventStreamProvider Integration', () => {
     vi.mocked(useSessionEventsHook).mockReturnValue({
       allEvents: [],
       filteredEvents: [],
-      pendingApprovals: [],
       loadingHistory: false,
       connected: false,
-      clearApprovalRequest: vi.fn(),
       addSessionEvent: mockAddSessionEvent,
-      handleApprovalRequest: vi.fn(),
-      handleApprovalResponse: vi.fn(),
     });
 
     vi.mocked(useEventStreamHook).mockReturnValue({
@@ -156,30 +158,28 @@ describe('EventStreamProvider Integration', () => {
     vi.mocked(useSessionEventsHook).mockReturnValue({
       allEvents: mockEvents,
       filteredEvents: mockEvents,
-      pendingApprovals: mockApprovals,
       loadingHistory: true,
       connected: true,
-      clearApprovalRequest: vi.fn(),
       addSessionEvent: mockAddSessionEvent,
-      handleApprovalRequest: vi.fn(),
-      handleApprovalResponse: vi.fn(),
     });
 
     render(
       <ThemeProvider>
-        <EventStreamProvider
-          projectId="test-project"
-          sessionId={'test-session' as ThreadId}
-          agentId={'test-agent' as ThreadId}
-        >
-          <div>
+        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+          <EventStreamProvider
+            projectId="test-project"
+            sessionId={'test-session' as ThreadId}
+            agentId={'test-agent' as ThreadId}
+          >
             <div>
               <div>
-                <TestEventStreamConsumer />
+                <div>
+                  <TestEventStreamConsumer />
+                </div>
               </div>
             </div>
-          </div>
-        </EventStreamProvider>
+          </EventStreamProvider>
+        </ToolApprovalProvider>
       </ThemeProvider>
     );
 
@@ -188,7 +188,6 @@ describe('EventStreamProvider Integration', () => {
     expect(screen.getByTestId('connection-id')).toHaveTextContent('conn-123');
     expect(screen.getByTestId('events-count')).toHaveTextContent('2');
     expect(screen.getByTestId('loading-history')).toHaveTextContent('true');
-    expect(screen.getByTestId('approvals-count')).toHaveTextContent('1');
   });
 
   it('allows API calls to be made from deeply nested components', async () => {
@@ -197,19 +196,21 @@ describe('EventStreamProvider Integration', () => {
 
     render(
       <ThemeProvider>
-        <EventStreamProvider
-          projectId="test-project"
-          sessionId={'test-session' as ThreadId}
-          agentId={'test-agent' as ThreadId}
-        >
-          <div>
+        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+          <EventStreamProvider
+            projectId="test-project"
+            sessionId={'test-session' as ThreadId}
+            agentId={'test-agent' as ThreadId}
+          >
             <div>
               <div>
-                <TestEventStreamConsumer />
+                <div>
+                  <TestEventStreamConsumer />
+                </div>
               </div>
             </div>
-          </div>
-        </EventStreamProvider>
+          </EventStreamProvider>
+        </ToolApprovalProvider>
       </ThemeProvider>
     );
 
@@ -239,13 +240,15 @@ describe('EventStreamProvider Integration', () => {
   it('updates state when underlying hooks change', () => {
     const { rerender } = render(
       <ThemeProvider>
-        <EventStreamProvider
-          projectId="test-project"
-          sessionId={'test-session' as ThreadId}
-          agentId={'test-agent' as ThreadId}
-        >
-          <TestEventStreamConsumer />
-        </EventStreamProvider>
+        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+          <EventStreamProvider
+            projectId="test-project"
+            sessionId={'test-session' as ThreadId}
+            agentId={'test-agent' as ThreadId}
+          >
+            <TestEventStreamConsumer />
+          </EventStreamProvider>
+        </ToolApprovalProvider>
       </ThemeProvider>
     );
 
@@ -269,13 +272,15 @@ describe('EventStreamProvider Integration', () => {
     // Force re-render with new mock data
     rerender(
       <ThemeProvider>
-        <EventStreamProvider
-          projectId="test-project"
-          sessionId={'test-session' as ThreadId}
-          agentId={'test-agent' as ThreadId}
-        >
-          <TestEventStreamConsumer />
-        </EventStreamProvider>
+        <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
+          <EventStreamProvider
+            projectId="test-project"
+            sessionId={'test-session' as ThreadId}
+            agentId={'test-agent' as ThreadId}
+          >
+            <TestEventStreamConsumer />
+          </EventStreamProvider>
+        </ToolApprovalProvider>
       </ThemeProvider>
     );
 
@@ -287,13 +292,15 @@ describe('EventStreamProvider Integration', () => {
   it('passes correct parameters to underlying hooks based on props', () => {
     render(
       <ThemeProvider>
-        <EventStreamProvider
-          projectId="my-project"
-          sessionId={'my-session' as ThreadId}
-          agentId={'my-agent' as ThreadId}
-        >
-          <TestEventStreamConsumer />
-        </EventStreamProvider>
+        <ToolApprovalProvider agentId={'my-agent' as ThreadId}>
+          <EventStreamProvider
+            projectId="my-project"
+            sessionId={'my-session' as ThreadId}
+            agentId={'my-agent' as ThreadId}
+          >
+            <TestEventStreamConsumer />
+          </EventStreamProvider>
+        </ToolApprovalProvider>
       </ThemeProvider>
     );
 
@@ -317,13 +324,15 @@ describe('EventStreamProvider Integration', () => {
   it('handles null agentId gracefully', () => {
     render(
       <ThemeProvider>
-        <EventStreamProvider
-          projectId="test-project"
-          sessionId={'test-session' as ThreadId}
-          agentId={null}
-        >
-          <TestEventStreamConsumer />
-        </EventStreamProvider>
+        <ToolApprovalProvider agentId={null}>
+          <EventStreamProvider
+            projectId="test-project"
+            sessionId={'test-session' as ThreadId}
+            agentId={null}
+          >
+            <TestEventStreamConsumer />
+          </EventStreamProvider>
+        </ToolApprovalProvider>
       </ThemeProvider>
     );
 
