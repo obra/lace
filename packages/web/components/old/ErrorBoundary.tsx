@@ -41,24 +41,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
-          <div className="max-w-md w-full bg-gray-800 rounded-lg p-6 shadow-lg">
-            <h1 className="text-2xl font-bold text-red-500 mb-4">Something went wrong</h1>
-            <p className="text-gray-300 mb-4">
+        <div className="min-h-screen bg-base-200 text-base-content flex items-center justify-center">
+          <div className="max-w-md w-full bg-base-100 rounded-lg p-6 shadow-lg">
+            <h1 className="text-2xl font-bold text-error mb-4">Something went wrong</h1>
+            <p className="text-base-content/80 mb-4">
               An unexpected error occurred. The error has been logged and we&apos;ll look into it.
             </p>
             <details className="mb-4">
-              <summary className="cursor-pointer text-sm text-gray-400 hover:text-gray-300">
+              <summary className="cursor-pointer text-sm text-base-content/60 hover:text-base-content/80">
                 Error details
               </summary>
-              <pre className="mt-2 text-xs bg-gray-900 p-2 rounded overflow-auto">
+              <pre className="mt-2 text-xs bg-base-200 p-2 rounded overflow-auto">
                 {this.state.error.toString()}
               </pre>
             </details>
-            <button
-              onClick={this.reset}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            >
+            <button onClick={this.reset} className="btn btn-primary">
               Try again
             </button>
           </div>
