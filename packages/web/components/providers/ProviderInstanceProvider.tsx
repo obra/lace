@@ -396,10 +396,11 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     [testResults, getInstanceById]
   );
 
-  // Load instances on mount
+  // Load instances on mount only - dependency on loadInstances would cause infinite re-render loop
+  // since loadInstances is recreated on every render despite useCallback
   useEffect(() => {
     void loadInstances();
-  }, [loadInstances]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(

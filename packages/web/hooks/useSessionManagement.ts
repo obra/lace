@@ -219,12 +219,12 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
   // Load sessions when project changes
   useEffect(() => {
     void loadSessions();
-  }, [loadSessions]);
+  }, [projectId, loadSessions]);
 
   // Load project config when project changes
   useEffect(() => {
     void loadProjectConfig();
-  }, [loadProjectConfig]);
+  }, [projectId, loadProjectConfig]);
 
   // Clear sessions when no project is selected
   useEffect(() => {

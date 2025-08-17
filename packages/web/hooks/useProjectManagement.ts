@@ -149,10 +149,11 @@ export function useProjectManagement(): UseProjectManagementResult {
     []
   );
 
-  // Load projects on mount
+  // Load projects on mount only - dependency on loadProjects would cause infinite re-render loop  
+  // since loadProjects is recreated on every render despite useCallback
   useEffect(() => {
     void loadProjects();
-  }, [loadProjects]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     projects,

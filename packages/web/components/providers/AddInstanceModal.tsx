@@ -41,6 +41,8 @@ export function AddInstanceModal({
     apiKey: '',
   });
 
+  // Load catalog when modal opens - removing loadCatalog from deps to prevent infinite re-render loop
+  // since loadCatalog is recreated on every render despite useCallback
   useEffect(() => {
     if (isOpen && !preselectedProvider) {
       void loadCatalog();
@@ -52,7 +54,7 @@ export function AddInstanceModal({
       }));
       setStep('configure');
     }
-  }, [isOpen, preselectedProvider, loadCatalog]);
+  }, [isOpen, preselectedProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProviderSelect = (provider: CatalogProvider) => {
     setSelectedProvider(provider);

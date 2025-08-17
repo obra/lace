@@ -144,7 +144,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
   // Load session details when session changes
   useEffect(() => {
     void loadSessionDetails();
-  }, [loadSessionDetails]);
+  }, [sessionId, loadSessionDetails]);
 
   // Clear session details when no session is selected
   useEffect(() => {
