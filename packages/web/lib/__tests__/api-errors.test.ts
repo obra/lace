@@ -3,7 +3,6 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  ApiError,
   HttpError,
   NetworkError,
   AbortError,
@@ -12,7 +11,7 @@ import {
   isRetryableError,
   isApiError,
   getErrorDetails,
-} from '../api-errors';
+} from '@/lib/api-errors';
 
 describe('ApiError Types', () => {
   describe('HttpError', () => {

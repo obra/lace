@@ -2,8 +2,8 @@
 // ABOUTME: Validates retry strategies, timing, and proper error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withRetry, createRetryable, DEFAULT_RETRY_CONFIG, type RetryConfig } from '../retry-logic';
-import { HttpError, NetworkError, AbortError } from '../api-errors';
+import { withRetry, createRetryable, type RetryConfig } from '@/lib/retry-logic';
+import { HttpError, NetworkError, AbortError } from '@/lib/api-errors';
 
 describe('Retry Logic', () => {
   beforeEach(() => {

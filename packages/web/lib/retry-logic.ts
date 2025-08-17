@@ -51,7 +51,7 @@ export async function withRetry<T>(
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
   onRetry?: (error: ApiError, attempt: number, nextDelay: number) => void
 ): Promise<T> {
-  let lastError: Error;
+  let lastError: Error = new Error('No attempts made');
 
   for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
     try {

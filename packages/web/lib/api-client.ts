@@ -4,7 +4,7 @@
 import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
 import { HttpError, NetworkError, AbortError, ParseError, BusinessError } from './api-errors';
-import { withRetry, DEFAULT_RETRY_CONFIG, type RetryConfig } from './retry-logic';
+import { withRetry, type RetryConfig } from './retry-logic';
 
 export interface ApiClientOptions {
   retryConfig?: RetryConfig;
