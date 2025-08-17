@@ -16,7 +16,7 @@ export interface AgentContextType {
   loading: boolean;
 
   // Selection state (managed by this provider)
-  selectedAgent: string | null;
+  selectedAgent: ThreadId | null;
   foundAgent: AgentInfo | null;
 
   // Computed agent state
@@ -24,7 +24,7 @@ export interface AgentContextType {
   agentBusy: boolean;
 
   // Selection actions
-  selectAgent: (agentId: string | null) => void;
+  selectAgent: (agentId: ThreadId | string | null) => void;
   onAgentSelect: (agent: { id: string }) => void;
 
   // Data operations (passed through from hook)
@@ -90,8 +90,8 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
 
   // Selection actions
   const selectAgent = useCallback(
-    (agentId: string | null) => {
-      setSelectedAgent(agentId as ThreadId | null);
+    (agentId: ThreadId | string | null) => {
+      setSelectedAgent(agentId);
       if (onAgentChange) {
         onAgentChange(agentId);
       }

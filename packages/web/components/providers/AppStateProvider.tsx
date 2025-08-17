@@ -10,8 +10,8 @@ import type { ThreadId } from '@/types/core';
 // Types for the context
 interface AppSelections {
   selectedProject: string | null;
-  selectedSession: string | null;
-  selectedAgent: string | null;
+  selectedSession: ThreadId | null;
+  selectedAgent: ThreadId | null;
   urlStateHydrated: boolean;
 }
 
@@ -21,7 +21,7 @@ interface AppActions {
   setSelectedSession: (session: ThreadId | string | null, replace?: boolean) => void;
   setSelectedAgent: (agent: ThreadId | string | null, replace?: boolean) => void;
   updateHashState: (
-    newState: Partial<{ project?: string; session?: string; agent?: string }>,
+    newState: Partial<{ project?: string; session?: ThreadId | string; agent?: ThreadId | string }>,
     replace?: boolean
   ) => void;
   clearAll: (replace?: boolean) => void;
