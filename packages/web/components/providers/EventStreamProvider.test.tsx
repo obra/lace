@@ -263,6 +263,9 @@ describe('EventStreamProvider', () => {
   });
 
   it('throws error when used outside provider', () => {
+    // Suppress console.error for expected error scenarios
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     expect(() => {
       renderHook(() => useEventStream());
     }).toThrow('useEventStream must be used within EventStreamProvider');
@@ -274,6 +277,11 @@ describe('EventStreamProvider', () => {
     expect(() => {
       renderHook(() => useSessionAPI());
     }).toThrow('useSessionAPI must be used within EventStreamProvider');
+
+    // Verify React error boundary logging occurred (these are expected)
+    expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
 
     // Note: Tool approval functionality has been moved to ToolApprovalProvider
   });
