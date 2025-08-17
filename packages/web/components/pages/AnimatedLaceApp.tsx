@@ -447,9 +447,9 @@ export function AnimatedLaceApp({
                 <motion.span
                   className={`text-xs px-1.5 py-0.5 rounded hidden sm:inline-flex ${
                     currentTimeline.agent === 'Claude'
-                      ? 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+                      ? 'bg-warning/20 text-warning'
                       : currentTimeline.agent === 'Gemini'
-                        ? 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                        ? 'bg-info/20 text-info'
                         : 'bg-base-content/10 text-base-content/60'
                   }`}
                   initial={{ scale: 0, opacity: 0 }}
