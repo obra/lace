@@ -163,9 +163,7 @@ export function TaskCreationModal({
                 placeholder="Type your task here..."
                 disabled={loading}
               />
-              {errors.title && (
-                <p className="text-sm text-error mt-2 leading-5">{errors.title}</p>
-              )}
+              {errors.title && <p className="text-sm text-error mt-2 leading-5">{errors.title}</p>}
             </div>
           </div>
 
@@ -388,7 +386,7 @@ export function TaskCreationModal({
             </button>
             <button
               type="submit"
-              className="px-8 py-3 bg-base-100 text-base-content border-2 border-success hover:bg-success/10 hover:border-success/80 rounded-xl font-medium text-base leading-6 transition-all duration-200 shadow-sm"
+              className="px-8 py-3 bg-base-100 text-base-content border-2 border-emerald-500 hover:bg-emerald-50 hover:border-emerald-600 rounded-xl font-medium text-base leading-6 transition-all duration-200 shadow-sm"
               disabled={loading}
             >
               {loading ? (
