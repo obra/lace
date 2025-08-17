@@ -172,7 +172,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
       }
     };
 
-    const { avatarClass, badgeClass } = getAgentStyles(entry.agent);
+    const { avatarClass, badgeClass } = getAgentStyles(entry.agent || 'Assistant');
 
     return (
       <motion.div
