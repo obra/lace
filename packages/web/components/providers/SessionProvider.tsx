@@ -141,32 +141,51 @@ export function SessionProvider({ children, projectId, onSessionChange }: Sessio
     [selectSession]
   );
 
-  const value: SessionContextType = {
-    // Session data (from hook)
-    sessions,
-    loading,
-    projectConfig,
+  const value: SessionContextType = useMemo(
+    () => ({
+      // Session data (from hook)
+      sessions,
+      loading,
+      projectConfig,
 
-    // Selection state (managed here)
-    selectedSession,
-    foundSession,
+      // Selection state (managed here)
+      selectedSession,
+      foundSession,
 
-    // Selection actions
-    selectSession,
-    onSessionSelect,
+      // Selection actions
+      selectSession,
+      onSessionSelect,
 
-    // Data operations (passed through)
-    createSession,
-    loadProjectConfig,
-    reloadSessions,
-    loadSessionConfiguration,
-    updateSessionConfiguration,
-    updateSession,
-    loadSessionsForProject,
+      // Data operations (passed through)
+      createSession,
+      loadProjectConfig,
+      reloadSessions,
+      loadSessionConfiguration,
+      updateSessionConfiguration,
+      updateSession,
+      loadSessionsForProject,
 
-    // Agent auto-selection control
-    enableAgentAutoSelection,
-  };
+      // Agent auto-selection control
+      enableAgentAutoSelection,
+    }),
+    [
+      sessions,
+      loading,
+      projectConfig,
+      selectedSession,
+      foundSession,
+      selectSession,
+      onSessionSelect,
+      createSession,
+      loadProjectConfig,
+      reloadSessions,
+      loadSessionConfiguration,
+      updateSessionConfiguration,
+      updateSession,
+      loadSessionsForProject,
+      enableAgentAutoSelection,
+    ]
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

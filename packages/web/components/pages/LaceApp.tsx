@@ -324,25 +324,29 @@ function LaceAppMain() {
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
-          {loadingProjects || loadingProviders ? (
-            <LoadingView />
-          ) : selectedProject && foundProject ? (
-            selectedAgent ||
-            (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
-              <Chat />
-            ) : (
-              <div className="flex-1 p-6">
-                <SessionConfigPanel />
-              </div>
-            )
-          ) : (
-            <div className="flex-1 p-6 min-h-0 space-y-6">
-              {projects.length === 0 && (
-                <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
-              )}
-              {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
-            </div>
-          )}
+          {(() => {
+            if (loadingProjects || loadingProviders) {
+              return <LoadingView />;
+            } else if (selectedProject && foundProject) {
+              return selectedAgent ||
+                (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
+                <Chat />
+              ) : (
+                <div className="flex-1 p-6">
+                  <SessionConfigPanel />
+                </div>
+              );
+            } else {
+              return (
+                <div className="flex-1 p-6 min-h-0 space-y-6">
+                  {projects.length === 0 && (
+                    <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
+                  )}
+                  {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
+                </div>
+              );
+            }
+          })()}
         </div>
       </motion.div>
 
@@ -380,6 +384,7 @@ export default function LaceApp() {
 function LaceAppContent() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
+    actions: { setSelectedProject },
   } = useAppState();
 
   const handleProjectChange = useCallback((projectId: string | null) => {
@@ -390,8 +395,19 @@ function LaceAppContent() {
     // Agent selection change handling
   }, []);
 
+  const handleProjectSelect = useCallback(
+    (projectId: string | null) => {
+      setSelectedProject(projectId);
+    },
+    [setSelectedProject]
+  );
+
   return (
-    <ProjectProvider onProjectChange={handleProjectChange}>
+    <ProjectProvider
+      onProjectChange={handleProjectChange}
+      selectedProject={selectedProject}
+      onProjectSelect={handleProjectSelect}
+    >
       <SessionProvider projectId={selectedProject}>
         <AgentProvider sessionId={selectedSession} onAgentChange={handleAgentChange}>
           <LaceAppWithAllProviders />

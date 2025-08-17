@@ -53,9 +53,16 @@ const ProjectContext = createContext<ProjectContextType | null>(null);
 interface ProjectProviderProps {
   children: ReactNode;
   onProjectChange?: (projectId: string | null) => void;
+  selectedProject?: string | null;
+  onProjectSelect?: (projectId: string | null) => void;
 }
 
-export function ProjectProvider({ children, onProjectChange }: ProjectProviderProps) {
+export function ProjectProvider({
+  children,
+  onProjectChange,
+  selectedProject: externalSelectedProject,
+  onProjectSelect: externalOnProjectSelect,
+}: ProjectProviderProps) {
   // Get project data from pure data hook
   const {
     projects,
@@ -67,8 +74,10 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     reloadProjects,
   } = useProjectManagement();
 
-  // Get selection state from hash router
-  const { project: selectedProject, setProject: setSelectedProject } = useHashRouter();
+  // Use external selection state if provided, otherwise fall back to internal hash router
+  const internalHashRouter = useHashRouter();
+  const selectedProject = externalSelectedProject ?? internalHashRouter.project;
+  const setSelectedProject = externalOnProjectSelect ?? internalHashRouter.setProject;
 
   // Compute derived state based on data + selection
   const foundProject = useMemo(() => {
@@ -127,30 +136,47 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     [selectProject]
   );
 
-  const value: ProjectContextType = {
-    // Project data (from hook)
-    projects,
-    loading,
-    error,
+  const value: ProjectContextType = useMemo(
+    () => ({
+      // Project data (from hook)
+      projects,
+      loading,
+      error,
 
-    // Selection state (managed here)
-    selectedProject,
-    foundProject,
+      // Selection state (managed here)
+      selectedProject,
+      foundProject,
 
-    // Computed values
-    currentProject,
-    projectsForSidebar,
+      // Computed values
+      currentProject,
+      projectsForSidebar,
 
-    // Selection actions
-    selectProject,
-    onProjectSelect,
+      // Selection actions
+      selectProject,
+      onProjectSelect,
 
-    // Data operations (passed through)
-    updateProject,
-    createProject,
-    loadProjectConfiguration,
-    reloadProjects,
-  };
+      // Data operations (passed through)
+      updateProject,
+      createProject,
+      loadProjectConfiguration,
+      reloadProjects,
+    }),
+    [
+      projects,
+      loading,
+      error,
+      selectedProject,
+      foundProject,
+      currentProject,
+      projectsForSidebar,
+      selectProject,
+      onProjectSelect,
+      updateProject,
+      createProject,
+      loadProjectConfiguration,
+      reloadProjects,
+    ]
+  );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }

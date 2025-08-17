@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
@@ -112,28 +112,43 @@ export function EventStreamProvider({
   });
 
   // Create context value
-  const contextValue: EventStreamContextType = {
-    eventStream: {
-      connection: eventStreamResult.connection,
-      lastEvent: eventStreamResult.lastEvent,
-      sendCount: eventStreamResult.sendCount,
-      close: eventStreamResult.close,
-      reconnect: eventStreamResult.reconnect,
-    },
+  const contextValue: EventStreamContextType = useMemo(
+    () => ({
+      eventStream: {
+        connection: eventStreamResult.connection,
+        lastEvent: eventStreamResult.lastEvent,
+        sendCount: eventStreamResult.sendCount,
+        close: eventStreamResult.close,
+        reconnect: eventStreamResult.reconnect,
+      },
 
-    sessionEvents: {
-      events: filteredEvents,
+      sessionEvents: {
+        events: filteredEvents,
+        loadingHistory,
+        addSessionEvent,
+      },
+
+      sessionAPI: {
+        sendMessage: sessionAPI.sendMessage,
+        stopAgent: sessionAPI.stopAgent,
+      },
+
+      onAgentStateChange: handleAgentStateChangeCallback,
+    }),
+    [
+      eventStreamResult.connection,
+      eventStreamResult.lastEvent,
+      eventStreamResult.sendCount,
+      eventStreamResult.close,
+      eventStreamResult.reconnect,
+      filteredEvents,
       loadingHistory,
       addSessionEvent,
-    },
-
-    sessionAPI: {
-      sendMessage: sessionAPI.sendMessage,
-      stopAgent: sessionAPI.stopAgent,
-    },
-
-    onAgentStateChange: handleAgentStateChangeCallback,
-  };
+      sessionAPI.sendMessage,
+      sessionAPI.stopAgent,
+      handleAgentStateChangeCallback,
+    ]
+  );
 
   return <EventStreamContext.Provider value={contextValue}>{children}</EventStreamContext.Provider>;
 }
