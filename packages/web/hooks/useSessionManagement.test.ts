@@ -78,8 +78,10 @@ describe('useSessionManagement', () => {
     });
 
     expect(result.current.sessions).toEqual(mockSessions);
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/sessions');
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration');
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/sessions', { method: 'GET' });
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration', {
+      method: 'GET',
+    });
   });
 
   it('clears sessions when project is deselected', async () => {
@@ -192,7 +194,9 @@ describe('useSessionManagement', () => {
     });
 
     expect(result.current.projectConfig).toEqual({ theme: 'dark' });
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration');
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration', {
+      method: 'GET',
+    });
   });
 
   it('handles API errors gracefully', async () => {
@@ -283,7 +287,7 @@ describe('useSessionManagement', () => {
       });
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', 'Session creation failed');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });

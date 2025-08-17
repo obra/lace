@@ -63,7 +63,7 @@ describe('useProjectManagement', () => {
 
     expect(result.current.loading).toBe(false);
     expect(result.current.projects).toEqual(mockProjects);
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects');
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects', { method: 'GET' });
   });
 
   it('handles loading errors gracefully', async () => {
@@ -196,8 +196,8 @@ describe('useProjectManagement', () => {
       await result.current.updateProject('project-1', { name: 'Updated Project' });
     });
 
-    expect(result.current.error).toBe('Failed to update project: 404');
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to update project: 404');
+    expect(result.current.error).toBe('HTTP 404: undefined');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to update project:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });

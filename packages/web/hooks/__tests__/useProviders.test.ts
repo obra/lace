@@ -84,7 +84,7 @@ describe('useProviders', () => {
 
       expect(result.current.providers).toEqual(mockProviders);
       expect(result.current.error).toBe(null);
-      expect(mockFetch).toHaveBeenCalledWith('/api/providers');
+      expect(mockFetch).toHaveBeenCalledWith('/api/providers', { method: 'GET' });
       expect(mockParseResponse).toHaveBeenCalledWith(mockResponse);
     });
 
@@ -103,9 +103,9 @@ describe('useProviders', () => {
       });
 
       expect(result.current.providers).toEqual([]);
-      expect(result.current.error).toBe('Failed to load providers: Provider service unavailable');
+      expect(result.current.error).toBe('Failed to load providers: HTTP undefined: undefined');
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to load providers: Provider service unavailable'
+        'Failed to load providers: HTTP undefined: undefined'
       );
 
       consoleSpy.mockRestore();

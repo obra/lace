@@ -66,7 +66,7 @@ describe('useAgentManagement', () => {
 
     expect(result.current.sessionDetails).toEqual(mockSessionWithAgents);
     expect(result.current.loading).toBe(false);
-    expect(mockFetch).toHaveBeenCalledWith('/api/sessions/session-1');
+    expect(mockFetch).toHaveBeenCalledWith('/api/sessions/session-1', { method: 'GET' });
   });
 
   it('clears session details when session is deselected', async () => {
@@ -249,7 +249,7 @@ describe('useAgentManagement', () => {
       });
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create agent');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create agent:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });

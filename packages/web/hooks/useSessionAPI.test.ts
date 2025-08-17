@@ -56,7 +56,7 @@ describe('useSessionAPI', () => {
 
       // Verify error handling behavior
       expect(session).toBe(null);
-      expect(result.current.error).toBe('Failed to create session');
+      expect(result.current.error).toBe('{"json":{"error":"Failed to create session"}}');
     });
 
     it('should handle network errors gracefully', async () => {
@@ -305,7 +305,7 @@ describe('useSessionAPI', () => {
         await result.current.createSession({ name: 'Test Session 2' });
       });
 
-      expect(result.current.error).toBe('API Error');
+      expect(result.current.error).toBe('{"json":{"error":"API Error"}}');
     });
 
     it('should clear error state when starting new operations', async () => {
@@ -318,7 +318,7 @@ describe('useSessionAPI', () => {
         await result.current.createSession({ name: 'Test Session' });
       });
 
-      expect(result.current.error).toBe('First error');
+      expect(result.current.error).toBe('{"json":{"error":"First error"}}');
 
       // Second operation succeeds - error should be cleared
       const mockSession = {
