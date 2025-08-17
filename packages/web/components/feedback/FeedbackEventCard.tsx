@@ -36,7 +36,7 @@ export function FeedbackEventCard({
       case 'insight':
         return 'bg-indigo-100 text-indigo-700';
       case 'celebration':
-        return 'bg-emerald-100 text-emerald-700';
+        return 'bg-success/20 text-success';
       default:
         return 'bg-gray-100 text-gray-700';
     }
