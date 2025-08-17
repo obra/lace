@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import { ProviderCatalogCard } from './ProviderCatalogCard';
 import { AddInstanceModal } from './AddInstanceModal';
+import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances, type CatalogProvider } from './ProviderInstanceProvider';
 
 export function ProviderCatalogGrid() {
@@ -55,12 +56,11 @@ export function ProviderCatalogGrid() {
 
   if (error) {
     return (
-      <div className="alert alert-error">
-        <span>Error: {error}</span>
+      <Alert variant="error" title="Error" description={error}>
         <button className="btn btn-sm btn-ghost" onClick={() => void loadCatalog()}>
           Retry
         </button>
-      </div>
+      </Alert>
     );
   }
 

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
+import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances, type CatalogProvider } from './ProviderInstanceProvider';
 
 interface AddInstanceModalProps {
@@ -126,9 +127,7 @@ export function AddInstanceModal({
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={getStepTitle()} size="md">
       {(error || submitError) && (
-        <div className="alert alert-error mb-4">
-          <span className="text-sm">{error || submitError}</span>
-        </div>
+        <Alert variant="error" title="Error" description={error || submitError} className="mb-4" />
       )}
 
       {step === 'select' && !preselectedProvider ? (

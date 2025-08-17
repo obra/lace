@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
+import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances } from './ProviderInstanceProvider';
 
 interface EditInstanceModalProps {
@@ -85,11 +86,7 @@ export function EditInstanceModal({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={`Edit ${instance.displayName}`} size="md">
-      {error && (
-        <div className="alert alert-error mb-4">
-          <span className="text-sm">{error}</span>
-        </div>
-      )}
+      {error && <Alert variant="error" title="Error" description={error} className="mb-4" />}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
