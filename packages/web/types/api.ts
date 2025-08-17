@@ -20,6 +20,18 @@ import type { LaceEvent } from '@/types/core';
 
 // DESTROYED: API response types removed - using core types with superjson everywhere
 
+// Session configuration interface
+export interface SessionConfiguration {
+  providerInstanceId?: string;
+  modelId?: string;
+  maxTokens?: number;
+  tools?: string[];
+  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
+  workingDirectory?: string;
+  environmentVariables?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 // Tool approval types
 
 // Multiple approval support - as defined in spec Phase 3.2

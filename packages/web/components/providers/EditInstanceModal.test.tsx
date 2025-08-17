@@ -3,13 +3,16 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditInstanceModal } from './EditInstanceModal';
+import { ProviderInstanceProvider } from './ProviderInstanceProvider';
+import { stringify } from '@/lib/serialization';
 
 // Mock the serialization utility
 vi.mock('@/lib/serialization', () => ({
   parseResponse: vi.fn(),
+  stringify: vi.fn((data) => JSON.stringify(data)),
 }));
 
 // Mock UI components to focus on logic
@@ -48,10 +51,45 @@ describe('EditInstanceModal', () => {
     onSuccess: vi.fn(),
   };
 
+  // Helper to render with provider
+  const renderWithProvider = async (props = defaultProps) => {
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(
+        <ProviderInstanceProvider>
+          <EditInstanceModal {...props} />
+        </ProviderInstanceProvider>
+      );
+    });
+    return result!;
+  };
+
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+
+    // Mock parseResponse to return proper data structures
+    mockParseResponse.mockImplementation(async (response: Response) => {
+      const url = response.url || '';
+      if (url.includes('/api/provider/instances')) {
+        return { instances: [] };
+      }
+      if (url.includes('/api/provider/catalog')) {
+        return { providers: [] };
+      }
+      return {};
+    });
+
+    // Setup default fetch mock for provider initialization
+    global.fetch = vi.fn().mockImplementation((url) => {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        url: url,
+        text: () => Promise.resolve(''),
+        json: () => Promise.resolve({}),
+      } as Response);
+    });
   });
 
   afterEach(() => {
@@ -59,7 +97,7 @@ describe('EditInstanceModal', () => {
   });
 
   it('should render edit form with current instance values', async () => {
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     expect(screen.getByDisplayValue('Test Instance')).toBeInTheDocument();
     expect(screen.getByDisplayValue('https://api.openai.com/v1')).toBeInTheDocument();
@@ -79,13 +117,25 @@ describe('EditInstanceModal', () => {
       instance: mockUpdatedInstance,
     });
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
+    const mockFetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(stringify({})),
+      });
     });
     global.fetch = mockFetch;
 
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     // Update display name
     const nameInput = screen.getByDisplayValue('Test Instance');
@@ -107,6 +157,7 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Updated Instance Name',
           endpoint: 'https://custom.api.com',
+          timeout: 30,
         }),
       });
     });
@@ -122,12 +173,24 @@ describe('EditInstanceModal', () => {
       instance: mockInstance,
     });
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(stringify({})),
+      });
     });
 
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     // Update API key
     const apiKeyInput = screen.getByPlaceholderText(/leave empty to keep current/i);
@@ -144,6 +207,7 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Test Instance',
           endpoint: 'https://api.openai.com/v1',
+          timeout: 30,
           credential: { apiKey: 'new-api-key' },
         }),
       });
@@ -153,7 +217,7 @@ describe('EditInstanceModal', () => {
   it('should validate required fields', async () => {
     const user = userEvent.setup();
 
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     // Clear required display name
     const nameInput = screen.getByDisplayValue('Test Instance');
@@ -163,8 +227,9 @@ describe('EditInstanceModal', () => {
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
 
-    // Should not make API call
-    expect(global.fetch).not.toHaveBeenCalled();
+    // Should not make API call to update instance (only the initial load)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('/api/provider/instances');
 
     // Form should show validation state (HTML5 validation)
     expect(nameInput).toBeInvalid();
@@ -172,17 +237,30 @@ describe('EditInstanceModal', () => {
 
   it('should handle API errors gracefully', async () => {
     const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     mockParseResponse.mockResolvedValue({
       error: 'Instance validation failed',
     });
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve(''),
+      });
     });
 
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
@@ -191,12 +269,24 @@ describe('EditInstanceModal', () => {
       expect(screen.getByText(/instance validation failed/i)).toBeInTheDocument();
     });
 
+    // Verify that error logging occurred for both instance loading and updating
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error loading instances:',
+      'Instance validation failed'
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error updating instance:',
+      'Instance validation failed'
+    );
+
     // Should not close modal on error
     expect(defaultProps.onClose).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 
-  it('should not render when closed', () => {
-    render(<EditInstanceModal {...defaultProps} isOpen={false} />);
+  it('should not render when closed', async () => {
+    await renderWithProvider({ ...defaultProps, isOpen: false });
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -204,7 +294,7 @@ describe('EditInstanceModal', () => {
   it('should close modal on cancel', async () => {
     const user = userEvent.setup();
 
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
@@ -216,23 +306,32 @@ describe('EditInstanceModal', () => {
     const user = userEvent.setup();
 
     // Mock delayed response
-    global.fetch = vi.fn().mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                ok: true,
-                status: 200,
-              }),
-            100
-          )
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ instances: [] }),
+        });
+      }
+      return new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              ok: true,
+              status: 200,
+              text: () => Promise.resolve(stringify({})),
+            }),
+          100
         )
-    );
+      );
+    });
 
     mockParseResponse.mockResolvedValue({ instance: mockInstance });
 
-    render(<EditInstanceModal {...defaultProps} />);
+    await renderWithProvider();
 
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);

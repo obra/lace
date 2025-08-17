@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { LaceApp } from '@/components/pages/LaceApp';
+import LaceApp from '@/components/pages/LaceApp';
 import type { SessionInfo, AgentInfo, AgentState } from '@/types/core';
 import { stringify } from '@/lib/serialization';
 import { asThreadId } from '~/threads/types';
@@ -212,22 +212,6 @@ describe('LaceApp agent state handling', () => {
   it('should show stop button when agent is thinking', async () => {
     // Arrange: Render component and set up initial session state
     const { rerender } = await renderWithProvidersAsync(<LaceApp />);
-
-    // Set up session details with an agent in idle state initially
-    const mockSessionInfo: SessionInfo = {
-      id: asThreadId('lace_20250101_sess01'),
-      name: 'Test Session',
-      createdAt: new Date(),
-      agents: [
-        {
-          threadId: asThreadId('lace_20250101_agent1'),
-          name: 'Test Agent',
-          providerInstanceId: 'test-anthropic-instance',
-          modelId: 'claude-3-5-haiku-20241022',
-          status: 'idle' as AgentState,
-        },
-      ],
-    };
 
     // Act: Simulate agent state change to thinking
     await act(async () => {

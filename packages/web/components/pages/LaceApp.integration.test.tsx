@@ -5,8 +5,9 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { LaceApp } from './LaceApp';
+import LaceApp from './LaceApp';
 import { createFetchMock, createMockResponse } from '@/test-utils/mock-fetch';
+import { stringify } from '@/lib/serialization';
 
 // Mock external dependencies
 const mockSetters = {
@@ -99,6 +100,26 @@ describe('LaceApp Onboarding Integration', () => {
 
         if (url === '/api/providers') {
           return Promise.resolve(createMockResponse([]));
+        }
+
+        if (url === '/api/provider/instances') {
+          const response = stringify({ instances: [] });
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(response),
+            json: () => Promise.resolve({ instances: [] }),
+          } as Response);
+        }
+
+        if (url === '/api/provider/catalog') {
+          const response = stringify({ providers: [] });
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(response),
+            json: () => Promise.resolve({ providers: [] }),
+          } as Response);
         }
 
         return Promise.reject(new Error(`Unhandled URL: ${url} with method: ${method}`));

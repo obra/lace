@@ -18,30 +18,18 @@ import {
 } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
-import { parseResponse, parseTyped } from '@/lib/serialization';
+import { parseTyped } from '@/lib/serialization';
 import { DirectoryField } from '@/components/ui';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
+import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useUIState } from '@/hooks/useUIState';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import { useProviders } from '@/hooks/useProviders';
 
 interface ProjectSelectorPanelProps {
-  projects: ProjectInfo[];
-  selectedProject: ProjectInfo | null;
-  providers?: ProviderInfo[];
-  onProjectSelect: (project: ProjectInfo) => void;
-  onProjectCreate?: () => void;
-  onProjectUpdate?: (
-    projectId: string,
-    updates: {
-      isArchived?: boolean;
-      name?: string;
-      description?: string;
-      workingDirectory?: string;
-      configuration?: ProjectConfiguration;
-    }
-  ) => void;
-  loading?: boolean;
-  autoOpenCreate?: boolean;
-  onAutoCreateHandled?: () => void;
-  onOnboardingComplete?: (projectId: string, sessionId: string, agentId: string) => Promise<void>;
+  // No props needed - all data comes from providers
 }
 
 type ProjectFilter = 'active' | 'archived' | 'all';
@@ -85,18 +73,30 @@ const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
   environmentVariables: {},
 };
 
-export function ProjectSelectorPanel({
-  projects,
-  selectedProject,
-  providers = [],
-  onProjectSelect,
-  onProjectCreate,
-  onProjectUpdate,
-  loading = false,
-  autoOpenCreate = false,
-  onAutoCreateHandled,
-  onOnboardingComplete,
-}: ProjectSelectorPanelProps) {
+export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
+  // Get data from providers instead of props
+  const {
+    projects,
+    projectsForSidebar,
+    currentProject,
+    loading: projectLoading,
+    onProjectSelect,
+    updateProject,
+    createProject,
+    loadProjectConfiguration,
+    reloadProjects,
+  } = useProjectContext();
+  const { enableAgentAutoSelection, sessions, loadSessionsForProject } = useSessionContext();
+  const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIState();
+  const { handleOnboardingComplete } = useOnboarding(
+    setAutoOpenCreateProject,
+    enableAgentAutoSelection
+  );
+  const { providers, loading: providersLoading } = useProviders();
+
+  const loading = projectLoading || providersLoading;
+  const selectedProject = currentProject.id ? currentProject : null;
+  const autoOpenCreate = autoOpenCreateProject;
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ProjectFilter>('active');
   const [timeFrame, setTimeFrame] = useState<ProjectTimeFrame>('week');
@@ -166,7 +166,7 @@ export function ProjectSelectorPanel({
     if (!autoOpenCreate) {
       autoOpenHandledRef.current = false;
     }
-  }, [autoOpenCreate, showCreateProject, onAutoCreateHandled]);
+  }, [autoOpenCreate, showCreateProject]);
 
   // When the modal opens, start at step 2 (Directory)
   useEffect(() => {
@@ -193,9 +193,9 @@ export function ProjectSelectorPanel({
     setCreateNewEnvValue('');
     setShowAdvancedOptions(false); // Reset simplified mode state
     setShowAddProvider(false); // Reset provider modal state
-    // Notify parent so CTA can be toggled again cleanly
-    onAutoCreateHandled?.();
-  }, [onAutoCreateHandled]);
+    // Clear auto-open state so CTA can be toggled again cleanly
+    setAutoOpenCreateProject(false);
+  }, [setAutoOpenCreateProject]);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -312,25 +312,23 @@ export function ProjectSelectorPanel({
 
   // Handle context menu actions
   const handleContextMenuAction = (projectId: string, action: 'archive' | 'unarchive' | 'edit') => {
-    if (!onProjectUpdate) return;
-
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
     switch (action) {
       case 'archive':
-        onProjectUpdate(projectId, { isArchived: true });
+        updateProject(projectId, { isArchived: true });
         break;
       case 'unarchive':
-        onProjectUpdate(projectId, { isArchived: false });
+        updateProject(projectId, { isArchived: false });
         break;
       case 'edit':
         setEditingProject(project);
         setEditName(project.name);
         setEditDescription(project.description || '');
         setEditWorkingDirectory(project.workingDirectory);
-        // Load actual project configuration from API
-        void loadProjectConfiguration(project.id);
+        // Load actual project configuration using provider
+        void loadProjectConfig(project.id);
         break;
     }
 
@@ -343,37 +341,15 @@ export function ProjectSelectorPanel({
     if (!editingProject || !editName.trim()) return;
 
     try {
-      // Update project via API
-      const res = await fetch(`/api/projects/${editingProject.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editName.trim(),
-          description: editDescription.trim() || undefined,
-          workingDirectory: editWorkingDirectory.trim(),
-          configuration: editConfig,
-        }),
+      // Use provider method instead of direct API call
+      await updateProject(editingProject.id, {
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+        workingDirectory: editWorkingDirectory.trim(),
+        configuration: editConfig,
       });
 
-      if (res.ok) {
-        // Update local state via callback if available
-        if (onProjectUpdate) {
-          onProjectUpdate(editingProject.id, {
-            name: editName.trim(),
-            description: editDescription.trim() || undefined,
-            workingDirectory: editWorkingDirectory.trim(),
-            configuration: editConfig,
-          });
-        }
-
-        handleCancelEdit();
-      } else {
-        const errorData = await parseResponse<{ error: string }>(res);
-        console.error('Project update failed:', {
-          projectId: editingProject.id,
-          error: errorData.error,
-        });
-      }
+      handleCancelEdit();
     } catch (error) {
       console.error('Project update error:', { projectId: editingProject?.id, error });
     }
@@ -427,33 +403,20 @@ export function ProjectSelectorPanel({
     }));
   };
 
-  // Load project configuration from API
-  const loadProjectConfiguration = async (projectId: string) => {
+  // Load project configuration using provider method
+  const loadProjectConfig = async (projectId: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/configuration`);
-
-      if (res.ok) {
-        const data = await parseResponse<{ configuration: ProjectConfiguration }>(res);
-        // If no provider instance configured, use first available
-        const config = {
-          ...DEFAULT_PROJECT_CONFIG,
-          ...data.configuration,
-        };
-        if (!config.providerInstanceId && availableProviders.length > 0) {
-          config.providerInstanceId = availableProviders[0].instanceId;
-          config.modelId = availableProviders[0].models[0]?.id || '';
-        }
-        setEditConfig(config);
-      } else {
-        console.error('Project config load failed:', { projectId });
-        // Fallback to default configuration with first available provider
-        const config = { ...DEFAULT_PROJECT_CONFIG };
-        if (availableProviders.length > 0) {
-          config.providerInstanceId = availableProviders[0].instanceId;
-          config.modelId = availableProviders[0].models[0]?.id || '';
-        }
-        setEditConfig(config);
+      const configData = await loadProjectConfiguration(projectId);
+      // If no provider instance configured, use first available
+      const config = {
+        ...DEFAULT_PROJECT_CONFIG,
+        ...configData,
+      };
+      if (!config.providerInstanceId && availableProviders.length > 0) {
+        config.providerInstanceId = availableProviders[0].instanceId;
+        config.modelId = availableProviders[0].models[0]?.id || '';
       }
+      setEditConfig(config);
     } catch (error) {
       console.error('Project config load error:', { projectId, error });
       // Fallback to default configuration with first available provider
@@ -472,91 +435,31 @@ export function ProjectSelectorPanel({
     if (!createName.trim() || !createWorkingDirectory.trim()) return;
 
     try {
-      // Step 1: Create project
-      const projectRes = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: createName.trim(),
-          description: createDescription.trim() || undefined,
-          workingDirectory: createWorkingDirectory.trim(),
-          configuration: createConfig,
-        }),
+      // Step 1: Create project using provider method
+      const projectData = await createProject({
+        name: createName.trim(),
+        description: createDescription.trim() || undefined,
+        workingDirectory: createWorkingDirectory.trim(),
+        configuration: createConfig,
       });
 
-      if (!projectRes.ok) {
-        const errorData = await parseResponse<{ error: string }>(projectRes);
-        console.error('Project create failed:', { error: errorData.error });
-        return;
-      }
-
-      const projectData = await parseResponse<ProjectInfo>(projectRes);
       const projectId = projectData.id;
 
-      // Call the callback to refresh projects list if available
-      if (onProjectCreate) {
-        onProjectCreate();
-      }
+      // Select the newly created project
+      onProjectSelect(projectData);
 
-      // For any project creation, navigate directly to the coordinator agent
-      if (onOnboardingComplete) {
-        // Step 2: Get sessions (project creation should have created a default session)
-        // Add retry to mitigate transient eventual-consistency: project not found
-        const maxAttempts = 5;
-        let attempt = 0;
-        let sessionId: string | undefined;
-        while (attempt < maxAttempts && !sessionId) {
-          try {
-            const sessionsRes = await fetch(`/api/projects/${projectId}/sessions`);
-            if (sessionsRes.ok) {
-              const sessionsData = await parseResponse<Array<{ id: string }>>(sessionsRes);
-              sessionId = sessionsData[0]?.id;
-              if (sessionId) break;
-              console.warn('Create project session missing, retrying:', {
-                attempt: attempt + 1,
-                maxAttempts,
-                projectId,
-              });
-            } else {
-              const bodyText = await sessionsRes.text();
-              // Common transient: {"json":{"error":"Project not found","code":"RESOURCE_NOT_FOUND"}}
-              console.warn('Create project session fetch failed:', {
-                attempt: attempt + 1,
-                maxAttempts,
-                projectId,
-                status: sessionsRes.status,
-              });
-            }
-          } catch (err) {
-            console.warn('Create project session fetch error:', {
-              attempt: attempt + 1,
-              maxAttempts,
-              projectId,
-              error: err,
-            });
+      // If onboarding is available, get the session for this project
+      if (handleOnboardingComplete) {
+        try {
+          const sessionsData = await loadSessionsForProject(projectId);
+          const sessionId = sessionsData[0]?.id;
+          if (sessionId) {
+            const coordinatorAgentId = sessionId; // coordinator has same threadId
+            await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
           }
-          attempt += 1;
-          if (!sessionId) {
-            // Exponential backoff: 200ms, 400ms, 800ms, 1200ms, 1600ms (cap at 1600)
-            const delay = Math.min(200 * 2 ** attempt, 1600);
-            await new Promise((r) => setTimeout(r, delay));
-          }
+        } catch (error) {
+          console.error('Failed to get project sessions for onboarding:', error);
         }
-
-        if (sessionId) {
-          const coordinatorAgentId = sessionId; // coordinator has same threadId
-          await onOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-        } else {
-          console.warn('Create project session fallback:', {
-            projectId,
-            maxAttempts,
-          });
-          // Fallback to regular project selection if session fetch failed
-          onProjectSelect(projectData);
-        }
-      } else {
-        // Fallback to regular project creation - just select the project
-        onProjectSelect(projectData);
       }
 
       handleCancelCreateProject();
@@ -610,151 +513,157 @@ export function ProjectSelectorPanel({
   };
 
   return (
-    <div
-      className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full"
-      onClick={handleBackdropClick}
-    >
-      {/* Header (hidden until at least one project exists) */}
-      {projects.length > 0 && (
-        <div className="flex items-start justify-between mb-6 flex-shrink-0">
-          <div className="flex-1">
-            {/* Intentionally omit 'Select Project' title per UX request */}
+    <ProviderInstanceProvider>
+      <div
+        className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full"
+        onClick={handleBackdropClick}
+      >
+        {/* Header (hidden until at least one project exists) */}
+        {projects.length > 0 && (
+          <div className="flex items-start justify-between mb-6 flex-shrink-0">
+            <div className="flex-1">
+              {/* Intentionally omit 'Select Project' title per UX request */}
 
-            {/* Tabs and Filters */}
-            <div className="flex items-center gap-4 mt-4">
-              {/* Archive Filter Tabs */}
-              <div className="tabs tabs-boxed">
-                <button
-                  className={`tab ${filter === 'active' ? 'tab-active' : ''}`}
-                  onClick={() => setFilter('active')}
-                >
-                  Active
-                </button>
-                <button
-                  className={`tab ${filter === 'archived' ? 'tab-active' : ''}`}
-                  onClick={() => setFilter('archived')}
-                >
-                  Archived
-                </button>
-              </div>
-
-              {/* Timeframe Filter (only for active projects) */}
-              {filter === 'active' && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-base-content/60">Show:</span>
-                  <select
-                    data-testid="project-timeframe-filter"
-                    value={timeFrame}
-                    onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
-                    className="select select-bordered select-sm"
+              {/* Tabs and Filters */}
+              <div className="flex items-center gap-4 mt-4">
+                {/* Archive Filter Tabs */}
+                <div className="tabs tabs-boxed">
+                  <button
+                    className={`tab ${filter === 'active' ? 'tab-active' : ''}`}
+                    onClick={() => setFilter('active')}
                   >
-                    <option value="week">This week</option>
-                    <option value="month">This month</option>
-                    <option value="all">All time</option>
-                  </select>
+                    Active
+                  </button>
+                  <button
+                    className={`tab ${filter === 'archived' ? 'tab-active' : ''}`}
+                    onClick={() => setFilter('archived')}
+                  >
+                    Archived
+                  </button>
                 </div>
+
+                {/* Timeframe Filter (only for active projects) */}
+                {filter === 'active' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-base-content/60">Show:</span>
+                    <select
+                      data-testid="project-timeframe-filter"
+                      value={timeFrame}
+                      onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
+                      className="select select-bordered select-sm"
+                    >
+                      <option value="week">This week</option>
+                      <option value="month">This month</option>
+                      <option value="all">All time</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Search */}
+        {projects.length > 6 && (
+          <div className="mb-6 flex-shrink-0">
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input input-bordered w-full max-w-md"
+            />
+          </div>
+        )}
+
+        {/* Projects Grid - Scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3">
+                <div className="loading loading-spinner loading-md"></div>
+                <span>Loading projects...</span>
+              </div>
+            </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="text-center py-12">
+              {projects.length === 0 ? (
+                <>
+                  <FontAwesomeIcon
+                    icon={faFolder}
+                    className="w-16 h-16 text-base-content/20 mb-4"
+                  />
+                  <h3 className="text-lg font-medium text-base-content mb-2">No Projects Yet</h3>
+                  <p className="text-base-content/60">
+                    Create your first project to start working with AI agents
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-medium text-base-content mb-2">
+                    No matching projects
+                  </h3>
+                  <p className="text-base-content/60">Try adjusting your search terms</p>
+                </>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search */}
-      {projects.length > 6 && (
-        <div className="mb-6 flex-shrink-0">
-          <input
-            type="text"
-            placeholder="Search projects..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="input input-bordered w-full max-w-md"
-          />
-        </div>
-      )}
-
-      {/* Projects Grid - Scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center gap-3">
-              <div className="loading loading-spinner loading-md"></div>
-              <span>Loading projects...</span>
-            </div>
-          </div>
-        ) : filteredProjects.length === 0 ? (
-          <div className="text-center py-12">
-            {projects.length === 0 ? (
-              <>
-                <FontAwesomeIcon icon={faFolder} className="w-16 h-16 text-base-content/20 mb-4" />
-                <h3 className="text-lg font-medium text-base-content mb-2">No Projects Yet</h3>
-                <p className="text-base-content/60">
-                  Create your first project to start working with AI agents
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-medium text-base-content mb-2">No matching projects</h3>
-                <p className="text-base-content/60">Try adjusting your search terms</p>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3 pb-4">
-            {/* New Project Button */}
-            <div
-              onClick={() => setShowCreateProject(true)}
-              className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
-              data-testid="create-new-project-button"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setShowCreateProject(true);
-                }
-              }}
-            >
-              <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
-              <div className="text-left">
-                <h3 className="font-semibold text-base-content">Create New Project</h3>
-                <p className="text-sm text-base-content/60">
-                  Start a new project to organize your AI conversations
-                </p>
-              </div>
-            </div>
-
-            {filteredProjects.map((project) => (
+          ) : (
+            <div className="space-y-3 pb-4">
+              {/* New Project Button */}
               <div
-                key={project.id}
-                className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
-                  selectedProject?.id === project.id
-                    ? 'border-primary bg-primary/5 shadow-md'
-                    : 'border-base-300 hover:border-primary/50'
-                }`}
-                onClick={() => onProjectSelect(project)}
+                onClick={() => setShowCreateProject(true)}
+                className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
+                data-testid="create-project-button"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowCreateProject(true);
+                  }
+                }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-focus rounded-lg flex items-center justify-center">
-                      <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary-content" />
+                <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
+                <div className="text-left">
+                  <h3 className="font-semibold text-base-content">Create New Project</h3>
+                  <p className="text-sm text-base-content/60">
+                    Start a new project to organize your AI conversations
+                  </p>
+                </div>
+              </div>
+
+              {filteredProjects.map((project) => (
+                <div
+                  key={project.id}
+                  className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
+                    selectedProject?.id === project.id
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-base-300 hover:border-primary/50'
+                  }`}
+                  onClick={() => onProjectSelect(project)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-focus rounded-lg flex items-center justify-center">
+                        <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary-content" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-base-content truncate">{project.name}</h3>
+                        {project.description && (
+                          <p className="text-sm text-base-content/60 truncate">
+                            {project.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-base-content truncate">{project.name}</h3>
-                      {project.description && (
-                        <p className="text-sm text-base-content/60 truncate">
-                          {project.description}
-                        </p>
+
+                    <div className="flex items-center gap-2">
+                      {selectedProject?.id === project.id && (
+                        <div className="badge badge-primary badge-sm">Active</div>
                       )}
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    {selectedProject?.id === project.id && (
-                      <div className="badge badge-primary badge-sm">Active</div>
-                    )}
+                      {/* Context Menu Button */}
 
-                    {/* Context Menu Button */}
-                    {onProjectUpdate && (
                       <div className="relative">
                         <button
                           onClick={(e) => {
@@ -799,825 +708,829 @@ export function ProjectSelectorPanel({
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-4 text-sm text-base-content/60">
-                    <div className="flex items-center gap-1">
-                      <FontAwesomeIcon icon={faFileText} className="w-3 h-3" />
-                      <span>{project.sessionCount || 0} sessions</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <FontAwesomeIcon icon={faHistory} className="w-3 h-3" />
-                      <span>{getRelativeTime(project.lastUsedAt)}</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Archive Status */}
-                {project.isArchived && (
-                  <div className="pt-2">
-                    <span className="badge badge-warning badge-xs">Archived</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Edit Project Modal */}
-      {editingProject && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Edit Project: {editingProject.name}</h3>
-              <button onClick={handleCancelEdit} className="btn btn-ghost btn-sm">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleEditProject} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
-                {/* Basic Information */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Project Name *</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="input input-bordered w-full"
-                      placeholder="Enter project name"
-                      required
-                      autoFocus
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Description</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="input input-bordered w-full"
-                      placeholder="Optional description"
-                    />
-                  </div>
-                </div>
-
-                {/* Working Directory */}
-                <DirectoryField
-                  label="Working Directory *"
-                  value={editWorkingDirectory}
-                  onChange={setEditWorkingDirectory}
-                  placeholder="/path/to/project"
-                  required
-                />
-
-                {/* Default Provider and Model Configuration */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Provider</span>
-                    </label>
-                    <select
-                      value={editConfig.providerInstanceId || ''}
-                      onChange={(e) => {
-                        const newInstanceId = e.target.value;
-                        const provider = providers.find((p) => p.instanceId === newInstanceId);
-                        const providerModels = provider?.models || [];
-                        setEditConfig((prev) => ({
-                          ...prev,
-                          providerInstanceId: newInstanceId,
-                          modelId: providerModels[0]?.id || prev.modelId,
-                        }));
-                      }}
-                      className="select select-bordered w-full"
-                    >
-                      {availableProviders.length === 0 ? (
-                        <option value="">No providers available</option>
-                      ) : (
-                        <>
-                          {!editConfig.providerInstanceId && (
-                            <option value="">Select a provider</option>
-                          )}
-                          {availableProviders.map((provider) => (
-                            <option key={provider.instanceId} value={provider.instanceId}>
-                              {provider.displayName}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Default Model</span>
-                    </label>
-                    <select
-                      value={editConfig.modelId || ''}
-                      onChange={(e) =>
-                        setEditConfig((prev) => ({ ...prev, modelId: e.target.value }))
-                      }
-                      className="select select-bordered w-full"
-                    >
-                      {availableModels.length === 0 ? (
-                        <option value="">No models available</option>
-                      ) : (
-                        <>
-                          {!editConfig.modelId && <option value="">Select a model</option>}
-                          {availableModels.map((model) => (
-                            <option key={model.id} value={model.id}>
-                              {model.displayName}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Environment Variables */}
-                <div>
-                  <label className="label">
-                    <span className="label-text font-medium">Environment Variables</span>
-                  </label>
-                  <div className="space-y-2">
-                    {Object.entries(editConfig.environmentVariables || {}).map(([key, value]) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={key}
-                          className="input input-bordered input-sm flex-1"
-                          readOnly
-                        />
-                        <span className="text-base-content/60">=</span>
-                        <input
-                          type="text"
-                          value={value}
-                          className="input input-bordered input-sm flex-1"
-                          readOnly
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEnvironmentVariable(key)}
-                          className="btn btn-error btn-sm btn-square"
-                        >
-                          <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                        </button>
+                    <div className="flex items-center gap-4 text-sm text-base-content/60">
+                      <div className="flex items-center gap-1">
+                        <FontAwesomeIcon icon={faFileText} className="w-3 h-3" />
+                        <span>{project.sessionCount || 0} sessions</span>
                       </div>
-                    ))}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newEnvKey}
-                        onChange={(e) => setNewEnvKey(e.target.value)}
-                        className="input input-bordered input-sm flex-1"
-                        placeholder="Key"
-                      />
-                      <span className="text-base-content/60">=</span>
-                      <input
-                        type="text"
-                        value={newEnvValue}
-                        onChange={(e) => setNewEnvValue(e.target.value)}
-                        className="input input-bordered input-sm flex-1"
-                        placeholder="Value"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddEnvironmentVariable}
-                        className="btn btn-primary btn-sm"
-                        disabled={!newEnvKey.trim() || !newEnvValue.trim()}
-                      >
-                        <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <FontAwesomeIcon icon={faHistory} className="w-3 h-3" />
+                        <span>{getRelativeTime(project.lastUsedAt)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Tool Access Policies */}
-                <div>
-                  <label className="label">
-                    <span className="label-text font-medium">Tool Access Policies</span>
-                  </label>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {AVAILABLE_TOOLS.map((tool) => (
-                      <div
-                        key={tool}
-                        className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                      >
-                        <span className="font-medium text-sm">{tool}</span>
-                        <select
-                          value={editConfig.toolPolicies?.[tool] || 'require-approval'}
-                          onChange={(e) =>
-                            handleToolPolicyChange(
-                              tool,
-                              e.target.value as 'allow' | 'require-approval' | 'deny'
-                            )
-                          }
-                          className="select select-bordered select-sm w-40"
-                        >
-                          <option value="allow">Allow</option>
-                          <option value="require-approval">Require Approval</option>
-                          <option value="deny">Deny</option>
-                        </select>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
-                <button type="button" onClick={handleCancelEdit} className="btn btn-ghost">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={!editName.trim() || !editWorkingDirectory.trim() || loading}
-                >
-                  {loading ? (
-                    <>
-                      <div className="loading loading-spinner loading-sm"></div>
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Project'
+                  {/* Archive Status */}
+                  {project.isArchived && (
+                    <div className="pt-2">
+                      <span className="badge badge-warning badge-xs">Archived</span>
+                    </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Edit Project Modal */}
+        {editingProject && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">Edit Project: {editingProject.name}</h3>
+                <button onClick={handleCancelEdit} className="btn btn-ghost btn-sm">
+                  ✕
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Create Project Modal */}
-      {showCreateProject && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Create New Project</h3>
-              <button onClick={handleCancelCreateProject} className="btn btn-ghost btn-sm">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateProject} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
-                {isSimplifiedMode ? (
-                  // Simplified Mode Wizard (DaisyUI steps)
-                  <>
-                    {/* Stepper moved to footer; more vertical room for content/help */}
-
-                    {createStep === 2 && (
-                      <GlassCard className="p-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-lg font-semibold">Set project directory</h4>
-                          <button
-                            type="button"
-                            className="btn btn-accent btn-xs btn-circle text-base-100 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-                            aria-label="Show directory tips"
-                            onClick={() => setShowDirHelp((v) => !v)}
-                            title={showDirHelp ? 'Hide tips' : 'Show tips'}
-                            aria-expanded={showDirHelp}
-                          >
-                            i
-                          </button>
-                        </div>
-                        <DirectoryField
-                          label="Directory path"
-                          value={createWorkingDirectory}
-                          onChange={handleCreateDirectoryChange}
-                          placeholder="/path/to/your/project"
-                          required
-                          className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
-                        />
-                        {createWorkingDirectory.trim() &&
-                          !createWorkingDirectory.trim().startsWith('/') && (
-                            <p className="mt-2 text-sm text-error">
-                              Please paste an absolute path starting with &quot;/&quot;.
-                            </p>
-                          )}
-                        {showDirHelp && (
-                          <div className="collapse mt-3 text-sm text-base-content/60 space-y-2">
-                            <input type="checkbox" checked readOnly />
-                            <div className="collapse-title font-medium">
-                              How to copy the full path
-                            </div>
-                            <div className="collapse-content">
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>
-                                  macOS Finder: hold <kbd>Option</kbd>, right‑click the folder →
-                                  Copy “<i>name</i>” as Pathname
-                                </li>
-                                <li>
-                                  Terminal: drag the folder into the Terminal window to paste its
-                                  absolute path
-                                </li>
-                              </ul>
-                              <p className="font-medium">Tips</p>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>
-                                  Pick the repository root (where your package.json, pyproject.toml,
-                                  or .git lives)
-                                </li>
-                                <li>You can change this later in Project Settings</li>
-                              </ul>
-                            </div>
-                          </div>
-                        )}
-                        {isSimplifiedMode && (
-                          <div className="mt-4 grid md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-medium">Project Name</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={createName}
-                                className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
-                                readOnly
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Advanced settings temporarily removed per UX request */}
-                      </GlassCard>
-                    )}
-
-                    {createStep === 3 && (
-                      <GlassCard className="p-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-lg font-semibold">Set default AI provider</h4>
-                          <button
-                            type="button"
-                            className="btn btn-accent btn-xs btn-circle text-base-100 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-                            aria-label="Show provider tips"
-                            onClick={() => setShowProviderHelp((v) => !v)}
-                            title={showProviderHelp ? 'Hide tips' : 'Show tips'}
-                            aria-expanded={showProviderHelp}
-                          >
-                            i
-                          </button>
-                        </div>
-
-                        {availableProviders.length === 0 ? (
-                          // No providers available - show model selection prompt
-                          <div>
-                            <div className="mb-4">
-                              <button
-                                type="button"
-                                onClick={() => setShowAddProvider(true)}
-                                className="w-full p-4 border-2 border-dashed border-base-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-left"
-                              >
-                                <div className="text-base font-medium text-base-content">
-                                  Select an AI model
-                                </div>
-                                <div className="text-sm text-base-content/60 mt-1">
-                                  Choose from OpenAI, Anthropic, local models, and more
-                                </div>
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          // Providers available - show selection dropdowns
-                          <>
-                            <div className="grid md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="label">
-                                  <span className="label-text font-medium">Provider</span>
-                                </label>
-                                <select
-                                  className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                                  value={createConfig.providerInstanceId || ''}
-                                  onChange={(e) => {
-                                    const newInstanceId = e.target.value;
-                                    const provider = providers.find(
-                                      (p) => p.instanceId === newInstanceId
-                                    );
-                                    const providerModels = provider?.models || [];
-                                    setCreateConfig((prev) => ({
-                                      ...prev,
-                                      providerInstanceId: newInstanceId,
-                                      modelId: providerModels[0]?.id || prev.modelId,
-                                    }));
-                                  }}
-                                >
-                                  {availableProviders.map((p) => (
-                                    <option key={p.instanceId} value={p.instanceId}>
-                                      {p.displayName}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="label">
-                                  <span className="label-text font-medium">Model</span>
-                                </label>
-                                <select
-                                  className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                                  value={createConfig.modelId || ''}
-                                  onChange={(e) =>
-                                    setCreateConfig((prev) => ({
-                                      ...prev,
-                                      modelId: e.target.value,
-                                    }))
-                                  }
-                                >
-                                  {availableCreateModels.map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                      {m.displayName || m.id}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                            <div className="mt-3">
-                              <button
-                                type="button"
-                                onClick={() => setShowAddProvider(true)}
-                                className="btn btn-link text-sm text-base-content/70 no-underline p-0 h-auto min-h-0"
-                              >
-                                <FontAwesomeIcon icon={faPlus} className="w-3 h-3 mr-2" />
-                                Add more providers
-                              </button>
-                            </div>
-                          </>
-                        )}
-
-                        {/* Help section - shown for both states */}
-                        {showProviderHelp && (
-                          <div className="mt-4 text-sm text-base-content/70 space-y-2">
-                            <p className="font-medium">What this does</p>
-                            <p>
-                              Sets the default AI for this project. You can override per session or
-                              task later.
-                            </p>
-                            {availableProviders.length > 0 ? (
-                              <>
-                                <p className="font-medium">Choosing a model</p>
-                                <ul className="list-disc pl-5 space-y-1">
-                                  <li>Pick a balanced model (good quality + speed) to start</li>
-                                  <li>
-                                    Use larger models for complex refactors; smaller models for
-                                    quick edits
-                                  </li>
-                                </ul>
-                              </>
-                            ) : (
-                              <>
-                                <p className="font-medium">Getting started</p>
-                                <p>
-                                  Click &quot;Select an AI model&quot; to add a provider and choose
-                                  your preferred model. You can add multiple providers and switch
-                                  between them later.
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </GlassCard>
-                    )}
-
-                    {createStep === 4 && (
-                      <GlassCard className="p-6">
-                        <h4 className="text-lg font-semibold mb-2">Review</h4>
-                        <p className="text-sm text-base-content/70 mb-3">
-                          Review your project settings. Go back to make changes.
-                        </p>
-                        <div>
-                          <div>
-                            <span className="font-medium">Name:</span>{' '}
-                            {createName || '(from directory)'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Directory:</span> {createWorkingDirectory}
-                          </div>
-                          <div>
-                            <span className="font-medium">Provider:</span>{' '}
-                            {providers.find((p) => p.instanceId === createConfig.providerInstanceId)
-                              ?.displayName || '—'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Model:</span>{' '}
-                            {createConfig.modelId || '—'}
-                          </div>
-                        </div>
-                      </GlassCard>
-                    )}
-
-                    {/* Bottom footer: back, step indicators, primary action */}
-                    <div className="mt-auto flex justify-between items-center pt-4">
-                      <div>
-                        {createStep > 2 && (
-                          <button
-                            type="button"
-                            className="btn btn-link text-base-content/70 no-underline"
-                            onClick={() => setCreateStep(createStep - 1)}
-                          >
-                            Back
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {createStep >= 3 && (
-                          <div className="w-40 h-1.5 rounded-full bg-base-content/20 overflow-hidden">
-                            <div
-                              className="h-full bg-accent/80 transition-all"
-                              style={{ width: `${createStep === 3 ? 66 : 100}%` }}
-                            />
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          {createStep === 2 && (
-                            <button
-                              type="button"
-                              className="btn btn-link text-base-content/70 no-underline"
-                              onClick={() => setShowAdvancedOptions(true)}
-                            >
-                              Advanced setup
-                            </button>
-                          )}
-                          {createStep > 1 && createStep < 4 && (
-                            <AccentButton
-                              type="button"
-                              onClick={() => setCreateStep(createStep + 1)}
-                              disabled={
-                                (createStep === 2 &&
-                                  !(
-                                    createWorkingDirectory.trim().startsWith('/') &&
-                                    createWorkingDirectory.trim().length > 1
-                                  )) ||
-                                (createStep === 3 &&
-                                  (availableProviders.length === 0 ||
-                                    !createConfig.providerInstanceId ||
-                                    !createConfig.modelId))
-                              }
-                            >
-                              Continue
-                            </AccentButton>
-                          )}
-                          {createStep === 4 && (
-                            <AccentButton
-                              type="submit"
-                              disabled={!createWorkingDirectory.trim()}
-                              data-testid="create-project-submit"
-                            >
-                              {loading ? (
-                                <>
-                                  <div className="loading loading-spinner loading-sm"></div>
-                                  Creating...
-                                </>
-                              ) : (
-                                'Create project'
-                              )}
-                            </AccentButton>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  // Full Advanced Mode UI (existing complex form)
-                  <>
-                    {/* Basic Information */}
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-medium">Project Name *</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={createName}
-                          onChange={(e) => setCreateName(e.target.value)}
-                          className="input input-bordered w-full"
-                          data-testid="project-name-input"
-                          placeholder="Enter project name"
-                          required
-                          autoFocus
-                        />
-                      </div>
-
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-medium">Description</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={createDescription}
-                          onChange={(e) => setCreateDescription(e.target.value)}
-                          className="input input-bordered w-full"
-                          placeholder="Optional description"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Working Directory */}
-                    <DirectoryField
-                      label="Working Directory *"
-                      value={createWorkingDirectory}
-                      onChange={setCreateWorkingDirectory}
-                      placeholder="/path/to/project"
-                      required
-                    />
-
-                    {/* Default Provider and Model Configuration */}
-                    <div className="grid md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-medium">Default Provider</span>
-                        </label>
-                        <select
-                          data-testid="create-project-provider-select"
-                          value={createConfig.providerInstanceId || ''}
-                          onChange={(e) => {
-                            const newInstanceId = e.target.value;
-                            const provider = providers.find((p) => p.instanceId === newInstanceId);
-                            const providerModels = provider?.models || [];
-                            setCreateConfig((prev) => ({
-                              ...prev,
-                              providerInstanceId: newInstanceId,
-                              modelId: providerModels[0]?.id || prev.modelId,
-                            }));
-                          }}
-                          className="select select-bordered w-full"
-                        >
-                          {availableProviders.map((provider) => (
-                            <option key={provider.instanceId} value={provider.instanceId}>
-                              {provider.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-medium">Default Model</span>
-                        </label>
-                        <select
-                          data-testid="create-project-model-select"
-                          value={createConfig.modelId || ''}
-                          onChange={(e) =>
-                            setCreateConfig((prev) => ({ ...prev, modelId: e.target.value }))
-                          }
-                          className="select select-bordered w-full"
-                        >
-                          {availableCreateModels.length === 0 ? (
-                            <option value="">No models available</option>
-                          ) : (
-                            <>
-                              {!createConfig.modelId && <option value="">Select a model</option>}
-                              {availableCreateModels.map((model) => (
-                                <option key={model.id} value={model.id}>
-                                  {model.displayName}
-                                </option>
-                              ))}
-                            </>
-                          )}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Environment Variables */}
+              <form onSubmit={handleEditProject} className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                  {/* Basic Information */}
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="label">
-                        <span className="label-text font-medium">Environment Variables</span>
+                        <span className="label-text font-medium">Project Name *</span>
                       </label>
-                      <div className="space-y-2">
-                        {Object.entries(createConfig.environmentVariables || {}).map(
-                          ([key, value]) => (
-                            <div key={key} className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={key}
-                                className="input input-bordered input-sm flex-1"
-                                readOnly
-                              />
-                              <span className="text-base-content/60">=</span>
-                              <input
-                                type="text"
-                                value={value}
-                                className="input input-bordered input-sm flex-1"
-                                readOnly
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveCreateEnvironmentVariable(key)}
-                                className="btn btn-error btn-sm btn-square"
-                              >
-                                <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                              </button>
-                            </div>
-                          )
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="input input-bordered w-full"
+                        placeholder="Enter project name"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-medium">Description</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        className="input input-bordered w-full"
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Working Directory */}
+                  <DirectoryField
+                    label="Working Directory *"
+                    value={editWorkingDirectory}
+                    onChange={setEditWorkingDirectory}
+                    placeholder="/path/to/project"
+                    required
+                  />
+
+                  {/* Default Provider and Model Configuration */}
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-medium">Default Provider</span>
+                      </label>
+                      <select
+                        value={editConfig.providerInstanceId || ''}
+                        onChange={(e) => {
+                          const newInstanceId = e.target.value;
+                          const provider = providers.find((p) => p.instanceId === newInstanceId);
+                          const providerModels = provider?.models || [];
+                          setEditConfig((prev) => ({
+                            ...prev,
+                            providerInstanceId: newInstanceId,
+                            modelId: providerModels[0]?.id || prev.modelId,
+                          }));
+                        }}
+                        className="select select-bordered w-full"
+                      >
+                        {availableProviders.length === 0 ? (
+                          <option value="">No providers available</option>
+                        ) : (
+                          <>
+                            {!editConfig.providerInstanceId && (
+                              <option value="">Select a provider</option>
+                            )}
+                            {availableProviders.map((provider) => (
+                              <option key={provider.instanceId} value={provider.instanceId}>
+                                {provider.displayName}
+                              </option>
+                            ))}
+                          </>
                         )}
-                        <div className="flex items-center gap-2">
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-medium">Default Model</span>
+                      </label>
+                      <select
+                        value={editConfig.modelId || ''}
+                        onChange={(e) =>
+                          setEditConfig((prev) => ({ ...prev, modelId: e.target.value }))
+                        }
+                        className="select select-bordered w-full"
+                      >
+                        {availableModels.length === 0 ? (
+                          <option value="">No models available</option>
+                        ) : (
+                          <>
+                            {!editConfig.modelId && <option value="">Select a model</option>}
+                            {availableModels.map((model) => (
+                              <option key={model.id} value={model.id}>
+                                {model.displayName}
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Environment Variables */}
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Environment Variables</span>
+                    </label>
+                    <div className="space-y-2">
+                      {Object.entries(editConfig.environmentVariables || {}).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
                           <input
                             type="text"
-                            value={createNewEnvKey}
-                            onChange={(e) => setCreateNewEnvKey(e.target.value)}
+                            value={key}
                             className="input input-bordered input-sm flex-1"
-                            placeholder="Key"
+                            readOnly
                           />
                           <span className="text-base-content/60">=</span>
                           <input
                             type="text"
-                            value={createNewEnvValue}
-                            onChange={(e) => setCreateNewEnvValue(e.target.value)}
+                            value={value}
                             className="input input-bordered input-sm flex-1"
-                            placeholder="Value"
+                            readOnly
                           />
                           <button
                             type="button"
-                            onClick={handleAddCreateEnvironmentVariable}
-                            className="btn btn-primary btn-sm"
-                            disabled={!createNewEnvKey.trim() || !createNewEnvValue.trim()}
+                            onClick={() => handleRemoveEnvironmentVariable(key)}
+                            className="btn btn-error btn-sm btn-square"
                           >
-                            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
                           </button>
                         </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newEnvKey}
+                          onChange={(e) => setNewEnvKey(e.target.value)}
+                          className="input input-bordered input-sm flex-1"
+                          placeholder="Key"
+                        />
+                        <span className="text-base-content/60">=</span>
+                        <input
+                          type="text"
+                          value={newEnvValue}
+                          onChange={(e) => setNewEnvValue(e.target.value)}
+                          className="input input-bordered input-sm flex-1"
+                          placeholder="Value"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddEnvironmentVariable}
+                          className="btn btn-primary btn-sm"
+                          disabled={!newEnvKey.trim() || !newEnvValue.trim()}
+                        >
+                          <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Tool Access Policies */}
-                    <div>
-                      <label className="label">
-                        <span className="label-text font-medium">Tool Access Policies</span>
-                      </label>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        {AVAILABLE_TOOLS.map((tool) => (
-                          <div
-                            key={tool}
-                            className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                  {/* Tool Access Policies */}
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-medium">Tool Access Policies</span>
+                    </label>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {AVAILABLE_TOOLS.map((tool) => (
+                        <div
+                          key={tool}
+                          className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                        >
+                          <span className="font-medium text-sm">{tool}</span>
+                          <select
+                            value={editConfig.toolPolicies?.[tool] || 'require-approval'}
+                            onChange={(e) =>
+                              handleToolPolicyChange(
+                                tool,
+                                e.target.value as 'allow' | 'require-approval' | 'deny'
+                              )
+                            }
+                            className="select select-bordered select-sm w-40"
                           >
-                            <span className="font-medium text-sm">{tool}</span>
-                            <select
-                              value={createConfig.toolPolicies?.[tool] || 'require-approval'}
-                              onChange={(e) =>
-                                handleCreateToolPolicyChange(
-                                  tool,
-                                  e.target.value as 'allow' | 'require-approval' | 'deny'
-                                )
-                              }
-                              className="select select-bordered select-sm w-40"
-                            >
-                              <option value="allow">Allow</option>
-                              <option value="require-approval">Require Approval</option>
-                              <option value="deny">Deny</option>
-                            </select>
-                          </div>
-                        ))}
-                      </div>
+                            <option value="allow">Allow</option>
+                            <option value="require-approval">Require Approval</option>
+                            <option value="deny">Deny</option>
+                          </select>
+                        </div>
+                      ))}
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                </div>
 
-              {/* Actions (Advanced mode only) */}
-              {!isSimplifiedMode && (
+                {/* Actions */}
                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
-                  <button
-                    type="button"
-                    onClick={handleCancelCreateProject}
-                    className="btn btn-ghost"
-                  >
+                  <button type="button" onClick={handleCancelEdit} className="btn btn-ghost">
                     Cancel
                   </button>
                   <button
                     type="submit"
                     className="btn btn-primary"
-                    data-testid="create-project-submit"
-                    disabled={!createName.trim() || !createWorkingDirectory.trim() || loading}
+                    disabled={!editName.trim() || !editWorkingDirectory.trim() || loading}
                   >
                     {loading ? (
                       <>
                         <div className="loading loading-spinner loading-sm"></div>
-                        Creating...
+                        Updating...
                       </>
                     ) : (
-                      'Create Project'
+                      'Update Project'
                     )}
                   </button>
                 </div>
-              )}
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Add Provider Modal */}
-      <AddInstanceModal
-        isOpen={showAddProvider}
-        onClose={() => setShowAddProvider(false)}
-        onSuccess={handleProviderAdded}
-      />
-    </div>
+        {/* Create Project Modal */}
+        {showCreateProject && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">Create New Project</h3>
+                <button onClick={handleCancelCreateProject} className="btn btn-ghost btn-sm">
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateProject} className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-6">
+                  {isSimplifiedMode ? (
+                    // Simplified Mode Wizard (DaisyUI steps)
+                    <>
+                      {/* Stepper moved to footer; more vertical room for content/help */}
+
+                      {createStep === 2 && (
+                        <GlassCard className="p-6">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-lg font-semibold">Set project directory</h4>
+                            <button
+                              type="button"
+                              className="btn btn-accent btn-xs btn-circle text-base-100 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+                              aria-label="Show directory tips"
+                              onClick={() => setShowDirHelp((v) => !v)}
+                              title={showDirHelp ? 'Hide tips' : 'Show tips'}
+                              aria-expanded={showDirHelp}
+                            >
+                              i
+                            </button>
+                          </div>
+                          <DirectoryField
+                            label="Directory path"
+                            value={createWorkingDirectory}
+                            onChange={handleCreateDirectoryChange}
+                            placeholder="/path/to/your/project"
+                            required
+                            className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
+                          />
+                          {createWorkingDirectory.trim() &&
+                            !createWorkingDirectory.trim().startsWith('/') && (
+                              <p className="mt-2 text-sm text-error">
+                                Please paste an absolute path starting with &quot;/&quot;.
+                              </p>
+                            )}
+                          {showDirHelp && (
+                            <div className="collapse mt-3 text-sm text-base-content/60 space-y-2">
+                              <input type="checkbox" checked readOnly />
+                              <div className="collapse-title font-medium">
+                                How to copy the full path
+                              </div>
+                              <div className="collapse-content">
+                                <ul className="list-disc pl-5 space-y-1">
+                                  <li>
+                                    macOS Finder: hold <kbd>Option</kbd>, right‑click the folder →
+                                    Copy “<i>name</i>” as Pathname
+                                  </li>
+                                  <li>
+                                    Terminal: drag the folder into the Terminal window to paste its
+                                    absolute path
+                                  </li>
+                                </ul>
+                                <p className="font-medium">Tips</p>
+                                <ul className="list-disc pl-5 space-y-1">
+                                  <li>
+                                    Pick the repository root (where your package.json,
+                                    pyproject.toml, or .git lives)
+                                  </li>
+                                  <li>You can change this later in Project Settings</li>
+                                </ul>
+                              </div>
+                            </div>
+                          )}
+                          {isSimplifiedMode && (
+                            <div className="mt-4 grid md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="label">
+                                  <span className="label-text font-medium">Project Name</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={createName}
+                                  className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
+                                  readOnly
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Advanced settings temporarily removed per UX request */}
+                        </GlassCard>
+                      )}
+
+                      {createStep === 3 && (
+                        <GlassCard className="p-6">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-lg font-semibold">Set default AI provider</h4>
+                            <button
+                              type="button"
+                              className="btn btn-accent btn-xs btn-circle text-base-100 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+                              aria-label="Show provider tips"
+                              onClick={() => setShowProviderHelp((v) => !v)}
+                              title={showProviderHelp ? 'Hide tips' : 'Show tips'}
+                              aria-expanded={showProviderHelp}
+                            >
+                              i
+                            </button>
+                          </div>
+
+                          {availableProviders.length === 0 ? (
+                            // No providers available - show model selection prompt
+                            <div>
+                              <div className="mb-4">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAddProvider(true)}
+                                  className="w-full p-4 border-2 border-dashed border-base-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-left"
+                                >
+                                  <div className="text-base font-medium text-base-content">
+                                    Select an AI model
+                                  </div>
+                                  <div className="text-sm text-base-content/60 mt-1">
+                                    Choose from OpenAI, Anthropic, local models, and more
+                                  </div>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            // Providers available - show selection dropdowns
+                            <>
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="label">
+                                    <span className="label-text font-medium">Provider</span>
+                                  </label>
+                                  <select
+                                    className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                                    value={createConfig.providerInstanceId || ''}
+                                    onChange={(e) => {
+                                      const newInstanceId = e.target.value;
+                                      const provider = providers.find(
+                                        (p) => p.instanceId === newInstanceId
+                                      );
+                                      const providerModels = provider?.models || [];
+                                      setCreateConfig((prev) => ({
+                                        ...prev,
+                                        providerInstanceId: newInstanceId,
+                                        modelId: providerModels[0]?.id || prev.modelId,
+                                      }));
+                                    }}
+                                  >
+                                    {availableProviders.map((p) => (
+                                      <option key={p.instanceId} value={p.instanceId}>
+                                        {p.displayName}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="label">
+                                    <span className="label-text font-medium">Model</span>
+                                  </label>
+                                  <select
+                                    className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                                    value={createConfig.modelId || ''}
+                                    onChange={(e) =>
+                                      setCreateConfig((prev) => ({
+                                        ...prev,
+                                        modelId: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    {availableCreateModels.map((m) => (
+                                      <option key={m.id} value={m.id}>
+                                        {m.displayName || m.id}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAddProvider(true)}
+                                  className="btn btn-link text-sm text-base-content/70 no-underline p-0 h-auto min-h-0"
+                                >
+                                  <FontAwesomeIcon icon={faPlus} className="w-3 h-3 mr-2" />
+                                  Add more providers
+                                </button>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Help section - shown for both states */}
+                          {showProviderHelp && (
+                            <div className="mt-4 text-sm text-base-content/70 space-y-2">
+                              <p className="font-medium">What this does</p>
+                              <p>
+                                Sets the default AI for this project. You can override per session
+                                or task later.
+                              </p>
+                              {availableProviders.length > 0 ? (
+                                <>
+                                  <p className="font-medium">Choosing a model</p>
+                                  <ul className="list-disc pl-5 space-y-1">
+                                    <li>Pick a balanced model (good quality + speed) to start</li>
+                                    <li>
+                                      Use larger models for complex refactors; smaller models for
+                                      quick edits
+                                    </li>
+                                  </ul>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="font-medium">Getting started</p>
+                                  <p>
+                                    Click &quot;Select an AI model&quot; to add a provider and
+                                    choose your preferred model. You can add multiple providers and
+                                    switch between them later.
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </GlassCard>
+                      )}
+
+                      {createStep === 4 && (
+                        <GlassCard className="p-6">
+                          <h4 className="text-lg font-semibold mb-2">Review</h4>
+                          <p className="text-sm text-base-content/70 mb-3">
+                            Review your project settings. Go back to make changes.
+                          </p>
+                          <div>
+                            <div>
+                              <span className="font-medium">Name:</span>{' '}
+                              {createName || '(from directory)'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Directory:</span>{' '}
+                              {createWorkingDirectory}
+                            </div>
+                            <div>
+                              <span className="font-medium">Provider:</span>{' '}
+                              {providers.find(
+                                (p) => p.instanceId === createConfig.providerInstanceId
+                              )?.displayName || '—'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Model:</span>{' '}
+                              {createConfig.modelId || '—'}
+                            </div>
+                          </div>
+                        </GlassCard>
+                      )}
+
+                      {/* Bottom footer: back, step indicators, primary action */}
+                      <div className="mt-auto flex justify-between items-center pt-4">
+                        <div>
+                          {createStep > 2 && (
+                            <button
+                              type="button"
+                              className="btn btn-link text-base-content/70 no-underline"
+                              onClick={() => setCreateStep(createStep - 1)}
+                            >
+                              Back
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {createStep >= 3 && (
+                            <div className="w-40 h-1.5 rounded-full bg-base-content/20 overflow-hidden">
+                              <div
+                                className="h-full bg-accent/80 transition-all"
+                                style={{ width: `${createStep === 3 ? 66 : 100}%` }}
+                              />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            {createStep === 2 && (
+                              <button
+                                type="button"
+                                className="btn btn-link text-base-content/70 no-underline"
+                                onClick={() => setShowAdvancedOptions(true)}
+                              >
+                                Advanced setup
+                              </button>
+                            )}
+                            {createStep > 1 && createStep < 4 && (
+                              <AccentButton
+                                type="button"
+                                onClick={() => setCreateStep(createStep + 1)}
+                                disabled={
+                                  (createStep === 2 &&
+                                    !(
+                                      createWorkingDirectory.trim().startsWith('/') &&
+                                      createWorkingDirectory.trim().length > 1
+                                    )) ||
+                                  (createStep === 3 &&
+                                    (availableProviders.length === 0 ||
+                                      !createConfig.providerInstanceId ||
+                                      !createConfig.modelId))
+                                }
+                              >
+                                Continue
+                              </AccentButton>
+                            )}
+                            {createStep === 4 && (
+                              <AccentButton
+                                type="submit"
+                                disabled={!createWorkingDirectory.trim()}
+                                data-testid="create-project-submit"
+                              >
+                                {loading ? (
+                                  <>
+                                    <div className="loading loading-spinner loading-sm"></div>
+                                    Creating...
+                                  </>
+                                ) : (
+                                  'Create project'
+                                )}
+                              </AccentButton>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // Full Advanced Mode UI (existing complex form)
+                    <>
+                      {/* Basic Information */}
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-medium">Project Name *</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={createName}
+                            onChange={(e) => setCreateName(e.target.value)}
+                            className="input input-bordered w-full"
+                            data-testid="project-name-input"
+                            placeholder="Enter project name"
+                            required
+                            autoFocus
+                          />
+                        </div>
+
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-medium">Description</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={createDescription}
+                            onChange={(e) => setCreateDescription(e.target.value)}
+                            className="input input-bordered w-full"
+                            placeholder="Optional description"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Working Directory */}
+                      <DirectoryField
+                        label="Working Directory *"
+                        value={createWorkingDirectory}
+                        onChange={setCreateWorkingDirectory}
+                        placeholder="/path/to/project"
+                        required
+                      />
+
+                      {/* Default Provider and Model Configuration */}
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-medium">Default Provider</span>
+                          </label>
+                          <select
+                            data-testid="create-project-provider-select"
+                            value={createConfig.providerInstanceId || ''}
+                            onChange={(e) => {
+                              const newInstanceId = e.target.value;
+                              const provider = providers.find(
+                                (p) => p.instanceId === newInstanceId
+                              );
+                              const providerModels = provider?.models || [];
+                              setCreateConfig((prev) => ({
+                                ...prev,
+                                providerInstanceId: newInstanceId,
+                                modelId: providerModels[0]?.id || prev.modelId,
+                              }));
+                            }}
+                            className="select select-bordered w-full"
+                          >
+                            {availableProviders.map((provider) => (
+                              <option key={provider.instanceId} value={provider.instanceId}>
+                                {provider.displayName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-medium">Default Model</span>
+                          </label>
+                          <select
+                            data-testid="create-project-model-select"
+                            value={createConfig.modelId || ''}
+                            onChange={(e) =>
+                              setCreateConfig((prev) => ({ ...prev, modelId: e.target.value }))
+                            }
+                            className="select select-bordered w-full"
+                          >
+                            {availableCreateModels.length === 0 ? (
+                              <option value="">No models available</option>
+                            ) : (
+                              <>
+                                {!createConfig.modelId && <option value="">Select a model</option>}
+                                {availableCreateModels.map((model) => (
+                                  <option key={model.id} value={model.id}>
+                                    {model.displayName}
+                                  </option>
+                                ))}
+                              </>
+                            )}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Environment Variables */}
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-medium">Environment Variables</span>
+                        </label>
+                        <div className="space-y-2">
+                          {Object.entries(createConfig.environmentVariables || {}).map(
+                            ([key, value]) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={key}
+                                  className="input input-bordered input-sm flex-1"
+                                  readOnly
+                                />
+                                <span className="text-base-content/60">=</span>
+                                <input
+                                  type="text"
+                                  value={value}
+                                  className="input input-bordered input-sm flex-1"
+                                  readOnly
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCreateEnvironmentVariable(key)}
+                                  className="btn btn-error btn-sm btn-square"
+                                >
+                                  <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )
+                          )}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={createNewEnvKey}
+                              onChange={(e) => setCreateNewEnvKey(e.target.value)}
+                              className="input input-bordered input-sm flex-1"
+                              placeholder="Key"
+                            />
+                            <span className="text-base-content/60">=</span>
+                            <input
+                              type="text"
+                              value={createNewEnvValue}
+                              onChange={(e) => setCreateNewEnvValue(e.target.value)}
+                              className="input input-bordered input-sm flex-1"
+                              placeholder="Value"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddCreateEnvironmentVariable}
+                              className="btn btn-primary btn-sm"
+                              disabled={!createNewEnvKey.trim() || !createNewEnvValue.trim()}
+                            >
+                              <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tool Access Policies */}
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-medium">Tool Access Policies</span>
+                        </label>
+                        <div className="grid md:grid-cols-2 gap-3">
+                          {AVAILABLE_TOOLS.map((tool) => (
+                            <div
+                              key={tool}
+                              className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                            >
+                              <span className="font-medium text-sm">{tool}</span>
+                              <select
+                                value={createConfig.toolPolicies?.[tool] || 'require-approval'}
+                                onChange={(e) =>
+                                  handleCreateToolPolicyChange(
+                                    tool,
+                                    e.target.value as 'allow' | 'require-approval' | 'deny'
+                                  )
+                                }
+                                className="select select-bordered select-sm w-40"
+                              >
+                                <option value="allow">Allow</option>
+                                <option value="require-approval">Require Approval</option>
+                                <option value="deny">Deny</option>
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Actions (Advanced mode only) */}
+                {!isSimplifiedMode && (
+                  <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
+                    <button
+                      type="button"
+                      onClick={handleCancelCreateProject}
+                      className="btn btn-ghost"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      data-testid="create-project-submit"
+                      disabled={!createName.trim() || !createWorkingDirectory.trim() || loading}
+                    >
+                      {loading ? (
+                        <>
+                          <div className="loading loading-spinner loading-sm"></div>
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Project'
+                      )}
+                    </button>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Add Provider Modal */}
+        <AddInstanceModal
+          isOpen={showAddProvider}
+          onClose={() => setShowAddProvider(false)}
+          onSuccess={handleProviderAdded}
+        />
+      </div>
+    </ProviderInstanceProvider>
   );
 }

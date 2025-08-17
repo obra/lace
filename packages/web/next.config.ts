@@ -2,17 +2,9 @@ import type { NextConfig } from 'next';
 import path from 'path';
 import { readFileSync, existsSync } from 'fs';
 
-// Load nft-traced dependencies - only required for production builds
+// Load nft-traced dependencies - only needed for standalone builds
 function getServerDependencies(): string[] {
   const traceFile = path.resolve('./server-dependencies.json');
-
-  // In development mode, tracing is optional
-  if (process.env.NODE_ENV !== 'production') {
-    if (!existsSync(traceFile)) {
-      return ['packages/web/server-custom.ts'];
-    }
-    // If trace file exists in dev, use it but don't require validation
-  }
 
   if (!existsSync(traceFile)) {
     throw new Error(
@@ -38,12 +30,18 @@ function getServerDependencies(): string[] {
   }
 }
 
+// Determine if we should build standalone (only for production or explicit standalone builds)
+const isStandaloneBuild =
+  process.env.BUILD_STANDALONE === 'true' || process.env.NODE_ENV === 'production';
+
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  outputFileTracingRoot: path.resolve('../../'),
-  outputFileTracingIncludes: {
-    '/': getServerDependencies(),
-  },
+  ...(isStandaloneBuild && {
+    output: 'standalone',
+    outputFileTracingRoot: path.resolve('../../'),
+    outputFileTracingIncludes: {
+      '/': getServerDependencies(),
+    },
+  }),
   typescript: {
     ignoreBuildErrors: false,
   },

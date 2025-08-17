@@ -3,115 +3,35 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ProviderInstanceCard } from './ProviderInstanceCard';
 import { AddInstanceModal } from './AddInstanceModal';
-import { parseResponse } from '@/lib/serialization';
-
-interface ProviderInstance {
-  id: string;
-  displayName: string;
-  catalogProviderId: string;
-  hasCredentials: boolean;
-  endpoint?: string;
-  timeout?: number;
-  status?: 'connected' | 'error' | 'untested';
-  modelCount?: number;
-  lastTested?: string;
-}
+import { useProviderInstances } from './ProviderInstanceProvider';
 
 export function ProviderInstanceList() {
-  const [instances, setInstances] = useState<ProviderInstance[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<
-    Record<
-      string,
-      {
-        status: 'connected' | 'error' | 'testing';
-        lastTested?: string;
-        message?: string;
-      }
-    >
-  >({});
+  const {
+    instances,
+    instancesLoading: loading,
+    instancesError: error,
+    showAddModal,
+    testInstance,
+    deleteInstance,
+    loadInstances,
+    openAddModal,
+    closeAddModal,
+    getInstanceWithTestResult,
+  } = useProviderInstances();
 
-  useEffect(() => {
-    loadInstances();
-  }, []);
-
-  const loadInstances = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch('/api/provider/instances');
-
-      if (!response.ok) {
-        throw new Error(`Failed to load instances: ${response.status}`);
-      }
-
-      const data = await parseResponse<{ instances: ProviderInstance[] }>(response);
-      setInstances(data.instances);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load instances');
-    } finally {
-      setLoading(false);
-    }
+  const handleTest = (instanceId: string) => {
+    void testInstance(instanceId);
   };
 
   const handleDelete = async (instanceId: string) => {
     try {
-      const response = await fetch(`/api/provider/instances/${instanceId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete instance: ${response.status}`);
-      }
-
-      await loadInstances();
+      await deleteInstance(instanceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete instance');
-    }
-  };
-
-  const handleTest = async (instanceId: string) => {
-    // Set testing state
-    setTestResults((prev) => ({
-      ...prev,
-      [instanceId]: { status: 'testing' },
-    }));
-
-    try {
-      const response = await fetch(`/api/provider/instances/${instanceId}/test`, {
-        method: 'POST',
-      });
-
-      const result = await parseResponse<{
-        success: boolean;
-        status: 'connected' | 'error';
-        message?: string;
-        testedAt: string;
-      }>(response);
-
-      // Update test results
-      setTestResults((prev) => ({
-        ...prev,
-        [instanceId]: {
-          status: result.status,
-          lastTested: result.testedAt,
-          message: result.message,
-        },
-      }));
-    } catch (error) {
-      setTestResults((prev) => ({
-        ...prev,
-        [instanceId]: {
-          status: 'error',
-          lastTested: new Date().toISOString(),
-          message: error instanceof Error ? error.message : 'Test failed',
-        },
-      }));
+      // Error handling is already done in the provider
+      console.error('Failed to delete instance:', err);
     }
   };
 
@@ -139,7 +59,7 @@ export function ProviderInstanceList() {
     return (
       <div className="alert alert-error">
         <span>Error: {error}</span>
-        <button className="btn btn-sm btn-ghost" onClick={loadInstances}>
+        <button className="btn btn-sm btn-ghost" onClick={() => void loadInstances()}>
           Retry
         </button>
       </div>
@@ -174,10 +94,7 @@ export function ProviderInstanceList() {
                   Anthropic, local models, and more.
                 </p>
               </div>
-              <button
-                className="btn btn-primary vapor-button"
-                onClick={() => setShowAddModal(true)}
-              >
+              <button className="btn btn-primary vapor-button" onClick={() => openAddModal()}>
                 Add Your First Instance
               </button>
             </div>
@@ -190,27 +107,23 @@ export function ProviderInstanceList() {
               </span>
               <button
                 className="btn btn-primary vapor-button btn-sm"
-                onClick={() => setShowAddModal(true)}
+                onClick={() => openAddModal()}
               >
                 Add Instance
               </button>
             </div>
 
             {instances.map((instance) => {
-              const testResult = testResults[instance.id];
-              const instanceWithStatus = {
-                ...instance,
-                status: testResult?.status || 'untested',
-                lastTested: testResult?.lastTested,
-              };
+              const instanceWithTestResult = getInstanceWithTestResult(instance.id);
+              if (!instanceWithTestResult) return null;
 
               return (
                 <ProviderInstanceCard
                   key={instance.id}
-                  instance={instanceWithStatus}
+                  instance={instanceWithTestResult}
                   onTest={() => handleTest(instance.id)}
-                  onDelete={() => handleDelete(instance.id)}
-                  onEdit={loadInstances} // Refresh list after edit
+                  onDelete={() => void handleDelete(instance.id)}
+                  onEdit={() => void loadInstances()} // Refresh list after edit
                 />
               );
             })}
@@ -220,8 +133,8 @@ export function ProviderInstanceList() {
 
       <AddInstanceModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSuccess={loadInstances}
+        onClose={closeAddModal}
+        onSuccess={() => void loadInstances()}
       />
     </>
   );

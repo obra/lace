@@ -10,6 +10,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
+import { stringify } from '@/lib/serialization';
 
 // Mock localStorage
 const localStorageMock = {
@@ -24,9 +25,7 @@ Object.defineProperty(window, 'localStorage', {
 
 // Mock fetch API to prevent actual network calls
 const mockFetch = vi.fn();
-Object.defineProperty(global, 'fetch', {
-  value: mockFetch,
-});
+global.fetch = mockFetch;
 
 describe('SettingsContainer', () => {
   // Helper function to render with proper async handling
@@ -55,14 +54,38 @@ describe('SettingsContainer', () => {
     // Mock document.documentElement.setAttribute
     vi.spyOn(document.documentElement, 'setAttribute').mockImplementation(vi.fn());
 
-    // Mock fetch API responses with resolved Promise
-    mockFetch.mockImplementation(() =>
-      Promise.resolve({
+    // Mock fetch API responses with proper superjson serialized content
+    mockFetch.mockImplementation((url: string) => {
+      // Handle provider instances endpoint
+      if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ instances: [] }),
+        } as Response);
+      }
+
+      // Handle provider catalog endpoint
+      if (url === '/api/provider/catalog') {
+        const response = stringify({ providers: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ providers: [] }),
+        } as Response);
+      }
+
+      // Default fallback for other URLs
+      return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ instances: [] }),
-        text: () => Promise.resolve(JSON.stringify({ instances: [] })),
-      } as Response)
-    );
+        status: 200,
+        text: () => Promise.resolve(stringify({})),
+        json: () => Promise.resolve({}),
+      } as Response);
+    });
   });
 
   afterEach(() => {

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
-import { parseResponse } from '@/lib/serialization';
+import { useProviderInstances } from './ProviderInstanceProvider';
 
 interface EditInstanceModalProps {
   isOpen: boolean;
@@ -33,14 +33,18 @@ export function EditInstanceModal({
   const [formData, setFormData] = useState({
     displayName: instance.displayName,
     endpoint: instance.endpoint || '',
+    timeout: 30,
     apiKey: '',
   });
+
+  const { updateInstance } = useProviderInstances();
 
   // Update form data when instance changes
   useEffect(() => {
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
+      timeout: 30,
       apiKey: '',
     });
   }, [instance]);
@@ -52,28 +56,12 @@ export function EditInstanceModal({
       setSubmitting(true);
       setError(null);
 
-      const updateData: Record<string, unknown> = {
+      await updateInstance(instance.id, {
         displayName: formData.displayName,
         endpoint: formData.endpoint || undefined,
-      };
-
-      // Only include credential if API key was provided
-      if (formData.apiKey.trim()) {
-        updateData.credential = { apiKey: formData.apiKey };
-      }
-
-      const response = await fetch(`/api/provider/instances/${instance.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData),
+        timeout: formData.timeout,
+        apiKey: formData.apiKey || undefined,
       });
-
-      if (!response.ok) {
-        const errorData = await parseResponse<{ error?: string }>(response).catch(() => ({
-          error: undefined,
-        }));
-        throw new Error(errorData.error || `Failed to update instance: ${response.status}`);
-      }
 
       onSuccess();
       onClose();
@@ -89,6 +77,7 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
+      timeout: 30,
       apiKey: '',
     });
     onClose();
@@ -162,6 +151,24 @@ export function EditInstanceModal({
           />
           <div className="label">
             <span className="label-text-alt">Optional: Override the default API endpoint</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">
+            <span className="label-text">Timeout (seconds)</span>
+          </label>
+          <input
+            type="number"
+            className="input input-bordered w-full"
+            value={formData.timeout}
+            onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) || 30 })}
+            placeholder="30"
+            min="1"
+            max="300"
+          />
+          <div className="label">
+            <span className="label-text-alt">API request timeout in seconds (1-300)</span>
           </div>
         </div>
 

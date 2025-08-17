@@ -1,24 +1,19 @@
-// ABOUTME: Event stream hook for thread events and tool approvals
-// ABOUTME: Real-time updates using unified event stream
+// ABOUTME: Event stream hook for thread events
+// ABOUTME: Real-time updates using unified event stream (tool approvals now handled by ToolApprovalProvider)
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { LaceEvent } from '@/types/core';
-import type { PendingApproval } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
 import { parse } from '@/lib/serialization';
 
-interface UseSessionEventsReturn {
+export interface UseSessionEventsReturn {
   allEvents: LaceEvent[];
   filteredEvents: LaceEvent[];
-  pendingApprovals: PendingApproval[];
   loadingHistory: boolean;
   connected: boolean;
-  clearApprovalRequest: () => void;
   // Event handlers for the parent to wire to useEventStream
   addSessionEvent: (event: LaceEvent) => void;
-  handleApprovalRequest: (approval: PendingApproval) => void;
-  handleApprovalResponse: (toolCallId: string) => void;
 }
 
 export function useSessionEvents(
@@ -27,7 +22,6 @@ export function useSessionEvents(
   connected = false // Connection state passed from parent
 ): UseSessionEventsReturn {
   const [events, setEvents] = useState<LaceEvent[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Use ref to track seen events for O(1) deduplication
@@ -74,47 +68,12 @@ export function useSessionEvents(
     [getEventKey]
   );
 
-  // Handle approval requests
-  const handleApprovalRequest = useCallback(
-    (approval: PendingApproval) => {
-      // When we get a TOOL_APPROVAL_REQUEST, we need to trigger a refresh
-      // The pending approvals will be fetched from the API endpoint
-      // which has access to the tool metadata to properly enrich the data
-      setPendingApprovals((prev) => {
-        // Just mark that we need to refresh - the useEffect below will fetch the data
-        return prev;
-      });
-
-      // Trigger a fetch of pending approvals if we have a selected agent
-      if (selectedAgent) {
-        void fetch(`/api/threads/${selectedAgent}/approvals/pending`)
-          .then(async (res) => {
-            const text = await res.text();
-            return parse(text) as PendingApproval[];
-          })
-          .then((data) => {
-            setPendingApprovals(data || []);
-          })
-          .catch((error) => {
-            console.error('[SESSION_EVENTS] Failed to fetch pending approvals:', error);
-          });
-      }
-    },
-    [selectedAgent]
-  );
-
-  // Handle approval responses
-  const handleApprovalResponse = useCallback((toolCallId: string) => {
-    setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
-  }, []);
-
   // Connection state is now managed by parent
 
   // Load historical events when session changes
   useEffect(() => {
     if (!sessionId) {
       setEvents([]);
-      setPendingApprovals([]);
       setLoadingHistory(false);
       return;
     }
@@ -143,41 +102,6 @@ export function useSessionEvents(
       });
   }, [sessionId]);
 
-  // Check for pending approvals when agent is selected
-  useEffect(() => {
-    if (!sessionId || !selectedAgent) {
-      setPendingApprovals([]);
-      return;
-    }
-
-    fetch(`/api/threads/${selectedAgent}/approvals/pending`)
-      .then(async (res) => {
-        const text = await res.text();
-        return parse(text) as PendingApproval[];
-      })
-      .then((data) => {
-        if (data?.length > 0) {
-          const approvals = data.map((approval: PendingApproval) => ({
-            toolCallId: approval.toolCallId,
-            toolCall: approval.toolCall,
-            requestedAt: approval.requestedAt, // Keep as string now
-            requestData: approval.requestData,
-          }));
-          setPendingApprovals(approvals);
-        } else {
-          setPendingApprovals([]);
-        }
-      })
-      .catch((error) => {
-        console.error('[SESSION_EVENTS] Failed to check pending approvals:', error);
-      });
-  }, [sessionId, selectedAgent]);
-
-  // Clear approval request
-  const clearApprovalRequest = useCallback(() => {
-    setPendingApprovals([]);
-  }, []);
-
   // Filter events by selected agent
   const filteredEvents = useMemo(() => {
     if (!selectedAgent) return [];
@@ -196,13 +120,9 @@ export function useSessionEvents(
   return {
     allEvents: events,
     filteredEvents,
-    pendingApprovals,
     loadingHistory,
     connected,
-    clearApprovalRequest,
     // Export event handlers for parent to use
     addSessionEvent,
-    handleApprovalRequest,
-    handleApprovalResponse,
   };
 }
