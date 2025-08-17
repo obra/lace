@@ -199,6 +199,7 @@ describe('ToolApprovalProvider', () => {
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -303,6 +304,7 @@ describe('ToolApprovalProvider', () => {
       // Should trigger refresh
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -499,7 +501,7 @@ describe('ToolApprovalProvider', () => {
       expect(mockParseResponse).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
-        expect.objectContaining({ message: 'Failed to fetch approvals: 404' })
+        expect.objectContaining({ message: 'HTTP 404: undefined' })
       );
 
       consoleSpy.mockRestore();
@@ -564,7 +566,7 @@ describe('ToolApprovalProvider', () => {
       // Should log the HTTP status error
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
-        expect.objectContaining({ message: 'Failed to fetch approvals: 500' })
+        expect.objectContaining({ message: 'HTTP 500: undefined' })
       );
 
       consoleSpy.mockRestore();
@@ -611,6 +613,7 @@ describe('ToolApprovalProvider', () => {
       // Wait for initial load
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -628,6 +631,7 @@ describe('ToolApprovalProvider', () => {
       // Should fetch for new agent
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${newAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });

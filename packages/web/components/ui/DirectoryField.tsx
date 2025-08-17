@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faSpinner, faChevronLeft, faHome } from '@/lib/fontawesome';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
 
 interface DirectoryFieldProps {
@@ -74,14 +74,8 @@ export function DirectoryField({
       const url = path
         ? `/api/filesystem/list?path=${encodeURIComponent(path)}`
         : '/api/filesystem/list';
-      const response = await fetch(url);
 
-      if (!response.ok) {
-        const errorData = await parseResponse<{ error: string; code: string }>(response);
-        throw new Error(errorData.error);
-      }
-
-      const data = await parseResponse<ListDirectoryResponse>(response);
+      const data = await api.get<ListDirectoryResponse>(url);
       setDirectories(data.entries);
       setCurrentPath(data.currentPath);
       setParentPath(data.parentPath);

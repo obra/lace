@@ -52,6 +52,10 @@ const config = [
           }
         ]
       }],
+      'no-restricted-globals': ['error', {
+        name: 'fetch',
+        message: 'Use api.get/post/put/delete from @/lib/api-client instead of direct fetch() to ensure proper error handling'
+      }],
       'no-var': 'error',
       // Add TypeScript ESLint rules from root config
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
@@ -69,6 +73,7 @@ const config = [
     rules: {
       'no-console': ['error', { allow: ['warn', 'error'] }], // Allow only warn/error in tests
       'no-restricted-imports': 'off',
+      'no-restricted-globals': 'off', // Allow fetch in tests for mocking
       // Disable unsafe TypeScript rules for test files (testing library returns any types)
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
@@ -88,6 +93,18 @@ const config = [
       '@typescript-eslint/no-unsafe-call': 'off', // Allow unsafe calls in stories
       '@typescript-eslint/no-unsafe-return': 'off', // Allow unsafe returns in stories
       '@typescript-eslint/no-unsafe-argument': 'off', // Allow unsafe arguments in stories
+    },
+  },
+  {
+    files: [
+      'lib/api-client.ts', // Contains the fetch implementation - legitimately needs fetch
+      'lib/console-forward/client.ts', // Browser console forwarding to server - external communication
+      'lib/metaScraper.ts', // External URL fetching - not our API
+      'app/api/tunnel/route.ts', // Server-side tunneling - proxy functionality
+      'app/sentry-test/page.tsx', // Test page - not production code
+    ],
+    rules: {
+      'no-restricted-globals': 'off', // Allow fetch only for legitimate external/infrastructure cases
     },
   },
   {

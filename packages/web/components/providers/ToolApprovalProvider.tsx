@@ -15,8 +15,7 @@ import React, {
 } from 'react';
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
-import { parseResponse } from '@/lib/serialization';
-import { isApiError } from '@/types/api';
+import { api } from '@/lib/api-client';
 import type { ApprovalDecision } from '@/types/core';
 
 // Types for tool approval context
@@ -59,19 +58,9 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      const res = await fetch(`/api/threads/${agentId}/approvals/pending`, {
+      const data = await api.get<PendingApproval[]>(`/api/threads/${agentId}/approvals/pending`, {
         signal: controller.signal,
       });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch approvals: ${res.status}`);
-      }
-
-      const data = await parseResponse<PendingApproval[] | { error: string }>(res);
-
-      if (isApiError(data)) {
-        throw new Error(data.error);
-      }
 
       if (Array.isArray(data)) {
         setPendingApprovals(data);
@@ -108,16 +97,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
       if (!agentId) return;
 
       try {
-        const res = await fetch(`/api/threads/${agentId}/approvals/${toolCallId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision }),
-        });
-
-        if (!res.ok) {
-          console.error('[TOOL_APPROVAL] Failed to submit approval decision');
-          return;
-        }
+        await api.post(`/api/threads/${agentId}/approvals/${toolCallId}`, { decision });
 
         // Remove the approval from pending list after successful submission
         handleApprovalResponse(toolCallId);
