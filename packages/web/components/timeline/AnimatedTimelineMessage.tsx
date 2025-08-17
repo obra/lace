@@ -45,10 +45,9 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
     );
 
     // Inline code formatting
-    formatted = formatted.replace(
-      /`([^`]+)`/g,
-      '<code class="bg-base-300 px-2 py-1 rounded text-accent text-sm font-mono">$1</code>'
-    );
+    formatted = formatted.replace(/`([^`]+)`/g, (_match, code) => {
+      return `<code class="bg-base-300 px-2 py-1 rounded text-accent text-sm font-mono">${escapeHtml(code)}</code>`;
+    });
 
     // Newline formatting
     formatted = formatted.replace(/\n/g, '<br>');
