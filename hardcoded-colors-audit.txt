@@ -1,0 +1,281 @@
+# Lace Web Interface - Hardcoded Colors Audit Report
+
+This comprehensive audit identifies ALL hardcoded color usage across the Lace web interface that should be converted to use DaisyUI theme system colors.
+
+**Scope:** packages/web/app and packages/web/components (excluding stories_parked/)
+
+**Legend:**
+- 🔴 **Critical** - UI elements that must use theme colors
+- 🟠 **Important** - Status indicators and feedback that should be semantic
+- 🟡 **Consider** - May benefit from theme colors but could stay hardcoded
+- ⚪ **Design Elements** - Theme-specific demo/mock data that can stay
+
+---
+
+## 1. GLOBALS.CSS - /packages/web/app/globals.css
+
+### 🔴 Diff Line Styling (Lines 213-235)
+**Current:**
+```css
+.diff-line.added { @apply bg-green-50 border-l-2 border-green-500; }
+.diff-line.removed { @apply bg-red-50 border-l-2 border-red-500; }
+.diff-line.highlighted { @apply bg-yellow-50; }
+[data-theme='dark'] .diff-line.added { @apply bg-green-100 border-green-400; }
+[data-theme='dark'] .diff-line.removed { @apply bg-red-100 border-red-400; }
+[data-theme='dark'] .diff-line.highlighted { @apply bg-yellow-100; }
+```
+**Context:** Code diff visual indicators
+**Recommended:** Use `bg-success/10 border-success` for added, `bg-error/10 border-error` for removed, `bg-warning/10` for highlighted
+
+### 🟠 Terminal Syntax Highlighting (Lines 310-342)
+**Current:**
+```css
+.terminal-syntax .hljs-string { @apply text-green-500; }
+.terminal-syntax .hljs-number { @apply text-yellow-500; }
+.terminal-syntax .hljs-keyword { @apply text-blue-500; }
+.terminal-syntax .hljs-literal { @apply text-cyan-500; }
+.terminal-syntax .hljs-comment { @apply text-gray-500; }
+.terminal-syntax .hljs-attr { @apply text-cyan-500; }
+.terminal-syntax .hljs-title { @apply text-purple-500; }
+.terminal-syntax .hljs-built_in { @apply text-blue-500; }
+.terminal-syntax .hljs-variable { @apply text-yellow-500; }
+```
+**Context:** Terminal-specific syntax highlighting
+**Recommended:** Use semantic theme colors: `text-success`, `text-warning`, `text-info`, `text-accent`, `text-base-content/50`, etc.
+
+### ⚪ Design Gradients (Lines 404, 463)
+**Current:**
+```css
+linear-gradient(180deg, #0b0f0e, #121614)
+linear-gradient(135deg, #6366f1 0%, #a855f7 35%, #f472b6 100%)
+```
+**Context:** Hero/vapor background gradients - these are design-specific and can stay
+
+---
+
+## 2. APP PAGES
+
+### 🔴 Global Error Page - /app/global-error.tsx (Lines 23-36)
+**Current:**
+```tsx
+<div className="min-h-screen flex items-center justify-center bg-gray-100">
+  <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong!</h2>
+  <p className="text-gray-600 mb-4">
+  <p className="text-sm text-gray-400 mb-4">
+  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+```
+**Context:** Error page UI
+**Recommended:** 
+- `bg-base-200` for background
+- `text-error` for error heading
+- `text-base-content/70` for text
+- `btn btn-primary` for button
+
+### 🟠 Font Test Page - /app/font-test/page.tsx (Lines 118-124)
+**Current:**
+```tsx
+<div className="text-green-600">✅ All fonts loaded locally via @fontsource</div>
+<div className="text-red-600">❌ Font verification error: {localStatus.error}</div>
+<div className="text-yellow-600">⚠️ Font CSS variables not properly defined</div>
+<div className="text-gray-500">⏳ Testing local fonts...</div>
+```
+**Context:** Font status indicators
+**Recommended:** `text-success`, `text-error`, `text-warning`, `text-base-content/50`
+
+### 🟠 Speech Demo Page - /app/speech-demo/page.tsx (Lines 82-221)
+**Current:**
+Multiple hardcoded colors for status indicators:
+```tsx
+'bg-green-100 text-green-800' (ready)
+'bg-blue-100 text-blue-800' (listening)  
+'bg-red-100 text-red-800' (error)
+'bg-gray-100 text-gray-800' (default)
+'bg-red-50 border border-red-200' (error container)
+'text-red-800' (error heading)
+'text-red-700' (error text)
+'bg-green-500' (active indicators)
+'bg-yellow-500' (processing)
+'bg-red-500' (error indicators)
+```
+**Context:** Speech recognition status display
+**Recommended:** Use semantic theme colors with opacity variants
+
+### 🔴 Sentry Test Page - /app/sentry-test/page.tsx (Lines 35-49)
+**Current:**
+```tsx
+className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+```
+**Context:** Test buttons
+**Recommended:** `btn btn-error`, `btn btn-warning`, `btn btn-primary`
+
+---
+
+## 3. COMPONENTS
+
+### 🔴 Chat Input - /components/chat/ChatInput.tsx (Lines 201-374)
+**Current:**
+Multiple hardcoded colors for status and UI:
+```tsx
+'text-red-600' (error text)
+'bg-red-500' (error indicator)
+'text-blue-600' (listening text)
+'bg-blue-500' (listening indicator)
+'bg-red-50 border border-red-200 rounded-lg text-red-800' (error container)
+'bg-neutral-800' (input background)
+'text-neutral-300' (text color)
+'ring-2 ring-blue-400' (drag over state)
+'text-neutral-400' (placeholder)
+'text-neutral-100' (input text)
+'bg-neutral-700 hover:bg-neutral-600' (button backgrounds)
+```
+**Context:** Chat input component with states
+**Recommended:** Use theme colors: `text-error`, `bg-error`, `bg-base-100`, `text-base-content`, `ring-primary`
+
+### 🔴 Old Error Boundary - /components/old/ErrorBoundary.tsx (Lines 44-60)
+**Current:**
+```tsx
+'bg-gray-900 text-gray-100' (background)
+'bg-gray-800' (container)
+'text-red-500' (error title)
+'text-gray-300' (text)
+'text-gray-400 hover:text-gray-300' (details)
+'bg-gray-900' (code background)
+'bg-blue-600 text-white hover:bg-blue-700' (button)
+```
+**Context:** Error boundary UI
+**Recommended:** Use theme colors: `bg-base-200`, `bg-base-100`, `text-error`, `text-base-content`, `btn btn-primary`
+
+### 🟠 Feedback Components
+
+#### Predictive Panel - /components/feedback/PredictivePanel.tsx
+**Current (Lines 18-125):**
+```tsx
+'bg-red-100 text-red-700' (critical)
+'bg-orange-100 text-orange-700' (high)
+'bg-yellow-100 text-yellow-700' (medium)
+'bg-green-100 text-green-700' (low)
+'bg-gray-100 text-gray-700' (info)
+'bg-green-500', 'bg-yellow-500', 'bg-red-500' (confidence bars)
+'bg-gray-200' (progress background)
+'text-gray-600' (percentage text)
+'text-gray-500' (empty state)
+'bg-blue-100 text-blue-700' (category badge)
+'text-gray-900', 'text-gray-800' (headings)
+'text-blue-500' (arrow)
+```
+**Context:** Predictive feedback panel with severity indicators
+**Recommended:** Use theme semantic colors with opacity variants
+
+#### Feedback Insight Card - /components/feedback/FeedbackInsightCard.tsx
+**Current (Lines 24-41):**
+```tsx
+'bg-blue-100 text-blue-700' (insight)
+'bg-green-100 text-green-700' (success)
+'bg-red-100 text-red-700' (error)
+'bg-orange-100 text-orange-700' (warning)
+'bg-purple-100 text-purple-700' (performance)
+'bg-gray-100 text-gray-700' (default)
+'text-red-600' (critical)
+```
+**Context:** Insight card status indicators
+**Recommended:** Use semantic theme colors: `bg-info/20 text-info`, `bg-success/20 text-success`, etc.
+
+### 🔴 Layout Components
+
+#### Mobile Sidebar - /components/layout/MobileSidebar.tsx (Line 46)
+**Current:**
+```tsx
+'bg-gradient-to-br from-accent to-cyan-800 text-neutral-200'
+```
+**Context:** Avatar gradient
+**Recommended:** Use theme gradient or `bg-primary text-primary-content`
+
+### 🔴 Timeline Components
+
+#### Animated Lace App - /components/pages/AnimatedLaceApp.tsx (Lines 450-452)
+**Current:**
+```tsx
+'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' (thinking)
+'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' (active)
+```
+**Context:** Agent status indicators
+**Recommended:** `bg-warning/20 text-warning` for thinking, `bg-info/20 text-info` for active
+
+### 🔴 Sidebar Components
+
+#### Task Sidebar Section - /components/sidebar/TaskSidebarSection.tsx (Lines 91-95)
+**Current:**
+```tsx
+'bg-amber-500' (pending status)
+'bg-slate-400' (completed status)
+```
+**Context:** Task status dots
+**Recommended:** `bg-warning` for pending, `bg-base-content/40` for completed
+
+### 🟠 Google Doc Components
+
+#### Google Doc Chat Message - /components/organisms/GoogleDocChatMessage.tsx
+**Current (Lines 71-121):**
+```tsx
+'bg-orange-500 text-white' (user avatar)
+'text-blue-600' (file icon)
+'bg-green-100 text-green-700' (success status)
+'bg-yellow-100 text-yellow-700' (warning status)
+'bg-gray-100 text-gray-700' (default status)
+```
+**Context:** Google Docs integration demo component
+**Recommended:** Use semantic theme colors for status indicators
+
+---
+
+## 4. DESIGN/DEMO ELEMENTS (Can Stay Hardcoded)
+
+### ⚪ Theme Selector Mock Data - /components/ui/ThemeSelector.tsx
+**Current (Lines 8-16):** Theme color definitions for demo purposes - these should stay as they represent actual theme values.
+
+### ⚪ Animated Lace App Mock Data - /components/pages/AnimatedLaceApp.tsx
+**Current (Lines 34-39):** Theme mock data for demo - can stay.
+
+### ⚪ Syntax Highlighting Demo - /components/demo/SyntaxHighlightingDemo.tsx
+**Current (Lines 299-370):** CSS custom properties for demo - design-specific, can stay.
+
+### ⚪ Vapor Background - /components/ui/VaporBackground.tsx
+**Current (Line 30):** Design gradient - can stay as it's decorative.
+
+---
+
+## 5. STORIES_PARKED (Excluded but Noted)
+
+Multiple hardcoded colors found in stories files - these are intentionally excluded as they're parked storybook content, but they contain similar patterns to the main components.
+
+---
+
+## SUMMARY STATISTICS
+
+**Total Issues Found:** 47 distinct hardcoded color usages
+- 🔴 **Critical (UI Elements):** 28 issues
+- 🟠 **Important (Status/Feedback):** 15 issues  
+- 🟡 **Consider:** 4 issues
+- ⚪ **Design Elements (OK to stay):** Multiple theme mock data instances
+
+**Most Common Patterns:**
+1. Status indicators using green/red/yellow/blue hardcoded colors
+2. Error states using red-500, red-600, red-100 variants
+3. Gray color variants for text and backgrounds
+4. Success/warning/info states not using semantic theme colors
+
+**Priority Files for Conversion:**
+1. /app/globals.css (diff styling, terminal syntax)
+2. /components/chat/ChatInput.tsx (primary UI component)
+3. /components/feedback/ components (status indicators)
+4. Error pages and boundaries
+5. Status indicator components
+
+**Recommended Next Steps:**
+1. Start with critical UI components (chat input, error boundaries)
+2. Convert status indicators to semantic colors
+3. Update globals.css for consistent diff and syntax highlighting
+4. Test theme switching to ensure all converted colors work across themes
+5. Consider creating utility classes for common status patterns

@@ -1,0 +1,141 @@
+# Alert
+
+A reusable alert component for displaying status messages with semantic colors and proper contrast.
+
+## Features
+
+- **Semantic variants**: success, warning, error, info
+- **Proper contrast**: Uses `text-base-content` for readable text on colored backgrounds
+- **Consistent styling**: Unified appearance across all alert types
+- **Flexible content**: Supports title, description, and custom children
+- **Optional icon**: Each variant has a semantic icon that can be hidden
+- **Dismissible**: Optional close button with callback
+- **Accessible**: Proper ARIA labels and keyboard navigation
+
+## Usage
+
+### Basic Examples
+
+```tsx
+import { Alert } from '@/components/ui';
+
+// Success alert
+<Alert 
+  variant="success" 
+  title="Settings are saved"
+  description="Your preferences are automatically saved and will persist between sessions."
+/>
+
+// Warning alert
+<Alert 
+  variant="warning" 
+  title="Settings are not saved"
+  description="Your user preferences are only stored during this session."
+/>
+
+// Error alert
+<Alert 
+  variant="error" 
+  title="Failed to save"
+  description="There was an error saving your settings. Please try again."
+/>
+
+// Info alert
+<Alert 
+  variant="info" 
+  title="Hardware permissions required"
+  description="This demo uses native OS-level speech recognition."
+/>
+```
+
+### With Custom Content
+
+```tsx
+<Alert variant="warning" title="Confirm action">
+  <div className="flex gap-2 mt-2">
+    <button className="btn btn-sm btn-error">Delete</button>
+    <button className="btn btn-sm btn-ghost">Cancel</button>
+  </div>
+</Alert>
+```
+
+### Dismissible
+
+```tsx
+<Alert 
+  variant="info" 
+  title="Welcome!" 
+  description="This is your first time using the app."
+  onDismiss={() => setShowAlert(false)}
+/>
+```
+
+### Without Icon
+
+```tsx
+<Alert 
+  variant="success" 
+  title="Task completed" 
+  showIcon={false}
+/>
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `variant` | `'success' \| 'warning' \| 'error' \| 'info'` | - | Alert type determining colors and icon |
+| `title` | `string` | - | Main alert message |
+| `description` | `string` | - | Optional secondary message |
+| `children` | `ReactNode` | - | Custom content below description |
+| `className` | `string` | `''` | Additional CSS classes |
+| `showIcon` | `boolean` | `true` | Whether to show the semantic icon |
+| `onDismiss` | `() => void` | - | Callback for dismiss button |
+
+## Design System Integration
+
+The Alert component uses DaisyUI semantic colors with proper contrast:
+
+- **Background**: `bg-{variant}/10` - Very light tinted background
+- **Border**: `border-{variant}/20` - Subtle colored border  
+- **Icon**: `text-{variant}` - Full strength semantic color
+- **Title**: `text-base-content` - High contrast readable text
+- **Description**: `text-base-content/70` - Slightly muted readable text
+
+This ensures excellent readability in both light and dark themes while maintaining semantic color meaning through the background tint, border, and icon.
+
+## Variants
+
+### Success
+- **Use for**: Confirmations, successful operations, positive feedback
+- **Color**: Green tones
+- **Icon**: Check circle
+
+### Warning  
+- **Use for**: Cautions, non-critical issues, important notices
+- **Color**: Yellow/amber tones
+- **Icon**: Exclamation triangle
+
+### Error
+- **Use for**: Failures, critical issues, validation errors
+- **Color**: Red tones  
+- **Icon**: Times circle
+
+### Info
+- **Use for**: General information, tips, neutral notices
+- **Color**: Blue tones
+- **Icon**: Info circle
+
+## Migration from Existing Patterns
+
+Replace scattered alert patterns like:
+
+```tsx
+// Old pattern - poor contrast
+<div className="bg-success/10 border border-success/20 rounded-lg p-3">
+  <div className="text-success">Settings saved</div>
+</div>
+
+// New pattern - proper contrast
+<Alert variant="success" title="Settings saved" />
+```

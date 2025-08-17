@@ -1,4 +1,5 @@
 // ATOMS - Single-purpose building blocks
+export { Alert } from './Alert';
 export { default as Avatar } from './Avatar';
 export { default as StatusDot } from './StatusDot';
 export { default as Badge } from './Badge';

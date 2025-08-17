@@ -6,6 +6,7 @@ import { faUser } from '@/lib/fontawesome';
 // Import all migrated components organized by category
 // ATOMS - Single-purpose UI building blocks
 import {
+  Alert,
   AgentBadge,
   TokenUsageDisplay,
   SendButton,
@@ -108,6 +109,62 @@ export default function PlaygroundPage() {
 
   const renderAtoms = () => (
     <div className="grid gap-6">
+      {/* Alerts & Notifications */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-base-content">
+            🚨 Alerts & Notifications
+            <span className="badge badge-outline ml-2">Alert Component</span>
+          </h3>
+          <div className="grid gap-4">
+            <div className="tooltip" data-tip="Success Alert">
+              <Alert
+                variant="success"
+                title="Settings are saved"
+                description="Your preferences are automatically saved and will persist between sessions."
+              />
+            </div>
+            <div className="tooltip" data-tip="Warning Alert">
+              <Alert
+                variant="warning"
+                title="Settings are not saved"
+                description="Your user preferences are only stored during this session."
+              />
+            </div>
+            <div className="tooltip" data-tip="Error Alert">
+              <Alert
+                variant="error"
+                title="Failed to save"
+                description="There was an error saving your settings. Please try again."
+              />
+            </div>
+            <div className="tooltip" data-tip="Info Alert">
+              <Alert
+                variant="info"
+                title="Hardware permissions required"
+                description="This demo uses native OS-level speech recognition."
+              />
+            </div>
+            <div className="tooltip" data-tip="Alert with custom content">
+              <Alert variant="warning" title="Confirm deletion">
+                <div className="flex gap-2 mt-2">
+                  <button className="btn btn-sm btn-error">Delete</button>
+                  <button className="btn btn-sm btn-ghost">Cancel</button>
+                </div>
+              </Alert>
+            </div>
+            <div className="tooltip" data-tip="Dismissible alert">
+              <Alert
+                variant="info"
+                title="Welcome to the playground!"
+                description="This alert can be dismissed."
+                onDismiss={() => console.log('Alert dismissed')}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Identity & Status */}
       <div className="card bg-base-100 shadow">
         <div className="card-body">

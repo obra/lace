@@ -1,0 +1,169 @@
+# Emerald Color Usage Audit Report
+Generated: 2025-08-17
+
+## Executive Summary
+
+This audit examines all uses of emerald colors across the Lace web interface codebase. Emerald is primarily used as an accent color for active states, success indicators, and UI emphasis elements. The usage shows strong semantic consistency around "active/success" states but lacks centralized color management.
+
+## Key Findings
+
+### 1. Configuration Level Usage
+**File:** `/packages/web/tailwind.config.js`
+- **Lines 86, 95:** `accent: '#10b981'` and `success: '#10b981'`
+- **Line 109:** `'emerald'` theme included in DaisyUI themes
+- **Context:** Core theme configuration defines emerald as both accent and success colors
+- **Semantic Purpose:** Primary brand accent and success state indication
+
+### 2. Accent/CTA Button Usage
+**Primary Component:** `AccentButton.tsx` (Line 15)
+```
+'bg-gradient-to-br from-emerald-500 to-cyan-400 text-black hover:from-emerald-400 hover:to-cyan-300'
+```
+- **Context:** Main call-to-action button styling
+- **Semantic Purpose:** Primary action emphasis
+- **Pattern:** Consistent gradient from emerald to cyan for brand identity
+
+### 3. Speech/Voice Interface Usage
+**Components:** `ChatInput.tsx`, `MemoizedChatInput.tsx`, `NativeSpeechInput.tsx`
+
+**ChatInput.tsx (Lines 210-211, 229, 290-291):**
+- `text-emerald-600` + `bg-emerald-500` for listening state
+- `ring-emerald-500` for focus states during speech
+- **Semantic Purpose:** Active voice recording indicator
+
+**NativeSpeechInput.tsx (Lines 385, 423):**
+- `bg-emerald-500 hover:bg-emerald-600` for listening state
+- `bg-emerald-500` for pulsing animation overlay
+- **Semantic Purpose:** Voice input active state
+
+**Pattern Consistency:** All speech components use emerald-500/600 for active recording states
+
+### 4. Status Indicators & Badges
+**Sidebar Components:**
+- `Sidebar.tsx` (Line 242): Avatar gradient `from-emerald-400 via-emerald-500 to-cyan-600`
+- `MobileSidebar.tsx` (Line 46): Badge gradient `from-emerald-300 to-cyan-800`
+- `TaskSidebarSection.tsx` (Line 87): Task status dot `bg-emerald-500`
+
+**Semantic Purpose:** Success/completion/active status indication across navigation
+
+### 5. Feedback & Event Display
+**Components:** `FeedbackEventCard.tsx`, `InfoIconButton.tsx`
+- `FeedbackEventCard.tsx` (Line 39): `bg-emerald-100 text-emerald-700` for success states
+- `InfoIconButton.tsx` (Line 25): `bg-emerald-500/90 hover:bg-emerald-500` for info buttons
+
+**Semantic Purpose:** Success feedback and informational elements
+
+### 6. Hero/Branding Elements
+**Components:** `FirstProjectHero.tsx`, Story files
+- `FirstProjectHero.tsx` (Line 21): Hero gradient `from-emerald-400 via-teal-300 to-cyan-300`
+- Multiple story files use emerald gradients for demonstrations
+
+**Semantic Purpose:** Brand identity and visual appeal in onboarding
+
+### 7. CSS Global Styles
+**File:** `globals.css` (Lines 456, 213, 226, 310)
+- Ring hover effects with emerald accent
+- Diff line styling uses emerald for success/added states
+- Terminal syntax highlighting fallbacks
+
+## Semantic Pattern Analysis
+
+### Consistent Usage Categories:
+
+1. **Active States (Strong Pattern)**
+   - Voice recording: emerald-500/600
+   - Focus rings: emerald-500
+   - Tool running indicators: emerald-500
+   - Pattern: Very consistent across components
+
+2. **Success/Completion (Strong Pattern)**
+   - Task completion dots: emerald-500  
+   - Success feedback cards: emerald-100/700
+   - Added lines in diffs: emerald/green variants
+   - Pattern: Consistent semantic meaning
+
+3. **Brand/Accent (Strong Pattern)**
+   - Primary buttons: emerald-500 to cyan gradients
+   - Navigation badges: emerald gradients
+   - Hero elements: emerald gradients
+   - Pattern: Always combined with cyan for brand identity
+
+4. **Configuration Theme (Centralized)**
+   - Tailwind config: #10b981 as accent/success
+   - DaisyUI emerald theme available
+   - Pattern: Properly centralized in config
+
+### Inconsistent or Problematic Areas:
+
+1. **Shade Variations**
+   - Uses emerald-300, 400, 500, 600, 700 across different contexts
+   - Some inconsistency in which shade for similar purposes
+   - Recommendation: Standardize shade usage per semantic purpose
+
+2. **Mixed with Green**
+   - Some components use green-* classes for similar purposes
+   - Creates potential visual inconsistency
+   - Recommendation: Consolidate around emerald or green consistently
+
+## Recommendations
+
+### 1. Create CSS Custom Properties
+Since emerald shows strong semantic consistency, recommend creating custom properties:
+
+```css
+:root {
+  --color-success: theme(colors.emerald.500);
+  --color-success-light: theme(colors.emerald.100);
+  --color-success-dark: theme(colors.emerald.700);
+  --color-active: theme(colors.emerald.500);
+  --color-accent-start: theme(colors.emerald.500);
+  --color-accent-end: theme(colors.cyan.400);
+}
+```
+
+### 2. Semantic Class Utilities
+Create utility classes in globals.css:
+```css
+.success-indicator { @apply bg-emerald-500; }
+.success-background { @apply bg-emerald-100 text-emerald-700; }
+.active-state { @apply text-emerald-600; }
+.accent-gradient { @apply bg-gradient-to-br from-emerald-500 to-cyan-400; }
+```
+
+### 3. Component Standardization
+- Standardize voice/speech components to use custom properties
+- Unify success indicator styling across components
+- Consolidate gradient definitions for accent elements
+
+### 4. Green vs Emerald Decision
+- Decide whether to use emerald or green for success states
+- Currently mixed: some use green-*, others emerald-*
+- Recommend: Use emerald for brand/accent, green for pure success states
+
+## Files Requiring Updates (If Implementing Custom Properties)
+
+**High Priority:**
+- `components/ui/AccentButton.tsx`
+- `components/chat/ChatInput.tsx` 
+- `components/chat/MemoizedChatInput.tsx`
+- `components/ui/NativeSpeechInput.tsx`
+- `components/sidebar/TaskSidebarSection.tsx`
+
+**Medium Priority:**
+- `components/layout/Sidebar.tsx`
+- `components/layout/MobileSidebar.tsx`
+- `components/feedback/FeedbackEventCard.tsx`
+- `components/ui/InfoIconButton.tsx`
+
+**Low Priority (Decorative):**
+- `components/onboarding/FirstProjectHero.tsx`
+- Story files in `stories_parked/`
+
+## Conclusion
+
+Emerald usage in the codebase is semantically consistent and follows clear patterns:
+- Active states (voice, focus, tools)
+- Success indicators (completion, positive feedback)
+- Brand accent elements (buttons, gradients, navigation)
+
+The usage justifies creating CSS custom properties for emerald as a core theme color. The main work needed is standardizing shade selections and consolidating similar semantic uses across components.
