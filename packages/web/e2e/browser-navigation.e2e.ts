@@ -3,24 +3,45 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
-import { withTempLaceDir } from './utils/withTempLaceDir';
+import { withIsolatedServer } from './utils/isolated-server';
 import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Browser Navigation Support', () => {
   test('handles browser back and forward navigation correctly', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-navigation-', async (tempDir) => {
+    await withIsolatedServer('navigation-', async (serverUrl, tempDir) => {
       const projectName = 'E2E Navigation Test Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Start at home page
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
       const homeUrl = page.url();
 
       // Create project (this should change the URL)
       const projectPath = path.join(tempDir, 'navigation-test-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       const projectUrl = page.url();
@@ -109,16 +130,37 @@ test.describe('Browser Navigation Support', () => {
   });
 
   test('preserves application state during URL hash changes', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-hash-navigation-', async (tempDir) => {
+    await withIsolatedServer('hash-navigation-', async (serverUrl, tempDir) => {
       const projectName = 'E2E Hash Navigation Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
 
       const projectPath = path.join(tempDir, 'hash-navigation-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       const originalUrl = page.url();
@@ -217,17 +259,38 @@ test.describe('Browser Navigation Support', () => {
   });
 
   test('handles direct URL access and deep linking', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-deep-linking-', async (tempDir) => {
+    await withIsolatedServer('deep-linking-', async (serverUrl, tempDir) => {
       const projectName = 'E2E Deep Linking Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // First create a project to get a valid URL structure
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
       const homeUrl = page.url(); // Capture home URL for reference
 
       const projectPath = path.join(tempDir, 'deep-linking-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       const validProjectUrl = page.url();
@@ -365,16 +428,37 @@ test.describe('Browser Navigation Support', () => {
   });
 
   test('validates browser refresh and reload behavior', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-refresh-behavior-', async (tempDir) => {
+    await withIsolatedServer('refresh-behavior-', async (serverUrl, tempDir) => {
       const projectName = 'E2E Refresh Behavior Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project and establish state
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
 
       const projectPath = path.join(tempDir, 'refresh-behavior-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       const originalUrl = page.url();
