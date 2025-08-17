@@ -477,7 +477,6 @@ function FilePreviewCard({ file, onFileClick, onFileRemoved, disabled }: FilePre
 interface FileContentModalProps {
   file: AttachedFile;
   content: string;
-  onClose: () => void;
 }
 
 function FileContentModal({ file, content }: FileContentModalProps) {
