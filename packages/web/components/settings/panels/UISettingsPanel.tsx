@@ -30,7 +30,7 @@ export function UISettingsPanel({ currentTheme, onThemeChange }: UISettingsPanel
             />
           </svg>
           <div className="text-sm">
-            <div className="font-medium text-success">Settings are saved</div>
+            <div className="font-medium text-base-content">Settings are saved</div>
             <div className="text-base-content/70 mt-1">
               Your UI preferences are automatically saved and will persist between sessions.
             </div>
