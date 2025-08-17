@@ -363,7 +363,17 @@ export class Session {
       threadMetadata: existingThread?.metadata,
       sessionConfig,
     });
-    const providerInstance = Session.resolveProviderInstance(providerInstanceId);
+    let providerInstance: AIProvider | null;
+    try {
+      providerInstance = Session.resolveProviderInstance(providerInstanceId);
+    } catch (error) {
+      logger.warn('Failed to resolve provider instance for session, creating with null provider', {
+        sessionId,
+        providerInstanceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      providerInstance = null;
+    }
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
@@ -436,9 +446,21 @@ export class Session {
           delegateModelId,
           delegateMetadata: delegateThread.metadata,
         });
-        const delegateProviderInstance = Session.resolveProviderInstance(
-          delegateProviderInstanceId
-        );
+        let delegateProviderInstance: AIProvider | null;
+        try {
+          delegateProviderInstance = Session.resolveProviderInstance(delegateProviderInstanceId);
+        } catch (error) {
+          logger.warn(
+            'Failed to resolve provider instance for delegate agent, creating with null provider',
+            {
+              sessionId,
+              delegateThreadId,
+              delegateProviderInstanceId,
+              error: error instanceof Error ? error.message : String(error),
+            }
+          );
+          delegateProviderInstance = null;
+        }
 
         // Create and initialize delegate agent
         const delegateAgent = await session.createAgent({

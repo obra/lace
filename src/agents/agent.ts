@@ -29,7 +29,7 @@ import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-c
 import { aggregateTokenUsage } from '~/threads/token-aggregation';
 
 export interface AgentConfig {
-  provider: AIProvider;
+  provider: AIProvider | null;
   toolExecutor: ToolExecutor;
   threadManager: ThreadManager;
   threadId: string;
@@ -119,7 +119,7 @@ interface AgentEvents {
 }
 
 export class Agent extends EventEmitter {
-  private readonly _provider: AIProvider;
+  private readonly _provider: AIProvider | null;
   private readonly _toolExecutor: ToolExecutor;
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;
@@ -132,7 +132,7 @@ export class Agent extends EventEmitter {
 
   // Public access to provider name for interfaces
   get providerName(): string {
-    return this._provider.providerName;
+    return this._provider?.providerName || 'unknown';
   }
 
   // Public access to thread ID for delegation
@@ -206,6 +206,10 @@ export class Agent extends EventEmitter {
       metadata?: QueuedMessage['metadata'];
     }
   ): Promise<void> {
+    if (!this._provider) {
+      throw new Error('Cannot send messages to agent with missing provider instance');
+    }
+
     if (!this._initialized) {
       await this.initialize();
     }
@@ -305,13 +309,15 @@ export class Agent extends EventEmitter {
     }
 
     // Configure provider with loaded system prompt (happens every time)
-    this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+    if (this.providerInstance) {
+      this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+    }
 
     this._initialized = true;
 
     logger.info('AGENT: Initialized', {
       threadId: this._threadId,
-      provider: this._provider.providerName,
+      provider: this.providerInstance?.providerName || 'missing',
     });
   }
 
@@ -347,13 +353,13 @@ export class Agent extends EventEmitter {
     await this.initialize();
 
     // Provider might be fresh, so always set system prompt
-    if (this._promptConfig) {
+    if (this._promptConfig && this.providerInstance) {
       this.providerInstance.setSystemPrompt(this._promptConfig.systemPrompt);
     }
 
     logger.info('AGENT: Started', {
       threadId: this._threadId,
-      provider: this._provider.providerName,
+      provider: this.providerInstance?.providerName || 'missing',
     });
   }
 
@@ -369,12 +375,14 @@ export class Agent extends EventEmitter {
     this._setState('idle');
 
     // Clean up provider resources
-    try {
-      this._provider.cleanup();
-    } catch (cleanupError) {
-      logger.warn('Provider cleanup failed during stop', {
-        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-      });
+    if (this.providerInstance) {
+      try {
+        this.providerInstance.cleanup();
+      } catch (cleanupError) {
+        logger.warn('Provider cleanup failed during stop', {
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      }
     }
 
     // DO NOT close ThreadManager - it's shared by all agents in the session!
@@ -447,7 +455,7 @@ export class Agent extends EventEmitter {
     return [...this._tools]; // Return copy to prevent mutation
   }
 
-  get providerInstance(): AIProvider {
+  get providerInstance(): AIProvider | null {
     // Always use the provider that was passed to the constructor
     // The Session class is responsible for creating agents with the correct provider
     // based on their metadata when reconstructing from persistence
@@ -456,7 +464,7 @@ export class Agent extends EventEmitter {
 
   get provider(): string {
     const metadata = this.getThreadMetadata();
-    return (metadata?.provider as string) || this._provider.providerName;
+    return (metadata?.provider as string) || this._provider?.providerName || 'unknown';
   }
 
   get name(): string {
@@ -705,12 +713,14 @@ export class Agent extends EventEmitter {
       this._completeTurn();
 
       // Clean up provider resources on error to prevent hanging connections
-      try {
-        this._provider.cleanup();
-      } catch (cleanupError) {
-        logger.warn('Provider cleanup failed', {
-          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-        });
+      if (this.providerInstance) {
+        try {
+          this.providerInstance.cleanup();
+        } catch (cleanupError) {
+          logger.warn('Provider cleanup failed', {
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          });
+        }
       }
     } finally {
       this._abortController = null;
@@ -722,6 +732,10 @@ export class Agent extends EventEmitter {
     tools: Tool[],
     signal?: AbortSignal
   ): Promise<AgentMessageResult> {
+    if (!this.providerInstance) {
+      throw new Error('Cannot send messages to agent with missing provider instance');
+    }
+
     // Default to streaming if provider supports it (unless explicitly disabled)
     const useStreaming =
       this.providerInstance.supportsStreaming && this.providerInstance.config?.streaming !== false;
@@ -1986,8 +2000,12 @@ export class Agent extends EventEmitter {
       content: promptContent,
     });
 
+    if (!this.providerInstance) {
+      throw new Error('Cannot create summary with missing provider instance');
+    }
+
     // Get the summary using this agent's provider and model
-    const response = await this._provider.createResponse(
+    const response = await this.providerInstance.createResponse(
       messages,
       [], // No tools for summarization
       this.model || 'default'
@@ -2588,8 +2606,8 @@ export class Agent extends EventEmitter {
     const modelId = this.model;
     let contextLimit = 200000; // Default fallback
 
-    if (modelId && modelId !== 'unknown-model') {
-      const models = this._provider.getAvailableModels();
+    if (modelId && modelId !== 'unknown-model' && this.providerInstance) {
+      const models = this.providerInstance.getAvailableModels();
       const modelInfo = models.find((m) => m.id === modelId);
       if (modelInfo) {
         contextLimit = modelInfo.contextWindow;
