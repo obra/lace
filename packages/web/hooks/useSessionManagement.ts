@@ -182,6 +182,16 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     async (targetProjectId: string): Promise<SessionInfo[]> => {
       try {
         const res = await fetch(`/api/projects/${targetProjectId}/sessions`);
+
+        if (!res.ok) {
+          const errorBody = await res.text().catch(() => '');
+          console.error('Failed to load sessions for project (non-OK response):', {
+            status: res.status,
+            bodySnippet: errorBody.slice(0, 256),
+          });
+          return [];
+        }
+
         const data: unknown = await parseResponse<unknown>(res);
 
         if (isApiError(data)) {
@@ -189,8 +199,15 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
           return [];
         }
 
-        const sessionsData = data as SessionInfo[];
-        return sessionsData || [];
+        // Normalize response shape - could be SessionInfo[] or { sessions: SessionInfo[] }
+        if (Array.isArray(data)) {
+          return data as SessionInfo[];
+        } else if (data && typeof data === 'object' && 'sessions' in data) {
+          return (data as { sessions: SessionInfo[] }).sessions || [];
+        } else {
+          console.error('Invalid response shape for sessions:', data);
+          return [];
+        }
       } catch (error) {
         console.error('Failed to load sessions for project:', error);
         return [];
