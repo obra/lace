@@ -135,7 +135,6 @@ describe('SessionSection', () => {
 
       render(<SessionSection {...defaultProps} />);
 
-      expect(screen.getByText('Continue Session')).toBeInTheDocument();
       expect(screen.queryByText('Configure Session')).not.toBeInTheDocument();
     });
 

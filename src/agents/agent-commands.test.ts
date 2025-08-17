@@ -84,7 +84,7 @@ describe('Agent command handling', () => {
     expect(compactSpy).toHaveBeenCalledWith(agent.threadId);
 
     // Should not call provider for /compact commands
-    expect(agent['_provider'].createResponse).not.toHaveBeenCalled();
+    expect(agent['_provider']?.createResponse).not.toHaveBeenCalled();
   });
 
   it('should handle normal messages when not a command', async () => {
@@ -92,7 +92,7 @@ describe('Agent command handling', () => {
     await agent.sendMessage('Hello world');
 
     // Should call provider for normal messages
-    expect(agent['_provider'].createResponse).toHaveBeenCalled();
+    expect(agent['_provider']?.createResponse).toHaveBeenCalled();
   });
 
   it('should emit compaction events during compaction', async () => {

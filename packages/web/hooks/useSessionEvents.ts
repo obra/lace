@@ -83,16 +83,22 @@ export function useSessionEvents(
     // Load session history
     fetch(`/api/sessions/${sessionId}/history`)
       .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        }
         const text = await res.text();
         return parse(text) as LaceEvent[];
       })
       .then((data) => {
-        if (data) {
+        if (data && Array.isArray(data)) {
           // Events are already properly typed LaceEvents from superjson
           // Filter out internal workflow events (they're handled separately)
           const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
 
           setEvents(timelineEvents);
+        } else {
+          console.warn('[SESSION_EVENTS] Received non-array data:', data);
+          setEvents([]);
         }
         setLoadingHistory(false);
       })
