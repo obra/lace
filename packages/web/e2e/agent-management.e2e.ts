@@ -4,23 +4,44 @@
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
 import { getMessageInput } from './helpers/test-utils';
+import { withIsolatedServer } from './utils/isolated-server';
 import * as fs from 'fs';
 import * as path from 'path';
-import { withTempLaceDir } from './utils/withTempLaceDir';
 
 test.describe('Agent Management', () => {
   test('automatically creates default agent when project is opened', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-auto-agent-', async (tempDir) => {
+    await withIsolatedServer('auto-agent-', async (serverUrl, tempDir) => {
       const { projectSelector, chatInterface } = createPageObjects(page);
 
-      // Create project and verify it automatically creates an agent
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
 
       const projectName = 'E2E Auto Agent Project';
       const projectPath = path.join(tempDir, 'auto-agent-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       // Verify URL contains agent ID
@@ -55,17 +76,38 @@ test.describe('Agent Management', () => {
   });
 
   test('agent state persists across page reloads', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-persistent-agent-', async (tempDir) => {
+    await withIsolatedServer('persistent-agent-', async (serverUrl, tempDir) => {
       const { projectSelector, chatInterface } = createPageObjects(page);
 
-      // Create project with agent
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
 
       const projectName = 'E2E Persistent Agent Project';
       const projectPath = path.join(tempDir, 'persistent-agent-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       // Send a message to create agent activity
@@ -119,17 +161,38 @@ test.describe('Agent Management', () => {
   });
 
   test('maintains agent isolation between different workers', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-agent-isolation-', async (tempDir) => {
+    await withIsolatedServer('agent-isolation-', async (serverUrl, tempDir) => {
       const { projectSelector, chatInterface } = createPageObjects(page);
 
-      // Create project with agent
-      await page.goto('/');
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
 
       const projectName = 'E2E Agent Isolation Project';
       const projectPath = path.join(tempDir, 'agent-isolation-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       // Send a unique message to establish this agent's context
