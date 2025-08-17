@@ -1,0 +1,12 @@
+// ABOUTME: Central Sentry configuration constants
+// ABOUTME: Single source of truth for Sentry DSN and shared settings
+
+export const SENTRY_DSN = 'https://886230dfd5ba5600e8cc8db8710f2448@o543459.ingest.us.sentry.io/4509844023279616';
+
+export const SENTRY_CONFIG = {
+  dsn: SENTRY_DSN,
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  // Only enable debug in development and if we have a debug bundle
+  debug: process.env.NODE_ENV === 'development' && process.env.SENTRY_DEBUG === 'true',
+  environment: process.env.NODE_ENV,
+};
