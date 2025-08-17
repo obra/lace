@@ -108,30 +108,47 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
     [selectAgent]
   );
 
-  const value: AgentContextType = {
-    // Agent data (from hook)
-    sessionDetails,
-    loading,
+  const value: AgentContextType = useMemo(
+    () => ({
+      // Agent data (from hook)
+      sessionDetails,
+      loading,
 
-    // Selection state (managed here)
-    selectedAgent,
-    foundAgent,
+      // Selection state (managed here)
+      selectedAgent,
+      foundAgent,
 
-    // Computed agent state
-    currentAgent,
-    agentBusy,
+      // Computed agent state
+      currentAgent,
+      agentBusy,
 
-    // Selection actions
-    selectAgent,
-    onAgentSelect,
+      // Selection actions
+      selectAgent,
+      onAgentSelect,
 
-    // Data operations (passed through)
-    createAgent,
-    updateAgentState,
-    reloadSessionDetails,
-    loadAgentConfiguration,
-    updateAgent,
-  };
+      // Data operations (passed through)
+      createAgent,
+      updateAgentState,
+      reloadSessionDetails,
+      loadAgentConfiguration,
+      updateAgent,
+    }),
+    [
+      sessionDetails,
+      loading,
+      selectedAgent,
+      foundAgent,
+      currentAgent,
+      agentBusy,
+      selectAgent,
+      onAgentSelect,
+      createAgent,
+      updateAgentState,
+      reloadSessionDetails,
+      loadAgentConfiguration,
+      updateAgent,
+    ]
+  );
 
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
 }

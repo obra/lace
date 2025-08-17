@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback, ReactNode } from 'react';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useTaskHandlers } from '@/hooks/useTaskHandlers';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
@@ -77,34 +77,53 @@ export function TaskProvider({ children, projectId, sessionId, agents = [] }: Ta
   });
 
   // Enhanced handlers with modal management
-  const handleTaskCreateFromModal = async (
-    taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>
-  ) => {
-    await baseHandleTaskCreateFromModal(taskData);
-    // Modal is closed by the base handler
-  };
+  const handleTaskCreateFromModal = useCallback(
+    async (
+      taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'notes' | 'createdBy' | 'threadId'>
+    ) => {
+      await baseHandleTaskCreateFromModal(taskData);
+      // Modal is closed by the base handler
+    },
+    [baseHandleTaskCreateFromModal]
+  );
 
-  const handleTaskDisplay = (task: Task) => {
-    baseHandleTaskDisplay(task);
-    // Modal state is set by the base handler
-  };
+  const handleTaskDisplay = useCallback(
+    (task: Task) => {
+      baseHandleTaskDisplay(task);
+      // Modal state is set by the base handler
+    },
+    [baseHandleTaskDisplay]
+  );
 
   // Modal control functions
-  const showTaskBoard = () => setShowTaskBoardModal(true);
-  const showTaskCreation = () => setShowTaskCreationModal(true);
+  const showTaskBoard = useCallback(() => setShowTaskBoardModal(true), []);
+  const showTaskCreation = useCallback(() => setShowTaskCreationModal(true), []);
 
   // Context value
-  const contextValue: TaskContextValue = {
-    taskManager,
-    handleTaskUpdate,
-    handleTaskCreate,
-    handleTaskCreateFromModal,
-    handleTaskDisplay,
-    handleTaskUpdateFromModal,
-    handleTaskAddNote,
-    showTaskBoard,
-    showTaskCreation,
-  };
+  const contextValue: TaskContextValue = useMemo(
+    () => ({
+      taskManager,
+      handleTaskUpdate,
+      handleTaskCreate,
+      handleTaskCreateFromModal,
+      handleTaskDisplay,
+      handleTaskUpdateFromModal,
+      handleTaskAddNote,
+      showTaskBoard,
+      showTaskCreation,
+    }),
+    [
+      taskManager,
+      handleTaskUpdate,
+      handleTaskCreate,
+      handleTaskCreateFromModal,
+      handleTaskDisplay,
+      handleTaskUpdateFromModal,
+      handleTaskAddNote,
+      showTaskBoard,
+      showTaskCreation,
+    ]
+  );
 
   return (
     <TaskContext.Provider value={contextValue}>

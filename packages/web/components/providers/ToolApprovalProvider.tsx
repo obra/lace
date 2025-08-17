@@ -130,18 +130,29 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
     void refreshPendingApprovals();
   }, [agentId, refreshPendingApprovals]);
 
-  const value: ToolApprovalContextType = {
-    // Approval data
-    pendingApprovals,
-    loading,
+  const value: ToolApprovalContextType = useMemo(
+    () => ({
+      // Approval data
+      pendingApprovals,
+      loading,
 
-    // Approval actions
-    handleApprovalRequest,
-    handleApprovalResponse,
-    handleApprovalDecision,
-    clearApprovalRequest,
-    refreshPendingApprovals,
-  };
+      // Approval actions
+      handleApprovalRequest,
+      handleApprovalResponse,
+      handleApprovalDecision,
+      clearApprovalRequest,
+      refreshPendingApprovals,
+    }),
+    [
+      pendingApprovals,
+      loading,
+      handleApprovalRequest,
+      handleApprovalResponse,
+      handleApprovalDecision,
+      clearApprovalRequest,
+      refreshPendingApprovals,
+    ]
+  );
 
   return <ToolApprovalContext.Provider value={value}>{children}</ToolApprovalContext.Provider>;
 }
