@@ -3,7 +3,19 @@
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Initialize Sentry first, then logging
+    await import('./sentry.server.config');
     await import('./lib/server/logging-init');
+  }
+  
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    await import('./sentry.edge.config');
+  }
+
+  // Initialize client-side Sentry
+  if (typeof window !== 'undefined') {
+    const { onClientInit } = await import('./instrumentation-client');
+    onClientInit();
   }
 }
 
