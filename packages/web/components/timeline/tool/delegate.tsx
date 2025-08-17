@@ -17,6 +17,7 @@ import {
   faCode,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ToolRenderer, ToolResult } from './types';
+import { Alert } from '@/components/ui/Alert';
 
 /**
  * Status badge component for delegation status display
@@ -186,15 +187,11 @@ export const delegateRenderer: ToolRenderer = {
     // Handle legacy plain text output
     if (typeof parsed === 'string') {
       const statusText = result.status !== 'completed' ? result.status.toUpperCase() : parsed;
-      return (
-        <div
-          className={`font-mono text-sm whitespace-pre-wrap rounded-lg p-3 ${
-            result.status !== 'completed'
-              ? 'text-error bg-error/10 border border-error/20'
-              : 'text-base-content/80 bg-base-200 border border-base-300'
-          }`}
-        >
-          {result.status !== 'completed' ? statusText : parsed}
+      return result.status !== 'completed' ? (
+        <Alert variant="error" title="Delegation Failed" description={statusText} />
+      ) : (
+        <div className="text-base-content/80 bg-base-200 border border-base-300 font-mono text-sm whitespace-pre-wrap rounded-lg p-3">
+          {parsed}
         </div>
       );
     }
@@ -244,40 +241,27 @@ export const delegateRenderer: ToolRenderer = {
         <div className="p-4 space-y-4">
           {/* Success Result */}
           {isCompleted && data.result && (
-            <div className="bg-success/5 border border-success/20 rounded p-3">
-              <div className="flex items-center gap-2 text-success text-sm font-medium mb-2">
-                <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4" />
-                Delegation Completed Successfully
-              </div>
-              <div className="text-sm whitespace-pre-wrap text-base-content">{data.result}</div>
-            </div>
+            <Alert variant="success" title="Delegation Completed Successfully">
+              <div className="text-sm whitespace-pre-wrap">{data.result}</div>
+            </Alert>
           )}
 
           {/* Error Result */}
           {isError && data.error && (
-            <div className="bg-error/10 border border-error/20 rounded p-3">
-              <div className="flex items-center gap-2 text-error text-sm font-medium mb-2">
-                <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4" />
-                Delegation Failed
-              </div>
-              <div className="text-sm text-error/80">{data.error}</div>
-            </div>
+            <Alert variant="error" title="Delegation Failed" description={data.error} />
           )}
 
           {/* Timeout with Partial Result */}
           {data.status === 'timeout' && data.partialResult && (
-            <div className="bg-warning/10 border border-warning/20 rounded p-3">
-              <div className="flex items-center gap-2 text-warning text-sm font-medium mb-2">
-                <FontAwesomeIcon icon={faClock} className="w-4 h-4" />
-                Delegation Timed Out
-              </div>
-              <div className="text-sm text-base-content/80 mb-2">
-                Partial result before timeout:
-              </div>
+            <Alert
+              variant="warning"
+              title="Delegation Timed Out"
+              description="Partial result before timeout:"
+            >
               <div className="text-sm bg-base-100 border border-base-300 rounded p-2 whitespace-pre-wrap">
                 {data.partialResult}
               </div>
-            </div>
+            </Alert>
           )}
 
           {/* In Progress */}

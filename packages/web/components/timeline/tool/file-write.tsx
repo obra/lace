@@ -9,6 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileRenderer from '@/components/ui/FileRenderer';
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
+import { Alert } from '@/components/ui/Alert';
 
 /**
  * File write-specific tool renderer providing file-centric formatting
@@ -45,24 +46,7 @@ export const fileWriteRenderer: ToolRenderer = {
     const isError = fileWriteRenderer.isError!(result);
 
     if (isError) {
-      return (
-        <div className="bg-error/5 border border-error/20 rounded-xl shadow-sm">
-          <div className="px-3 py-2 border-b border-error/20 bg-error/10">
-            <div className="flex items-center gap-2">
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="w-4 h-4 text-error flex-shrink-0"
-              />
-              <span className="text-error font-medium text-sm">Write Failed</span>
-            </div>
-          </div>
-          <div className="p-3">
-            <div className="text-error/80 text-sm font-mono whitespace-pre-wrap break-words">
-              {content}
-            </div>
-          </div>
-        </div>
-      );
+      return <Alert variant="error" title="Write Failed" description={content} />;
     }
 
     // Extract file path and content from arguments
