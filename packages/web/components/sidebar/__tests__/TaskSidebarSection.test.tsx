@@ -187,7 +187,7 @@ describe('TaskSidebarSection', () => {
     mockUseAgentContext.mockReturnValue(
       createMockAgentContext({
         sessionDetails: createMockSessionDetails(),
-        selectedAgent: 'test-agent',
+        selectedAgent: 'test-agent' as ThreadId,
       })
     );
   });
@@ -244,7 +244,7 @@ describe('TaskSidebarSection', () => {
       mockUseAgentContext.mockReturnValue(
         createMockAgentContext({
           sessionDetails: null,
-          selectedAgent: 'test-agent',
+          selectedAgent: 'test-agent' as ThreadId,
         })
       );
 
