@@ -480,6 +480,15 @@ interface FileContentModalProps {
 }
 
 function FileContentModal({ file, content }: FileContentModalProps) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file.file);
+    setObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
   const isImageFile = (file: AttachedFile): boolean => {
     return file.type.startsWith('image/');
   };
@@ -517,7 +526,7 @@ function FileContentModal({ file, content }: FileContentModalProps) {
         {isImageFile(file) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={URL.createObjectURL(file.file)}
+            src={objectUrl ?? ''}
             alt={file.name}
             className="max-w-full h-auto rounded-lg border border-base-300"
           />
