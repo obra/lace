@@ -87,9 +87,6 @@ vi.mock('@/components/sidebar/SessionSection', () => ({
 vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
   TaskSidebarSection: ({ onCloseMobileNav }: { onCloseMobileNav?: () => void }) => (
     <div data-testid="task-section">
-      <div data-testid="task-project">test-project</div>
-      <div data-testid="task-session">test-session</div>
-      <div data-testid="task-session-name">Test Session</div>
       {onCloseMobileNav && (
         <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-task">
           Close
@@ -223,16 +220,6 @@ describe('SidebarContent', () => {
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
       expect(screen.queryByTestId('session-section')).not.toBeInTheDocument();
       expect(screen.getByTestId('task-section')).toBeInTheDocument();
-    });
-  });
-
-  describe('Props Passing', () => {
-    it('passes correct props to TaskSidebarSection', () => {
-      render(<SidebarContent {...defaultProps} />);
-
-      expect(screen.getByTestId('task-project')).toHaveTextContent('test-project');
-      expect(screen.getByTestId('task-session')).toHaveTextContent('test-session');
-      expect(screen.getByTestId('task-session-name')).toHaveTextContent('Test Session');
     });
   });
 

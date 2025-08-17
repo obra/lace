@@ -65,7 +65,7 @@ export function EventStreamProvider({
   onAgentStateChange,
 }: EventStreamProviderProps) {
   // Get tool approval handlers from ToolApprovalProvider
-  const { handleApprovalRequest } = useToolApprovalContext();
+  const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
 
   // Session events hook (no longer manages approvals internally)
   const { filteredEvents, loadingHistory, addSessionEvent } = useSessionEventsHook(
@@ -107,6 +107,8 @@ export function EventStreamProvider({
     onAgentStateChange: handleAgentStateChangeCallback,
     // Tool approval requests
     onApprovalRequest: handleApprovalRequest,
+    // Tool approval responses
+    onApprovalResponse: handleApprovalResponse,
   });
 
   // Create context value

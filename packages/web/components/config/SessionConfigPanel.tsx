@@ -12,28 +12,18 @@ import { SessionCreateModal } from './SessionCreateModal';
 import { SessionEditModal } from './SessionEditModal';
 import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
-import type { ProviderInfo, ModelInfo, CreateAgentRequest } from '@/types/api';
+import type {
+  ProviderInfo,
+  ModelInfo,
+  CreateAgentRequest,
+  SessionConfiguration,
+} from '@/types/api';
 import type { SessionInfo, ProjectInfo } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useAppState } from '@/components/providers/AppStateProvider';
 import { useProviders } from '@/hooks/useProviders';
-
-interface SessionConfiguration {
-  providerInstanceId?: string;
-  modelId?: string;
-  maxTokens?: number;
-  tools?: string[];
-  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
-  workingDirectory?: string;
-  environmentVariables?: Record<string, string>;
-  [key: string]: unknown;
-}
-
-interface SessionConfigPanelProps {
-  // No props needed - all data comes from providers
-}
 
 const AVAILABLE_TOOLS = [
   'bash',
@@ -62,7 +52,7 @@ const DEFAULT_CONFIG: SessionConfiguration = {
   environmentVariables: {},
 };
 
-export function SessionConfigPanel({}: SessionConfigPanelProps) {
+export function SessionConfigPanel(): JSX.Element {
   // Get data from providers instead of props
   const { currentProject } = useProjectContext();
   const {

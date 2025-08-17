@@ -29,6 +29,7 @@ import type {
 } from '@/types/api';
 import { isApiError } from '@/types/api';
 import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { ApprovalDecision } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
@@ -162,7 +163,7 @@ const LaceAppInner = memo(function LaceAppInner() {
   // Handle agent selection within a session
   const handleAgentSelect = (agentThreadId: string) => {
     // Manual agent selection - no need to disable auto-selection as SessionProvider handles this
-    setSelectedAgent(agentThreadId as ThreadId);
+    setSelectedAgent(asThreadId(agentThreadId));
   };
 
   // Onboarding completion is now handled by useOnboarding hook

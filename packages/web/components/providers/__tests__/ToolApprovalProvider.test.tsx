@@ -119,7 +119,7 @@ describe('ToolApprovalProvider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+    global.fetch = vi.fn() as unknown as typeof global.fetch;
     mockParse.mockResolvedValue([]);
   });
 

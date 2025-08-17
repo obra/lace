@@ -157,6 +157,17 @@ describe('TaskSidebarSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Reset mockTaskContext to prevent state leakage between tests
+    mockTaskContext.taskManager = null;
+    mockTaskContext.showTaskBoard = vi.fn();
+    mockTaskContext.showTaskCreation = vi.fn();
+    mockTaskContext.handleTaskDisplay = vi.fn();
+    mockTaskContext.handleTaskUpdate = vi.fn();
+    mockTaskContext.handleTaskCreate = vi.fn();
+    mockTaskContext.handleTaskCreateFromModal = vi.fn();
+    mockTaskContext.handleTaskUpdateFromModal = vi.fn();
+    mockTaskContext.handleTaskAddNote = vi.fn();
+
     // Set up provider mocks with default values
     mockUseProjectContext.mockReturnValue(
       createMockProjectContext({

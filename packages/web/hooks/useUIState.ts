@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 
-interface UseUIStateResult {
+export interface UseUIStateResult {
   // Navigation state
   showMobileNav: boolean;
   showDesktopSidebar: boolean;

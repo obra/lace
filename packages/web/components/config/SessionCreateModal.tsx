@@ -7,19 +7,8 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { ModelSelectionForm } from './ModelSelectionForm';
-import type { ProviderInfo } from '@/types/api';
+import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo } from '@/types/core';
-
-interface SessionConfiguration {
-  providerInstanceId?: string;
-  modelId?: string;
-  maxTokens?: number;
-  tools?: string[];
-  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
-  workingDirectory?: string;
-  environmentVariables?: Record<string, string>;
-  [key: string]: unknown;
-}
 
 interface SessionCreateModalProps {
   isOpen: boolean;
@@ -78,7 +67,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
     onSessionConfigChange({
       ...sessionConfig,
       environmentVariables: {
-        ...sessionConfig.environmentVariables,
+        ...(sessionConfig.environmentVariables ?? {}),
         [newEnvKey.trim()]: newEnvValue.trim(),
       },
     });
@@ -100,7 +89,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
     onSessionConfigChange({
       ...sessionConfig,
       toolPolicies: {
-        ...sessionConfig.toolPolicies,
+        ...(sessionConfig.toolPolicies ?? {}),
         [tool]: policy,
       },
     });

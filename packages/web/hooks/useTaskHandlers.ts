@@ -67,10 +67,16 @@ export function useTaskHandlers({
       if (!taskManager) return;
 
       try {
+        const fallbackPrompt = (
+          taskData.prompt ||
+          taskData.description ||
+          taskData.title ||
+          ''
+        ).trim();
         await taskManager.createTask({
           title: taskData.title,
           description: taskData.description,
-          prompt: taskData.prompt,
+          prompt: fallbackPrompt,
           priority: taskData.priority,
           assignedTo: taskData.assignedTo,
         });
