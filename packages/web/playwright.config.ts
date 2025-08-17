@@ -17,7 +17,7 @@ export default defineConfig({
   reporter: [['html', { outputFolder: 'playwright-report' }], ['dot']],
 
   use: {
-    baseURL: 'http://localhost:23457',
+    // Remove fixed baseURL - each test will set its own server URL
     trace: 'retain-on-failure', // More comprehensive than 'on-first-retry'
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -42,12 +42,7 @@ export default defineConfig({
         ]),
   ],
 
-  webServer: {
-    command: 'node scripts/start-test-server.js',
-    port: 23457,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // Increase timeout for server startup
-  },
+  // Remove shared webServer - each test will start its own isolated server
 
   // Global setup for worker isolation
   globalSetup: './e2e/global-setup.ts',
