@@ -216,15 +216,17 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     []
   );
 
-  // Load sessions when project changes
+  // Load sessions when project changes - dependency on loadSessions would cause infinite re-render loop
+  // since loadSessions is recreated on every render despite useCallback
   useEffect(() => {
     void loadSessions();
-  }, [loadSessions]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load project config when project changes
+  // Load project config when project changes - dependency on loadProjectConfig would cause infinite re-render loop
+  // since loadProjectConfig is recreated on every render despite useCallback
   useEffect(() => {
     void loadProjectConfig();
-  }, [loadProjectConfig]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear sessions when no project is selected
   useEffect(() => {

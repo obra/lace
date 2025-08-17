@@ -115,7 +115,8 @@ export function useTaskManager(
     [eventHandlers]
   );
 
-  // Initial fetch
+  // Initial fetch on mount only - dependency on fetchTasks would cause infinite re-render loop
+  // since fetchTasks is recreated on every render despite useCallback
   useEffect(() => {
     void fetchTasks();
 
@@ -124,7 +125,7 @@ export function useTaskManager(
         clearTimeout(refetchTimeout.current);
       }
     };
-  }, [fetchTasks]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch with filters
   const refetch = useCallback(

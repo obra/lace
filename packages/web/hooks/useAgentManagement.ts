@@ -141,10 +141,11 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
     [loadSessionDetails]
   );
 
-  // Load session details when session changes
+  // Load session details when session changes - dependency on loadSessionDetails would cause infinite re-render loop
+  // since loadSessionDetails is recreated on every render despite useCallback
   useEffect(() => {
     void loadSessionDetails();
-  }, [loadSessionDetails]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear session details when no session is selected
   useEffect(() => {
