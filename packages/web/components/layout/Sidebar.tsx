@@ -239,7 +239,7 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
                   href="/"
                   className="flex items-center gap-3 font-semibold tracking-tight hover:opacity-80 transition-opacity"
                 >
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-cyan-600 text-xs text-white shadow-md">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-accent to-cyan-600 text-xs text-white shadow-md">
                     ✦
                   </span>
                   <span className="text-xl font-ui font-medium">Lace</span>
