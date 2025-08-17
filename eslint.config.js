@@ -9,17 +9,17 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*', 'src/vfs/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/**/*', 'src/vfs/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/**/*', 'src/vfs/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -53,7 +53,7 @@ export default [
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
@@ -82,14 +82,14 @@ export default [
   },
   {
     files: ['src/cli/**/*.ts', 'src/interfaces/**/*.ts', 'src/app.ts'],
-    ignores: ['dist/**/*', 'packages/**/*', 'src/vfs/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     rules: {
       'no-console': 'off',
     },
   },
   {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-    ignores: ['dist/**/*', 'packages/**/*', 'src/vfs/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -119,7 +119,7 @@ export default [
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
-    ignores: ['dist/**/*', 'packages/**/*', 'src/vfs/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     plugins: {
       vitest,
     },
