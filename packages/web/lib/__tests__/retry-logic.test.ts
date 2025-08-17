@@ -1,16 +1,13 @@
 // ABOUTME: Tests for retry logic with exponential backoff functionality
 // ABOUTME: Validates retry strategies, timing, and proper error handling
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { withRetry, createRetryable, type RetryConfig } from '@/lib/retry-logic';
 import { HttpError, NetworkError, AbortError } from '@/lib/api-errors';
 
 describe('Retry Logic', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
+    // Use real timers for most tests except specific timing tests
     vi.useRealTimers();
   });
 
@@ -33,17 +30,13 @@ describe('Retry Logic', () => {
 
       const config: RetryConfig = {
         maxAttempts: 3,
-        baseDelay: 100,
-        maxDelay: 1000,
+        baseDelay: 10, // Very short for testing
+        maxDelay: 100,
         backoffMultiplier: 2,
         jitter: false,
       };
 
-      const promise = withRetry(fn, config);
-
-      // Fast-forward through delays and wait for promise resolution
-      await vi.runAllTimersAsync();
-      const result = await promise;
+      const result = await withRetry(fn, config);
 
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(3);
@@ -62,16 +55,13 @@ describe('Retry Logic', () => {
 
       const config: RetryConfig = {
         maxAttempts: 2,
-        baseDelay: 100,
-        maxDelay: 1000,
+        baseDelay: 10, // Use very short delays for testing
+        maxDelay: 100,
         backoffMultiplier: 2,
         jitter: false,
       };
 
-      const promise = withRetry(fn, config);
-      await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow('Always fails');
+      await expect(withRetry(fn, config)).rejects.toThrow('Always fails');
       expect(fn).toHaveBeenCalledTimes(2);
     });
 
@@ -84,24 +74,22 @@ describe('Retry Logic', () => {
 
       const config: RetryConfig = {
         maxAttempts: 3,
-        baseDelay: 100,
-        maxDelay: 10000,
+        baseDelay: 10, // Very short for testing
+        maxDelay: 100,
         backoffMultiplier: 2,
         jitter: false,
       };
 
       const onRetry = vi.fn();
-      const promise = withRetry(fn, config, onRetry);
+      const result = await withRetry(fn, config, onRetry);
 
-      vi.runAllTimers();
-      await promise;
-
+      expect(result).toBe('success');
       // Should be called twice (after 1st and 2nd failures)
       expect(onRetry).toHaveBeenCalledTimes(2);
 
       // Check delays: baseDelay * multiplier^(attempt-1)
-      expect(onRetry).toHaveBeenNthCalledWith(1, expect.any(NetworkError), 1, 100);
-      expect(onRetry).toHaveBeenNthCalledWith(2, expect.any(NetworkError), 2, 200);
+      expect(onRetry).toHaveBeenNthCalledWith(1, expect.any(NetworkError), 1, 10);
+      expect(onRetry).toHaveBeenNthCalledWith(2, expect.any(NetworkError), 2, 20);
     });
 
     it('should cap delay at maxDelay', async () => {
@@ -113,20 +101,18 @@ describe('Retry Logic', () => {
 
       const config: RetryConfig = {
         maxAttempts: 3,
-        baseDelay: 1000,
-        maxDelay: 1500, // Cap at 1.5 seconds
+        baseDelay: 50,
+        maxDelay: 75, // Cap at 75ms
         backoffMultiplier: 3,
         jitter: false,
       };
 
       const onRetry = vi.fn();
-      const promise = withRetry(fn, config, onRetry);
+      const result = await withRetry(fn, config, onRetry);
 
-      vi.runAllTimers();
-      await promise;
-
-      // Delay should be capped: second delay would be 1000 * 3 = 3000, but capped at 1500
-      expect(onRetry).toHaveBeenNthCalledWith(2, expect.any(NetworkError), 2, 1500);
+      expect(result).toBe('success');
+      // Delay should be capped: second delay would be 50 * 3 = 150, but capped at 75
+      expect(onRetry).toHaveBeenNthCalledWith(2, expect.any(NetworkError), 2, 75);
     });
 
     it('should apply jitter when enabled', async () => {
@@ -141,20 +127,18 @@ describe('Retry Logic', () => {
 
       const config: RetryConfig = {
         maxAttempts: 2,
-        baseDelay: 1000,
-        maxDelay: 10000,
+        baseDelay: 100,
+        maxDelay: 1000,
         backoffMultiplier: 2,
         jitter: true,
       };
 
       const onRetry = vi.fn();
-      const promise = withRetry(fn, config, onRetry);
+      const result = await withRetry(fn, config, onRetry);
 
-      vi.runAllTimers();
-      await promise;
-
-      // Expected: 1000 * 0.85 = 850
-      expect(onRetry).toHaveBeenCalledWith(expect.any(NetworkError), 1, 850);
+      expect(result).toBe('success');
+      // Expected: 100 * 0.85 = 85
+      expect(onRetry).toHaveBeenCalledWith(expect.any(NetworkError), 1, 85);
 
       Math.random = originalRandom;
     });
@@ -175,10 +159,7 @@ describe('Retry Logic', () => {
         jitter: false,
       });
 
-      const promise = retryableFn('arg1', 'arg2');
-      vi.runAllTimers();
-
-      const result = await promise;
+      const result = await retryableFn('arg1', 'arg2');
 
       expect(result).toBe('success');
       expect(originalFn).toHaveBeenCalledTimes(2);

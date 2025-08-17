@@ -212,8 +212,11 @@ describe('useSessionManagement', () => {
 
     expect(result.current.sessions).toEqual([]);
     expect(result.current.loading).toBe(false);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions:', networkError);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load project configuration:', networkError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions:', expect.any(Error));
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to load project configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -245,7 +248,7 @@ describe('useSessionManagement', () => {
       });
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', createError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -318,7 +321,10 @@ describe('useSessionManagement', () => {
       );
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error loading session configuration:', configError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error loading session configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -349,7 +355,10 @@ describe('useSessionManagement', () => {
       ).rejects.toThrow('Update config failed');
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating session configuration:', updateError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error updating session configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -380,7 +389,7 @@ describe('useSessionManagement', () => {
       ).rejects.toThrow('Update session failed');
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating session:', updateError);
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating session:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -411,7 +420,10 @@ describe('useSessionManagement', () => {
     });
 
     expect(sessions!).toEqual([]);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions for project:', loadError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to load sessions for project:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });

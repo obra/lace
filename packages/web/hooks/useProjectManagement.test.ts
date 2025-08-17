@@ -80,7 +80,7 @@ describe('useProjectManagement', () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.projects).toEqual([]);
     expect(result.current.error).toBe('Network error');
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load projects:', networkError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load projects:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });

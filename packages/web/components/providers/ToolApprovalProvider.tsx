@@ -16,6 +16,7 @@ import React, {
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 import { api } from '@/lib/api-client';
+import { AbortError } from '@/lib/api-errors';
 import type { ApprovalDecision } from '@/types/core';
 
 // Types for tool approval context
@@ -68,7 +69,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
         setPendingApprovals([]);
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof AbortError) return;
       console.error('[TOOL_APPROVAL] Failed to fetch pending approvals:', error);
       setPendingApprovals([]);
     } finally {

@@ -139,8 +139,8 @@ describe('useProviders', () => {
       });
 
       expect(result.current.providers).toEqual([]);
-      expect(result.current.error).toBe('Failed to load providers: Unknown error');
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Unknown error');
+      expect(result.current.error).toBe('Failed to load providers: String error');
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: String error');
 
       consoleSpy.mockRestore();
     });

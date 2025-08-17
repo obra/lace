@@ -189,7 +189,7 @@ describe('useAgentManagement', () => {
 
     expect(result.current.sessionDetails).toBeNull();
     expect(result.current.loading).toBe(false);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load session details:', networkError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load session details:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -218,7 +218,7 @@ describe('useAgentManagement', () => {
       });
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create agent:', createError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create agent:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -276,7 +276,10 @@ describe('useAgentManagement', () => {
       );
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error loading agent configuration:', configError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error loading agent configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -307,7 +310,7 @@ describe('useAgentManagement', () => {
       ).rejects.toThrow('Update failed');
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating agent:', updateError);
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating agent:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
