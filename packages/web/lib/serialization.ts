@@ -29,8 +29,9 @@ superjson.registerCustom<NewAgentSpec, string>(
   'NewAgentSpec'
 );
 
-// Export the configured superjson instance
-export const { serialize, deserialize, stringify, parse } = superjson;
+// Export the configured superjson instance (parse not exported to encourage parseResponse/parseTyped)
+export const { serialize, deserialize, stringify } = superjson;
+const { parse } = superjson; // Keep internal for parseResponse/parseTyped
 
 // Convenience functions for common use cases
 function _serializeForAPI<T>(data: T): string {

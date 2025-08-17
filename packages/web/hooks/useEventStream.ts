@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { StreamSubscription, StreamConnection } from '@/types/stream-events';
 import type { LaceEvent } from '~/threads/types';
-import { parse } from '@/lib/serialization';
+import { parseTyped } from '@/lib/serialization';
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 import type { Task } from '@/types/core';
@@ -528,7 +528,7 @@ export function useEventStream({
 
     eventSource.onmessage = (event) => {
       try {
-        const threadEvent = parse(event.data) as LaceEvent;
+        const threadEvent = parseTyped<LaceEvent>(event.data);
 
         setLastEvent(threadEvent);
         setSendCount((prev) => prev + 1);
