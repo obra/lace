@@ -15,15 +15,15 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
   const getTimeframeColor = (timeframe: string) => {
     switch (timeframe) {
       case 'immediate':
-        return 'bg-red-100 text-red-700';
+        return 'bg-error/20 text-error';
       case 'short':
-        return 'bg-orange-100 text-orange-700';
+        return 'bg-warning/20 text-warning';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'bg-warning/20 text-warning';
       case 'long':
-        return 'bg-green-100 text-green-700';
+        return 'bg-success/20 text-success';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-base-200 text-base-content/80';
     }
   };
 
@@ -44,22 +44,21 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
 
   const getConfidenceBar = (confidence: number) => {
     const percentage = Math.round(confidence * 100);
-    const color =
-      confidence > 0.8 ? 'bg-green-500' : confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500';
+    const color = confidence > 0.8 ? 'bg-success' : confidence > 0.6 ? 'bg-warning' : 'bg-error';
 
     return (
       <div className="flex items-center space-x-2">
-        <div className="w-16 h-2 bg-gray-200 rounded-full">
+        <div className="w-16 h-2 bg-base-300 rounded-full">
           <div className={`h-2 rounded-full ${color}`} style={{ width: `${percentage}%` }} />
         </div>
-        <span className="text-xs text-gray-600">{percentage}%</span>
+        <span className="text-xs text-base-content/60">{percentage}%</span>
       </div>
     );
   };
 
   if (insights.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-base-content/60">
         <div className="text-4xl mb-2">🔮</div>
         <p>No predictions available yet</p>
         <p className="text-sm mt-1">Predictions will appear as patterns emerge</p>
@@ -72,7 +71,7 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
       {insights.map((insight, index) => (
         <div
           key={index}
-          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+          className="bg-base-100 border border-base-300 rounded-lg p-4 hover:shadow-md transition-shadow"
         >
           {/* Header */}
           <div className="flex items-start justify-between mb-3">
@@ -81,13 +80,13 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
                 {getTimeframeIcon(insight.timeframe)}
               </span>
               <div>
-                <h3 className="font-medium text-gray-900">{insight.prediction}</h3>
+                <h3 className="font-medium text-base-content">{insight.prediction}</h3>
                 <div className="flex items-center space-x-2 mt-1">
                   <Badge variant="secondary" className={getTimeframeColor(insight.timeframe)}>
                     {insight.timeframe}
                   </Badge>
                   {insight.actionable && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                    <span className="text-xs bg-info/20 text-info px-2 py-1 rounded-full">
                       Actionable
                     </span>
                   )}
@@ -95,19 +94,19 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500 mb-1">Confidence</div>
+              <div className="text-xs text-base-content/60 mb-1">Confidence</div>
               {getConfidenceBar(insight.confidence)}
             </div>
           </div>
 
           {/* Contributing Factors */}
           <div className="mb-3">
-            <h4 className="text-sm font-medium text-gray-800 mb-2">Contributing Factors:</h4>
+            <h4 className="text-sm font-medium text-base-content/90 mb-2">Contributing Factors:</h4>
             <div className="flex flex-wrap gap-2">
               {insight.factors.map((factor, factorIndex) => (
                 <span
                   key={factorIndex}
-                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full"
+                  className="px-2 py-1 text-xs bg-base-200 text-base-content/80 rounded-full"
                 >
                   {factor}
                 </span>
@@ -117,12 +116,14 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
 
           {/* Prevention Suggestions */}
           {insight.preventionSuggestions && insight.preventionSuggestions.length > 0 && (
-            <div className="pt-3 border-t border-gray-100">
-              <h4 className="text-sm font-medium text-gray-800 mb-2">Prevention Suggestions:</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
+            <div className="pt-3 border-t border-base-300">
+              <h4 className="text-sm font-medium text-base-content/90 mb-2">
+                Prevention Suggestions:
+              </h4>
+              <ul className="text-sm text-base-content/80 space-y-1">
                 {insight.preventionSuggestions.map((suggestion, suggestionIndex) => (
                   <li key={suggestionIndex} className="flex items-start space-x-2">
-                    <span className="text-blue-500 mt-1">→</span>
+                    <span className="text-info mt-1">→</span>
                     <span>{suggestion}</span>
                   </li>
                 ))}
