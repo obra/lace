@@ -5,12 +5,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCheckCircle,
-  faExclamationTriangle,
-  faInfoCircle,
-  faTimesCircle,
-} from '@/lib/fontawesome';
+import { faCheckCircle, faExclamationTriangle, faInfoCircle, faTimes } from '@/lib/fontawesome';
 
 export type AlertVariant = 'success' | 'warning' | 'error' | 'info';
 
@@ -40,7 +35,7 @@ const alertConfig = {
     descriptionClass: 'text-base-content/70',
   },
   error: {
-    icon: faTimesCircle,
+    icon: faTimes,
     containerClass: 'bg-error/10 border-error/20',
     iconClass: 'text-error',
     titleClass: 'text-base-content',
@@ -86,7 +81,7 @@ export function Alert({
             className="text-base-content/60 hover:text-base-content/80 transition-colors"
             aria-label="Dismiss alert"
           >
-            <FontAwesomeIcon icon={faTimesCircle} className="w-4 h-4" />
+            <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
           </button>
         )}
       </div>
