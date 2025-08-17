@@ -118,7 +118,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className="w-8 h-8 rounded-md bg-teal-600 text-white flex items-center justify-center text-sm font-medium"
+            className="w-8 h-8 rounded-md bg-[rgb(var(--user-primary))] text-white flex items-center justify-center text-sm font-medium"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={springConfig.snappy}
           >
@@ -247,7 +247,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm"
+            className="w-8 h-8 rounded-md bg-info/20 text-info flex items-center justify-center text-sm"
             animate={{
               boxShadow: [
                 '0 0 0 0 rgba(20, 184, 166, 0)',
@@ -401,7 +401,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 flex items-center justify-center text-sm"
+            className="w-8 h-8 rounded-md bg-info/20 text-info flex items-center justify-center text-sm"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={springConfig.snappy}
           >
