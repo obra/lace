@@ -43,8 +43,8 @@ export default function MessageDisplay({
     return (
       <div className={`flex gap-3 ${className}`}>
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm">
-            <div className="w-3 h-3 bg-teal-600 rounded"></div>
+          <div className="w-8 h-8 rounded-md bg-[rgb(var(--user-primary))]/20 text-[rgb(var(--user-primary))] flex items-center justify-center text-sm">
+            <div className="w-3 h-3 bg-[rgb(var(--user-primary))] rounded"></div>
           </div>
         </div>
         <div className="flex-1 min-w-0">
