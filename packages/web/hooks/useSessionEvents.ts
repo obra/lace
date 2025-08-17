@@ -118,7 +118,7 @@ export function useSessionEvents(
 
           // Merge history with existing streamed events using dedup guard
           setEvents((prev) => {
-            const newUniqueEvents = [];
+            const newUniqueEvents: LaceEvent[] = [];
             for (const event of timelineEvents) {
               const eventKey = getEventKey(event);
               if (!seenEvents.current.has(eventKey)) {
@@ -126,7 +126,14 @@ export function useSessionEvents(
                 seenEvents.current.add(eventKey);
               }
             }
-            return [...prev, ...newUniqueEvents];
+
+            // Merge and sort by timestamp for chronological order
+            const mergedEvents = [...prev, ...newUniqueEvents];
+            return mergedEvents.sort((a, b) => {
+              const aTime = new Date(a.timestamp ?? new Date()).getTime();
+              const bTime = new Date(b.timestamp ?? new Date()).getTime();
+              return aTime - bTime;
+            });
           });
         } else {
           console.warn('[SESSION_EVENTS] Received non-array data:', data);

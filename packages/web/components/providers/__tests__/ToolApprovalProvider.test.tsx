@@ -475,10 +475,7 @@ describe('ToolApprovalProvider', () => {
   });
 
   describe('Error Handling', () => {
-    it('handles HTTP errors using isApiError', async () => {
-      const errorResponse = { error: 'Agent not found' };
-      mockParseResponse.mockResolvedValue(errorResponse);
-      mockIsApiError.mockReturnValue(true);
+    it('handles HTTP errors by checking res.ok first', async () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: false,
         status: 404,
@@ -498,7 +495,39 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
-      // Should log the API error message
+      // Should log the HTTP status error without attempting to parse
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[TOOL_APPROVAL] Failed to fetch pending approvals:',
+        expect.objectContaining({ message: 'Failed to fetch approvals: 404' })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('handles API errors after successful HTTP response', async () => {
+      const errorResponse = { error: 'Agent not found' };
+      mockParseResponse.mockResolvedValue(errorResponse);
+      mockIsApiError.mockReturnValue(true);
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"error": "Agent not found"}'),
+      } as Response);
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(
+        <ToolApprovalProvider agentId={testAgentId}>
+          <ContextConsumer />
+        </ToolApprovalProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
+      });
+
+      // Should log the API error message from parsed response
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
         expect.objectContaining({ message: 'Agent not found' })

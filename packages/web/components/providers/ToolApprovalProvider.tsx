@@ -62,11 +62,15 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
       const res = await fetch(`/api/threads/${agentId}/approvals/pending`, {
         signal: controller.signal,
       });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch approvals: ${res.status}`);
+      }
+
       const data = await parseResponse<PendingApproval[] | { error: string }>(res);
 
-      if (!res.ok || isApiError(data)) {
-        const message = isApiError(data) ? data.error : `Failed to fetch approvals: ${res.status}`;
-        throw new Error(message);
+      if (isApiError(data)) {
+        throw new Error(data.error);
       }
 
       if (Array.isArray(data)) {
