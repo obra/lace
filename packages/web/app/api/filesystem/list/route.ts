@@ -2,8 +2,8 @@
 // ABOUTME: Returns directory contents with permissions and metadata for file browser component
 
 import { NextRequest } from 'next/server';
-import { promises as fs } from 'fs';
-import { join, resolve, relative } from 'path';
+import { promises as fs, constants as fsConstants } from 'fs';
+import { join, resolve, relative, sep } from 'path';
 import { homedir } from 'os';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
@@ -47,13 +47,13 @@ export async function GET(request: NextRequest) {
         const entryStats = await fs.stat(entryPath);
 
         // Check read permissions
-        await fs.access(entryPath, fs.constants.R_OK);
+        await fs.access(entryPath, fsConstants.R_OK);
         const canRead = true;
 
         // Check write permissions
         let canWrite = false;
         try {
-          await fs.access(entryPath, fs.constants.W_OK);
+          await fs.access(entryPath, fsConstants.W_OK);
           canWrite = true;
         } catch {
           canWrite = false;
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Build path from home to current directory
       const relativePathForBreadcrumbs = relative(homeDir, absolutePath);
-      const pathParts = relativePathForBreadcrumbs.split('/').filter(Boolean);
+      const pathParts = relativePathForBreadcrumbs.split(sep).filter(Boolean);
 
       breadcrumbPaths.push(homeDir);
       breadcrumbNames.push('Home');

@@ -4,10 +4,10 @@
 import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
 import { HttpError, NetworkError, AbortError, ParseError, BusinessError } from './api-errors';
-import { withRetry, type RetryConfig } from './retry-logic';
+import { withRetry } from './retry-logic';
 
 export interface ApiClientOptions {
-  retryConfig?: RetryConfig;
+  retry?: boolean;
   timeout?: number;
 }
 
@@ -79,11 +79,12 @@ async function makeRequest<T>(
     }
 
     // Only parse when we know it's a successful response
+    const responseClone = response.clone();
     let data: T;
     try {
       data = await parseResponse<T>(response);
     } catch (parseError) {
-      const responseText = await response.text().catch(() => '<unable to read response>');
+      const responseText = await responseClone.text().catch(() => '<unable to read response>');
       throw new ParseError(
         `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
         url,
@@ -143,12 +144,8 @@ export const api = {
     options?: Omit<RequestInit, 'method'>,
     clientOptions?: ApiClientOptions
   ) => {
-    // Only use retry if explicitly configured
-    if (clientOptions?.retryConfig) {
-      return withRetry(
-        () => makeRequest<T>(url, { ...options, method: 'GET' }, clientOptions),
-        clientOptions.retryConfig
-      );
+    if (clientOptions?.retry) {
+      return withRetry(() => makeRequest<T>(url, { ...options, method: 'GET' }, clientOptions));
     }
     return makeRequest<T>(url, { ...options, method: 'GET' }, clientOptions);
   },
@@ -169,12 +166,8 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     };
 
-    // Only use retry if explicitly configured
-    if (clientOptions?.retryConfig) {
-      return withRetry(
-        () => makeRequest<T>(url, requestOptions, clientOptions),
-        clientOptions.retryConfig
-      );
+    if (clientOptions?.retry) {
+      return withRetry(() => makeRequest<T>(url, requestOptions, clientOptions));
     }
     return makeRequest<T>(url, requestOptions, clientOptions);
   },
@@ -195,12 +188,8 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     };
 
-    // Only use retry if explicitly configured
-    if (clientOptions?.retryConfig) {
-      return withRetry(
-        () => makeRequest<T>(url, requestOptions, clientOptions),
-        clientOptions.retryConfig
-      );
+    if (clientOptions?.retry) {
+      return withRetry(() => makeRequest<T>(url, requestOptions, clientOptions));
     }
     return makeRequest<T>(url, requestOptions, clientOptions);
   },
@@ -221,12 +210,8 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     };
 
-    // Only use retry if explicitly configured
-    if (clientOptions?.retryConfig) {
-      return withRetry(
-        () => makeRequest<T>(url, requestOptions, clientOptions),
-        clientOptions.retryConfig
-      );
+    if (clientOptions?.retry) {
+      return withRetry(() => makeRequest<T>(url, requestOptions, clientOptions));
     }
     return makeRequest<T>(url, requestOptions, clientOptions);
   },
@@ -236,12 +221,8 @@ export const api = {
     options?: Omit<RequestInit, 'method'>,
     clientOptions?: ApiClientOptions
   ) => {
-    // Only use retry if explicitly configured
-    if (clientOptions?.retryConfig) {
-      return withRetry(
-        () => makeRequest<T>(url, { ...options, method: 'DELETE' }, clientOptions),
-        clientOptions.retryConfig
-      );
+    if (clientOptions?.retry) {
+      return withRetry(() => makeRequest<T>(url, { ...options, method: 'DELETE' }, clientOptions));
     }
     return makeRequest<T>(url, { ...options, method: 'DELETE' }, clientOptions);
   },

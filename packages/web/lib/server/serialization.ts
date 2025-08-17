@@ -6,11 +6,11 @@ import { stringify } from '@/lib/serialization';
 
 // Next.js API route helper that preserves NextResponse optimizations
 export function createSuperjsonResponse<T>(data: T, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  headers.set('Content-Type', 'application/json');
+
   return new NextResponse(stringify(data), {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
   });
 }

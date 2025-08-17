@@ -32,7 +32,7 @@ export function useSessionAPI() {
 
         if (!response.ok) {
           try {
-            const error: unknown = await parseResponse(response);
+            const error: unknown = await parseResponse(response.clone());
             if (isApiError(error)) {
               throw new Error(error.error || 'Failed to create session');
             }

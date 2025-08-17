@@ -18,10 +18,14 @@ describe('API Client', () => {
   describe('GET requests', () => {
     it('should handle successful JSON responses', async () => {
       const mockData = { id: 'test', name: 'Test Item' };
-      vi.mocked(global.fetch).mockResolvedValue({
+      const mockResponse = {
         ok: true,
         text: () => Promise.resolve(stringify(mockData)),
-      } as Response);
+        clone: function () {
+          return this;
+        },
+      } as Response;
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
 
       const result = await api.get('/api/test');
       expect(result).toEqual(mockData);
@@ -39,10 +43,14 @@ describe('API Client', () => {
     });
 
     it('should handle empty/204 responses', async () => {
-      vi.mocked(global.fetch).mockResolvedValue({
+      const mockResponse = {
         ok: true,
         text: () => Promise.resolve(''),
-      } as Response);
+        clone: function () {
+          return this;
+        },
+      } as Response;
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
 
       const result = await api.get('/api/empty');
       expect(result).toBeUndefined();
@@ -54,10 +62,14 @@ describe('API Client', () => {
       const requestBody = { name: 'New Item' };
       const responseBody = { id: 'new-id', name: 'New Item' };
 
-      vi.mocked(global.fetch).mockResolvedValue({
+      const mockResponse = {
         ok: true,
         text: () => Promise.resolve(stringify(responseBody)),
-      } as Response);
+        clone: function () {
+          return this;
+        },
+      } as Response;
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
 
       const result = await api.post('/api/items', requestBody);
 
@@ -73,11 +85,15 @@ describe('API Client', () => {
   describe('Error handling', () => {
     it('should enforce res.ok check before parsing', async () => {
       // This test ensures we never parse HTML error pages as JSON
-      vi.mocked(global.fetch).mockResolvedValue({
+      const mockResponse = {
         ok: false,
         status: 500,
         text: () => Promise.resolve('<html><body>Internal Server Error</body></html>'),
-      } as Response);
+        clone: function () {
+          return this;
+        },
+      } as Response;
+      vi.mocked(global.fetch).mockResolvedValue(mockResponse);
 
       await expect(api.get('/api/failing')).rejects.toThrow('HTTP 500');
 
