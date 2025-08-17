@@ -12,11 +12,11 @@ global.fetch = mockFetch;
 
 // Mock parseResponse
 vi.mock('@/lib/serialization', () => ({
-  parseResponse: vi.fn((res) => {
-    if (!res.ok) throw new Error('Network error');
-    return res.json();
-  }),
+  parseResponse: vi.fn(),
 }));
+
+import { parseResponse } from '@/lib/serialization';
+const mockParseResponse = vi.mocked(parseResponse);
 
 const mockSessionWithAgents: SessionInfo = {
   id: 'session-1' as ThreadId,
@@ -43,6 +43,13 @@ const mockSessionWithAgents: SessionInfo = {
 describe('useAgentManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default parseResponse behavior - safely handle response
+    mockParseResponse.mockImplementation((res: Response) => {
+      if (!res || typeof res.json !== 'function') {
+        return Promise.resolve(null);
+      }
+      return res.json();
+    });
   });
 
   it('loads session details when session is selected', async () => {
@@ -62,7 +69,7 @@ describe('useAgentManagement', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/sessions/session-1');
   });
 
-  it('clears session details when session is deselected', () => {
+  it('clears session details when session is deselected', async () => {
     const { result, rerender } = renderHook(
       (props: { sessionId: string | null }) => useAgentManagement(props.sessionId),
       {
@@ -71,7 +78,11 @@ describe('useAgentManagement', () => {
     );
 
     // Clear session
-    rerender({ sessionId: null });
+    await act(async () => {
+      rerender({ sessionId: null });
+      // Allow state updates to complete
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     expect(result.current.sessionDetails).toBeNull();
   });
@@ -166,7 +177,9 @@ describe('useAgentManagement', () => {
   });
 
   it('handles API errors gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const networkError = new Error('Network error');
+    mockFetch.mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -176,5 +189,126 @@ describe('useAgentManagement', () => {
 
     expect(result.current.sessionDetails).toBeNull();
     expect(result.current.loading).toBe(false);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load session details:', networkError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles create agent errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const createError = new Error('Create failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessionWithAgents),
+      })
+      .mockRejectedValueOnce(createError);
+
+    const { result } = renderHook(() => useAgentManagement('session-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await result.current.createAgent('session-1', {
+        name: 'New Agent',
+        modelId: 'gpt-4',
+        providerInstanceId: 'openai',
+      });
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create agent:', createError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles create agent HTTP errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessionWithAgents),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Agent creation failed' }),
+      });
+
+    const { result } = renderHook(() => useAgentManagement('session-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await result.current.createAgent('session-1', {
+        name: 'New Agent',
+        modelId: 'gpt-4',
+        providerInstanceId: 'openai',
+      });
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create agent');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles load agent configuration errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const configError = new Error('Config load failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessionWithAgents),
+      })
+      .mockRejectedValueOnce(configError);
+
+    const { result } = renderHook(() => useAgentManagement('session-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await expect(result.current.loadAgentConfiguration('agent-1')).rejects.toThrow(
+        'Config load failed'
+      );
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Error loading agent configuration:', configError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles update agent errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const updateError = new Error('Update failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessionWithAgents),
+      })
+      .mockRejectedValueOnce(updateError);
+
+    const { result } = renderHook(() => useAgentManagement('session-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.updateAgent('agent-1', {
+          name: 'Updated Agent',
+          providerInstanceId: 'openai',
+          modelId: 'gpt-4',
+        })
+      ).rejects.toThrow('Update failed');
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating agent:', updateError);
+
+    consoleSpy.mockRestore();
   });
 });

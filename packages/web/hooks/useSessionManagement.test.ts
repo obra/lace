@@ -12,11 +12,11 @@ global.fetch = mockFetch;
 
 // Mock parseResponse
 vi.mock('@/lib/serialization', () => ({
-  parseResponse: vi.fn((res) => {
-    if (!res.ok) throw new Error('Network error');
-    return res.json();
-  }),
+  parseResponse: vi.fn(),
 }));
+
+import { parseResponse } from '@/lib/serialization';
+const mockParseResponse = vi.mocked(parseResponse);
 
 const mockSessions: SessionInfo[] = [
   {
@@ -44,6 +44,8 @@ const mockSessions: SessionInfo[] = [
 describe('useSessionManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default parseResponse behavior - just call res.json()
+    mockParseResponse.mockImplementation((res: Response) => res.json());
   });
 
   it('loads sessions when project is selected', async () => {
@@ -194,9 +196,9 @@ describe('useSessionManagement', () => {
   });
 
   it('handles API errors gracefully', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockRejectedValueOnce(new Error('Network error'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const networkError = new Error('Network error');
+    mockFetch.mockRejectedValueOnce(networkError).mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -206,5 +208,207 @@ describe('useSessionManagement', () => {
 
     expect(result.current.sessions).toEqual([]);
     expect(result.current.loading).toBe(false);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions:', networkError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load project configuration:', networkError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles create session errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const createError = new Error('Create failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessions),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      })
+      .mockRejectedValueOnce(createError);
+
+    const { result } = renderHook(() => useSessionManagement('project-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await result.current.createSession({
+        name: 'New Session',
+        description: 'A new session',
+      });
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', createError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles create session HTTP errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorResponse = {
+      ok: false,
+      json: () => Promise.resolve({ error: 'Session creation failed' }),
+    };
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessions),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      })
+      .mockResolvedValueOnce(errorResponse);
+
+    // For the error response, parseResponse should return the parsed error data
+    mockParseResponse
+      .mockImplementationOnce((res: Response) => res.json())
+      .mockImplementationOnce((res: Response) => res.json())
+      .mockImplementationOnce((res: Response) => res.json());
+
+    const { result } = renderHook(() => useSessionManagement('project-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await result.current.createSession({
+        name: 'New Session',
+        description: 'A new session',
+      });
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', 'Session creation failed');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles load session configuration errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const configError = new Error('Config load failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      })
+      .mockRejectedValueOnce(configError);
+
+    const { result } = renderHook(() => useSessionManagement('project-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await expect(result.current.loadSessionConfiguration('session-1')).rejects.toThrow(
+        'Config load failed'
+      );
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Error loading session configuration:', configError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles update session configuration errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const updateError = new Error('Update config failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      })
+      .mockRejectedValueOnce(updateError);
+
+    const { result } = renderHook(() => useSessionManagement('project-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.updateSessionConfiguration('session-1', { theme: 'dark' })
+      ).rejects.toThrow('Update config failed');
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating session configuration:', updateError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles update session errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const updateError = new Error('Update session failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      })
+      .mockRejectedValueOnce(updateError);
+
+    const { result } = renderHook(() => useSessionManagement('project-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.updateSession('session-1', { name: 'Updated Session' })
+      ).rejects.toThrow('Update session failed');
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating session:', updateError);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles load sessions for project errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loadError = new Error('Load sessions failed');
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ configuration: {} }),
+      })
+      .mockRejectedValueOnce(loadError);
+
+    const { result } = renderHook(() => useSessionManagement('project-1'));
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    let sessions: SessionInfo[];
+    await act(async () => {
+      sessions = await result.current.loadSessionsForProject('other-project');
+    });
+
+    expect(sessions!).toEqual([]);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions for project:', loadError);
+
+    consoleSpy.mockRestore();
   });
 });

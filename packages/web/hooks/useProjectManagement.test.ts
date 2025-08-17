@@ -67,7 +67,9 @@ describe('useProjectManagement', () => {
   });
 
   it('handles loading errors gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const networkError = new Error('Network error');
+    mockFetch.mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useProjectManagement());
 
@@ -77,6 +79,10 @@ describe('useProjectManagement', () => {
 
     expect(result.current.loading).toBe(false);
     expect(result.current.projects).toEqual([]);
+    expect(result.current.error).toBe('Network error');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load projects:', networkError);
+
+    consoleSpy.mockRestore();
   });
 
   it('updates a project', async () => {
@@ -141,5 +147,118 @@ describe('useProjectManagement', () => {
 
     // Should call fetch 3 times: initial load, update, reload
     expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('handles update project errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProjects),
+      })
+      .mockRejectedValueOnce(new Error('Update failed'));
+
+    const { result } = renderHook(() => useProjectManagement());
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await result.current.updateProject('project-1', { name: 'Updated Project' });
+    });
+
+    expect(result.current.error).toBe('Update failed');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to update project:', expect.any(Error));
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles update project HTTP errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProjects),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+
+    const { result } = renderHook(() => useProjectManagement());
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await result.current.updateProject('project-1', { name: 'Updated Project' });
+    });
+
+    expect(result.current.error).toBe('Failed to update project: 404');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to update project: 404');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles create project errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProjects),
+      })
+      .mockRejectedValueOnce(new Error('Create failed'));
+
+    const { result } = renderHook(() => useProjectManagement());
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.createProject({
+          name: 'New Project',
+          workingDirectory: '/new',
+        })
+      ).rejects.toThrow('Create failed');
+    });
+
+    expect(result.current.error).toBe('Create failed');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create project:', expect.any(Error));
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles load project configuration errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProjects),
+      })
+      .mockRejectedValueOnce(new Error('Config load failed'));
+
+    const { result } = renderHook(() => useProjectManagement());
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    let config: Record<string, unknown>;
+    await act(async () => {
+      config = await result.current.loadProjectConfiguration('project-1');
+    });
+
+    expect(config!).toEqual({});
+    expect(result.current.error).toBe('Config load failed');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to load project configuration:',
+      expect.any(Error)
+    );
+
+    consoleSpy.mockRestore();
   });
 });

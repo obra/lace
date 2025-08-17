@@ -89,6 +89,7 @@ describe('useProviders', () => {
     });
 
     it('handles API errors from parseResponse', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const mockResponse = { ok: false };
       const apiError = { error: 'Provider service unavailable' };
 
@@ -103,9 +104,15 @@ describe('useProviders', () => {
 
       expect(result.current.providers).toEqual([]);
       expect(result.current.error).toBe('Failed to load providers: Provider service unavailable');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to load providers: Provider service unavailable'
+      );
+
+      consoleSpy.mockRestore();
     });
 
     it('handles fetch errors', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       const { result } = renderHook(() => useProviders());
@@ -116,9 +123,13 @@ describe('useProviders', () => {
 
       expect(result.current.providers).toEqual([]);
       expect(result.current.error).toBe('Failed to load providers: Network error');
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Network error');
+
+      consoleSpy.mockRestore();
     });
 
     it('handles unknown errors', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockRejectedValue('String error');
 
       const { result } = renderHook(() => useProviders());
@@ -129,11 +140,16 @@ describe('useProviders', () => {
 
       expect(result.current.providers).toEqual([]);
       expect(result.current.error).toBe('Failed to load providers: Unknown error');
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Unknown error');
+
+      consoleSpy.mockRestore();
     });
   });
 
   describe('Refetch Functionality', () => {
     it('provides refetch function that reloads providers', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       // Initial load fails
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
@@ -143,6 +159,8 @@ describe('useProviders', () => {
         expect(result.current.loading).toBe(false);
         expect(result.current.error).toBe('Failed to load providers: Network error');
       });
+
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Network error');
 
       // Refetch succeeds
       const mockResponse = { ok: true };
@@ -160,6 +178,8 @@ describe('useProviders', () => {
       expect(result.current.providers).toEqual(mockProviders);
       expect(result.current.error).toBe(null);
       expect(mockFetch).toHaveBeenCalledTimes(2); // Initial + refetch
+
+      consoleSpy.mockRestore();
     });
 
     it('sets loading state during refetch', async () => {
@@ -234,6 +254,8 @@ describe('useProviders', () => {
     });
 
     it('preserves providers data when refetch fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       // Initial successful load
       const mockResponse = { ok: true };
       mockFetch.mockResolvedValue(mockResponse);
@@ -260,6 +282,9 @@ describe('useProviders', () => {
       // Should keep original providers and show error
       expect(result.current.providers).toEqual([]); // Sets to empty on error
       expect(result.current.error).toBe('Failed to load providers: Network error');
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Network error');
+
+      consoleSpy.mockRestore();
     });
   });
 
@@ -278,6 +303,8 @@ describe('useProviders', () => {
     });
 
     it('clears error state on successful refetch', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       // Initial load fails
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
@@ -286,6 +313,8 @@ describe('useProviders', () => {
       await waitFor(() => {
         expect(result.current.error).toBe('Failed to load providers: Network error');
       });
+
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Network error');
 
       // Refetch succeeds
       const mockResponse = { ok: true };
@@ -300,6 +329,8 @@ describe('useProviders', () => {
         expect(result.current.error).toBe(null);
         expect(result.current.providers).toEqual(mockProviders);
       });
+
+      consoleSpy.mockRestore();
     });
   });
 });
