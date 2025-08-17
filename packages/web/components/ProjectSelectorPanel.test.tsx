@@ -12,6 +12,7 @@ import {
   createMockProjectContext,
   createMockSessionContext,
 } from '@/__tests__/utils/provider-mocks';
+import { stringify } from '@/lib/serialization';
 
 // Mock all the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -84,6 +85,39 @@ describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Mock fetch API for ProviderInstanceProvider
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      // Handle provider instances endpoint
+      if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ instances: [] }),
+        } as Response);
+      }
+
+      // Handle provider catalog endpoint
+      if (url === '/api/provider/catalog') {
+        const response = stringify({ providers: [] });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve({ providers: [] }),
+        } as Response);
+      }
+
+      // Default fallback for other URLs
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(stringify({})),
+        json: () => Promise.resolve({}),
+      } as Response);
+    });
+
     // Set up default mock returns
     mockUseProjectContext.mockReturnValue(
       createMockProjectContext({
@@ -135,9 +169,7 @@ describe('ProjectSelectorPanel', () => {
 
   it('should render project list', async () => {
     await act(async () => {
-      await act(async () => {
-        render(<ProjectSelectorPanel />);
-      });
+      render(<ProjectSelectorPanel />);
     });
 
     expect(screen.getByText('Test Project 1')).toBeInTheDocument();
@@ -148,9 +180,7 @@ describe('ProjectSelectorPanel', () => {
 
   it('should call onProjectSelect when project is clicked', async () => {
     await act(async () => {
-      await act(async () => {
-        render(<ProjectSelectorPanel />);
-      });
+      render(<ProjectSelectorPanel />);
     });
 
     await user.click(screen.getByText('Test Project 1'));
