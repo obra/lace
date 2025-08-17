@@ -3,16 +3,12 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@/lib/fontawesome';
-import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
+import { faBars } from '@/lib/fontawesome';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
-import { TokenUsageDisplay } from '@/components/ui';
-import { TokenUsageSection } from '@/components/ui/TokenUsageSection';
-import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
-import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { LoadingView } from '@/components/pages/views/LoadingView';
 import { Chat } from '@/components/chat/Chat';
@@ -20,23 +16,11 @@ import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
-import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
-import type {
-  ProviderInfo,
-  CreateAgentRequest,
-  MessageRequest,
-  MessageResponse,
-} from '@/types/api';
-import { isApiError } from '@/types/api';
-import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
+import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
-import { ApprovalDecision } from '@/types/core';
-import type { LaceEvent } from '~/threads/types';
-import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
-import type { ToolApprovalRequestData } from '@/types/web-events';
 import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
+import { useTheme } from '@/components/providers/ThemeProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
@@ -52,16 +36,11 @@ import {
   ToolApprovalProvider,
   useToolApprovalContext,
 } from '@/components/providers/ToolApprovalProvider';
-import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
-import { SessionSection } from '@/components/sidebar/SessionSection';
-import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
-import Link from 'next/link';
 
 // Main app component logic
 function LaceAppMain() {
@@ -71,33 +50,19 @@ function LaceAppMain() {
   // App state from context (now only hash router selections)
   const {
     selections: { selectedSession, selectedProject, selectedAgent, urlStateHydrated },
-    actions: { setSelectedSession, updateHashState },
   } = useAppState();
 
   // Agent state from AgentProvider
   const {
     sessionDetails: selectedSessionDetails,
     loading: agentLoading,
-    foundAgent,
-    currentAgent,
-    agentBusy,
     selectAgent: setSelectedAgent,
-    createAgent,
-    updateAgentState,
-    reloadSessionDetails,
     loadAgentConfiguration,
     updateAgent,
   } = useAgentContext();
 
-  // Session state from SessionProvider
-  const {
-    sessions,
-    loading: sessionLoading,
-    projectConfig,
-    createSession,
-    reloadSessions,
-    enableAgentAutoSelection,
-  } = useSessionContext();
+  // Get enableAgentAutoSelection for onboarding
+  const { enableAgentAutoSelection } = useSessionContext();
 
   // Project state from ProjectProvider
   const {
@@ -327,7 +292,7 @@ function LaceAppMain() {
           {loadingProjects || loadingProviders ? (
             <LoadingView />
           ) : selectedProject && foundProject ? (
-            selectedAgent || (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
+            selectedAgent || (selectedSessionDetails?.agents?.length ?? 0) > 0 ? (
               <Chat />
             ) : (
               <div className="flex-1 p-6">

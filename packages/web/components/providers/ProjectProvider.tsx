@@ -97,7 +97,7 @@ export function ProjectProvider({
   // Transform projects for sidebar display
   const projectsForSidebar = useMemo(
     () =>
-      projects.map((p) => ({
+      (projects || []).map((p) => ({
         id: p.id,
         name: p.name,
         workingDirectory: p.workingDirectory,
