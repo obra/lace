@@ -263,7 +263,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     // Search filter
     const matchesSearch =
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (project.description ?? '').toLowerCase().includes(searchQuery.toLowerCase());
 
     // Archive filter
     const matchesArchiveFilter =

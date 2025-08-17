@@ -10,6 +10,7 @@ import React, {
   useCallback,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { ThreadId } from '@/types/core';
@@ -42,6 +43,7 @@ interface ToolApprovalProviderProps {
 export function ToolApprovalProvider({ children, agentId }: ToolApprovalProviderProps) {
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loading, setLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Refresh pending approvals from API
   const refreshPendingApprovals = useCallback(async () => {
@@ -52,7 +54,14 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/threads/${agentId}/approvals/pending`);
+      // Abort any in-flight request before starting a new one
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      const res = await fetch(`/api/threads/${agentId}/approvals/pending`, {
+        signal: controller.signal,
+      });
       const data = await parseResponse<PendingApproval[] | { error: string }>(res);
 
       if (!res.ok || isApiError(data)) {
@@ -60,18 +69,13 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
         throw new Error(message);
       }
 
-      if (Array.isArray(data) && data.length > 0) {
-        const approvals = data.map((approval: PendingApproval) => ({
-          toolCallId: approval.toolCallId,
-          toolCall: approval.toolCall,
-          requestedAt: approval.requestedAt,
-          requestData: approval.requestData,
-        }));
-        setPendingApprovals(approvals);
+      if (Array.isArray(data)) {
+        setPendingApprovals(data);
       } else {
         setPendingApprovals([]);
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       console.error('[TOOL_APPROVAL] Failed to fetch pending approvals:', error);
       setPendingApprovals([]);
     } finally {
@@ -81,7 +85,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
 
   // Handle approval requests (triggered by event stream)
   const handleApprovalRequest = useCallback(
-    (approval: PendingApproval) => {
+    (_approval: PendingApproval) => {
       // When we get a new approval request, refresh the pending approvals
       // to get the most up-to-date data from the API with tool metadata
       void refreshPendingApprovals();

@@ -67,12 +67,12 @@ export function useSessionEvents(
 
       setEvents((prev) => {
         // Insert in sorted position to avoid full sort
-        const timestamp = new Date(threadEvent.timestamp || new Date()).getTime();
+        const timestamp = new Date(threadEvent.timestamp ?? new Date()).getTime();
         let insertIndex = prev.length;
 
         // Find insertion point (reverse search since newer events are more common)
         for (let i = prev.length - 1; i >= 0; i--) {
-          if (new Date(prev[i]!.timestamp || new Date()).getTime() <= timestamp) {
+          if (new Date(prev[i]!.timestamp ?? new Date()).getTime() <= timestamp) {
             insertIndex = i + 1;
             break;
           }
@@ -116,13 +116,21 @@ export function useSessionEvents(
           // Filter out internal workflow events (they're handled separately)
           const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
 
-          setEvents(timelineEvents);
-          // Seed dedup cache so replays do not create duplicates
-          for (const ev of timelineEvents) {
-            seenEvents.current.add(getEventKey(ev));
-          }
+          // Merge history with existing streamed events using dedup guard
+          setEvents((prev) => {
+            const newUniqueEvents = [];
+            for (const event of timelineEvents) {
+              const eventKey = getEventKey(event);
+              if (!seenEvents.current.has(eventKey)) {
+                newUniqueEvents.push(event);
+                seenEvents.current.add(eventKey);
+              }
+            }
+            return [...prev, ...newUniqueEvents];
+          });
         } else {
           console.warn('[SESSION_EVENTS] Received non-array data:', data);
+          seenEvents.current.clear();
           setEvents([]);
         }
         setLoadingHistory(false);

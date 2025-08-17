@@ -201,7 +201,9 @@ describe('ToolApprovalProvider', () => {
       );
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`);
+        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          signal: expect.any(AbortSignal),
+        });
       });
 
       await waitFor(() => {
@@ -303,7 +305,9 @@ describe('ToolApprovalProvider', () => {
 
       // Should trigger refresh
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`);
+        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          signal: expect.any(AbortSignal),
+        });
       });
     });
 
@@ -489,7 +493,9 @@ describe('ToolApprovalProvider', () => {
 
       // Wait for initial load
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`);
+        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          signal: expect.any(AbortSignal),
+        });
       });
 
       vi.clearAllMocks();
@@ -504,7 +510,9 @@ describe('ToolApprovalProvider', () => {
 
       // Should fetch for new agent
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${newAgentId}/approvals/pending`);
+        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${newAgentId}/approvals/pending`, {
+          signal: expect.any(AbortSignal),
+        });
       });
     });
   });

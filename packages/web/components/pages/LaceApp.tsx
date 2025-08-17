@@ -20,18 +20,13 @@ import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
-import { useTheme } from '@/components/providers/ThemeProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import {
-  EventStreamProvider,
-  useSessionEvents,
-  useEventStream,
-} from '@/components/providers/EventStreamProvider';
+import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
 import {
   ToolApprovalProvider,
   useToolApprovalContext,
@@ -44,9 +39,6 @@ import { AgentProvider } from '@/components/providers/AgentProvider';
 
 // Main app component logic
 function LaceAppMain() {
-  // Theme state
-  const { theme, setTheme } = useTheme();
-
   // App state from context (now only hash router selections)
   const {
     selections: { selectedSession, selectedProject, selectedAgent, urlStateHydrated },
@@ -85,8 +77,6 @@ function LaceAppMain() {
     toggleDesktopSidebar,
     autoOpenCreateProject,
     setAutoOpenCreateProject,
-    loading,
-    setLoading,
   } = useUIContext();
 
   const { providers, loading: loadingProviders } = useProviders();
@@ -106,15 +96,8 @@ function LaceAppMain() {
     enableAgentAutoSelection
   );
 
-  // Use session events from EventStreamProvider context
-  const { events, loadingHistory } = useSessionEvents();
-
   // Use tool approvals from ToolApprovalProvider context
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
-
-  // Use event stream connection from EventStreamProvider context
-  const { connection } = useEventStream();
-  const connected = connection.connected;
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
