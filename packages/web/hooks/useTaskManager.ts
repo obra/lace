@@ -31,7 +31,7 @@ export function useTaskManager(
 
   // Keep track of pending operations to batch refetches
   const pendingOperations = useRef(0);
-  const refetchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const refetchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Create API client
   const client = useRef(new TaskAPIClient());
@@ -115,7 +115,7 @@ export function useTaskManager(
     [eventHandlers]
   );
 
-  // Initial fetch
+  // Fetch tasks when project or session changes
   useEffect(() => {
     void fetchTasks();
 
@@ -124,7 +124,7 @@ export function useTaskManager(
         clearTimeout(refetchTimeout.current);
       }
     };
-  }, [fetchTasks]);
+  }, [projectId, sessionId]); // fetchTasks is stable thanks to useCallback([projectId, sessionId])
 
   // Refetch with filters
   const refetch = useCallback(

@@ -17,15 +17,9 @@ vi.mock('@/hooks/useProjectManagement', () => ({
   useProjectManagement: vi.fn(),
 }));
 
-vi.mock('@/hooks/useHashRouter', () => ({
-  useHashRouter: vi.fn(),
-}));
-
 import { useProjectManagement } from '@/hooks/useProjectManagement';
-import { useHashRouter } from '@/hooks/useHashRouter';
 
 const mockUseProjectManagement = vi.mocked(useProjectManagement);
-const mockUseHashRouter = vi.mocked(useHashRouter);
 
 // Test data factories
 const createMockProject = (overrides?: Partial<ProjectInfo>): ProjectInfo => ({
@@ -45,6 +39,14 @@ const mockProjects: ProjectInfo[] = [
   createMockProject({ id: 'project-2', name: 'Project Two', isArchived: true }),
   createMockProject({ id: 'project-3', name: 'Project Three', sessionCount: 0 }),
 ];
+
+// Factory for test props to avoid shared mutable state
+function createTestProps() {
+  return {
+    selectedProject: 'project-1' as string | null,
+    onProjectSelect: vi.fn(),
+  };
+}
 
 // Component to test context provision
 function ContextConsumer() {
@@ -105,30 +107,16 @@ describe('ProjectProvider', () => {
     reloadProjects: mockReloadProjects,
   };
 
-  const defaultHashRouter = {
-    project: 'project-1',
-    setProject: mockSetSelectedProject,
-    // Add other required properties with minimal implementations
-    session: null,
-    agent: null,
-    isHydrated: true,
-    setSession: vi.fn(),
-    setAgent: vi.fn(),
-    updateState: vi.fn(),
-    clearAll: vi.fn(),
-    state: { project: 'project-1' },
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseProjectManagement.mockReturnValue(defaultProjectManagement);
-    mockUseHashRouter.mockReturnValue(defaultHashRouter);
   });
 
   describe('Context Provision', () => {
     it('provides project context to children', () => {
+      const testProps = createTestProps();
       render(
-        <ProjectProvider>
+        <ProjectProvider {...testProps}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -155,7 +143,7 @@ describe('ProjectProvider', () => {
   describe('Project Data Management', () => {
     it('provides found project data when project is selected', () => {
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -164,14 +152,8 @@ describe('ProjectProvider', () => {
     });
 
     it('provides null found project when no project is selected', () => {
-      mockUseHashRouter.mockReturnValue({
-        ...defaultHashRouter,
-        project: null,
-        state: { project: undefined },
-      });
-
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()} selectedProject={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -180,14 +162,8 @@ describe('ProjectProvider', () => {
     });
 
     it('provides null found project when selected project not found', () => {
-      mockUseHashRouter.mockReturnValue({
-        ...defaultHashRouter,
-        project: 'nonexistent-project',
-        state: { project: 'nonexistent-project' },
-      });
-
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()} selectedProject="nonexistent-project">
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -197,7 +173,7 @@ describe('ProjectProvider', () => {
 
     it('transforms projects for sidebar display correctly', () => {
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -208,33 +184,35 @@ describe('ProjectProvider', () => {
   });
 
   describe('Project Selection', () => {
-    it('calls setSelectedProject when selectProject is called', () => {
+    it('calls onProjectSelect when selectProject is called', () => {
+      const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-project-2'));
 
-      expect(mockSetSelectedProject).toHaveBeenCalledWith('project-2');
+      expect(mockOnProjectSelect).toHaveBeenCalledWith('project-2');
     });
 
     it('calls selectProject when onProjectSelect is called', () => {
+      const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-project-3'));
 
-      expect(mockSetSelectedProject).toHaveBeenCalledWith('project-3');
+      expect(mockOnProjectSelect).toHaveBeenCalledWith('project-3');
     });
 
     it('calls onProjectChange callback when project selection changes', () => {
       render(
-        <ProjectProvider onProjectChange={mockOnProjectChange}>
+        <ProjectProvider {...createTestProps()} onProjectChange={mockOnProjectChange}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -255,8 +233,13 @@ describe('ProjectProvider', () => {
         );
       }
 
+      const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider onProjectChange={mockOnProjectChange}>
+        <ProjectProvider
+          {...createTestProps()}
+          onProjectChange={mockOnProjectChange}
+          onProjectSelect={mockOnProjectSelect}
+        >
           <TestComponent />
         </ProjectProvider>
       );
@@ -264,8 +247,8 @@ describe('ProjectProvider', () => {
       // Click the button that calls onProjectSelect with empty string
       fireEvent.click(screen.getByTestId('clear-selection'));
 
-      // Verify that setProject was called with null (empty string converted)
-      expect(mockSetSelectedProject).toHaveBeenCalledWith(null);
+      // Verify that onProjectSelect was called with null (empty string converted)
+      expect(mockOnProjectSelect).toHaveBeenCalledWith(null);
       expect(mockOnProjectChange).toHaveBeenCalledWith(null);
     });
   });
@@ -275,7 +258,7 @@ describe('ProjectProvider', () => {
       mockUpdateProject.mockResolvedValue(undefined);
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -289,7 +272,7 @@ describe('ProjectProvider', () => {
       mockReloadProjects.mockResolvedValue(mockProjects);
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -305,7 +288,7 @@ describe('ProjectProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -328,7 +311,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -343,7 +326,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -359,7 +342,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -384,14 +367,8 @@ describe('ProjectProvider', () => {
         projects: incompleteProjects,
       });
 
-      mockUseHashRouter.mockReturnValue({
-        ...defaultHashRouter,
-        project: 'incomplete',
-        state: { project: 'incomplete' },
-      });
-
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()} selectedProject="incomplete">
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -414,7 +391,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );

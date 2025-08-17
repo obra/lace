@@ -8,9 +8,7 @@ import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import type { ThreadId } from '@/types/core';
 
 interface SidebarContentProps {
   // Mobile behavior
@@ -21,6 +19,7 @@ interface SidebarContentProps {
   onSwitchProject: () => void;
   onAgentSelect: (agentId: string) => void;
   onClearAgent: () => void;
+  onConfigureAgent?: (agentId: string) => void;
 }
 
 export const SidebarContent = memo(function SidebarContent({
@@ -29,6 +28,7 @@ export const SidebarContent = memo(function SidebarContent({
   onSwitchProject,
   onAgentSelect,
   onClearAgent,
+  onConfigureAgent,
 }: SidebarContentProps) {
   // Get state from providers
   const { selectedProject } = useProjectContext();
@@ -51,6 +51,7 @@ export const SidebarContent = memo(function SidebarContent({
           onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
           onAgentSelect={onAgentSelect}
           onClearAgent={onClearAgent}
+          onConfigureAgent={onConfigureAgent}
         />
       )}
 

@@ -18,7 +18,6 @@ import {
 } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
-import { parseTyped } from '@/lib/serialization';
 import { DirectoryField } from '@/components/ui';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
@@ -77,7 +76,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   // Get data from providers instead of props
   const {
     projects,
-    projectsForSidebar,
     currentProject,
     loading: projectLoading,
     onProjectSelect,
@@ -86,13 +84,13 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectContext();
-  const { enableAgentAutoSelection, sessions, loadSessionsForProject } = useSessionContext();
+  const { enableAgentAutoSelection, loadSessionsForProject } = useSessionContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIState();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,
     enableAgentAutoSelection
   );
-  const { providers, loading: providersLoading } = useProviders();
+  const { providers, loading: providersLoading, refetch: refetchProviders } = useProviders();
 
   const loading = projectLoading || providersLoading;
   const selectedProject = currentProject.id ? currentProject : null;
@@ -130,7 +128,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Provider setup state
   const [showAddProvider, setShowAddProvider] = useState(false);
-  const [refreshProviders, setRefreshProviders] = useState(0);
 
   // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
@@ -149,7 +146,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         modelId: firstProvider.models[0]?.id || '',
       }));
     }
-  }, [availableProviders, createConfig.providerInstanceId, refreshProviders]);
+  }, [availableProviders, createConfig.providerInstanceId]);
 
   // External trigger: open modal when parent requests (e.g., empty-state button)
   // Only open once per toggle of autoOpenCreate to avoid reopening after user closes
@@ -178,9 +175,9 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   // Handle provider instance creation success
   const handleProviderAdded = useCallback(() => {
     // Trigger a refresh of providers data
-    setRefreshProviders((prev) => prev + 1);
+    void refetchProviders();
     setShowAddProvider(false);
-  }, []);
+  }, [refetchProviders]);
 
   // Cancel project creation
   const handleCancelCreateProject = useCallback(() => {
@@ -266,7 +263,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     // Search filter
     const matchesSearch =
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (project.description ?? '').toLowerCase().includes(searchQuery.toLowerCase());
 
     // Archive filter
     const matchesArchiveFilter =

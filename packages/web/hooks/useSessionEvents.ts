@@ -5,7 +5,28 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { LaceEvent } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
+
+// Runtime type guards for safe parsing
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return !!val && typeof val === 'object' && !Array.isArray(val);
+}
+
+function isLaceEvent(val: unknown): val is LaceEvent {
+  if (!isPlainObject(val)) return false;
+  const type = val.type;
+  const threadId = val.threadId;
+  const timestamp = val.timestamp;
+  return (
+    typeof type === 'string' &&
+    typeof threadId === 'string' &&
+    (typeof timestamp === 'string' || typeof timestamp === 'number')
+  );
+}
+
+function isLaceEventArray(data: unknown): data is LaceEvent[] {
+  return Array.isArray(data) && data.every(isLaceEvent);
+}
 
 export interface UseSessionEventsReturn {
   allEvents: LaceEvent[];
@@ -46,12 +67,12 @@ export function useSessionEvents(
 
       setEvents((prev) => {
         // Insert in sorted position to avoid full sort
-        const timestamp = new Date(threadEvent.timestamp || new Date()).getTime();
+        const timestamp = new Date(threadEvent.timestamp ?? new Date()).getTime();
         let insertIndex = prev.length;
 
         // Find insertion point (reverse search since newer events are more common)
         for (let i = prev.length - 1; i >= 0; i--) {
-          if (new Date(prev[i]!.timestamp || new Date()).getTime() <= timestamp) {
+          if (new Date(prev[i]!.timestamp ?? new Date()).getTime() <= timestamp) {
             insertIndex = i + 1;
             break;
           }
@@ -73,34 +94,63 @@ export function useSessionEvents(
   // Load historical events when session changes
   useEffect(() => {
     if (!sessionId) {
+      seenEvents.current.clear();
       setEvents([]);
       setLoadingHistory(false);
       return;
     }
 
     setLoadingHistory(true);
+    const controller = new AbortController();
 
-    // Load session history
-    fetch(`/api/sessions/${sessionId}/history`)
+    void fetch(`/api/sessions/${sessionId}/history`, { signal: controller.signal })
       .then(async (res) => {
-        const text = await res.text();
-        return parse(text) as LaceEvent[];
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        }
+        return parseResponse<unknown>(res);
       })
       .then((data) => {
-        if (data) {
+        if (isLaceEventArray(data)) {
           // Events are already properly typed LaceEvents from superjson
           // Filter out internal workflow events (they're handled separately)
           const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
 
-          setEvents(timelineEvents);
+          // Merge history with existing streamed events using dedup guard
+          setEvents((prev) => {
+            const newUniqueEvents: LaceEvent[] = [];
+            for (const event of timelineEvents) {
+              const eventKey = getEventKey(event);
+              if (!seenEvents.current.has(eventKey)) {
+                newUniqueEvents.push(event);
+                seenEvents.current.add(eventKey);
+              }
+            }
+
+            // Merge and sort by timestamp for chronological order
+            const mergedEvents = [...prev, ...newUniqueEvents];
+            return mergedEvents.sort((a, b) => {
+              const aTime = new Date(a.timestamp ?? new Date()).getTime();
+              const bTime = new Date(b.timestamp ?? new Date()).getTime();
+              return aTime - bTime;
+            });
+          });
+        } else {
+          console.warn('[SESSION_EVENTS] Received non-array data:', data);
+          seenEvents.current.clear();
+          setEvents([]);
         }
         setLoadingHistory(false);
       })
-      .catch((error) => {
-        console.error('[SESSION_EVENTS] Failed to load history:', error);
-        setLoadingHistory(false);
+      .catch((error: unknown) => {
+        if ((error as { name?: string }).name !== 'AbortError') {
+          console.error('[SESSION_EVENTS] Failed to load history:', error);
+          setLoadingHistory(false);
+        }
       });
-  }, [sessionId]);
+
+    return () => controller.abort();
+  }, [sessionId, getEventKey]);
 
   // Filter events by selected agent
   const filteredEvents = useMemo(() => {

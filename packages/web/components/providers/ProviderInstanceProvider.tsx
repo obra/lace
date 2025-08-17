@@ -185,13 +185,37 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
   const createInstance = useCallback(
     async (catalogProviderId: string, formData: InstanceFormData) => {
       try {
+        // Generate instanceId from displayName and catalogProviderId
+        const generateInstanceId = (displayName: string, providerId: string): string => {
+          const baseName = `${displayName.toLowerCase()}-${providerId}`;
+          const cleanName = baseName
+            .replace(/[^a-z0-9\s]/g, '') // Remove special chars except spaces
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+
+          // Add timestamp suffix to ensure uniqueness
+          const timestamp = Date.now().toString().slice(-4);
+          return `${cleanName}-${timestamp}`;
+        };
+
+        const instanceId = generateInstanceId(formData.displayName, catalogProviderId);
+
+        const requestBody = {
+          instanceId,
+          catalogProviderId,
+          displayName: formData.displayName,
+          endpoint: formData.endpoint || undefined, // Don't send empty string
+          timeout: formData.timeout,
+          credential: {
+            apiKey: formData.apiKey,
+          },
+        };
+
         const response = await fetch('/api/provider/instances', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            catalogProviderId,
-            ...formData,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -372,10 +396,11 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     [testResults, getInstanceById]
   );
 
-  // Load instances on mount
+  // Load instances on mount only - dependency on loadInstances would cause infinite re-render loop
+  // since loadInstances is recreated on every render despite useCallback
   useEffect(() => {
     void loadInstances();
-  }, [loadInstances]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(

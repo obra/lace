@@ -3,105 +3,63 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faFolder, faComments, faRobot, faPlus, faCog, faTasks } from '@/lib/fontawesome';
-import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
+import { faBars } from '@/lib/fontawesome';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileSidebar } from '@/components/layout/MobileSidebar';
-import { TokenUsageDisplay } from '@/components/ui';
-import { TokenUsageSection } from '@/components/ui/TokenUsageSection';
-import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
-import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { LoadingView } from '@/components/pages/views/LoadingView';
 import { Chat } from '@/components/chat/Chat';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
+import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
-import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
-import type {
-  ProviderInfo,
-  CreateAgentRequest,
-  MessageRequest,
-  MessageResponse,
-} from '@/types/api';
-import { isApiError } from '@/types/api';
-import type { ThreadId, Task, SessionInfo, AgentInfo, ProjectInfo, AgentState } from '@/types/core';
+import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
-import { ApprovalDecision } from '@/types/core';
-import type { LaceEvent } from '~/threads/types';
-import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
-import type { ToolApprovalRequestData } from '@/types/web-events';
-import { useUIState } from '@/hooks/useUIState';
+import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import {
-  EventStreamProvider,
-  useSessionEvents,
-  useEventStream,
-} from '@/components/providers/EventStreamProvider';
+import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
 import {
   ToolApprovalProvider,
   useToolApprovalContext,
 } from '@/components/providers/ToolApprovalProvider';
-import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
-import { SessionSection } from '@/components/sidebar/SessionSection';
-import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
-import Link from 'next/link';
 
-// Inner component that uses app state context
-const LaceAppInner = memo(function LaceAppInner() {
-  // Theme state
-  const { theme, setTheme } = useTheme();
-
+// Main app component logic
+function LaceAppMain() {
   // App state from context (now only hash router selections)
   const {
-    selections: { selectedSession, urlStateHydrated },
-    actions: { setSelectedSession, updateHashState },
+    selections: { selectedSession, selectedProject, selectedAgent, urlStateHydrated },
   } = useAppState();
 
   // Agent state from AgentProvider
   const {
     sessionDetails: selectedSessionDetails,
     loading: agentLoading,
-    selectedAgent,
-    foundAgent,
-    currentAgent,
-    agentBusy,
     selectAgent: setSelectedAgent,
-    createAgent,
-    updateAgentState,
-    reloadSessionDetails,
+    loadAgentConfiguration,
+    updateAgent,
   } = useAgentContext();
 
-  // Session state from SessionProvider
-  const {
-    sessions,
-    loading: sessionLoading,
-    projectConfig,
-    createSession,
-    reloadSessions,
-    enableAgentAutoSelection,
-  } = useSessionContext();
+  // Get enableAgentAutoSelection for onboarding
+  const { enableAgentAutoSelection } = useSessionContext();
 
   // Project state from ProjectProvider
   const {
     projects,
     loading: loadingProjects,
-    selectedProject,
     foundProject,
     currentProject,
     projectsForSidebar,
@@ -110,9 +68,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     reloadProjects,
   } = useProjectContext();
 
-  // Current project now comes from ProjectProvider
-
-  // UI State
+  // UI State from UIProvider
   const {
     showMobileNav,
     setShowMobileNav,
@@ -121,10 +77,18 @@ const LaceAppInner = memo(function LaceAppInner() {
     toggleDesktopSidebar,
     autoOpenCreateProject,
     setAutoOpenCreateProject,
-    loading,
-    setLoading,
-  } = useUIState();
+  } = useUIContext();
+
   const { providers, loading: loadingProviders } = useProviders();
+
+  // Agent config modal state
+  const [showEditAgent, setShowEditAgent] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<{
+    threadId: string;
+    name: string;
+    providerInstanceId: string;
+    modelId: string;
+  } | null>(null);
 
   // Onboarding flow management
   const { handleOnboardingComplete, handleAutoOpenProjectCreation } = useOnboarding(
@@ -132,24 +96,8 @@ const LaceAppInner = memo(function LaceAppInner() {
     enableAgentAutoSelection
   );
 
-  // Use session events from EventStreamProvider context
-  const { events, loadingHistory } = useSessionEvents();
-
-  // Use session API from EventStreamProvider context
-
   // Use tool approvals from ToolApprovalProvider context
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
-
-  // Use event stream connection from EventStreamProvider context
-  const { connection } = useEventStream();
-  const connected = connection.connected;
-
-  // Current agent and busy state now come from AgentProvider
-
-  // Events are now LaceEvent[] directly
-  // No conversion needed - components handle LaceEvent natively
-
-  // Providers are now loaded by useProviders hook
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
@@ -158,22 +106,62 @@ const LaceAppInner = memo(function LaceAppInner() {
     }
   }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
 
-  // Tool approval decisions are now handled by ToolApprovalProvider
-
   // Handle agent selection within a session
-  const handleAgentSelect = (agentThreadId: string) => {
-    // Manual agent selection - no need to disable auto-selection as SessionProvider handles this
-    setSelectedAgent(asThreadId(agentThreadId));
-  };
-
-  // Onboarding completion is now handled by useOnboarding hook
-
-  // Project data transformations are now handled by ProjectProvider
+  const handleAgentSelect = useCallback(
+    (agentThreadId: string) => {
+      setSelectedAgent(asThreadId(agentThreadId));
+    },
+    [setSelectedAgent]
+  );
 
   // Handle switching projects (clear current selection)
   const handleSwitchProject = useCallback(() => {
     onProjectSelect({ id: '' }); // Empty string will be handled as null by ProjectProvider
   }, [onProjectSelect]);
+
+  // Handle agent configuration
+  const handleConfigureAgent = useCallback(
+    async (agentId: string) => {
+      try {
+        const agentDetails = await loadAgentConfiguration(agentId);
+        setEditingAgent({
+          threadId: agentId,
+          name: agentDetails.name,
+          providerInstanceId: agentDetails.providerInstanceId,
+          modelId: agentDetails.modelId,
+        });
+        setShowEditAgent(true);
+      } catch (error) {
+        console.error('Failed to load agent for editing:', error);
+      }
+    },
+    [loadAgentConfiguration]
+  );
+
+  const handleEditAgentSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingAgent || !editingAgent.name.trim()) return;
+
+      try {
+        await updateAgent(editingAgent.threadId, {
+          name: editingAgent.name.trim(),
+          providerInstanceId: editingAgent.providerInstanceId,
+          modelId: editingAgent.modelId,
+        });
+        setShowEditAgent(false);
+        setEditingAgent(null);
+      } catch (error) {
+        console.error('Failed to update agent:', error);
+      }
+    },
+    [editingAgent, updateAgent]
+  );
+
+  const handleCloseEditAgent = useCallback(() => {
+    setShowEditAgent(false);
+    setEditingAgent(null);
+  }, []);
 
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
@@ -213,6 +201,7 @@ const LaceAppInner = memo(function LaceAppInner() {
                     onSwitchProject={handleSwitchProject}
                     onAgentSelect={handleAgentSelect}
                     onClearAgent={() => setSelectedAgent(null)}
+                    onConfigureAgent={handleConfigureAgent}
                   />
                 </MobileSidebar>
               )}
@@ -235,6 +224,7 @@ const LaceAppInner = memo(function LaceAppInner() {
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
                 onClearAgent={() => setSelectedAgent(null)}
+                onConfigureAgent={handleConfigureAgent}
               />
             </Sidebar>
           )}
@@ -285,8 +275,7 @@ const LaceAppInner = memo(function LaceAppInner() {
           {loadingProjects || loadingProviders ? (
             <LoadingView />
           ) : selectedProject && foundProject ? (
-            selectedAgent ||
-            (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
+            selectedAgent || (selectedSessionDetails?.agents?.length ?? 0) > 0 ? (
               <Chat />
             ) : (
               <div className="flex-1 p-6">
@@ -308,78 +297,92 @@ const LaceAppInner = memo(function LaceAppInner() {
       {pendingApprovals && pendingApprovals.length > 0 && (
         <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
       )}
+
+      {/* Agent Edit Modal */}
+      <AgentEditModal
+        isOpen={showEditAgent}
+        editingAgent={editingAgent}
+        providers={providers}
+        loading={agentLoading}
+        onClose={handleCloseEditAgent}
+        onSubmit={handleEditAgentSubmit}
+        onAgentChange={setEditingAgent}
+      />
     </motion.div>
   );
-});
+}
 
-// Main LaceApp component with integrated provider hierarchy
+// Main LaceApp component with all providers
 export default function LaceApp() {
   return (
     <AppStateProvider>
-      <LaceAppContent />
+      <UIProvider>
+        <LaceAppContent />
+      </UIProvider>
     </AppStateProvider>
   );
 }
 
-// Main app content with all providers integrated
-const LaceAppContent = memo(function LaceAppContent() {
+// Content component with all business logic providers
+function LaceAppContent() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
+    actions: { setSelectedProject },
   } = useAppState();
 
   const handleProjectChange = useCallback((projectId: string | null) => {
     // Enable auto-selection for project changes
-    // This matches the current LaceApp behavior
-    // TODO: Move this logic to AgentProvider when we create it
   }, []);
 
   const handleAgentChange = useCallback((agentId: string | null) => {
     // Agent selection change handling
-    // This will be called when agent selection changes
   }, []);
 
+  const handleProjectSelect = useCallback(
+    (projectId: string | null) => {
+      setSelectedProject(projectId);
+    },
+    [setSelectedProject]
+  );
+
   return (
-    <ProjectProvider onProjectChange={handleProjectChange}>
+    <ProjectProvider
+      onProjectChange={handleProjectChange}
+      selectedProject={selectedProject}
+      onProjectSelect={handleProjectSelect}
+    >
       <SessionProvider projectId={selectedProject}>
         <AgentProvider sessionId={selectedSession} onAgentChange={handleAgentChange}>
-          <ToolApprovalProvider agentId={selectedAgent as ThreadId | null}>
-            <AgentProviderConsumer />
-          </ToolApprovalProvider>
+          <LaceAppWithAllProviders />
         </AgentProvider>
       </SessionProvider>
     </ProjectProvider>
   );
-});
+}
 
-// Consumer component that has access to AgentProvider context
-const AgentProviderConsumer = memo(function AgentProviderConsumer() {
+// Component with all remaining providers and main UI logic
+function LaceAppWithAllProviders() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
   } = useAppState();
 
-  const { sessionDetails: selectedSessionDetails, updateAgentState } = useAgentContext();
-
-  const handleAgentStateChange = useCallback(
-    (agentId: string, from: string, to: string) => {
-      updateAgentState(agentId, from, to);
-    },
-    [updateAgentState]
-  );
+  const { sessionDetails: selectedSessionDetails } = useAgentContext();
 
   return (
-    <EventStreamProvider
-      projectId={selectedProject}
-      sessionId={selectedSession as ThreadId | null}
-      agentId={selectedAgent as ThreadId | null}
-      onAgentStateChange={handleAgentStateChange}
-    >
-      <TaskProvider
+    <ToolApprovalProvider agentId={selectedAgent as ThreadId | null}>
+      <EventStreamProvider
         projectId={selectedProject}
         sessionId={selectedSession as ThreadId | null}
-        agents={selectedSessionDetails?.agents}
+        agentId={selectedAgent as ThreadId | null}
       >
-        <LaceAppInner />
-      </TaskProvider>
-    </EventStreamProvider>
+        <TaskProvider
+          projectId={selectedProject}
+          sessionId={selectedSession as ThreadId | null}
+          agents={selectedSessionDetails?.agents}
+        >
+          <LaceAppMain />
+        </TaskProvider>
+      </EventStreamProvider>
+    </ToolApprovalProvider>
   );
-});
+}

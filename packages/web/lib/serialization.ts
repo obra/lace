@@ -29,8 +29,9 @@ superjson.registerCustom<NewAgentSpec, string>(
   'NewAgentSpec'
 );
 
-// Export the configured superjson instance
-export const { serialize, deserialize, stringify, parse } = superjson;
+// Export the configured superjson instance (parse not exported to encourage parseResponse/parseTyped)
+export const { serialize, deserialize, stringify } = superjson;
+const { parse } = superjson; // Keep internal for parseResponse/parseTyped
 
 // Convenience functions for common use cases
 function _serializeForAPI<T>(data: T): string {
@@ -63,7 +64,13 @@ export function createSuperjsonResponse<T>(data: T, init?: ResponseInit) {
 
 // Typed parsing helpers for better type safety
 export function parseResponse<T>(response: Response): Promise<T> {
-  return response.text().then((text) => parse(text) as T);
+  return response.text().then((text) => {
+    // Treat empty bodies as undefined to avoid parse errors on 204/empty responses
+    if (!text || !text.trim()) {
+      return undefined as unknown as T;
+    }
+    return parse(text) as T;
+  });
 }
 
 export function parseTyped<T>(text: string): T {

@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { createContext, useContext, type ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import type { ThreadId } from '@/types/core';
 
@@ -42,24 +42,36 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   // Hash-based routing state
   const hashRouter = useHashRouter();
 
-  // Create context value
-  const contextValue: AppStateContextType = {
-    selections: {
-      selectedProject: hashRouter.project,
-      selectedSession: hashRouter.session,
-      selectedAgent: hashRouter.agent,
-      urlStateHydrated: hashRouter.isHydrated,
-    },
+  // Create context value with proper memoization
+  const contextValue: AppStateContextType = useMemo(() => {
+    return {
+      selections: {
+        selectedProject: hashRouter.project,
+        selectedSession: hashRouter.session,
+        selectedAgent: hashRouter.agent,
+        urlStateHydrated: hashRouter.isHydrated,
+      },
 
-    actions: {
-      // Selection actions
-      setSelectedProject: hashRouter.setProject,
-      setSelectedSession: hashRouter.setSession,
-      setSelectedAgent: hashRouter.setAgent,
-      updateHashState: hashRouter.updateState,
-      clearAll: hashRouter.clearAll,
-    },
-  };
+      actions: {
+        // Selection actions
+        setSelectedProject: hashRouter.setProject,
+        setSelectedSession: hashRouter.setSession,
+        setSelectedAgent: hashRouter.setAgent,
+        updateHashState: hashRouter.updateState,
+        clearAll: hashRouter.clearAll,
+      },
+    };
+  }, [
+    hashRouter.project,
+    hashRouter.session,
+    hashRouter.agent,
+    hashRouter.isHydrated,
+    hashRouter.setProject,
+    hashRouter.setSession,
+    hashRouter.setAgent,
+    hashRouter.updateState,
+    hashRouter.clearAll,
+  ]);
 
   return <AppStateContext.Provider value={contextValue}>{children}</AppStateContext.Provider>;
 }

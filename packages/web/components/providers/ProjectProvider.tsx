@@ -5,7 +5,6 @@
 
 import React, { createContext, useContext, useMemo, useCallback, type ReactNode } from 'react';
 import { useProjectManagement } from '@/hooks/useProjectManagement';
-import { useHashRouter } from '@/hooks/useHashRouter';
 import type { ProjectInfo } from '@/types/core';
 
 // Types for project context
@@ -53,9 +52,16 @@ const ProjectContext = createContext<ProjectContextType | null>(null);
 interface ProjectProviderProps {
   children: ReactNode;
   onProjectChange?: (projectId: string | null) => void;
+  selectedProject: string | null;
+  onProjectSelect: (projectId: string | null) => void;
 }
 
-export function ProjectProvider({ children, onProjectChange }: ProjectProviderProps) {
+export function ProjectProvider({
+  children,
+  onProjectChange,
+  selectedProject,
+  onProjectSelect,
+}: ProjectProviderProps) {
   // Get project data from pure data hook
   const {
     projects,
@@ -66,9 +72,6 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectManagement();
-
-  // Get selection state from hash router
-  const { project: selectedProject, setProject: setSelectedProject } = useHashRouter();
 
   // Compute derived state based on data + selection
   const foundProject = useMemo(() => {
@@ -94,7 +97,7 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
   // Transform projects for sidebar display
   const projectsForSidebar = useMemo(
     () =>
-      projects.map((p) => ({
+      (projects || []).map((p) => ({
         id: p.id,
         name: p.name,
         workingDirectory: p.workingDirectory,
@@ -110,15 +113,15 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
   // Selection actions
   const selectProject = useCallback(
     (projectId: string | null) => {
-      setSelectedProject(projectId);
+      onProjectSelect(projectId);
       if (onProjectChange) {
         onProjectChange(projectId);
       }
     },
-    [setSelectedProject, onProjectChange]
+    [onProjectSelect, onProjectChange]
   );
 
-  const onProjectSelect = useCallback(
+  const handleProjectSelect = useCallback(
     (project: { id: string }) => {
       // Handle empty string as null (for clearing selection)
       const projectId = project.id === '' ? null : project.id;
@@ -127,30 +130,47 @@ export function ProjectProvider({ children, onProjectChange }: ProjectProviderPr
     [selectProject]
   );
 
-  const value: ProjectContextType = {
-    // Project data (from hook)
-    projects,
-    loading,
-    error,
+  const value: ProjectContextType = useMemo(
+    () => ({
+      // Project data (from hook)
+      projects,
+      loading,
+      error,
 
-    // Selection state (managed here)
-    selectedProject,
-    foundProject,
+      // Selection state (managed here)
+      selectedProject,
+      foundProject,
 
-    // Computed values
-    currentProject,
-    projectsForSidebar,
+      // Computed values
+      currentProject,
+      projectsForSidebar,
 
-    // Selection actions
-    selectProject,
-    onProjectSelect,
+      // Selection actions
+      selectProject,
+      onProjectSelect: handleProjectSelect,
 
-    // Data operations (passed through)
-    updateProject,
-    createProject,
-    loadProjectConfiguration,
-    reloadProjects,
-  };
+      // Data operations (passed through)
+      updateProject,
+      createProject,
+      loadProjectConfiguration,
+      reloadProjects,
+    }),
+    [
+      projects,
+      loading,
+      error,
+      selectedProject,
+      foundProject,
+      currentProject,
+      projectsForSidebar,
+      selectProject,
+      handleProjectSelect,
+      updateProject,
+      createProject,
+      loadProjectConfiguration,
+      reloadProjects,
+    ]
+  );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }

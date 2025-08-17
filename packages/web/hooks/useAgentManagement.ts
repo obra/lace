@@ -2,7 +2,7 @@
 // ABOUTME: Handles agent creation, selection, and state updates
 
 import { useState, useEffect, useCallback } from 'react';
-import type { SessionInfo, ThreadId, AgentState } from '@/types/core';
+import type { SessionInfo, AgentState } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
@@ -144,7 +144,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
   // Load session details when session changes
   useEffect(() => {
     void loadSessionDetails();
-  }, [loadSessionDetails]);
+  }, [sessionId, loadSessionDetails]);
 
   // Clear session details when no session is selected
   useEffect(() => {

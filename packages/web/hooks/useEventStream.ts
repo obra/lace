@@ -3,8 +3,8 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { StreamSubscription, StreamConnection } from '@/types/stream-events';
-import type { LaceEvent } from '~/threads/types';
-import { parse } from '@/lib/serialization';
+import type { LaceEvent } from '@/types/core';
+import { parseTyped } from '@/lib/serialization';
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 import type { Task } from '@/types/core';
@@ -228,7 +228,7 @@ export function useEventStream({
   const [sendCount, setSendCount] = useState(0);
 
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleStreamEventRef = useRef<(event: LaceEvent) => void>(() => {});
   const autoReconnectRef = useRef(autoReconnect);
   const reconnectIntervalRef = useRef(reconnectInterval);
@@ -528,7 +528,7 @@ export function useEventStream({
 
     eventSource.onmessage = (event) => {
       try {
-        const threadEvent = parse(event.data) as LaceEvent;
+        const threadEvent = parseTyped<LaceEvent>(event.data);
 
         setLastEvent(threadEvent);
         setSendCount((prev) => prev + 1);

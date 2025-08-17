@@ -10,11 +10,13 @@ import React, {
   useCallback,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
-import { parse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
+import { isApiError } from '@/types/api';
 import type { ApprovalDecision } from '@/types/core';
 
 // Types for tool approval context
@@ -41,6 +43,7 @@ interface ToolApprovalProviderProps {
 export function ToolApprovalProvider({ children, agentId }: ToolApprovalProviderProps) {
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [loading, setLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Refresh pending approvals from API
   const refreshPendingApprovals = useCallback(async () => {
@@ -51,22 +54,32 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/threads/${agentId}/approvals/pending`);
-      const text = await res.text();
-      const data = (await parse(text)) as PendingApproval[];
+      // Abort any in-flight request before starting a new one
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-      if (data?.length > 0) {
-        const approvals = data.map((approval: PendingApproval) => ({
-          toolCallId: approval.toolCallId,
-          toolCall: approval.toolCall,
-          requestedAt: approval.requestedAt,
-          requestData: approval.requestData,
-        }));
-        setPendingApprovals(approvals);
+      const res = await fetch(`/api/threads/${agentId}/approvals/pending`, {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch approvals: ${res.status}`);
+      }
+
+      const data = await parseResponse<PendingApproval[] | { error: string }>(res);
+
+      if (isApiError(data)) {
+        throw new Error(data.error);
+      }
+
+      if (Array.isArray(data)) {
+        setPendingApprovals(data);
       } else {
         setPendingApprovals([]);
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       console.error('[TOOL_APPROVAL] Failed to fetch pending approvals:', error);
       setPendingApprovals([]);
     } finally {
@@ -76,7 +89,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
 
   // Handle approval requests (triggered by event stream)
   const handleApprovalRequest = useCallback(
-    (approval: PendingApproval) => {
+    (_approval: PendingApproval) => {
       // When we get a new approval request, refresh the pending approvals
       // to get the most up-to-date data from the API with tool metadata
       void refreshPendingApprovals();
@@ -130,18 +143,29 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
     void refreshPendingApprovals();
   }, [agentId, refreshPendingApprovals]);
 
-  const value: ToolApprovalContextType = {
-    // Approval data
-    pendingApprovals,
-    loading,
+  const value: ToolApprovalContextType = useMemo(
+    () => ({
+      // Approval data
+      pendingApprovals,
+      loading,
 
-    // Approval actions
-    handleApprovalRequest,
-    handleApprovalResponse,
-    handleApprovalDecision,
-    clearApprovalRequest,
-    refreshPendingApprovals,
-  };
+      // Approval actions
+      handleApprovalRequest,
+      handleApprovalResponse,
+      handleApprovalDecision,
+      clearApprovalRequest,
+      refreshPendingApprovals,
+    }),
+    [
+      pendingApprovals,
+      loading,
+      handleApprovalRequest,
+      handleApprovalResponse,
+      handleApprovalDecision,
+      clearApprovalRequest,
+      refreshPendingApprovals,
+    ]
+  );
 
   return <ToolApprovalContext.Provider value={value}>{children}</ToolApprovalContext.Provider>;
 }
