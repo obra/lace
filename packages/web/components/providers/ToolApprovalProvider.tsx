@@ -14,7 +14,8 @@ import React, {
 } from 'react';
 import type { ThreadId } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
-import { parse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
+import { isApiError } from '@/types/api';
 import type { ApprovalDecision } from '@/types/core';
 
 // Types for tool approval context
@@ -52,10 +53,14 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
     setLoading(true);
     try {
       const res = await fetch(`/api/threads/${agentId}/approvals/pending`);
-      const text = await res.text();
-      const data = (await parse(text)) as PendingApproval[];
+      const data = await parseResponse<PendingApproval[] | { error: string }>(res);
 
-      if (data?.length > 0) {
+      if (!res.ok || isApiError(data)) {
+        const message = isApiError(data) ? data.error : `Failed to fetch approvals: ${res.status}`;
+        throw new Error(message);
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
         const approvals = data.map((approval: PendingApproval) => ({
           toolCallId: approval.toolCallId,
           toolCall: approval.toolCall,
