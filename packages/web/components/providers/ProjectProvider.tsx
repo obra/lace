@@ -5,7 +5,6 @@
 
 import React, { createContext, useContext, useMemo, useCallback, type ReactNode } from 'react';
 import { useProjectManagement } from '@/hooks/useProjectManagement';
-import { useHashRouter } from '@/hooks/useHashRouter';
 import type { ProjectInfo } from '@/types/core';
 
 // Types for project context
@@ -53,15 +52,15 @@ const ProjectContext = createContext<ProjectContextType | null>(null);
 interface ProjectProviderProps {
   children: ReactNode;
   onProjectChange?: (projectId: string | null) => void;
-  selectedProject?: string | null;
-  onProjectSelect?: (projectId: string | null) => void;
+  selectedProject: string | null;
+  onProjectSelect: (projectId: string | null) => void;
 }
 
 export function ProjectProvider({
   children,
   onProjectChange,
-  selectedProject: externalSelectedProject,
-  onProjectSelect: externalOnProjectSelect,
+  selectedProject,
+  onProjectSelect,
 }: ProjectProviderProps) {
   // Get project data from pure data hook
   const {
@@ -73,11 +72,6 @@ export function ProjectProvider({
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectManagement();
-
-  // Use external selection state if provided, otherwise fall back to internal hash router
-  const internalHashRouter = useHashRouter();
-  const selectedProject = externalSelectedProject ?? internalHashRouter.project;
-  const setSelectedProject = externalOnProjectSelect ?? internalHashRouter.setProject;
 
   // Compute derived state based on data + selection
   const foundProject = useMemo(() => {
@@ -119,15 +113,15 @@ export function ProjectProvider({
   // Selection actions
   const selectProject = useCallback(
     (projectId: string | null) => {
-      setSelectedProject(projectId);
+      onProjectSelect(projectId);
       if (onProjectChange) {
         onProjectChange(projectId);
       }
     },
-    [setSelectedProject, onProjectChange]
+    [onProjectSelect, onProjectChange]
   );
 
-  const onProjectSelect = useCallback(
+  const handleProjectSelect = useCallback(
     (project: { id: string }) => {
       // Handle empty string as null (for clearing selection)
       const projectId = project.id === '' ? null : project.id;
@@ -153,7 +147,7 @@ export function ProjectProvider({
 
       // Selection actions
       selectProject,
-      onProjectSelect,
+      onProjectSelect: handleProjectSelect,
 
       // Data operations (passed through)
       updateProject,
@@ -170,7 +164,7 @@ export function ProjectProvider({
       currentProject,
       projectsForSidebar,
       selectProject,
-      onProjectSelect,
+      handleProjectSelect,
       updateProject,
       createProject,
       loadProjectConfiguration,
