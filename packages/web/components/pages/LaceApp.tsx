@@ -35,7 +35,7 @@ import { ApprovalDecision } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
 import type { ToolApprovalRequestData } from '@/types/web-events';
-import { useUIState } from '@/hooks/useUIState';
+import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviders } from '@/hooks/useProviders';
 import { AppStateProvider, useAppState } from '@/components/providers/AppStateProvider';
@@ -112,7 +112,7 @@ const LaceAppInner = memo(function LaceAppInner() {
 
   // Current project now comes from ProjectProvider
 
-  // UI State
+  // UI State from UIProvider
   const {
     showMobileNav,
     setShowMobileNav,
@@ -123,7 +123,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     setAutoOpenCreateProject,
     loading,
     setLoading,
-  } = useUIState();
+  } = useUIContext();
   const { providers, loading: loadingProviders } = useProviders();
 
   // Onboarding flow management
@@ -316,7 +316,9 @@ const LaceAppInner = memo(function LaceAppInner() {
 export default function LaceApp() {
   return (
     <AppStateProvider>
-      <LaceAppContent />
+      <UIProvider>
+        <LaceAppContent />
+      </UIProvider>
     </AppStateProvider>
   );
 }
