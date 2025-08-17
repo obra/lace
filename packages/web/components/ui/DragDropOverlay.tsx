@@ -110,17 +110,13 @@ export function DragDropOverlay({
 
       {/* Drag Overlay */}
       {isDragOver && !disabled && (
-        <div className="absolute inset-0 bg-teal-500/10 border-2 border-dashed border-teal-500 rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="text-center p-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-teal-500/20 rounded-full flex items-center justify-center">
-              <FontAwesomeIcon icon={faPaperclip} className="w-8 h-8 text-teal-600" />
+            <div className="w-16 h-16 mx-auto mb-4 bg-primary/20 rounded-full flex items-center justify-center">
+              <FontAwesomeIcon icon={faPaperclip} className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-teal-700 dark:text-teal-300 mb-2">
-              Drop files to attach
-            </h3>
-            <p className="text-sm text-teal-600 dark:text-teal-400">
-              Release to add files to your message
-            </p>
+            <h3 className="text-lg font-semibold text-primary mb-2">Drop files to attach</h3>
+            <p className="text-sm text-primary/80">Release to add files to your message</p>
           </div>
         </div>
       )}

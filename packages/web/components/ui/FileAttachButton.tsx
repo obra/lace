@@ -67,11 +67,11 @@ export default function FileAttachButton({
       case 'primary':
         return 'text-primary hover:text-primary-focus hover:bg-primary/10';
       case 'ghost':
-        return 'text-base-content/60 hover:text-teal-600 hover:bg-base-200';
+        return 'text-base-content/60 hover:text-primary hover:bg-base-200';
       case 'outline':
-        return 'text-base-content/60 hover:text-teal-600 border border-base-300 hover:bg-base-200';
+        return 'text-base-content/60 hover:text-primary border border-base-300 hover:bg-base-200';
       default:
-        return 'text-base-content/60 hover:text-teal-600 hover:bg-base-200';
+        return 'text-base-content/60 hover:text-primary hover:bg-base-200';
     }
   };
 
