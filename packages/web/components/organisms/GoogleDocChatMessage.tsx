@@ -66,7 +66,9 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
       <div className="flex-shrink-0">
         <div
           className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
-            message.role === 'user' ? 'bg-teal-600 text-white' : 'bg-orange-500 text-white'
+            message.role === 'user'
+              ? 'bg-[rgb(var(--user-primary))] text-white'
+              : 'bg-orange-500 text-white'
           }`}
         >
           <FontAwesomeIcon icon={message.role === 'user' ? faUser : faRobot} className="text-xs" />
