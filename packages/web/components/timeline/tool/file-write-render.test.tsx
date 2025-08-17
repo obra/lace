@@ -48,8 +48,8 @@ describe('fileWriteRenderer visual rendering', () => {
 
     const { container } = render(rendered as React.ReactElement);
 
-    // Check for error styling
-    const errorDiv = container.querySelector('.bg-error\\/5');
+    // Check for error styling (Alert component)
+    const errorDiv = container.querySelector('.alert-error');
     expect(errorDiv).toBeTruthy();
 
     // Check for error text content

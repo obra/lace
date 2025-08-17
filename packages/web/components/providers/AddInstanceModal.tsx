@@ -127,7 +127,12 @@ export function AddInstanceModal({
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={getStepTitle()} size="md">
       {(error || submitError) && (
-        <Alert variant="error" title="Error" description={error || submitError} className="mb-4" />
+        <Alert
+          variant="error"
+          title="Error"
+          description={error || submitError || undefined}
+          className="mb-4"
+        />
       )}
 
       {step === 'select' && !preselectedProvider ? (
