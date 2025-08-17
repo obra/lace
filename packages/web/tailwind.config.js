@@ -75,6 +75,7 @@ const config = {
           '--agent-claude': '251 146 60',
           '--agent-gpt4': '34 197 94', 
           '--agent-gemini': '59 130 246',
+          '--user-primary': '20 184 166',
         },
       },
       {
@@ -98,6 +99,7 @@ const config = {
           '--agent-claude': '251 146 60',
           '--agent-gpt4': '34 197 94', 
           '--agent-gemini': '59 130 246',
+          '--user-primary': '20 184 166',
         },
       },
       'dark',
