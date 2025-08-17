@@ -344,6 +344,7 @@ export function useEventStream({
         projectIds: projectId ? [projectId] : [],
         sessionIds: sessionId ? [sessionId] : [],
         threads: sortedThreadIds,
+        includeGlobal,
       });
     },
     [projectId, sessionId, threadIds?.join(','), includeGlobal] // Use join for array stability
@@ -414,15 +415,15 @@ export function useEventStream({
           case 'LOCAL_SYSTEM_MESSAGE':
             callbackRefs.current.onSystemMessage?.(event);
             break;
-          case 'AGENT_STATE_CHANGE':
-            if (event.type === 'AGENT_STATE_CHANGE') {
-              const { agentId, from, to } = event.data;
-              // Only call the callback if all required fields are present
-              if (agentId && from !== undefined && to !== undefined) {
-                callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+          case 'AGENT_STATE_CHANGE': {
+            if (event.data && typeof event.data === 'object') {
+              const data = event.data as { agentId: string; from: string; to: string };
+              if (data.agentId && data.from !== undefined && data.to !== undefined) {
+                callbackRefs.current.onAgentStateChange?.(data.agentId, data.from, data.to);
               }
             }
             break;
+          }
         }
       } else if (isTaskEvent(event)) {
         // Extract task event data from LaceEvent
