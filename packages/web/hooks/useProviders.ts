@@ -3,8 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ProviderInfo } from '@/types/api';
-import { isApiError } from '@/types/api';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 interface UseProvidersResult {
   providers: ProviderInfo[];
@@ -23,17 +22,7 @@ export function useProviders(): UseProvidersResult {
     setError(null);
 
     try {
-      const res = await fetch('/api/providers');
-      const data: unknown = await parseResponse<unknown>(res);
-
-      if (isApiError(data)) {
-        const errorMessage = `Failed to load providers: ${data.error}`;
-        console.error(errorMessage);
-        setError(errorMessage);
-        return;
-      }
-
-      const providersData = data as ProviderInfo[];
+      const providersData = await api.get<ProviderInfo[]>('/api/providers');
       setProviders(providersData || []);
     } catch (err) {
       const errorMessage = `Failed to load providers: ${err instanceof Error ? err.message : 'Unknown error'}`;
