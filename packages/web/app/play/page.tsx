@@ -109,62 +109,6 @@ export default function PlaygroundPage() {
 
   const renderAtoms = () => (
     <div className="grid gap-6">
-      {/* Alerts & Notifications */}
-      <div className="card bg-base-100 shadow">
-        <div className="card-body">
-          <h3 className="card-title text-base-content">
-            🚨 Alerts & Notifications
-            <span className="badge badge-outline ml-2">Alert Component</span>
-          </h3>
-          <div className="grid gap-4">
-            <div className="tooltip" data-tip="Success Alert">
-              <Alert
-                variant="success"
-                title="Settings are saved"
-                description="Your preferences are automatically saved and will persist between sessions."
-              />
-            </div>
-            <div className="tooltip" data-tip="Warning Alert">
-              <Alert
-                variant="warning"
-                title="Settings are not saved"
-                description="Your user preferences are only stored during this session."
-              />
-            </div>
-            <div className="tooltip" data-tip="Error Alert">
-              <Alert
-                variant="error"
-                title="Failed to save"
-                description="There was an error saving your settings. Please try again."
-              />
-            </div>
-            <div className="tooltip" data-tip="Info Alert">
-              <Alert
-                variant="info"
-                title="Hardware permissions required"
-                description="This demo uses native OS-level speech recognition."
-              />
-            </div>
-            <div className="tooltip" data-tip="Alert with custom content">
-              <Alert variant="warning" title="Confirm deletion">
-                <div className="flex gap-2 mt-2">
-                  <button className="btn btn-sm btn-error">Delete</button>
-                  <button className="btn btn-sm btn-ghost">Cancel</button>
-                </div>
-              </Alert>
-            </div>
-            <div className="tooltip" data-tip="Dismissible alert">
-              <Alert
-                variant="info"
-                title="Welcome to the playground!"
-                description="This alert can be dismissed."
-                onDismiss={() => console.log('Alert dismissed')}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Identity & Status */}
       <div className="card bg-base-100 shadow">
         <div className="card-body">
@@ -359,6 +303,46 @@ export default function PlaygroundPage() {
               >
                 Sample message bubble
               </MessageBubble>
+            </AtomItem>
+          </div>
+        </div>
+      </div>
+
+      {/* Alerts & Notifications */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-base-content">
+            🚨 Alerts & Notifications
+            <span className="badge badge-outline ml-2">Atoms 56-59</span>
+          </h3>
+          <div className="space-y-4">
+            <AtomItem n={56} tip="Atom #56: Alert Success">
+              <Alert
+                variant="success"
+                title="Settings are saved"
+                description="Your preferences are automatically saved and will persist between sessions."
+              />
+            </AtomItem>
+            <AtomItem n={57} tip="Atom #57: Alert Warning">
+              <Alert
+                variant="warning"
+                title="Settings are not saved"
+                description="Your user preferences are only stored during this session."
+              />
+            </AtomItem>
+            <AtomItem n={58} tip="Atom #58: Alert Error">
+              <Alert
+                variant="error"
+                title="Failed to save"
+                description="There was an error saving your settings. Please try again."
+              />
+            </AtomItem>
+            <AtomItem n={59} tip="Atom #59: Alert Info">
+              <Alert
+                variant="info"
+                title="Hardware permissions required"
+                description="This demo uses native OS-level speech recognition."
+              />
             </AtomItem>
           </div>
         </div>
@@ -620,8 +604,8 @@ export default function PlaygroundPage() {
               <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M5</span>
               <span className="text-sm font-medium">UISettingsPanel</span>
               <div className="text-xs text-base-content/60">
-                Uses: <span className="text-primary">ThemeSelector(18)</span> +{' '}
-                <span className="text-primary">AccentSelect(14)</span>
+                Uses: <span className="text-primary">Alert Success(56)</span> +{' '}
+                <span className="text-primary">ThemeSelector(18)</span>
               </div>
             </div>
             <UISettingsPanel />
@@ -637,7 +621,7 @@ export default function PlaygroundPage() {
         <div className="card-body">
           <h3 className="card-title text-base-content">
             🦠 Complex Interactive Components
-            <span className="badge badge-accent ml-2">Organisms 1-2</span>
+            <span className="badge badge-accent ml-2">Organisms 1-3</span>
           </h3>
 
           <div className="space-y-6">
@@ -690,6 +674,46 @@ export default function PlaygroundPage() {
                 }}
               />
             </div>
+
+            <div className="border border-accent/20 rounded p-4 bg-accent/5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm bg-accent/20 text-accent px-2 py-1 rounded">O3</span>
+                <span className="text-lg font-semibold">Settings Dashboard</span>
+              </div>
+              <div className="text-sm text-base-content/70 mb-3">
+                <strong>Composition:</strong> Complete settings interface with alert notifications
+                and theme controls
+              </div>
+              <div className="text-xs bg-base-200 p-2 rounded mb-3">
+                <strong>Built from:</strong>
+                <br />
+                🧪 <span className="text-secondary">Molecules:</span> UISettingsPanel(M5)
+                <br />
+                🔬 <span className="text-primary">Atoms:</span> Alert Success(56), Alert
+                Warning(57), ThemeSelector(18), Badge(4)
+              </div>
+              <div className="space-y-4">
+                <div className="p-4 bg-base-200/50 rounded-lg">
+                  <h4 className="text-sm font-medium mb-2">Settings with Success Alert</h4>
+                  <UISettingsPanel />
+                </div>
+                <div className="p-4 bg-base-200/50 rounded-lg">
+                  <h4 className="text-sm font-medium mb-2">Standalone Alert Examples</h4>
+                  <div className="space-y-2">
+                    <Alert
+                      variant="warning"
+                      title="Warning example"
+                      description="This shows how alerts integrate into organisms."
+                    />
+                    <Alert
+                      variant="info"
+                      title="Info example"
+                      description="Alerts provide contextual feedback."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -701,7 +725,7 @@ export default function PlaygroundPage() {
       <div>
         <h2 className="text-3xl font-bold mb-6 text-base-content flex items-center gap-2">
           🔬 Atoms
-          <span className="badge badge-primary">55 components</span>
+          <span className="badge badge-primary">59 components</span>
         </h2>
         <p className="text-base-content/70 mb-6">
           Single-purpose UI building blocks - buttons, inputs, icons, labels, and other fundamental
