@@ -237,6 +237,7 @@ describe('EditInstanceModal', () => {
 
   it('should handle API errors gracefully', async () => {
     const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     mockParseResponse.mockResolvedValue({
       error: 'Instance validation failed',
@@ -268,8 +269,20 @@ describe('EditInstanceModal', () => {
       expect(screen.getByText(/instance validation failed/i)).toBeInTheDocument();
     });
 
+    // Verify that error logging occurred for both instance loading and updating
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error loading instances:',
+      'Instance validation failed'
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error updating instance:',
+      'Instance validation failed'
+    );
+
     // Should not close modal on error
     expect(defaultProps.onClose).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 
   it('should not render when closed', async () => {
