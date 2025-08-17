@@ -87,7 +87,7 @@ describe('SessionSection', () => {
       mockUseAgentContext.mockReturnValue(
         createMockAgentContext({
           sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
         })
       );
@@ -128,7 +128,7 @@ describe('SessionSection', () => {
             createMockAgent('agent-1', 'Alice', 'idle'),
             createMockAgent('agent-2', 'Bob', 'thinking'),
           ]),
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
         })
       );
@@ -146,7 +146,7 @@ describe('SessionSection', () => {
             createMockAgent('agent-1', 'Alice', 'idle'),
             createMockAgent('agent-2', 'Bob', 'thinking'),
           ]),
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
         })
       );
@@ -160,7 +160,7 @@ describe('SessionSection', () => {
       mockUseAgentContext.mockReturnValue(
         createMockAgentContext({
           sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
         })
       );
@@ -178,7 +178,7 @@ describe('SessionSection', () => {
           sessionDetails: createMockSessionDetails([
             createMockAgent('agent-1', 'Alice', 'thinking'),
           ]),
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           foundAgent: createMockAgent('agent-1', 'Alice', 'thinking'),
         })
       );
@@ -213,7 +213,7 @@ describe('SessionSection', () => {
       mockUseAgentContext.mockReturnValue(
         createMockAgentContext({
           sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: 'nonexistent-agent',
+          selectedAgent: 'nonexistent-agent' as ThreadId,
           foundAgent: null,
         })
       );
@@ -242,7 +242,7 @@ describe('SessionSection', () => {
             createMockAgent('agent-1', 'Alice', 'idle'),
             createMockAgent('agent-2', 'Bob', 'thinking'),
           ]),
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
         })
       );

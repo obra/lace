@@ -140,7 +140,7 @@ describe('Chat', () => {
           createdAt: new Date(),
           agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
         },
-        selectedAgent: 'agent-1',
+        selectedAgent: 'agent-1' as ThreadId,
         agentBusy: false,
       })
     );
@@ -201,7 +201,7 @@ describe('Chat', () => {
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
           },
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           agentBusy: true,
         })
       );
@@ -226,7 +226,7 @@ describe('Chat', () => {
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
           },
-          selectedAgent: 'nonexistent',
+          selectedAgent: 'nonexistent' as ThreadId,
         })
       );
 
@@ -270,7 +270,7 @@ describe('Chat', () => {
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice')],
           },
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           agentBusy: true,
         })
       );
@@ -289,7 +289,7 @@ describe('Chat', () => {
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice')],
           },
-          selectedAgent: 'agent-1',
+          selectedAgent: 'agent-1' as ThreadId,
           agentBusy: true,
         })
       );
@@ -394,7 +394,7 @@ describe('Chat', () => {
             createdAt: new Date(),
             agents: [createMockAgent('agent-1', 'Alice'), createMockAgent('agent-2', 'Bob')],
           },
-          selectedAgent: 'agent-2',
+          selectedAgent: 'agent-2' as ThreadId,
         })
       );
 
@@ -491,7 +491,7 @@ describe('Chat', () => {
             createdAt: new Date(),
             agents: [createMockAgent('solo-agent', 'Solo')],
           },
-          selectedAgent: 'solo-agent',
+          selectedAgent: 'solo-agent' as ThreadId,
         })
       );
 
