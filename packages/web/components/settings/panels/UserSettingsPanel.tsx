@@ -35,7 +35,7 @@ export function UserSettingsPanel({
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   // Ref for timeout cleanup
-  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Determine if we're in controlled or uncontrolled mode
   const isControlled =

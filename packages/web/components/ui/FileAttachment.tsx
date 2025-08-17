@@ -3,7 +3,7 @@
 import React from 'react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip, faTimes, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';
+import { faPaperclip, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';
 import { DismissButton } from '@/components/ui/DismissButton';
 import { Modal } from '@/components/ui/Modal';
 
@@ -408,18 +408,17 @@ function FilePreviewCard({ file, onFileClick, onFileRemoved, disabled }: FilePre
   return (
     <div className="relative group bg-base-200 rounded-lg overflow-hidden border border-base-300 hover:border-primary/50 transition-all duration-200 cursor-pointer aspect-square max-h-44">
       {/* Remove button */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onFileRemoved(file.id);
-        }}
-        className="absolute top-2 right-2 z-10 w-5 h-5 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-black/70 hover:scale-110"
-        disabled={disabled}
-        title="Remove file"
-      >
-        <FontAwesomeIcon icon={faTimes} className="w-2.5 h-2.5" />
-      </button>
+      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <div onClick={(e) => e.stopPropagation()}>
+          <DismissButton
+            onClick={() => onFileRemoved(file.id)}
+            size="sm"
+            ariaLabel="Remove file"
+            disabled={disabled}
+            className="bg-black/50 text-white hover:bg-black/70 hover:scale-110"
+          />
+        </div>
+      </div>
 
       {/* File type overlay pill - Hide for images */}
       {!isImageFile(file) && (

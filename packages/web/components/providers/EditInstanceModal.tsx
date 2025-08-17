@@ -159,7 +159,9 @@ export function EditInstanceModal({
             type="number"
             className="input input-bordered w-full"
             value={formData.timeout}
-            onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) || 30 })}
+            onChange={(e) =>
+              setFormData({ ...formData, timeout: parseInt(e.target.value, 10) || 30 })
+            }
             placeholder="30"
             min="1"
             max="300"

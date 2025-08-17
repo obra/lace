@@ -13,7 +13,7 @@ export function AccountDropdown() {
           className="flex items-center gap-3 p-3 hover:bg-base-200 rounded-lg transition-colors cursor-pointer w-full"
         >
           <div className="relative flex-shrink-0">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary))]/80 flex items-center justify-center ring-2 ring-base-300 shadow-md">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary)/0.8)] flex items-center justify-center ring-2 ring-base-300 shadow-md">
               <span className="text-white font-bold text-lg">U</span>
             </div>
             <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-[rgb(var(--user-primary))] rounded-full border-2 border-base-100"></div>

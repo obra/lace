@@ -33,6 +33,13 @@ export const fileReadRenderer: ToolRenderer = {
   },
 
   renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
+    const isError = fileReadRenderer.isError!(result);
+    if (isError) {
+      const message =
+        result.content?.map((block) => block.text || '').join('') || 'An error occurred';
+      return <Alert variant="error" title="File Read Failed" description={message} />;
+    }
+
     if (!result.content || result.content.length === 0) {
       return (
         <div className="font-mono text-sm text-base-content/60">
@@ -42,12 +49,6 @@ export const fileReadRenderer: ToolRenderer = {
     }
 
     const content = result.content.map((block) => block.text || '').join('');
-
-    const isError = fileReadRenderer.isError!(result);
-
-    if (isError) {
-      return <Alert variant="error" title="File Read Failed" description={content} />;
-    }
 
     // Extract file path from arguments
     const filePath =

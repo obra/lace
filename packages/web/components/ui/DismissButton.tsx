@@ -22,35 +22,27 @@ export function DismissButton({
   className = '',
   disabled = false,
 }: DismissButtonProps) {
-  const getSizeClasses = () => {
-    switch (size) {
-      case 'sm':
-        return 'p-1 w-4 h-4';
-      case 'md':
-        return 'p-1 w-5 h-5';
-      case 'lg':
-        return 'p-2 w-6 h-6';
-      default:
-        return 'p-1 w-5 h-5';
-    }
+  const sizeStyles: Record<'sm' | 'md' | 'lg', { button: string; icon: string }> = {
+    sm: { button: 'p-1', icon: 'w-4 h-4' },
+    md: { button: 'p-1', icon: 'w-5 h-5' },
+    lg: { button: 'p-2', icon: 'w-6 h-6' },
   };
-
-  const [padding, iconSize] = getSizeClasses().split(' ').slice(0, 2);
-  const iconSizeClass = getSizeClasses().split(' ').slice(2).join(' ');
+  const sizeClass = sizeStyles[size];
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={`
-        ${padding} hover:bg-base-200 rounded-full transition-colors flex-shrink-0
+        ${sizeClass.button} hover:bg-base-200 rounded-full transition-colors flex-shrink-0
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-base-300
         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent
         ${className}
       `}
       aria-label={ariaLabel}
       type="button"
     >
-      <FontAwesomeIcon icon={faTimes} className={`${iconSizeClass} text-base-content/60`} />
+      <FontAwesomeIcon icon={faTimes} className={`${sizeClass.icon} text-base-content/60`} />
     </button>
   );
 }

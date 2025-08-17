@@ -51,7 +51,11 @@ export function Alert({
   const config = alertConfig[variant];
 
   return (
-    <div className={`alert ${config.alertClass} ${className}`}>
+    <div
+      className={`alert ${config.alertClass} ${className}`}
+      role={variant === 'error' || variant === 'warning' ? 'alert' : 'status'}
+      aria-live={variant === 'error' || variant === 'warning' ? 'assertive' : 'polite'}
+    >
       {showIcon && <FontAwesomeIcon icon={config.icon} className="w-4 h-4 flex-shrink-0" />}
       <div className="flex-1">
         <div className="font-medium">{title}</div>
