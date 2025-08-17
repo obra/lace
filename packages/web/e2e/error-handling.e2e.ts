@@ -3,15 +3,30 @@
 
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
-import { withTempLaceDir } from './utils/withTempLaceDir';
+import { withIsolatedServer } from './utils/isolated-server';
 import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Error Handling and Recovery', () => {
   test('handles invalid project paths gracefully', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-invalid-path-', async (tempDir) => {
+    await withIsolatedServer('lace-e2e-invalid-path-', async (serverUrl, tempDir) => {
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
+
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
       const { projectSelector, chatInterface } = createPageObjects(page);
-      await page.goto('/');
 
       // Try to create project with invalid path
       const invalidPath = '/nonexistent/directory/that/cannot/be/created';
@@ -26,7 +41,32 @@ test.describe('Error Handling and Recovery', () => {
 
       // Attempt to create project with invalid path
       try {
-        await page.locator('[data-testid="project-path-input"]').fill(invalidPath);
+        if (modalAlreadyOpen) {
+          // Modal auto-opened - continue with test
+        } else if (createButtonVisible) {
+          // First open the project creation modal
+          await projectSelector.clickNewProject();
+        } else {
+          throw new Error('Unable to find either open modal or create project button');
+        }
+
+        // Wait for modal to appear
+        await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible(
+          {
+            timeout: 10000,
+          }
+        );
+
+        // Navigate through wizard steps to reach the directory input
+        await projectSelector.navigateWizardSteps();
+
+        // Now try to fill the invalid path - try both possible placeholder values
+        const directoryInput = page
+          .locator('input[placeholder="/path/to/your/project"]')
+          .or(page.locator('input[placeholder="/path/to/project"]'))
+          .first();
+        await directoryInput.waitFor({ timeout: 5000 });
+        await directoryInput.fill(invalidPath);
         await page.locator('[data-testid="create-project-submit"]').click();
 
         // Wait to see what happens
@@ -68,16 +108,38 @@ test.describe('Error Handling and Recovery', () => {
   });
 
   test('recovers from network failures gracefully', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-network-failure-', async (tempDir) => {
+    await withIsolatedServer('lace-e2e-network-failure-', async (serverUrl, tempDir) => {
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
+
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
       const projectName = 'E2E Network Failure Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project successfully first
-      await page.goto('/');
 
       const projectPath = path.join(tempDir, 'network-failure-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       // Monitor network requests for failures
@@ -150,16 +212,38 @@ test.describe('Error Handling and Recovery', () => {
   });
 
   test('provides user feedback during processing errors', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-processing-errors-', async (tempDir) => {
+    await withIsolatedServer('lace-e2e-processing-errors-', async (serverUrl, tempDir) => {
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
+
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
       const projectName = 'E2E Processing Errors Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
 
       const projectPath = path.join(tempDir, 'processing-errors-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       // Monitor for error indicators in the UI
@@ -235,7 +319,7 @@ test.describe('Error Handling and Recovery', () => {
   });
 
   test('handles malformed URLs and navigation errors', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-url-errors-', async (tempDir) => {
+    await withIsolatedServer('lace-e2e-url-errors-', async (serverUrl, tempDir) => {
       const { projectSelector, chatInterface } = createPageObjects(page);
       // Test malformed URLs
       const malformedUrls = [
@@ -258,9 +342,9 @@ test.describe('Error Handling and Recovery', () => {
 
       for (const malformedUrl of malformedUrls) {
         try {
-          // Get the base URL from page and construct malformed URL
-          await page.goto('/');
-          const baseUrl = new URL(page.url()).origin;
+          // Get the base URL from isolated server and construct malformed URL
+          await page.goto(serverUrl);
+          const baseUrl = new URL(serverUrl).origin;
           await page.goto(`${baseUrl}${malformedUrl}`);
           await page.waitForTimeout(2000);
 
@@ -305,16 +389,38 @@ test.describe('Error Handling and Recovery', () => {
   });
 
   test('maintains functionality after JavaScript errors', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-js-errors-', async (tempDir) => {
+    await withIsolatedServer('lace-e2e-js-errors-', async (serverUrl, tempDir) => {
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
+
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+
+      const modalAlreadyOpen = await page
+        .getByRole('heading', { name: 'Create New Project' })
+        .isVisible()
+        .catch(() => false);
+      const createButtonVisible = await page
+        .getByTestId('create-project-button')
+        .isVisible()
+        .catch(() => false);
+
       const projectName = 'E2E JS Error Resilience Project';
       const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
 
       const projectPath = path.join(tempDir, 'js-error-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
-      await projectSelector.createProject(projectName, projectPath);
+      if (modalAlreadyOpen) {
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
       await chatInterface.waitForChatReady();
 
       // Monitor JavaScript errors
