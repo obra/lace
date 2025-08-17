@@ -18,6 +18,7 @@ import { LoadingView } from '@/components/pages/views/LoadingView';
 import { Chat } from '@/components/chat/Chat';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
+import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
@@ -84,6 +85,8 @@ function LaceAppMain() {
     createAgent,
     updateAgentState,
     reloadSessionDetails,
+    loadAgentConfiguration,
+    updateAgent,
   } = useAgentContext();
 
   // Session state from SessionProvider
@@ -123,6 +126,15 @@ function LaceAppMain() {
 
   const { providers, loading: loadingProviders } = useProviders();
 
+  // Agent config modal state
+  const [showEditAgent, setShowEditAgent] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<{
+    threadId: string;
+    name: string;
+    providerInstanceId: string;
+    modelId: string;
+  } | null>(null);
+
   // Onboarding flow management
   const { handleOnboardingComplete, handleAutoOpenProjectCreation } = useOnboarding(
     setAutoOpenCreateProject,
@@ -158,6 +170,50 @@ function LaceAppMain() {
   const handleSwitchProject = useCallback(() => {
     onProjectSelect({ id: '' }); // Empty string will be handled as null by ProjectProvider
   }, [onProjectSelect]);
+
+  // Handle agent configuration
+  const handleConfigureAgent = useCallback(
+    async (agentId: string) => {
+      try {
+        const agentDetails = await loadAgentConfiguration(agentId);
+        setEditingAgent({
+          threadId: agentId,
+          name: agentDetails.name,
+          providerInstanceId: agentDetails.providerInstanceId,
+          modelId: agentDetails.modelId,
+        });
+        setShowEditAgent(true);
+      } catch (error) {
+        console.error('Failed to load agent for editing:', error);
+      }
+    },
+    [loadAgentConfiguration]
+  );
+
+  const handleEditAgentSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingAgent || !editingAgent.name.trim()) return;
+
+      try {
+        await updateAgent(editingAgent.threadId, {
+          name: editingAgent.name.trim(),
+          providerInstanceId: editingAgent.providerInstanceId,
+          modelId: editingAgent.modelId,
+        });
+        setShowEditAgent(false);
+        setEditingAgent(null);
+      } catch (error) {
+        console.error('Failed to update agent:', error);
+      }
+    },
+    [editingAgent, updateAgent]
+  );
+
+  const handleCloseEditAgent = useCallback(() => {
+    setShowEditAgent(false);
+    setEditingAgent(null);
+  }, []);
 
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
@@ -197,6 +253,7 @@ function LaceAppMain() {
                     onSwitchProject={handleSwitchProject}
                     onAgentSelect={handleAgentSelect}
                     onClearAgent={() => setSelectedAgent(null)}
+                    onConfigureAgent={handleConfigureAgent}
                   />
                 </MobileSidebar>
               )}
@@ -219,6 +276,7 @@ function LaceAppMain() {
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
                 onClearAgent={() => setSelectedAgent(null)}
+                onConfigureAgent={handleConfigureAgent}
               />
             </Sidebar>
           )}
@@ -292,6 +350,17 @@ function LaceAppMain() {
       {pendingApprovals && pendingApprovals.length > 0 && (
         <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
       )}
+
+      {/* Agent Edit Modal */}
+      <AgentEditModal
+        isOpen={showEditAgent}
+        editingAgent={editingAgent}
+        providers={providers}
+        loading={agentLoading}
+        onClose={handleCloseEditAgent}
+        onSubmit={handleEditAgentSubmit}
+        onAgentChange={setEditingAgent}
+      />
     </motion.div>
   );
 }

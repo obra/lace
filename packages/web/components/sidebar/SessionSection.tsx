@@ -15,6 +15,7 @@ interface SessionSectionProps {
   onCloseMobileNav?: () => void;
   onAgentSelect: (agentId: string) => void;
   onClearAgent: () => void;
+  onConfigureAgent?: (agentId: string) => void;
 }
 
 export const SessionSection = memo(function SessionSection({
@@ -22,6 +23,7 @@ export const SessionSection = memo(function SessionSection({
   onCloseMobileNav,
   onAgentSelect,
   onClearAgent,
+  onConfigureAgent,
 }: SessionSectionProps) {
   // Get agent data from AgentProvider
   const { sessionDetails, selectedAgent } = useAgentContext();
@@ -121,24 +123,34 @@ export const SessionSection = memo(function SessionSection({
         <div className="space-y-2">
           {/* Agent Selection */}
           {sessionDetails.agents?.map((agent) => (
-            <SidebarItem
-              key={agent.threadId}
-              active={selectedAgent === agent.threadId}
-              onClick={() => handleAgentSelect(agent.threadId)}
-              className="text-sm"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5 text-base-content/60" />
-                  <span className="font-medium truncate">{agent.name}</span>
+            <div key={agent.threadId} className="flex items-center gap-1">
+              <SidebarItem
+                active={selectedAgent === agent.threadId}
+                onClick={() => handleAgentSelect(agent.threadId)}
+                className="text-sm flex-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5 text-base-content/60" />
+                    <span className="font-medium truncate">{agent.name}</span>
+                  </div>
+                  <span
+                    className={`text-xs badge badge-xs ${getAgentStatusBadgeClass(agent.status)}`}
+                  >
+                    {agent.status}
+                  </span>
                 </div>
-                <span
-                  className={`text-xs badge badge-xs ${getAgentStatusBadgeClass(agent.status)}`}
+              </SidebarItem>
+              {onConfigureAgent && (
+                <button
+                  onClick={() => onConfigureAgent(agent.threadId)}
+                  className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
+                  title="Configure agent"
                 >
-                  {agent.status}
-                </span>
-              </div>
-            </SidebarItem>
+                  <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           )) || []}
 
           <SidebarButton onClick={handleConfigureSession} variant="ghost" size="sm">
