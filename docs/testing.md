@@ -916,6 +916,265 @@ See `src/__tests__/e2e-pty-terminal.test.ts` for complete examples of the clean 
 
 The Lace web interface uses a comprehensive Playwright testing infrastructure designed for reliability, maintainability, and parallel execution. This system provides robust testing of user workflows without the brittleness of CSS selectors or the complexity of mocking application logic.
 
+## ⚠️ CRITICAL: Isolated Server Architecture
+
+### Always Use `withIsolatedServer()` for Complete Test Isolation
+
+**New Architecture**: As of 2025, all Playwright E2E tests use the isolated server architecture for maximum reliability and true end-to-end testing.
+
+### Correct Pattern ✅
+
+```typescript
+import { test, expect } from './mocks/setup';
+import { createPageObjects } from './page-objects';
+import { withIsolatedServer } from './utils/isolated-server';
+import * as fs from 'fs';
+import * as path from 'path';
+
+test.describe('Feature Tests', () => {
+  test('user can complete workflow', async ({ page }) => {
+    await withIsolatedServer('test-prefix-', async (serverUrl, tempDir) => {
+      const { projectSelector, chatInterface } = createPageObjects(page);
+      
+      // Navigate to the isolated server
+      await page.goto(serverUrl);
+      
+      // Wait for page to be loaded and handle modal auto-opening
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
+      
+      const modalAlreadyOpen = await page.getByRole('heading', { name: 'Create New Project' }).isVisible().catch(() => false);
+      const createButtonVisible = await page.getByTestId('create-project-button').isVisible().catch(() => false);
+      
+      if (modalAlreadyOpen) {
+        // Modal auto-opened - fill form directly
+        const projectName = 'Test Project';
+        const projectPath = path.join(tempDir, 'test-project');
+        await fs.promises.mkdir(projectPath, { recursive: true });
+        
+        await projectSelector.fillProjectForm(projectName, projectPath);
+        await projectSelector.navigateWizardSteps();
+        await projectSelector.submitProjectCreation();
+      } else if (createButtonVisible) {
+        // Manual creation flow
+        await projectSelector.createProject(projectName, projectPath);
+      } else {
+        throw new Error('Unable to find either open modal or create project button');
+      }
+      
+      await chatInterface.waitForChatReady();
+      
+      // Test your functionality here...
+      await chatInterface.sendMessage('Hello!');
+      await expect(chatInterface.getMessage('Hello!')).toBeVisible();
+    });
+  });
+});
+```
+
+### Deprecated Pattern ❌ (Don't Use)
+
+```typescript
+// DON'T DO THIS - Uses shared server with potential state contamination
+import { withTempLaceDir } from './utils/withTempLaceDir';
+
+test('old pattern test', async ({ page }) => {
+  await withTempLaceDir('prefix-', async (tempDir) => {
+    await page.goto('/'); // Shared server - state pollution possible
+    
+    // Manual environment setup - brittle and error-prone
+    const { projectSelector } = createPageObjects(page);
+    await projectSelector.createProject(name, path);
+  });
+});
+```
+
+### Why Isolated Server Architecture Is Critical
+
+**Complete Test Isolation**:
+- **Individual Server Process**: Each test gets its own server instance
+- **Dedicated Database**: Each server uses its own temp LACE_DIR with isolated SQLite database
+- **Clean State**: No cross-test contamination or shared state issues
+- **Real End-to-End**: Tests the actual server startup, database initialization, and full application stack
+
+**Reliable Modal Behavior**:
+- **Auto-Opening Detection**: Handles the UI behavior where project creation modal auto-opens when no projects exist
+- **Consistent Pattern**: All tests use the same modal detection and handling logic
+- **Robust Fallbacks**: Gracefully handles both auto-opened modal and manual creation flows
+
+**Resource Management**:
+- **Automatic Cleanup**: Server processes and temp directories are cleaned up automatically
+- **Port Management**: Dynamic port allocation prevents conflicts between parallel tests
+- **Process Isolation**: Each test server process is independent and cannot interfere with others
+
+### Key Implementation Details
+
+#### 1. Server Startup and Lifecycle
+
+```typescript
+// The withIsolatedServer utility handles all of this automatically:
+export async function withIsolatedServer<T>(
+  prefix: string,
+  testFn: (serverUrl: string, tempDir: string) => Promise<T>
+): Promise<T> {
+  const { withTempLaceDir } = await import('./withTempLaceDir');
+  
+  return withTempLaceDir(prefix, async (tempDir) => {
+    // Start individual server with dedicated temp LACE_DIR
+    const serverContext = await startIsolatedServer(tempDir);
+    try {
+      return await testFn(serverContext.url, tempDir);
+    } finally {
+      // Automatic cleanup of server process and resources
+      await serverContext.cleanup();
+    }
+  });
+}
+```
+
+#### 2. Modal Auto-Opening Detection
+
+Fresh servers with empty databases trigger automatic project creation modal opening:
+
+```typescript
+// Standard pattern for handling modal auto-opening
+await page.waitForLoadState('domcontentloaded');
+await page.waitForTimeout(3000); // Allow time for modal auto-opening
+
+const modalAlreadyOpen = await page.getByRole('heading', { name: 'Create New Project' }).isVisible().catch(() => false);
+const createButtonVisible = await page.getByTestId('create-project-button').isVisible().catch(() => false);
+
+if (modalAlreadyOpen) {
+  // Use direct form filling for auto-opened modal
+  await projectSelector.fillProjectForm(projectName, projectPath);
+  await projectSelector.navigateWizardSteps();
+  await projectSelector.submitProjectCreation();
+} else if (createButtonVisible) {
+  // Use traditional creation flow for manual trigger
+  await projectSelector.createProject(projectName, projectPath);
+} else {
+  throw new Error('Unable to find either open modal or create project button');
+}
+```
+
+#### 3. Database and Filesystem Isolation
+
+```typescript
+// Each test gets its own isolated environment:
+// - Unique temp directory: /tmp/lace-test-prefix-abc123/
+// - Dedicated LACE_DIR: set to tempDir
+// - Isolated database: ${tempDir}/lace.db
+// - Independent server process: running on dynamic port
+// - Clean project directories: created within tempDir
+```
+
+### Converting Existing Tests
+
+When updating tests to use the isolated server architecture:
+
+#### Step 1: Update Imports
+```typescript
+// Replace this:
+import { withTempLaceDir } from './utils/withTempLaceDir';
+
+// With this:
+import { withIsolatedServer } from './utils/isolated-server';
+```
+
+#### Step 2: Update Function Signature
+```typescript
+// Replace this:
+await withTempLaceDir('prefix-', async (tempDir) => {
+
+// With this:
+await withIsolatedServer('prefix-', async (serverUrl, tempDir) => {
+```
+
+#### Step 3: Update Navigation
+```typescript
+// Replace this:
+await page.goto('/');
+
+// With this:
+await page.goto(serverUrl);
+```
+
+#### Step 4: Add Modal Handling
+```typescript
+// Add this after page.goto():
+await page.waitForLoadState('domcontentloaded');
+await page.waitForTimeout(3000);
+
+const modalAlreadyOpen = await page.getByRole('heading', { name: 'Create New Project' }).isVisible().catch(() => false);
+const createButtonVisible = await page.getByTestId('create-project-button').isVisible().catch(() => false);
+
+if (modalAlreadyOpen) {
+  await projectSelector.fillProjectForm(projectName, projectPath);
+  await projectSelector.navigateWizardSteps();
+  await projectSelector.submitProjectCreation();
+} else if (createButtonVisible) {
+  await projectSelector.createProject(projectName, projectPath);
+} else {
+  throw new Error('Unable to find either open modal or create project button');
+}
+```
+
+### Benefits of Isolated Server Architecture
+
+1. **True End-to-End Testing**: Tests the complete application stack including server startup, database initialization, and API routes
+2. **Elimination of Race Conditions**: No shared state between tests, preventing intermittent failures
+3. **Realistic Test Environment**: Each test runs in an environment identical to a fresh application startup
+4. **Better Debugging**: When tests fail, the failure is isolated to that specific test's environment
+5. **Parallel Execution Safety**: Tests can run in parallel without any risk of interference
+6. **Simplified Maintenance**: Consistent pattern across all tests makes maintenance easier
+
+### Common Pitfalls with Old Architecture
+
+The isolated server architecture eliminates these common issues:
+
+**Shared State Contamination**:
+```typescript
+// OLD: Tests could fail depending on execution order
+test('test A', async () => {
+  // Creates projects in shared database
+  await projectSelector.createProject('A', '/path/a');
+});
+
+test('test B', async () => {
+  // Sees projects from test A, causing unexpected behavior
+  await page.goto('/'); // Same shared server
+});
+```
+
+**Manual Environment Management**:
+```typescript
+// OLD: Error-prone manual setup/cleanup
+test('old test', async () => {
+  const tempDir = await setupTestEnvironment();
+  try {
+    // Test logic...
+  } finally {
+    await cleanupTestEnvironment(tempDir); // Could fail and leak resources
+  }
+});
+```
+
+**Database Configuration Mismatch**:
+```typescript
+// OLD: Using :memory: database while temp directory was unused
+// This made withTempLaceDir() ineffective and eliminated filesystem-based persistence testing
+```
+
+### Testing Best Practices with Isolated Servers
+
+1. **Start Every Test with Isolated Server**: Use `withIsolatedServer` as the outer wrapper for every test
+2. **Handle Modal Auto-Opening**: Always include the modal detection pattern after `page.goto(serverUrl)`
+3. **Use Real File Paths**: Create project directories within the provided `tempDir` for realistic testing
+4. **Test Full Workflows**: Since each test has a clean environment, test complete user journeys
+5. **Don't Share Test Data**: Each test should be self-contained and not depend on other tests
+
+The isolated server architecture provides the foundation for reliable, maintainable, and comprehensive E2E testing of the Lace web interface.
+
 ### Key Features
 
 - **🚀 Parallel Execution**: Tests run in parallel with worker-scoped database isolation
