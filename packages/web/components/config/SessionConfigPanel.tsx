@@ -52,7 +52,7 @@ const DEFAULT_CONFIG: SessionConfiguration = {
   environmentVariables: {},
 };
 
-export function SessionConfigPanel(): JSX.Element {
+export function SessionConfigPanel(): React.JSX.Element {
   // Get data from providers instead of props
   const { currentProject } = useProjectContext();
   const {
