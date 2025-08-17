@@ -495,7 +495,8 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
-      // Should log the HTTP status error without attempting to parse
+      // Critical: Should NOT call parseResponse on HTTP errors to avoid parsing HTML as JSON
+      expect(mockParseResponse).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
         expect.objectContaining({ message: 'Failed to fetch approvals: 404' })
@@ -558,6 +559,8 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
+      // Critical: Should NOT call parseResponse on HTTP errors to avoid parsing HTML as JSON
+      expect(mockParseResponse).not.toHaveBeenCalled();
       // Should log the HTTP status error
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
