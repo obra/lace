@@ -3,8 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { SessionInfo, ThreadId } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
-import { isApiError } from '@/types/api';
+import { api } from '@/lib/api-client';
 
 interface UseSessionManagementResult {
   sessions: SessionInfo[];
@@ -39,16 +38,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/sessions`);
-      const data: unknown = await parseResponse<unknown>(res);
-
-      if (isApiError(data)) {
-        console.error('Failed to load sessions:', data.error);
-        setSessions([]);
-        return;
-      }
-
-      const sessionsData = data as SessionInfo[];
+      const sessionsData = await api.get<SessionInfo[]>(`/api/projects/${projectId}/sessions`);
       setSessions(sessionsData || []);
     } catch (error) {
       console.error('Failed to load sessions:', error);
@@ -65,8 +55,9 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     }
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/configuration`);
-      const data = await parseResponse<{ configuration?: Record<string, unknown> }>(res);
+      const data = await api.get<{ configuration?: Record<string, unknown> }>(
+        `/api/projects/${projectId}/configuration`
+      );
 
       if (data.configuration) {
         setProjectConfig(data.configuration);
@@ -88,19 +79,9 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
       if (!projectId) return;
 
       try {
-        const res = await fetch(`/api/projects/${projectId}/sessions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sessionData),
-        });
-
-        if (res.ok) {
-          // Reload sessions to show the new one
-          await loadSessions();
-        } else {
-          const errorData = await parseResponse<{ error?: string }>(res);
-          console.error('Failed to create session:', errorData.error);
-        }
+        await api.post(`/api/projects/${projectId}/sessions`, sessionData);
+        // Reload sessions to show the new one
+        await loadSessions();
       } catch (error) {
         console.error('Failed to create session:', error);
       }
@@ -111,17 +92,9 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
   const loadSessionConfiguration = useCallback(
     async (sessionId: string): Promise<Record<string, unknown>> => {
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/configuration`);
-
-        if (!res.ok) {
-          throw new Error(`Failed to load session configuration: ${res.status}`);
-        }
-
-        const data = await parseResponse<{ configuration: Record<string, unknown> }>(res);
-        if (isApiError(data)) {
-          throw new Error(data.error);
-        }
-
+        const data = await api.get<{ configuration: Record<string, unknown> }>(
+          `/api/sessions/${sessionId}/configuration`
+        );
         return data.configuration || {};
       } catch (error) {
         console.error('Error loading session configuration:', error);
@@ -134,18 +107,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
   const updateSessionConfiguration = useCallback(
     async (sessionId: string, config: Record<string, unknown>): Promise<void> => {
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/configuration`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        });
-
-        if (!res.ok) {
-          const errorData = await parseResponse<{ error: string }>(res);
-          throw new Error(
-            errorData.error || `Failed to update session configuration: ${res.status}`
-          );
-        }
+        await api.put(`/api/sessions/${sessionId}/configuration`, { configuration: config });
       } catch (error) {
         console.error('Error updating session configuration:', error);
         throw error;
@@ -157,17 +119,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
   const updateSession = useCallback(
     async (sessionId: string, updates: { name: string; description?: string }): Promise<void> => {
       try {
-        const res = await fetch(`/api/sessions/${sessionId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        });
-
-        if (!res.ok) {
-          const errorData = await parseResponse<{ error: string }>(res);
-          throw new Error(errorData.error || `Failed to update session: ${res.status}`);
-        }
-
+        await api.patch(`/api/sessions/${sessionId}`, updates);
         // Reload sessions to reflect the changes
         await loadSessions();
       } catch (error) {
@@ -181,23 +133,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
   const loadSessionsForProject = useCallback(
     async (targetProjectId: string): Promise<SessionInfo[]> => {
       try {
-        const res = await fetch(`/api/projects/${targetProjectId}/sessions`);
-
-        if (!res.ok) {
-          const errorBody = await res.text().catch(() => '');
-          console.error('Failed to load sessions for project (non-OK response):', {
-            status: res.status,
-            bodySnippet: errorBody.slice(0, 256),
-          });
-          return [];
-        }
-
-        const data: unknown = await parseResponse<unknown>(res);
-
-        if (isApiError(data)) {
-          console.error('Failed to load sessions for project:', data.error);
-          return [];
-        }
+        const data: unknown = await api.get<unknown>(`/api/projects/${targetProjectId}/sessions`);
 
         // Normalize response shape - could be SessionInfo[] or { sessions: SessionInfo[] }
         if (Array.isArray(data)) {

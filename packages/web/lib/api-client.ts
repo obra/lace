@@ -56,6 +56,17 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }),
 
+  patch: <T>(url: string, body?: unknown, options?: Omit<RequestInit, 'method' | 'body'>) =>
+    makeRequest<T>(url, {
+      ...options,
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+
   delete: <T>(url: string, options?: Omit<RequestInit, 'method'>) =>
     makeRequest<T>(url, { ...options, method: 'DELETE' }),
 } as const;
