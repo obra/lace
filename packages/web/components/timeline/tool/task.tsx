@@ -18,7 +18,7 @@ import {
   faUser,
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer, ToolResult } from './types';
+import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { Task } from '@/types/core';
 import Badge from '@/components/ui/Badge';
