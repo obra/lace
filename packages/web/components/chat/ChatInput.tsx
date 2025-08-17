@@ -12,7 +12,7 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
   disabled?: boolean;
-  onInterrupt?: () => void | Promise<void>;
+  onInterrupt?: () => void | Promise<boolean | void>;
   isStreaming?: boolean;
   placeholder?: string;
   attachedFiles?: AttachedFile[];

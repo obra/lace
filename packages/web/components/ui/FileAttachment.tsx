@@ -334,9 +334,7 @@ function FileCarousel({
 
       {/* File Content Modal */}
       <Modal isOpen={isModalOpen} onClose={handleModalClose} title={selectedFile?.name} size="lg">
-        {selectedFile && (
-          <FileContentModal file={selectedFile} content={fileContent} onClose={handleModalClose} />
-        )}
+        {selectedFile && <FileContentModal file={selectedFile} content={fileContent} />}
       </Modal>
     </div>
   );
