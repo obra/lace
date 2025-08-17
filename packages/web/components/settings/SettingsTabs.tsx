@@ -105,16 +105,16 @@ export function SettingsTabs({ defaultTab, onTabChange, children, tabs }: Settin
                 aria-selected={isActive}
                 aria-controls={`tabpanel-${tab.id}`}
                 tabIndex={isActive ? 0 : -1}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-accent/50 focus:ring-offset-0 ${
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-0 ${
                   isActive
-                    ? 'border-accent text-accent bg-accent/5'
+                    ? 'border-primary text-primary bg-primary/5'
                     : 'border-transparent text-base-content/70 hover:text-base-content hover:border-base-300/70'
                 }`}
                 onClick={() => handleTabClick(tab.id)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
               >
                 {tab.icon && (
-                  <span className="mr-2 inline-flex items-center text-accent/90">{tab.icon}</span>
+                  <span className="mr-2 inline-flex items-center text-primary/90">{tab.icon}</span>
                 )}
                 {tab.label}
               </button>
