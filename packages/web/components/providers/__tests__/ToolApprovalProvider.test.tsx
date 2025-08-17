@@ -477,6 +477,94 @@ describe('ToolApprovalProvider', () => {
     });
   });
 
+  describe('Error Handling', () => {
+    it('handles HTTP errors using isApiError', async () => {
+      const errorResponse = { error: 'Agent not found' };
+      mockParseResponse.mockResolvedValue(errorResponse);
+      mockIsApiError.mockReturnValue(true);
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: () => Promise.resolve('Agent not found'),
+      } as Response);
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(
+        <ToolApprovalProvider agentId={testAgentId}>
+          <ContextConsumer />
+        </ToolApprovalProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
+      });
+
+      // Should log the API error message
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[TOOL_APPROVAL] Failed to fetch pending approvals:',
+        expect.objectContaining({ message: 'Agent not found' })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('handles HTTP errors without isApiError response', async () => {
+      mockParseResponse.mockResolvedValue({ some: 'data' });
+      mockIsApiError.mockReturnValue(false);
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('Internal server error'),
+      } as Response);
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(
+        <ToolApprovalProvider agentId={testAgentId}>
+          <ContextConsumer />
+        </ToolApprovalProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
+      });
+
+      // Should log the HTTP status error
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[TOOL_APPROVAL] Failed to fetch pending approvals:',
+        expect.objectContaining({ message: 'Failed to fetch approvals: 500' })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('handles AbortError without logging', async () => {
+      const abortError = new DOMException('Aborted', 'AbortError');
+      vi.mocked(global.fetch).mockRejectedValue(abortError);
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(
+        <ToolApprovalProvider agentId={testAgentId}>
+          <ContextConsumer />
+        </ToolApprovalProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
+      });
+
+      // Should NOT log abort errors
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+  });
+
   describe('Agent ID Changes', () => {
     it('reloads approvals when agentId changes', async () => {
       mockParseResponse.mockResolvedValue(mockApprovals);

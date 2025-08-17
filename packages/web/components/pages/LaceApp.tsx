@@ -366,14 +366,7 @@ function LaceAppWithAllProviders() {
     selections: { selectedProject, selectedSession, selectedAgent },
   } = useAppState();
 
-  const { sessionDetails: selectedSessionDetails, updateAgentState } = useAgentContext();
-
-  const handleAgentStateChange = useCallback(
-    (agentId: string, from: string, to: string) => {
-      updateAgentState(agentId, from, to);
-    },
-    [updateAgentState]
-  );
+  const { sessionDetails: selectedSessionDetails } = useAgentContext();
 
   return (
     <ToolApprovalProvider agentId={selectedAgent as ThreadId | null}>
@@ -381,7 +374,6 @@ function LaceAppWithAllProviders() {
         projectId={selectedProject}
         sessionId={selectedSession as ThreadId | null}
         agentId={selectedAgent as ThreadId | null}
-        onAgentStateChange={handleAgentStateChange}
       >
         <TaskProvider
           projectId={selectedProject}
