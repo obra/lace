@@ -67,8 +67,8 @@ const CustomChatInput = memo(function CustomChatInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
-  onInterrupt?: () => void;
+  onSubmit: () => void | Promise<void>;
+  onInterrupt?: () => void | Promise<void>;
   disabled: boolean;
   isStreaming?: boolean;
   placeholder: string;

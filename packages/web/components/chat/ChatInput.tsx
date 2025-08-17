@@ -10,9 +10,9 @@ import { faPaperPlane, faStop, faPlus } from '@/lib/fontawesome';
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
   disabled?: boolean;
-  onInterrupt?: () => void;
+  onInterrupt?: () => void | Promise<void>;
   isStreaming?: boolean;
   placeholder?: string;
   attachedFiles?: AttachedFile[];
