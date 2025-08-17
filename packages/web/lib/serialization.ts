@@ -64,7 +64,13 @@ export function createSuperjsonResponse<T>(data: T, init?: ResponseInit) {
 
 // Typed parsing helpers for better type safety
 export function parseResponse<T>(response: Response): Promise<T> {
-  return response.text().then((text) => parse(text) as T);
+  return response.text().then((text) => {
+    // Treat empty bodies as undefined to avoid parse errors on 204/empty responses
+    if (!text || !text.trim()) {
+      return undefined as unknown as T;
+    }
+    return parse(text) as T;
+  });
 }
 
 export function parseTyped<T>(text: string): T {

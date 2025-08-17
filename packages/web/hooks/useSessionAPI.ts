@@ -142,7 +142,6 @@ export function useSessionAPI() {
         throw new Error('Failed to send message');
       }
 
-      await parseResponse(response);
       return true;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
