@@ -40,11 +40,13 @@ const mockProjects: ProjectInfo[] = [
   createMockProject({ id: 'project-3', name: 'Project Three', sessionCount: 0 }),
 ];
 
-// Default props for testing
-const defaultTestProps = {
-  selectedProject: 'project-1' as string | null,
-  onProjectSelect: vi.fn(),
-};
+// Factory for test props to avoid shared mutable state
+function createTestProps() {
+  return {
+    selectedProject: 'project-1' as string | null,
+    onProjectSelect: vi.fn(),
+  };
+}
 
 // Component to test context provision
 function ContextConsumer() {
@@ -108,15 +110,13 @@ describe('ProjectProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseProjectManagement.mockReturnValue(defaultProjectManagement);
-    // Reset default test props
-    defaultTestProps.selectedProject = 'project-1';
-    defaultTestProps.onProjectSelect = vi.fn();
   });
 
   describe('Context Provision', () => {
     it('provides project context to children', () => {
+      const testProps = createTestProps();
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...testProps}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -143,7 +143,7 @@ describe('ProjectProvider', () => {
   describe('Project Data Management', () => {
     it('provides found project data when project is selected', () => {
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -153,7 +153,7 @@ describe('ProjectProvider', () => {
 
     it('provides null found project when no project is selected', () => {
       render(
-        <ProjectProvider {...defaultTestProps} selectedProject={null}>
+        <ProjectProvider {...createTestProps()} selectedProject={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -163,7 +163,7 @@ describe('ProjectProvider', () => {
 
     it('provides null found project when selected project not found', () => {
       render(
-        <ProjectProvider {...defaultTestProps} selectedProject="nonexistent-project">
+        <ProjectProvider {...createTestProps()} selectedProject="nonexistent-project">
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -173,7 +173,7 @@ describe('ProjectProvider', () => {
 
     it('transforms projects for sidebar display correctly', () => {
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -187,7 +187,7 @@ describe('ProjectProvider', () => {
     it('calls onProjectSelect when selectProject is called', () => {
       const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider {...defaultTestProps} onProjectSelect={mockOnProjectSelect}>
+        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -200,7 +200,7 @@ describe('ProjectProvider', () => {
     it('calls selectProject when onProjectSelect is called', () => {
       const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider {...defaultTestProps} onProjectSelect={mockOnProjectSelect}>
+        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -212,7 +212,7 @@ describe('ProjectProvider', () => {
 
     it('calls onProjectChange callback when project selection changes', () => {
       render(
-        <ProjectProvider {...defaultTestProps} onProjectChange={mockOnProjectChange}>
+        <ProjectProvider {...createTestProps()} onProjectChange={mockOnProjectChange}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -235,7 +235,11 @@ describe('ProjectProvider', () => {
 
       const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider {...defaultTestProps} onProjectChange={mockOnProjectChange} onProjectSelect={mockOnProjectSelect}>
+        <ProjectProvider
+          {...createTestProps()}
+          onProjectChange={mockOnProjectChange}
+          onProjectSelect={mockOnProjectSelect}
+        >
           <TestComponent />
         </ProjectProvider>
       );
@@ -254,7 +258,7 @@ describe('ProjectProvider', () => {
       mockUpdateProject.mockResolvedValue(undefined);
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -268,7 +272,7 @@ describe('ProjectProvider', () => {
       mockReloadProjects.mockResolvedValue(mockProjects);
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -284,7 +288,7 @@ describe('ProjectProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -307,7 +311,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -322,7 +326,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -338,7 +342,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -364,7 +368,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...defaultTestProps} selectedProject="incomplete">
+        <ProjectProvider {...createTestProps()} selectedProject="incomplete">
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -387,7 +391,7 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...defaultTestProps}>
+        <ProjectProvider {...createTestProps()}>
           <ContextConsumer />
         </ProjectProvider>
       );

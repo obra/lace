@@ -33,13 +33,14 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState('dark');
+  const [theme, setThemeState] = useState(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return localStorage.getItem('lace-theme') || 'dark';
+  });
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('lace-theme') || 'dark';
-    setThemeState(savedTheme);
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const setTheme = useCallback((newTheme: string) => {
     setThemeState(newTheme);

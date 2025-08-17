@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, type ReactNode } from 'react';
 import { useUIState } from '@/hooks/useUIState';
 import type { UseUIStateResult } from '@/hooks/useUIState';
 

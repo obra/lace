@@ -31,7 +31,7 @@ export function useTaskManager(
 
   // Keep track of pending operations to batch refetches
   const pendingOperations = useRef(0);
-  const refetchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const refetchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Create API client
   const client = useRef(new TaskAPIClient());

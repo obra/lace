@@ -18,7 +18,6 @@ import {
 } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
-import { parseTyped } from '@/lib/serialization';
 import { DirectoryField } from '@/components/ui';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
@@ -77,7 +76,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   // Get data from providers instead of props
   const {
     projects,
-    projectsForSidebar,
     currentProject,
     loading: projectLoading,
     onProjectSelect,
@@ -86,7 +84,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectContext();
-  const { enableAgentAutoSelection, sessions, loadSessionsForProject } = useSessionContext();
+  const { enableAgentAutoSelection, loadSessionsForProject } = useSessionContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIState();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,

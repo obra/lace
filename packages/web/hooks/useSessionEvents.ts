@@ -5,7 +5,28 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { LaceEvent } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
+
+// Runtime type guards for safe parsing
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return !!val && typeof val === 'object' && !Array.isArray(val);
+}
+
+function isLaceEvent(val: unknown): val is LaceEvent {
+  if (!isPlainObject(val)) return false;
+  const type = val.type;
+  const threadId = val.threadId;
+  const timestamp = val.timestamp;
+  return (
+    typeof type === 'string' &&
+    typeof threadId === 'string' &&
+    (typeof timestamp === 'string' || typeof timestamp === 'number')
+  );
+}
+
+function isLaceEventArray(data: unknown): data is LaceEvent[] {
+  return Array.isArray(data) && data.every(isLaceEvent);
+}
 
 export interface UseSessionEventsReturn {
   allEvents: LaceEvent[];
@@ -73,40 +94,48 @@ export function useSessionEvents(
   // Load historical events when session changes
   useEffect(() => {
     if (!sessionId) {
+      seenEvents.current.clear();
       setEvents([]);
       setLoadingHistory(false);
       return;
     }
 
     setLoadingHistory(true);
+    const controller = new AbortController();
 
-    // Load session history
-    fetch(`/api/sessions/${sessionId}/history`)
+    void fetch(`/api/sessions/${sessionId}/history`, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${await res.text()}`);
         }
-        const text = await res.text();
-        return parse(text) as LaceEvent[];
+        return parseResponse<unknown>(res);
       })
       .then((data) => {
-        if (data && Array.isArray(data)) {
+        if (isLaceEventArray(data)) {
           // Events are already properly typed LaceEvents from superjson
           // Filter out internal workflow events (they're handled separately)
           const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
 
           setEvents(timelineEvents);
+          // Seed dedup cache so replays do not create duplicates
+          for (const ev of timelineEvents) {
+            seenEvents.current.add(getEventKey(ev));
+          }
         } else {
           console.warn('[SESSION_EVENTS] Received non-array data:', data);
           setEvents([]);
         }
         setLoadingHistory(false);
       })
-      .catch((error) => {
-        console.error('[SESSION_EVENTS] Failed to load history:', error);
-        setLoadingHistory(false);
+      .catch((error: unknown) => {
+        if ((error as { name?: string }).name !== 'AbortError') {
+          console.error('[SESSION_EVENTS] Failed to load history:', error);
+          setLoadingHistory(false);
+        }
       });
-  }, [sessionId]);
+
+    return () => controller.abort();
+  }, [sessionId, getEventKey]);
 
   // Filter events by selected agent
   const filteredEvents = useMemo(() => {

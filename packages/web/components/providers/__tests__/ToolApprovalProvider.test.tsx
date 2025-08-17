@@ -20,10 +20,18 @@ import type { ToolApprovalRequestData } from '@/types/web-events';
 // Mock the serialization utility
 vi.mock('@/lib/serialization', () => ({
   parse: vi.fn(),
+  parseResponse: vi.fn(),
 }));
 
-import { parse } from '@/lib/serialization';
+vi.mock('@/types/api', () => ({
+  isApiError: vi.fn(),
+}));
+
+import { parse, parseResponse } from '@/lib/serialization';
+import { isApiError } from '@/types/api';
 const mockParse = vi.mocked(parse);
+const mockParseResponse = vi.mocked(parseResponse);
+const mockIsApiError = vi.mocked(isApiError);
 
 // Test data factories
 const createMockApproval = (overrides?: Partial<PendingApproval>): PendingApproval => ({
@@ -121,6 +129,8 @@ describe('ToolApprovalProvider', () => {
     vi.clearAllMocks();
     global.fetch = vi.fn() as unknown as typeof global.fetch;
     mockParse.mockResolvedValue([]);
+    mockParseResponse.mockResolvedValue([]);
+    mockIsApiError.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -129,7 +139,7 @@ describe('ToolApprovalProvider', () => {
 
   describe('Context Provision', () => {
     it('provides tool approval context to children', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -178,7 +188,7 @@ describe('ToolApprovalProvider', () => {
 
   describe('Pending Approvals Management', () => {
     it('loads pending approvals on mount when agentId is provided', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -200,7 +210,7 @@ describe('ToolApprovalProvider', () => {
     });
 
     it('clears approvals when agentId is null', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -230,7 +240,7 @@ describe('ToolApprovalProvider', () => {
     });
 
     it('handles empty approvals response', async () => {
-      mockParse.mockResolvedValue([]);
+      mockParseResponse.mockResolvedValue([]);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
@@ -248,7 +258,7 @@ describe('ToolApprovalProvider', () => {
     });
 
     it('handles null/undefined approvals response gracefully', async () => {
-      mockParse.mockResolvedValue(null);
+      mockParseResponse.mockResolvedValue(null);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('null'),
@@ -268,7 +278,7 @@ describe('ToolApprovalProvider', () => {
 
   describe('Approval Actions', () => {
     it('handles approval requests by refreshing pending approvals', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -298,7 +308,7 @@ describe('ToolApprovalProvider', () => {
     });
 
     it('handles approval responses by removing from pending list', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -346,7 +356,7 @@ describe('ToolApprovalProvider', () => {
     });
 
     it('clears all approval requests', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -370,7 +380,7 @@ describe('ToolApprovalProvider', () => {
     });
 
     it('refreshes pending approvals on demand', async () => {
-      mockParse.mockResolvedValue([]);
+      mockParseResponse.mockResolvedValue([]);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
@@ -388,7 +398,7 @@ describe('ToolApprovalProvider', () => {
       });
 
       // Update mock to return approvals
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-with-approvals'),
@@ -465,7 +475,7 @@ describe('ToolApprovalProvider', () => {
 
   describe('Agent ID Changes', () => {
     it('reloads approvals when agentId changes', async () => {
-      mockParse.mockResolvedValue(mockApprovals);
+      mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
@@ -506,7 +516,7 @@ describe('ToolApprovalProvider', () => {
         toolCall: { name: 'test_transform', arguments: { key: 'value' } },
       });
 
-      mockParse.mockResolvedValue([rawApproval]);
+      mockParseResponse.mockResolvedValue([rawApproval]);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
