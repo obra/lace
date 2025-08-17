@@ -115,13 +115,13 @@ export default function FontTest() {
         <h2 className="text-xl font-semibold">Local Font Status</h2>
         <div className="bg-base-200 p-4 rounded font-mono text-sm">
           {localStatus.variablesDefined ? (
-            <div className="text-green-600">✅ All fonts loaded locally via @fontsource</div>
+            <div className="text-success">✅ All fonts loaded locally via @fontsource</div>
           ) : localStatus.error ? (
-            <div className="text-red-600">❌ Font verification error: {localStatus.error}</div>
+            <div className="text-error">❌ Font verification error: {localStatus.error}</div>
           ) : localStatus.variablesDefined === false ? (
-            <div className="text-yellow-600">⚠️ Font CSS variables not properly defined</div>
+            <div className="text-warning">⚠️ Font CSS variables not properly defined</div>
           ) : (
-            <div className="text-gray-500">⏳ Testing local fonts...</div>
+            <div className="text-base-content/60">⏳ Testing local fonts...</div>
           )}
         </div>
       </div>
