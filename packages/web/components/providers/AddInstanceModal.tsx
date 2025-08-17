@@ -63,20 +63,6 @@ export function AddInstanceModal({
     setStep('configure');
   };
 
-  const generateInstanceId = (displayName: string, providerId: string): string => {
-    // Create a valid instanceId from displayName and providerId
-    const baseName = `${displayName.toLowerCase()}-${providerId}`;
-    const cleanName = baseName
-      .replace(/[^a-z0-9\s]/g, '') // Remove special chars except spaces
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single
-      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-
-    // Add timestamp suffix to ensure uniqueness
-    const timestamp = Date.now().toString().slice(-4);
-    return `${cleanName}-${timestamp}`;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,7 +75,7 @@ export function AddInstanceModal({
       // Create the instance using provider method
       await createInstance(selectedProvider.id, {
         displayName: formData.displayName,
-        endpoint: formData.endpoint || '',
+        endpoint: formData.endpoint.trim(),
         timeout: formData.timeout,
         apiKey: formData.apiKey,
       });
