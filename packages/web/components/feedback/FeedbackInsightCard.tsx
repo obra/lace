@@ -66,7 +66,7 @@ export function FeedbackInsightCard({
   };
 
   const getConfidenceBar = (confidence: number) => {
-    const percentage = Math.round(confidence * 100);
+    const percentage = Math.min(100, Math.max(0, Math.round(confidence * 100)));
     const color = confidence > 0.8 ? 'bg-success' : confidence > 0.6 ? 'bg-warning' : 'bg-error';
 
     return (
