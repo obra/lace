@@ -62,14 +62,14 @@ import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
 import Link from 'next/link';
 
-// Inner component that uses app state context
-const LaceAppInner = memo(function LaceAppInner() {
+// Main app component logic
+function LaceAppMain() {
   // Theme state
   const { theme, setTheme } = useTheme();
 
   // App state from context (now only hash router selections)
   const {
-    selections: { selectedSession, urlStateHydrated },
+    selections: { selectedSession, selectedProject, selectedAgent, urlStateHydrated },
     actions: { setSelectedSession, updateHashState },
   } = useAppState();
 
@@ -77,7 +77,6 @@ const LaceAppInner = memo(function LaceAppInner() {
   const {
     sessionDetails: selectedSessionDetails,
     loading: agentLoading,
-    selectedAgent,
     foundAgent,
     currentAgent,
     agentBusy,
@@ -101,7 +100,6 @@ const LaceAppInner = memo(function LaceAppInner() {
   const {
     projects,
     loading: loadingProjects,
-    selectedProject,
     foundProject,
     currentProject,
     projectsForSidebar,
@@ -109,8 +107,6 @@ const LaceAppInner = memo(function LaceAppInner() {
     updateProject: updateProjectFromProvider,
     reloadProjects,
   } = useProjectContext();
-
-  // Current project now comes from ProjectProvider
 
   // UI State from UIProvider
   const {
@@ -124,6 +120,7 @@ const LaceAppInner = memo(function LaceAppInner() {
     loading,
     setLoading,
   } = useUIContext();
+
   const { providers, loading: loadingProviders } = useProviders();
 
   // Onboarding flow management
@@ -135,21 +132,12 @@ const LaceAppInner = memo(function LaceAppInner() {
   // Use session events from EventStreamProvider context
   const { events, loadingHistory } = useSessionEvents();
 
-  // Use session API from EventStreamProvider context
-
   // Use tool approvals from ToolApprovalProvider context
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
 
   // Use event stream connection from EventStreamProvider context
   const { connection } = useEventStream();
   const connected = connection.connected;
-
-  // Current agent and busy state now come from AgentProvider
-
-  // Events are now LaceEvent[] directly
-  // No conversion needed - components handle LaceEvent natively
-
-  // Providers are now loaded by useProviders hook
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
@@ -158,17 +146,13 @@ const LaceAppInner = memo(function LaceAppInner() {
     }
   }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
 
-  // Tool approval decisions are now handled by ToolApprovalProvider
-
   // Handle agent selection within a session
-  const handleAgentSelect = (agentThreadId: string) => {
-    // Manual agent selection - no need to disable auto-selection as SessionProvider handles this
-    setSelectedAgent(asThreadId(agentThreadId));
-  };
-
-  // Onboarding completion is now handled by useOnboarding hook
-
-  // Project data transformations are now handled by ProjectProvider
+  const handleAgentSelect = useCallback(
+    (agentThreadId: string) => {
+      setSelectedAgent(asThreadId(agentThreadId));
+    },
+    [setSelectedAgent]
+  );
 
   // Handle switching projects (clear current selection)
   const handleSwitchProject = useCallback(() => {
@@ -310,9 +294,9 @@ const LaceAppInner = memo(function LaceAppInner() {
       )}
     </motion.div>
   );
-});
+}
 
-// Main LaceApp component with integrated provider hierarchy
+// Main LaceApp component with all providers
 export default function LaceApp() {
   return (
     <AppStateProvider>
@@ -323,38 +307,33 @@ export default function LaceApp() {
   );
 }
 
-// Main app content with all providers integrated
-const LaceAppContent = memo(function LaceAppContent() {
+// Content component with all business logic providers
+function LaceAppContent() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
   } = useAppState();
 
   const handleProjectChange = useCallback((projectId: string | null) => {
     // Enable auto-selection for project changes
-    // This matches the current LaceApp behavior
-    // TODO: Move this logic to AgentProvider when we create it
   }, []);
 
   const handleAgentChange = useCallback((agentId: string | null) => {
     // Agent selection change handling
-    // This will be called when agent selection changes
   }, []);
 
   return (
     <ProjectProvider onProjectChange={handleProjectChange}>
       <SessionProvider projectId={selectedProject}>
         <AgentProvider sessionId={selectedSession} onAgentChange={handleAgentChange}>
-          <ToolApprovalProvider agentId={selectedAgent as ThreadId | null}>
-            <AgentProviderConsumer />
-          </ToolApprovalProvider>
+          <LaceAppWithAllProviders />
         </AgentProvider>
       </SessionProvider>
     </ProjectProvider>
   );
-});
+}
 
-// Consumer component that has access to AgentProvider context
-const AgentProviderConsumer = memo(function AgentProviderConsumer() {
+// Component with all remaining providers and main UI logic
+function LaceAppWithAllProviders() {
   const {
     selections: { selectedProject, selectedSession, selectedAgent },
   } = useAppState();
@@ -369,19 +348,21 @@ const AgentProviderConsumer = memo(function AgentProviderConsumer() {
   );
 
   return (
-    <EventStreamProvider
-      projectId={selectedProject}
-      sessionId={selectedSession as ThreadId | null}
-      agentId={selectedAgent as ThreadId | null}
-      onAgentStateChange={handleAgentStateChange}
-    >
-      <TaskProvider
+    <ToolApprovalProvider agentId={selectedAgent as ThreadId | null}>
+      <EventStreamProvider
         projectId={selectedProject}
         sessionId={selectedSession as ThreadId | null}
-        agents={selectedSessionDetails?.agents}
+        agentId={selectedAgent as ThreadId | null}
+        onAgentStateChange={handleAgentStateChange}
       >
-        <LaceAppInner />
-      </TaskProvider>
-    </EventStreamProvider>
+        <TaskProvider
+          projectId={selectedProject}
+          sessionId={selectedSession as ThreadId | null}
+          agents={selectedSessionDetails?.agents}
+        >
+          <LaceAppMain />
+        </TaskProvider>
+      </EventStreamProvider>
+    </ToolApprovalProvider>
   );
-});
+}
