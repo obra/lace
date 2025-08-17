@@ -11,12 +11,6 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'edge') {
     await import('./sentry.edge.config');
   }
-
-  // Initialize client-side Sentry
-  if (typeof window !== 'undefined') {
-    const { onClientInit } = await import('./instrumentation-client');
-    onClientInit();
-  }
 }
 
 // New Next.js 15 error handling hook for logging errors across all runtimes

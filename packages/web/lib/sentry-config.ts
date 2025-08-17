@@ -9,4 +9,13 @@ export const SENTRY_CONFIG = {
   // Only enable debug in development and if we have a debug bundle
   debug: process.env.NODE_ENV === 'development' && process.env.SENTRY_DEBUG === 'true',
   environment: process.env.NODE_ENV,
+  
+  // Use tunnel to avoid CORS issues in development
+  tunnel: process.env.NODE_ENV === 'development' ? '/api/tunnel' : undefined,
+  
+  // Configure trace propagation to avoid unwanted CORS preflight requests
+  tracePropagationTargets: [
+    'localhost',
+    /^\/api\//,  // Same-origin API calls only
+  ],
 };
