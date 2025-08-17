@@ -120,6 +120,7 @@ export function AddInstanceModal({
           title="Error"
           description={error || submitError || undefined}
           className="mb-4"
+          onDismiss={() => setSubmitError(null)}
         />
       )}
 
