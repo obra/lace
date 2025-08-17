@@ -324,29 +324,24 @@ function LaceAppMain() {
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
-          {(() => {
-            if (loadingProjects || loadingProviders) {
-              return <LoadingView />;
-            } else if (selectedProject && foundProject) {
-              return selectedAgent ||
-                (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
-                <Chat />
-              ) : (
-                <div className="flex-1 p-6">
-                  <SessionConfigPanel />
-                </div>
-              );
-            } else {
-              return (
-                <div className="flex-1 p-6 min-h-0 space-y-6">
-                  {projects.length === 0 && (
-                    <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
-                  )}
-                  {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
-                </div>
-              );
-            }
-          })()}
+          {loadingProjects || loadingProviders ? (
+            <LoadingView />
+          ) : selectedProject && foundProject ? (
+            selectedAgent || (selectedSessionDetails?.agents && selectedSessionDetails.agents.length > 0) ? (
+              <Chat />
+            ) : (
+              <div className="flex-1 p-6">
+                <SessionConfigPanel />
+              </div>
+            )
+          ) : (
+            <div className="flex-1 p-6 min-h-0 space-y-6">
+              {projects.length === 0 && (
+                <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
+              )}
+              {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
+            </div>
+          )}
         </div>
       </motion.div>
 
