@@ -178,7 +178,7 @@ export function createTestScenarios() {
           },
         ],
       },
-      selectedAgent: 'lace_20250801_test01.1',
+      selectedAgent: 'lace_20250801_test01.1' as ThreadId,
       currentAgent: {
         threadId: 'lace_20250801_test01.1' as ThreadId,
         name: 'Test Agent',

@@ -10,9 +10,7 @@ import { useSessionEvents, useSessionAPI } from '@/components/providers/EventStr
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
-interface ChatProps {}
-
-export const Chat = memo(function Chat({}: ChatProps) {
+export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
   const { events } = useSessionEvents();
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
