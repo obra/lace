@@ -6,7 +6,7 @@ import { useEventStream } from './useEventStream';
 import type { ThreadId, CombinedTokenUsage, AgentInfo, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 // Use the same type structure as the API
 type AgentTokenUsage = ThreadTokenUsage;
@@ -36,12 +36,9 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
       setError(null);
 
       console.log('[useAgentTokenUsage] Fetching token usage for agent:', agentId);
-      const response = await fetch(`/api/agents/${agentId}`, { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch agent data: ${response.status}`);
-      }
-
-      const data = await parseResponse<AgentWithTokenUsage>(response);
+      const data = await api.get<AgentWithTokenUsage>(`/api/agents/${agentId}`, {
+        signal: controller.signal,
+      });
       console.log('[useAgentTokenUsage] API response:', {
         hasTokenUsage: !!data.tokenUsage,
         tokenUsage: data.tokenUsage,

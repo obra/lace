@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { api } from '../api-client';
-import { stringify } from '../serialization';
+import { api } from '@/lib/api-client';
+import { stringify } from '@/lib/serialization';
 
 describe('API Client', () => {
   beforeEach(() => {
