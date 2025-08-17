@@ -330,6 +330,7 @@ describe('EventStreamProvider Integration', () => {
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
+      onApprovalResponse: expect.any(Function),
     });
   });
 
@@ -367,6 +368,7 @@ describe('EventStreamProvider Integration', () => {
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
+      onApprovalResponse: expect.any(Function),
     });
   });
 });
