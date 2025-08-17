@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import { join, resolve, relative } from 'path';
 import { homedir } from 'os';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { ListDirectoryRequestSchema } from '@/types/filesystem';
 import type { DirectoryEntry, ListDirectoryResponse } from '@/types/filesystem';

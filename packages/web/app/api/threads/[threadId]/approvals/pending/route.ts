@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { ThreadIdSchema } from '@/lib/validation/schemas';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Validation schema

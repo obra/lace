@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 
 export interface TestConnectionResponse {
   success: boolean;

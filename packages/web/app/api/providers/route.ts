@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server';
 import { ProviderRegistry, ProviderCatalogManager } from '@/lib/server/lace-imports';
 import type { ProviderInfo, ModelInfo } from '@/types/core';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 
 // Type guard for unknown error values

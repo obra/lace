@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { logger } from '~/utils/logger';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { TASK_STATUS_VALUES } from '~/tasks/task-status';
 
 // Route parameter validation schemas

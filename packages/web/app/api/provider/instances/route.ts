@@ -7,7 +7,7 @@ import {
   ProviderInstanceManager,
   ProviderCatalogManager,
 } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import type { ConfiguredInstance } from '@/lib/server/lace-imports';
