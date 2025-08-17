@@ -206,7 +206,7 @@ export function NativeSpeechInput({
       setIsListening(true);
       onStatusChange?.('listening');
       // Start audio level monitoring when speech recognition starts
-      startAudioLevelMonitoring();
+      void startAudioLevelMonitoring();
     };
 
     // Handle speech recognition end
@@ -329,7 +329,7 @@ export function NativeSpeechInput({
   // Auto-start if requested
   useEffect(() => {
     if (autoStart && isSupported && !isListening) {
-      startListening();
+      void startListening();
     }
   }, [autoStart, isSupported, isListening, startListening]);
 
@@ -358,7 +358,7 @@ export function NativeSpeechInput({
     if (isListening) {
       stopListening();
     } else {
-      startListening();
+      void startListening();
     }
   };
 
