@@ -7,10 +7,12 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ProviderInstanceProvider } from './ProviderInstanceProvider';
+import { stringify } from '@/lib/serialization';
 
 // Mock the serialization utility
 vi.mock('@/lib/serialization', () => ({
   parseResponse: vi.fn(),
+  stringify: vi.fn((data) => JSON.stringify(data)),
 }));
 
 // Mock UI components to focus on logic
@@ -66,20 +68,27 @@ describe('EditInstanceModal', () => {
     // Reset all mocks
     vi.clearAllMocks();
 
+    // Mock parseResponse to return proper data structures
+    mockParseResponse.mockImplementation(async (response: Response) => {
+      const url = response.url || '';
+      if (url.includes('/api/provider/instances')) {
+        return { instances: [] };
+      }
+      if (url.includes('/api/provider/catalog')) {
+        return { providers: [] };
+      }
+      return {};
+    });
+
     // Setup default fetch mock for provider initialization
     global.fetch = vi.fn().mockImplementation((url) => {
-      if (url === '/api/provider/instances') {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ instances: [] }),
-        });
-      }
       return Promise.resolve({
         ok: true,
         status: 200,
+        url: url,
+        text: () => Promise.resolve(''),
         json: () => Promise.resolve({}),
-      });
+      } as Response);
     });
   });
 
@@ -110,15 +119,18 @@ describe('EditInstanceModal', () => {
 
     const mockFetch = vi.fn().mockImplementation((url) => {
       if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
         return Promise.resolve({
           ok: true,
           status: 200,
+          text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
         });
       }
       return Promise.resolve({
         ok: true,
         status: 200,
+        text: () => Promise.resolve(stringify({})),
       });
     });
     global.fetch = mockFetch;
@@ -163,15 +175,18 @@ describe('EditInstanceModal', () => {
 
     global.fetch = vi.fn().mockImplementation((url) => {
       if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
         return Promise.resolve({
           ok: true,
           status: 200,
+          text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
         });
       }
       return Promise.resolve({
         ok: true,
         status: 200,
+        text: () => Promise.resolve(stringify({})),
       });
     });
 
@@ -229,15 +244,18 @@ describe('EditInstanceModal', () => {
 
     global.fetch = vi.fn().mockImplementation((url) => {
       if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
         return Promise.resolve({
           ok: true,
           status: 200,
+          text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
         });
       }
       return Promise.resolve({
         ok: false,
         status: 400,
+        text: () => Promise.resolve(''),
       });
     });
 
@@ -277,9 +295,11 @@ describe('EditInstanceModal', () => {
     // Mock delayed response
     global.fetch = vi.fn().mockImplementation((url) => {
       if (url === '/api/provider/instances') {
+        const response = stringify({ instances: [] });
         return Promise.resolve({
           ok: true,
           status: 200,
+          text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
         });
       }
@@ -289,6 +309,7 @@ describe('EditInstanceModal', () => {
             resolve({
               ok: true,
               status: 200,
+              text: () => Promise.resolve(stringify({})),
             }),
           100
         )

@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
+import { stringify } from '@/lib/serialization';
 import {
   EventStreamProvider,
   useEventStream,
@@ -35,6 +36,10 @@ const mockUseEventStream = useEventStreamHook as MockedFunction<() => UseEventSt
 const mockUseSessionAPI = useSessionAPIHook as MockedFunction<() => UseSessionAPIReturn>;
 
 describe('EventStreamProvider', () => {
+  // Mock fetch globally
+  const mockFetch = vi.fn();
+  global.fetch = mockFetch;
+
   const wrapper = ({ children }: { children: ReactNode }) => (
     <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
       <EventStreamProvider
@@ -49,6 +54,28 @@ describe('EventStreamProvider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock fetch API responses with proper superjson serialized content
+    mockFetch.mockImplementation((url: string) => {
+      // Handle tool approval endpoints
+      if (url.includes('/approvals/pending')) {
+        const response = stringify([]);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(response),
+          json: () => Promise.resolve([]),
+        } as Response);
+      }
+
+      // Default fallback for other URLs
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(stringify({})),
+        json: () => Promise.resolve({}),
+      } as Response);
+    });
 
     // Set up default mock return values
     const mockSessionEventsReturn: UseSessionEventsReturn = {
@@ -86,8 +113,12 @@ describe('EventStreamProvider', () => {
     mockUseSessionAPI.mockReturnValue(mockSessionAPIReturn);
   });
 
-  it('provides event stream context to children', () => {
+  it('provides event stream context to children', async () => {
     const { result } = renderHook(() => useEventStream(), { wrapper });
+
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
 
     expect(result.current).toBeDefined();
     expect(result.current.connection).toBeDefined();
@@ -97,8 +128,12 @@ describe('EventStreamProvider', () => {
     expect(result.current.reconnect).toBeDefined();
   });
 
-  it('provides session events context to children', () => {
+  it('provides session events context to children', async () => {
     const { result } = renderHook(() => useSessionEvents(), { wrapper });
+
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
 
     expect(result.current).toBeDefined();
     expect(result.current.events).toBeDefined();
@@ -106,8 +141,12 @@ describe('EventStreamProvider', () => {
     expect(result.current.addSessionEvent).toBeDefined();
   });
 
-  it('provides session API context to children', () => {
+  it('provides session API context to children', async () => {
     const { result } = renderHook(() => useSessionAPI(), { wrapper });
+
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
 
     expect(result.current).toBeDefined();
     expect(result.current.sendMessage).toBeDefined();
@@ -116,7 +155,7 @@ describe('EventStreamProvider', () => {
 
   // Note: Tool approval functionality has been moved to ToolApprovalProvider
 
-  it('exposes session events state', () => {
+  it('exposes session events state', async () => {
     const mockEvents: LaceEvent[] = [
       {
         id: 'event-1',
@@ -139,13 +178,17 @@ describe('EventStreamProvider', () => {
 
     const { result } = renderHook(() => useSessionEvents(), { wrapper });
 
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
+
     expect(result.current.events).toEqual(mockEvents);
     expect(result.current.loadingHistory).toBe(false);
   });
 
   // Note: Tool approval functionality has been moved to ToolApprovalProvider
 
-  it('exposes event stream connection state', () => {
+  it('exposes event stream connection state', async () => {
     mockUseEventStream.mockReturnValue({
       connection: {
         connected: true,
@@ -161,12 +204,16 @@ describe('EventStreamProvider', () => {
 
     const { result } = renderHook(() => useEventStream(), { wrapper });
 
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
+
     expect(result.current.connection.connected).toBe(true);
     expect(result.current.connection.lastEventId).toBe('conn-1');
     expect(result.current.sendCount).toBe(5);
   });
 
-  it('exposes session API methods', () => {
+  it('exposes session API methods', async () => {
     const mockSendMessage = vi.fn();
     const mockStopAgent = vi.fn();
 
@@ -184,12 +231,20 @@ describe('EventStreamProvider', () => {
 
     const { result } = renderHook(() => useSessionAPI(), { wrapper });
 
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
+
     expect(result.current.sendMessage).toBe(mockSendMessage);
     expect(result.current.stopAgent).toBe(mockStopAgent);
   });
 
-  it('passes correct parameters to underlying hooks', () => {
+  it('passes correct parameters to underlying hooks', async () => {
     renderHook(() => useEventStream(), { wrapper });
+
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
 
     expect(mockUseSessionEvents).toHaveBeenCalledWith('test-session', 'test-agent', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
@@ -223,8 +278,12 @@ describe('EventStreamProvider', () => {
     // Note: Tool approval functionality has been moved to ToolApprovalProvider
   });
 
-  it('calls underlying hooks with correct parameters', () => {
+  it('calls underlying hooks with correct parameters', async () => {
     renderHook(() => useEventStream(), { wrapper });
+
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
 
     // Verify initial calls are made with correct parameters
     expect(mockUseSessionEvents).toHaveBeenCalledWith('test-session', 'test-agent', false);
@@ -243,7 +302,7 @@ describe('EventStreamProvider', () => {
     });
   });
 
-  it('handles missing agentId gracefully', () => {
+  it('handles missing agentId gracefully', async () => {
     const wrapperWithoutAgent = ({ children }: { children: ReactNode }) => (
       <ToolApprovalProvider agentId={null}>
         <EventStreamProvider
@@ -257,6 +316,10 @@ describe('EventStreamProvider', () => {
     );
 
     renderHook(() => useEventStream(), { wrapper: wrapperWithoutAgent });
+
+    await act(async () => {
+      // Wait for any async effects to complete
+    });
 
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
