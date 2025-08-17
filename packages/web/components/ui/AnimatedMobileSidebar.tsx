@@ -345,7 +345,7 @@ export function AnimatedMobileSidebar({
                 >
                   <label className="text-sm font-medium text-base-content/70">Active Tasks</label>
                   <motion.span
-                    className="badge badge-sm bg-teal-500 text-white border-0"
+                    className="badge badge-sm bg-accent text-accent-content border-0"
                     animate={{
                       scale: [1, 1.1, 1],
                     }}

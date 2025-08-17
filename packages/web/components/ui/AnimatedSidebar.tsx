@@ -289,7 +289,7 @@ export function AnimatedSidebar({
                   animate={{ rotate: [0, 10, 0] }}
                   transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                 >
-                  <FontAwesomeIcon icon={faFolderOpen} className="w-4 h-4 text-teal-600" />
+                  <FontAwesomeIcon icon={faFolderOpen} className="w-4 h-4 text-primary" />
                 </motion.div>
                 <span className="truncate">{currentProject.name}</span>
               </div>
@@ -358,13 +358,13 @@ export function AnimatedSidebar({
                 >
                   {/* Current Timeline */}
                   <motion.div
-                    className="p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg text-sm"
+                    className="p-3 bg-accent/10 border border-accent/30 rounded-lg text-sm"
                     variants={scaleIn}
                     {...hoverLift}
                   >
                     <div className="flex items-center gap-2">
                       <motion.div
-                        className="w-2 h-2 bg-teal-500 rounded-full"
+                        className="w-2 h-2 bg-accent rounded-full"
                         animate={{
                           scale: [1, 1.2, 1],
                           opacity: [0.7, 1, 0.7],
@@ -467,7 +467,7 @@ export function AnimatedSidebar({
               <span className="text-sm font-medium text-base-content">Tasks</span>
               <div className="flex items-center gap-2">
                 <motion.span
-                  className="badge badge-sm bg-teal-500 text-white border-0"
+                  className="badge badge-sm bg-accent text-accent-content border-0"
                   animate={{
                     scale: [1, 1.1, 1],
                   }}
@@ -614,7 +614,7 @@ export function AnimatedSidebar({
                         >
                           <FontAwesomeIcon
                             icon={faFileCode}
-                            className="w-4 h-4 mr-2 text-base-content/40 group-hover:text-teal-600 transition-colors"
+                            className="w-4 h-4 mr-2 text-base-content/40 group-hover:text-primary transition-colors"
                           />
                         </motion.div>
                         <div className="flex-1 min-w-0">
