@@ -5,7 +5,8 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faExclamationTriangle, faInfoCircle, faTimes } from '@/lib/fontawesome';
+import { faCheckCircle, faExclamationTriangle, faInfoCircle } from '@/lib/fontawesome';
+import { DismissButton } from '@/components/ui/DismissButton';
 
 export type AlertVariant = 'success' | 'warning' | 'error' | 'info';
 
@@ -75,15 +76,7 @@ export function Alert({
           {description && <div className={`${config.descriptionClass} mt-1`}>{description}</div>}
           {children && <div className="mt-2">{children}</div>}
         </div>
-        {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="text-base-content/60 hover:text-base-content/80 transition-colors"
-            aria-label="Dismiss alert"
-          >
-            <FontAwesomeIcon icon={faTimes} className="w-4 h-4" />
-          </button>
-        )}
+        {onDismiss && <DismissButton onClick={onDismiss} size="sm" ariaLabel="Dismiss alert" />}
       </div>
     </div>
   );

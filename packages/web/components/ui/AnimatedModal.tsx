@@ -3,8 +3,7 @@
 import React from 'react';
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@/lib/fontawesome';
+import { DismissButton } from '@/components/ui/DismissButton';
 import {
   modalOverlay,
   modalContent,
@@ -154,22 +153,18 @@ export function AnimatedModal({
                     </motion.h2>
                   )}
                   {showCloseButton && (
-                    <motion.button
-                      onClick={onClose}
-                      className="p-2 hover:bg-base-200 rounded-full transition-colors"
-                      aria-label="Close modal"
+                    <motion.div
                       initial={{ opacity: 0, scale: 0 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2, ...springConfig.bouncy }}
                       {...buttonTap}
                       whileHover={{
                         scale: 1.1,
-                        backgroundColor: 'rgba(0,0,0,0.05)',
                         transition: springConfig.snappy,
                       }}
                     >
-                      <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
-                    </motion.button>
+                      <DismissButton onClick={onClose} ariaLabel="Close modal" />
+                    </motion.div>
                   )}
                 </motion.div>
               )}

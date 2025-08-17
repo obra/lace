@@ -6,6 +6,7 @@ import { faUser } from '@/lib/fontawesome';
 // Import all migrated components organized by category
 // ATOMS - Single-purpose UI building blocks
 import { Alert } from '@/components/ui/Alert';
+import { DismissButton } from '@/components/ui/DismissButton';
 import {
   AgentBadge,
   TokenUsageDisplay,
@@ -343,6 +344,15 @@ export default function PlaygroundPage() {
                 title="Hardware permissions required"
                 description="This demo uses native OS-level speech recognition."
               />
+            </AtomItem>
+            <AtomItem n={60} tip="Atom #60: DismissButton Small">
+              <DismissButton onClick={() => {}} size="sm" ariaLabel="Close small" />
+            </AtomItem>
+            <AtomItem n={61} tip="Atom #61: DismissButton Medium">
+              <DismissButton onClick={() => {}} size="md" ariaLabel="Close medium" />
+            </AtomItem>
+            <AtomItem n={62} tip="Atom #62: DismissButton Large">
+              <DismissButton onClick={() => {}} size="lg" ariaLabel="Close large" />
             </AtomItem>
           </div>
         </div>
@@ -725,7 +735,7 @@ export default function PlaygroundPage() {
       <div>
         <h2 className="text-3xl font-bold mb-6 text-base-content flex items-center gap-2">
           🔬 Atoms
-          <span className="badge badge-primary">59 components</span>
+          <span className="badge badge-primary">62 components</span>
         </h2>
         <p className="text-base-content/70 mb-6">
           Single-purpose UI building blocks - buttons, inputs, icons, labels, and other fundamental

@@ -3,7 +3,8 @@
 import React from 'react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip, faTimes, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';
+import { faPaperclip, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';
+import { DismissButton } from '@/components/ui/DismissButton';
 import { Modal } from '@/components/ui/Modal';
 
 export interface AttachedFile {
