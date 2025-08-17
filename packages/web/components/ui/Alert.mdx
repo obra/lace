@@ -1,12 +1,13 @@
 # Alert
 
-A reusable alert component for displaying status messages with semantic colors and proper contrast.
+A reusable alert component built on DaisyUI's alert system for displaying status messages.
 
 ## Features
 
-- **Semantic variants**: success, warning, error, info
-- **Proper contrast**: Uses `text-base-content` for readable text on colored backgrounds
-- **Consistent styling**: Unified appearance across all alert types
+- **Built on DaisyUI**: Uses DaisyUI's `alert` classes for consistent theming
+- **Semantic variants**: success, warning, error, info  
+- **Proper theming**: Inherits DaisyUI's color system and contrast ratios
+- **Consistent styling**: Unified with DaisyUI design system
 - **Flexible content**: Supports title, description, and custom children
 - **Optional icon**: Each variant has a semantic icon that can be hidden
 - **Dismissible**: Optional close button with callback
@@ -131,11 +132,22 @@ This ensures excellent readability in both light and dark themes while maintaini
 Replace scattered alert patterns like:
 
 ```tsx
-// Old pattern - poor contrast
+// Old patterns - inconsistent styling
 <div className="bg-success/10 border border-success/20 rounded-lg p-3">
   <div className="text-success">Settings saved</div>
 </div>
 
-// New pattern - proper contrast
+// DaisyUI alerts without standardized content structure
+<div className="alert alert-success">
+  <span>Settings saved</span>
+</div>
+
+// New pattern - standardized with proper structure
 <Alert variant="success" title="Settings saved" />
 ```
+
+This component provides a consistent API over DaisyUI's alert system while adding:
+- Structured title/description content model
+- Standardized icon integration  
+- Optional dismiss functionality
+- Consistent content hierarchy

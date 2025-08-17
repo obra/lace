@@ -151,6 +151,82 @@ Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, S
 - **CSS Variables** for dynamic theming and font management
 - **Google Fonts** loaded via Next.js font optimization + CSS imports
 
+## UI Component System Philosophy
+
+**Our component system is built on a core principle: strongly-typed, developer-friendly wrappers around DaisyUI components.**
+
+### The Problem
+Raw DaisyUI usage is error-prone and inconsistent:
+```tsx
+// Easy to mess up - typos, wrong structure, missing features
+<div className="alert alert-sucess"> {/* typo! */}
+  <span>Some message</span> {/* no icon, inconsistent structure */}
+</div>
+```
+
+### Our Solution
+Strongly-typed component wrappers that prevent developer errors:
+```tsx
+// Can't mess this up - typed, structured, consistent
+<Alert variant="success" title="Settings saved" description="Changes applied" />
+```
+
+### Component Design Principles
+
+1. **Strong TypeScript Interfaces**
+   - Use union types for variants: `type AlertVariant = 'success' | 'warning' | 'error' | 'info'`
+   - Required and optional props clearly defined
+   - No room for typos or invalid configurations
+
+2. **Named Semantic Props**
+   - `title`, `description`, `variant` instead of raw markup
+   - Props that map to the component's purpose, not implementation
+   - Clear developer intent through prop names
+
+3. **Built-in Best Practices**
+   - Consistent icon usage per variant
+   - Proper accessibility attributes
+   - Standard features like dismiss functionality
+   - Responsive design patterns
+
+4. **DaisyUI Foundation**
+   - Always use DaisyUI classes under the hood (`alert alert-success`, `btn btn-primary`, etc.)
+   - Leverage DaisyUI's theming system
+   - Inherit DaisyUI's accessibility features
+   - Stay consistent with DaisyUI's design language
+
+5. **Consistent Structure**
+   - Standardized content hierarchy (title/description/children)
+   - Predictable prop patterns across similar components
+   - Uniform styling approach
+
+### Example: Alert Component Architecture
+```tsx
+// DaisyUI foundation with typed wrapper
+export function Alert({ variant, title, description, onDismiss }: AlertProps) {
+  const config = alertConfig[variant]; // Type-safe config lookup
+  
+  return (
+    <div className={`alert ${config.alertClass}`}> {/* DaisyUI classes */}
+      <FontAwesomeIcon icon={config.icon} />     {/* Consistent icons */}
+      <div>
+        <div className="font-medium">{title}</div>        {/* Structured content */}
+        {description && <div className="opacity-80">{description}</div>}
+      </div>
+      {onDismiss && <DismissButton onClick={onDismiss} />} {/* Standard features */}
+    </div>
+  );
+}
+```
+
+### Benefits
+- **Developer Experience**: Clear props, strong typing, IntelliSense support
+- **Consistency**: Uniform patterns across the entire application
+- **Maintainability**: Centralized styling and behavior changes
+- **Quality**: Impossible to create malformed components
+- **Accessibility**: Built-in best practices and ARIA attributes
+- **Theming**: Automatic DaisyUI theme support
+
 ## Tool Development
 
 ### Schema-Based Tool Architecture

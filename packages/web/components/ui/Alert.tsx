@@ -23,31 +23,19 @@ export interface AlertProps {
 const alertConfig = {
   success: {
     icon: faCheckCircle,
-    containerClass: 'bg-success/10 border-success/20',
-    iconClass: 'text-success',
-    titleClass: 'text-base-content',
-    descriptionClass: 'text-base-content/70',
+    alertClass: 'alert-success',
   },
   warning: {
     icon: faExclamationTriangle,
-    containerClass: 'bg-warning/10 border-warning/20',
-    iconClass: 'text-warning',
-    titleClass: 'text-base-content',
-    descriptionClass: 'text-base-content/70',
+    alertClass: 'alert-warning',
   },
   error: {
     icon: faExclamationTriangle,
-    containerClass: 'bg-error/10 border-error/20',
-    iconClass: 'text-error',
-    titleClass: 'text-base-content',
-    descriptionClass: 'text-base-content/70',
+    alertClass: 'alert-error',
   },
   info: {
     icon: faInfoCircle,
-    containerClass: 'bg-info/10 border-info/20',
-    iconClass: 'text-info',
-    titleClass: 'text-base-content',
-    descriptionClass: 'text-base-content/70',
+    alertClass: 'alert-info',
   },
 };
 
@@ -63,21 +51,14 @@ export function Alert({
   const config = alertConfig[variant];
 
   return (
-    <div className={`border rounded-lg p-3 ${config.containerClass} ${className}`}>
-      <div className="flex items-start gap-2">
-        {showIcon && (
-          <FontAwesomeIcon
-            icon={config.icon}
-            className={`w-4 h-4 mt-0.5 flex-shrink-0 ${config.iconClass}`}
-          />
-        )}
-        <div className="flex-1 text-sm">
-          <div className={`font-medium ${config.titleClass}`}>{title}</div>
-          {description && <div className={`${config.descriptionClass} mt-1`}>{description}</div>}
-          {children && <div className="mt-2">{children}</div>}
-        </div>
-        {onDismiss && <DismissButton onClick={onDismiss} size="sm" ariaLabel="Dismiss alert" />}
+    <div className={`alert ${config.alertClass} ${className}`}>
+      {showIcon && <FontAwesomeIcon icon={config.icon} className="w-4 h-4 flex-shrink-0" />}
+      <div className="flex-1">
+        <div className="font-medium">{title}</div>
+        {description && <div className="mt-1 opacity-80">{description}</div>}
+        {children && <div className="mt-2">{children}</div>}
       </div>
+      {onDismiss && <DismissButton onClick={onDismiss} size="sm" ariaLabel="Dismiss alert" />}
     </div>
   );
 }
