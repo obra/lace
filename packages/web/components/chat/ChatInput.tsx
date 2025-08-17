@@ -207,8 +207,8 @@ export function ChatInput({
 
     if (isListening) {
       return (
-        <div className="flex items-center gap-2 text-emerald-600 text-xs">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+        <div className="flex items-center gap-2 text-success text-xs">
+          <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
           <span>Listening...</span>
         </div>
       );
@@ -226,7 +226,7 @@ export function ChatInput({
     if (disabled) {
       return (
         <div className="flex items-center gap-2 text-base-content/60 text-xs">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
           <span>Tool running...</span>
         </div>
       );
@@ -287,8 +287,8 @@ export function ChatInput({
         <div
           className={`
             flex items-center w-full bg-neutral-800 rounded-md px-3 py-2 text-neutral-300 
-            focus-within:ring-2 focus-within:ring-emerald-500 transition-all duration-200
-            ${isListening ? 'ring-1 ring-emerald-500/50' : ''}
+            focus-within:ring-2 focus-within:ring-success transition-all duration-200
+            ${isListening ? 'ring-1 ring-success/50' : ''}
             ${isDragOver ? 'ring-2 ring-blue-400' : ''}
           `}
           onDragOver={handleDragOver}
