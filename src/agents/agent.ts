@@ -544,7 +544,7 @@ export class Agent extends EventEmitter {
       logger.info('🎯 AGENT PROVIDER CALL', {
         threadId: this._threadId,
         agentName: (metadata?.name as string) || 'unknown',
-        providerName: this.providerInstance.providerName,
+        providerName: this.providerInstance?.providerName || 'missing',
         modelId,
         metadataProvider: metadata?.provider as string,
         metadataModelId: metadata?.modelId as string,
@@ -553,17 +553,15 @@ export class Agent extends EventEmitter {
 
       // Try provider-specific token counting first, fall back to estimation
       let promptTokens: number;
-      const providerCount = await this.providerInstance.countTokens(
-        conversation,
-        this._tools,
-        modelId
-      );
+      const providerCount = this.providerInstance
+        ? await this.providerInstance.countTokens(conversation, this._tools, modelId)
+        : null;
       if (providerCount !== null) {
         promptTokens = providerCount;
         logger.debug('Using provider-specific token count', {
           threadId: this._threadId,
           promptTokens,
-          provider: this.providerInstance.providerName,
+          provider: this.providerInstance?.providerName || 'missing',
         });
       } else {
         promptTokens = this._estimateConversationTokens(conversation);
@@ -609,7 +607,7 @@ export class Agent extends EventEmitter {
         if (error instanceof Error && error.name === 'AbortError') {
           logger.debug('AGENT: Request was aborted', {
             threadId: this._threadId,
-            providerName: this.providerInstance.providerName,
+            providerName: this.providerInstance?.providerName || 'missing',
           });
           // Abort was called - don't treat as error, metrics already emitted by abort()
           return;
@@ -619,7 +617,7 @@ export class Agent extends EventEmitter {
           threadId: this._threadId,
           errorMessage: error instanceof Error ? error.message : String(error),
           errorStack: error instanceof Error ? error.stack : undefined,
-          providerName: this.providerInstance.providerName,
+          providerName: this.providerInstance?.providerName || 'missing',
         });
 
         this.emit('error', {
@@ -829,11 +827,13 @@ export class Agent extends EventEmitter {
     };
 
     // Subscribe to provider events
-    this.providerInstance.on('token', tokenListener);
-    this.providerInstance.on('token_usage_update', tokenUsageListener);
-    this.providerInstance.on('error', errorListener);
-    this.providerInstance.on('retry_attempt', retryAttemptListener);
-    this.providerInstance.on('retry_exhausted', retryExhaustedListener);
+    if (this.providerInstance) {
+      this.providerInstance.on('token', tokenListener);
+      this.providerInstance.on('token_usage_update', tokenUsageListener);
+      this.providerInstance.on('error', errorListener);
+      this.providerInstance.on('retry_attempt', retryAttemptListener);
+      this.providerInstance.on('retry_exhausted', retryExhaustedListener);
+    }
 
     try {
       // Get model from thread metadata
@@ -841,6 +841,10 @@ export class Agent extends EventEmitter {
       const modelId = metadata?.modelId as string;
       if (!modelId) {
         throw new Error('No model configured for agent');
+      }
+
+      if (!this.providerInstance) {
+        throw new Error('Cannot create streaming response with missing provider instance');
       }
 
       const response = await this.providerInstance.createStreamingResponse(
@@ -877,11 +881,13 @@ export class Agent extends EventEmitter {
       };
     } finally {
       // Clean up event listeners
-      this.providerInstance.removeListener('token', tokenListener);
-      this.providerInstance.removeListener('token_usage_update', tokenUsageListener);
-      this.providerInstance.removeListener('error', errorListener);
-      this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
-      this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
+      if (this.providerInstance) {
+        this.providerInstance.removeListener('token', tokenListener);
+        this.providerInstance.removeListener('token_usage_update', tokenUsageListener);
+        this.providerInstance.removeListener('error', errorListener);
+        this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
+        this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
+      }
     }
   }
 
@@ -926,8 +932,10 @@ export class Agent extends EventEmitter {
     };
 
     // Subscribe to provider retry events
-    this.providerInstance.on('retry_attempt', retryAttemptListener);
-    this.providerInstance.on('retry_exhausted', retryExhaustedListener);
+    if (this.providerInstance) {
+      this.providerInstance.on('retry_attempt', retryAttemptListener);
+      this.providerInstance.on('retry_exhausted', retryExhaustedListener);
+    }
 
     try {
       // Get model from thread metadata
@@ -935,6 +943,10 @@ export class Agent extends EventEmitter {
       const modelId = metadata?.modelId as string;
       if (!modelId) {
         throw new Error('No model configured for agent');
+      }
+
+      if (!this.providerInstance) {
+        throw new Error('Cannot create response with missing provider instance');
       }
 
       const response = await this.providerInstance.createResponse(messages, tools, modelId, signal);
@@ -966,8 +978,10 @@ export class Agent extends EventEmitter {
       };
     } finally {
       // Clean up retry event listeners
-      this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
-      this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
+      if (this.providerInstance) {
+        this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
+        this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
+      }
     }
   }
 

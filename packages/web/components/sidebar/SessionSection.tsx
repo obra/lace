@@ -30,12 +30,6 @@ export const SessionSection = memo(function SessionSection({
   if (!sessionDetails) {
     return null;
   }
-  const handleContinueSession = () => {
-    if (isMobile) {
-      onCloseMobileNav?.();
-    }
-    // Could scroll to chat input or focus it in desktop mode
-  };
 
   const handleSwitchAgent = () => {
     onClearAgent();
@@ -116,14 +110,6 @@ export const SessionSection = memo(function SessionSection({
       {/* Primary Actions */}
       {selectedAgent && currentAgent ? (
         <div className="space-y-2">
-          <SidebarButton
-            onClick={handleContinueSession}
-            variant="secondary"
-            className="font-medium"
-          >
-            Continue Session
-          </SidebarButton>
-
           {sessionDetails.agents && sessionDetails.agents.length > 1 && (
             <SidebarButton onClick={handleSwitchAgent} variant="ghost" size="sm">
               <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />

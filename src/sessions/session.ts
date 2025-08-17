@@ -1257,7 +1257,7 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private static createAgentSync(params: {
     sessionData: SessionData;
-    providerInstance: AIProvider;
+    providerInstance: AIProvider | null;
     toolExecutor: ToolExecutor;
     threadManager: ThreadManager;
     threadId: string;
@@ -1297,7 +1297,7 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private async createAgent(params: {
     sessionData: SessionData;
-    providerInstance: AIProvider;
+    providerInstance: AIProvider | null;
     toolExecutor: ToolExecutor;
     threadManager: ThreadManager;
     threadId: string;

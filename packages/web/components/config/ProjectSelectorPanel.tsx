@@ -92,7 +92,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     setAutoOpenCreateProject,
     enableAgentAutoSelection
   );
-  const { providers, loading: providersLoading } = useProviders();
+  const { providers, loading: providersLoading, refetch: refetchProviders } = useProviders();
 
   const loading = projectLoading || providersLoading;
   const selectedProject = currentProject.id ? currentProject : null;
@@ -130,7 +130,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Provider setup state
   const [showAddProvider, setShowAddProvider] = useState(false);
-  const [refreshProviders, setRefreshProviders] = useState(0);
 
   // Get available providers (only those that are configured with instance IDs)
   const availableProviders = useMemo(() => {
@@ -149,7 +148,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         modelId: firstProvider.models[0]?.id || '',
       }));
     }
-  }, [availableProviders, createConfig.providerInstanceId, refreshProviders]);
+  }, [availableProviders, createConfig.providerInstanceId]);
 
   // External trigger: open modal when parent requests (e.g., empty-state button)
   // Only open once per toggle of autoOpenCreate to avoid reopening after user closes
@@ -178,9 +177,9 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   // Handle provider instance creation success
   const handleProviderAdded = useCallback(() => {
     // Trigger a refresh of providers data
-    setRefreshProviders((prev) => prev + 1);
+    void refetchProviders();
     setShowAddProvider(false);
-  }, []);
+  }, [refetchProviders]);
 
   // Cancel project creation
   const handleCancelCreateProject = useCallback(() => {
