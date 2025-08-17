@@ -166,7 +166,7 @@ describe('SidebarContent', () => {
     mockUseAgentContext.mockReturnValue(
       createMockAgentContext({
         sessionDetails: createMockSessionDetails(),
-        selectedAgent: 'agent-1',
+        selectedAgent: 'agent-1' as ThreadId,
         foundAgent: createMockAgent('agent-1', 'Agent 1'),
       })
     );
