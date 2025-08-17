@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NativeSpeechInput, useSpeechRecognition } from '@/components/ui/NativeSpeechInput';
 import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
+import { Alert } from '@/components/ui/Alert';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faStop, faPlus } from '@/lib/fontawesome';
 
@@ -253,12 +254,7 @@ export function ChatInput({
 
       {/* Speech Error Display */}
       {speechError && (
-        <div className="mb-3 p-3 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Voice Input:</span>
-            <span>{speechError}</span>
-          </div>
-        </div>
+        <Alert variant="error" title="Voice Input" description={speechError} className="mb-3" />
       )}
 
       {/* File Attachment Area */}

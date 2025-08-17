@@ -22,6 +22,7 @@ import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { Task } from '@/types/core';
 import Badge from '@/components/ui/Badge';
+import { Alert } from '@/components/ui/Alert';
 import InlineCode from '@/components/ui/InlineCode';
 
 /**
@@ -153,14 +154,14 @@ const taskAddRenderer: ToolRenderer = {
     ) {
       const error = parsed as { error: string; code?: string };
       return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3 mt-2">
-          <div className="flex items-center gap-2 text-error text-sm font-medium mb-1">
-            <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4" />
-            Failed to create task
-          </div>
-          <div className="text-error/80 text-sm">{error?.error || 'Unknown error'}</div>
-          {error?.code && <div className="text-error/60 text-xs mt-1">Code: {error.code}</div>}
-        </div>
+        <Alert
+          variant="error"
+          title="Failed to create task"
+          description={error?.error || 'Unknown error'}
+          className="mt-2"
+        >
+          {error?.code && <div className="text-sm opacity-60">Code: {error.code}</div>}
+        </Alert>
       );
     }
 

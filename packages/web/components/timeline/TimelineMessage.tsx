@@ -8,6 +8,7 @@ import type { LaceEvent, AgentInfo } from '@/types/core';
 import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
 import { MessageHeader, MessageText } from '@/components/ui';
 import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
+import { Alert } from '@/components/ui/Alert';
 import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
 import { CompactionEntry } from '@/components/timeline/CompactionEntry';
@@ -191,12 +192,12 @@ export function TimelineMessage({
     case 'COMPACTION_START':
       return (
         <div className="flex justify-center">
-          <div className="bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info">
-            <div className="flex items-center gap-2">
-              <span className="loading loading-spinner loading-xs"></span>
-              <span>Compacting conversation{event.data.auto ? ' (auto)' : ''}...</span>
-            </div>
-          </div>
+          <Alert
+            variant="info"
+            title={`Compacting conversation${event.data.auto ? ' (auto)' : ''}...`}
+          >
+            <span className="loading loading-spinner loading-xs"></span>
+          </Alert>
         </div>
       );
 
@@ -204,23 +205,13 @@ export function TimelineMessage({
       if (!event.data.success) {
         return (
           <div className="flex justify-center">
-            <div className="bg-error/10 border border-error/20 rounded-lg px-4 py-2 text-sm text-error">
-              <div className="flex items-center gap-2">
-                <span>❌</span>
-                <span>Compaction failed</span>
-              </div>
-            </div>
+            <Alert variant="error" title="Compaction failed" />
           </div>
         );
       }
       return (
         <div className="flex justify-center">
-          <div className="bg-success/10 border border-success/20 rounded-lg px-4 py-2 text-sm text-success">
-            <div className="flex items-center gap-2">
-              <span>✅</span>
-              <span>Compaction complete</span>
-            </div>
-          </div>
+          <Alert variant="success" title="Compaction complete" />
         </div>
       );
 
@@ -240,44 +231,31 @@ export function TimelineMessage({
     case 'TASK_UPDATED':
       return (
         <div className="flex justify-center">
-          <div className="bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info">
-            <div className="flex items-center gap-2">
-              <span>✏️</span>
-              <span>Task updated: {event.data.task?.title || event.data.taskId}</span>
-            </div>
-          </div>
+          <Alert
+            variant="info"
+            title={`Task updated: ${event.data.task?.title || event.data.taskId}`}
+          />
         </div>
       );
 
     case 'TASK_DELETED':
       return (
         <div className="flex justify-center">
-          <div className="bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning">
-            <div className="flex items-center gap-2">
-              <span>🗑️</span>
-              <span>Task deleted: {event.data.task?.title || event.data.taskId}</span>
-            </div>
-          </div>
+          <Alert
+            variant="warning"
+            title={`Task deleted: ${event.data.task?.title || event.data.taskId}`}
+          />
         </div>
       );
 
     // System notification
     case 'SYSTEM_NOTIFICATION': {
-      const severityClassMap = {
-        info: 'bg-info/10 border border-info/20 rounded-lg px-4 py-2 text-sm text-info',
-        warning: 'bg-warning/10 border border-warning/20 rounded-lg px-4 py-2 text-sm text-warning',
-        error: 'bg-error/10 border border-error/20 rounded-lg px-4 py-2 text-sm text-error',
-      };
-      const className = severityClassMap[event.data?.severity] || severityClassMap.info;
+      const severity = event.data?.severity || 'info';
+      const variant = severity as 'info' | 'warning' | 'error';
 
       return (
         <div className="flex justify-center">
-          <div className={className}>
-            <div className="flex items-center gap-2">
-              <span>ℹ️</span>
-              <span>{event.data?.message}</span>
-            </div>
-          </div>
+          <Alert variant={variant} title={event.data?.message || 'System notification'} />
         </div>
       );
     }
