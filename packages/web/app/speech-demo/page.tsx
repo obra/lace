@@ -79,12 +79,12 @@ export default function SpeechDemoPage() {
                   <span
                     className={`ml-2 px-2 py-1 rounded text-xs ${
                       status === 'listening'
-                        ? 'bg-green-100 text-green-800'
+                        ? 'bg-success/20 text-success'
                         : status === 'processing'
-                          ? 'bg-blue-100 text-blue-800'
+                          ? 'bg-info/20 text-info'
                           : status === 'error'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-error/20 text-error'
+                            : 'bg-base-200 text-base-content/80'
                     }`}
                   >
                     {status}
@@ -123,11 +123,9 @@ export default function SpeechDemoPage() {
 
             {/* Error Display */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <div className="text-sm font-medium text-red-800 mb-2">
-                  Speech Recognition Error:
-                </div>
-                <div className="text-red-700">{error}</div>
+              <div className="bg-error/10 border border-error/20 rounded-lg p-4 mb-4">
+                <div className="text-sm font-medium text-error mb-2">Speech Recognition Error:</div>
+                <div className="text-error/80">{error}</div>
                 <button className="btn btn-sm btn-outline btn-error mt-2" onClick={clearError}>
                   Dismiss
                 </button>
@@ -206,19 +204,19 @@ export default function SpeechDemoPage() {
             <h3 className="card-title text-sm">Browser Compatibility</h3>
             <div className="text-sm space-y-2">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span className="w-2 h-2 bg-success rounded-full"></span>
                 <span>Chrome/Chromium: Full support</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span className="w-2 h-2 bg-success rounded-full"></span>
                 <span>Safari: Full support (macOS/iOS)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                <span className="w-2 h-2 bg-warning rounded-full"></span>
                 <span>Firefox: Limited support</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                <span className="w-2 h-2 bg-error rounded-full"></span>
                 <span>Edge: Variable support</span>
               </div>
             </div>
