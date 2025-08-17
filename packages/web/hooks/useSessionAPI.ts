@@ -4,7 +4,7 @@
 import { useState, useCallback } from 'react';
 import { CreateSessionRequest, CreateAgentRequest, isApiError, isApiSuccess } from '@/types/api';
 import type { ThreadId, SessionInfo, AgentInfo } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
 
 interface APIState {
   error: string | null;
@@ -31,14 +31,14 @@ export function useSessionAPI() {
         });
 
         if (!response.ok) {
-          const error: unknown = parse(await response.text());
+          const error: unknown = await parseResponse(response);
           if (isApiError(error)) {
             throw new Error(error.error || 'Failed to create session');
           }
           throw new Error('Failed to create session');
         }
 
-        const data = parse(await response.text()) as SessionInfo;
+        const data = await parseResponse<SessionInfo>(response);
         return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
@@ -55,14 +55,14 @@ export function useSessionAPI() {
       const response = await fetch(`/api/sessions/${sessionId}`);
 
       if (!response.ok) {
-        const error: unknown = parse(await response.text());
+        const error: unknown = await parseResponse(response);
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to get session');
         }
         throw new Error('Failed to get session');
       }
 
-      const data = parse(await response.text()) as SessionInfo;
+      const data = await parseResponse<SessionInfo>(response);
       return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
@@ -82,14 +82,14 @@ export function useSessionAPI() {
         });
 
         if (!response.ok) {
-          const error: unknown = parse(await response.text());
+          const error: unknown = await parseResponse(response);
           if (isApiError(error)) {
             throw new Error(error.error || 'Failed to spawn agent');
           }
           throw new Error('Failed to spawn agent');
         }
 
-        const data = parse(await response.text()) as AgentInfo;
+        const data = await parseResponse<AgentInfo>(response);
         return data;
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Unknown error');
@@ -106,14 +106,14 @@ export function useSessionAPI() {
       const response = await fetch(`/api/sessions/${sessionId}/agents`);
 
       if (!response.ok) {
-        const error: unknown = parse(await response.text());
+        const error: unknown = await parseResponse(response);
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to list agents');
         }
         throw new Error('Failed to list agents');
       }
 
-      const data = parse(await response.text()) as AgentInfo[];
+      const data = await parseResponse<AgentInfo[]>(response);
       return data;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
@@ -135,14 +135,14 @@ export function useSessionAPI() {
       });
 
       if (!response.ok) {
-        const error: unknown = parse(await response.text());
+        const error: unknown = await parseResponse(response);
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to send message');
         }
         throw new Error('Failed to send message');
       }
 
-      parse(await response.text());
+      await parseResponse(response);
       return true;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
@@ -160,14 +160,14 @@ export function useSessionAPI() {
       });
 
       if (!response.ok) {
-        const error: unknown = parse(await response.text());
+        const error: unknown = await parseResponse(response);
         if (isApiError(error)) {
           throw new Error(error.error || 'Failed to stop agent');
         }
         throw new Error('Failed to stop agent');
       }
 
-      const data: unknown = parse(await response.text());
+      const data: unknown = await parseResponse(response);
       if (isApiSuccess<{ success: boolean }>(data) && 'success' in data) {
         return data['success'] as boolean;
       }

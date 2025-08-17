@@ -19,7 +19,6 @@ import type { ToolApprovalRequestData } from '@/types/web-events';
 
 // Mock the serialization utility
 vi.mock('@/lib/serialization', () => ({
-  parse: vi.fn(),
   parseResponse: vi.fn(),
 }));
 
@@ -27,9 +26,8 @@ vi.mock('@/types/api', () => ({
   isApiError: vi.fn(),
 }));
 
-import { parse, parseResponse } from '@/lib/serialization';
+import { parseResponse } from '@/lib/serialization';
 import { isApiError } from '@/types/api';
-const mockParse = vi.mocked(parse);
 const mockParseResponse = vi.mocked(parseResponse);
 const mockIsApiError = vi.mocked(isApiError);
 
@@ -128,7 +126,6 @@ describe('ToolApprovalProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn() as unknown as typeof global.fetch;
-    mockParse.mockResolvedValue([]);
     mockParseResponse.mockResolvedValue([]);
     mockIsApiError.mockReturnValue(false);
   });
