@@ -5,8 +5,8 @@ import { faUser } from '@/lib/fontawesome';
 
 // Import all migrated components organized by category
 // ATOMS - Single-purpose UI building blocks
+import { Alert } from '@/components/ui/Alert';
 import {
-  Alert,
   AgentBadge,
   TokenUsageDisplay,
   SendButton,

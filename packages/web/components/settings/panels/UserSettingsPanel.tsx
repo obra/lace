@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { TextAreaField } from '@/components/ui/TextAreaField';
-import { Alert } from '@/components/ui';
+import { Alert } from '@/components/ui/Alert';
 import { validateUserName, validateEmail, validateBio } from '@/lib/validation';
 
 interface UserSettingsPanelProps {

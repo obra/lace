@@ -35,7 +35,7 @@ const alertConfig = {
     descriptionClass: 'text-base-content/70',
   },
   error: {
-    icon: faTimes,
+    icon: faExclamationTriangle,
     containerClass: 'bg-error/10 border-error/20',
     iconClass: 'text-error',
     titleClass: 'text-base-content',

@@ -7,7 +7,7 @@ import React from 'react';
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
-import { Alert } from '@/components/ui';
+import { Alert } from '@/components/ui/Alert';
 
 interface UISettingsPanelProps {
   currentTheme?: string;
