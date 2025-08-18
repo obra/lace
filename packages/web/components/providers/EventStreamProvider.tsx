@@ -4,7 +4,7 @@
 'use client';
 
 import React, { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
-import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
+import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
@@ -22,10 +22,10 @@ interface EventStreamConnection {
   reconnect: () => void;
 }
 
-interface SessionEventsState {
+interface AgentEventsState {
   events: LaceEvent[];
   loadingHistory: boolean;
-  addSessionEvent: (event: LaceEvent) => void;
+  addAgentEvent: (event: LaceEvent) => void;
 }
 
 interface SessionAPIActions {
@@ -37,8 +37,8 @@ interface EventStreamContextType {
   // Event stream connection
   eventStream: EventStreamConnection;
 
-  // Session events
-  sessionEvents: SessionEventsState;
+  // Agent events
+  agentEvents: AgentEventsState;
 
   // Session API
   sessionAPI: SessionAPIActions;
@@ -67,12 +67,8 @@ export function EventStreamProvider({
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
 
-  // Session events hook (no longer manages approvals internally)
-  const { filteredEvents, loadingHistory, addSessionEvent } = useSessionEventsHook(
-    sessionId,
-    agentId,
-    false
-  );
+  // Agent events hook (no longer manages approvals internally)
+  const { events, loadingHistory, addAgentEvent } = useAgentEventsHook(agentId, false);
 
   // Session API hook
   const sessionAPI = useSessionAPIHook();
@@ -98,11 +94,11 @@ export function EventStreamProvider({
     onError: (error) => {
       console.error('Event stream error:', error);
     },
-    // Session event handlers
-    onUserMessage: addSessionEvent,
-    onAgentMessage: addSessionEvent,
-    onToolCall: addSessionEvent,
-    onToolResult: addSessionEvent,
+    // Agent event handlers
+    onUserMessage: addAgentEvent,
+    onAgentMessage: addAgentEvent,
+    onToolCall: addAgentEvent,
+    onToolResult: addAgentEvent,
     // Agent state changes
     onAgentStateChange: handleAgentStateChangeCallback,
     // Tool approval requests
@@ -122,10 +118,10 @@ export function EventStreamProvider({
         reconnect: eventStreamResult.reconnect,
       },
 
-      sessionEvents: {
-        events: filteredEvents,
+      agentEvents: {
+        events,
         loadingHistory,
-        addSessionEvent,
+        addAgentEvent,
       },
 
       sessionAPI: {
@@ -141,9 +137,9 @@ export function EventStreamProvider({
       eventStreamResult.sendCount,
       eventStreamResult.close,
       eventStreamResult.reconnect,
-      filteredEvents,
+      events,
       loadingHistory,
-      addSessionEvent,
+      addAgentEvent,
       sessionAPI.sendMessage,
       sessionAPI.stopAgent,
       handleAgentStateChangeCallback,
@@ -188,7 +184,7 @@ export function useSessionEvents() {
     throw new Error('useSessionEvents must be used within EventStreamProvider');
   }
 
-  return context.sessionEvents;
+  return context.agentEvents;
 }
 
 export function useSessionAPI() {

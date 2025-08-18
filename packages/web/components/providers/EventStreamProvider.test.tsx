@@ -17,21 +17,21 @@ import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { PendingApproval } from '@/types/api';
 import type { StreamConnection } from '@/types/stream-events';
-import type { UseSessionEventsReturn } from '@/hooks/useSessionEvents';
+import type { UseAgentEventsReturn } from '@/hooks/useAgentEvents';
 import type { UseEventStreamResult } from '@/hooks/useEventStream';
 import type { UseSessionAPIReturn } from '@/hooks/useSessionAPI';
 
 // Mock all dependencies
-vi.mock('@/hooks/useSessionEvents');
+vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
 
 // Import and type the mocked hooks
-import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
+import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
 
-const mockUseSessionEvents = useSessionEventsHook as MockedFunction<() => UseSessionEventsReturn>;
+const mockUseAgentEvents = useAgentEventsHook as MockedFunction<() => UseAgentEventsReturn>;
 const mockUseEventStream = useEventStreamHook as MockedFunction<() => UseEventStreamResult>;
 const mockUseSessionAPI = useSessionAPIHook as MockedFunction<() => UseSessionAPIReturn>;
 
@@ -84,12 +84,11 @@ describe('EventStreamProvider', () => {
     });
 
     // Set up default mock return values
-    const mockSessionEventsReturn: UseSessionEventsReturn = {
-      allEvents: [],
-      filteredEvents: [],
+    const mockAgentEventsReturn: UseAgentEventsReturn = {
+      events: [],
       loadingHistory: false,
       connected: false,
-      addSessionEvent: vi.fn(),
+      addAgentEvent: vi.fn(),
     };
 
     const mockEventStreamReturn: UseEventStreamResult = {
@@ -114,7 +113,7 @@ describe('EventStreamProvider', () => {
       stopAgent: vi.fn(),
     };
 
-    mockUseSessionEvents.mockReturnValue(mockSessionEventsReturn);
+    mockUseAgentEvents.mockReturnValue(mockAgentEventsReturn);
     mockUseEventStream.mockReturnValue(mockEventStreamReturn);
     mockUseSessionAPI.mockReturnValue(mockSessionAPIReturn);
   });
@@ -144,7 +143,7 @@ describe('EventStreamProvider', () => {
     expect(result.current).toBeDefined();
     expect(result.current.events).toBeDefined();
     expect(result.current.loadingHistory).toBeDefined();
-    expect(result.current.addSessionEvent).toBeDefined();
+    expect(result.current.addAgentEvent).toBeDefined();
   });
 
   it('provides session API context to children', async () => {
@@ -172,15 +171,14 @@ describe('EventStreamProvider', () => {
       },
     ];
 
-    const mockSessionEventsWithData: UseSessionEventsReturn = {
-      allEvents: mockEvents,
-      filteredEvents: mockEvents,
+    const mockAgentEventsWithData: UseAgentEventsReturn = {
+      events: mockEvents,
       loadingHistory: false,
       connected: false,
-      addSessionEvent: vi.fn(),
+      addAgentEvent: vi.fn(),
     };
 
-    mockUseSessionEvents.mockReturnValue(mockSessionEventsWithData);
+    mockUseAgentEvents.mockReturnValue(mockAgentEventsWithData);
 
     const { result } = renderHook(() => useSessionEvents(), { wrapper });
 
@@ -252,7 +250,7 @@ describe('EventStreamProvider', () => {
       // Wait for any async effects to complete
     });
 
-    expect(mockUseSessionEvents).toHaveBeenCalledWith('test-session', 'test-agent', false);
+    expect(mockUseAgentEvents).toHaveBeenCalledWith('test-agent', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
       sessionId: 'test-session',
@@ -301,7 +299,7 @@ describe('EventStreamProvider', () => {
     });
 
     // Verify initial calls are made with correct parameters
-    expect(mockUseSessionEvents).toHaveBeenCalledWith('test-session', 'test-agent', false);
+    expect(mockUseAgentEvents).toHaveBeenCalledWith('test-agent', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
       sessionId: 'test-session',

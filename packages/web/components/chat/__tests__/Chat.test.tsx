@@ -124,7 +124,7 @@ describe('Chat', () => {
     mockUseSessionEvents.mockReturnValue({
       events: [createMockEvent('event-1'), createMockEvent('event-2')],
       loadingHistory: false,
-      addSessionEvent: vi.fn(),
+      addAgentEvent: vi.fn(),
     });
 
     mockUseSessionAPI.mockReturnValue({
@@ -474,7 +474,7 @@ describe('Chat', () => {
       mockUseSessionEvents.mockReturnValue({
         events: [],
         loadingHistory: false,
-        addSessionEvent: vi.fn(),
+        addAgentEvent: vi.fn(),
       });
 
       render(<Chat />);

@@ -17,7 +17,7 @@ import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 
 // Mock all the hooks that EventStreamProvider depends on
-vi.mock('@/hooks/useSessionEvents');
+vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
 
@@ -26,7 +26,7 @@ beforeEach(() => {
   global.fetch = vi.fn().mockResolvedValue(createMockResponse([]));
 });
 
-import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
+import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
 import type { PendingApproval } from '@/types/api';
@@ -66,18 +66,18 @@ function TestComponentWithoutProvider() {
 describe('EventStreamProvider Integration', () => {
   const mockSendMessage = vi.fn();
   const mockStopAgent = vi.fn();
-  const mockAddSessionEvent = vi.fn();
+  const mockAddAgentEvent = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Setup default mock implementations
-    vi.mocked(useSessionEventsHook).mockReturnValue({
+    vi.mocked(useAgentEventsHook).mockReturnValue({
       allEvents: [],
       filteredEvents: [],
       loadingHistory: false,
       connected: false,
-      addSessionEvent: mockAddSessionEvent,
+      addAgentEvent: mockAddAgentEvent,
     });
 
     vi.mocked(useEventStreamHook).mockReturnValue({
@@ -153,12 +153,12 @@ describe('EventStreamProvider Integration', () => {
       reconnect: vi.fn(),
     });
 
-    vi.mocked(useSessionEventsHook).mockReturnValue({
+    vi.mocked(useAgentEventsHook).mockReturnValue({
       allEvents: mockEvents,
       filteredEvents: mockEvents,
       loadingHistory: true,
       connected: true,
-      addSessionEvent: mockAddSessionEvent,
+      addAgentEvent: mockAddAgentEvent,
     });
 
     await act(async () => {
@@ -315,7 +315,7 @@ describe('EventStreamProvider Integration', () => {
     });
 
     // Verify hooks are called with correct parameters
-    expect(useSessionEventsHook).toHaveBeenCalledWith('my-session', 'my-agent', false);
+    expect(useAgentEventsHook).toHaveBeenCalledWith('my-agent', false);
     expect(useEventStreamHook).toHaveBeenCalledWith({
       projectId: 'my-project',
       sessionId: 'my-session',
