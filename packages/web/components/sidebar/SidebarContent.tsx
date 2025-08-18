@@ -7,6 +7,7 @@ import React, { memo } from 'react';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
+import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 
@@ -57,6 +58,9 @@ export const SidebarContent = memo(function SidebarContent({
 
       {/* TASK MANAGEMENT */}
       <TaskSidebarSection onCloseMobileNav={isMobile ? onCloseMobileNav : undefined} />
+
+      {/* FEEDBACK */}
+      <FeedbackSection isMobile={isMobile} onCloseMobileNav={onCloseMobileNav} />
     </>
   );
 });
