@@ -232,6 +232,7 @@ export function useEventStream({
   const handleStreamEventRef = useRef<(event: LaceEvent) => void>(() => {});
   const autoReconnectRef = useRef(autoReconnect);
   const reconnectIntervalRef = useRef(reconnectInterval);
+  const includeGlobalRef = useRef(includeGlobal);
 
   // Store callbacks in refs to avoid recreating connect on every callback change
   const callbackRefs = useRef({
@@ -301,6 +302,7 @@ export function useEventStream({
     // Update reconnection settings refs
     autoReconnectRef.current = autoReconnect;
     reconnectIntervalRef.current = reconnectInterval;
+    includeGlobalRef.current = includeGlobal;
   }, [
     onConnect,
     onDisconnect,
@@ -332,6 +334,7 @@ export function useEventStream({
     onSystemNotification,
     autoReconnect,
     reconnectInterval,
+    includeGlobal,
   ]);
 
   // Create unified subscription for ALL event types
@@ -344,6 +347,7 @@ export function useEventStream({
         projectIds: projectId ? [projectId] : [],
         sessionIds: sessionId ? [sessionId] : [],
         threads: sortedThreadIds,
+        includeGlobal,
       });
     },
     [projectId, sessionId, threadIds?.join(','), includeGlobal] // Use join for array stability
@@ -359,13 +363,13 @@ export function useEventStream({
   );
 
   // Build query string from subscription - pure function, no need for useCallback
-  const buildQueryString = (sub: StreamSubscription): string => {
+  const buildQueryString = (sub: StreamSubscription, includeGlobal: boolean): string => {
     const params = new URLSearchParams();
 
     if (sub.projectIds?.length) params.set('projects', sub.projectIds.join(','));
     if (sub.sessionIds?.length) params.set('sessions', sub.sessionIds.join(','));
     if (sub.threads?.length) params.set('threads', sub.threads.join(','));
-    // global and eventTypes removed - LaceEvent handles all types
+    if (includeGlobal) params.set('global', 'true');
 
     return params.toString();
   };
@@ -414,15 +418,15 @@ export function useEventStream({
           case 'LOCAL_SYSTEM_MESSAGE':
             callbackRefs.current.onSystemMessage?.(event);
             break;
-          case 'AGENT_STATE_CHANGE':
-            if (event.type === 'AGENT_STATE_CHANGE') {
-              const { agentId, from, to } = event.data;
-              // Only call the callback if all required fields are present
-              if (agentId && from !== undefined && to !== undefined) {
-                callbackRefs.current.onAgentStateChange?.(agentId, from, to);
+          case 'AGENT_STATE_CHANGE': {
+            if (event.data && typeof event.data === 'object') {
+              const data = event.data as { agentId: string; from: string; to: string };
+              if (data.agentId && data.from !== undefined && data.to !== undefined) {
+                callbackRefs.current.onAgentStateChange?.(data.agentId, data.from, data.to);
               }
             }
             break;
+          }
         }
       } else if (isTaskEvent(event)) {
         // Extract task event data from LaceEvent
@@ -511,7 +515,7 @@ export function useEventStream({
       eventSourceRef.current.close();
     }
 
-    const queryString = buildQueryString(subscriptionRef.current);
+    const queryString = buildQueryString(subscriptionRef.current, includeGlobalRef.current);
     const url = `/api/events/stream${queryString ? `?${queryString}` : ''}`;
 
     const eventSource = new EventSource(url);

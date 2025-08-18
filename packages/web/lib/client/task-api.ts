@@ -2,7 +2,7 @@
 // ABOUTME: Provides type-safe methods for interacting with task API endpoints
 
 import type { Task, TaskStatus, TaskPriority, TaskFilters } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 export interface CreateTaskRequest {
   title: string;
@@ -43,43 +43,22 @@ export class TaskAPIClient {
       }
     }
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('Failed to fetch tasks');
-    }
-
-    const data = await parseResponse<{ tasks: Task[] }>(response);
+    const data = await api.get<{ tasks: Task[] }>(url);
     return data.tasks;
   }
 
   async createTask(projectId: string, sessionId: string, task: CreateTaskRequest): Promise<Task> {
-    const response = await fetch(
+    const data = await api.post<{ task: Task }>(
       `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
-      }
+      task
     );
-
-    if (!response.ok) {
-      throw new Error('Failed to create task');
-    }
-
-    const data = await parseResponse<{ task: Task }>(response);
     return data.task;
   }
 
   async getTask(projectId: string, sessionId: string, taskId: string): Promise<Task> {
-    const response = await fetch(
+    const data = await api.get<{ task: Task }>(
       `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`
     );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch task');
-    }
-
-    const data = await parseResponse<{ task: Task }>(response);
     return data.task;
   }
 
@@ -89,34 +68,17 @@ export class TaskAPIClient {
     taskId: string,
     updates: UpdateTaskRequest
   ): Promise<Task> {
-    const response = await fetch(
+    const data = await api.patch<{ task: Task }>(
       `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      }
+      updates
     );
-
-    if (!response.ok) {
-      throw new Error('Failed to update task');
-    }
-
-    const data = await parseResponse<{ task: Task }>(response);
     return data.task;
   }
 
   async deleteTask(projectId: string, sessionId: string, taskId: string): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`,
-      {
-        method: 'DELETE',
-      }
+    await api.delete(
+      `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}`
     );
-
-    if (!response.ok) {
-      throw new Error('Failed to delete task');
-    }
   }
 
   async addNote(
@@ -131,20 +93,10 @@ export class TaskAPIClient {
       requestBody.author = author;
     }
 
-    const response = await fetch(
+    const data = await api.post<{ message: string; task: Task }>(
       `${this.baseUrl}/api/projects/${projectId}/sessions/${sessionId}/tasks/${taskId}/notes`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      }
+      requestBody
     );
-
-    if (!response.ok) {
-      throw new Error('Failed to add note');
-    }
-
-    const data = await parseResponse<{ message: string; task: Task }>(response);
     return data.task;
   }
 }

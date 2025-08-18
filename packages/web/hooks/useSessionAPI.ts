@@ -31,9 +31,15 @@ export function useSessionAPI() {
         });
 
         if (!response.ok) {
-          const error: unknown = await parseResponse(response);
-          if (isApiError(error)) {
-            throw new Error(error.error || 'Failed to create session');
+          try {
+            const error: unknown = await parseResponse(response.clone());
+            if (isApiError(error)) {
+              throw new Error(error.error || 'Failed to create session');
+            }
+          } catch {
+            // Fallback to raw text for non-JSON error payloads (HTML error pages)
+            const text = await response.text();
+            throw new Error(text || `Failed to create session: ${response.status}`);
           }
           throw new Error('Failed to create session');
         }

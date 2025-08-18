@@ -6,7 +6,7 @@ import { getSessionService } from '@/lib/server/session-service';
 import type { LaceEvent } from '@/types/core';
 import { asThreadId, isConversationEvent } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 
 export async function GET(
@@ -49,6 +49,6 @@ export async function GET(
     return createSuperjsonResponse(events, { status: 200 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR', error });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

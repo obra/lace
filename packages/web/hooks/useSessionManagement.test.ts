@@ -52,12 +52,22 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessions),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessions)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      });
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response);
+
+    mockParseResponse
+      .mockResolvedValueOnce(mockSessions)
+      .mockResolvedValueOnce({ configuration: {} });
 
     const { result, rerender } = renderHook(
       (props: { projectId: string | null }) => useSessionManagement(props.projectId),
@@ -78,8 +88,10 @@ describe('useSessionManagement', () => {
     });
 
     expect(result.current.sessions).toEqual(mockSessions);
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/sessions');
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration');
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/sessions', { method: 'GET' });
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration', {
+      method: 'GET',
+    });
   });
 
   it('clears sessions when project is deselected', async () => {
@@ -98,12 +110,22 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessions),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessions)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      });
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response);
+
+    mockParseResponse
+      .mockResolvedValueOnce(mockSessions)
+      .mockResolvedValueOnce({ configuration: {} });
 
     await act(async () => {
       rerender({ projectId: 'project-1' });
@@ -124,20 +146,41 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessions),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessions)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ id: 'new-session' }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ id: 'new-session' })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([...mockSessions, { id: 'new-session', name: 'New Session' }]),
-      });
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([...mockSessions, { id: 'new-session', name: 'New Session' }])
+          ),
+        clone: function () {
+          return this;
+        },
+      } as Response);
+
+    mockParseResponse
+      .mockResolvedValueOnce(mockSessions)
+      .mockResolvedValueOnce({ configuration: {} })
+      .mockResolvedValueOnce({ id: 'new-session' })
+      .mockResolvedValueOnce([...mockSessions, { id: 'new-session', name: 'New Session' }]);
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -169,16 +212,30 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
-      })
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: { theme: 'dark' } }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: { theme: 'dark' } })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: { theme: 'dark' } }),
-      });
+        text: () => Promise.resolve(JSON.stringify({ configuration: { theme: 'dark' } })),
+        clone: function () {
+          return this;
+        },
+      } as Response);
+
+    mockParseResponse
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ configuration: { theme: 'dark' } })
+      .mockResolvedValueOnce({ configuration: { theme: 'dark' } });
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -192,13 +249,17 @@ describe('useSessionManagement', () => {
     });
 
     expect(result.current.projectConfig).toEqual({ theme: 'dark' });
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration');
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects/project-1/configuration', {
+      method: 'GET',
+    });
   });
 
   it('handles API errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const networkError = new Error('Network error');
     mockFetch.mockRejectedValueOnce(networkError).mockRejectedValueOnce(networkError);
+
+    // parseResponse won't be called for network errors, no need to mock
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -208,8 +269,11 @@ describe('useSessionManagement', () => {
 
     expect(result.current.sessions).toEqual([]);
     expect(result.current.loading).toBe(false);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions:', networkError);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load project configuration:', networkError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions:', expect.any(Error));
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to load project configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -220,13 +284,24 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessions),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessions)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(createError);
+
+    mockParseResponse
+      .mockResolvedValueOnce(mockSessions)
+      .mockResolvedValueOnce({ configuration: {} });
+    // Third call will be rejected, so no parseResponse call
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -241,7 +316,7 @@ describe('useSessionManagement', () => {
       });
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', createError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -250,25 +325,34 @@ describe('useSessionManagement', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const errorResponse = {
       ok: false,
-      json: () => Promise.resolve({ error: 'Session creation failed' }),
-    };
+      text: () => Promise.resolve(JSON.stringify({ error: 'Session creation failed' })),
+      clone: function () {
+        return this;
+      },
+    } as Response;
 
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessions),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessions)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce(errorResponse);
 
     // For the error response, parseResponse should return the parsed error data
     mockParseResponse
-      .mockImplementationOnce((res: Response) => res.json())
-      .mockImplementationOnce((res: Response) => res.json())
-      .mockImplementationOnce((res: Response) => res.json());
+      .mockResolvedValueOnce(mockSessions)
+      .mockResolvedValueOnce({ configuration: {} })
+      .mockResolvedValueOnce({ error: 'Session creation failed' });
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -283,7 +367,7 @@ describe('useSessionManagement', () => {
       });
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', 'Session creation failed');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -294,13 +378,21 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
-      })
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(configError);
+
+    mockParseResponse.mockResolvedValueOnce([]).mockResolvedValueOnce({ configuration: {} });
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -314,7 +406,10 @@ describe('useSessionManagement', () => {
       );
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error loading session configuration:', configError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error loading session configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -325,13 +420,21 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
-      })
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(updateError);
+
+    mockParseResponse.mockResolvedValueOnce([]).mockResolvedValueOnce({ configuration: {} });
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -345,7 +448,10 @@ describe('useSessionManagement', () => {
       ).rejects.toThrow('Update config failed');
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating session configuration:', updateError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error updating session configuration:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });
@@ -356,13 +462,21 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
-      })
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(updateError);
+
+    mockParseResponse.mockResolvedValueOnce([]).mockResolvedValueOnce({ configuration: {} });
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
 
@@ -376,7 +490,7 @@ describe('useSessionManagement', () => {
       ).rejects.toThrow('Update session failed');
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating session:', updateError);
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating session:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -387,12 +501,18 @@ describe('useSessionManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
-      })
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ configuration: {} }),
-      })
+        text: () => Promise.resolve(JSON.stringify({ configuration: {} })),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(loadError);
 
     const { result } = renderHook(() => useSessionManagement('project-1'));
@@ -407,7 +527,10 @@ describe('useSessionManagement', () => {
     });
 
     expect(sessions!).toEqual([]);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load sessions for project:', loadError);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to load sessions for project:',
+      expect.any(Error)
+    );
 
     consoleSpy.mockRestore();
   });

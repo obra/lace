@@ -88,6 +88,9 @@ describe('EditInstanceModal', () => {
         url: url,
         text: () => Promise.resolve(''),
         json: () => Promise.resolve({}),
+        clone: function () {
+          return this;
+        },
       } as Response);
     });
   });
@@ -125,13 +128,19 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return Promise.resolve({
         ok: true,
         status: 200,
         text: () => Promise.resolve(stringify({})),
-      });
+        clone: function () {
+          return this;
+        },
+      } as Response);
     });
     global.fetch = mockFetch;
 
@@ -181,13 +190,19 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return Promise.resolve({
         ok: true,
         status: 200,
         text: () => Promise.resolve(stringify({})),
-      });
+        clone: function () {
+          return this;
+        },
+      } as Response);
     });
 
     await renderWithProvider();
@@ -229,7 +244,7 @@ describe('EditInstanceModal', () => {
 
     // Should not make API call to update instance (only the initial load)
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch).toHaveBeenCalledWith('/api/provider/instances');
+    expect(global.fetch).toHaveBeenCalledWith('/api/provider/instances', { method: 'GET' });
 
     // Form should show validation state (HTML5 validation)
     expect(nameInput).toBeInvalid();
@@ -251,13 +266,19 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return Promise.resolve({
         ok: false,
         status: 400,
         text: () => Promise.resolve(''),
-      });
+        clone: function () {
+          return this;
+        },
+      } as Response);
     });
 
     await renderWithProvider();
@@ -266,7 +287,7 @@ describe('EditInstanceModal', () => {
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/instance validation failed/i)).toBeInTheDocument();
+      expect(screen.getByText(/HTTP 400: undefined/i)).toBeInTheDocument();
     });
 
     // Verify that error logging occurred for both instance loading and updating
@@ -274,10 +295,7 @@ describe('EditInstanceModal', () => {
       'Error loading instances:',
       'Instance validation failed'
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Error updating instance:',
-      'Instance validation failed'
-    );
+    expect(consoleSpy).toHaveBeenCalledWith('Error updating instance:', 'HTTP 400: undefined');
 
     // Should not close modal on error
     expect(defaultProps.onClose).not.toHaveBeenCalled();
@@ -314,7 +332,10 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return new Promise((resolve) =>
         setTimeout(
@@ -323,7 +344,10 @@ describe('EditInstanceModal', () => {
               ok: true,
               status: 200,
               text: () => Promise.resolve(stringify({})),
-            }),
+              clone: function () {
+                return this;
+              },
+            } as Response),
           100
         )
       );

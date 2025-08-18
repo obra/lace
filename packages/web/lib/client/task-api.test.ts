@@ -32,7 +32,7 @@ describe('TaskAPIClient Unit Tests', () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       expect(fetchCall[0]).toBe('/api/projects/project_123/sessions/lace_20240101_sess01/tasks');
-      expect(fetchCall[1]).toBeUndefined(); // GET request has no body
+      expect(fetchCall[1]).toEqual({ method: 'GET' }); // API client adds method parameter
     });
 
     it('should construct RESTful URL with filter parameters', async () => {
@@ -138,7 +138,7 @@ describe('TaskAPIClient Unit Tests', () => {
       mockFetch.mockResolvedValue(createMockErrorResponse('Server error', { status: 500 }));
 
       await expect(client.listTasks('project_123', 'lace_20240101_sess01')).rejects.toThrow(
-        'Failed to fetch tasks'
+        'HTTP 500: Bad Request'
       );
     });
 
@@ -147,7 +147,7 @@ describe('TaskAPIClient Unit Tests', () => {
 
       await expect(
         client.createTask('project_123', 'invalid-session', { title: '', prompt: '' })
-      ).rejects.toThrow('Failed to create task');
+      ).rejects.toThrow('HTTP 400: Bad Request');
     });
 
     it('should handle network errors', async () => {

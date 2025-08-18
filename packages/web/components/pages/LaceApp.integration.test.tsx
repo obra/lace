@@ -109,6 +109,9 @@ describe('LaceApp Onboarding Integration', () => {
             status: 200,
             text: () => Promise.resolve(response),
             json: () => Promise.resolve({ instances: [] }),
+            clone: function () {
+              return this;
+            },
           } as Response);
         }
 
@@ -119,6 +122,9 @@ describe('LaceApp Onboarding Integration', () => {
             status: 200,
             text: () => Promise.resolve(response),
             json: () => Promise.resolve({ providers: [] }),
+            clone: function () {
+              return this;
+            },
           } as Response);
         }
 

@@ -50,7 +50,10 @@ describe('DirectoryField', () => {
       status: 200,
       text: () => Promise.resolve(stringify(mockResponseData)),
       json: () => Promise.resolve(mockResponseData),
-    });
+      clone: function () {
+        return this;
+      },
+    } as Response);
     vi.stubGlobal('fetch', mockFetch);
   });
 

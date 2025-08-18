@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ProjectInfo } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 interface UseProjectManagementResult {
   projects: ProjectInfo[];
@@ -38,8 +38,7 @@ export function useProjectManagement(): UseProjectManagementResult {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/projects');
-      const data = await parseResponse<ProjectInfo[]>(res);
+      const data = await api.get<ProjectInfo[]>('/api/projects');
       setProjects(data);
       setLoading(false);
       return data;
@@ -65,20 +64,9 @@ export function useProjectManagement(): UseProjectManagementResult {
       }
     ) => {
       try {
-        const res = await fetch(`/api/projects/${projectId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        });
-
-        if (res.ok) {
-          // Reload projects to reflect the changes
-          await loadProjects();
-        } else {
-          const errorMessage = `Failed to update project: ${res.status}`;
-          setError(errorMessage);
-          console.error(errorMessage);
-        }
+        await api.patch(`/api/projects/${projectId}`, updates);
+        // Reload projects to reflect the changes
+        await loadProjects();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to update project';
         setError(errorMessage);
@@ -96,24 +84,10 @@ export function useProjectManagement(): UseProjectManagementResult {
       configuration?: Record<string, unknown>;
     }): Promise<ProjectInfo> => {
       try {
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(projectData),
-        });
-
-        if (res.ok) {
-          const newProject = await parseResponse<ProjectInfo>(res);
-          // Reload projects to include the new project
-          await loadProjects();
-          return newProject;
-        } else {
-          const errorData = await parseResponse<{ error: string }>(res);
-          const errorMessage = `Failed to create project: ${errorData.error}`;
-          setError(errorMessage);
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
+        const newProject = await api.post<ProjectInfo>('/api/projects', projectData);
+        // Reload projects to include the new project
+        await loadProjects();
+        return newProject;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to create project';
         setError(errorMessage);
@@ -127,17 +101,10 @@ export function useProjectManagement(): UseProjectManagementResult {
   const loadProjectConfiguration = useCallback(
     async (projectId: string): Promise<Record<string, unknown>> => {
       try {
-        const res = await fetch(`/api/projects/${projectId}/configuration`);
-
-        if (res.ok) {
-          const data = await parseResponse<{ configuration: Record<string, unknown> }>(res);
-          return data.configuration || {};
-        } else {
-          const errorMessage = `Failed to load project configuration: ${res.status}`;
-          setError(errorMessage);
-          console.error(errorMessage);
-          return {};
-        }
+        const data = await api.get<{ configuration: Record<string, unknown> }>(
+          `/api/projects/${projectId}/configuration`
+        );
+        return data.configuration || {};
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Failed to load project configuration';
@@ -149,7 +116,7 @@ export function useProjectManagement(): UseProjectManagementResult {
     []
   );
 
-  // Load projects on mount only - dependency on loadProjects would cause infinite re-render loop  
+  // Load projects on mount only - dependency on loadProjects would cause infinite re-render loop
   // since loadProjects is recreated on every render despite useCallback
   useEffect(() => {
     void loadProjects();

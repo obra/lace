@@ -2,10 +2,10 @@
 // ABOUTME: Returns directory contents with permissions and metadata for file browser component
 
 import { NextRequest } from 'next/server';
-import { promises as fs } from 'fs';
-import { join, resolve, relative } from 'path';
+import { promises as fs, constants as fsConstants } from 'fs';
+import { join, resolve, relative, sep } from 'path';
 import { homedir } from 'os';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { ListDirectoryRequestSchema } from '@/types/filesystem';
 import type { DirectoryEntry, ListDirectoryResponse } from '@/types/filesystem';
@@ -18,12 +18,23 @@ export async function GET(request: NextRequest) {
     // Validate input
     const { path } = ListDirectoryRequestSchema.parse({ path: rawPath });
 
-    // Security: Ensure path is within user's home directory
+    // Security: Ensure path is within user's home directory (follow symlinks)
     const homeDir = homedir();
     const absolutePath = resolve(path);
-    const relativePath = relative(homeDir, absolutePath);
+    const [realHomeDir, realAbsolutePath] = await Promise.all([
+      fs.realpath(homeDir).catch(() => homeDir),
+      fs.realpath(absolutePath).catch(() => absolutePath),
+    ]);
 
-    if (relativePath.startsWith('..') || resolve(homeDir, relativePath) !== absolutePath) {
+    // Allow exact home or any descendant. Use separator-aware prefix check.
+    const isInsideHome =
+      realAbsolutePath === realHomeDir ||
+      (realAbsolutePath.startsWith(realHomeDir) &&
+        (realAbsolutePath[realHomeDir.length] === sep ||
+          realHomeDir.endsWith(sep) ||
+          realHomeDir === sep));
+
+    if (!isInsideHome) {
       return createErrorResponse('Access denied: path outside home directory', 403, {
         code: 'PATH_ACCESS_DENIED',
       });
@@ -46,14 +57,29 @@ export async function GET(request: NextRequest) {
         const entryPath = join(absolutePath, dirent.name);
         const entryStats = await fs.stat(entryPath);
 
+        // Exclude entries resolving outside of home directory (symlink escape)
+        const realEntryPath = await fs.realpath(entryPath).catch(() => null);
+        if (!realEntryPath) {
+          continue;
+        }
+        const entryInsideHome =
+          realEntryPath === realHomeDir ||
+          (realEntryPath.startsWith(realHomeDir) &&
+            (realEntryPath[realHomeDir.length] === sep ||
+              realHomeDir.endsWith(sep) ||
+              realHomeDir === sep));
+        if (!entryInsideHome) {
+          continue;
+        }
+
         // Check read permissions
-        await fs.access(entryPath, fs.constants.R_OK);
+        await fs.access(entryPath, fsConstants.R_OK);
         const canRead = true;
 
         // Check write permissions
         let canWrite = false;
         try {
-          await fs.access(entryPath, fs.constants.W_OK);
+          await fs.access(entryPath, fsConstants.W_OK);
           canWrite = true;
         } catch {
           canWrite = false;
@@ -104,7 +130,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Build path from home to current directory
       const relativePathForBreadcrumbs = relative(homeDir, absolutePath);
-      const pathParts = relativePathForBreadcrumbs.split('/').filter(Boolean);
+      const pathParts = relativePathForBreadcrumbs.split(sep).filter(Boolean);
 
       breadcrumbPaths.push(homeDir);
       breadcrumbNames.push('Home');

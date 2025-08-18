@@ -4,14 +4,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { SessionInfo, AgentState } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
-import { parseResponse } from '@/lib/serialization';
-import { isApiError } from '@/types/api';
+import { api } from '@/lib/api-client';
 
 interface UseAgentManagementResult {
   sessionDetails: SessionInfo | null;
   loading: boolean;
   createAgent: (sessionId: string, agentData: CreateAgentRequest) => Promise<void>;
-  updateAgentState: (agentId: string, from: string, to: string) => void;
+  updateAgentState: (agentId: string, to: string) => void;
   reloadSessionDetails: () => Promise<void>;
   loadAgentConfiguration: (
     agentId: string
@@ -34,10 +33,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}`);
-      const data: unknown = await parseResponse<unknown>(res);
-
-      const sessionResponse = data as SessionInfo;
+      const sessionResponse = await api.get<SessionInfo>(`/api/sessions/${sessionId}`);
       setSessionDetails(sessionResponse);
     } catch (error) {
       console.error('Failed to load session details:', error);
@@ -51,18 +47,9 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
     async (sessionId: string, agentData: CreateAgentRequest) => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/agents`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(agentData),
-        });
-
-        if (res.ok) {
-          // Reload session details to show the new agent
-          await loadSessionDetails();
-        } else {
-          console.error('Failed to create agent');
-        }
+        await api.post(`/api/sessions/${sessionId}/agents`, agentData);
+        // Reload session details to show the new agent
+        await loadSessionDetails();
       } catch (error) {
         console.error('Failed to create agent:', error);
       } finally {
@@ -72,7 +59,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
     [loadSessionDetails]
   );
 
-  const updateAgentState = useCallback((agentId: string, from: string, to: string) => {
+  const updateAgentState = useCallback((agentId: string, to: string) => {
     setSessionDetails((prevSession) => {
       if (!prevSession?.agents) return prevSession;
 
@@ -90,22 +77,11 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
       agentId: string
     ): Promise<{ name: string; providerInstanceId: string; modelId: string }> => {
       try {
-        const res = await fetch(`/api/agents/${agentId}`);
-
-        if (!res.ok) {
-          throw new Error(`Failed to load agent configuration: ${res.status}`);
-        }
-
-        const data = await parseResponse<{
+        return await api.get<{
           name: string;
           providerInstanceId: string;
           modelId: string;
-        }>(res);
-        if (isApiError(data)) {
-          throw new Error(data.error);
-        }
-
-        return data;
+        }>(`/api/agents/${agentId}`);
       } catch (error) {
         console.error('Error loading agent configuration:', error);
         throw error;
@@ -120,17 +96,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
       config: { name: string; providerInstanceId: string; modelId: string }
     ): Promise<void> => {
       try {
-        const res = await fetch(`/api/agents/${agentId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        });
-
-        if (!res.ok) {
-          const errorData = await parseResponse<{ error: string }>(res);
-          throw new Error(errorData.error || `Failed to update agent: ${res.status}`);
-        }
-
+        await api.put(`/api/agents/${agentId}`, config);
         // Reload session details to reflect the changes
         await loadSessionDetails();
       } catch (error) {

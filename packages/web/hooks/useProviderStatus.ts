@@ -4,7 +4,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 interface ProviderStatus {
   status: 'connected' | 'error' | 'untested' | 'testing';
@@ -19,18 +19,14 @@ export function useProviderStatus(instanceId: string) {
     setStatus((prev) => ({ ...prev, status: 'testing' }));
 
     try {
-      const response = await fetch(`/api/provider/instances/${instanceId}/test`, {
-        method: 'POST',
-      });
-
-      const responseData = await parseResponse<{
+      const responseData = await api.post<{
         success: boolean;
         status: 'connected' | 'error';
         message?: string;
         testedAt: string;
-      }>(response);
+      }>(`/api/provider/instances/${instanceId}/test`);
 
-      if (response.ok && responseData.success) {
+      if (responseData.success) {
         setStatus({
           status: responseData.status,
           lastTested: responseData.testedAt,

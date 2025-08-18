@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { Project, Session } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 

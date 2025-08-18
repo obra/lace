@@ -140,6 +140,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -189,6 +192,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -199,6 +205,7 @@ describe('ToolApprovalProvider', () => {
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -213,6 +220,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const { rerender } = render(
@@ -243,6 +253,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -261,6 +274,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('null'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -281,6 +297,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -303,6 +322,7 @@ describe('ToolApprovalProvider', () => {
       // Should trigger refresh
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -313,6 +333,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       function TestApprovalResponse() {
@@ -361,6 +384,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -385,6 +411,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -403,6 +432,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-with-approvals'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       // Trigger refresh
@@ -436,6 +468,9 @@ describe('ToolApprovalProvider', () => {
       resolvePromise!({
         ok: true,
         text: () => Promise.resolve('[]'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       await waitFor(() => {
@@ -480,6 +515,9 @@ describe('ToolApprovalProvider', () => {
         ok: false,
         status: 404,
         text: () => Promise.resolve('Agent not found'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -495,10 +533,11 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
-      // Should log the HTTP status error without attempting to parse
+      // Critical: Should NOT call parseResponse on HTTP errors to avoid parsing HTML as JSON
+      expect(mockParseResponse).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
-        expect.objectContaining({ message: 'Failed to fetch approvals: 404' })
+        expect.objectContaining({ message: 'HTTP 404: undefined' })
       );
 
       consoleSpy.mockRestore();
@@ -512,6 +551,9 @@ describe('ToolApprovalProvider', () => {
         ok: true,
         status: 200,
         text: () => Promise.resolve('{"error": "Agent not found"}'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -543,6 +585,9 @@ describe('ToolApprovalProvider', () => {
         ok: false,
         status: 500,
         text: () => Promise.resolve('Internal server error'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -558,10 +603,12 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
+      // Critical: Should NOT call parseResponse on HTTP errors to avoid parsing HTML as JSON
+      expect(mockParseResponse).not.toHaveBeenCalled();
       // Should log the HTTP status error
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
-        expect.objectContaining({ message: 'Failed to fetch approvals: 500' })
+        expect.objectContaining({ message: 'HTTP 500: undefined' })
       );
 
       consoleSpy.mockRestore();
@@ -597,6 +644,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const { rerender } = render(
@@ -608,6 +658,7 @@ describe('ToolApprovalProvider', () => {
       // Wait for initial load
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -625,6 +676,7 @@ describe('ToolApprovalProvider', () => {
       // Should fetch for new agent
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${newAgentId}/approvals/pending`, {
+          method: 'GET',
           signal: expect.any(AbortSignal),
         });
       });
@@ -642,6 +694,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(

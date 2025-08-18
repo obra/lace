@@ -4,8 +4,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { parseResponse } from '@/lib/serialization';
-import { isApiError } from '@/types/api';
+import { api } from '@/lib/api-client';
 
 // Provider Instance Types
 export interface ProviderInstance {
@@ -135,15 +134,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       setInstancesLoading(true);
       setInstancesError(null);
 
-      const response = await fetch('/api/provider/instances');
-      if (!response.ok) {
-        throw new Error(`Failed to load instances: ${response.status}`);
-      }
-
-      const data = await parseResponse<{ instances: ProviderInstance[] }>(response);
-      if (isApiError(data)) {
-        throw new Error(data.error);
-      }
+      const data = await api.get<{ instances: ProviderInstance[] }>('/api/provider/instances');
 
       setInstances(data.instances || []);
     } catch (err) {
@@ -161,15 +152,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       setCatalogLoading(true);
       setCatalogError(null);
 
-      const response = await fetch('/api/provider/catalog');
-      if (!response.ok) {
-        throw new Error(`Failed to load catalog: ${response.status}`);
-      }
-
-      const data = await parseResponse<{ providers: CatalogProvider[] }>(response);
-      if (isApiError(data)) {
-        throw new Error(data.error);
-      }
+      const data = await api.get<{ providers: CatalogProvider[] }>('/api/provider/catalog');
 
       setCatalogProviders(data.providers || []);
     } catch (err) {
@@ -187,16 +170,23 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       try {
         // Generate instanceId from displayName and catalogProviderId
         const generateInstanceId = (displayName: string, providerId: string): string => {
-          const baseName = `${displayName.toLowerCase()}-${providerId}`;
+          const baseName = `${displayName.toLowerCase()}-${providerId.toLowerCase()}`;
           const cleanName = baseName
-            .replace(/[^a-z0-9\s]/g, '') // Remove special chars except spaces
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
-            .replace(/-+/g, '-') // Replace multiple hyphens with single
-            .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+            .replace(/[^a-z0-9\s-]/g, '') // keep hyphens
+            .replace(/\s+/g, '-') // spaces -> hyphens
+            .replace(/-+/g, '-') // collapse hyphens
+            .replace(/^-|-$/g, ''); // trim hyphens
 
-          // Add timestamp suffix to ensure uniqueness
-          const timestamp = Date.now().toString().slice(-4);
-          return `${cleanName}-${timestamp}`;
+          // Ensure uniqueness by checking existing instances
+          let candidate = cleanName;
+          let counter = 1;
+
+          while (instances.some((instance) => instance.id === candidate)) {
+            candidate = `${cleanName}-${counter}`;
+            counter++;
+          }
+
+          return candidate;
         };
 
         const instanceId = generateInstanceId(formData.displayName, catalogProviderId);
@@ -212,19 +202,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
           },
         };
 
-        const response = await fetch('/api/provider/instances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorData = await parseResponse<unknown>(response);
-          if (isApiError(errorData)) {
-            throw new Error(errorData.error);
-          }
-          throw new Error(`Failed to create instance: ${response.status}`);
-        }
+        await api.post('/api/provider/instances', requestBody);
 
         // Reload instances to get the updated list
         await loadInstances();
@@ -234,7 +212,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
         throw err; // Re-throw so the modal can handle the error
       }
     },
-    [loadInstances]
+    [loadInstances, instances]
   );
 
   // Update provider instance
@@ -252,19 +230,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
           payload.credential = { apiKey: updateData.apiKey };
         }
 
-        const response = await fetch(`/api/provider/instances/${instanceId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errorData = await parseResponse<unknown>(response);
-          if (isApiError(errorData)) {
-            throw new Error(errorData.error);
-          }
-          throw new Error(`Failed to update instance: ${response.status}`);
-        }
+        await api.put(`/api/provider/instances/${instanceId}`, payload);
 
         // Reload instances to get the updated data
         await loadInstances();
@@ -281,17 +247,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
   const deleteInstance = useCallback(
     async (instanceId: string) => {
       try {
-        const response = await fetch(`/api/provider/instances/${instanceId}`, {
-          method: 'DELETE',
-        });
-
-        if (!response.ok) {
-          const errorData = await parseResponse<unknown>(response);
-          if (isApiError(errorData)) {
-            throw new Error(errorData.error);
-          }
-          throw new Error(`Failed to delete instance: ${response.status}`);
-        }
+        await api.delete(`/api/provider/instances/${instanceId}`);
 
         // Optimistically remove from local state and reload to ensure consistency
         setInstances((prev) => prev.filter((instance) => instance.id !== instanceId));
@@ -325,20 +281,12 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     }));
 
     try {
-      const response = await fetch(`/api/provider/instances/${instanceId}/test`, {
-        method: 'POST',
-      });
-
-      const result = await parseResponse<{
+      const result = await api.post<{
         success: boolean;
         status: 'connected' | 'error';
         message?: string;
         testedAt: string;
-      }>(response);
-
-      if (isApiError(result)) {
-        throw new Error(result.error);
-      }
+      }>(`/api/provider/instances/${instanceId}/test`);
 
       // Update test results with API response
       setTestResults((prev) => ({
@@ -396,11 +344,10 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     [testResults, getInstanceById]
   );
 
-  // Load instances on mount only - dependency on loadInstances would cause infinite re-render loop
-  // since loadInstances is recreated on every render despite useCallback
+  // Load instances on mount only
   useEffect(() => {
     void loadInstances();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadInstances]);
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(

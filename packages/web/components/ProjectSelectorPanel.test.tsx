@@ -95,6 +95,9 @@ describe('ProjectSelectorPanel', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
+          clone: function () {
+            return this;
+          },
         } as Response);
       }
 
@@ -106,6 +109,9 @@ describe('ProjectSelectorPanel', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ providers: [] }),
+          clone: function () {
+            return this;
+          },
         } as Response);
       }
 
@@ -115,6 +121,9 @@ describe('ProjectSelectorPanel', () => {
         status: 200,
         text: () => Promise.resolve(stringify({})),
         json: () => Promise.resolve({}),
+        clone: function () {
+          return this;
+        },
       } as Response);
     });
 

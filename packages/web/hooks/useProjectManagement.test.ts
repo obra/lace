@@ -10,13 +10,13 @@ import { useProjectManagement } from './useProjectManagement';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock parseResponse
+// Mock parseResponse to return parsed data directly
 vi.mock('@/lib/serialization', () => ({
-  parseResponse: vi.fn((res) => {
-    if (!res.ok) throw new Error('Network error');
-    return res.json();
-  }),
+  parseResponse: vi.fn(),
 }));
+
+import { parseResponse } from '@/lib/serialization';
+const mockParseResponse = vi.mocked(parseResponse);
 
 const mockProjects: ProjectInfo[] = [
   {
@@ -49,8 +49,12 @@ describe('useProjectManagement', () => {
   it('loads projects on mount', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockProjects),
-    });
+      text: () => Promise.resolve(JSON.stringify(mockProjects)),
+      clone: function () {
+        return this;
+      },
+    } as Response);
+    mockParseResponse.mockResolvedValueOnce(mockProjects);
 
     const { result } = renderHook(() => useProjectManagement());
 
@@ -63,7 +67,7 @@ describe('useProjectManagement', () => {
 
     expect(result.current.loading).toBe(false);
     expect(result.current.projects).toEqual(mockProjects);
-    expect(mockFetch).toHaveBeenCalledWith('/api/projects');
+    expect(mockFetch).toHaveBeenCalledWith('/api/projects', { method: 'GET' });
   });
 
   it('handles loading errors gracefully', async () => {
@@ -80,7 +84,7 @@ describe('useProjectManagement', () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.projects).toEqual([]);
     expect(result.current.error).toBe('Network error');
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to load projects:', networkError);
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to load projects:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -89,17 +93,28 @@ describe('useProjectManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockProjects),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockProjects)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({}),
-      })
+        text: () => Promise.resolve(JSON.stringify({})),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve([{ ...mockProjects[0], name: 'Updated Project' }, mockProjects[1]]),
-      });
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([{ ...mockProjects[0], name: 'Updated Project' }, mockProjects[1]])
+          ),
+        clone: function () {
+          return this;
+        },
+      } as Response);
 
     const { result } = renderHook(() => useProjectManagement());
 
@@ -122,16 +137,25 @@ describe('useProjectManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockProjects),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockProjects)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({}),
-      })
+        text: () => Promise.resolve(JSON.stringify({})),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
-      });
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response);
 
     const { result } = renderHook(() => useProjectManagement());
 
@@ -154,8 +178,11 @@ describe('useProjectManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockProjects),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockProjects)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(new Error('Update failed'));
 
     const { result } = renderHook(() => useProjectManagement());
@@ -179,12 +206,16 @@ describe('useProjectManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockProjects),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockProjects)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: false,
         status: 404,
-      });
+        statusText: 'Not Found',
+      } as Response);
 
     const { result } = renderHook(() => useProjectManagement());
 
@@ -196,8 +227,8 @@ describe('useProjectManagement', () => {
       await result.current.updateProject('project-1', { name: 'Updated Project' });
     });
 
-    expect(result.current.error).toBe('Failed to update project: 404');
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to update project: 404');
+    expect(result.current.error).toBe('HTTP 404: Not Found');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to update project:', expect.any(Error));
 
     consoleSpy.mockRestore();
   });
@@ -207,8 +238,11 @@ describe('useProjectManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockProjects),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockProjects)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(new Error('Create failed'));
 
     const { result } = renderHook(() => useProjectManagement());
@@ -237,8 +271,11 @@ describe('useProjectManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockProjects),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockProjects)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(new Error('Config load failed'));
 
     const { result } = renderHook(() => useProjectManagement());

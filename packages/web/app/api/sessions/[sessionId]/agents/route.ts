@@ -7,7 +7,7 @@ import { ProviderRegistry } from '@/lib/server/lace-imports';
 import { CreateAgentRequest } from '@/types/api';
 import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { EventStreamManager } from '@/lib/event-stream-manager';

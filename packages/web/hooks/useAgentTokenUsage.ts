@@ -1,12 +1,12 @@
 // ABOUTME: Hook for agent token usage tracking without polling
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEventStream } from './useEventStream';
 import type { ThreadId, CombinedTokenUsage, AgentInfo, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 // Use the same type structure as the API
 type AgentTokenUsage = ThreadTokenUsage;
@@ -22,20 +22,23 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   const [tokenUsage, setTokenUsage] = useState<AgentTokenUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load initial token usage from agent API
   const fetchTokenUsage = useCallback(async () => {
+    // Abort previous request to prevent race conditions
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       setError(null);
 
       console.log('[useAgentTokenUsage] Fetching token usage for agent:', agentId);
-      const response = await fetch(`/api/agents/${agentId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch agent data: ${response.status}`);
-      }
-
-      const data = await parseResponse<AgentWithTokenUsage>(response);
+      const data = await api.get<AgentWithTokenUsage>(`/api/agents/${agentId}`, {
+        signal: controller.signal,
+      });
       console.log('[useAgentTokenUsage] API response:', {
         hasTokenUsage: !!data.tokenUsage,
         tokenUsage: data.tokenUsage,
@@ -48,6 +51,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         console.log('[useAgentTokenUsage] No token usage data in API response');
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('[useAgentTokenUsage] Error fetching token usage:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch token usage');
     } finally {
@@ -84,18 +88,25 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         console.log('[useAgentTokenUsage] Processing token usage data:', tokenUsageData);
 
         // Transform CombinedTokenUsage to AgentTokenUsage by extracting thread-level data
-        const threadData = tokenUsageData.thread;
-        const completeTokenUsage: AgentTokenUsage = {
-          totalPromptTokens: threadData.totalPromptTokens,
-          totalCompletionTokens: threadData.totalCompletionTokens,
-          totalTokens: threadData.totalTokens,
-          contextLimit: threadData.contextLimit,
-          percentUsed: threadData.percentUsed,
-          nearLimit: threadData.nearLimit,
-        };
+        const threadData = tokenUsageData?.thread;
+        if (
+          threadData &&
+          typeof threadData === 'object' &&
+          typeof (threadData as { totalTokens?: number }).totalTokens === 'number'
+        ) {
+          const safeThreadData = threadData as Partial<AgentTokenUsage>;
+          const completeTokenUsage: AgentTokenUsage = {
+            totalPromptTokens: safeThreadData.totalPromptTokens ?? 0,
+            totalCompletionTokens: safeThreadData.totalCompletionTokens ?? 0,
+            totalTokens: safeThreadData.totalTokens!,
+            contextLimit: safeThreadData.contextLimit ?? 0,
+            percentUsed: safeThreadData.percentUsed ?? 0,
+            nearLimit: !!safeThreadData.nearLimit,
+          };
 
-        console.log('[useAgentTokenUsage] Setting token usage:', completeTokenUsage);
-        setTokenUsage(completeTokenUsage);
+          console.log('[useAgentTokenUsage] Setting token usage:', completeTokenUsage);
+          setTokenUsage(completeTokenUsage);
+        }
       }
     },
     [agentId]

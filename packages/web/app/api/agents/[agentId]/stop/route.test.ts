@@ -7,11 +7,11 @@ import { POST } from './route';
 
 // Mock only the external dependencies we need
 vi.mock('@/lib/server/session-service');
-vi.mock('@/lib/serialization');
+vi.mock('@/lib/server/serialization');
 vi.mock('@/lib/server/api-utils');
 
 import { getSessionService } from '@/lib/server/session-service';
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import type { ThreadId } from '@/types/core';
 
