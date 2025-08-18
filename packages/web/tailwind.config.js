@@ -69,7 +69,15 @@ const config = {
   plugins: [require('daisyui')],
   daisyui: {
     themes: [
-      'light',
+      {
+        light: {
+          ...require('daisyui/src/theming/themes')['light'],
+          '--agent-claude': '251 146 60',
+          '--agent-gpt4': '34 197 94', 
+          '--agent-gemini': '59 130 246',
+          '--user-primary': '20 184 166',
+        },
+      },
       {
         'lace-dark': {
           primary: '#8b5cf6',
@@ -88,6 +96,10 @@ const config = {
           success: '#10b981',
           warning: '#f59e0b',
           error: '#ef4444',
+          '--agent-claude': '251 146 60',
+          '--agent-gpt4': '34 197 94', 
+          '--agent-gemini': '59 130 246',
+          '--user-primary': '20 184 166',
         },
       },
       'dark',

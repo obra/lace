@@ -169,7 +169,7 @@ describe('MemoizedChatInput', () => {
     render(<MemoizedChatInput {...defaultProps} disabled={true} />);
 
     expect(screen.getByText('Tool running...')).toBeInTheDocument();
-    expect(screen.getByText('Tool running...').closest('div')).toHaveClass('text-emerald-600');
+    expect(screen.getByText('Tool running...').closest('div')).toHaveClass('text-success');
   });
 
   it('prioritizes error over other statuses', () => {

@@ -1,0 +1,91 @@
+# DismissButton
+
+A standardized dismiss/close button component that provides consistent styling and behavior across the application.
+
+## Features
+
+- **Consistent styling**: Based on the Modal component's dismiss button pattern
+- **Multiple sizes**: Small, medium, and large variants
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+- **Disabled state**: Visual feedback and interaction prevention
+- **Hover effects**: Subtle background color changes on interaction
+
+## Usage
+
+### Basic Example
+
+```tsx
+import { DismissButton } from '@/components/ui/DismissButton';
+
+function MyComponent() {
+  const handleDismiss = () => {
+    console.log('Dismissed!');
+  };
+
+  return <DismissButton onClick={handleDismiss} />;
+}
+```
+
+### Size Variants
+
+```tsx
+// Small dismiss button (w-4 h-4 icon)
+<DismissButton onClick={handleDismiss} size="sm" />
+
+// Medium dismiss button (w-5 h-5 icon) - default
+<DismissButton onClick={handleDismiss} size="md" />
+
+// Large dismiss button (w-6 h-6 icon)
+<DismissButton onClick={handleDismiss} size="lg" />
+```
+
+### Custom Aria Label
+
+```tsx
+<DismissButton 
+  onClick={handleClose} 
+  ariaLabel="Close modal" 
+/>
+```
+
+### Disabled State
+
+```tsx
+<DismissButton 
+  onClick={handleDismiss} 
+  disabled={true} 
+/>
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `onClick` | `() => void` | - | **Required.** Callback when button is clicked |
+| `ariaLabel` | `string` | `'Dismiss'` | Accessibility label for screen readers |
+| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Size variant of the button |
+| `className` | `string` | `''` | Additional CSS classes |
+| `disabled` | `boolean` | `false` | Whether the button is disabled |
+
+## Design System Integration
+
+This component standardizes dismiss button patterns used across:
+
+- **Modal components**: Close buttons in modal headers
+- **Alert components**: Dismissible alert notifications  
+- **File attachments**: Remove file buttons
+- **Voice input**: Stop recording buttons
+
+### Migration from Custom Dismiss Buttons
+
+Replace custom dismiss button implementations:
+
+```tsx
+// Old pattern - inconsistent styling
+<button onClick={onClose} className="p-1 hover:bg-base-200 rounded-full">
+  <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
+</button>
+
+// New pattern - standardized component
+<DismissButton onClick={onClose} ariaLabel="Close modal" />
+```

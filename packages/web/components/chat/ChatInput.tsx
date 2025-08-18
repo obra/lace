@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NativeSpeechInput, useSpeechRecognition } from '@/components/ui/NativeSpeechInput';
 import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
+import { Alert } from '@/components/ui/Alert';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faStop, faPlus } from '@/lib/fontawesome';
 
@@ -198,8 +199,8 @@ export function ChatInput({
   const getStatusIndicator = () => {
     if (speechError) {
       return (
-        <div className="flex items-center gap-2 text-red-600 text-xs">
-          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+        <div className="flex items-center gap-2 text-error text-xs">
+          <div className="w-2 h-2 bg-error rounded-full"></div>
           <span>Speech error</span>
         </div>
       );
@@ -207,8 +208,8 @@ export function ChatInput({
 
     if (isListening) {
       return (
-        <div className="flex items-center gap-2 text-emerald-600 text-xs">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+        <div className="flex items-center gap-2 text-success text-xs">
+          <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
           <span>Listening...</span>
         </div>
       );
@@ -216,8 +217,8 @@ export function ChatInput({
 
     if (speechStatus === 'processing') {
       return (
-        <div className="flex items-center gap-2 text-blue-600 text-xs">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+        <div className="flex items-center gap-2 text-info text-xs">
+          <div className="w-2 h-2 bg-info rounded-full animate-pulse"></div>
           <span>Processing...</span>
         </div>
       );
@@ -226,7 +227,7 @@ export function ChatInput({
     if (disabled) {
       return (
         <div className="flex items-center gap-2 text-base-content/60 text-xs">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
           <span>Tool running...</span>
         </div>
       );
@@ -253,12 +254,7 @@ export function ChatInput({
 
       {/* Speech Error Display */}
       {speechError && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Voice Input:</span>
-            <span>{speechError}</span>
-          </div>
-        </div>
+        <Alert variant="error" title="Voice Input" description={speechError} className="mb-3" />
       )}
 
       {/* File Attachment Area */}
@@ -286,10 +282,10 @@ export function ChatInput({
         {/* Clean Input Container - Matching Sample Design */}
         <div
           className={`
-            flex items-center w-full bg-neutral-800 rounded-md px-3 py-2 text-neutral-300 
-            focus-within:ring-2 focus-within:ring-emerald-500 transition-all duration-200
-            ${isListening ? 'ring-1 ring-emerald-500/50' : ''}
-            ${isDragOver ? 'ring-2 ring-blue-400' : ''}
+            flex items-center w-full bg-base-100 rounded-md px-3 py-2 text-base-content 
+            focus-within:ring-2 focus-within:ring-success transition-all duration-200
+            ${isListening ? 'ring-1 ring-success/50' : ''}
+            ${isDragOver ? 'ring-2 ring-primary' : ''}
           `}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -312,7 +308,7 @@ export function ChatInput({
                 input.click();
               }}
               disabled={disabled || isListening}
-              className="text-neutral-400 hover:text-neutral-300 mr-3 transition-colors"
+              className="text-base-content/60 hover:text-base-content/80 mr-3 transition-colors"
             >
               <FontAwesomeIcon icon={faPlus} className="w-5 h-5" />
             </button>
@@ -326,7 +322,7 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={getDynamicPlaceholder()}
             disabled={disabled || isListening}
-            className="flex-1 bg-transparent outline-none placeholder-neutral-400 text-neutral-100 resize-none overflow-y-auto"
+            className="flex-1 bg-transparent outline-none placeholder:text-base-content/60 text-base-content resize-none overflow-y-auto"
             style={{
               minHeight: '44px', // Larger minimum height (~2 lines)
               maxHeight: '88px', // ~3-4 lines before scrolling
@@ -359,19 +355,19 @@ export function ChatInput({
                 continuous={true}
                 interimResults={true}
                 forceStop={forceStopSpeech}
-                className="text-neutral-400 hover:text-neutral-300 p-0 bg-transparent border-0 rounded-none w-5 h-5"
+                className="text-base-content/60 hover:text-base-content/80 p-0 bg-transparent border-0 rounded-none w-5 h-5"
               />
             </div>
           )}
 
           {/* Send Button */}
-          <div className="h-8 w-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-neutral-600 transition-colors">
+          <div className="h-8 w-8 flex items-center justify-center rounded-full bg-base-200 hover:bg-base-300 transition-colors">
             <button
               type="button"
               onClick={handleSendClick}
               disabled={isDisabled}
               data-testid={isStreaming ? 'stop-button' : 'send-button'}
-              className="w-full h-full flex items-center justify-center text-neutral-300 hover:text-white transition-colors"
+              className="w-full h-full flex items-center justify-center text-base-content/70 hover:text-base-content transition-colors"
               title={
                 isStreaming
                   ? 'Stop response (ESC)'

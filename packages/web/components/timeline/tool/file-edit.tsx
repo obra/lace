@@ -14,6 +14,7 @@ import {
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { FileEditDiffContext } from '@/types/core';
+import { Alert } from '@/components/ui/Alert';
 
 /**
  * File edit-specific tool renderer providing diff visualization
@@ -79,66 +80,51 @@ export const fileEditRenderer: ToolRenderer = {
           }
         | undefined;
 
+      const errorTitle =
+        validationError?.type === 'WRONG_COUNT'
+          ? 'Occurrence Count Mismatch'
+          : validationError?.type === 'NO_MATCH'
+            ? 'Text Not Found'
+            : 'Edit Failed';
+
+      const errorDescription =
+        validationError?.edit_index !== undefined
+          ? `Edit ${validationError.edit_index + 1} of ${validationError.total_edits}: ${content}`
+          : content;
+
       return (
-        <div className="bg-error/5 border border-error/20 rounded-lg">
-          <div className="px-3 py-2 border-b border-error/20 bg-error/10">
-            <div className="flex items-center gap-2">
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="w-4 h-4 text-error flex-shrink-0"
-              />
-              <span className="text-error font-medium text-sm">
-                {validationError?.type === 'WRONG_COUNT'
-                  ? 'Occurrence Count Mismatch'
-                  : validationError?.type === 'NO_MATCH'
-                    ? 'Text Not Found'
-                    : 'Edit Failed'}
-              </span>
-              {validationError?.edit_index !== undefined && (
-                <span className="text-error/70 text-xs">
-                  (Edit {validationError.edit_index + 1} of {validationError.total_edits})
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="p-3 space-y-3">
-            <div className="text-error/80 text-sm font-mono whitespace-pre-wrap break-words">
-              {content}
-            </div>
-
-            {/* Show match locations for WRONG_COUNT errors */}
-            {validationError?.match_locations && validationError.match_locations.length > 0 && (
-              <div className="bg-error/5 rounded border border-error/10 p-3">
-                <h4 className="text-xs font-medium text-error/70 mb-2">Found at:</h4>
-                <div className="space-y-1 text-xs font-mono">
-                  {validationError.match_locations.map((loc, i) => (
-                    <div key={i} className="text-error/80">
-                      <span className="text-error/60">Line {loc.line_number}:</span>{' '}
-                      {loc.line_content}
-                    </div>
-                  ))}
-                </div>
+        <Alert variant="error" title={errorTitle} description={errorDescription}>
+          {/* Show match locations for WRONG_COUNT errors */}
+          {validationError?.match_locations && validationError.match_locations.length > 0 && (
+            <div className="bg-error/5 rounded border border-error/10 p-3">
+              <h4 className="text-xs font-medium opacity-70 mb-2">Found at:</h4>
+              <div className="space-y-1 text-xs font-mono">
+                {validationError.match_locations.map((loc, i) => (
+                  <div key={i} className="opacity-80">
+                    <span className="opacity-60">Line {loc.line_number}:</span> {loc.line_content}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Show similar content for NO_MATCH errors */}
-            {validationError?.similar_content && validationError.similar_content.length > 0 && (
-              <div className="bg-warning/5 rounded border border-warning/10 p-3">
-                <h4 className="text-xs font-medium text-warning/70 mb-2">Similar content found:</h4>
-                <div className="space-y-1 text-xs font-mono">
-                  {validationError.similar_content.map((sim, i) => (
-                    <div key={i} className="text-warning/80">
-                      <span className="text-warning/60">
-                        Line {sim.line_number} ({Math.round(sim.similarity_score * 100)}% similar):
-                      </span>{' '}
-                      {sim.content}
-                    </div>
-                  ))}
-                </div>
+          {/* Show similar content for NO_MATCH errors */}
+          {validationError?.similar_content && validationError.similar_content.length > 0 && (
+            <div className="bg-warning/5 rounded border border-warning/10 p-3">
+              <h4 className="text-xs font-medium text-warning/70 mb-2">Similar content found:</h4>
+              <div className="space-y-1 text-xs font-mono">
+                {validationError.similar_content.map((sim, i) => (
+                  <div key={i} className="text-warning/80">
+                    <span className="text-warning/60">
+                      Line {sim.line_number} ({Math.round(sim.similarity_score * 100)}% similar):
+                    </span>{' '}
+                    {sim.content}
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </Alert>
       );
     }
 
@@ -214,22 +200,13 @@ export const fileEditRenderer: ToolRenderer = {
     if (resultMetadata?.dry_run) {
       const editCount = resultMetadata.edits_applied?.length || 0;
       return (
-        <div className="bg-info/5 border border-info/20 rounded-lg">
-          <div className="px-3 py-2 border-b border-info/20 bg-info/10">
-            <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faFileEdit} className="w-4 h-4 text-info flex-shrink-0" />
-              <span className="text-info font-medium text-sm">Dry Run Mode</span>
+        <Alert variant="info" title="Dry Run Mode" description={content}>
+          {editCount > 0 && (
+            <div className="text-xs opacity-70">
+              Would apply {editCount} edit{editCount === 1 ? '' : 's'}
             </div>
-          </div>
-          <div className="p-3">
-            <div className="text-info/80 text-sm">{content}</div>
-            {editCount > 0 && (
-              <div className="mt-2 text-xs text-info/70">
-                Would apply {editCount} edit{editCount === 1 ? '' : 's'}
-              </div>
-            )}
-          </div>
-        </div>
+          )}
+        </Alert>
       );
     }
 
@@ -237,51 +214,30 @@ export const fileEditRenderer: ToolRenderer = {
     const editCount = resultMetadata?.edits_applied?.length || 0;
     const totalReplacements = resultMetadata?.total_replacements || 0;
 
+    const successDescription =
+      editCount > 0
+        ? `Applied ${editCount} edit${editCount === 1 ? '' : 's'}${totalReplacements > 0 ? ` with ${totalReplacements} total replacement${totalReplacements === 1 ? '' : 's'}` : ''}`
+        : content;
+
     return (
-      <div className="bg-success/5 border border-success/20 rounded-lg">
-        <div className="px-3 py-2 border-b border-success/20 bg-success/10">
-          <div className="flex items-center gap-2">
-            <FontAwesomeIcon icon={faFileEdit} className="w-4 h-4 text-success flex-shrink-0" />
-            <span className="text-success font-medium text-sm">Edit Successful</span>
-          </div>
-        </div>
-        <div className="p-3">
-          <div className="text-success/80 text-sm">{content}</div>
-          {editCount > 0 && (
-            <div className="mt-2 space-y-1">
-              <div className="text-xs text-success/70">
-                Applied {editCount} edit{editCount === 1 ? '' : 's'}
-                {totalReplacements > 0 &&
-                  ` with ${totalReplacements} total replacement${totalReplacements === 1 ? '' : 's'}`}
+      <Alert variant="success" title="Edit Successful" description={successDescription}>
+        {resultMetadata?.edits_applied && resultMetadata.edits_applied.length <= 3 && (
+          <div className="space-y-1">
+            {resultMetadata.edits_applied.map((edit, i) => (
+              <div key={i} className="text-xs font-mono opacity-60 bg-success/5 rounded p-2">
+                <span className="opacity-50">Replace:</span> {edit.old_text.substring(0, 50)}
+                {edit.old_text.length > 50 ? '...' : ''}
+                <br />
+                <span className="opacity-50">With:</span> {edit.new_text.substring(0, 50)}
+                {edit.new_text.length > 50 ? '...' : ''}
+                {edit.occurrences_replaced > 1 && (
+                  <span className="opacity-40"> ({edit.occurrences_replaced} occurrences)</span>
+                )}
               </div>
-              {resultMetadata?.edits_applied && resultMetadata.edits_applied.length <= 3 && (
-                <div className="space-y-1">
-                  {resultMetadata.edits_applied.map((edit, i) => (
-                    <div
-                      key={i}
-                      className="text-xs font-mono text-success/60 bg-success/5 rounded p-2"
-                    >
-                      <span className="text-success/50">Replace:</span>{' '}
-                      {edit.old_text.substring(0, 50)}
-                      {edit.old_text.length > 50 ? '...' : ''}
-                      <br />
-                      <span className="text-success/50">With:</span>{' '}
-                      {edit.new_text.substring(0, 50)}
-                      {edit.new_text.length > 50 ? '...' : ''}
-                      {edit.occurrences_replaced > 1 && (
-                        <span className="text-success/40">
-                          {' '}
-                          ({edit.occurrences_replaced} occurrences)
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </Alert>
     );
   },
 

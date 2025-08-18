@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/Badge';
 import StatusDot from '@/components/ui/StatusDot';
+import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances } from './ProviderInstanceProvider';
 
 interface Model {
@@ -144,11 +145,7 @@ export function ModelSelectionForm({
   }
 
   if (error) {
-    return (
-      <div className={`alert alert-error ${className}`}>
-        <span>Error: {error}</span>
-      </div>
-    );
+    return <Alert variant="error" title="Error" description={error} className={className} />;
   }
 
   return (
@@ -194,12 +191,11 @@ export function ModelSelectionForm({
       </div>
 
       {instances.length === 0 && (
-        <div className="alert alert-info">
-          <span>No provider instances configured. </span>
+        <Alert variant="info" title="No provider instances configured">
           <a href="/providers" className="link">
             Configure providers
           </a>
-        </div>
+        </Alert>
       )}
 
       {selectedInstanceId && availableModels.length > 0 && (

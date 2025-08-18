@@ -382,7 +382,7 @@ export function NativeSpeechInput({
 
   const getVariantClasses = () => {
     if (isListening) {
-      return 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg';
+      return 'bg-success hover:bg-success text-success-content shadow-lg';
     }
 
     switch (variant) {
@@ -420,7 +420,7 @@ export function NativeSpeechInput({
       <div className="relative">
         {/* Pulsing background circle when listening */}
         {isListening && (
-          <div className="absolute inset-0 bg-emerald-500 rounded-full animate-pulse opacity-30"></div>
+          <div className="absolute inset-0 bg-success rounded-full animate-pulse opacity-30"></div>
         )}
 
         <button

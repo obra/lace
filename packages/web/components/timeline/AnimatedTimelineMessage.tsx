@@ -118,7 +118,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className="w-8 h-8 rounded-md bg-teal-600 text-white flex items-center justify-center text-sm font-medium"
+            className="w-8 h-8 rounded-md bg-[rgb(var(--user-primary))] text-white flex items-center justify-center text-sm font-medium"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={springConfig.snappy}
           >
@@ -147,17 +147,32 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
 
   // AI Messages with typing effect
   if (entry.type === 'ai') {
-    const agentColors = {
-      Claude: 'bg-orange-500 text-white',
-      'GPT-4': 'bg-green-600 text-white',
-      Gemini: 'bg-blue-600 text-white',
+    const getAgentStyles = (agentName: string) => {
+      switch (agentName) {
+        case 'Claude':
+          return {
+            avatarClass: 'bg-[rgb(var(--agent-claude))] text-white',
+            badgeClass: 'bg-[rgb(var(--agent-claude))]/20 text-[rgb(var(--agent-claude))]',
+          };
+        case 'GPT-4':
+          return {
+            avatarClass: 'bg-[rgb(var(--agent-gpt4))] text-white',
+            badgeClass: 'bg-[rgb(var(--agent-gpt4))]/20 text-[rgb(var(--agent-gpt4))]',
+          };
+        case 'Gemini':
+          return {
+            avatarClass: 'bg-[rgb(var(--agent-gemini))] text-white',
+            badgeClass: 'bg-[rgb(var(--agent-gemini))]/20 text-[rgb(var(--agent-gemini))]',
+          };
+        default:
+          return {
+            avatarClass: 'bg-neutral text-neutral-content',
+            badgeClass: 'bg-base-content/10 text-base-content/60',
+          };
+      }
     };
 
-    const agentBadgeColors = {
-      Claude: 'bg-orange-900/20 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
-      'GPT-4': 'bg-green-900/20 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-      Gemini: 'bg-blue-900/20 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    };
+    const { avatarClass, badgeClass } = getAgentStyles(entry.agent || 'Assistant');
 
     return (
       <motion.div
@@ -176,9 +191,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
-              agentColors[entry.agent as keyof typeof agentColors] || 'bg-gray-600 text-white'
-            }`}
+            className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${avatarClass}`}
             whileHover={{ scale: 1.1, rotate: -5 }}
             transition={springConfig.snappy}
           >
@@ -197,10 +210,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
               {formatTime(entry.timestamp)}
             </motion.span>
             <motion.span
-              className={`text-xs px-1.5 py-0.5 rounded ${
-                agentBadgeColors[entry.agent as keyof typeof agentBadgeColors] ||
-                'bg-base-content/10 text-base-content/60'
-              }`}
+              className={`text-xs px-1.5 py-0.5 rounded ${badgeClass}`}
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.4, ...springConfig.bouncy }}
@@ -237,7 +247,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 flex items-center justify-center text-sm"
+            className="w-8 h-8 rounded-md bg-info/20 text-info flex items-center justify-center text-sm"
             animate={{
               boxShadow: [
                 '0 0 0 0 rgba(20, 184, 166, 0)',
@@ -391,7 +401,7 @@ export function AnimatedTimelineMessage({ entry, index }: AnimatedTimelineMessag
           transition={{ delay: 0.1, ...springConfig.bouncy }}
         >
           <motion.div
-            className="w-8 h-8 rounded-md bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 flex items-center justify-center text-sm"
+            className="w-8 h-8 rounded-md bg-info/20 text-info flex items-center justify-center text-sm"
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={springConfig.snappy}
           >

@@ -84,15 +84,15 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
         {taskManager.tasks.length > 0 && (
           <div className="flex items-center gap-3 text-xs text-base-content/60">
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-success rounded-full"></div>
               <span>{completedCount} done</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-warning rounded-full"></div>
               <span>{activeCount} active</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+              <div className="w-2 h-2 bg-base-content/40 rounded-full"></div>
               <span>{pendingCount} pending</span>
             </div>
           </div>

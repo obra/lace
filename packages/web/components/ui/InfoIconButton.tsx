@@ -22,7 +22,7 @@ export const InfoIconButton: React.FC<InfoIconButtonProps> = ({
       className={[
         'inline-flex items-center justify-center rounded-full',
         'w-8 h-8',
-        'text-white bg-emerald-500/90 hover:bg-emerald-500 focus:outline-none',
+        'text-white bg-accent/90 hover:bg-accent focus:outline-none',
         'focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100',
         active ? 'ring-2 ring-accent/70' : '',
         className,

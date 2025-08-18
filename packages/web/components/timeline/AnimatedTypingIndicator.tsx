@@ -11,21 +11,45 @@ interface AnimatedTypingIndicatorProps {
 }
 
 export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps) {
-  const agentColors = {
-    Claude: 'bg-orange-500',
-    'GPT-4': 'bg-green-600',
-    Gemini: 'bg-blue-600',
+  const getAgentStyles = (agentName: string) => {
+    switch (agentName) {
+      case 'Claude':
+        return {
+          dotClass: 'bg-[rgb(var(--agent-claude))]',
+          avatarClass: 'bg-[rgb(var(--agent-claude))] text-white',
+        };
+      case 'GPT-4':
+        return {
+          dotClass: 'bg-[rgb(var(--agent-gpt4))]',
+          avatarClass: 'bg-[rgb(var(--agent-gpt4))] text-white',
+        };
+      case 'Gemini':
+        return {
+          dotClass: 'bg-[rgb(var(--agent-gemini))]',
+          avatarClass: 'bg-[rgb(var(--agent-gemini))] text-white',
+        };
+      default:
+        return {
+          dotClass: 'bg-neutral',
+          avatarClass: 'bg-neutral text-neutral-content',
+        };
+    }
   };
 
-  const agentColorClasses = {
-    Claude: 'bg-orange-500 text-white',
-    'GPT-4': 'bg-green-600 text-white',
-    Gemini: 'bg-blue-600 text-white',
+  const { dotClass, avatarClass } = getAgentStyles(agent);
+  
+  const getAgentShadowColor = (agentName: string) => {
+    switch (agentName) {
+      case 'Claude':
+        return 'rgba(var(--agent-claude), 0.4)';
+      case 'GPT-4':
+        return 'rgba(var(--agent-gpt4), 0.4)';
+      case 'Gemini':
+        return 'rgba(var(--agent-gemini), 0.4)';
+      default:
+        return 'rgba(156, 163, 175, 0.4)';
+    }
   };
-
-  const dotColor = agentColors[agent as keyof typeof agentColors] || 'bg-gray-600';
-  const avatarColor =
-    agentColorClasses[agent as keyof typeof agentColorClasses] || 'bg-gray-600 text-white';
 
   return (
     <motion.div
@@ -42,12 +66,12 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
         transition={{ delay: 0.1, ...springConfig.bouncy }}
       >
         <motion.div
-          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${avatarColor}`}
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${avatarClass}`}
           animate={{
             boxShadow: [
-              `0 0 0 0 ${agentColors[agent as keyof typeof agentColors] || 'rgba(156, 163, 175, 0.7)'}40`,
-              `0 0 0 10px ${agentColors[agent as keyof typeof agentColors] || 'rgba(156, 163, 175, 0.7)'}10`,
-              `0 0 0 0 ${agentColors[agent as keyof typeof agentColors] || 'rgba(156, 163, 175, 0.7)'}40`,
+              `0 0 0 0 ${getAgentShadowColor(agent)}`,
+              `0 0 0 10px ${getAgentShadowColor(agent).replace('0.4', '0.1')}`,
+              `0 0 0 0 ${getAgentShadowColor(agent)}`,
             ],
           }}
           transition={{
@@ -80,7 +104,7 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
           {[0, 1, 2].map((index) => (
             <motion.div
               key={index}
-              className={`w-2 h-2 rounded-full ${dotColor}`}
+              className={`w-2 h-2 rounded-full ${dotClass}`}
               variants={loadingDot}
               custom={index}
               animate={{

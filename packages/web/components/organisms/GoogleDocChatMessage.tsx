@@ -66,7 +66,9 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
       <div className="flex-shrink-0">
         <div
           className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium ${
-            message.role === 'user' ? 'bg-teal-600 text-white' : 'bg-orange-500 text-white'
+            message.role === 'user'
+              ? 'bg-[rgb(var(--user-primary))] text-white'
+              : 'bg-orange-500 text-white'
           }`}
         >
           <FontAwesomeIcon icon={message.role === 'user' ? faUser : faRobot} className="text-xs" />
@@ -99,7 +101,7 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
                 {/* Document header */}
                 <div className="p-3 bg-base-200 border-b border-base-300">
                   <div className="flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFileText} className="text-blue-600 text-sm" />
+                    <FontAwesomeIcon icon={faFileText} className="text-info text-sm" />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm truncate" title={message.document.title}>
                         {message.document.title}
@@ -113,10 +115,10 @@ export default function GoogleDocChatMessage({ message }: GoogleDocChatMessagePr
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
                           message.document.permissions === 'edit'
-                            ? 'bg-green-100 text-green-700'
+                            ? 'bg-success/20 text-success'
                             : message.document.permissions === 'comment'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-gray-100 text-gray-700'
+                              ? 'bg-warning/20 text-warning'
+                              : 'bg-base-200 text-base-content/80'
                         }`}
                       >
                         {message.document.permissions}

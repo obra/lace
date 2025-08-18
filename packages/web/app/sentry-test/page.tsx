@@ -30,24 +30,15 @@ export default function SentryTestPage() {
     <div className="p-8">
       <h1 className="text-3xl font-bold mb-8">Sentry Test Page</h1>
       <div className="space-y-4">
-        <button
-          onClick={triggerClientError}
-          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-        >
+        <button onClick={triggerClientError} className="btn btn-error">
           Trigger Client Error
         </button>
-        
-        <button
-          onClick={triggerServerError}
-          className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
-        >
+
+        <button onClick={triggerServerError} className="btn btn-warning">
           Trigger Server Error
         </button>
-        
-        <button
-          onClick={captureMessage}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
+
+        <button onClick={captureMessage} className="btn btn-primary">
           Capture Test Message
         </button>
       </div>

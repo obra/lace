@@ -9,6 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileRenderer from '@/components/ui/FileRenderer';
 import type { ToolRenderer, ToolResult } from './types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
+import { Alert } from '@/components/ui/Alert';
 
 /**
  * File read-specific tool renderer providing content-centric formatting
@@ -45,20 +46,7 @@ export const fileReadRenderer: ToolRenderer = {
     const isError = fileReadRenderer.isError!(result);
 
     if (isError) {
-      return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="flex items-start gap-2">
-            <FontAwesomeIcon
-              icon={faFileCode}
-              className="w-4 h-4 text-error mt-0.5 flex-shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="text-error font-medium text-sm mb-1">File Read Failed</div>
-              <div className="text-error/80 text-sm whitespace-pre-wrap break-words">{content}</div>
-            </div>
-          </div>
-        </div>
-      );
+      return <Alert variant="error" title="File Read Failed" description={content} />;
     }
 
     // Extract file path from arguments

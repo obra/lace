@@ -120,13 +120,26 @@ export function TaskCreationModal({
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
       case 'high':
-        return 'text-red-600';
+        return 'text-error';
       case 'medium':
-        return 'text-yellow-600';
+        return 'text-warning';
       case 'low':
-        return 'text-green-600';
+        return 'text-success';
       default:
-        return 'text-gray-600';
+        return 'text-base-content/60';
+    }
+  };
+
+  const getPriorityBorderColor = (priority: TaskPriority) => {
+    switch (priority) {
+      case 'high':
+        return 'rgb(var(--fallback-er, oklch(65.69% 0.199 27.33)))'; // DaisyUI error
+      case 'medium':
+        return 'rgb(var(--fallback-wa, oklch(84.71% 0.199 83.87)))'; // DaisyUI warning
+      case 'low':
+        return 'rgb(var(--fallback-su, oklch(64.8% 0.150 160)))'; // DaisyUI success
+      default:
+        return 'rgb(156, 163, 175)'; // neutral gray
     }
   };
 
@@ -150,9 +163,7 @@ export function TaskCreationModal({
                 placeholder="Type your task here..."
                 disabled={loading}
               />
-              {errors.title && (
-                <p className="text-sm text-red-600 mt-2 leading-5">{errors.title}</p>
-              )}
+              {errors.title && <p className="text-sm text-error mt-2 leading-5">{errors.title}</p>}
             </div>
           </div>
 
@@ -211,12 +222,7 @@ export function TaskCreationModal({
                       className="absolute top-1/2 w-5 h-5 rounded-full bg-white border-2 shadow-sm transition-all duration-300 transform -translate-y-1/2 -translate-x-1/2 pointer-events-none"
                       style={{
                         left: `${taskData.priority === 'low' ? 0 : taskData.priority === 'medium' ? 50 : 100}%`,
-                        borderColor:
-                          taskData.priority === 'high'
-                            ? '#ef4444'
-                            : taskData.priority === 'medium'
-                              ? '#f59e0b'
-                              : '#10b981',
+                        borderColor: getPriorityBorderColor(taskData.priority),
                       }}
                     />
                   </div>
@@ -224,17 +230,17 @@ export function TaskCreationModal({
                   {/* Labels */}
                   <div className="flex justify-between text-sm mt-4 mx-3">
                     <span
-                      className={`transition-colors duration-200 ${taskData.priority === 'low' ? 'font-medium text-emerald-600' : 'text-base-content/60'}`}
+                      className={`transition-colors duration-200 ${taskData.priority === 'low' ? 'font-medium text-success' : 'text-base-content/60'}`}
                     >
                       Low
                     </span>
                     <span
-                      className={`transition-colors duration-200 ${taskData.priority === 'medium' ? 'font-medium text-amber-600' : 'text-base-content/60'}`}
+                      className={`transition-colors duration-200 ${taskData.priority === 'medium' ? 'font-medium text-warning' : 'text-base-content/60'}`}
                     >
                       Medium
                     </span>
                     <span
-                      className={`transition-colors duration-200 ${taskData.priority === 'high' ? 'font-medium text-red-600' : 'text-base-content/60'}`}
+                      className={`transition-colors duration-200 ${taskData.priority === 'high' ? 'font-medium text-error' : 'text-base-content/60'}`}
                     >
                       High
                     </span>
@@ -380,7 +386,7 @@ export function TaskCreationModal({
             </button>
             <button
               type="submit"
-              className="px-8 py-3 bg-base-100 text-base-content border-2 border-emerald-500 hover:bg-emerald-50 hover:border-emerald-600 rounded-xl font-medium text-base leading-6 transition-all duration-200 shadow-sm"
+              className="px-8 py-3 bg-base-100 text-base-content border-2 border-success hover:bg-success/10 hover:border-success rounded-xl font-medium text-base leading-6 transition-all duration-200 shadow-sm"
               disabled={loading}
             >
               {loading ? (

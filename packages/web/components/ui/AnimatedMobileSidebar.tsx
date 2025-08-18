@@ -141,7 +141,7 @@ export function AnimatedMobileSidebar({
                 transition={springConfig.gentle}
               >
                 <motion.div
-                  className="w-8 h-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-lg flex items-center justify-center overflow-hidden relative shadow-lg"
+                  className="w-8 h-8 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary))]/80 rounded-lg flex items-center justify-center overflow-hidden relative shadow-lg"
                   whileHover={{
                     rotate: 360,
                     transition: { duration: 0.8, ease: 'easeInOut' },
@@ -345,7 +345,7 @@ export function AnimatedMobileSidebar({
                 >
                   <label className="text-sm font-medium text-base-content/70">Active Tasks</label>
                   <motion.span
-                    className="badge badge-sm bg-teal-500 text-white border-0"
+                    className="badge badge-sm bg-accent text-accent-content border-0"
                     animate={{
                       scale: [1, 1.1, 1],
                     }}

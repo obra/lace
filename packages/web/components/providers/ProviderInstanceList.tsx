@@ -6,6 +6,7 @@
 import React from 'react';
 import { ProviderInstanceCard } from './ProviderInstanceCard';
 import { AddInstanceModal } from './AddInstanceModal';
+import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances } from './ProviderInstanceProvider';
 
 export function ProviderInstanceList() {
@@ -57,12 +58,11 @@ export function ProviderInstanceList() {
 
   if (error) {
     return (
-      <div className="alert alert-error">
-        <span>Error: {error}</span>
+      <Alert variant="error" title="Error" description={error}>
         <button className="btn btn-sm btn-ghost" onClick={() => void loadInstances()}>
           Retry
         </button>
-      </div>
+      </Alert>
     );
   }
 

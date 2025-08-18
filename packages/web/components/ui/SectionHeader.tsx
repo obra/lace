@@ -53,7 +53,7 @@ export default function SectionHeader({
       case 'info':
         return `${baseClasses} bg-info text-info-content`;
       case 'teal':
-        return `${baseClasses} bg-teal-500 text-white`;
+        return `${baseClasses} bg-accent text-accent-content`;
       default:
         return `${baseClasses} bg-primary text-primary-content`;
     }

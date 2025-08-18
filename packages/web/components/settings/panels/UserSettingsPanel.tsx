@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { TextAreaField } from '@/components/ui/TextAreaField';
+import { Alert } from '@/components/ui/Alert';
 import { validateUserName, validateEmail, validateBio } from '@/lib/validation';
 
 interface UserSettingsPanelProps {
@@ -141,28 +142,12 @@ export function UserSettingsPanel({
       title="User Settings"
       description="Manage your personal information and preferences"
     >
-      <div className="bg-warning/10 border border-warning/20 rounded-lg p-3 mb-6">
-        <div className="flex items-start gap-2">
-          <svg
-            className="w-4 h-4 text-warning mt-0.5 flex-shrink-0"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fillRule="evenodd"
-              d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <div className="text-sm">
-            <div className="font-medium text-warning">Settings are not saved</div>
-            <div className="text-base-content/70 mt-1">
-              Your user preferences are only stored during this session and will be lost when you
-              close the application.
-            </div>
-          </div>
-        </div>
-      </div>
+      <Alert
+        variant="warning"
+        title="Settings are not saved"
+        description="Your user preferences are only stored during this session and will be lost when you close the application."
+        className="mb-6"
+      />
       <div className="space-y-6">
         <SettingField label="Display Name" description="Your name as it appears in the application">
           <input

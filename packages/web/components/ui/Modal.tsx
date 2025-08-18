@@ -2,8 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@/lib/fontawesome';
+import { DismissButton } from '@/components/ui/DismissButton';
 
 interface ModalProps {
   isOpen: boolean;
@@ -126,15 +125,7 @@ export function Modal({
                   )}
                 </div>
               )}
-              {showCloseButton && (
-                <button
-                  onClick={onClose}
-                  className="p-1 hover:bg-base-200 rounded-full transition-colors flex-shrink-0"
-                  aria-label="Close modal"
-                >
-                  <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
-                </button>
-              )}
+              {showCloseButton && <DismissButton onClick={onClose} ariaLabel="Close modal" />}
             </div>
           )}
 

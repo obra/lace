@@ -4,6 +4,7 @@ import React from 'react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperclip, faTimes, faFile, faImage, faFileCode, faFileAlt } from '@/lib/fontawesome';
+import { DismissButton } from '@/components/ui/DismissButton';
 import { Modal } from '@/components/ui/Modal';
 
 export interface AttachedFile {
@@ -212,9 +213,7 @@ export function FileAttachment({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-            dragOver
-              ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20'
-              : 'border-base-300 hover:border-base-400'
+            dragOver ? 'border-primary bg-primary/10' : 'border-base-300 hover:border-base-400'
           } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           onClick={!disabled ? handleAttachClick : undefined}
         >
