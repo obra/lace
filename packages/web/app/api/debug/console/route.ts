@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         } else {
           formattedArgs = stringify(deserializedArgs);
         }
-      } catch (error) {
+      } catch (_error) {
         // Fallback: handle raw args data gracefully
         // This can happen with branded types or other custom values
         // Just extract the json part and stringify it normally
