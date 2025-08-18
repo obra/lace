@@ -7,6 +7,7 @@ import type { ThreadId, CombinedTokenUsage, AgentInfo, ThreadTokenUsage } from '
 import type { LaceEvent } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 import { api } from '@/lib/api-client';
+import { AbortError } from '@/lib/api-errors';
 
 // Use the same type structure as the API
 type AgentTokenUsage = ThreadTokenUsage;
@@ -43,7 +44,8 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         setTokenUsage(data.tokenUsage);
       }
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
+      // Check for both DOMException AbortError and our custom AbortError class
+      if ((err instanceof DOMException && err.name === 'AbortError') || err instanceof AbortError) {
         // Abort is intentional when component unmounts or agentId changes
         // Don't log or set error state
         return;
