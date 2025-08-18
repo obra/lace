@@ -35,6 +35,8 @@ export interface SessionContextType {
   createSession: (sessionData: {
     name: string;
     description?: string;
+    providerInstanceId?: string;
+    modelId?: string;
     configuration?: Record<string, unknown>;
   }) => Promise<void>;
   loadProjectConfig: () => Promise<void>;

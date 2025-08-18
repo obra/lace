@@ -12,6 +12,8 @@ interface UseSessionManagementResult {
   createSession: (sessionData: {
     name: string;
     description?: string;
+    providerInstanceId?: string;
+    modelId?: string;
     configuration?: Record<string, unknown>;
   }) => Promise<void>;
   loadProjectConfig: () => Promise<void>;
@@ -74,6 +76,8 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     async (sessionData: {
       name: string;
       description?: string;
+      providerInstanceId?: string;
+      modelId?: string;
       configuration?: Record<string, unknown>;
     }) => {
       if (!projectId) return;

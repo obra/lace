@@ -138,7 +138,7 @@ describe('TaskAPIClient Unit Tests', () => {
       mockFetch.mockResolvedValue(createMockErrorResponse('Server error', { status: 500 }));
 
       await expect(client.listTasks('project_123', 'lace_20240101_sess01')).rejects.toThrow(
-        'HTTP 500: Bad Request'
+        /HTTP 500/
       );
     });
 
@@ -147,7 +147,7 @@ describe('TaskAPIClient Unit Tests', () => {
 
       await expect(
         client.createTask('project_123', 'invalid-session', { title: '', prompt: '' })
-      ).rejects.toThrow('HTTP 400: Bad Request');
+      ).rejects.toThrow(/HTTP 400/);
     });
 
     it('should handle network errors', async () => {

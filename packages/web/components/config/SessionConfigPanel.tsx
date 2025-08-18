@@ -178,10 +178,15 @@ export function SessionConfigPanel(): React.JSX.Element {
     if (!newSessionName.trim()) return;
 
     try {
+      // Extract providerInstanceId and modelId from sessionConfig
+      const { providerInstanceId, modelId, ...otherConfig } = sessionConfig;
+
       await createSession({
         name: newSessionName.trim(),
         description: newSessionDescription.trim() || undefined,
-        configuration: sessionConfig,
+        providerInstanceId: providerInstanceId || '',
+        modelId: modelId || '',
+        configuration: otherConfig,
       });
 
       resetSessionForm();
