@@ -105,8 +105,8 @@ const CustomChatInput = memo(function CustomChatInput({
               <span>Listening...</span>
             </div>
           ) : isStreaming ? (
-            <div className="flex items-center gap-2 text-amber-600">
-              <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+            <div className="flex items-center gap-2 text-warning">
+              <div className="w-2 h-2 bg-warning rounded-full animate-pulse"></div>
               <span>Agent is responding...</span>
             </div>
           ) : disabled ? (
