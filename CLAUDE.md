@@ -29,6 +29,21 @@ LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true npm run dev
 - `LACE_LOG_STDERR`: Set to `true` to output logs to stderr
 - `LACE_LOG_FILE`: Optional file path for log output
 
+### SQL Profiling
+```bash
+# Enable SQL profiling to log all database queries with timing
+LACE_SQL_PROFILING=true LACE_LOG_LEVEL=debug npm run dev
+
+# Or with file output
+LACE_SQL_PROFILING=true LACE_LOG_LEVEL=debug LACE_LOG_FILE=sql-profile.log npm run dev
+```
+
+When `LACE_SQL_PROFILING=true`:
+- All SQL queries are logged at DEBUG level with execution time, parameters, and row counts
+- Slow queries (>100ms) are additionally logged at INFO level
+- Zero overhead when disabled - no performance impact on production
+- Logs include operation type (run/get/all/exec), duration, affected/returned rows
+
 ### Testing
 ```bash
 npm test            # Run tests in watch mode

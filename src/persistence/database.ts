@@ -15,6 +15,49 @@ interface SQLiteDatabase {
   close(): void;
 }
 
+// Profiled wrapper around SQLite prepared statement
+class ProfiledStatement {
+  constructor(
+    private statement: ReturnType<SQLiteDatabase['prepare']>,
+    private query: string
+  ) {}
+
+  run(...params: unknown[]): { lastInsertRowid: number | bigint; changes: number } {
+    return SQLProfiler.profileRun(this.query, params, () => this.statement.run(...params));
+  }
+
+  get(...params: unknown[]): unknown {
+    return SQLProfiler.profileGet(this.query, params, () => this.statement.get(...params));
+  }
+
+  all(...params: unknown[]): unknown[] {
+    return SQLProfiler.profileAll(this.query, params, () => this.statement.all(...params));
+  }
+}
+
+// Profiled wrapper around SQLite database
+class ProfiledDatabase implements SQLiteDatabase {
+  constructor(private db: SQLiteDatabase) {}
+
+  prepare(sql: string): ProfiledStatement {
+    const statement = this.db.prepare(sql);
+    return new ProfiledStatement(statement, sql);
+  }
+
+  exec(sql: string): void {
+    SQLProfiler.profileExec(sql, () => this.db.exec(sql));
+  }
+
+  transaction<T>(fn: () => T): () => T {
+    // Don't profile the transaction wrapper itself, just the queries inside
+    return this.db.transaction(fn);
+  }
+
+  close(): void {
+    this.db.close();
+  }
+}
+
 // Type for the Database constructor
 type DatabaseConstructor = new (path: string) => SQLiteDatabase;
 
@@ -50,6 +93,7 @@ import {
 import { logger } from '~/utils/logger';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
+import { SQLProfiler } from '~/persistence/sql-profiler';
 
 // Helper function to create properly typed LaceEvent from database row
 function createLaceEventFromDb(
@@ -166,14 +210,19 @@ export class DatabasePersistence {
 
   constructor(dbPath: string | SQLiteDatabase) {
     try {
+      let rawDb: SQLiteDatabase;
+
       if (typeof dbPath === 'string') {
-        this.db = new Database(dbPath);
+        rawDb = new Database(dbPath);
         // Enable WAL mode for better concurrency (use exec for compatibility with both Bun and better-sqlite3)
-        this.db.exec('PRAGMA journal_mode = WAL');
-        this.db.exec('PRAGMA busy_timeout = 5000');
+        rawDb.exec('PRAGMA journal_mode = WAL');
+        rawDb.exec('PRAGMA busy_timeout = 5000');
       } else {
-        this.db = dbPath;
+        rawDb = dbPath;
       }
+
+      // Wrap with profiling if enabled, otherwise use raw database
+      this.db = SQLProfiler.isEnabled() ? new ProfiledDatabase(rawDb) : rawDb;
       this.initializeSchema();
     } catch (error) {
       logger.error('Failed to initialize database', {
