@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 📍 Finding Your Way
+
+**[CODE-MAP](docs/architecture/CODE-MAP.md)** - Complete directory structure showing where everything lives in the codebase.
+
 ## Project Overview
 
 Lace is a sophisticated AI coding assistant built with TypeScript and Node.js. It uses event-sourcing architecture with immutable conversation sequences that enable resumable conversations across process restarts and support for multiple interface types (CLI, web, API).
