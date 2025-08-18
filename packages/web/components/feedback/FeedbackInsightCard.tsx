@@ -66,7 +66,7 @@ export function FeedbackInsightCard({
   };
 
   const getConfidenceBar = (confidence: number) => {
-    const percentage = Math.round(confidence * 100);
+    const percentage = Math.min(100, Math.max(0, Math.round(confidence * 100)));
     const color = confidence > 0.8 ? 'bg-success' : confidence > 0.6 ? 'bg-warning' : 'bg-error';
 
     return (
@@ -119,7 +119,7 @@ export function FeedbackInsightCard({
           <h4 className="text-sm font-medium text-base-content/90 mb-2">Recommendations:</h4>
           <ul className="text-sm text-base-content/80 space-y-1">
             {insight.recommendations.map((rec, index) => (
-              <li key={index} className="flex items-start space-x-2">
+              <li key={`rec-${index}-${rec.slice(0, 20)}`} className="flex items-start space-x-2">
                 <span className="text-success mt-1">•</span>
                 <span>{rec}</span>
               </li>
@@ -137,7 +137,10 @@ export function FeedbackInsightCard({
             </summary>
             <div className="mt-2 space-y-1">
               {insight.relatedEvents.map((eventId, index) => (
-                <div key={index} className="font-mono text-xs text-base-content/60">
+                <div
+                  key={eventId || `event-${index}`}
+                  className="font-mono text-xs text-base-content/60"
+                >
                   {eventId}
                 </div>
               ))}

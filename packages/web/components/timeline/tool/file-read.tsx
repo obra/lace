@@ -7,7 +7,7 @@ import React from 'react';
 import { faFileCode } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileRenderer from '@/components/ui/FileRenderer';
-import type { ToolRenderer, ToolResult } from './types';
+import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import { Alert } from '@/components/ui/Alert';
 
@@ -33,6 +33,13 @@ export const fileReadRenderer: ToolRenderer = {
   },
 
   renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
+    const isError = fileReadRenderer.isError!(result);
+    if (isError) {
+      const message =
+        result.content?.map((block) => block.text || '').join('') || 'An error occurred';
+      return <Alert variant="error" title="File Read Failed" description={message} />;
+    }
+
     if (!result.content || result.content.length === 0) {
       return (
         <div className="font-mono text-sm text-base-content/60">
@@ -42,12 +49,6 @@ export const fileReadRenderer: ToolRenderer = {
     }
 
     const content = result.content.map((block) => block.text || '').join('');
-
-    const isError = fileReadRenderer.isError!(result);
-
-    if (isError) {
-      return <Alert variant="error" title="File Read Failed" description={content} />;
-    }
 
     // Extract file path from arguments
     const filePath =

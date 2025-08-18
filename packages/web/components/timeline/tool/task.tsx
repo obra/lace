@@ -18,10 +18,10 @@ import {
   faUser,
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer, ToolResult } from './types';
+import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { Task } from '@/types/core';
-import Badge from '@/components/ui/Badge';
+import { Badge } from '@/components/ui';
 import { Alert } from '@/components/ui/Alert';
 import InlineCode from '@/components/ui/InlineCode';
 
@@ -222,11 +222,7 @@ const taskAddRenderer: ToolRenderer = {
     }
 
     // Fallback: No task data found
-    return (
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <div className="text-yellow-600 text-sm">No task metadata found</div>
-      </div>
-    );
+    return <Alert variant="warning" title="No task metadata found" className="mt-2" />;
   },
 
   getIcon: () => faPlus,
@@ -269,9 +265,12 @@ const taskListRenderer: ToolRenderer = {
     ) {
       const error = parsed as { error: string };
       return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="text-error text-sm">{error?.error || 'Unknown error'}</div>
-        </div>
+        <Alert
+          variant="error"
+          title="Failed to list tasks"
+          description={error?.error || 'Unknown error'}
+          className="mt-2"
+        />
       );
     }
 
@@ -586,11 +585,12 @@ const taskAddNoteRenderer: ToolRenderer = {
     ) {
       const error = parsed as { error: string };
       return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="text-error text-sm">
-            {error?.error || `Failed to add note (${result.status})`}
-          </div>
-        </div>
+        <Alert
+          variant="error"
+          title="Failed to add note"
+          description={error?.error || `Add note failed (${result.status})`}
+          className="mt-2"
+        />
       );
     }
 
@@ -668,14 +668,9 @@ const taskViewRenderer: ToolRenderer = {
     if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
       const error = parsed as { error: string; code?: string };
       return (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
-          <div className="flex items-center gap-2 text-error text-sm font-medium mb-1">
-            <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4" />
-            Task not found
-          </div>
-          <div className="text-error/80 text-sm">{error.error}</div>
-          {error.code && <div className="text-error/60 text-xs mt-1">Code: {error.code}</div>}
-        </div>
+        <Alert variant="error" title="Task not found" description={error.error} className="mt-2">
+          {error.code && <div className="text-xs opacity-60">Code: {error.code}</div>}
+        </Alert>
       );
     }
 

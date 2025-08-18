@@ -4,8 +4,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
-import Badge from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances, type CatalogProvider } from './ProviderInstanceProvider';
 
@@ -120,6 +120,7 @@ export function AddInstanceModal({
           title="Error"
           description={error || submitError || undefined}
           className="mb-4"
+          onDismiss={() => setSubmitError(null)}
         />
       )}
 

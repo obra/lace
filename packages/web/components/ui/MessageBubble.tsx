@@ -1,8 +1,6 @@
 import React from 'react';
 import { ReactNode } from 'react';
-import Avatar from './Avatar';
-import Badge from './Badge';
-import StatusDot from './StatusDot';
+import { Avatar, Badge, StatusDot } from '@/components/ui';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';

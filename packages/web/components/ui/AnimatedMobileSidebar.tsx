@@ -141,7 +141,7 @@ export function AnimatedMobileSidebar({
                 transition={springConfig.gentle}
               >
                 <motion.div
-                  className="w-8 h-8 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary))]/80 rounded-lg flex items-center justify-center overflow-hidden relative shadow-lg"
+                  className="w-8 h-8 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary)/0.8)] rounded-lg flex items-center justify-center overflow-hidden relative shadow-lg"
                   whileHover={{
                     rotate: 360,
                     transition: { duration: 0.8, ease: 'easeInOut' },

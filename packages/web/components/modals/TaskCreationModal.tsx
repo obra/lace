@@ -133,11 +133,11 @@ export function TaskCreationModal({
   const getPriorityBorderColor = (priority: TaskPriority) => {
     switch (priority) {
       case 'high':
-        return 'rgb(var(--fallback-er, oklch(65.69% 0.199 27.33)))'; // DaisyUI error
+        return 'oklch(var(--er, 65.69% 0.199 27.33))'; // DaisyUI error
       case 'medium':
-        return 'rgb(var(--fallback-wa, oklch(84.71% 0.199 83.87)))'; // DaisyUI warning
+        return 'oklch(var(--wa, 84.71% 0.199 83.87))'; // DaisyUI warning
       case 'low':
-        return 'rgb(var(--fallback-su, oklch(64.8% 0.150 160)))'; // DaisyUI success
+        return 'oklch(var(--su, 64.8% 0.150 160))'; // DaisyUI success
       default:
         return 'rgb(156, 163, 175)'; // neutral gray
     }

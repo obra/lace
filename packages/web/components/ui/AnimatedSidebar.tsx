@@ -104,7 +104,7 @@ export function AnimatedSidebar({
         >
           {/* Logo */}
           <motion.div
-            className="w-10 h-10 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary))]/80 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
+            className="w-10 h-10 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary)/0.8)] rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
             variants={popIn}
             whileHover={{
               scale: 1.1,
@@ -229,7 +229,7 @@ export function AnimatedSidebar({
               transition={springConfig.gentle}
             >
               <motion.div
-                className="w-8 h-8 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary))]/80 rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
+                className="w-8 h-8 bg-gradient-to-br from-[rgb(var(--user-primary))] to-[rgb(var(--user-primary)/0.8)] rounded-lg flex items-center justify-center shadow-lg overflow-hidden relative"
                 whileHover={{
                   rotate: 360,
                   transition: { duration: 0.8, ease: 'easeInOut' },

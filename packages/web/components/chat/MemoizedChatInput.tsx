@@ -67,8 +67,8 @@ const CustomChatInput = memo(function CustomChatInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
-  onInterrupt?: () => void;
+  onSubmit: () => void | Promise<void>;
+  onInterrupt?: () => void | Promise<boolean | void>;
   disabled: boolean;
   isStreaming?: boolean;
   placeholder: string;
@@ -93,10 +93,10 @@ const CustomChatInput = memo(function CustomChatInput({
       {/* Bottom Status Area */}
       <div className="flex justify-between items-center text-xs text-base-content/40 min-h-[16px]">
         {/* Left side - Status messages */}
-        <div className="flex-1">
+        <div className="flex-1" aria-live="polite" aria-atomic="true">
           {speechError ? (
-            <div className="flex items-center gap-2 text-red-600">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <div className="flex items-center gap-2 text-error">
+              <div className="w-2 h-2 bg-error rounded-full"></div>
               <span>Speech error</span>
             </div>
           ) : isListening ? (
@@ -105,8 +105,8 @@ const CustomChatInput = memo(function CustomChatInput({
               <span>Listening...</span>
             </div>
           ) : isStreaming ? (
-            <div className="flex items-center gap-2 text-amber-600">
-              <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+            <div className="flex items-center gap-2 text-warning">
+              <div className="w-2 h-2 bg-warning rounded-full animate-pulse"></div>
               <span>Agent is responding...</span>
             </div>
           ) : disabled ? (

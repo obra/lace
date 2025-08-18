@@ -2,8 +2,7 @@ import React from 'react';
 import { ReactNode, MouseEvent } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import Badge from './Badge';
-import StatusDot from './StatusDot';
+import { Badge, StatusDot } from '@/components/ui';
 
 interface NavigationItemProps {
   icon?: IconDefinition;

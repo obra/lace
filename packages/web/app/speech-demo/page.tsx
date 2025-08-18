@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { NativeSpeechInput, useSpeechRecognition } from '@/components/ui';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { Alert } from '@/components/ui/Alert';
 
 export default function SpeechDemoPage() {
   const [messages, setMessages] = useState<string[]>([]);
@@ -123,13 +124,13 @@ export default function SpeechDemoPage() {
 
             {/* Error Display */}
             {error && (
-              <div className="bg-error/10 border border-error/20 rounded-lg p-4 mb-4">
-                <div className="text-sm font-medium text-error mb-2">Speech Recognition Error:</div>
-                <div className="text-error/80">{error}</div>
-                <button className="btn btn-sm btn-outline btn-error mt-2" onClick={clearError}>
-                  Dismiss
-                </button>
-              </div>
+              <Alert
+                variant="error"
+                title="Speech Recognition Error"
+                description={error}
+                onDismiss={clearError}
+                className="mb-4"
+              />
             )}
           </div>
         </div>

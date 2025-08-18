@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Badge from '@/components/ui/Badge';
 import StatusDot from '@/components/ui/StatusDot';
 import { Alert } from '@/components/ui/Alert';
-import { useProviderInstances } from './ProviderInstanceProvider';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 interface Model {
   id: string;

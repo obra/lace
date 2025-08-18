@@ -34,7 +34,7 @@ export default function SentryTestPage() {
           Trigger Client Error
         </button>
 
-        <button onClick={triggerServerError} className="btn btn-warning">
+        <button onClick={() => void triggerServerError()} className="btn btn-warning">
           Trigger Server Error
         </button>
 

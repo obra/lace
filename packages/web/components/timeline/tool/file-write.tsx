@@ -7,7 +7,7 @@ import React from 'react';
 import { faFileEdit, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileRenderer from '@/components/ui/FileRenderer';
-import type { ToolRenderer, ToolResult } from './types';
+import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import { Alert } from '@/components/ui/Alert';
 

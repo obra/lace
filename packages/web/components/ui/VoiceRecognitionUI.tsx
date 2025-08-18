@@ -52,9 +52,9 @@ export function VoiceRecognitionUI({
   }, [isListening]);
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600';
-    if (confidence >= 0.6) return 'text-yellow-600';
-    return 'text-red-600';
+    if (confidence >= 0.8) return 'text-success';
+    if (confidence >= 0.6) return 'text-warning';
+    return 'text-error';
   };
 
   const handleToggleListening = () => {
@@ -75,7 +75,7 @@ export function VoiceRecognitionUI({
             relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200
             ${
               isListening
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg scale-110'
+                ? 'bg-error hover:bg-error-focus text-error-content shadow-lg scale-110'
                 : 'bg-primary hover:bg-primary-focus text-primary-content shadow-md hover:scale-105'
             }
           `}
@@ -85,8 +85,8 @@ export function VoiceRecognitionUI({
             <>
               <FontAwesomeIcon icon={faTimes} className="w-6 h-6" />
               {/* Pulsing ring animation */}
-              <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-25"></div>
-              <div className="absolute inset-2 rounded-full bg-red-400 animate-pulse opacity-50"></div>
+              <div className="absolute inset-0 rounded-full bg-error animate-ping opacity-25"></div>
+              <div className="absolute inset-2 rounded-full bg-error animate-pulse opacity-50"></div>
             </>
           ) : (
             <FontAwesomeIcon icon={faMicrophone} className="w-6 h-6" />
@@ -116,14 +116,14 @@ export function VoiceRecognitionUI({
             <span className="text-sm text-base-content/60">Level:</span>
             <div className="w-32 h-2 bg-base-300 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-green-500 to-red-500 transition-all duration-100"
+                className="h-full bg-gradient-to-r from-success to-error transition-all duration-100"
                 style={{ width: `${audioLevel}%` }}
               />
             </div>
           </div>
 
           {/* Status text */}
-          <div className="text-center">
+          <div className="text-center" aria-live="polite">
             <div className="text-sm font-medium text-base-content animate-pulse">Listening...</div>
             <div className="text-xs text-base-content/60 mt-1">Tap the microphone to stop</div>
           </div>
@@ -163,8 +163,12 @@ export function VoiceRecognitionUI({
 
       {/* Error display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <div className="text-sm text-red-800">
+        <div
+          className="bg-error/10 border border-error/20 rounded-lg p-3"
+          aria-live="assertive"
+          role="alert"
+        >
+          <div className="text-sm text-error">
             <strong>Voice Recognition Error:</strong> {error}
           </div>
         </div>
@@ -211,7 +215,7 @@ export function CompactVoiceButton({
 
   const getVariantClasses = () => {
     if (isListening) {
-      return 'bg-red-500 hover:bg-red-600 text-white';
+      return 'bg-error hover:bg-error-focus text-error-content';
     }
 
     switch (variant) {

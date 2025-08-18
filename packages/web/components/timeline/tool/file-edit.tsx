@@ -11,7 +11,7 @@ import {
   createFileDiffFromText,
   detectLanguageFromPath,
 } from '@/components/files/FileDiffViewer.utils';
-import type { ToolRenderer, ToolResult } from './types';
+import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { FileEditDiffContext } from '@/types/core';
 import { Alert } from '@/components/ui/Alert';

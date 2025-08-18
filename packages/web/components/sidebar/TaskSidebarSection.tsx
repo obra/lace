@@ -12,7 +12,7 @@ import { useTaskContext } from '@/components/providers/TaskProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import type { SessionInfo, ThreadId, Task } from '@/types/core';
+import type { Task } from '@/types/core';
 
 interface TaskSidebarSectionProps {
   onCloseMobileNav?: () => void;

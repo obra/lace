@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { faTerminal } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer, ToolResult } from './types';
+import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import { Alert } from '@/components/ui/Alert';
 
 /**

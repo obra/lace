@@ -2,7 +2,7 @@
 // ABOUTME: Maps model names like 'claude', 'gpt-4', 'gemini' to appropriate badge variants
 
 import React from 'react';
-import Badge from './Badge';
+import { Badge } from '@/components/ui';
 
 interface LLMModelBadgeProps {
   model: string;

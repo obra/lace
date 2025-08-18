@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef, Children, cloneElement, isValidElement } from 'react';
+import React, { useState, useRef, Children, isValidElement } from 'react';
 
 interface TabConfig {
   id: string;

@@ -162,7 +162,7 @@ describe('MemoizedChatInput', () => {
     render(<MemoizedChatInput {...defaultProps} isStreaming={true} />);
 
     expect(screen.getByText('Agent is responding...')).toBeInTheDocument();
-    expect(screen.getByText('Agent is responding...').closest('div')).toHaveClass('text-amber-600');
+    expect(screen.getByText('Agent is responding...').closest('div')).toHaveClass('text-warning');
   });
 
   it('shows tool running status when disabled is true', () => {
