@@ -9,7 +9,7 @@ import {
   EventStreamProvider,
   useEventStream,
   useSessionEvents,
-  useSessionAPI,
+  useAgentAPI,
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import type { ReactNode } from 'react';
@@ -17,23 +17,27 @@ import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { PendingApproval } from '@/types/api';
 import type { StreamConnection } from '@/types/stream-events';
-import type { UseSessionEventsReturn } from '@/hooks/useSessionEvents';
+import type { UseAgentEventsReturn } from '@/hooks/useAgentEvents';
 import type { UseEventStreamResult } from '@/hooks/useEventStream';
 import type { UseSessionAPIReturn } from '@/hooks/useSessionAPI';
+import type { UseAgentAPIReturn } from '@/hooks/useAgentAPI';
 
 // Mock all dependencies
-vi.mock('@/hooks/useSessionEvents');
+vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
+vi.mock('@/hooks/useAgentAPI');
 
 // Import and type the mocked hooks
-import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';
+import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
+import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
 
-const mockUseSessionEvents = useSessionEventsHook as MockedFunction<() => UseSessionEventsReturn>;
+const mockUseAgentEvents = useAgentEventsHook as MockedFunction<() => UseAgentEventsReturn>;
 const mockUseEventStream = useEventStreamHook as MockedFunction<() => UseEventStreamResult>;
 const mockUseSessionAPI = useSessionAPIHook as MockedFunction<() => UseSessionAPIReturn>;
+const mockUseAgentAPI = useAgentAPIHook as MockedFunction<() => UseAgentAPIReturn>;
 
 describe('EventStreamProvider', () => {
   // Mock fetch globally
@@ -84,12 +88,11 @@ describe('EventStreamProvider', () => {
     });
 
     // Set up default mock return values
-    const mockSessionEventsReturn: UseSessionEventsReturn = {
-      allEvents: [],
-      filteredEvents: [],
+    const mockAgentEventsReturn: UseAgentEventsReturn = {
+      events: [],
       loadingHistory: false,
       connected: false,
-      addSessionEvent: vi.fn(),
+      addAgentEvent: vi.fn(),
     };
 
     const mockEventStreamReturn: UseEventStreamResult = {
@@ -110,13 +113,18 @@ describe('EventStreamProvider', () => {
       getSession: vi.fn(),
       spawnAgent: vi.fn(),
       listAgents: vi.fn(),
+    };
+
+    const mockAgentAPIReturn: UseAgentAPIReturn = {
+      error: null,
       sendMessage: vi.fn(),
       stopAgent: vi.fn(),
     };
 
-    mockUseSessionEvents.mockReturnValue(mockSessionEventsReturn);
+    mockUseAgentEvents.mockReturnValue(mockAgentEventsReturn);
     mockUseEventStream.mockReturnValue(mockEventStreamReturn);
     mockUseSessionAPI.mockReturnValue(mockSessionAPIReturn);
+    mockUseAgentAPI.mockReturnValue(mockAgentAPIReturn);
   });
 
   it('provides event stream context to children', async () => {
@@ -144,11 +152,11 @@ describe('EventStreamProvider', () => {
     expect(result.current).toBeDefined();
     expect(result.current.events).toBeDefined();
     expect(result.current.loadingHistory).toBeDefined();
-    expect(result.current.addSessionEvent).toBeDefined();
+    expect(result.current.addAgentEvent).toBeDefined();
   });
 
-  it('provides session API context to children', async () => {
-    const { result } = renderHook(() => useSessionAPI(), { wrapper });
+  it('provides agent API context to children', async () => {
+    const { result } = renderHook(() => useAgentAPI(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -172,15 +180,14 @@ describe('EventStreamProvider', () => {
       },
     ];
 
-    const mockSessionEventsWithData: UseSessionEventsReturn = {
-      allEvents: mockEvents,
-      filteredEvents: mockEvents,
+    const mockAgentEventsWithData: UseAgentEventsReturn = {
+      events: mockEvents,
       loadingHistory: false,
       connected: false,
-      addSessionEvent: vi.fn(),
+      addAgentEvent: vi.fn(),
     };
 
-    mockUseSessionEvents.mockReturnValue(mockSessionEventsWithData);
+    mockUseAgentEvents.mockReturnValue(mockAgentEventsWithData);
 
     const { result } = renderHook(() => useSessionEvents(), { wrapper });
 
@@ -219,23 +226,19 @@ describe('EventStreamProvider', () => {
     expect(result.current.sendCount).toBe(5);
   });
 
-  it('exposes session API methods', async () => {
+  it('exposes agent API methods', async () => {
     const mockSendMessage = vi.fn();
     const mockStopAgent = vi.fn();
 
-    const mockSessionAPIWithMethods: UseSessionAPIReturn = {
+    const mockAgentAPIWithMethods: UseAgentAPIReturn = {
       error: null,
-      createSession: vi.fn(),
-      getSession: vi.fn(),
-      spawnAgent: vi.fn(),
-      listAgents: vi.fn(),
       sendMessage: mockSendMessage,
       stopAgent: mockStopAgent,
     };
 
-    mockUseSessionAPI.mockReturnValue(mockSessionAPIWithMethods);
+    mockUseAgentAPI.mockReturnValue(mockAgentAPIWithMethods);
 
-    const { result } = renderHook(() => useSessionAPI(), { wrapper });
+    const { result } = renderHook(() => useAgentAPI(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -252,7 +255,7 @@ describe('EventStreamProvider', () => {
       // Wait for any async effects to complete
     });
 
-    expect(mockUseSessionEvents).toHaveBeenCalledWith('test-session', 'test-agent', false);
+    expect(mockUseAgentEvents).toHaveBeenCalledWith('test-agent', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
       sessionId: 'test-session',
@@ -282,8 +285,8 @@ describe('EventStreamProvider', () => {
     }).toThrow('useSessionEvents must be used within EventStreamProvider');
 
     expect(() => {
-      renderHook(() => useSessionAPI());
-    }).toThrow('useSessionAPI must be used within EventStreamProvider');
+      renderHook(() => useAgentAPI());
+    }).toThrow('useAgentAPI must be used within EventStreamProvider');
 
     // Verify React error boundary logging occurred (these are expected)
     expect(consoleSpy).toHaveBeenCalled();
@@ -301,7 +304,7 @@ describe('EventStreamProvider', () => {
     });
 
     // Verify initial calls are made with correct parameters
-    expect(mockUseSessionEvents).toHaveBeenCalledWith('test-session', 'test-agent', false);
+    expect(mockUseAgentEvents).toHaveBeenCalledWith('test-agent', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
       sessionId: 'test-session',

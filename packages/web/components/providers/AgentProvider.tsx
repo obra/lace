@@ -124,6 +124,7 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
     if (sessionId && sessionDetails && !selectedAgent && hasAutoSelectedRef.current !== sessionId) {
       // Coordinator agent has the same threadId as the sessionId
       const coordinatorAgent = sessionDetails.agents?.find((agent) => agent.threadId === sessionId);
+
       if (coordinatorAgent) {
         selectAgent(coordinatorAgent.threadId);
         hasAutoSelectedRef.current = sessionId;

@@ -6,7 +6,7 @@
 import React, { memo, useCallback } from 'react';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
-import { useSessionEvents, useSessionAPI } from '@/components/providers/EventStreamProvider';
+import { useSessionEvents, useAgentAPI } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
@@ -14,7 +14,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
   const { events } = useSessionEvents();
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
-  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useSessionAPI();
+  const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
 
   const agents = sessionDetails?.agents;
 

@@ -91,9 +91,9 @@ export function useSessionEvents(
 
   // Connection state is now managed by parent
 
-  // Load historical events when session changes
+  // Load historical events when session or selected agent changes
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId || !selectedAgent) {
       seenEvents.current.clear();
       setEvents([]);
       setLoadingHistory(false);
@@ -103,7 +103,7 @@ export function useSessionEvents(
     setLoadingHistory(true);
     const controller = new AbortController();
 
-    void fetch(`/api/sessions/${sessionId}/history`, { signal: controller.signal })
+    void fetch(`/api/threads/${selectedAgent}/history`, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${await res.text()}`);

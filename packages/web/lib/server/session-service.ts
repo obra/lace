@@ -293,6 +293,20 @@ export class SessionService {
               agentId: undefined,
             },
           });
+        } else if (event.type === 'USER_MESSAGE') {
+          // Broadcast user messages to UI (agent messages handled via agent_response_complete)
+          sseManager.broadcast({
+            type: 'USER_MESSAGE',
+            threadId: asThreadId(eventThreadId),
+            timestamp: new Date(event.timestamp || new Date()),
+            data: event.data,
+            context: {
+              sessionId,
+              projectId: undefined,
+              taskId: undefined,
+              agentId: undefined,
+            },
+          });
         }
       }
     );

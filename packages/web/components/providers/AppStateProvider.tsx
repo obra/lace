@@ -43,6 +43,7 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   const hashRouter = useHashRouter();
 
   // Create context value with proper memoization
+  // Fix: Use hashRouter object directly as dependency to catch all state changes
   const contextValue: AppStateContextType = useMemo(() => {
     return {
       selections: {
@@ -61,17 +62,7 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
         clearAll: hashRouter.clearAll,
       },
     };
-  }, [
-    hashRouter.project,
-    hashRouter.session,
-    hashRouter.agent,
-    hashRouter.isHydrated,
-    hashRouter.setProject,
-    hashRouter.setSession,
-    hashRouter.setAgent,
-    hashRouter.updateState,
-    hashRouter.clearAll,
-  ]);
+  }, [hashRouter]); // FIXED: Depend on the entire hashRouter object
 
   return <AppStateContext.Provider value={contextValue}>{children}</AppStateContext.Provider>;
 }

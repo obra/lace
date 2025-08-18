@@ -90,7 +90,18 @@ export function useHashRouter() {
       } else {
         // Validate that agent is a valid ThreadId
         if (isValidThreadId(agent)) {
-          updateState({ agent }, replace);
+          // CRITICAL: Get current project/session from URL directly to avoid stale state
+          // The React state might not be updated yet, but the URL is the source of truth
+          const currentUrlState = getCurrentState();
+
+          updateState(
+            {
+              project: currentUrlState.project,
+              session: currentUrlState.session,
+              agent,
+            },
+            replace
+          );
         } else {
           console.warn(`Invalid agent ID format: ${agent}`);
           updateState({ agent: undefined }, replace);
